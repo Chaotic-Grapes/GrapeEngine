@@ -7,7 +7,7 @@
 // TODO: Implement GetSystem(std::string)?
 namespace Engine {
     class Engine {
-    public:
+public:
         Engine();
         ~Engine() = default;
 
@@ -16,7 +16,7 @@ namespace Engine {
 
         /// Destroys all attached systems
         void DestroySystems() const;
-
+    
         /// Updates all attached systems
         void Update();
 
@@ -32,7 +32,7 @@ namespace Engine {
 
         /// Flag to check if engine is still running
         bool IsRunning;
-    };
+};
 
     extern Engine* CORE;
 }

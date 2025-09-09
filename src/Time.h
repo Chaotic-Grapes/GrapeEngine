@@ -17,7 +17,7 @@ public:
 private:
     static std::chrono::high_resolution_clock::time_point StartTime;
     static std::chrono::high_resolution_clock::time_point LastFrameTime;
-
+    
     static float Dt;
     static float FixedDt;
     static float TimeElapsed;

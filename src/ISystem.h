@@ -5,9 +5,9 @@
 
 namespace Engine {
     class ISystem {
-    public:
+public:
         virtual ~ISystem() = default;
-
+    
         /// Called when attaching to the engine
         virtual void Initialize() = 0;
 
@@ -16,6 +16,6 @@ namespace Engine {
 
         /// A string name for debugging
         virtual std::string Name() const = 0;
-    };
+};
 }
 #endif // ISYSTEM_H
