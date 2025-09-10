@@ -18,7 +18,7 @@ public:
         void DestroySystems() const;
     
         /// Updates all attached systems
-        void Update();
+        void Update() const;
 
         /// Initialize engine and its systems.
         /// This must be called after AttachSystem()
