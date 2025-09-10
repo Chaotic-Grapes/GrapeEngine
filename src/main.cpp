@@ -13,8 +13,10 @@ int main() {
                   height = 480;
 
     GLFWwindow* window = glfwCreateWindow(width, height, "GrapeEngine", NULL, NULL);
-    if (window == NULL) {
+    if (!window) {
         std::cout << "Failed to create GLFW window" << '\n';
+        glfwTerminate();
+        return -1;
     }
     glfwMakeContextCurrent(window);
     gladLoadGL();
@@ -22,6 +24,7 @@ int main() {
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        glfwSwapBuffers(window);
     }
 
     glfwDestroyWindow(window);
