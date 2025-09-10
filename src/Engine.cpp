@@ -7,9 +7,6 @@ namespace Engine {
 
     Engine::Engine() {
         Time::Initialize();
-        
-        LastTime = 0;
-        IsRunning = true;
         CORE = this;
     }
 
@@ -18,17 +15,29 @@ namespace Engine {
             system->Initialize();
     }
 
+    void Engine::Run() {
+        if (!MainWindow.Create("GrapeEngine", 1280, 720))
+            return;
+
+        while (!MainWindow.ShouldClose()) {
+            MainWindow.PollEvents();
+            Update();
+            MainWindow.SwapBuffers();
+		}
+
+        MainWindow.Destroy();
+    }
+
     void Engine::AttachSystem(ISystem* system) {
         Systems.push_back(system);
     }
 
-    void Engine::Update() {
+    void Engine::Update() const {
         Time::Update();
 
         for (const auto& system : Systems)
             system->Update();
     }
-
 
     void Engine::DestroySystems() const {
         for (const auto& system : Systems)
