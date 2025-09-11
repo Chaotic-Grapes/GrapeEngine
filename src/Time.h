@@ -16,7 +16,7 @@ public:
 
     /// Debug name
     std::string Name() const override;
-    
+
     static float DeltaTime();
     static float UnscaledDeltaTime();
     static float FixedDeltaTime();
@@ -29,14 +29,14 @@ public:
     static float MaximumDeltaTime();
     
 private:
-    static std::chrono::high_resolution_clock::time_point StartTime;
-    static std::chrono::high_resolution_clock::time_point LastFrameTime;
+    static std::chrono::high_resolution_clock::time_point m_startTime;
+    static std::chrono::high_resolution_clock::time_point m_lastFrameTime;
     
-    static float Dt;
-    static float FixedDt;
-    static float TimeElapsed;
-    static float TimeScaling;
-    static int   FrameCounter;
-    static float MaximumDt;
+    static float m_deltaTime;
+    static float m_fixedDeltaTime;
+    static float m_timeElapsed;
+    static float m_timeScale;
+    static int   m_frameCounter;
+    static float m_maximumDeltaTime;
 };
 #endif // TIME_H

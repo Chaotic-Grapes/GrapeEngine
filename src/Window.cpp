@@ -4,9 +4,9 @@
 Window::~Window() { Destroy(); }
 
 bool Window::Create(const std::string& title, const int width, const int height, GLFWmonitor* monitor) {
-	this->WindowWidth = width;
-	this->WindowHeight = height;
-	this->WindowTitle = title;
+	this->m_width = width;
+	this->m_height = height;
+	this->m_title = title;
 
 	if (!glfwInit()) {
 		// Log: "Failed to initialize GLFW";
@@ -17,17 +17,17 @@ bool Window::Create(const std::string& title, const int width, const int height,
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	WindowHandle = glfwCreateWindow(width, height, title.c_str(), monitor, nullptr);
+	m_windowHandle = glfwCreateWindow(width, height, title.c_str(), monitor, nullptr);
 
-	if (!WindowHandle) {
+	if (!m_windowHandle) {
 		// Log: "Failed to create GLFW window";
 		glfwTerminate();
 		return false;
 	}
-	glfwMakeContextCurrent(WindowHandle);
+	glfwMakeContextCurrent(m_windowHandle);
 	if (!gladLoadGL()) {
 		// Log: "Failed to initialize GLAD";
-		glfwDestroyWindow(WindowHandle);
+		glfwDestroyWindow(m_windowHandle);
 		glfwTerminate();
 		return false;
 	}
@@ -36,17 +36,17 @@ bool Window::Create(const std::string& title, const int width, const int height,
 }
 
 void Window::Destroy() {
-	if (WindowHandle) {
-		glfwDestroyWindow(WindowHandle);
-		WindowHandle = nullptr;
+	if (m_windowHandle) {
+		glfwDestroyWindow(m_windowHandle);
+		m_windowHandle = nullptr;
 		glfwTerminate();
 	}
 }
 
-GLFWwindow* Window::GetWindow() const { return WindowHandle; }
-int Window::Width()				const { return WindowWidth; }
-int Window::Height()			const { return WindowHeight; }
+GLFWwindow* Window::GetWindow() const { return m_windowHandle; }
+int Window::Width()				const { return m_width; }
+int Window::Height()			const { return m_height; }
 void Window::PollEvents()		const { glfwPollEvents(); }
-void Window::SwapBuffers()		const { glfwSwapBuffers(WindowHandle); }
-bool Window::ShouldClose()		const { return WindowHandle && glfwWindowShouldClose(WindowHandle); }
-void Window::Close()			const { glfwSetWindowShouldClose(WindowHandle, true); }
+void Window::SwapBuffers()		const { glfwSwapBuffers(m_windowHandle); }
+bool Window::ShouldClose()		const { return m_windowHandle && glfwWindowShouldClose(m_windowHandle); }
+void Window::Close()			const { glfwSetWindowShouldClose(m_windowHandle, true); }

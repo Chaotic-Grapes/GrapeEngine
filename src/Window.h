@@ -25,10 +25,10 @@ public:
 	GLFWwindow* GetWindow() const;
 
 private:
-	GLFWwindow* WindowHandle = nullptr;
-	int WindowWidth = 0;
-	int WindowHeight = 0;
-	std::string WindowTitle;
+	GLFWwindow* m_windowHandle = nullptr;
+	int m_width = 0;
+	int m_height = 0;
+	std::string m_title;
 };
 
 #endif // WINDOW_H

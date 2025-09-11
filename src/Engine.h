@@ -29,10 +29,10 @@ public:
         void Run();
     private:
         /// Systems currently attached to the Engine
-        std::vector<ISystem*> Systems;
+        std::vector<ISystem*> m_systems;
 
 		/// The main window of the engine
-        Window MainWindow;
+        Window m_mainWindow;
 };
 
     extern Engine* CORE;
