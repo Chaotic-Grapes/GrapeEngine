@@ -16,6 +16,19 @@ namespace Engine {
             system->Initialize();
     }
 
+    void Engine::Run() {
+        if (!MainWindow.Create("GrapeEngine", 1280, 720))
+            return;
+
+        while (!MainWindow.ShouldClose()) {
+            MainWindow.PollEvents();
+            Update();
+            MainWindow.SwapBuffers();
+		}
+
+        MainWindow.Destroy();
+    }
+
     void Engine::AttachSystem(ISystem* system) {
         Systems.push_back(system);
     }

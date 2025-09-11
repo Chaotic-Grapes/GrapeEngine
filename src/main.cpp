@@ -1,30 +1,11 @@
-﻿#include <iostream>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+﻿#include "Engine.h"
+#include "Time.h"
 
 int main() {
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	auto* engine = new Engine::Engine();
 
-    // Placeholder
-    constexpr int width = 640,
-                  height = 480;
+	engine->Initialize();
+    engine->Run();
 
-    GLFWwindow* window = glfwCreateWindow(width, height, "GrapeEngine", NULL, NULL);
-    if (window == NULL) {
-        std::cout << "Failed to create GLFW window" << '\n';
-    }
-    glfwMakeContextCurrent(window);
-    gladLoadGL();
-    glViewport(0, 0, width, height);
-
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-    }
-
-    glfwDestroyWindow(window);
-    glfwTerminate();
     return 0;
 }
