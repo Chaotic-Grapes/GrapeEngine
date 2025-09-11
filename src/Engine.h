@@ -2,8 +2,10 @@
 #define ENGINE_H
 
 #include <vector>
+#include <memory>
 #include "ISystem.h"
 #include "Window.h"
+#include "../include/graphics/renderer.hpp"
 
 // TODO: Implement GetSystem(std::string)?
 namespace Engine {
@@ -33,6 +35,8 @@ public:
 
 		/// The main window of the engine
         Window m_mainWindow;
+
+        std::unique_ptr<Renderer> m_renderer; // RAII renderer owned by engine
 };
 
     extern Engine* CORE;
