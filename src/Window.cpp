@@ -50,3 +50,8 @@ void Window::PollEvents()		const { glfwPollEvents(); }
 void Window::SwapBuffers()		const { glfwSwapBuffers(m_windowHandle); }
 bool Window::ShouldClose()		const { return m_windowHandle && glfwWindowShouldClose(m_windowHandle); }
 void Window::Close()			const { glfwSetWindowShouldClose(m_windowHandle, true); }
+
+bool Window::IsFocused()		const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_FOCUSED); }
+bool Window::IsMinimized()		const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_ICONIFIED); }
+bool Window::IsMaximized()		const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_MAXIMIZED); }
+bool Window::IsVisible()		const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_VISIBLE); }

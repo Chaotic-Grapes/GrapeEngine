@@ -5,8 +5,9 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-class Window
-{
+// Todo: Borderless, Fullscreen etc
+// Borderless: glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+class Window {
 public:
 	Window() = default;
 	~Window();
@@ -21,6 +22,11 @@ public:
 
 	int Width() const;
 	int Height() const;
+
+	bool IsFocused() const;
+	bool IsMinimized() const;
+	bool IsMaximized() const;
+	bool IsVisible() const;
 
 	GLFWwindow* GetWindow() const;
 
