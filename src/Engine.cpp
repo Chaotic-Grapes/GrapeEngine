@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "Time.h"
 #include <iostream>
+#include "GLHelper.h"
 
 namespace Engine {
     /// Global pointer to the core engine
@@ -27,6 +28,10 @@ namespace Engine {
             std::cerr << "Failed to initialize GLAD" << std::endl;
             return;
         }
+
+    #ifdef _DEBUG
+        GLHelper::PrintSpecs();
+    #endif
 
         m_renderer = std::make_unique<Renderer>(1000); // ctor runs after context creation
 
