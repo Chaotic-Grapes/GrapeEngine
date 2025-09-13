@@ -9,8 +9,9 @@ namespace Engine {
 
     void PhysicsSystem::Update() {
 
-        m_accumulator += Time::DeltaTime();
+        m_accumulator += Time::DeltaTime(); // accumulate time from last frame
 
+        // fixed time physics update
         while (m_accumulator >= m_fixedTimestep) {
             FixedUpdate();
             m_accumulator -= m_fixedTimestep;
@@ -23,7 +24,11 @@ namespace Engine {
         for (auto& component : m_entities) {
             if (!component) continue;
 
+            // applies damping to velocity like basic resistance
+            // when damping = 1.0, no slowdown. when damping = 0.0, instantly stops
             component->velocity *= component->damping;
+
+            // integrates position to move based on current velocity
             component->position += component->velocity * fixedDt;
 
         }
