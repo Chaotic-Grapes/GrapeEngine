@@ -158,6 +158,7 @@
   <ItemGroup>
     <ClInclude Include="src\Engine.h" />
     <ClInclude Include="src\ISystem.h" />
+    <ClInclude Include="src\Logger.h" />
     <ClInclude Include="src\Time.h" />
     <ClInclude Include="src\Window.h" />
   </ItemGroup>
