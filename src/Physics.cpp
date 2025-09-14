@@ -1,11 +1,13 @@
 #include "Physics.h"
 #include <iostream>
-#include <cstdio>
 
 namespace Engine {
 
+    // initialize gravity
+    glm::vec3 PhysicsSystem::m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
+
     void PhysicsSystem::Initialize() {
-        std::cout << "Physics System Initialized - Linear Velocity & Damping Only" << std::endl; // placeholder for now
+        std::cout << "Physics System Initialized" << std::endl; // placeholder for now
     }
 
     void PhysicsSystem::Update() {
@@ -13,9 +15,9 @@ namespace Engine {
         m_accumulator += Time::DeltaTime(); // accumulate time from last frame
 
         // fixed time physics update
-        while (m_accumulator >= m_fixedTimestep) {
+        while (m_accumulator >= Time::FixedDeltaTime()) {
             FixedUpdate();
-            m_accumulator -= m_fixedTimestep;
+            m_accumulator -= Time::FixedDeltaTime();
         }
     }
 
@@ -25,14 +27,45 @@ namespace Engine {
         for (auto& component : m_entities) {
             if (!component) continue;
 
+            // this resets acceleration each frame!!! (Only applied forces)
+            component->acceleration = glm::vec3(0.0f, 0.0f, 0.0f);
+
+            // apply gravity if enabled
+            if (component->useGravity) {
+                component->acceleration += m_gravity;
+            }
+
             // applies damping to velocity like basic resistance
             // when damping = 1.0, no slowdown. when damping = 0.0, instantly stops
             component->velocity *= component->damping;
 
-            // integrates position to move based on current velocity
-            component->position += component->velocity * fixedDt;
+            // integrates acceleration into velocity (a = F/m)
+            component->velocity += component->acceleration * fixedDt;
 
+            // integrates velocity into position
+            component->position += component->velocity * fixedDt;
         }
+    }
+
+    void PhysicsSystem::ApplyForce(PhysicsComponent* component, const glm::vec3& force) {
+        if (component) {
+            component->acceleration += force / component->mass;
+        }
+    }
+
+    void PhysicsSystem::ApplyImpulse(PhysicsComponent* component, const glm::vec3& impulse) {
+        if (component) {
+            component->velocity += impulse / component->mass;
+        }
+    }
+
+    void PhysicsSystem::SetGravity(const glm::vec3& gravity) {
+        m_gravity = gravity;
+    }
+
+    // get current global gravity
+    glm::vec3 PhysicsSystem::GetGravity() {
+        return m_gravity;
     }
 
     void PhysicsSystem::AddEntity(PhysicsComponent* component) {

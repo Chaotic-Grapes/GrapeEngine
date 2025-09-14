@@ -11,12 +11,19 @@ namespace Engine {
     struct PhysicsComponent {
         glm::vec3 position;
         glm::vec3 velocity;
-        float damping; // damping range from 0-1, higher means more resistance
+        glm::vec3 acceleration;
+        float damping;
+        float mass;
+        bool useGravity;
 
+        // TEMPORARY INITIALISATION 
         PhysicsComponent()
-            : position(0.0f, 0.0f, 0.0f)    // initialized to 0 for now.
-            , velocity(0.0f, 0.0f, 0.0f)    // initialized to 0 for now.
-            , damping(0.95f)                // initialized to 0.95 for now.
+            : position(0.0f, 0.0f, 0.0f)
+            , velocity(0.0f, 0.0f, 0.0f)
+            , acceleration (0.0f, 0.0f, 0.0f)
+            , damping(0.98f)                        // damping range from 0-1, higher means more resistance
+            , mass(1.0f)
+            , useGravity(true)                      // gravity is on by default
         {}
     };
 
@@ -26,16 +33,24 @@ namespace Engine {
         void Update() override;
         std::string Name() const override { return "Physics"; }
 
+        // Entities
         void AddEntity(PhysicsComponent* component);
         void RemoveEntity(PhysicsComponent* component);
+
+        static void ApplyForce(PhysicsComponent* component, const glm::vec3& force);
+        static void ApplyImpulse(PhysicsComponent* component, const glm::vec3& impulse);
+
+        static void SetGravity(const glm::vec3& gravity);
+        static glm::vec3 GetGravity();
 
     private:
         void FixedUpdate();
 
         std::vector<PhysicsComponent*> m_entities;
 
+        static glm::vec3 m_gravity;
+
         float m_accumulator = 0.0f;
-        const float m_fixedTimestep = 1.0f / 60.0f; //  physics to update every approx 0.0167 seconds
     };
 
 } // namespace Engine
