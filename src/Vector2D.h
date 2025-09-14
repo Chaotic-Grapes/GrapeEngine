@@ -18,11 +18,10 @@ public:
     Vector2D& operator-=(const Vector2D& rhs);
     Vector2D& operator*=(float rhs);
     Vector2D& operator/=(float rhs); // caller must avoid rhs == 0
-
     // Unary minus
     Vector2D operator-() const;
 
-    // Queries
+    // maths
     float Length() const;
     float SquareLength() const;
     float Distance(const Vector2D& other) const;
@@ -32,9 +31,9 @@ public:
 
     // Normalization
     void     Normalize();        // in-place; zero stays (0,0)
-    Vector2D Normalized() const; // returns unit copy
+    Vector2D Normalized() const; // returning unit copyyy
 
-    // Clamp utilities (GLM-backed)
+    // Clamp utilities
     static Vector2D Clamp(const Vector2D& v,
         const Vector2D& lo,
         const Vector2D& hi);

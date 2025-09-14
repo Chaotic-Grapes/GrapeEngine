@@ -1,28 +1,19 @@
 #include "Vector2D.h"
 
-// -------------------------
-// Constructors
-// -------------------------
+
 Vector2D::Vector2D() : x(0.0f), y(0.0f) {}
 Vector2D::Vector2D(float _x, float _y) : x(_x), y(_y) {}
 
-// -------------------------
-// In-place arithmetic
-// -------------------------
+
 Vector2D& Vector2D::operator+=(const Vector2D& rhs) { x += rhs.x; y += rhs.y; return *this; }
 Vector2D& Vector2D::operator-=(const Vector2D& rhs) { x -= rhs.x; y -= rhs.y; return *this; }
 Vector2D& Vector2D::operator*=(float rhs) { x *= rhs;   y *= rhs;   return *this; }
 Vector2D& Vector2D::operator/=(float rhs) { x /= rhs;   y /= rhs;   return *this; } // avoid rhs==0
 
-// -------------------------
-// Unary minus
-// -------------------------
+
 Vector2D Vector2D::operator-() const { return Vector2D(-x, -y); }
 
 
-// -------------------------
-// Queries (GLM-backed)
-// -------------------------
 float Vector2D::SquareLength() const {
     glm::vec2 v(x, y);
     return glm::dot(v, v);
@@ -50,9 +41,6 @@ float Vector2D::CrossProductMag(const Vector2D& other) const {
     return x * other.y - y * other.x;
 }
 
-// -------------------------
-// Normalization
-// -------------------------
 void Vector2D::Normalize() {
     glm::vec2 v(x, y);
     float L2 = glm::dot(v, v);
@@ -69,9 +57,6 @@ Vector2D Vector2D::Normalized() const {
     return Vector2D(n.x, n.y);
 }
 
-// -------------------------
-// Clamp utilities (GLM-backed)
-// -------------------------
 Vector2D Vector2D::Clamp(const Vector2D& v, const Vector2D& lo, const Vector2D& hi) {
     glm::vec2 c = glm::clamp(glm::vec2(v.x, v.y),
         glm::vec2(lo.x, lo.y),
@@ -83,9 +68,6 @@ float Vector2D::ClampFloat(float x, float lo, float hi) {
     return glm::clamp(x, lo, hi);
 }
 
-// -------------------------
-// Free operators
-// -------------------------
 Vector2D operator+(const Vector2D& lhs, const Vector2D& rhs) { return Vector2D(lhs.x + rhs.x, lhs.y + rhs.y); }
 Vector2D operator-(const Vector2D& lhs, const Vector2D& rhs) { return Vector2D(lhs.x - rhs.x, lhs.y - rhs.y); }
 Vector2D operator*(const Vector2D& lhs, float rhs) { return Vector2D(lhs.x * rhs, lhs.y * rhs); }
