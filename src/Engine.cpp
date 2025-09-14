@@ -1,8 +1,9 @@
 ﻿#include "Engine.h"
 #include "Time.h"
+#include "WindowManager.h"
 
 namespace Engine {
-    /// Global pointer to the core engine
+    // Global pointer to the core engine
     Engine* CORE;
 
     Engine::Engine() {
@@ -14,17 +15,24 @@ namespace Engine {
             system->Initialize();
     }
 
-    void Engine::Run() {
-        if (!m_mainWindow.Create("GrapeEngine", 1280, 720))
+    void Engine::Run() const {
+        // WindowManager must be attached
+        if (WindowManager::GetWindows().empty()) {
             return;
-
-        while (!m_mainWindow.ShouldClose()) {
-            m_mainWindow.PollEvents();
+        }
+        
+        while (true) {
             Update();
-            m_mainWindow.SwapBuffers();
+            
+            bool stop = true;
+            for (const auto* win : WindowManager::GetWindows())
+                if (!win->ShouldClose()) {
+                    stop = false;
+                    break;
+                }
+            
+            if (stop) break;
 		}
-
-        m_mainWindow.Destroy();
     }
 
     void Engine::AttachSystem(ISystem* system) {

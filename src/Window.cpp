@@ -3,7 +3,7 @@
 
 Window::~Window() { Destroy(); }
 
-bool Window::Create(const std::string& title, const int width, const int height, GLFWmonitor* monitor) {
+bool Window::Create(const std::string& title, const int width, const int height, GLFWmonitor* monitor, GLFWwindow* parent) {
 	this->m_width = width;
 	this->m_height = height;
 	this->m_title = title;
@@ -16,8 +16,8 @@ bool Window::Create(const std::string& title, const int width, const int height,
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	m_windowHandle = glfwCreateWindow(width, height, title.c_str(), monitor, nullptr);
+	
+	m_windowHandle = glfwCreateWindow(width, height, title.c_str(), monitor, parent);
 
 	if (!m_windowHandle) {
 		// Log: "Failed to create GLFW window";
@@ -43,7 +43,7 @@ void Window::Destroy() {
 	}
 }
 
-GLFWwindow* Window::GetWindow() const { return m_windowHandle; }
+GLFWwindow* Window::Handle()    const { return m_windowHandle; }
 int Window::Width()				const { return m_width; }
 int Window::Height()			const { return m_height; }
 void Window::PollEvents()		const { glfwPollEvents(); }

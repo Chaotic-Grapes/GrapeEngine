@@ -154,12 +154,14 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
+    <ClCompile Include="src\WindowManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Engine.h" />
     <ClInclude Include="src\ISystem.h" />
     <ClInclude Include="src\Time.h" />
     <ClInclude Include="src\Window.h" />
+    <ClInclude Include="src\WindowManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -11,28 +11,44 @@ namespace Engine {
 public:
         Engine();
         ~Engine() = default;
-
-        /// Attaches a system to the engine
+        
+        /**
+         *  @brief Attaches a system to the engine
+         *
+		 *  @param system The system to attach
+         */
         void AttachSystem(ISystem* system);
 
-        /// Destroys all attached systems
+        /**
+         * @brief Destroys all attached systems
+         */
         void DestroySystems() const;
-    
-        /// Updates all attached systems
+
+        /**
+         * @brief Returns the main window of the engine
+         * 
+         * @return Window
+		 */
+        Window MainWindow() const;
+
+        /**
+		 * @brief Ticks all attached systems and others as needed
+         */
         void Update() const;
 
-        /// Initialize engine and its systems.
-        /// This must be called after AttachSystem()
+        /**
+         * @brief Initializes engine and all attached systems. <br>
+         *        Must be called after AttachSystem()
+		 */
         void Initialize() const;
 
-        /// Start the engine
-        void Run();
+        /**
+         * @brief Starts the engine
+         */
+        void Run() const;
     private:
-        /// Systems currently attached to the Engine
+        // Systems currently attached to the Engine
         std::vector<ISystem*> m_systems;
-
-		/// The main window of the engine
-        Window m_mainWindow;
 };
 
     extern Engine* CORE;

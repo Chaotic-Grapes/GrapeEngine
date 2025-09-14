@@ -12,7 +12,7 @@ public:
 	Window() = default;
 	~Window();
 
-	bool Create(const std::string& title, int width, int height, GLFWmonitor* monitor = nullptr);
+	bool Create(const std::string& title, int width, int height, GLFWmonitor* monitor = nullptr, GLFWwindow* parent = nullptr);
 	void Destroy();
 
 	void PollEvents() const;
@@ -28,7 +28,7 @@ public:
 	bool IsMaximized() const;
 	bool IsVisible() const;
 
-	GLFWwindow* GetWindow() const;
+	GLFWwindow* Handle() const;
 
 private:
 	GLFWwindow* m_windowHandle = nullptr;
