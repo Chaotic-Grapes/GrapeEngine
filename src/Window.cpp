@@ -1,5 +1,4 @@
 ﻿#include "Window.h"
-#include "GLHelper.h"
 #include <iostream>
 
 Window::~Window() { Destroy(); }
@@ -13,9 +12,6 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		// Log: "Failed to initialize GLFW";
 		return false;
 	}
-
-	// In case a GLFW function fails, an error is reported to callback function
-	glfwSetErrorCallback(GLHelper::ErrorCallback);
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
@@ -35,10 +31,6 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		glfwTerminate();
 		return false;
 	}
-
-	// Register all GLFW input and framebuffer callbacks
-	GLHelper::SetupEventCallbacks(m_windowHandle);
-
 	glViewport(0, 0, width, height);
 	return true;
 }
