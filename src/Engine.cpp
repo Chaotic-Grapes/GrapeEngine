@@ -4,6 +4,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "Time.h"
 #include <iostream>
+#include "test.h"
+#include "Physics.h" 
 
 namespace Engine {
     /// Global pointer to the core engine
@@ -37,6 +39,12 @@ namespace Engine {
             0.0f, (float)m_mainWindow.Height(),
             -1.0f, 1.0f);
 
+        //test code
+        PhysicsSystem* physics = new PhysicsSystem();
+        AttachSystem(physics);
+        TestScene test;
+        test.init(physics, (float)m_mainWindow.Width(), (float)m_mainWindow.Height());
+
         while (!m_mainWindow.ShouldClose()) {
             m_mainWindow.PollEvents();
             Update();
@@ -48,9 +56,13 @@ namespace Engine {
             shader.use();
             shader.setMat4("uProjection", proj);
 
+            test.update(Time::DeltaTime());
+
             m_renderer->beginFrame();
 
             // Submit primitives here
+
+            test.render(*m_renderer);
 
             m_renderer->endFrame();
 
