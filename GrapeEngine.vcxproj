@@ -161,6 +161,7 @@
     <ClCompile Include="src\graphics\sprite.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Physics.cpp" />
+    <ClCompile Include="src\test.cpp" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Vector2D.cpp" />
     <ClCompile Include="src\Window.cpp" />
@@ -467,6 +468,7 @@
     <ClInclude Include="src\Engine.h" />
     <ClInclude Include="src\ISystem.h" />
     <ClInclude Include="src\Physics.h" />
+    <ClInclude Include="src\test.h" />
     <ClInclude Include="src\Time.h" />
     <ClInclude Include="src\Vector2D.h" />
     <ClInclude Include="src\Window.h" />
