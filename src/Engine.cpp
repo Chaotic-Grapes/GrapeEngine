@@ -1,6 +1,7 @@
 ﻿#include "Engine.h"
 #include "../include/graphics/renderer.hpp"
 #include "../include/graphics/shader.hpp"
+#include "../include/graphics/debugDraw2D.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include "Time.h"
 #include <iostream>
