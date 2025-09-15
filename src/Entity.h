@@ -1,13 +1,8 @@
 #ifndef ENTITY_H
 #define ENTITY_H
 
-#include <unordered_map>
-#include <typeindex>
 #include <memory>
-#include <cstdint>
-#include "IComponent.h"
-
-using EntityId = uint32_t;
+#include "ComponentRegistry.h"
 
 class Entity {
 public:
@@ -18,43 +13,33 @@ public:
     Entity& operator=(const Entity& entity);
     Entity(Entity&& entity) noexcept;
     Entity& operator=(Entity&& entity) noexcept;
+
     EntityId GetId() const;
+    Entity Clone() const;
 
     template<typename T, typename... Args>
     T& AddComponent(Args&&... args) {
-        auto comp = std::make_unique<T>(std::forward<Args>(args)...);
-        T& ref = *comp;
-        m_components[std::type_index(typeid(T))] = std::move(comp);
-        return ref;
+        return ComponentRegistry::Get().AddComponent<T>(m_id, std::forward<Args>(args)...);
     }
 
     template<typename T>
     T* GetComponent() {
-        const auto it = m_components.find(std::type_index(typeid(T)));
-        if (it != m_components.end())
-            return static_cast<T*>(it->second.get());
-        return nullptr;
-    }
-
-    template<typename T>
-    void RemoveComponent() {
-        m_components.erase(std::type_index(typeid(T)));
+        return ComponentRegistry::Get().GetComponent<T>(m_id);
     }
 
     template<typename T>
     bool HasComponent() const {
-        return m_components.find(std::type_index(typeid(T))) != m_components.end();
+        return ComponentRegistry::Get().HasComponent<T>(m_id);
     }
 
-	// Similar to copy constructor but does not take in an entity reference
-    Entity Clone() const;
+    template<typename T>
+    void RemoveComponent() const {
+        ComponentRegistry::Get().RemoveComponent<T>(m_id);
+    }
 
 private:
     EntityId m_id;
     static inline EntityId m_nextId = 0;
-
-    using ComponentMap = std::unordered_map<std::type_index, std::unique_ptr<Component::IComponent>>;
-    ComponentMap m_components;
 };
 
 #endif // ENTITY_H
