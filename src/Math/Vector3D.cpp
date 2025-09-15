@@ -1,4 +1,4 @@
-#include "Vector3D.h"
+#include "Math/Vector3D.h"
 #include <cmath> // For trigonometric or arithmetic operations
 #include <stdexcept>
 
@@ -64,6 +64,9 @@ void Vector3D::Normalize() {
 		z *= invLength;
 	}
 }
+
+// Easier access
+float Vector3D::Dot(const Vector3D& other) const { return x * other.x + y * other.y + z * other.z; }
 
 // Static functions
 float Vector3D::Dot(const Vector3D& a, const Vector3D& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }

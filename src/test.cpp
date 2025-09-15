@@ -122,7 +122,7 @@ void TestScene::bounceAndClamp(CircleEntity& e) {
 
     Vector2D pre(p.x, p.y);
     Vector2D lo(r, r), hi(width_ - r, height_ - r);
-    Vector2D post = Vector2D::Clamp(pre, lo, hi);
+    Vector2D post = Vector2D::ClampVector(pre, lo, hi);
 
     if (post.x != pre.x) v.x = -v.x; // bounced on left/right edge
     if (post.y != pre.y) v.y = -v.y; // bounced on bottom/top edge

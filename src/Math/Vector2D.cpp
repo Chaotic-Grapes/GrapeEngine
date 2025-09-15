@@ -1,4 +1,4 @@
-#include "Vector2D.h"
+#include "Math/Vector2D.h"
 #include <cmath> // For trigonometric or arithmetic operations
 #include <stdexcept>
 
@@ -59,6 +59,9 @@ void Vector2D::Normalize() {
 		y *= invLength;
 	}
 }
+
+// To fit with collision code
+float Vector2D::Dot(const Vector2D& other) const { return x * other.x + y * other.y; }
 
 // Static functions
 float Vector2D::Dot(const Vector2D& a, const Vector2D& b) { return a.x * b.x + a.y * b.y; }

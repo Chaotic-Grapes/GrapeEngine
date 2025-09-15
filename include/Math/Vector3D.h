@@ -24,6 +24,7 @@ public:
     float SquareLength() const;
     Vector3D Normalized() const;  // Returns a new vector
     void Normalize();             // Modifies the current vector
+    float Dot(const Vector3D& other) const;
 
     // Static functions
     static float Dot(const Vector3D& a, const Vector3D& b);

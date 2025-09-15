@@ -1,5 +1,5 @@
 #pragma once
-#include "Vector3D.h"
+#include "Math/Vector3D.h"
 
 class Vector4D {
 public:
@@ -25,6 +25,7 @@ public:
     float SquareLength() const;
     Vector4D Normalized() const;  // Returns a new vector
     void Normalize();             // Modifies the current vector
+    float Dot(const Vector4D& other) const;
 
     // Static functions
     static float Dot(const Vector4D& a, const Vector4D& b);

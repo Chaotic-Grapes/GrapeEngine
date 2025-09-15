@@ -2,7 +2,7 @@
 #include <cmath>      // std::sqrt, std::fabs
 #include <limits>     // std::numeric_limits
 #include <algorithm>  // std::min
-#include "Vector2D.h"
+#include "Math/Vector2D.h"
 
 namespace {
     constexpr float EPS = 1e-6f;
@@ -72,8 +72,9 @@ bool Collision::pointSweepHitCircle(const Vector2D& C0, const Vector2D& C1,
     tHit = tCandidate;
     Vector2D C = C0 + v * tHit;
     Vector2D n = C - P; // outward from endpoint to circle center
-    float L2 = n.SquareLength();
-    normalAtHit = (L2 > 0.0f) ? n * (1.0f / std::sqrt(L2)) : Vector2D(0.0f, 1.0f);
+    // float L2 = n.SquareLength();
+    // normalAtHit = (L2 > 0.0f) ? n * (1.0f / std::sqrt(L2)) : Vector2D(0.0f, 1.0f);
+    normalAtHit = n.Normalized();
     return true;
 }
 
@@ -198,7 +199,7 @@ bool Collision::PointVsSegment(
         t = (P - S0).Dot(V) / len2;
     }
     // clamp to [0,1] without relying on glm
-    float tc = Vector2D::ClampFloat(t, 0.0f, 1.0f);
+    float tc = Vector2D::ClampValue(t, 0.0f, 1.0f);
     Vector2D Q = S0 + V * tc;
 
     bool hit = (P - Q).SquareLength() <= (tol * tol);

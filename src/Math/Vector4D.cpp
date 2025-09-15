@@ -1,4 +1,4 @@
-#include "Vector4D.h"
+#include "Math/Vector4D.h"
 #include <cmath>  // For trigonometric or arithmetic operations
 #include <stdexcept>
 
@@ -69,6 +69,9 @@ void Vector4D::Normalize() {
 		w *= invLength;
 	}
 }
+
+// Easier access
+float Vector4D::Dot(const Vector4D& other) const { return x * other.x + y * other.y + z * other.z + w * other.w; }
 
 // Static functions
 float Vector4D::Dot(const Vector4D& a, const Vector4D& b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
