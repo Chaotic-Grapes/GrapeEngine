@@ -1,10 +1,21 @@
 ﻿#include "Window.h"
 #include <iostream>
+#include <windows.h>
+#include "MessageBus.h"
+#include "MessageTypes.h"
 
 namespace {
 	bool HasFlag(const WindowMode::Flags a, const WindowMode::Flags b) {
 		return (a & b) != static_cast<WindowMode::Flags>(0);
 	}
+}
+
+static void FramebufferSizeCallback(GLFWwindow* window, const int width, const int height) {
+	UNREFERENCED_PARAMETER(window);
+	glViewport(0, 0, width, height);
+
+	// Broadcast resize message
+	Messaging::MessageBus::Broadcast(Messaging::WindowResized{ width, height });
 }
 
 Window::~Window() { Destroy(); }
@@ -52,6 +63,9 @@ bool Window::Create(const std::string& title, const int width, const int height,
 	// Store the pointer to this instance for use in callbacks
 	// because GLFW does not know context
 	glfwSetWindowUserPointer(m_windowHandle, this);
+
+	// Register callback for resize
+	glfwSetFramebufferSizeCallback(m_windowHandle, FramebufferSizeCallback);
 	return true;
 }
 
