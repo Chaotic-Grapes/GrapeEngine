@@ -2,6 +2,8 @@
 #include "../include/graphics/renderer.hpp"
 #include "../include/graphics/shader.hpp"
 #include "../include/graphics/debugDraw2D.hpp"
+#include "../include/graphics/texture.hpp"
+#include "../include/graphics/sprite.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include "Time.h"
 #include <iostream>
@@ -38,6 +40,16 @@ namespace Engine {
             0.0f, (float)m_mainWindow.Height(),
             -1.0f, 1.0f);
 
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Load sprite sheet once before the loop
+        Texture idleTexture("assets/textures/samurai-test/ATTACK 1.png");
+
+        GLuint texId = idleTexture.ID();  // texture handle
+        int texWidth = idleTexture.Width();
+        int texHeight = idleTexture.Height();
+
         while (!m_mainWindow.ShouldClose()) {
             m_mainWindow.PollEvents();
             Update();
@@ -52,6 +64,12 @@ namespace Engine {
             m_renderer->beginFrame();
 
             // Submit primitives here
+            static SpriteAnimation idleAnim(texId, 96, 96, texWidth, texHeight);
+            idleAnim.setFPS(12.0f);
+
+            m_renderer->drawSprite(
+                idleAnim.play({ 400, 300 }, { 288, 288 }, Time::DeltaTime())
+            );
 
             m_renderer->endFrame();
 
