@@ -1,46 +1,53 @@
-#include <GLHelper.h>
+#include <Input.h>
 #include <iostream>
 
+// Initialize static member
+GLFWwindow* Input::m_window = nullptr;
+
+void Input::Init(GLFWwindow* pWin) { 
+    m_window = pWin; 
+}
+
 // Check if a specific key is currently pressed
-bool GLHelper::IsKeyPressed(GLFWwindow* pWin, int key) {
-    return glfwGetKey(pWin, key) == GLFW_PRESS;
+bool Input::IsKeyPressed(int key) {
+    return glfwGetKey(m_window, key) == PRESS;
 }
 
 // Check if a specific mouse button is currently pressed  
-bool GLHelper::IsMouseButtonPressed(GLFWwindow* pWin, int button) {
-    return glfwGetMouseButton(pWin, button) == GLFW_PRESS;
+bool Input::IsMousePressed(int button) {
+    return glfwGetMouseButton(m_window, button) == PRESS;
 }
 
 // Get current mouse position
-void GLHelper::GetMousePosition(GLFWwindow* pWin, double& xPos, double& yPos) {
-    glfwGetCursorPos(pWin, &xPos, &yPos);
+void Input::GetMousePos(double& xPos, double& yPos) {
+    glfwGetCursorPos(m_window, &xPos, &yPos);
 }
 
 // Get mouse X position
-double GLHelper::GetMouseX(GLFWwindow* pWin) {
+double Input::GetMouseX() {
     double xPos, yPos;
-    glfwGetCursorPos(pWin, &xPos, &yPos);
+    glfwGetCursorPos(m_window, &xPos, &yPos);
     return xPos;
 }
 
 // Get mouse Y position
-double GLHelper::GetMouseY(GLFWwindow* pWin) {
+double Input::GetMouseY() {
     double xPos, yPos;
-    glfwGetCursorPos(pWin, &xPos, &yPos);
+    glfwGetCursorPos(m_window, &xPos, &yPos);
     return yPos;
 }
 
 // Sets up all GLFW event callbacks (keyboard, mouse, resize)
-void GLHelper::SetupEventCallbacks(GLFWwindow* pWin) {
-    glfwSetFramebufferSizeCallback(pWin, FBSizeCallback);
-    glfwSetKeyCallback(pWin, KeyCallback);
-    glfwSetMouseButtonCallback(pWin, MouseButtonCallback);
-    glfwSetCursorPosCallback(pWin, MousePosCallback);
-    glfwSetScrollCallback(pWin, MouseScrollCallback);
+void Input::SetupEventCallbacks() {
+    glfwSetFramebufferSizeCallback(m_window, _framebufferSizeCallback);
+    glfwSetKeyCallback(m_window, _keyCallback);
+    glfwSetMouseButtonCallback(m_window, _mouseButtonCallback);
+    glfwSetCursorPosCallback(m_window, _mousePosCallback);
+    glfwSetScrollCallback(m_window, _mouseScrollCallback);
 }
 
-// Called when GLFW encounters an error
-void GLHelper::ErrorCallback(int error, char const* description) {
+// Called when GLFW encounters an error 
+void Input::ErrorCallback(int error, char const* description) {
     (void)error;
 #ifdef _DEBUG
     std::cerr << "GLFW error: " << description << std::endl;
@@ -48,7 +55,7 @@ void GLHelper::ErrorCallback(int error, char const* description) {
 }
 
 // Called when window is resized
-void GLHelper::FBSizeCallback(GLFWwindow* pWin, int width, int height) {
+void Input::_framebufferSizeCallback(GLFWwindow* pWin, int width, int height) {
     (void)pWin;
     (void)width;
     (void)height;
@@ -58,7 +65,7 @@ void GLHelper::FBSizeCallback(GLFWwindow* pWin, int width, int height) {
 }
 
 // Called on keyboard key press/release
-void GLHelper::KeyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
+void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
     (void)pWin;
     (void)key;
     (void)scancode;
@@ -67,21 +74,21 @@ void GLHelper::KeyCallback(GLFWwindow* pWin, int key, int scancode, int action, 
 #ifdef _DEBUG
     const char* keyName = "";
     switch (key) {
-        case GLFW_KEY_W: keyName = "W"; break;
-        case GLFW_KEY_A: keyName = "A"; break;
-        case GLFW_KEY_S: keyName = "S"; break;
-        case GLFW_KEY_D: keyName = "D"; break;
+        case KEY_W: keyName = "W"; break;
+        case KEY_A: keyName = "A"; break;
+        case KEY_S: keyName = "S"; break;
+        case KEY_D: keyName = "D"; break;
         default: keyName = "Unknown"; break;
     }
     // Debug-only code
-    if (action == GLFW_PRESS) std::cout << keyName << " key pressed\n";
-    else if (action == GLFW_REPEAT) std::cout << keyName << " key repeatedly pressed\n";
-    else if (action == GLFW_RELEASE) std::cout << keyName << " key released\n";
+    if (action == PRESS) std::cout << keyName << " key pressed\n";
+    else if (action == REPEAT) std::cout << keyName << " key repeatedly pressed\n";
+    else if (action == RELEASE) std::cout << keyName << " key released\n";
 #endif
 }
 
 // Called on mouse button press/release
-void GLHelper::MouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod) {
+void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod) {
     (void)pWin;
     (void)button;
     (void)action;
@@ -89,18 +96,18 @@ void GLHelper::MouseButtonCallback(GLFWwindow* pWin, int button, int action, int
 #ifdef _DEBUG
     const char* buttonName = "";
     switch (button) {
-        case GLFW_MOUSE_BUTTON_LEFT: buttonName = "Left mouse button"; break;
-        case GLFW_MOUSE_BUTTON_RIGHT: buttonName = "Right mouse button"; break;
+        case MOUSE_LEFT: buttonName = "Left mouse button"; break;
+        case MOUSE_RIGHT: buttonName = "Right mouse button"; break;
         default: buttonName = "Mouse button"; break;
     }
     // Debug-only code
-    if (action == GLFW_PRESS) std::cout << buttonName << " pressed\n";
-    else if (action == GLFW_RELEASE) std::cout << buttonName << " released\n";
+    if (action == PRESS) std::cout << buttonName << " pressed\n";
+    else if (action == RELEASE) std::cout << buttonName << " released\n";
 #endif
 }
 
 // Called when mouse cursor moves
-void GLHelper::MousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
+void Input::_mousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
     (void)pWin;
     (void)xPos;
     (void)yPos;
@@ -110,7 +117,7 @@ void GLHelper::MousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
 }
 
 // Called when mouse wheel is scrolled
-void GLHelper::MouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffset) {
+void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffset) {
     (void)pWin;
     (void)xOffset;
     (void)yOffset;
@@ -120,7 +127,7 @@ void GLHelper::MouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOff
 }
 
 // Prints OpenGL system info (GPU, version, limits, etc.)
-void GLHelper::PrintSpecs() {
+void Input::PrintSpecs() {
     // glGetString() for OpenGL string information
     const GLubyte* vendorStr = glGetString(GL_VENDOR);       // Vendor name
     const GLubyte* rendererStr = glGetString(GL_RENDERER);   // Renderer name

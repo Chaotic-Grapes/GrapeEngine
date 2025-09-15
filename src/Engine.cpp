@@ -4,7 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "Time.h"
 #include <iostream>
-#include "GLHelper.h"
+#include "Input.h"
 
 namespace Engine {
     /// Global pointer to the core engine
@@ -30,7 +30,7 @@ namespace Engine {
         }
 
     #ifdef _DEBUG
-        GLHelper::PrintSpecs();
+        Input::PrintSpecs();
     #endif
 
         m_renderer = std::make_unique<Renderer>(1000); // ctor runs after context creation
