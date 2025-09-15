@@ -3,6 +3,7 @@
 
 #include <memory>
 #include "ComponentRegistry.h"
+#include "Components.h"
 
 class Entity {
 public:
@@ -16,6 +17,8 @@ public:
 
     EntityId GetId() const;
     Entity Clone() const;
+
+    Component::Transform& Transform();
 
     template<typename T, typename... Args>
     T& AddComponent(Args&&... args) {

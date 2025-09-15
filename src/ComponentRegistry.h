@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <functional>
 
+#include "Components.h"
+
 using EntityId = uint32_t;
 
 // Base wrapper interface (type-erased)
@@ -42,12 +44,16 @@ public:
 
     template<typename T, typename... Args>
     T& AddComponent(const EntityId id, Args&&... args) {
+		// Ensure core components are not duplicated
+        if constexpr (std::is_same_v<T, Component::Transform>) {
+            auto* existing = GetComponent<T>(id);
+            if (existing) return *existing;
+        }
         auto& compMap = m_components[typeid(T)];
         auto wrapper = std::make_unique<ComponentWrapper<T>>(T(std::forward<Args>(args)...));
 
         T& ref = static_cast<ComponentWrapper<T>*>(wrapper.get())->m_component;
         compMap[id] = std::move(wrapper);
-
         return ref;
     }
 
@@ -74,6 +80,8 @@ public:
 
     template<typename T>
     void RemoveComponent(const EntityId id) {
+        if (IsCoreComponent(typeid(T))) 
+			return; // Cannot remove core components like Transform
         const auto itMap = m_components.find(typeid(T));
         if (itMap != m_components.end())
             itMap->second.erase(id);
@@ -81,6 +89,8 @@ public:
 
     void RemoveAllComponents(const EntityId id) {
         for (auto& [type, compMap] : m_components) {
+            if (IsCoreComponent(type)) 
+                continue; // Skip core components
             compMap.erase(id);
         }
     }
@@ -100,6 +110,10 @@ private:
 	// Map: type_index -> (Map: EntityId -> ComponentWrapper)
     using ComponentMap = std::unordered_map<EntityId, std::unique_ptr<IComponentWrapper>>;
     std::unordered_map<std::type_index, ComponentMap> m_components;
+
+    static bool IsCoreComponent(const std::type_index& type) {
+        return type == typeid(Component::Transform);
+    }
 };
 
 #endif

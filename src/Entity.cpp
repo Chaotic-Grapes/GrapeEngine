@@ -1,6 +1,8 @@
 #include "Entity.h"
 
-Entity::Entity() : m_id(++m_nextId) { }
+#include "Components.h"
+
+Entity::Entity() : m_id(++m_nextId) { AddComponent<Component::Transform>(); }
 Entity::Entity(const Entity& entity) {
     m_id = ++m_nextId;
     ComponentRegistry::Get().CloneComponents(entity.m_id, m_id);
@@ -35,6 +37,10 @@ Entity Entity::Clone() const {
     Entity copy;
     ComponentRegistry::Get().CloneComponents(m_id, copy.m_id);
     return copy;
+}
+
+Component::Transform& Entity::Transform() {
+    return *GetComponent<Component::Transform>();
 }
 
 EntityId Entity::GetId() const { return m_id; }
