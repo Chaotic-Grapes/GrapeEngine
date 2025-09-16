@@ -25,13 +25,6 @@ public:
         void DestroySystems() const;
 
         /**
-         * @brief Returns the main window of the engine
-         * 
-         * @return Window
-		 */
-        Window MainWindow() const;
-
-        /**
 		 * @brief Ticks all attached systems and others as needed
          */
         void Update() const;
@@ -44,11 +37,17 @@ public:
 
         /**
          * @brief Starts the engine
+         *
+		 * @param consoleFlag If true, runs with console output enabled
          */
-        void Run() const;
+        void Run(bool consoleFlag);
     private:
         // Systems currently attached to the Engine
         std::vector<ISystem*> m_systems;
+
+		// Functions to enable/disable console output
+        static void _enableConsole();
+        static void _disableConsole();
 };
 
     extern Engine* CORE;
