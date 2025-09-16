@@ -6,11 +6,11 @@
 class Time final : public Engine::ISystem {
 public:
     /// Call this function before any other methods of the Time class
-    void Initialize() override;
+    void OnCreate() override;
 
     /// This will update all time variables that need modifications
-    /// To be called ONLY by the Engine's Update() loop
-    void Update() override;
+    /// To be called ONLY by the Engine's OnUpdate() loop
+    void OnUpdate() override;
 
     /// Debug name
     std::string Name() const override;

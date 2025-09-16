@@ -26,8 +26,8 @@ public:
     static Window* GetMainWindow();
 
     // System interface
-    void Initialize() override;
-    void Update() override;
+    void OnCreate() override;
+    void OnUpdate() override;
     std::string Name() const override;
 
 private:

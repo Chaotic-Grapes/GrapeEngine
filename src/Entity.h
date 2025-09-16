@@ -1,17 +1,17 @@
 #ifndef ENTITY_H
 #define ENTITY_H
 
-#include <memory>
-#include "ComponentRegistry.h"
 #include "Components.h"
+#include "World.h"
+
+using EntityId = uint32_t;
 
 class Entity {
 public:
-    Entity();
-	// Copy constructor
-    Entity(const Entity& entity);
+    Entity(EntityId id, World* world);
+    Entity(const Entity& other);
     ~Entity();
-    Entity& operator=(const Entity& entity);
+    Entity& operator=(const Entity& other);
     Entity(Entity&& entity) noexcept;
     Entity& operator=(Entity&& entity) noexcept;
 
@@ -20,29 +20,33 @@ public:
 
     Component::Transform& Transform();
 
+    template<typename T>
+    T* GetComponent() {
+        return m_world->GetEntityManager().GetComponent<T>(m_id);
+    }
+
     template<typename T, typename... Args>
     T& AddComponent(Args&&... args) {
-        return ComponentRegistry::Get().AddComponent<T>(m_id, std::forward<Args>(args)...);
+        return m_world->GetEntityManager().AddComponent<T>(m_id, std::forward<Args>(args)...);
     }
 
     template<typename T>
-    T* GetComponent() {
-        return ComponentRegistry::Get().GetComponent<T>(m_id);
+    void RemoveComponent() {
+        m_world->GetEntityManager().RemoveComponent<T>(m_id);
     }
 
     template<typename T>
     bool HasComponent() const {
-        return ComponentRegistry::Get().HasComponent<T>(m_id);
+        return m_world->GetEntityManager().HasComponent<T>(m_id);
     }
 
-    template<typename T>
-    void RemoveComponent() const {
-        ComponentRegistry::Get().RemoveComponent<T>(m_id);
+    void RemoveAllComponents() const {
+        m_world->GetEntityManager().RemoveAllComponents(m_id);
     }
 
 private:
     EntityId m_id;
-    static inline EntityId m_nextId = 0;
+    World* m_world;
 };
 
-#endif // ENTITY_H
+#endif

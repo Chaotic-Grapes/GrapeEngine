@@ -1,5 +1,6 @@
 ﻿#include "Time.h"
 #include <GLFW/glfw3.h>
+#include "World.h"
 
 // ********** Tracker variables ********** //
 double Time::m_startTime;
@@ -13,11 +14,11 @@ float  Time::m_timeScale          = 1.f;
 int    Time::m_frameCounter       = 0;
 float  Time::m_maximumDeltaTime   = 0.4f;
 
-void Time::Initialize() {
+void Time::OnCreate() {
     m_lastFrameTime = m_startTime = glfwGetTime();
 }
 
-void Time::Update() {
+void Time::OnUpdate() {
     // Frame time
     const auto& now = glfwGetTime();
     const auto& dt = now - m_lastFrameTime;

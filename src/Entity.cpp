@@ -1,41 +1,43 @@
 #include "Entity.h"
-
 #include "Components.h"
 
-Entity::Entity() : m_id(++m_nextId) { AddComponent<Component::Transform>(); }
-Entity::Entity(const Entity& entity) {
-    m_id = ++m_nextId;
-    ComponentRegistry::Get().CloneComponents(entity.m_id, m_id);
+Entity::Entity(const EntityId id, World* world) : m_id(id), m_world(world) { AddComponent<Component::Transform>(); }
+Entity::Entity(const Entity& other)
+    : m_id(other.m_world->GetEntityManager().CreateEntity().GetId()), m_world(other.m_world) {
+    m_world->GetEntityManager().CloneComponents(other.GetId(), m_id);
 }
 
-Entity& Entity::operator=(const Entity& entity) {
-    if (this != &entity) {
-        ComponentRegistry::Get().RemoveAllComponents(m_id);
-        ComponentRegistry::Get().CloneComponents(entity.m_id, m_id);
+Entity& Entity::operator=(const Entity& other) {
+    if (this != &other) {
+        RemoveAllComponents();
+        m_id = m_world->GetEntityManager().CreateEntity().GetId();
+        m_world->GetEntityManager().CloneComponents(other.GetId(), m_id);
     }
     return *this;
 }
 
-Entity::Entity(Entity&& entity) noexcept {
-    m_id = entity.m_id;
-    entity.m_id = 0; // moved-from
+Entity::Entity(Entity&& entity) noexcept : m_id(entity.m_id), m_world(entity.m_world) {
+    entity.m_id = 0;
+    entity.m_world = nullptr;
 }
 
 Entity& Entity::operator=(Entity&& entity) noexcept {
     if (this != &entity) {
         m_id = entity.m_id;
+        m_world = entity.m_world;
         entity.m_id = 0;
+        entity.m_world = nullptr;
     }
     return *this;
 }
 
 Entity::~Entity() {
-    ComponentRegistry::Get().RemoveAllComponents(m_id);
+    RemoveAllComponents();
 }
 
 Entity Entity::Clone() const {
-    Entity copy;
-    ComponentRegistry::Get().CloneComponents(m_id, copy.m_id);
+    Entity copy = m_world->GetEntityManager().CreateEntity();
+    m_world->GetEntityManager().CloneComponents(m_id, copy.GetId());
     return copy;
 }
 

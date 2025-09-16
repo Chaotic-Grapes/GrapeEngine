@@ -149,24 +149,28 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\EntityManager.cpp" />
     <ClCompile Include="src\EngineSandbox.cpp" />
-    <ClCompile Include="src\Engine.cpp" />
+    <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\Entity.cpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
-    <ClInclude Include="src\ComponentRegistry.h" />
+    <ClCompile Include="src\World.cpp" />
+    <ClInclude Include="src\ComponentManager.h" />
+    <ClInclude Include="src\EntityManager.h" />
     <ClInclude Include="src\Components.h" />
     <ClInclude Include="src\Entity.h" />
     <ClInclude Include="src\IComponent.h" />
     <ClInclude Include="src\MessageBus.h" />
     <ClInclude Include="src\MessageTypes.h" />
-    <ClInclude Include="src\Engine.h" />
+    <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\ISystem.h" />
     <ClInclude Include="src\Time.h" />
     <ClInclude Include="src\Window.h" />
     <ClInclude Include="src\WindowManager.h" />
+    <ClInclude Include="src\World.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

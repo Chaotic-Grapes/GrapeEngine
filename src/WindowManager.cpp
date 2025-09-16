@@ -36,14 +36,14 @@ void WindowManager::DestroyAll() {
     m_windows.clear();
 }
 
-void WindowManager::Initialize() {
+void WindowManager::OnCreate() {
     // Create main window
     if (m_windows.empty()) {
         CreateWindow("GrapeEngine", 1920, 1080);
     }
 }
 
-void WindowManager::Update() {
+void WindowManager::OnUpdate() {
     // Poll events once (GLFW applies to all windows)
     glfwPollEvents();
 

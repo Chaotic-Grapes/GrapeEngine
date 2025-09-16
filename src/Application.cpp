@@ -1,34 +1,37 @@
-﻿#include "Engine.h"
+﻿#include "Application.h"
 #include <windows.h>
 #include "Time.h"
 #include "WindowManager.h"
 
 namespace Engine {
     // Global pointer to the core engine
-    Engine* CORE;
+    Application* CORE = nullptr;
 
-    Engine::Engine() {
+    Application::Application() {
         CORE = this;
     }
 
-    void Engine::Initialize() const {
-        for (const auto& system : m_systems)
-            system->Initialize();
+    World& Application::CreateWorld() {
+        m_worlds.push_back(std::make_unique<World>());
+        return *m_worlds.back();
     }
 
-    void Engine::Run(const bool consoleFlag) {
-		// Attach core systems
-        AttachSystem(new Time());
-		AttachSystem(new WindowManager());
-
+    void Application::Run(const bool consoleFlag) {
 #if !_DEBUG
         if (consoleFlag)
             _enableConsole();
         else
             _disableConsole();
 #else
-        UNREFERENCED_PARAMETER(consoleFlag);
+        (void)consoleFlag;
 #endif
+
+        // Create default world
+        World& gameWorld = CreateWorld();
+
+        // Attach core systems to the default world
+        gameWorld.AddSystem<Time>();
+        gameWorld.AddSystem<WindowManager>();
 
 		Initialize();
 
@@ -37,37 +40,34 @@ namespace Engine {
             return;
         }
         
-        while (true) {
+        while (!m_shouldStop) {
             Update();
             
-            bool stop = true;
             for (const auto* win : WindowManager::GetWindows())
                 if (!win->ShouldClose()) {
-                    stop = false;
+                    m_shouldStop = true;
                     break;
                 }
-            
-            if (stop) break;
 		}
 
-		DestroySystems();
+        m_worlds.clear();
     }
 
-    void Engine::AttachSystem(ISystem* system) {
-        m_systems.push_back(system);
+    void Application::Initialize() const {
+        for (auto& world : m_worlds)
+            world->Initialize();
     }
 
-    void Engine::Update() const {
-        for (const auto& system : m_systems)
-            system->Update();
+    void Application::Update() const {
+        for (auto& world : m_worlds)
+            world->Update();
     }
 
-    void Engine::DestroySystems() const {
-        for (const auto& system : m_systems)
-            delete system;
+    void Application::Close() {
+		m_shouldStop = true;
     }
 
-    void Engine::_enableConsole() {
+    void Application::_enableConsole() {
 #ifdef _WIN32
         AllocConsole();
 
@@ -77,7 +77,7 @@ namespace Engine {
 #endif
     }
 
-    void Engine::_disableConsole() {
+    void Application::_disableConsole() {
 #ifdef _WIN32
 	    if (const HWND console = GetConsoleWindow())
             ShowWindow(console, SW_HIDE);

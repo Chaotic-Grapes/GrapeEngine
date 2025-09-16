@@ -1,6 +1,5 @@
 ﻿#include "Window.h"
 #include <iostream>
-#include <windows.h>
 #include "MessageBus.h"
 #include "MessageTypes.h"
 
@@ -11,7 +10,7 @@ namespace {
 }
 
 static void FramebufferSizeCallback(GLFWwindow* window, const int width, const int height) {
-	UNREFERENCED_PARAMETER(window);
+	(void)window;
 	glViewport(0, 0, width, height);
 
 	// Broadcast resize message
