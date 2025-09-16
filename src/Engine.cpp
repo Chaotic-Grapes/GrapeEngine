@@ -9,6 +9,7 @@
 #include <iostream>
 #include "test.h"
 #include "Physics.h" 
+#include "Input.h"
 
 namespace Engine {
     /// Global pointer to the core engine
@@ -32,6 +33,10 @@ namespace Engine {
             std::cerr << "Failed to initialize GLAD" << std::endl;
             return;
         }
+
+    #ifdef _DEBUG
+        Input::PrintSpecs();
+    #endif
 
         m_renderer = std::make_unique<Renderer>(1000); // ctor runs after context creation
 
