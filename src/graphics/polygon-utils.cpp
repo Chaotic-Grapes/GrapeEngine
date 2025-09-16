@@ -1,7 +1,6 @@
 #include "../include/graphics/polygon-utils.hpp"
 #include <algorithm>  // for std::reverse
 #include <numeric>    // for std::iota
-
 static float cross(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c) {
     return (b.x - a.x) * (c.y - a.y) -
         (b.y - a.y) * (c.x - a.x);

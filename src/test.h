@@ -5,6 +5,8 @@
 #include "Physics.h"
 #include "collision.h"
 #include "../include/graphics/renderer.hpp"   
+#include "../include/graphics/debugDraw2D.hpp"  
+#include "../include/graphics/polygon-utils.hpp"
 
 
 struct CircleEntity {

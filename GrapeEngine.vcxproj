@@ -152,8 +152,12 @@
     <ClCompile Include="src\Collision.cpp" />
     <ClCompile Include="src\Engine.cpp" />
     <ClCompile Include="src\glad.c" />
+    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
+    <ClCompile Include="src\graphics\polygon-utils.cpp" />
     <ClCompile Include="src\graphics\renderer.cpp" />
     <ClCompile Include="src\graphics\shader.cpp" />
+    <ClCompile Include="src\graphics\sprite.cpp" />
+    <ClCompile Include="src\graphics\texture.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Math\Matrix3x3.cpp" />
     <ClCompile Include="src\Math\Matrix4x4.cpp" />
@@ -166,6 +170,10 @@
     <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\GLFW\glfw3.h" />
+    <ClInclude Include="include\GLFW\glfw3native.h" />
+    <ClInclude Include="include\graphics\sprite.hpp" />
+    <ClInclude Include="include\graphics\texture.hpp" />
     <ClInclude Include="include\Math\Matrix3x3.h" />
     <ClInclude Include="include\Math\Matrix4x4.h" />
     <ClInclude Include="include\Math\Vector2D.h" />
@@ -178,6 +186,9 @@
     <ClInclude Include="src\test.h" />
     <ClInclude Include="src\Time.h" />
     <ClInclude Include="src\Window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="lib\glfw3.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

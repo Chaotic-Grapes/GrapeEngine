@@ -2,11 +2,14 @@
 
 #include "test.h"
 #include "../include/graphics/renderer.hpp" // same include style as Engine.cpp
+#include "../include/graphics/polygon-utils.hpp"
 #include <glm/vec2.hpp>
 #include <random>
 #include <cmath>
 #include <algorithm>
 #include "collision.h"
+#include "../include/graphics/debugDraw2D.hpp"  
+#include <glm/gtc/constants.hpp>
 
 // Tiny helpers for conversions (renderer uses glm::vec2)
 static inline glm::vec2 ToGLM2(const glm::vec3& v) { return { v.x, v.y }; }
@@ -52,18 +55,22 @@ void TestScene::render(Renderer& r) {
     // draw center lines
     const glm::vec4 lineColor(1.0f, 1.0f, 1.0f, 1.0f);
     const float thickness = 3.0f;
+    const GLuint tex = 0; // no texture
 
-    r.submitLine(glm::vec2(segLeft_.p0.x, segLeft_.p0.y),
+    DebugDraw2D::Line(r,
+        glm::vec2(segLeft_.p0.x, segLeft_.p0.y),
         glm::vec2(segLeft_.p1.x, segLeft_.p1.y),
-        lineColor, thickness);
+        thickness, lineColor, tex);
 
-    r.submitLine(glm::vec2(segRight_.p0.x, segRight_.p0.y),
+    DebugDraw2D::Line(r,
+        glm::vec2(segRight_.p0.x, segRight_.p0.y),
         glm::vec2(segRight_.p1.x, segRight_.p1.y),
-        lineColor, thickness);
+        thickness, lineColor, tex);
 
-    // draw balls
     for (const auto& b : balls_) {
-        r.submitCircle(ToGLM2(b.physics.position), b.radius, b.color, 48);
+        DebugDraw2D::Circle(r,
+            glm::vec2(b.physics.position.x, b.physics.position.y),
+            b.radius, b.color, 48, /*textureId*/ 0);
     }
 }
 
