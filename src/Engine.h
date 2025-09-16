@@ -44,11 +44,17 @@ public:
 
         /**
          * @brief Starts the engine
+         *
+		 * @param consoleFlag If true, runs with console output enabled
          */
-        void Run() const;
+        void Run(bool consoleFlag) const;
     private:
         // Systems currently attached to the Engine
         std::vector<ISystem*> m_systems;
+
+		// Functions to enable/disable console output
+        static void _enableConsole();
+        static void _disableConsole();
 };
 
     extern Engine* CORE;
