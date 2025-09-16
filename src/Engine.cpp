@@ -49,6 +49,8 @@ namespace Engine {
             
             if (stop) break;
 		}
+
+		DestroySystems();
     }
 
     void Engine::AttachSystem(ISystem* system) {

@@ -150,8 +150,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\EngineSandbox.cpp" />
-    <ClCompile Include="src\MessageBus.cpp" />
-    <ClCompile Include="src\MessageTypes.cpp" />
     <ClCompile Include="src\Engine.cpp" />
     <ClCompile Include="src\Entity.cpp" />
     <ClCompile Include="src\glad.c" />
