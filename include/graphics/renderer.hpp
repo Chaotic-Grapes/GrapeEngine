@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <glad/glad.h>
 #include "../include/graphics/vertex.hpp"
+#include "../include/graphics/sprite.hpp"
 
 class Renderer {
 public:
@@ -13,7 +14,7 @@ public:
     void beginFrame();
     void endFrame();
 
-    // Hot path: draw a textured quad (sprite)
+    // Draw a textured quad (sprite)
     void drawQuad(const glm::vec2& pos,
         const glm::vec2& size,
         GLuint textureId,
@@ -26,6 +27,8 @@ public:
         const uint32_t* indices, size_t iCount,
         GLuint textureId,
         int layer = 0);
+
+    void drawSprite(const Sprite& sprite);
 
 private:
     // GL objects
@@ -47,7 +50,8 @@ private:
 
     // Helpers
     void ensureCapacity(size_t vNeeded, size_t iNeeded);
+    void flush();
     void clearTextureSlots();
-    int  getOrAssignTextureSlot(GLuint textureId); // returns 0..N-1
+    int  getOrAssignTextureSlot(GLuint textureId, bool& flushed); // returns 0..N-1
     void bindTextureSlots() const;
 };

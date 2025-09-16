@@ -2,29 +2,33 @@
 #include "../include/graphics/vertex.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 
+// No need to grow since there is batch flushing when capacity is exceeded
 void Renderer::ensureCapacity(size_t vNeeded, size_t iNeeded) {
-    if (vNeeded > vboCapacity) {
-        vboCapacity = std::max(vNeeded, vboCapacity ? vboCapacity * 2 : size_t(256));
-        glNamedBufferData(vbo, vboCapacity * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
-    }
-    if (iNeeded > eboCapacity) {
-        eboCapacity = std::max(iNeeded, eboCapacity ? eboCapacity * 2 : size_t(384));
-        glNamedBufferData(ebo, eboCapacity * sizeof(uint32_t), nullptr, GL_DYNAMIC_DRAW);
-    }
+    assert(vNeeded <= vboCapacity && iNeeded <= eboCapacity &&
+        "Renderer: exceeded batch capacity. Did you forget to flush?");
 }
 
 void Renderer::clearTextureSlots() { textureSlots.clear(); }
 
-int Renderer::getOrAssignTextureSlot(GLuint textureId) {
+void Renderer::flush() {
+    endFrame();
+    beginFrame();
+}
+
+int Renderer::getOrAssignTextureSlot(GLuint textureId, bool& flushed) {
+    flushed = false;
+
     for (int i = 0; i < (int)textureSlots.size(); ++i)
         if (textureSlots[i] == textureId) return i;
 
     if ((int)textureSlots.size() >= MaxTextureSlots) {
-        // TODO: implement flush-and-continue; for now clamp to last slot
-        return MaxTextureSlots - 1;
+        flushed = true;
+        return -1; // signal to caller: need to flush before retry
     }
+
     textureSlots.push_back(textureId);
     return (int)textureSlots.size() - 1;
 }
@@ -106,8 +110,15 @@ void Renderer::drawQuad(const glm::vec2& pos,
 {
     float texIndex = -1.0f; // sentinel for "no texture"
 
-    if (textureId != 0) { // only assign if you pass a real GL texture
-        int slot = getOrAssignTextureSlot(textureId);
+    if (textureId != 0) {
+        bool flushed = false;
+        int slot = getOrAssignTextureSlot(textureId, flushed);
+
+        if (flushed) {
+            flush(); // finish current batch safely
+            slot = getOrAssignTextureSlot(textureId, flushed); // retry in fresh batch
+        }
+
         texIndex = static_cast<float>(slot);
     }
 
@@ -126,6 +137,13 @@ void Renderer::drawQuad(const glm::vec2& pos,
         {uvRect.z, uvRect.w}, // TR
         {uvRect.x, uvRect.w}  // TL
     };
+
+    // check if adding this geometry would exceed capacity.
+    // Prevent overflow: if adding this quad exceeds max capacity, flush first
+    if (cpuBuffer.size() + 4 > vboCapacity ||
+        cpuIndices.size() + 6 > eboCapacity) {
+        flush();
+    }
 
     size_t base = cpuBuffer.size();
     ensureCapacity(base + 4, cpuIndices.size() + 6);
@@ -149,8 +167,22 @@ void Renderer::submitTriangles(const Vertex* verts, size_t vCount,
     float texIndex = -1.0f; // default to no texture
 
     if (textureId != 0) {
-        int slot = getOrAssignTextureSlot(textureId);
+        bool flushed = false;
+        int slot = getOrAssignTextureSlot(textureId, flushed);
+
+        if (flushed) {
+            flush();
+            slot = getOrAssignTextureSlot(textureId, flushed);
+        }
+
         texIndex = static_cast<float>(slot);
+    }
+
+    // Prevent overflow: if adding this batch (vCount verts, iCount indices) 
+    // would exceed capacity, flush the current batch first.
+    if (cpuBuffer.size() + vCount > vboCapacity ||
+        cpuIndices.size() + iCount > eboCapacity) {
+        flush();
     }
 
     size_t base = cpuBuffer.size();
@@ -164,4 +196,8 @@ void Renderer::submitTriangles(const Vertex* verts, size_t vCount,
 
     for (size_t i = 0; i < iCount; ++i)
         cpuIndices.push_back((uint32_t)base + indices[i]);
+}
+
+void Renderer::drawSprite(const Sprite& sprite) {
+    drawQuad(sprite.pos, sprite.size, sprite.textureId, sprite.uv, sprite.color);
 }
