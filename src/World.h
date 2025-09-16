@@ -6,9 +6,10 @@
 #include "EntityManager.h"
 #include "ISystem.h"
 
+class Entity;
 class World {
 public:
-	World() = default;
+    World() { m_entityManager.SetWorld(this); }
 	~World() = default;
 
     EntityManager& GetEntityManager();

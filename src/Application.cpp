@@ -1,11 +1,15 @@
 ﻿#include "Application.h"
+
+#include <iostream>
 #include <windows.h>
 #include "Time.h"
 #include "WindowManager.h"
+#include "Entity.h"
 
 namespace Engine {
     // Global pointer to the core engine
     Application* CORE = nullptr;
+    bool Application::m_shouldStop = false;
 
     Application::Application() {
         CORE = this;
@@ -44,7 +48,7 @@ namespace Engine {
             Update();
             
             for (const auto* win : WindowManager::GetWindows())
-                if (!win->ShouldClose()) {
+                if (win->ShouldClose()) {
                     m_shouldStop = true;
                     break;
                 }

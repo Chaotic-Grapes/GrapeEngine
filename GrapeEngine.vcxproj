@@ -172,6 +172,9 @@
     <ClInclude Include="src\WindowManager.h" />
     <ClInclude Include="src\World.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="src\Entity.inl" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

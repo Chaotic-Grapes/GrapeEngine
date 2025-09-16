@@ -1,4 +1,5 @@
 #include "World.h"
+#include "Entity.h"
 
 void World::Initialize() const {
     for (auto& sys : m_systems)

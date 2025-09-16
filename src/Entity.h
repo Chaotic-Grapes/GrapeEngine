@@ -1,11 +1,12 @@
 #ifndef ENTITY_H
 #define ENTITY_H
 
+#include <cstdint>
 #include "Components.h"
-#include "World.h"
 
 using EntityId = uint32_t;
 
+class World;
 class Entity {
 public:
     Entity(EntityId id, World* world);
@@ -21,32 +22,24 @@ public:
     Component::Transform& Transform();
 
     template<typename T>
-    T* GetComponent() {
-        return m_world->GetEntityManager().GetComponent<T>(m_id);
-    }
+    T* GetComponent();
 
     template<typename T, typename... Args>
-    T& AddComponent(Args&&... args) {
-        return m_world->GetEntityManager().AddComponent<T>(m_id, std::forward<Args>(args)...);
-    }
+    T& AddComponent(Args&&... args);
 
     template<typename T>
-    void RemoveComponent() {
-        m_world->GetEntityManager().RemoveComponent<T>(m_id);
-    }
+    void RemoveComponent();
 
     template<typename T>
-    bool HasComponent() const {
-        return m_world->GetEntityManager().HasComponent<T>(m_id);
-    }
+    bool HasComponent() const;
 
-    void RemoveAllComponents() const {
-        m_world->GetEntityManager().RemoveAllComponents(m_id);
-    }
+    void RemoveAllComponents() const;
 
 private:
     EntityId m_id;
-    World* m_world;
+    World* m_world = nullptr;
 };
+
+#include "Entity.inl"
 
 #endif

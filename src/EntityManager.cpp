@@ -1,4 +1,5 @@
 #include "EntityManager.h"
+#include "Entity.h"
 
 Entity EntityManager::CreateEntity() {
     const EntityId id = ++m_nextId;
@@ -15,4 +16,5 @@ bool EntityManager::IsAlive(const Entity& entity) const {
 
 void EntityManager::DestroyEntity(const Entity& entity) {
     RemoveAllComponents(entity.GetId());
+    m_entities.erase(entity.GetId());
 }

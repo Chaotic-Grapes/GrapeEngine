@@ -1,4 +1,5 @@
 #include "Entity.h"
+#include "World.h"
 #include "Components.h"
 
 Entity::Entity(const EntityId id, World* world) : m_id(id), m_world(world) { AddComponent<Component::Transform>(); }
@@ -43,6 +44,10 @@ Entity Entity::Clone() const {
 
 Component::Transform& Entity::Transform() {
     return *GetComponent<Component::Transform>();
+}
+
+void Entity::RemoveAllComponents() const {
+    m_world->GetEntityManager().RemoveAllComponents(m_id);
 }
 
 EntityId Entity::GetId() const { return m_id; }

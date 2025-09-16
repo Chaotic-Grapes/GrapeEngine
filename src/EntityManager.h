@@ -6,14 +6,16 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "ComponentManager.h"
-#include "Entity.h"
-#include "World.h"
 
+class Entity;
+class World;
 class EntityManager {
 public:
     EntityManager() = default;
 
     Entity CreateEntity();
+
+    void SetWorld(World* world) { m_world = world; }
 
     void DestroyEntity(const Entity& entity);
 
@@ -25,7 +27,7 @@ public:
         if (!mgr.Get(id))
             mgr.Add(id, T(std::forward<Args>(args)...));
 
-        return *_getOrCreateManager<T>.Get(id);
+        return *_getOrCreateManager<T>().Get(id);
     }
 
     template<typename T>
@@ -63,7 +65,7 @@ public:
 
 private:
     EntityId m_nextId{ 0 };
-    World* m_world;
+    World* m_world = nullptr;
 
     std::unordered_set<EntityId> m_entities;
     std::unordered_map<std::type_index, std::unique_ptr<IComponentManager>> m_managers;
