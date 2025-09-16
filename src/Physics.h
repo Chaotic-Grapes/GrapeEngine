@@ -12,9 +12,23 @@ namespace Engine {
         glm::vec3 position;
         glm::vec3 velocity;
         glm::vec3 acceleration;
+        glm::vec3 angularVelocity;
         float damping;
         float mass;
         bool useGravity;
+
+        // underwater stuff
+        bool useBuoyancy;
+        float buoyancy;                      
+        float dragCoefficient;               
+        float angularDrag;                          // rotational resistance
+
+/*      
+        // FUTURE ROTATIONAL PHYSICS
+        glm::vec3 rotation;                         // current orientation in radians (or quaternion ??)
+        glm::vec3 torque;                           // rotational force
+        float inertiaMoment;                        // rotational mass
+*/
 
         // TEMPORARY INITIALISATION 
         PhysicsComponent()
@@ -24,6 +38,12 @@ namespace Engine {
             , damping(0.98f)                        // damping range from 0-1, higher means more resistance
             , mass(1.0f)
             , useGravity(true)                      // gravity is on by default
+
+            , angularVelocity(0.0f, 0.0f, 0.0f)
+            , useBuoyancy(false)                    // buoyancy is off by default for backward compatibility (CHANGE WHEN NEEDED!)
+            , buoyancy(0.8f)                        // 0 = sinks, 1 = neutral, >1 = floats        
+            , dragCoefficient(2.0f)                 // water has higher drag than air
+            , angularDrag(0.95f)
         {}
     };
 
