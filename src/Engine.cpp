@@ -16,11 +16,21 @@ namespace Engine {
             system->Initialize();
     }
 
-    void Engine::Run(const bool consoleFlag) const {
+    void Engine::Run(const bool consoleFlag) {
+		// Attach core systems
+        AttachSystem(new Time());
+		AttachSystem(new WindowManager());
+
+#if !_DEBUG
         if (consoleFlag)
             _enableConsole();
         else
             _disableConsole();
+#else
+        UNREFERENCED_PARAMETER(consoleFlag);
+#endif
+
+		Initialize();
 
         // WindowManager must be attached
         if (WindowManager::GetWindows().empty()) {

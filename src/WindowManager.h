@@ -5,6 +5,10 @@
 #include "ISystem.h"
 #include "Window.h"
 
+#ifdef CreateWindow
+#undef CreateWindow
+#endif
+
 class WindowManager final : public Engine::ISystem {
 public:
     ~WindowManager() override;
