@@ -152,10 +152,12 @@
     <ClCompile Include="src\Engine.cpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\MemoryManager.cpp" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\MemoryManager.h" />
     <ClInclude Include="src\Engine.h" />
     <ClInclude Include="src\ISystem.h" />
     <ClInclude Include="src\Time.h" />
