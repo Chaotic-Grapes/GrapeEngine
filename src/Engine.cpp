@@ -27,7 +27,7 @@ namespace Engine {
 
         // Load GL function pointers AFTER context creation
         if (!gladLoadGL()) {
-            std::cerr << "Failed to initialize GLAD" << std::endl;
+            std::cerr << "Failed to initialize GLAD" << '\n';
             return;
         }
 
