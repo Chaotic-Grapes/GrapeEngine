@@ -6,7 +6,9 @@
 #include "../include/graphics/sprite.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include "Time.h"
+#include "Memory.h"
 #include <iostream>
+#include <iomanip>
 
 namespace Engine {
     /// Global pointer to the core engine
@@ -74,6 +76,9 @@ namespace Engine {
             m_renderer->endFrame();
 
             m_mainWindow.SwapBuffers();
+
+            // Memory overlay (console)
+            RenderMemoryOverlay();
 		}
 
         m_mainWindow.Destroy();
@@ -91,5 +96,26 @@ namespace Engine {
     void Engine::DestroySystems() const {
         for (const auto& system : m_systems)
             delete system;
+    }
+
+    void Engine::Engine::RenderMemoryOverlay() {
+        static float updateTimer = 0.0f;
+        updateTimer += Time::DeltaTime();
+
+        if (updateTimer >= 0.1f) {  // Update every 0.1s
+            updateTimer = 0.0f;
+            Memory& memory = Memory::GetInstance();
+
+            // Use carriage return to overwrite the same line
+            std::cout << "\r";  // Return to start of line
+
+            // Number of MB = Number of bytes / 1 MB (i.e. 1024 * 1024)
+            std::cout << "[Memory] "
+                << "Current: " << std::setw(6) << (memory.GetCurrentAlloc() / (1024.0f * 1024.0f)) << " MB | "
+                << "Peak: " << std::setw(6) << (memory.GetPeakAlloc() / (1024.0f * 1024.0f)) << " MB | "
+                << "Allocs: " << memory.GetAllocationCount();
+
+            std::cout.flush();  // Force output
+        }
     }
 }

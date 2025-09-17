@@ -151,6 +151,13 @@
   <ItemGroup>
     <ClCompile Include="src\Engine.cpp" />
     <ClCompile Include="src\glad.c" />
+    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
+    <ClCompile Include="src\graphics\font.cpp" />
+    <ClCompile Include="src\graphics\polygon-utils.cpp" />
+    <ClCompile Include="src\graphics\renderer.cpp" />
+    <ClCompile Include="src\graphics\shader.cpp" />
+    <ClCompile Include="src\graphics\sprite.cpp" />
+    <ClCompile Include="src\graphics\texture.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Memory.cpp" />
     <ClCompile Include="src\MemoryTest.cpp" />
@@ -158,6 +165,15 @@
     <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\graphics\debugDraw2D.hpp" />
+    <ClInclude Include="include\graphics\font.hpp" />
+    <ClInclude Include="include\graphics\polygon-utils.hpp" />
+    <ClInclude Include="include\graphics\renderer.hpp" />
+    <ClInclude Include="include\graphics\shader.hpp" />
+    <ClInclude Include="include\graphics\sprite.hpp" />
+    <ClInclude Include="include\graphics\stb_image.h" />
+    <ClInclude Include="include\graphics\texture.hpp" />
+    <ClInclude Include="include\graphics\vertex.hpp" />
     <ClInclude Include="include\Memory.h" />
     <ClInclude Include="include\MemoryTest.h" />
     <ClInclude Include="src\Engine.h" />

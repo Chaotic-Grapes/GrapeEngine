@@ -32,6 +32,12 @@ public:
 	// Make sure there's only 1 instance of MemoryManager in the entire program
 	static Memory& GetInstance();
 
+	// Public methods
+	size_t GetCurrentAlloc() const;
+	size_t GetPeakAlloc() const;
+	size_t GetTotalAlloc() const;
+	size_t GetAllocationCount() const;
+
 private:
 	// Memory tracking system that logs every allocation 
 	// and deallocation (AllocationInfo)
@@ -49,6 +55,7 @@ private:
 
 	// Make constructor private so no one can create instances
 	Memory();
+	~Memory();
 
 	// Prevent copying
 	Memory(const Memory&) = delete;

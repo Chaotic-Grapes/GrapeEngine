@@ -100,7 +100,7 @@ void Memory::ReportLeaks() const {
 
 	std::cout << "\n===== MEMORY LEAK REPORT =====\n";
 	std::cout << "Total leaks: " << m_allocs.size() << "\n";
-	std::cout << "Total leaked memory: " << m_currentAlloc << " bytes\n\n";
+	std::cout << "Total leaked memory: " << m_currentAlloc << " bytes\n";
 
 	// Display each leak
 	std::unordered_map<void*, AllocInfo>::const_iterator it;
@@ -124,14 +124,45 @@ void Memory::PrintStats() const {
 	std::cout << "Active allocations: " << m_allocs.size() << "\n";
 }
 
-// Constructor implementation (add this)
+// Constructor implementation
 Memory::Memory() : m_totalAlloc(0), m_currentAlloc(0), m_peakAlloc(0) {
 	// Initialization code
 	std::cout << "MemoryManager initialized\n";
+}
+
+// Destructor implementation
+Memory::~Memory() {
+	if (!m_allocs.empty()) {
+		std::cerr << "\n\nWARNING: memory manager destroyed with " << m_allocs.size()
+			<< (m_allocs.size() == 1 ? " allocation " : " allocations ")
+			<< "still active\n";
+		ReportLeaks();
+	}
 }
 
 // Make sure there's only 1 instance of MemoryManager in the entire program
 Memory& Memory::GetInstance() {
 	static Memory instance;  // Created only once
 	return instance;
+}
+
+// Public methods for RenderMemoryOverlay()
+size_t Memory::GetCurrentAlloc() const {
+	std::lock_guard<std::mutex> lock(m_mutex);
+	return m_currentAlloc;
+}
+
+size_t Memory::GetPeakAlloc() const {
+	std::lock_guard<std::mutex> lock(m_mutex);
+	return m_peakAlloc;
+}
+
+size_t Memory::GetTotalAlloc() const {
+	std::lock_guard<std::mutex> lock(m_mutex);
+	return m_totalAlloc;
+}
+
+size_t Memory::GetAllocationCount() const {
+	std::lock_guard<std::mutex> lock(m_mutex);
+	return m_allocs.size();
 }

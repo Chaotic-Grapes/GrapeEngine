@@ -29,6 +29,10 @@ public:
 
         /// Start the engine
         void Run();
+
+        // I wanna use ImGUI for overlay but it's not set up yet
+        // So best thing to do rn is use console output
+        void RenderMemoryOverlay();
     private:
         /// Systems currently attached to the Engine
         std::vector<ISystem*> m_systems;
@@ -37,6 +41,11 @@ public:
         Window m_mainWindow;
 
         std::unique_ptr<Renderer> m_renderer; // RAII renderer owned by engine
+
+        // For memory manager:
+        bool m_showMemoryOverlay = true;
+        float m_memoryUpdateTimer = 0.0f;
+        const float m_memoryUpdateInter = 0.1f;  // Update every 0.1s
 };
 
     extern Engine* CORE;
