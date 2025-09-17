@@ -2,6 +2,7 @@
 #define COMPONENTS_H
 
 #include "IComponent.h"
+#include <string>
 
 namespace Component {
     // TODO: Replace with a math library vector type
