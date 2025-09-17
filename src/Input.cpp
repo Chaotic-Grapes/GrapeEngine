@@ -1,11 +1,13 @@
 #include <Input.h>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 
 // Initialize static member
 GLFWwindow* Input::m_window = nullptr;
 
-void Input::Init(GLFWwindow* pWin) { 
-    m_window = pWin; 
+void Input::Init(GLFWwindow* pWin) {
+    m_window = pWin;
 }
 
 // Check if a specific key is currently pressed
@@ -50,7 +52,7 @@ void Input::SetupEventCallbacks() {
 void Input::ErrorCallback(int error, char const* description) {
     (void)error;
 #ifdef _DEBUG
-    std::cerr << "GLFW error: " << description << std::endl;
+    std::cerr << "GLFW error: " << description << "\n";
 #endif
 }
 
@@ -60,7 +62,7 @@ void Input::_framebufferSizeCallback(GLFWwindow* pWin, int width, int height) {
     (void)width;
     (void)height;
 #ifdef _DEBUG
-    std::cout << "Window is being resized" << std::endl;
+    std::cout << "\r" << std::setw(50) << std::left << "Window is being resized" << std::flush;
 #endif
 }
 
@@ -74,16 +76,22 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
 #ifdef _DEBUG
     const char* keyName = "";
     switch (key) {
-        case KEY_W: keyName = "W"; break;
-        case KEY_A: keyName = "A"; break;
-        case KEY_S: keyName = "S"; break;
-        case KEY_D: keyName = "D"; break;
-        default: keyName = "Unknown"; break;
+    case KEY_W: keyName = "W"; break;
+    case KEY_A: keyName = "A"; break;
+    case KEY_S: keyName = "S"; break;
+    case KEY_D: keyName = "D"; break;
+    default: keyName = "Unknown"; break;
     }
     // Debug-only code
-    if (action == PRESS) std::cout << keyName << " key pressed\n";
-    else if (action == REPEAT) std::cout << keyName << " key repeatedly pressed\n";
-    else if (action == RELEASE) std::cout << keyName << " key released\n";
+    std::string message;
+    if (action == PRESS)
+        message = "[Key] " + std::string(keyName) + " key pressed";
+    else if (action == REPEAT)
+        message = "[Key] " + std::string(keyName) + " key repeatedly pressed";
+    else if (action == RELEASE)
+        message = "[Key] " + std::string(keyName) + " key released";
+
+    std::cout << "\r" << std::setw(50) << std::left << message << std::flush;
 #endif
 }
 
@@ -96,13 +104,18 @@ void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int m
 #ifdef _DEBUG
     const char* buttonName = "";
     switch (button) {
-        case MOUSE_LEFT: buttonName = "Left mouse button"; break;
-        case MOUSE_RIGHT: buttonName = "Right mouse button"; break;
-        default: buttonName = "Mouse button"; break;
+    case MOUSE_LEFT: buttonName = "Left mouse button"; break;
+    case MOUSE_RIGHT: buttonName = "Right mouse button"; break;
+    default: buttonName = "Mouse button"; break;
     }
     // Debug-only code
-    if (action == PRESS) std::cout << buttonName << " pressed\n";
-    else if (action == RELEASE) std::cout << buttonName << " released\n";
+    std::string message;
+    if (action == PRESS)
+        message = "[Mouse] " + std::string(buttonName) + " pressed";
+    else if (action == RELEASE)
+        message = "[Mouse] " + std::string(buttonName) + " released";
+
+    std::cout << "\r" << std::setw(50) << std::left << message << std::flush;
 #endif
 }
 
@@ -112,7 +125,9 @@ void Input::_mousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
     (void)xPos;
     (void)yPos;
 #ifdef _DEBUG
-    std::cout << "Mouse cursor position: (" << xPos << ", " << yPos << ")" << std::endl;
+    std::ostringstream oss;
+    oss << "Mouse cursor position: (" << std::fixed << std::setprecision(1) << xPos << ", " << yPos << ")";
+    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
 #endif
 }
 
@@ -122,7 +137,9 @@ void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffse
     (void)xOffset;
     (void)yOffset;
 #ifdef _DEBUG
-    std::cout << "Mouse scroll wheel offset: (" << xOffset << ", " << yOffset << ") " << std::endl;
+    std::ostringstream oss;
+    oss << "Mouse scroll wheel offset: (" << std::fixed << std::setprecision(1) << xOffset << ", " << yOffset << ")";
+    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
 #endif
 }
 
@@ -154,18 +171,18 @@ void Input::PrintSpecs() {
     glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBufferBindings); // Max buffer bindings
 
     // Print to output
-    std::cout << "GPU Vendor: " << vendorStr << std::endl
-        << "GL Renderer: " << rendererStr << std::endl
-        << "GL Version: " << versionStr << std::endl
-        << "GL Shader Version: " << shaderVersionStr << std::endl
-        << "GL Major Version: " << majorVersion << std::endl
-        << "GL Minor Version: " << minorVersion << std::endl
+    std::cout << "GPU Vendor: " << vendorStr << "\n"
+        << "GL Renderer: " << rendererStr << "\n"
+        << "GL Version: " << versionStr << "\n"
+        << "GL Shader Version: " << shaderVersionStr << "\n"
+        << "GL Major Version: " << majorVersion << "\n"
+        << "GL Minor Version: " << minorVersion << "\n"
         << (doubleBuffer ? "Current OpenGL Context is double-buffered\n" : "Current OpenGL Context is not double-buffered\n")
-        << "Maximum Vertex Count: " << maxVertices << std::endl
-        << "Maximum Indices Count: " << maxIndices << std::endl
-        << "GL Maximum texture size: " << maxTextureSize << std::endl
+        << "Maximum Vertex Count: " << maxVertices << "\n"
+        << "Maximum Indices Count: " << maxIndices << "\n"
+        << "GL Maximum texture size: " << maxTextureSize << "\n"
         << "Maximum Viewport Dimensions: " << maxViewportDims[0]
-        << " x " << maxViewportDims[1] << std::endl
-        << "Maximum generic vertex attributes: " << maxVertexAttribs << std::endl
-        << "Maximum vertex buffer bindings: " << maxBufferBindings << std::endl << std::endl;
+        << " x " << maxViewportDims[1] << "\n"
+        << "Maximum generic vertex attributes: " << maxVertexAttribs << "\n"
+        << "Maximum vertex buffer bindings: " << maxBufferBindings << "\n\n";
 }
