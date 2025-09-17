@@ -7,10 +7,11 @@
 #include "ISystem.h"
 
 class Entity;
+namespace Engine { class Application; } // Forward declaration for friend class
 class World {
 public:
     World() { m_entityManager.SetWorld(this); }
-	~World() = default;
+	~World() { _shutdown(); }
 
     EntityManager& GetEntityManager();
 
@@ -33,13 +34,15 @@ public:
         return nullptr;
     }
 
-    void Initialize() const;
-
-    void Update() const;
-
 private:
+	friend class Engine::Application;
+
 	EntityManager m_entityManager;
 	std::vector<std::unique_ptr<Engine::ISystem>> m_systems;
+
+    void _initialize() const;
+    void _update() const;
+    void _shutdown();
 };
 
 #endif

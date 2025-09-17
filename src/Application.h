@@ -1,6 +1,12 @@
 ﻿#ifndef APPLICATION_H
 #define APPLICATION_H
 
+#define CREATE_WORLD() Engine::CORE->CreateWorld()
+#define DESTROY_WORLD(world) Engine::CORE->DestroyWorld(world)
+#define DESTROY_WORLD_INDEX(index) Engine::CORE->DestroyWorld(index)
+#define DESTROY_ALL_WORLDS() Engine::CORE->DestroyAllWorlds()
+#define GET_WORLD_COUNT() Engine::CORE->GetWorldCount()
+
 #include <memory>
 #include <vector>
 #include "World.h"
@@ -15,6 +21,30 @@ public:
 		 * @brief Create a new world and return a reference to it.
 		 */
         World& CreateWorld();
+
+        /**
+         * @brief Destroy a specific world by reference
+         *
+		 * @param world The world to destroy
+         */
+        void DestroyWorld(World& world);
+
+        /**
+         * @brief Destroy a world by index
+         *
+		 * @param index The index of the world to destroy
+         */
+        void DestroyWorld(size_t index);
+
+        /**
+         * @brief Destroy all worlds
+         */
+        void DestroyAllWorlds();
+
+        /**
+		 * @brief Get the number of active worlds
+		 */
+        size_t GetWorldCount() const;
 
         /**
          * @brief Starts the engine

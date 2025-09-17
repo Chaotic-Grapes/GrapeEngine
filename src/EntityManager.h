@@ -18,6 +18,7 @@ public:
     void SetWorld(World* world) { m_world = world; }
 
     void DestroyEntity(const Entity& entity);
+    void DestroyAllEntities();
 
     bool IsAlive(const Entity& entity) const;
 

@@ -18,3 +18,11 @@ void EntityManager::DestroyEntity(const Entity& entity) {
     RemoveAllComponents(entity.GetId());
     m_entities.erase(entity.GetId());
 }
+
+void EntityManager::DestroyAllEntities() {
+    for (const EntityId id : m_entities)
+        RemoveAllComponents(id);
+
+    m_entities.clear();
+    m_nextId = 0;
+}

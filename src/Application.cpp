@@ -1,6 +1,4 @@
 ﻿#include "Application.h"
-
-#include <iostream>
 #include <windows.h>
 #include "Time.h"
 #include "WindowManager.h"
@@ -17,7 +15,38 @@ namespace Engine {
 
     World& Application::CreateWorld() {
         m_worlds.push_back(std::make_unique<World>());
-        return *m_worlds.back();
+        auto& world = *m_worlds.back();
+
+        // Attach core systems to the world
+        world.AddSystem<Time>();
+        world.AddSystem<WindowManager>();
+
+        return world;
+    }
+
+    void Application::DestroyWorld(World& world) {
+        const auto it = std::find_if(m_worlds.begin(), m_worlds.end(),
+            [&world](const std::unique_ptr<World>& ptr) {
+                return ptr.get() == &world;
+            });
+
+        if (it != m_worlds.end()) {
+            m_worlds.erase(it);
+        }
+    }
+
+    void Application::DestroyWorld(const size_t index) {
+        if (index < m_worlds.size()) {
+            m_worlds.erase(m_worlds.begin() + static_cast<long long>(index));
+        }
+    }
+
+    void Application::DestroyAllWorlds() {
+        m_worlds.clear();
+    }
+
+    size_t Application::GetWorldCount() const {
+        return m_worlds.size();
     }
 
     void Application::Run(const bool consoleFlag) {
@@ -29,13 +58,6 @@ namespace Engine {
 #else
         (void)consoleFlag;
 #endif
-
-        // Create default world
-        World& gameWorld = CreateWorld();
-
-        // Attach core systems to the default world
-        gameWorld.AddSystem<Time>();
-        gameWorld.AddSystem<WindowManager>();
 
 		Initialize();
 
@@ -59,12 +81,12 @@ namespace Engine {
 
     void Application::Initialize() const {
         for (auto& world : m_worlds)
-            world->Initialize();
+            world->_initialize();
     }
 
     void Application::Update() const {
         for (auto& world : m_worlds)
-            world->Update();
+            world->_update();
     }
 
     void Application::Close() {
