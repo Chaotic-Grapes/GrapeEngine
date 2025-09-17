@@ -153,11 +153,13 @@
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Memory.cpp" />
+    <ClCompile Include="src\MemoryTest.cpp" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Memory.h" />
+    <ClInclude Include="include\MemoryTest.h" />
     <ClInclude Include="src\Engine.h" />
     <ClInclude Include="src\ISystem.h" />
     <ClInclude Include="src\Time.h" />

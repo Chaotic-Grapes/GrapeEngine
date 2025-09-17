@@ -1,8 +1,12 @@
 ﻿#include "Engine.h"
 #include "Time.h"
 #include <iostream>
+#include "MemoryTest.h"
 
 int main() {
+	// Test memory tracking first
+	RunMemoryTests();
+
 	auto* engine = new Engine::Engine();
 	engine->AttachSystem(new Time());
 

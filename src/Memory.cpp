@@ -5,7 +5,7 @@
 
 // Store allocation details in map
 void* Memory::RecordAlloc(size_t size, const char* file, int line, const char* function) {
-	std::cout << "Entered RecordAlloc()\n";
+	std::cout << "\nEntered RecordAlloc()\n";
 	// Lock the mutex to ensure thread safety (allow multiple 
 	// threads to use code/functions without causing UDB)
 	std::lock_guard<std::mutex> lock(m_mutex);
@@ -58,7 +58,7 @@ void* Memory::RecordAlloc(size_t size, const char* file, int line, const char* f
 // Mark it as freed
 void Memory::RecordDealloc(void* ptr) { 
 	if (!ptr) return;
-	std::cout << "Entered RecordDealloc() for: " << ptr << '\n';
+	std::cout << "\nEntered RecordDealloc() for: " << ptr << '\n';
 
 	// Lock the mutex to ensure thread safety
 	std::lock_guard<std::mutex> lock(m_mutex);
@@ -107,7 +107,7 @@ void Memory::ReportLeaks() const {
 	for (it = m_allocs.begin(); it != m_allocs.end(); it++) {
 		const AllocInfo& info = it->second;
 		std::cout << "Leak: " << info.size << " bytes at address " << it->first << "\n";
-		std::cout << "  Location: " << info.file << ":" << info.line << " in " << info.function << "()\n\n";
+		std::cout << "Location: " << info.file << ":" << info.line << " in " << info.function << "()\n";
 	}
 }
 
