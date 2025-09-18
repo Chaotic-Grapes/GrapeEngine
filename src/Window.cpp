@@ -1,4 +1,5 @@
 ﻿#include "Window.h"
+#include "Input.h"
 #include <iostream>
 #include "MessageBus.h"
 #include "MessageTypes.h"
@@ -29,8 +30,11 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		return false;
 	}
 
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	// In case a GLFW function fails, an error is reported to callback function
+	glfwSetErrorCallback(Input::ErrorCallback);
+
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	
 	m_windowHandle = glfwCreateWindow(width, height, title.c_str(), monitor, parent);
@@ -47,6 +51,13 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		glfwTerminate();
 		return false;
 	}
+
+	// Initialize input system with the window
+	Input::Init(m_windowHandle);
+
+	// Register all GLFW input and framebuffer callbacks
+	Input::SetupEventCallbacks();
+
 	glViewport(0, 0, width, height);
 
 	// This callback function is called when the window is resized

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Resource Files">
@@ -14,15 +14,6 @@
     <Filter Include="Engine\Systems">
       <UniqueIdentifier>{2c14d2c2-851a-4c16-8683-c81a4bd3f40c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Engine\Entity Component System">
-      <UniqueIdentifier>{657cef2d-7a43-4e43-91e9-a64e6ac5dad5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Entity Component System\Components">
-      <UniqueIdentifier>{fc74c7b1-f524-4fc2-88eb-77ae5d1c3ec0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Entity Component System\Entity">
-      <UniqueIdentifier>{4b788cc7-025c-402c-a32a-f3b0d0e14c70}</UniqueIdentifier>
-    </Filter>
     <Filter Include="External">
       <UniqueIdentifier>{5d2f5d26-67a0-4d0c-8b0f-b10a66b0cd4f}</UniqueIdentifier>
     </Filter>
@@ -37,9 +28,6 @@
     </Filter>
     <Filter Include="Engine\Systems\Core\Time">
       <UniqueIdentifier>{c067ea98-e5d2-4ea0-a14a-54b4400af31f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Systems\Component Systems">
-      <UniqueIdentifier>{7081b69e-ec1e-485a-a14e-20df182f8715}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -69,6 +57,21 @@
     </ClCompile>
     <ClCompile Include="src\glad.c">
       <Filter>External</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\renderer.cpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\shader.cpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\sprite.cpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\font.cpp">
+      <Filter>Engine\Systems\Core\Font</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Input.cpp">
+      <Filter>Engine\Systems\Core\Input</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -111,11 +114,23 @@
     <ClInclude Include="src\ISystem.h">
       <Filter>Engine\Systems</Filter>
     </ClInclude>
-    <ClInclude Include="ComponentType.h">
-      <Filter>Engine\Entity Component System\Components</Filter>
+    <ClInclude Include="include\graphics\renderer.hpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Archetype.h">
-      <Filter>Engine\Entity Component System\Components</Filter>
+    <ClInclude Include="include\graphics\shader.hpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\sprite.hpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\font.hpp">
+      <Filter>Engine\Systems\Core\Font</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GLHelper.h">
+      <Filter>Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Input.h">
+      <Filter>Engine\Systems\Core\Input</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
