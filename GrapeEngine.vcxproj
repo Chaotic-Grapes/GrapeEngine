@@ -169,9 +169,6 @@
     <ClInclude Include="include\graphics\shader.hpp" />
     <ClInclude Include="include\graphics\sprite.hpp" />
   </ItemGroup>
-  <ItemGroup>
-    <Library Include="lib\glfw3.lib" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
