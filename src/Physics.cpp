@@ -1,10 +1,12 @@
 #include "Physics.h"
+#include "Math/Vector3D.h"  
+
 #include <iostream>
 
 namespace Engine {
 
     // initialize gravity
-    glm::vec3 PhysicsSystem::m_gravity = glm::vec3(0.0f, -9.81f, 0.0f);
+    Vector3D PhysicsSystem::m_gravity = Vector3D(0.0f, -9.81f, 0.0f);
 
     void PhysicsSystem::Initialize() {
         std::cout << "Physics System Initialized" << std::endl; // placeholder for now
@@ -28,7 +30,7 @@ namespace Engine {
             if (!component) continue;
 
             // this resets acceleration each frame!!! (Only applied forces)
-            component->acceleration = glm::vec3(0.0f, 0.0f, 0.0f);
+            component->acceleration = Vector3D(0.0f, 0.0f, 0.0f);
 
             // 1. GRAVITY
             // apply gravity if enabled
@@ -40,13 +42,13 @@ namespace Engine {
             // apply buoyancy if enabled
             if (component->useBuoyancy) {
                 // F_b = -gravity * buoyancyFactor * mass
-                glm::vec3 buoyancyForce = -m_gravity * component->buoyancy * component->mass;   // initialized here to save memory (temporary calc.)
+                Vector3D buoyancyForce = -m_gravity * component->buoyancy * component->mass;   // initialized here to save memory (temporary calc.)
                 component->acceleration += buoyancyForce / component->mass;
             }
 
             // 3. DRAG
             // F_d = -velocity * dragCoefficient
-            glm::vec3 dragForce = -component->velocity * component->dragCoefficient;
+            Vector3D dragForce = -component->velocity * component->dragCoefficient;
             component->acceleration += dragForce / component->mass;
 
             // 4. DAMPING
@@ -63,8 +65,8 @@ namespace Engine {
 /*
             // Maximum Velocity
             const float maxSpeed = 100.0f;
-            if (glm::length (component->velocity) > maxSpeed){
-                component->velocity = glm::normalize(component->velocity) * maxSpeed;
+            if (vec.length(component->velocity) > maxSpeed){
+                component->velocity = vec.Normalize(component->velocity) * maxSpeed;
             }
 */
             // integrates velocity into position
@@ -72,24 +74,24 @@ namespace Engine {
         }
     }
 
-    void PhysicsSystem::ApplyForce(PhysicsComponent* component, const glm::vec3& force) {
+    void PhysicsSystem::ApplyForce(PhysicsComponent* component, const Vector3D& force) {
         if (component && component->mass > 0.0f) { // checks for division by zero
             component->acceleration += force / component->mass;
         }
     }
 
-    void PhysicsSystem::ApplyImpulse(PhysicsComponent* component, const glm::vec3& impulse) {
+    void PhysicsSystem::ApplyImpulse(PhysicsComponent* component, const Vector3D& impulse) {
         if (component) {
             component->velocity += impulse / component->mass;
         }
     }
 
-    void PhysicsSystem::SetGravity(const glm::vec3& gravity) {
+    void PhysicsSystem::SetGravity(const Vector3D& gravity) {
         m_gravity = gravity;
     }
 
     // get current global gravity
-    glm::vec3 PhysicsSystem::GetGravity() {
+    Vector3D PhysicsSystem::GetGravity() {
         return m_gravity;
     }
 
