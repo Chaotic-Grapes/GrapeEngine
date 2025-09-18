@@ -163,8 +163,6 @@
     <ClCompile Include="src\graphics\renderer.cpp" />
     <ClCompile Include="src\graphics\shader.cpp" />
     <ClCompile Include="src\graphics\sprite.cpp" />
-    <ClCompile Include="src\Time.cpp" />
-    <ClCompile Include="src\Window.cpp" />
     <ClInclude Include="include\Input.h" />
     <ClInclude Include="src\ComponentManager.h" />
     <ClInclude Include="src\EntityManager.h" />

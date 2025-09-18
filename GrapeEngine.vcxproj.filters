@@ -14,12 +14,6 @@
     <Filter Include="Engine\Systems">
       <UniqueIdentifier>{2c14d2c2-851a-4c16-8683-c81a4bd3f40c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="External">
-      <UniqueIdentifier>{5d2f5d26-67a0-4d0c-8b0f-b10a66b0cd4f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Messaging">
-      <UniqueIdentifier>{f1a03209-d55a-4108-be00-8a49c37a779e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Engine\Systems\Core">
       <UniqueIdentifier>{9b26cd4e-3380-4616-8c4e-3205736f0cdf}</UniqueIdentifier>
     </Filter>
@@ -28,6 +22,33 @@
     </Filter>
     <Filter Include="Engine\Systems\Core\Time">
       <UniqueIdentifier>{c067ea98-e5d2-4ea0-a14a-54b4400af31f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Graphics">
+      <UniqueIdentifier>{667dac92-3aef-4eeb-aba4-af03ecd87b5f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Font">
+      <UniqueIdentifier>{03cee0fd-278e-41ad-9d3d-ae4a597f81e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Input">
+      <UniqueIdentifier>{3724a06d-1fe0-4a00-bbbc-51d113375e37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Messaging">
+      <UniqueIdentifier>{f1a03209-d55a-4108-be00-8a49c37a779e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External">
+      <UniqueIdentifier>{5d2f5d26-67a0-4d0c-8b0f-b10a66b0cd4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Entity Component System">
+      <UniqueIdentifier>{657cef2d-7a43-4e43-91e9-a64e6ac5dad5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Entity Component System\Components">
+      <UniqueIdentifier>{fc74c7b1-f524-4fc2-88eb-77ae5d1c3ec0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Entity Component System\Entity">
+      <UniqueIdentifier>{4b788cc7-025c-402c-a32a-f3b0d0e14c70}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Helpers">
+      <UniqueIdentifier>{ee230339-05e3-45ac-b05f-ab01c52dcc00}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -57,6 +78,15 @@
     </ClCompile>
     <ClCompile Include="src\glad.c">
       <Filter>External</Filter>
+    </ClCompile>
+    <ClCompile Include="src\World.cpp">
+      <Filter>Engine\Entity Component System</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Entity.cpp">
+      <Filter>Engine\Entity Component System\Entity</Filter>
+    </ClCompile>
+    <ClCompile Include="src\EntityManager.cpp">
+      <Filter>Engine\Entity Component System\Entity</Filter>
     </ClCompile>
     <ClCompile Include="src\graphics\renderer.cpp">
       <Filter>Engine\Systems\Core\Graphics</Filter>
