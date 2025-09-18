@@ -6,15 +6,26 @@
 namespace Engine {
     class ISystem {
 public:
+		/**
+		 * @brief Called when the system is being destroyed/cleaned up
+		 */
         virtual ~ISystem() = default;
-    
-        /// Called when attaching to the engine
-        virtual void Initialize() = 0;
 
-        /// Called every frame.
-        virtual void Update() = 0;
+        /**
+		 * @brief Called when the system is created/initialized
+         */
+        virtual void OnCreate() = 0;
 
-        /// A string name for debugging
+        /**
+		 * @brief Called every frame to update the system's state
+         */
+        virtual void OnUpdate() = 0;
+
+        /**
+		 * @brief Name of the system for debugging/logging purposes
+		 * 
+		 * @return std::string Name of the system
+         */
         virtual std::string Name() const = 0;
 };
 }

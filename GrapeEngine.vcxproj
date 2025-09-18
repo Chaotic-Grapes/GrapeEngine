@@ -149,8 +149,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\EntityManager.cpp" />
+    <ClCompile Include="src\EngineSandbox.cpp" />
+    <ClCompile Include="src\Application.cpp" />
+    <ClCompile Include="src\Entity.cpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\Input.cpp" />
+    <ClCompile Include="src\Time.cpp" />
+    <ClCompile Include="src\Window.cpp" />
+    <ClCompile Include="src\WindowManager.cpp" />
+    <ClCompile Include="src\World.cpp" />
     <ClCompile Include="src\graphics\font.cpp" />
     <ClCompile Include="src\graphics\renderer.cpp" />
     <ClCompile Include="src\graphics\shader.cpp" />
@@ -158,14 +166,27 @@
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
     <ClInclude Include="include\Input.h" />
+    <ClInclude Include="src\ComponentManager.h" />
+    <ClInclude Include="src\EntityManager.h" />
+    <ClInclude Include="src\Components.h" />
+    <ClInclude Include="src\Entity.h" />
+    <ClInclude Include="src\IComponent.h" />
+    <ClInclude Include="src\MessageBus.h" />
+    <ClInclude Include="src\MessageTypes.h" />
+    <ClInclude Include="src\Application.h" />
     <ClInclude Include="src\ISystem.h" />
     <ClInclude Include="src\Time.h" />
     <ClInclude Include="src\Window.h" />
+    <ClInclude Include="src\WindowManager.h" />
+    <ClInclude Include="src\World.h" />
     <ClInclude Include="include\GLHelper.h" />
     <ClInclude Include="include\graphics\font.hpp" />
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />
     <ClInclude Include="include\graphics\sprite.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\Entity.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
