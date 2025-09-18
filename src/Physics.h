@@ -1,18 +1,16 @@
 #ifndef PHYSICS_H
 #define PHYSICS_H
 
-#include "ISystem.h"
 #include "Time.h"
-#include <vector>
-#include <glm/glm.hpp>
+#include "Math/Vector3D.h"
 
 namespace Engine {
 
     struct PhysicsComponent {
-        glm::vec3 position;
-        glm::vec3 velocity;
-        glm::vec3 acceleration;
-        glm::vec3 angularVelocity;
+        Vector3D position;
+        Vector3D velocity;
+        Vector3D acceleration;
+        Vector3D angularVelocity;
         float damping;
         float mass;
         bool useGravity;
@@ -25,8 +23,8 @@ namespace Engine {
 
 /*      
         // FUTURE ROTATIONAL PHYSICS
-        glm::vec3 rotation;                         // current orientation in radians (or quaternion ??)
-        glm::vec3 torque;                           // rotational force
+        Vector3D rotation;                         // current orientation in radians (or quaternion ??)
+        Vector3D torque;                           // rotational force
         float inertiaMoment;                        // rotational mass
 */
 
@@ -57,18 +55,18 @@ namespace Engine {
         void AddEntity(PhysicsComponent* component);
         void RemoveEntity(PhysicsComponent* component);
 
-        static void ApplyForce(PhysicsComponent* component, const glm::vec3& force);
-        static void ApplyImpulse(PhysicsComponent* component, const glm::vec3& impulse);
+        static void ApplyForce(PhysicsComponent* component, const Vector3D& force);
+        static void ApplyImpulse(PhysicsComponent* component, const Vector3D& impulse);
 
-        static void SetGravity(const glm::vec3& gravity);
-        static glm::vec3 GetGravity();
+        static void SetGravity(const Vector3D& gravity);
+        static Vector3D GetGravity();
 
     private:
         void FixedUpdate();
 
         std::vector<PhysicsComponent*> m_entities;
 
-        static glm::vec3 m_gravity;
+        static Vector3D m_gravity;
 
         float m_accumulator = 0.0f;
     };
