@@ -33,7 +33,7 @@ void TestScene::init(Engine::PhysicsSystem* physics, float winW, float winH, uns
     segRight_ = Collision::MakeSegment(Vector2D(xMid + 0.5f * gap, y0),
         Vector2D(xMid + 0.5f * gap, y1));
 
-    spawnBalls(10, seed);  // create & register 10 balls (randomized)
+    spawnBalls(2500, seed);  // create & register 10 balls (randomized)
 }
 
 void TestScene::update(float dt) {
