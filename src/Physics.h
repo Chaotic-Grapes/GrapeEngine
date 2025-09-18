@@ -4,6 +4,8 @@
 #include "Time.h"
 #include "Math/Vector3D.h"
 
+#include <vector>
+
 namespace Engine {
 
     struct PhysicsComponent {
