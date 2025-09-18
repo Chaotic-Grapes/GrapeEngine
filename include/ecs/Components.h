@@ -1,7 +1,7 @@
 #ifndef COMPONENTS_H
 #define COMPONENTS_H
 
-#include "IComponent.h"
+#include "ecs/IComponent.h"
 #include <string>
 
 namespace Component {

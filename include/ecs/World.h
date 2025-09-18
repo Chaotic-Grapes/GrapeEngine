@@ -3,8 +3,8 @@
 
 #include <memory>
 #include <vector>
-#include "EntityManager.h"
-#include "ISystem.h"
+#include "ecs/EntityManager.h"
+#include "ecs/ISystem.h"
 
 class Entity;
 namespace Engine { class Application; } // Forward declaration for friend class

@@ -1,8 +1,8 @@
-﻿#include "Window.h"
+﻿#include "systems/Window.h"
 #include "Input.h"
 #include <iostream>
-#include "MessageBus.h"
-#include "MessageTypes.h"
+#include "messaging/MessageBus.h"
+#include "messaging/MessageTypes.h"
 
 namespace {
 	bool HasFlag(const WindowMode::Flags a, const WindowMode::Flags b) {

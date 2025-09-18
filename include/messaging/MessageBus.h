@@ -1,11 +1,8 @@
 #ifndef MESSAGEBUS_H
 #define MESSAGEBUS_H
 
-#include <unordered_map>
 #include <vector>
 #include <functional>
-#include <typeindex>
-#include <memory>
 
 namespace Messaging {
     class MessageBus {

@@ -9,7 +9,7 @@
 
 #include <memory>
 #include <vector>
-#include "World.h"
+#include "ecs/World.h"
 
 namespace Engine {
     class Application {

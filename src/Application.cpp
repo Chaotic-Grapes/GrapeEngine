@@ -1,8 +1,7 @@
 ﻿#include "Application.h"
 #include <windows.h>
-#include "Time.h"
-#include "WindowManager.h"
-#include "Entity.h"
+#include "systems/Time.h"
+#include "systems/WindowManager.h"
 
 namespace Engine {
     // Global pointer to the core engine

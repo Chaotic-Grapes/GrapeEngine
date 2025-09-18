@@ -92,6 +92,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -107,6 +108,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -123,6 +125,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -139,6 +142,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -164,19 +168,19 @@
     <ClCompile Include="src\graphics\shader.cpp" />
     <ClCompile Include="src\graphics\sprite.cpp" />
     <ClInclude Include="include\Input.h" />
-    <ClInclude Include="src\ComponentManager.h" />
-    <ClInclude Include="src\EntityManager.h" />
-    <ClInclude Include="src\Components.h" />
-    <ClInclude Include="src\Entity.h" />
-    <ClInclude Include="src\IComponent.h" />
-    <ClInclude Include="src\MessageBus.h" />
-    <ClInclude Include="src\MessageTypes.h" />
-    <ClInclude Include="src\Application.h" />
-    <ClInclude Include="src\ISystem.h" />
-    <ClInclude Include="src\Time.h" />
-    <ClInclude Include="src\Window.h" />
-    <ClInclude Include="src\WindowManager.h" />
-    <ClInclude Include="src\World.h" />
+    <ClInclude Include="include\ecs\ComponentManager.h" />
+    <ClInclude Include="include\ecs\EntityManager.h" />
+    <ClInclude Include="include\ecs\Components.h" />
+    <ClInclude Include="include\ecs\Entity.h" />
+    <ClInclude Include="include\ecs\IComponent.h" />
+    <ClInclude Include="include\ecs\ISystem.h" />
+    <ClInclude Include="include\ecs\World.h" />
+    <ClInclude Include="include\messaging\MessageBus.h" />
+    <ClInclude Include="include\messaging\MessageTypes.h" />
+    <ClInclude Include="include\Application.h" />
+    <ClInclude Include="include\systems\Time.h" />
+    <ClInclude Include="include\systems\Window.h" />
+    <ClInclude Include="include\systems\WindowManager.h" />
     <ClInclude Include="include\GLHelper.h" />
     <ClInclude Include="include\graphics\font.hpp" />
     <ClInclude Include="include\graphics\renderer.hpp" />

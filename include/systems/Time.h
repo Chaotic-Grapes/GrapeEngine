@@ -1,7 +1,7 @@
 ﻿#ifndef TIME_H
 #define TIME_H
 
-#include "ISystem.h"
+#include "ecs/ISystem.h"
 
 class Time final : public Engine::ISystem {
 public:

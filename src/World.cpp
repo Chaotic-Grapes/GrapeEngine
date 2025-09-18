@@ -1,5 +1,5 @@
-#include "World.h"
-#include "Entity.h"
+#include "ecs/World.h"
+#include "ecs/Entity.h"
 
 void World::_initialize() const {
     for (auto& sys : m_systems)

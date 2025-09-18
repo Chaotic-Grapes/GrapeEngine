@@ -2,7 +2,7 @@
 #define ENTITY_H
 
 #include <cstdint>
-#include "Components.h"
+#include "ecs/Components.h"
 
 using EntityId = uint32_t;
 

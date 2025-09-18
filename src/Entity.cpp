@@ -1,6 +1,6 @@
-#include "Entity.h"
-#include "World.h"
-#include "Components.h"
+#include "ecs/Entity.h"
+#include "ecs/World.h"
+#include "ecs/Components.h"
 
 Entity::Entity(const EntityId id, World* world) : m_id(id), m_world(world) { AddComponent<Component::Transform>(); }
 Entity::Entity(const Entity& other)

@@ -1,5 +1,5 @@
-#include "EntityManager.h"
-#include "Entity.h"
+#include "ecs/EntityManager.h"
+#include "ecs/Entity.h"
 
 Entity EntityManager::CreateEntity() {
     const EntityId id = ++m_nextId;

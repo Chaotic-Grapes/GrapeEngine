@@ -2,7 +2,7 @@
 #define WINDOW_MANAGER_H
 
 #include <vector>
-#include "ISystem.h"
+#include "ecs/ISystem.h"
 #include "Window.h"
 
 #ifdef CreateWindow
