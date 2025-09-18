@@ -152,7 +152,7 @@
     <ClCompile Include="src\Engine.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\glad.c" />
-    <ClCompile Include="src\GLHelper.cpp" />
+    <ClCompile Include="src\Input.cpp" />
     <ClCompile Include="src\graphics\font.cpp" />
     <ClCompile Include="src\graphics\renderer.cpp" />
     <ClCompile Include="src\graphics\shader.cpp" />
@@ -168,6 +168,9 @@
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />
     <ClInclude Include="include\graphics\sprite.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="lib\glfw3.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
