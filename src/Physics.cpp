@@ -1,6 +1,5 @@
 #include "Physics.h"
 #include "Math/Vector3D.h"  
-
 #include <iostream>
 #include <vector>
 
@@ -9,11 +8,11 @@ namespace Engine {
     // initialize gravity
     Vector3D PhysicsSystem::m_gravity = Vector3D(0.0f, -9.81f, 0.0f);
 
-    void PhysicsSystem::Initialize() {
+    void PhysicsSystem::OnCreate() {
         std::cout << "Physics System Initialized" << std::endl; // placeholder for now
     }
 
-    void PhysicsSystem::Update() {
+    void PhysicsSystem::OnUpdate() {
 
         m_accumulator += Time::DeltaTime(); // accumulate time from last frame
 

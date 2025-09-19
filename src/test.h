@@ -17,8 +17,8 @@ struct CircleEntity {
     CircleEntity(float r = 20.0f, const glm::vec4& col = glm::vec4(1, 0, 0, 1))
         : radius(r), color(col)
     {
-        physics.position = glm::vec3(0, 0, 0);
-        physics.velocity = glm::vec3(0, 0, 0);
+        physics.position = Vector3D(0, 0, 0);
+        physics.velocity = Vector3D(0, 0, 0);
         physics.damping = 1.0f; // start with NO slowdown; will enable after 5s
     }
 };

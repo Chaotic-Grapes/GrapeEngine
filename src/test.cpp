@@ -12,8 +12,7 @@
 #include <glm/gtc/constants.hpp>
 
 // Tiny helpers for conversions (renderer uses glm::vec2)
-static inline glm::vec2 ToGLM2(const glm::vec3& v) { return { v.x, v.y }; }
-static inline Vector2D  ToV2(const glm::vec3& v) { return { v.x, v.y }; }
+static inline Vector2D ToV2(const Vector3D& v) { return { v.x, v.y }; }
 
 
 void TestScene::init(Engine::PhysicsSystem* physics, float winW, float winH, unsigned seed) {
@@ -106,12 +105,12 @@ void TestScene::spawnBalls(int count, unsigned seed) {
         // Random position fully inside the screen
         std::uniform_real_distribution<float> xDist(r, width_ - r);
         std::uniform_real_distribution<float> yDist(r, height_ - r);
-        e.physics.position = glm::vec3(xDist(rng), yDist(rng), 0.0f);
+        e.physics.position = Vector3D(xDist(rng), yDist(rng), 0.0f);
 
         // Random velocity from speed + angle
         float ang = angleDist(rng);
         float speed = speedDist(rng);
-        e.physics.velocity = glm::vec3(std::cos(ang) * speed, std::sin(ang) * speed, 0.0f);
+        e.physics.velocity = Vector3D(std::cos(ang) * speed, std::sin(ang) * speed, 0.0f);
 
         // No damping initially
         e.physics.damping = 1.0f;
