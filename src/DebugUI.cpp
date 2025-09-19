@@ -15,7 +15,7 @@ void DebugUI::Initialize(GLFWwindow* window) {
     ImGui::CreateContext();   // Create ImGUI rendering context
     ImGuiIO& io = ImGui::GetIO();  // Get input/output config
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Allow keyboard navigation
-    io.FontGlobalScale = 1.25f;    // Scale the entire UI
+    io.FontGlobalScale = 1.35f;    // Scale the entire UI
 
     ImGui::StyleColorsDark(); // Set dark theme colors
     ImGui_ImplGlfw_InitForOpenGL(window, true); // GLFW backend (window/input handling)
@@ -23,6 +23,11 @@ void DebugUI::Initialize(GLFWwindow* window) {
 }
 
 void DebugUI::NewFrame() {
+    // Interact with debug UI (start of every frame so it keeps getting checked)
+    if (Input::WasKeyJustPressed(GLFW_KEY_F1)) {
+        DebugUI::SetEnabled(!DebugUI::IsEnabled());
+    }
+
     if (!m_enabled) return;  // Early exit if UI is toggled off
 
     ImGui_ImplOpenGL3_NewFrame(); // Prepare OpenGL rendering
@@ -42,6 +47,7 @@ void DebugUI::Render() {
     // Render custom debug windows
     _showEngineDebugWindow(showDemo); // Pass demo control to debug window
     _showPerformanceWindow();  // Show FPS and performance stats
+    _showInputDebugWindow();   // Input debugging
 
     // Finalize the frame and send to GPU
     ImGui::Render();  // Generate draw commands from UI
@@ -65,6 +71,7 @@ void DebugUI::_showEngineDebugWindow(bool& showDemo) {
     }
 
     ImGui::Text("Press F1 to toggle debug UI");
+
     ImGui::End();  // Complete window definition
 }
 
@@ -78,6 +85,53 @@ void DebugUI::_showPerformanceWindow() {
     if (ImGui::Button("Print GPU Specs to Console")) {
         Input::PrintSpecs();
     }
+    ImGui::End();
+}
+
+void DebugUI::_showInputDebugWindow() {
+    // Same stuff as before
+    ImGui::SetNextWindowPos(ImVec2(320, 10), ImGuiCond_Once);
+    ImGui::Begin("Input Debug");
+
+    ImGui::Text("=== Mouse ===");
+    ImGui::Text("Position: (%.1f, %.1f)", Input::GetMouseX(), Input::GetMouseY());
+    ImGui::Text("Left Button: %s", Input::IsMousePressed(MOUSE_LEFT) ? "PRESSED" : "Released");
+    ImGui::Text("Right Button: %s", Input::IsMousePressed(MOUSE_RIGHT) ? "PRESSED" : "Released");
+    ImGui::Text("Scroll Offset: (%.1f, %.1f)", Input::GetScrollX(), Input::GetScrollY());
+
+    ImGui::Separator();
+    ImGui::Text("=== Window ===");
+    ImGui::Text("Size: %dx%d", Input::GetWindowWidth(), Input::GetWindowHeight());
+
+    ImGui::Separator();
+    ImGui::Text("=== Keyboard ===");
+
+    // Show your WASD keys using your constants
+    ImGui::Text("W: %s", Input::IsKeyPressed(KEY_W) ? "PRESSED" : "Released");
+    ImGui::Text("A: %s", Input::IsKeyPressed(KEY_A) ? "PRESSED" : "Released");
+    ImGui::Text("S: %s", Input::IsKeyPressed(KEY_S) ? "PRESSED" : "Released");
+    ImGui::Text("D: %s", Input::IsKeyPressed(KEY_D) ? "PRESSED" : "Released");
+    ImGui::Text("F1: %s", Input::IsKeyPressed(GLFW_KEY_F1) ? "PRESSED" : "Released");
+
+    ImGui::Separator();
+    ImGui::Text("=== Event Testing ===");
+
+    // For fun
+    static int spacePressed = 0;
+    static int spaceReleased = 0;
+
+    if (Input::WasKeyJustPressed(GLFW_KEY_SPACE)) spacePressed++;
+    if (Input::WasKeyJustReleased(GLFW_KEY_SPACE)) spaceReleased++;
+
+    ImGui::Text("Space Bar Events:");
+    ImGui::Text("  Pressed: %d times", spacePressed);
+    ImGui::Text("  Released: %d times", spaceReleased);
+
+    if (ImGui::Button("Reset Counters")) {
+        spacePressed = 0;
+        spaceReleased = 0;
+    }
+
     ImGui::End();
 }
 

@@ -3,6 +3,22 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Ignore build directories
+build/
+Build/
+bin/
+Bin/
+
+# Ignore CMake generated files
+*.cmake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+#ImGUI settings
+imgui.ini
+
 # User-specific files
 *.rsuser
 *.suo
@@ -447,7 +463,3 @@ http-client.private.env.json
 # Apifox Helper cache
 .idea/.cache/.Apifox_Helper
 .idea/ApifoxUploaderProjectSetting.xml
-build/_deps/glad-src/
-build/_deps/glfw-src/
-build/_deps/glm-src/
-build/_deps/imgui-src/

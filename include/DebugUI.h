@@ -18,6 +18,7 @@ private:
     static bool m_enabled;
     static void _showEngineDebugWindow(bool& showDemo); // Main debug console window with engine status
     static void _showPerformanceWindow(); // Performance monitoring window
+    static void _showInputDebugWindow();   // Input debugging
 };
 
 #endif

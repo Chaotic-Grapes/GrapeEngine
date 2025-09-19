@@ -37,3 +37,8 @@ void Overlay::OnUpdate() {
     // Draw all the ImGUI windows and widgets
     DebugUI::Render();
 }
+
+// Prevent memory leaks
+Overlay::~Overlay() {
+    DebugUI::Shutdown();
+}
