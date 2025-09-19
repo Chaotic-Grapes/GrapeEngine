@@ -50,12 +50,18 @@
     <Filter Include="Helpers">
       <UniqueIdentifier>{ee230339-05e3-45ac-b05f-ab01c52dcc00}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sandboxing">
+      <UniqueIdentifier>{d2174dd4-2060-4ec1-a53e-a342c86dec39}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sandboxing\Scenes">
+      <UniqueIdentifier>{55cfc9c4-4bad-444f-822c-f287deb5871d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Physics">
+      <UniqueIdentifier>{c06e09d6-2f0c-447d-bb4e-176c712e4030}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp">
-      <Filter>Engine\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\EngineSandbox.cpp">
       <Filter>Engine\Core</Filter>
     </ClCompile>
     <ClCompile Include="src\Time.cpp">
@@ -112,44 +118,34 @@
     <ClCompile Include="src\graphics\renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Collision.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Physics.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Math\Matrix3x3.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Math\Matrix4x4.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Math\Vector2D.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Math\Vector3D.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Math\Vector4D.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\graphics\debugDraw2D.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\graphics\polygon-utils.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\graphics\sprite.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\graphics\texture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Input.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Collision.cpp" />
+    <ClCompile Include="src\graphics\texture.cpp" />
+    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
+    <ClCompile Include="src\graphics\polygon-utils.cpp" />
+    <ClCompile Include="src\Math\Matrix3x3.cpp" />
+    <ClCompile Include="src\Math\Matrix4x4.cpp" />
+    <ClCompile Include="src\Math\Vector2D.cpp" />
+    <ClCompile Include="src\Math\Vector3D.cpp" />
+    <ClCompile Include="src\Math\Vector4D.cpp" />
+    <ClCompile Include="src\Physics.cpp" />
+    <ClCompile Include="src\test.cpp" />
+    <ClCompile Include="src\EngineSandbox.cpp">
+      <Filter>Sandboxing</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PhysicsCollision2DTestScene.cpp">
+      <Filter>Sandboxing\Scenes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Physics2D.cpp">
+      <Filter>Engine\Systems\Core\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer2D.cpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -210,59 +206,34 @@
     <ClInclude Include="include\Input.h">
       <Filter>Engine\Systems\Core\Input</Filter>
     </ClInclude>
-    <ClInclude Include="src\Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Collision.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Physics.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\test.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Math\Matrix3x3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Math\Matrix4x4.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Math\Vector2D.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Math\Vector3D.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Math\Vector4D.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\GLFW\glfw3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\GLFW\glfw3native.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\graphics\sprite.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\graphics\texture.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\KHR\khrplatform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\Input.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="lib\glfw3.lib">
-      <Filter>Header Files</Filter>
-    </Library>
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="lib\glfw3.lib" />
+    <ClInclude Include="include\Color.h" />
+    <ClInclude Include="include\graphics\texture.hpp" />
+    <ClInclude Include="include\Math\Matrix3x3.h" />
+    <ClInclude Include="include\Math\Matrix4x4.h" />
+    <ClInclude Include="include\Math\Vector2D.h" />
+    <ClInclude Include="include\Math\Vector3D.h" />
+    <ClInclude Include="include\Math\Vector4D.h" />
+    <ClInclude Include="src\Collision.h" />
+    <ClInclude Include="src\Physics.h" />
+    <ClInclude Include="src\test.h" />
+    <ClInclude Include="include\PhysicsCollision2DTestScene.h">
+      <Filter>Sandboxing\Scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Math\MathHelper.h">
+      <Filter>Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Physics2D.h">
+      <Filter>Engine\Systems\Core\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Renderer2D.h">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">

@@ -1,5 +1,7 @@
 ﻿#include "Application.h"
 #include <windows.h>
+#include "Physics2D.h"
+#include "Renderer2D.h"
 #include "systems/Time.h"
 #include "systems/WindowManager.h"
 
@@ -19,6 +21,8 @@ namespace Engine {
         // Attach core systems to the world
         world.AddSystem<Time>();
         world.AddSystem<WindowManager>();
+        world.AddSystem<Physics2D>(&world);
+        world.AddSystem<Renderer2D>(&world);
 
         return world;
     }

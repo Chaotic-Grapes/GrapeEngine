@@ -3,57 +3,57 @@
 #include <stdexcept>
 
 // Constructors
-Vector4D::Vector4D() : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
-Vector4D::Vector4D(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
+Vector4D::Vector4D() : X(0.0f), Y(0.0f), Z(0.0f), W(0.0f) {}
+Vector4D::Vector4D(float x, float y, float z, float w) : X(x), Y(y), Z(z), W(w) {}
 
 // Assignment operators (member functions)
 Vector4D& Vector4D::operator+=(const Vector4D& other) {
-	x += other.x;
-	y += other.y;
-	z += other.z;
-	w += other.w;
+	X += other.X;
+	Y += other.Y;
+	Z += other.Z;
+	W += other.W;
 	return *this;
 }
 
 Vector4D& Vector4D::operator-=(const Vector4D& other) {
-	x -= other.x;
-	y -= other.y;
-	z -= other.z;
-	w -= other.w;
+	X -= other.X;
+	Y -= other.Y;
+	Z -= other.Z;
+	W -= other.W;
 	return *this;
 }
 
 Vector4D& Vector4D::operator*=(float scalar) {
-	x *= scalar;
-	y *= scalar;
-	z *= scalar;
-	w *= scalar;
+	X *= scalar;
+	Y *= scalar;
+	Z *= scalar;
+	W *= scalar;
 	return *this;
 }
 
 Vector4D& Vector4D::operator/=(float scalar) {
 	if (scalar == 0.0f) throw std::runtime_error("Division by zero");
 	float invScalar = 1.0f / scalar;
-	x *= invScalar;
-	y *= invScalar;
-	z *= invScalar;
-	w *= invScalar;
+	X *= invScalar;
+	Y *= invScalar;
+	Z *= invScalar;
+	W *= invScalar;
 	return *this;
 }
 
 // Unary operator
-Vector4D Vector4D::operator-() const { return Vector4D(-x, -y, -z, -w); }
+Vector4D Vector4D::operator-() const { return Vector4D(-X, -Y, -Z, -W); }
 
 // Member functions
-float Vector4D::Length() const { return sqrtf(x * x + y * y + z * z + w * w); }
-float Vector4D::SquareLength() const { return x * x + y * y + z * z + w * w; }
+float Vector4D::Length() const { return sqrtf(X * X + Y * Y + Z * Z + W * W); }
+float Vector4D::SquareLength() const { return X * X + Y * Y + Z * Z + W * W; }
 
 // Returns a new vector
 Vector4D Vector4D::Normalized() const {
 	float length = Length();
 	if (length > 0) {
 		float invLength = 1.0f / length;
-		return Vector4D(x * invLength, y * invLength, z * invLength, w * invLength);
+		return Vector4D(X * invLength, Y * invLength, Z * invLength, W * invLength);
 	}
 	return Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
 }
@@ -63,48 +63,48 @@ void Vector4D::Normalize() {
 	float length = Length();
 	if (length > 0) {
 		float invLength = 1.0f / length;
-		x *= invLength;
-		y *= invLength;
-		z *= invLength;
-		w *= invLength;
+		X *= invLength;
+		Y *= invLength;
+		Z *= invLength;
+		W *= invLength;
 	}
 }
 
 // Easier access
-float Vector4D::Dot(const Vector4D& other) const { return x * other.x + y * other.y + z * other.z + w * other.w; }
+float Vector4D::Dot(const Vector4D& other) const { return X * other.X + Y * other.Y + Z * other.Z + W * other.W; }
 
 // Static functions
-float Vector4D::Dot(const Vector4D& a, const Vector4D& b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
+float Vector4D::Dot(const Vector4D& a, const Vector4D& b) { return a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W; }
 
 float Vector4D::Distance(const Vector4D& a, const Vector4D& b) {
-	float dx = a.x - b.x;
-	float dy = a.y - b.y;
-	float dz = a.z - b.z;
-	float dw = a.w - b.w;
+	float dx = a.X - b.X;
+	float dy = a.Y - b.Y;
+	float dz = a.Z - b.Z;
+	float dw = a.W - b.W;
 	return sqrtf(dx * dx + dy * dy + dz * dz + dw * dw);
 }
 
 float Vector4D::SquareDistance(const Vector4D& a, const Vector4D& b) {
-	float dx = a.x - b.x;
-	float dy = a.y - b.y;
-	float dz = a.z - b.z;
-	float dw = a.w - b.w;
+	float dx = a.X - b.X;
+	float dy = a.Y - b.Y;
+	float dz = a.Z - b.Z;
+	float dw = a.W - b.W;
 	return dx * dx + dy * dy + dz * dz + dw * dw;
 }
 
 Vector4D Vector4D::Lerp(const Vector4D& a, const Vector4D& b, float t) {
 	// lerp = a + (b - a) t; clamp t between 0 and 1
 	t = (t < 0) ? 0 : ((t > 1) ? 1 : t);
-	return Vector4D(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t);
+	return Vector4D(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, a.Z + (b.Z - a.Z) * t, a.W + (b.W - a.W) * t);
 }
 
 Vector4D Vector4D::Homogenize(const Vector4D& vector) { 
-	if (vector.w != 0.0f) {
-		float invW = 1.0f / vector.w;
+	if (vector.W != 0.0f) {
+		float invW = 1.0f / vector.W;
 		return Vector4D(
-			vector.x * invW,
-			vector.y * invW,
-			vector.z * invW,
+			vector.X * invW,
+			vector.Y * invW,
+			vector.Z * invW,
 			1.0f
 		);
 	}
@@ -113,10 +113,10 @@ Vector4D Vector4D::Homogenize(const Vector4D& vector) {
 
 Vector4D Vector4D::ClampVector(const Vector4D& vector, const Vector4D& min, const Vector4D& max) {
 	// Clamp each component individually
-	float clampedX = (vector.x < min.x) ? min.x : ((vector.x > max.x) ? max.x : vector.x);
-	float clampedY = (vector.y < min.y) ? min.y : ((vector.y > max.y) ? max.y : vector.y);
-	float clampedZ = (vector.z < min.z) ? min.z : ((vector.z > max.z) ? max.z : vector.z);
-	float clampedW = (vector.w < min.w) ? min.w : ((vector.w > max.w) ? max.w : vector.w);
+	float clampedX = (vector.X < min.X) ? min.X : ((vector.X > max.X) ? max.X : vector.X);
+	float clampedY = (vector.Y < min.Y) ? min.Y : ((vector.Y > max.Y) ? max.Y : vector.Y);
+	float clampedZ = (vector.Z < min.Z) ? min.Z : ((vector.Z > max.Z) ? max.Z : vector.Z);
+	float clampedW = (vector.W < min.W) ? min.W : ((vector.W > max.W) ? max.W : vector.W);
 	return Vector4D(clampedX, clampedY, clampedZ, clampedW);
 }
 
@@ -126,24 +126,24 @@ float Vector4D::ClampValue(float component, float min, float max) {
 	return component;
 }
 
-// If w == 1.0f
-bool Vector4D::IsPoint() const { return w == 1.0f; }
-// If w == 0.0f
-bool Vector4D::IsVector() const { return w == 0.0f; }
+// If W == 1.0f
+bool Vector4D::IsPoint() const { return W == 1.0f; }
+// If W == 0.0f
+bool Vector4D::IsVector() const { return W == 0.0f; }
 // Extract 3D components
-Vector3D Vector4D::XYZ() const { return Vector3D(x, y, z); }
+Vector3D Vector4D::XYZ() const { return Vector3D(X, Y, Z); }
 
 // Binary operators (non-member functions)
-Vector4D operator+(const Vector4D& a, const Vector4D& b) { return Vector4D(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
-Vector4D operator-(const Vector4D& a, const Vector4D& b) { return Vector4D(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
-Vector4D operator*(const Vector4D& vector, float scalar) { return Vector4D(vector.x * scalar, vector.y * scalar, vector.z * scalar, vector.w * scalar); }
-Vector4D operator*(float scalar, const Vector4D& vector) { return Vector4D(vector.x * scalar, vector.y * scalar, vector.z * scalar, vector.w * scalar); }
+Vector4D operator+(const Vector4D& a, const Vector4D& b) { return Vector4D(a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.W + b.W); }
+Vector4D operator-(const Vector4D& a, const Vector4D& b) { return Vector4D(a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.W - b.W); }
+Vector4D operator*(const Vector4D& vector, float scalar) { return Vector4D(vector.X * scalar, vector.Y * scalar, vector.Z * scalar, vector.W * scalar); }
+Vector4D operator*(float scalar, const Vector4D& vector) { return Vector4D(vector.X * scalar, vector.Y * scalar, vector.Z * scalar, vector.W * scalar); }
 
 Vector4D operator/(const Vector4D& vector, float scalar) {
 	if (scalar == 0.0f) throw std::runtime_error("Division by zero");
 	float invScalar = 1.0f / scalar;
-	return Vector4D(vector.x * invScalar, vector.y * invScalar, vector.z * invScalar, vector.w * invScalar);
+	return Vector4D(vector.X * invScalar, vector.Y * invScalar, vector.Z * invScalar, vector.W * invScalar);
 }
 
-bool operator==(const Vector4D& a, const Vector4D& b) { return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w); }
+bool operator==(const Vector4D& a, const Vector4D& b) { return (a.X == b.X) && (a.Y == b.Y) && (a.Z == b.Z) && (a.W == b.W); }
 bool operator!=(const Vector4D& a, const Vector4D& b) { return !(a == b); }

@@ -1,0 +1,35 @@
+#ifndef PHYSICS2D_H
+#define PHYSICS2D_H
+
+#include "ecs/Components.h"
+#include "ecs/ISystem.h"
+#include "ecs/World.h"
+
+class Entity;
+namespace Engine {
+    class Physics2D : public ISystem {
+    public:
+        Physics2D(World* world) : m_world(world) {}
+
+        void OnCreate() override;
+        void OnUpdate() override;
+        std::string Name() const override { return "Physics2D"; }
+
+        static void SetGravity(const Vector2D& gravity) { m_gravity = gravity; }
+        static Vector2D GetGravity() { return m_gravity; }
+
+        static void AddForce(Component::Rigidbody2D& rb, const Vector2D& force);
+        static void AddImpulse(Component::Rigidbody2D& rb, const Vector2D& impulse);
+
+    private:
+        void FixedUpdate();
+        void UpdateRigidbody(Component::Rigidbody2D& rb, Component::Transform& t, Component::Collider2D* col);
+
+        World* m_world;
+        static Vector2D m_gravity;
+
+        float m_accumulator = 0.0f;
+    };
+}
+
+#endif

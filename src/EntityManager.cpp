@@ -5,9 +5,7 @@ Entity EntityManager::CreateEntity() {
     const EntityId id = ++m_nextId;
     m_entities.insert(id);
 
-    Entity e(id, m_world);
-
-    return e;
+    return {id, m_world};
 }
 
 bool EntityManager::IsAlive(const Entity& entity) const {

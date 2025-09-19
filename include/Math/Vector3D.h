@@ -2,7 +2,7 @@
 
 class Vector3D {
 public:
-    float x, y, z;
+    float X, Y, Z;
 
     // Constructors
     Vector3D();

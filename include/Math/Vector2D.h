@@ -2,7 +2,7 @@
 
 class Vector2D {
 public:
-    float x, y;
+    float X, Y;
 
     // Constructors
     Vector2D();

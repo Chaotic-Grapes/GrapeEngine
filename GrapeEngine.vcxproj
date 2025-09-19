@@ -153,6 +153,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Physics2D.cpp" />
+    <ClCompile Include="src\PhysicsCollision2DTestScene.cpp" />
+    <ClCompile Include="src\Renderer2D.cpp" />
     <ClCompile Include="src\Collision.cpp" />
     <ClCompile Include="src\Input.cpp" />
     <ClCompile Include="src\graphics\font.cpp" />
@@ -178,6 +181,7 @@
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
+    <ClInclude Include="include\Color.h" />
     <ClInclude Include="include\Input.h" />
     <ClInclude Include="include\ecs\ComponentManager.h" />
     <ClInclude Include="include\ecs\EntityManager.h" />
@@ -203,6 +207,10 @@
     <ClInclude Include="include\Math\Vector2D.h" />
     <ClInclude Include="include\Math\Vector3D.h" />
     <ClInclude Include="include\Math\Vector4D.h" />
+    <ClInclude Include="include\Math\MathHelper.h" />
+    <ClInclude Include="include\Physics2D.h" />
+    <ClInclude Include="include\PhysicsCollision2DTestScene.h" />
+    <ClInclude Include="include\Renderer2D.h" />
     <ClInclude Include="src\Collision.h" />
     <ClInclude Include="src\Physics.h" />
     <ClInclude Include="src\test.h" />

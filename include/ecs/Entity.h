@@ -10,11 +10,11 @@ class World;
 class Entity {
 public:
     Entity(EntityId id, World* world);
-    Entity(const Entity& other);
-    ~Entity();
-    Entity& operator=(const Entity& other);
-    Entity(Entity&& entity) noexcept;
-    Entity& operator=(Entity&& entity) noexcept;
+    Entity(const Entity& other) = default;   // just copy the handle
+    ~Entity() = default;
+    Entity& operator=(const Entity& other) = default;
+    Entity(Entity&& other) noexcept = default;
+    Entity& operator=(Entity&& other) noexcept = default;
 
     EntityId GetId() const;
     Entity Clone() const;

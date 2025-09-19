@@ -5,6 +5,7 @@
 #include "Math/Vector3D.h"
 #include <vector>
 #include "ecs/ISystem.h"
+#include "ecs/World.h"
 
 namespace Engine {
 
@@ -49,6 +50,8 @@ namespace Engine {
 
     class PhysicsSystem : public ISystem {
     public:
+        PhysicsSystem(World* world) : m_world(world) {}
+
         void OnCreate() override;
         void OnUpdate() override;
         std::string Name() const override { return "Physics"; }
@@ -71,6 +74,8 @@ namespace Engine {
         static Vector3D m_gravity;
 
         float m_accumulator = 0.0f;
+
+        World* m_world;
     };
 
 } // namespace Engine

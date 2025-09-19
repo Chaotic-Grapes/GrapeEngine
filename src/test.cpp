@@ -12,7 +12,7 @@
 #include <glm/gtc/constants.hpp>
 
 // Tiny helpers for conversions (renderer uses glm::vec2)
-static inline Vector2D ToV2(const Vector3D& v) { return { v.x, v.y }; }
+static inline Vector2D ToV2(const Vector3D& v) { return { v.X, v.Y }; }
 
 
 void TestScene::init(Engine::PhysicsSystem* physics, float winW, float winH, unsigned seed) {
@@ -26,7 +26,7 @@ void TestScene::init(Engine::PhysicsSystem* physics, float winW, float winH, uns
     const float y0 = height_ * 0.25f;
     const float y1 = height_ * 0.75f;
 
-    // Left line at x = mid - gap/2, right line at x = mid + gap/2
+    // Left line at X = mid - gap/2, right line at X = mid + gap/2
     segLeft_ = Collision::MakeSegment(Vector2D(xMid - 0.5f * gap, y0),
         Vector2D(xMid - 0.5f * gap, y1));
     segRight_ = Collision::MakeSegment(Vector2D(xMid + 0.5f * gap, y0),
@@ -57,18 +57,18 @@ void TestScene::render(Renderer& r) {
     const GLuint tex = 0; // no texture
 
     DebugDraw2D::Line(r,
-        glm::vec2(segLeft_.p0.x, segLeft_.p0.y),
-        glm::vec2(segLeft_.p1.x, segLeft_.p1.y),
+        glm::vec2(segLeft_.p0.X, segLeft_.p0.Y),
+        glm::vec2(segLeft_.p1.X, segLeft_.p1.Y),
         thickness, lineColor, tex);
 
     DebugDraw2D::Line(r,
-        glm::vec2(segRight_.p0.x, segRight_.p0.y),
-        glm::vec2(segRight_.p1.x, segRight_.p1.y),
+        glm::vec2(segRight_.p0.X, segRight_.p0.Y),
+        glm::vec2(segRight_.p1.X, segRight_.p1.Y),
         thickness, lineColor, tex);
 
     for (const auto& b : balls_) {
         DebugDraw2D::Circle(r,
-            glm::vec2(b.physics.position.x, b.physics.position.y),
+            glm::vec2(b.physics.position.X, b.physics.position.Y),
             b.radius, b.color, 48, /*textureId*/ 0);
     }
 }
@@ -126,15 +126,15 @@ void TestScene::bounceAndClamp(CircleEntity& e) {
     auto& p = e.physics.position;
     auto& v = e.physics.velocity;
 
-    Vector2D pre(p.x, p.y);
+    Vector2D pre(p.X, p.Y);
     Vector2D lo(r, r), hi(width_ - r, height_ - r);
     Vector2D post = Vector2D::ClampVector(pre, lo, hi);
 
-    if (post.x != pre.x) v.x = -v.x; // bounced on left/right edge
-    if (post.y != pre.y) v.y = -v.y; // bounced on bottom/top edge
+    if (post.X != pre.X) v.X = -v.X; // bounced on left/right edge
+    if (post.Y != pre.Y) v.Y = -v.Y; // bounced on bottom/top edge
 
-    p.x = post.x;
-    p.y = post.y;
+    p.X = post.X;
+    p.Y = post.Y;
 }
 
 // Bounce off the two center lines using closest-point of contact + reflection
@@ -160,16 +160,16 @@ void TestScene::collideWithCenterLinesBounce(CircleEntity& e) {
 
             // Position correction: place center exactly r away from line
             Vector2D newCenter = Q + n * r;
-            p.x = newCenter.x;
-            p.y = newCenter.y;
+            p.X = newCenter.X;
+            p.Y = newCenter.Y;
 
             // Reflect velocity: v' = v - 2*(v·n)*n
-            glm::vec2 ng(n.x, n.y);
-            glm::vec2 v2(v.x, v.y);
+            glm::vec2 ng(n.X, n.Y);
+            glm::vec2 v2(v.X, v.Y);
             glm::vec2 vRef = v2 - 2.0f * glm::dot(v2, ng) * ng;
 
-            v.x = vRef.x;
-            v.y = vRef.y;
+            v.X = vRef.x;
+            v.Y = vRef.y;
 
         
             return;
