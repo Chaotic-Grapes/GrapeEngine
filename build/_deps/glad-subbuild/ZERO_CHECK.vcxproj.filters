@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glad-subbuild\CMakeFiles\622b16c75b7b18276d02adde8a75379f\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{59A10EC6-52E0-3C2B-9BDD-90198E890280}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

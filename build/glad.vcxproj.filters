@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glad-src\src\glad.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{1B5552A9-95A1-342F-BD38-3FF789C268E0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

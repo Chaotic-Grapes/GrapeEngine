@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\da293690dd25f5876899bce3e7415c18\glm-populate-mkdir.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\da293690dd25f5876899bce3e7415c18\glm-populate-download.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\da293690dd25f5876899bce3e7415c18\glm-populate-update.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\da293690dd25f5876899bce3e7415c18\glm-populate-patch.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\da293690dd25f5876899bce3e7415c18\glm-populate-configure.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\da293690dd25f5876899bce3e7415c18\glm-populate-build.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\da293690dd25f5876899bce3e7415c18\glm-populate-install.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\da293690dd25f5876899bce3e7415c18\glm-populate-test.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\d4e31e5b07ccf1809d86383793954b8d\glm-populate-complete.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\0c1b387aa7031dd62c1c4f7c14f97b47\glm-populate.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\build\_deps\glm-subbuild\CMakeFiles\glm-populate" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{3173E9D9-8BD2-3093-9FC0-476E447FA544}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
