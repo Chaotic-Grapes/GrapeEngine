@@ -447,3 +447,7 @@ http-client.private.env.json
 # Apifox Helper cache
 .idea/.cache/.Apifox_Helper
 .idea/ApifoxUploaderProjectSetting.xml
+build/_deps/glad-src/
+build/_deps/glfw-src/
+build/_deps/glm-src/
+build/_deps/imgui-src/
