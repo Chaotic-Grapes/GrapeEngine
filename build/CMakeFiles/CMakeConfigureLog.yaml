@@ -24,7 +24,7 @@ events:
       The output was:
       0
       MSBuild version 17.14.19+164abd434 for .NET Framework
-      Build started 19/9/2025 10:36:02 pm.
+      Build started 19/9/2025 10:58:11 pm.
       
       Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\4.0.2\\CompilerIdC\\CompilerIdC.vcxproj" on node 1 (default targets).
       PrepareForBuild:
@@ -53,7 +53,7 @@ events:
           0 Warning(s)
           0 Error(s)
       
-      Time Elapsed 00:00:00.37
+      Time Elapsed 00:00:00.55
       
       
       Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "CompilerIdC.exe"
@@ -79,7 +79,7 @@ events:
       The output was:
       0
       MSBuild version 17.14.19+164abd434 for .NET Framework
-      Build started 19/9/2025 10:36:02 pm.
+      Build started 19/9/2025 10:58:12 pm.
       
       Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\4.0.2\\CompilerIdCXX\\CompilerIdCXX.vcxproj" on node 1 (default targets).
       PrepareForBuild:
@@ -108,7 +108,7 @@ events:
           0 Warning(s)
           0 Error(s)
       
-      Time Elapsed 00:00:00.37
+      Time Elapsed 00:00:00.39
       
       
       Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.exe"
@@ -127,8 +127,8 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-o9ul0e"
-      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-o9ul0e"
+      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-iwk8za"
+      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-iwk8za"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS /W3"
       CMAKE_C_FLAGS_DEBUG: "/MDd /Zi /Ob0 /Od /RTC1"
@@ -137,40 +137,40 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-o9ul0e'
+        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-iwk8za'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_43a2e.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_9ab59.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.19+164abd434 for .NET Framework
-        Build started 19/9/2025 10:36:03 pm.
+        Build started 19/9/2025 10:58:12 pm.
         
-        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-o9ul0e\\cmTC_43a2e.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-iwk8za\\cmTC_9ab59.vcxproj" on node 1 (default targets).
         PrepareForBuild:
-          Creating directory "cmTC_43a2e.dir\\Debug\\".
+          Creating directory "cmTC_9ab59.dir\\Debug\\".
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-o9ul0e\\Debug\\".
-          Creating directory "cmTC_43a2e.dir\\Debug\\cmTC_43a2e.tlog\\".
+          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-iwk8za\\Debug\\".
+          Creating directory "cmTC_9ab59.dir\\Debug\\cmTC_9ab59.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_43a2e.dir\\Debug\\cmTC_43a2e.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_43a2e.dir\\Debug\\cmTC_43a2e.tlog\\unsuccessfulbuild".
+          Creating "cmTC_9ab59.dir\\Debug\\cmTC_9ab59.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_9ab59.dir\\Debug\\cmTC_9ab59.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_43a2e.dir\\Debug\\\\" /Fd"cmTC_43a2e.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.0\\Modules\\CMakeCCompilerABI.c"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_9ab59.dir\\Debug\\\\" /Fd"cmTC_9ab59.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.0\\Modules\\CMakeCCompilerABI.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35215 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_43a2e.dir\\Debug\\\\" /Fd"cmTC_43a2e.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.0\\Modules\\CMakeCCompilerABI.c"
+          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_9ab59.dir\\Debug\\\\" /Fd"cmTC_9ab59.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.0\\Modules\\CMakeCCompilerABI.c"
           CMakeCCompilerABI.c
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-o9ul0e\\Debug\\cmTC_43a2e.exe" /INCREMENTAL /ILK:"cmTC_43a2e.dir\\Debug\\cmTC_43a2e.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-o9ul0e/Debug/cmTC_43a2e.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-o9ul0e/Debug/cmTC_43a2e.lib" /MACHINE:X64  /machine:x64 cmTC_43a2e.dir\\Debug\\CMakeCCompilerABI.obj
-          cmTC_43a2e.vcxproj -> C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-o9ul0e\\Debug\\cmTC_43a2e.exe
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-iwk8za\\Debug\\cmTC_9ab59.exe" /INCREMENTAL /ILK:"cmTC_9ab59.dir\\Debug\\cmTC_9ab59.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-iwk8za/Debug/cmTC_9ab59.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-iwk8za/Debug/cmTC_9ab59.lib" /MACHINE:X64  /machine:x64 cmTC_9ab59.dir\\Debug\\CMakeCCompilerABI.obj
+          cmTC_9ab59.vcxproj -> C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-iwk8za\\Debug\\cmTC_9ab59.exe
         FinalizeBuildStatus:
-          Deleting file "cmTC_43a2e.dir\\Debug\\cmTC_43a2e.tlog\\unsuccessfulbuild".
-          Touching "cmTC_43a2e.dir\\Debug\\cmTC_43a2e.tlog\\cmTC_43a2e.lastbuildstate".
-        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-o9ul0e\\cmTC_43a2e.vcxproj" (default targets).
+          Deleting file "cmTC_9ab59.dir\\Debug\\cmTC_9ab59.tlog\\unsuccessfulbuild".
+          Touching "cmTC_9ab59.dir\\Debug\\cmTC_9ab59.tlog\\cmTC_9ab59.lastbuildstate".
+        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-iwk8za\\cmTC_9ab59.vcxproj" (default targets).
         
         Build succeeded.
             0 Warning(s)
             0 Error(s)
         
-        Time Elapsed 00:00:00.36
+        Time Elapsed 00:00:00.34
         
       exitCode: 0
   -
@@ -210,8 +210,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-1sht0g"
-      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-1sht0g"
+      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-7nwlf0"
+      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-7nwlf0"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /W3 /GR /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/MDd /Zi /Ob0 /Od /RTC1"
@@ -221,40 +221,40 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-1sht0g'
+        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-7nwlf0'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_107f2.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_cf61a.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.19+164abd434 for .NET Framework
-        Build started 19/9/2025 10:36:04 pm.
+        Build started 19/9/2025 10:58:13 pm.
         
-        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1sht0g\\cmTC_107f2.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7nwlf0\\cmTC_cf61a.vcxproj" on node 1 (default targets).
         PrepareForBuild:
-          Creating directory "cmTC_107f2.dir\\Debug\\".
+          Creating directory "cmTC_cf61a.dir\\Debug\\".
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1sht0g\\Debug\\".
-          Creating directory "cmTC_107f2.dir\\Debug\\cmTC_107f2.tlog\\".
+          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7nwlf0\\Debug\\".
+          Creating directory "cmTC_cf61a.dir\\Debug\\cmTC_cf61a.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_107f2.dir\\Debug\\cmTC_107f2.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_107f2.dir\\Debug\\cmTC_107f2.tlog\\unsuccessfulbuild".
+          Creating "cmTC_cf61a.dir\\Debug\\cmTC_cf61a.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_cf61a.dir\\Debug\\cmTC_cf61a.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_107f2.dir\\Debug\\\\" /Fd"cmTC_107f2.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.0\\Modules\\CMakeCXXCompilerABI.cpp"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_cf61a.dir\\Debug\\\\" /Fd"cmTC_cf61a.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.0\\Modules\\CMakeCXXCompilerABI.cpp"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35215 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_107f2.dir\\Debug\\\\" /Fd"cmTC_107f2.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.0\\Modules\\CMakeCXXCompilerABI.cpp"
+          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /GR /Fo"cmTC_cf61a.dir\\Debug\\\\" /Fd"cmTC_cf61a.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.0\\Modules\\CMakeCXXCompilerABI.cpp"
           CMakeCXXCompilerABI.cpp
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1sht0g\\Debug\\cmTC_107f2.exe" /INCREMENTAL /ILK:"cmTC_107f2.dir\\Debug\\cmTC_107f2.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-1sht0g/Debug/cmTC_107f2.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-1sht0g/Debug/cmTC_107f2.lib" /MACHINE:X64  /machine:x64 cmTC_107f2.dir\\Debug\\CMakeCXXCompilerABI.obj
-          cmTC_107f2.vcxproj -> C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1sht0g\\Debug\\cmTC_107f2.exe
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7nwlf0\\Debug\\cmTC_cf61a.exe" /INCREMENTAL /ILK:"cmTC_cf61a.dir\\Debug\\cmTC_cf61a.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-7nwlf0/Debug/cmTC_cf61a.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-7nwlf0/Debug/cmTC_cf61a.lib" /MACHINE:X64  /machine:x64 cmTC_cf61a.dir\\Debug\\CMakeCXXCompilerABI.obj
+          cmTC_cf61a.vcxproj -> C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7nwlf0\\Debug\\cmTC_cf61a.exe
         FinalizeBuildStatus:
-          Deleting file "cmTC_107f2.dir\\Debug\\cmTC_107f2.tlog\\unsuccessfulbuild".
-          Touching "cmTC_107f2.dir\\Debug\\cmTC_107f2.tlog\\cmTC_107f2.lastbuildstate".
-        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1sht0g\\cmTC_107f2.vcxproj" (default targets).
+          Deleting file "cmTC_cf61a.dir\\Debug\\cmTC_cf61a.tlog\\unsuccessfulbuild".
+          Touching "cmTC_cf61a.dir\\Debug\\cmTC_cf61a.tlog\\cmTC_cf61a.lastbuildstate".
+        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7nwlf0\\cmTC_cf61a.vcxproj" (default targets).
         
         Build succeeded.
             0 Warning(s)
             0 Error(s)
         
-        Time Elapsed 00:00:00.37
+        Time Elapsed 00:00:00.41
         
       exitCode: 0
   -
@@ -296,8 +296,8 @@ events:
     checks:
       - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
     directories:
-      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-hwz2wk"
-      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-hwz2wk"
+      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-za6haj"
+      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-za6haj"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS /W3"
       CMAKE_C_FLAGS_DEBUG: "/MDd /Zi /Ob0 /Od /RTC1"
@@ -307,40 +307,40 @@ events:
       variable: "CMAKE_HAVE_LIBC_PTHREAD"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-hwz2wk'
+        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-za6haj'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_d8a34.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_b70d4.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.19+164abd434 for .NET Framework
-        Build started 19/9/2025 10:36:11 pm.
+        Build started 19/9/2025 10:58:20 pm.
         
-        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\cmTC_d8a34.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\cmTC_b70d4.vcxproj" on node 1 (default targets).
         PrepareForBuild:
-          Creating directory "cmTC_d8a34.dir\\Debug\\".
+          Creating directory "cmTC_b70d4.dir\\Debug\\".
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\Debug\\".
-          Creating directory "cmTC_d8a34.dir\\Debug\\cmTC_d8a34.tlog\\".
+          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\Debug\\".
+          Creating directory "cmTC_b70d4.dir\\Debug\\cmTC_b70d4.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_d8a34.dir\\Debug\\cmTC_d8a34.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_d8a34.dir\\Debug\\cmTC_d8a34.tlog\\unsuccessfulbuild".
+          Creating "cmTC_b70d4.dir\\Debug\\cmTC_b70d4.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_b70d4.dir\\Debug\\cmTC_b70d4.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d8a34.dir\\Debug\\\\" /Fd"cmTC_d8a34.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\src.c"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_b70d4.dir\\Debug\\\\" /Fd"cmTC_b70d4.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\src.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35215 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d8a34.dir\\Debug\\\\" /Fd"cmTC_d8a34.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\src.c"
+          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_b70d4.dir\\Debug\\\\" /Fd"cmTC_b70d4.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\src.c"
           src.c
-        C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\src.c(1,10): error C1083: Cannot open include file: 'pthread.h': No such file or directory [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\cmTC_d8a34.vcxproj]
-        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\cmTC_d8a34.vcxproj" (default targets) -- FAILED.
+        C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\src.c(1,10): error C1083: Cannot open include file: 'pthread.h': No such file or directory [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\cmTC_b70d4.vcxproj]
+        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\cmTC_b70d4.vcxproj" (default targets) -- FAILED.
         
         Build FAILED.
         
-        "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\cmTC_d8a34.vcxproj" (default target) (1) ->
+        "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\cmTC_b70d4.vcxproj" (default target) (1) ->
         (ClCompile target) -> 
-          C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\src.c(1,10): error C1083: Cannot open include file: 'pthread.h': No such file or directory [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hwz2wk\\cmTC_d8a34.vcxproj]
+          C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\src.c(1,10): error C1083: Cannot open include file: 'pthread.h': No such file or directory [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-za6haj\\cmTC_b70d4.vcxproj]
         
             0 Warning(s)
             1 Error(s)
         
-        Time Elapsed 00:00:00.24
+        Time Elapsed 00:00:00.21
         
       exitCode: 1
   -
@@ -353,8 +353,8 @@ events:
     checks:
       - "Looking for pthread_create in pthreads"
     directories:
-      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-ce895p"
-      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-ce895p"
+      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-5ssntz"
+      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-5ssntz"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS /W3"
       CMAKE_C_FLAGS_DEBUG: "/MDd /Zi /Ob0 /Od /RTC1"
@@ -364,42 +364,42 @@ events:
       variable: "CMAKE_HAVE_PTHREADS_CREATE"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-ce895p'
+        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-5ssntz'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_edb4f.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_2e01e.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.19+164abd434 for .NET Framework
-        Build started 19/9/2025 10:36:12 pm.
+        Build started 19/9/2025 10:58:21 pm.
         
-        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\cmTC_edb4f.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\cmTC_2e01e.vcxproj" on node 1 (default targets).
         PrepareForBuild:
-          Creating directory "cmTC_edb4f.dir\\Debug\\".
+          Creating directory "cmTC_2e01e.dir\\Debug\\".
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\Debug\\".
-          Creating directory "cmTC_edb4f.dir\\Debug\\cmTC_edb4f.tlog\\".
+          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\Debug\\".
+          Creating directory "cmTC_2e01e.dir\\Debug\\cmTC_2e01e.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_edb4f.dir\\Debug\\cmTC_edb4f.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_edb4f.dir\\Debug\\cmTC_edb4f.tlog\\unsuccessfulbuild".
+          Creating "cmTC_2e01e.dir\\Debug\\cmTC_2e01e.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_2e01e.dir\\Debug\\cmTC_2e01e.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_edb4f.dir\\Debug\\\\" /Fd"cmTC_edb4f.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\CheckFunctionExists.c"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_2e01e.dir\\Debug\\\\" /Fd"cmTC_2e01e.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\CheckFunctionExists.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35215 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_edb4f.dir\\Debug\\\\" /Fd"cmTC_edb4f.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\CheckFunctionExists.c"
+          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_2e01e.dir\\Debug\\\\" /Fd"cmTC_2e01e.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\CheckFunctionExists.c"
           CheckFunctionExists.c
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\Debug\\cmTC_edb4f.exe" /INCREMENTAL /ILK:"cmTC_edb4f.dir\\Debug\\cmTC_edb4f.ilk" /NOLOGO pthreads.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-ce895p/Debug/cmTC_edb4f.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-ce895p/Debug/cmTC_edb4f.lib" /MACHINE:X64  /machine:x64 cmTC_edb4f.dir\\Debug\\CheckFunctionExists.obj
-        LINK : fatal error LNK1104: cannot open file 'pthreads.lib' [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\cmTC_edb4f.vcxproj]
-        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\cmTC_edb4f.vcxproj" (default targets) -- FAILED.
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\Debug\\cmTC_2e01e.exe" /INCREMENTAL /ILK:"cmTC_2e01e.dir\\Debug\\cmTC_2e01e.ilk" /NOLOGO pthreads.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-5ssntz/Debug/cmTC_2e01e.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-5ssntz/Debug/cmTC_2e01e.lib" /MACHINE:X64  /machine:x64 cmTC_2e01e.dir\\Debug\\CheckFunctionExists.obj
+        LINK : fatal error LNK1104: cannot open file 'pthreads.lib' [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\cmTC_2e01e.vcxproj]
+        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\cmTC_2e01e.vcxproj" (default targets) -- FAILED.
         
         Build FAILED.
         
-        "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\cmTC_edb4f.vcxproj" (default target) (1) ->
+        "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\cmTC_2e01e.vcxproj" (default target) (1) ->
         (Link target) -> 
-          LINK : fatal error LNK1104: cannot open file 'pthreads.lib' [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ce895p\\cmTC_edb4f.vcxproj]
+          LINK : fatal error LNK1104: cannot open file 'pthreads.lib' [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ssntz\\cmTC_2e01e.vcxproj]
         
             0 Warning(s)
             1 Error(s)
         
-        Time Elapsed 00:00:00.30
+        Time Elapsed 00:00:00.28
         
       exitCode: 1
   -
@@ -412,8 +412,8 @@ events:
     checks:
       - "Looking for pthread_create in pthread"
     directories:
-      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-f9kfrc"
-      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-f9kfrc"
+      source: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-azc1oy"
+      binary: "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-azc1oy"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS /W3"
       CMAKE_C_FLAGS_DEBUG: "/MDd /Zi /Ob0 /Od /RTC1"
@@ -423,42 +423,42 @@ events:
       variable: "CMAKE_HAVE_PTHREAD_CREATE"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-f9kfrc'
+        Change Dir: 'C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-azc1oy'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_4110b.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_a6c24.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.19+164abd434 for .NET Framework
-        Build started 19/9/2025 10:36:13 pm.
+        Build started 19/9/2025 10:58:22 pm.
         
-        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\cmTC_4110b.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\cmTC_a6c24.vcxproj" on node 1 (default targets).
         PrepareForBuild:
-          Creating directory "cmTC_4110b.dir\\Debug\\".
+          Creating directory "cmTC_a6c24.dir\\Debug\\".
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\Debug\\".
-          Creating directory "cmTC_4110b.dir\\Debug\\cmTC_4110b.tlog\\".
+          Creating directory "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\Debug\\".
+          Creating directory "cmTC_a6c24.dir\\Debug\\cmTC_a6c24.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_4110b.dir\\Debug\\cmTC_4110b.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_4110b.dir\\Debug\\cmTC_4110b.tlog\\unsuccessfulbuild".
+          Creating "cmTC_a6c24.dir\\Debug\\cmTC_a6c24.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_a6c24.dir\\Debug\\cmTC_a6c24.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_4110b.dir\\Debug\\\\" /Fd"cmTC_4110b.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\CheckFunctionExists.c"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_a6c24.dir\\Debug\\\\" /Fd"cmTC_a6c24.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\CheckFunctionExists.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35215 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_4110b.dir\\Debug\\\\" /Fd"cmTC_4110b.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\CheckFunctionExists.c"
+          cl /c /Zi /W3 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_a6c24.dir\\Debug\\\\" /Fd"cmTC_a6c24.dir\\Debug\\vc143.pdb" /external:W3 /Gd /TC /errorReport:queue "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\CheckFunctionExists.c"
           CheckFunctionExists.c
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\Debug\\cmTC_4110b.exe" /INCREMENTAL /ILK:"cmTC_4110b.dir\\Debug\\cmTC_4110b.ilk" /NOLOGO pthread.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-f9kfrc/Debug/cmTC_4110b.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-f9kfrc/Debug/cmTC_4110b.lib" /MACHINE:X64  /machine:x64 cmTC_4110b.dir\\Debug\\CheckFunctionExists.obj
-        LINK : fatal error LNK1104: cannot open file 'pthread.lib' [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\cmTC_4110b.vcxproj]
-        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\cmTC_4110b.vcxproj" (default targets) -- FAILED.
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\Debug\\cmTC_a6c24.exe" /INCREMENTAL /ILK:"cmTC_a6c24.dir\\Debug\\cmTC_a6c24.ilk" /NOLOGO pthread.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-azc1oy/Debug/cmTC_a6c24.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/build/CMakeFiles/CMakeScratch/TryCompile-azc1oy/Debug/cmTC_a6c24.lib" /MACHINE:X64  /machine:x64 cmTC_a6c24.dir\\Debug\\CheckFunctionExists.obj
+        LINK : fatal error LNK1104: cannot open file 'pthread.lib' [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\cmTC_a6c24.vcxproj]
+        Done Building Project "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\cmTC_a6c24.vcxproj" (default targets) -- FAILED.
         
         Build FAILED.
         
-        "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\cmTC_4110b.vcxproj" (default target) (1) ->
+        "C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\cmTC_a6c24.vcxproj" (default target) (1) ->
         (Link target) -> 
-          LINK : fatal error LNK1104: cannot open file 'pthread.lib' [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-f9kfrc\\cmTC_4110b.vcxproj]
+          LINK : fatal error LNK1104: cannot open file 'pthread.lib' [C:\\Users\\ruiqi\\OneDrive\\Desktop\\school\\yr1 tri2\\GrapeEngine\\build\\CMakeFiles\\CMakeScratch\\TryCompile-azc1oy\\cmTC_a6c24.vcxproj]
         
             0 Warning(s)
             1 Error(s)
         
-        Time Elapsed 00:00:00.30
+        Time Elapsed 00:00:00.27
         
       exitCode: 1
 ...

@@ -32,16 +32,16 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\graphics\font.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\graphics</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\graphics\renderer.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\graphics</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\graphics\shader.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\graphics</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\graphics\sprite.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -49,931 +49,931 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\GLFW\glfw3.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\GLFW</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\GLFW\glfw3native.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\GLFW</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\Input.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\KHR\khrplatform.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\KHR</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\ecs\ComponentManager.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\ecs</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\ecs\Components.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\ecs</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\ecs\Entity.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\ecs</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\ecs\EntityManager.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\ecs</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\ecs\IComponent.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\ecs</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\ecs\ISystem.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\ecs</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\ecs\World.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\ecs</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glad\glad.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glad</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\common.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\_features.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\_fixes.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\_noise.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\_swizzle.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\_swizzle_func.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\_vectorize.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\compute_common.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\compute_vector_decl.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\compute_vector_relational.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\qualifier.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\setup.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_float.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_half.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat2x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat2x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat2x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat3x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat3x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat3x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat4x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat4x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_mat4x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_quat.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_vec1.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_vec2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_vec3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\detail\type_vec4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\detail</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\exponential.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\_matrix_vectorize.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_clip_space.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_common.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double2x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double2x2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double2x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double2x3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double2x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double2x4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double3x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double3x2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double3x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double3x3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double3x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double3x4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double4x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double4x2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double4x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double4x3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double4x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_double4x4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float2x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float2x2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float2x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float2x3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float2x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float2x4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float3x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float3x2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float3x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float3x3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float3x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float3x4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float4x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float4x2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float4x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float4x3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float4x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_float4x4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int2x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int2x2_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int2x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int2x3_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int2x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int2x4_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int3x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int3x2_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int3x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int3x3_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int3x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int3x4_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int4x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int4x2_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int4x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int4x3_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int4x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_int4x4_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_integer.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_projection.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_relational.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_transform.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint2x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint2x2_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint2x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint2x3_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint2x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint2x4_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint3x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint3x2_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint3x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint3x3_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint3x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint3x4_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint4x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint4x2_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint4x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint4x3_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint4x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\matrix_uint4x4_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_common.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_double.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_double_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_exponential.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_float.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_float_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_geometric.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_relational.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_transform.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\quaternion_trigonometric.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_common.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_constants.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_int_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_integer.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_packing.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_reciprocal.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_relational.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_uint_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\scalar_ulp.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_bool1.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_bool1_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_bool2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_bool2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_bool3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_bool3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_bool4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_bool4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_common.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_double1.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_double1_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_double2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_double2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_double3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_double3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_double4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_double4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_float1.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_float1_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_float2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_float2_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_float3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_float3_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_float4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_float4_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_int1.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_int1_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_int2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_int2_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_int3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_int3_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_int4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_int4_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_integer.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_packing.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_reciprocal.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_relational.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_uint1.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_uint1_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_uint2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_uint2_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_uint3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_uint3_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_uint4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_uint4_sized.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\ext\vector_ulp.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\ext</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\fwd.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\geometric.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\glm.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\bitfield.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\color_space.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\constants.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\epsilon.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\integer.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\matrix_access.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\matrix_integer.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\matrix_inverse.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\matrix_transform.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\noise.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\packing.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\quaternion.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\random.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\reciprocal.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\round.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\type_aligned.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\type_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\type_ptr.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\ulp.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtc\vec1.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtc</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\associated_min_max.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\bit.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\closest_point.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\color_encoding.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\color_space.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\color_space_YCoCg.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\common.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\compatibility.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\component_wise.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\dual_quaternion.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\easing.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\euler_angles.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\extend.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\extended_min_max.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\exterior_product.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\fast_exponential.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\fast_square_root.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\fast_trigonometry.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\functions.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\gradient_paint.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\handed_coordinate_space.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\hash.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\integer.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\intersect.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\io.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\log_base.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\matrix_cross_product.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\matrix_decompose.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\matrix_factorisation.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\matrix_interpolation.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\matrix_major_storage.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\matrix_operation.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\matrix_query.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\matrix_transform_2d.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\mixed_product.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\norm.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\normal.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\normalize_dot.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\number_precision.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\optimum_pow.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\orthonormalize.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\pca.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\perpendicular.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\polar_coordinates.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\projection.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\quaternion.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\range.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\raw_data.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\rotate_normalized_axis.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\rotate_vector.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\scalar_multiplication.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\scalar_relational.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\spline.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\std_based_type.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\string_cast.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\texture.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\transform.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\transform2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\type_aligned.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\type_trait.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\vec_swizzle.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\vector_angle.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\vector_query.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\gtx\wrap.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\gtx</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\integer.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat2x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat2x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat2x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat3x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat3x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat3x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat4x2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat4x3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\mat4x4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\matrix.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\packing.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\common.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\exponential.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\geometric.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\integer.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\matrix.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\neon.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\packing.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\platform.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\trigonometric.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\simd\vector_relational.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm\simd</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\trigonometric.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\vec2.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\vec3.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\vec4.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\glm\vector_relational.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\glm</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\graphics\font.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\graphics</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\graphics\renderer.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\graphics</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\graphics\shader.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\graphics</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\graphics\sprite.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\graphics</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\messaging\MessageBus.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\messaging</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\messaging\MessageTypes.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\messaging</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\Time.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\systems</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\Window.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\systems</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\WindowManager.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\systems</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -983,8 +983,50 @@
     <Filter Include="Header Files">
       <UniqueIdentifier>{906BB2B9-3FCD-3D74-A6C5-A8DFF746E161}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\GLFW">
+      <UniqueIdentifier>{D4436390-2C8C-31C5-9DE5-819620C7434E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\KHR">
+      <UniqueIdentifier>{E068767E-CDEB-34AB-B80E-5C1DFF7E3B8B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ecs">
+      <UniqueIdentifier>{71215A4C-25CD-340E-85AC-F1EE604650E3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\glad">
+      <UniqueIdentifier>{E5ED6261-14FE-3524-A24F-8FEF69D1786B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\glm">
+      <UniqueIdentifier>{9F334DC6-B53F-33E1-AFAB-C07735791B72}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\glm\detail">
+      <UniqueIdentifier>{1E82F02A-B06C-36A1-9A60-18D22D86D17B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\glm\ext">
+      <UniqueIdentifier>{49B731CF-EFF5-3059-B34A-FBD07C985815}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\glm\gtc">
+      <UniqueIdentifier>{95BF6940-B237-3A29-9C44-37D1FC681CF0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\glm\gtx">
+      <UniqueIdentifier>{74A9D5A2-D246-3A69-8F71-32690D3740DA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\glm\simd">
+      <UniqueIdentifier>{F6D0FB0D-C6F3-3096-9A72-A0D5FD743F7C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\graphics">
+      <UniqueIdentifier>{D5EB6E8B-91DF-317D-A15A-0E240EB1163A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\messaging">
+      <UniqueIdentifier>{2F75B85B-15B4-386D-B0FF-5CBA63A5AE74}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\systems">
+      <UniqueIdentifier>{3BBCE0C6-547E-32E2-9DE6-0165151B1709}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files">
       <UniqueIdentifier>{1B5552A9-95A1-342F-BD38-3FF789C268E0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\graphics">
+      <UniqueIdentifier>{06D10733-9C55-3148-9853-23F92F80BA57}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

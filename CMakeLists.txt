@@ -28,16 +28,42 @@ set(ALL_LIBS
 # ======================= SINGLE PROJECT CONFIGURATION =========================
 # Since we have a single engine project, not using auto-discovery
 
-# Collect your engine source files
-file(GLOB_RECURSE ENGINE_SOURCES
+# Collect your engine source files (preserving folder structure)
+file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS 
     ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/*.c
+)
+
+file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS 
     ${CMAKE_CURRENT_LIST_DIR}/include/*.h
     ${CMAKE_CURRENT_LIST_DIR}/include/*.hpp
 )
 
 # Create executable
-add_executable(GrapeEngine ${ENGINE_SOURCES})
+add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+
+# Preserve folder structure in Visual Studio
+foreach(source IN LISTS ENGINE_SOURCES)
+    get_filename_component(source_path "${source}" PATH)
+    file(RELATIVE_PATH source_path_rel "${CMAKE_CURRENT_LIST_DIR}/src" "${source_path}")
+    if(NOT source_path_rel STREQUAL "")
+        string(REPLACE "/" "\\" group_path "Source Files\\${source_path_rel}")
+    else()
+        set(group_path "Source Files")
+    endif()
+    source_group("${group_path}" FILES "${source}")
+endforeach()
+
+foreach(header IN LISTS ENGINE_HEADERS)
+    get_filename_component(header_path "${header}" PATH)
+    file(RELATIVE_PATH header_path_rel "${CMAKE_CURRENT_LIST_DIR}/include" "${header_path}")
+    if(NOT header_path_rel STREQUAL "")
+        string(REPLACE "/" "\\" group_path "Header Files\\${header_path_rel}")
+    else()
+        set(group_path "Header Files")
+    endif()
+    source_group("${group_path}" FILES "${header}")
+endforeach()
 
 # Link libraries
 target_link_libraries(GrapeEngine ${ALL_LIBS})
