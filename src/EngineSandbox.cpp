@@ -63,13 +63,7 @@ namespace {
 
         // Create world and systems
         World& world = CREATE_WORLD();
-
-        // Create and initialize test scene
-        TestScene2D testScene;
-        testScene.WorldWidth = 1600.0f;
-        testScene.WorldHeight = 900.0f;
-        testScene.DampingDelay = 7.0f;
-        testScene.Initialize(&world, testScene.WorldWidth, testScene.WorldHeight);
+		world.AddSystem<Sandbox::PhysicsCollision2DTestScene>(&world, 1600.f, 900.f, 7.f);
     }
 }
 

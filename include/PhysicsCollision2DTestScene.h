@@ -1,33 +1,36 @@
 #ifndef PHYSICSCOLLISION2DTESTSCENE_H
 #define PHYSICSCOLLISION2DTESTSCENE_H
+#if _DEBUG
 
 #include <vector>
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 
-class TestScene2D {
-public:
-    void Initialize(World* world, float width, float height, unsigned seed = 0);
-    void Update(float deltaTime);
-    void Cleanup();
+namespace Sandbox {
+    class PhysicsCollision2DTestScene : public Engine::ISystem {
+    public:
+        PhysicsCollision2DTestScene(World* world, float width, float height, float dampingDelay, unsigned seed = 0);
+        void Cleanup();
 
-    // Unity-style public properties
-    float WorldWidth = 1600.0f;
-    float WorldHeight = 900.0f;
-    bool EnableDamping = false;
-    float DampingDelay = 7.0f;
+        void OnCreate() override {}
+        void OnUpdate() override;
 
-private:
-    void CreateBalls(int count, unsigned seed);
-    void CreateBoundaryLines();
-    void UpdateBallCollisions(float deltaTime);
+        std::string Name() const override { return "PhysicsCollision2DTestScene"; }
+    private:
+        void CreateBalls(int count, unsigned seed);
+        void CreateBoundaryLines();
+        void UpdateBallCollisions();
 
-    World* m_world = nullptr;
-    std::vector<Entity> m_balls;
-    std::vector<Entity> m_boundaryLines;
+        World* m_world = nullptr;
+        std::vector<Entity> m_balls;
+        std::vector<Entity> m_boundaryLines;
 
-    float m_elapsedTime = 0.0f;
-    bool m_dampingEnabled = false;
-};
+        float m_elapsedTime = 0.0f;
+        float m_worldWidth = 1600.f, m_worldHeight = 900.f;
+        float m_dampingDelay = 7.f;
+        bool m_dampingEnabled = false;
+    };
+}
 
+#endif
 #endif

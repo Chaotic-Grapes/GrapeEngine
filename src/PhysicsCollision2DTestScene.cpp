@@ -5,14 +5,16 @@
 #include "Physics2D.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
+#include "systems/Time.h"
 
 constexpr float TWO_PI = 6.28318530718f;
 
-void TestScene2D::Initialize(World* world, const float width, const float height, const unsigned seed) {
+Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(World* world, const float width, const float height, const float dampingDelay, const unsigned seed) {
     m_world = world;
-    WorldWidth = width;
-    WorldHeight = height;
+    m_worldWidth = width;
+    m_worldHeight = height;
     m_elapsedTime = 0.0f;
+	m_dampingDelay = dampingDelay;
     m_dampingEnabled = false;
 
     // Disable gravity for this test (balls should fly around freely)
@@ -24,11 +26,11 @@ void TestScene2D::Initialize(World* world, const float width, const float height
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
 }
 
-void TestScene2D::CreateBoundaryLines() {
+void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines() {
 	constexpr float gap = 40.0f;
-    const float xMid = WorldWidth * 0.5f;
-    const float y0 = WorldHeight * 0.25f;
-    const float y1 = WorldHeight * 0.75f;
+    const float xMid = m_worldWidth * 0.5f;
+    const float y0 = m_worldHeight * 0.25f;
+    const float y1 = m_worldHeight * 0.75f;
 
     // Create left boundary line
     Entity leftLine = m_world->CreateEntity();
@@ -49,7 +51,7 @@ void TestScene2D::CreateBoundaryLines() {
     m_boundaryLines.push_back(rightLine);
 }
 
-void TestScene2D::CreateBalls(const int count, const unsigned seed) {
+void Sandbox::PhysicsCollision2DTestScene::CreateBalls(const int count, const unsigned seed) {
     m_balls.clear();
     m_balls.reserve(count);
 
@@ -69,8 +71,8 @@ void TestScene2D::CreateBalls(const int count, const unsigned seed) {
         Entity ball = m_world->CreateEntity();
 
         // Set random position
-		const float x = MathHelper::Randomize<float>(radius, WorldWidth - radius, seed),
-    				y = MathHelper::Randomize<float>(radius, WorldHeight - radius, seed);
+		const float x = MathHelper::Randomize<float>(radius, m_worldWidth - radius, seed),
+    				y = MathHelper::Randomize<float>(radius, m_worldHeight - radius, seed);
 
         auto& transform = ball.Transform();
         transform.Position.X = x;
@@ -101,13 +103,12 @@ void TestScene2D::CreateBalls(const int count, const unsigned seed) {
     }
 }
 
-void TestScene2D::Update(const float deltaTime) {
-    m_elapsedTime += deltaTime;
+void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
+    m_elapsedTime = static_cast<float>(Time::ElapsedTime());
 
     // Enable damping after specified delay
-    if (!m_dampingEnabled && m_elapsedTime >= DampingDelay) {
+    if (!m_dampingEnabled && m_elapsedTime >= m_dampingDelay) {
         m_dampingEnabled = true;
-        EnableDamping = true;
 
         for (auto& ball : m_balls) {
             auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
@@ -116,15 +117,13 @@ void TestScene2D::Update(const float deltaTime) {
             }
         }
 
-        std::cout << "Damping enabled after " << DampingDelay << " seconds!" << '\n';
+        std::cout << "Damping enabled after " << m_dampingDelay << " seconds!" << '\n';
     }
 
-    UpdateBallCollisions(deltaTime);
+    UpdateBallCollisions();
 }
 
-void TestScene2D::UpdateBallCollisions(const float deltaTime) {
-    (void)deltaTime;
-
+void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
     for (auto& ball : m_balls) {
         auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
         const auto* circleCollider = ball.GetComponent<Component::CircleCollider2D>();
@@ -144,8 +143,8 @@ void TestScene2D::UpdateBallCollisions(const float deltaTime) {
             rigidbody->Velocity.X = std::abs(rigidbody->Velocity.X);
             bounced = true;
         }
-        else if (transform.Position.X + radius >= WorldWidth) {
-            transform.Position.X = WorldWidth - radius;
+        else if (transform.Position.X + radius >= m_worldWidth) {
+            transform.Position.X = m_worldWidth - radius;
             rigidbody->Velocity.X = -std::abs(rigidbody->Velocity.X);
             bounced = true;
         }
@@ -156,8 +155,8 @@ void TestScene2D::UpdateBallCollisions(const float deltaTime) {
             rigidbody->Velocity.Y = std::abs(rigidbody->Velocity.Y);
             bounced = true;
         }
-        else if (transform.Position.Y + radius >= WorldHeight) {
-            transform.Position.Y = WorldHeight - radius;
+        else if (transform.Position.Y + radius >= m_worldHeight) {
+            transform.Position.Y = m_worldHeight - radius;
             rigidbody->Velocity.Y = -std::abs(rigidbody->Velocity.Y);
             bounced = true;
         }
@@ -166,7 +165,7 @@ void TestScene2D::UpdateBallCollisions(const float deltaTime) {
     }
 }
 
-void TestScene2D::Cleanup() {
+void Sandbox::PhysicsCollision2DTestScene::Cleanup() {
     m_balls.clear();
     m_boundaryLines.clear();
 }

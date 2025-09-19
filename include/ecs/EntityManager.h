@@ -5,7 +5,6 @@
 #include <typeindex>
 #include <unordered_map>
 #include <unordered_set>
-
 #include "IComponent.h"
 #include "ecs/ComponentManager.h"
 
@@ -41,8 +40,8 @@ public:
         std::vector<std::tuple<Components&...>> result;
 
         for (const EntityId id : m_entities) {
-            if ((HasComponentOrDerived<Components>(id) && ...)) {
-                result.emplace_back(*GetComponentOrDerived<Components>(id)...);
+            if ((_hasComponentOrDerived<Components>(id) && ...)) {
+                result.emplace_back(*_getComponentOrDerived<Components>(id)...);
             }
         }
 
@@ -111,7 +110,7 @@ private:
     }
 
     template<typename T>
-    bool HasComponentOrDerived(EntityId id) {
+    bool _hasComponentOrDerived(const EntityId id) {
         // Exact type first
         if (HasComponent<T>(id)) return true;
 
@@ -125,7 +124,7 @@ private:
     }
 
     template<typename T>
-    T* GetComponentOrDerived(EntityId id) {
+    T* _getComponentOrDerived(const EntityId id) {
         // Exact type first
         if (auto* comp = GetComponent<T>(id)) return comp;
 
