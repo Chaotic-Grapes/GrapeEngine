@@ -2,6 +2,7 @@
 #include <windows.h>
 #include "systems/Time.h"
 #include "systems/WindowManager.h"
+#include "systems/Overlay.h"
 
 namespace Engine {
     // Global pointer to the core engine
@@ -18,6 +19,7 @@ namespace Engine {
 
         // Attach core systems to the world
         world.AddSystem<Time>();
+        world.AddSystem<Overlay>();
         world.AddSystem<WindowManager>();
 
         return world;
@@ -74,7 +76,6 @@ namespace Engine {
                     break;
                 }
 		}
-
         m_worlds.clear();
     }
 
@@ -84,6 +85,10 @@ namespace Engine {
     }
 
     void Application::Update() const {
+        // Clear screen FIRST
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         for (auto& world : m_worlds)
             world->_update();
     }

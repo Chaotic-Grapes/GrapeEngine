@@ -5,6 +5,7 @@
 file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/*.h")
 set(OLD_GLOB
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/Application.h"
+  "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/DebugUI.h"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/GLFW/glfw3.h"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/GLFW/glfw3native.h"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/Input.h"
@@ -29,6 +30,7 @@ set(OLD_GLOB
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/glm/simd/vector_relational.h"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/messaging/MessageBus.h"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/messaging/MessageTypes.h"
+  "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/systems/Overlay.h"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/systems/Time.h"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/systems/Window.h"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/include/systems/WindowManager.h"
@@ -343,10 +345,12 @@ endif()
 file(GLOB_RECURSE NEW_GLOB LIST_DIRECTORIES false "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/*.cpp")
 set(OLD_GLOB
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/Application.cpp"
+  "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/DebugUI.cpp"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/EngineSandbox.cpp"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/Entity.cpp"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/EntityManager.cpp"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/Input.cpp"
+  "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/Overlay.cpp"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/Time.cpp"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/Window.cpp"
   "C:/Users/ruiqi/OneDrive/Desktop/school/yr1 tri2/GrapeEngine/src/WindowManager.cpp"

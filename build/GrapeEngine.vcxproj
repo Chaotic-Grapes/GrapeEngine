@@ -381,10 +381,12 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Application.cpp" />
+    <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\DebugUI.cpp" />
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\EngineSandbox.cpp" />
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Entity.cpp" />
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\EntityManager.cpp" />
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Input.cpp" />
+    <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Overlay.cpp" />
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Time.cpp" />
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Window.cpp" />
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\WindowManager.cpp" />
@@ -395,6 +397,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\graphics\shader.cpp" />
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\graphics\sprite.cpp" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\Application.h" />
+    <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\DebugUI.h" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\GLFW\glfw3.h" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\GLFW\glfw3native.h" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\Input.h" />
@@ -701,6 +704,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\graphics\sprite.hpp" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\messaging\MessageBus.h" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\messaging\MessageTypes.h" />
+    <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\Overlay.h" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\Time.h" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\Window.h" />
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\WindowManager.h" />

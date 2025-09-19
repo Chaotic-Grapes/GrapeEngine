@@ -4,6 +4,9 @@
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\DebugUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\EngineSandbox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -14,6 +17,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Input.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Overlay.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\src\Time.cpp">
@@ -46,6 +52,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\Application.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\DebugUI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\GLFW\glfw3.h">
@@ -965,6 +974,9 @@
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\messaging\MessageTypes.h">
       <Filter>Header Files\messaging</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\Overlay.h">
+      <Filter>Header Files\systems</Filter>
     </ClInclude>
     <ClInclude Include="C:\Users\ruiqi\OneDrive\Desktop\school\yr1 tri2\GrapeEngine\include\systems\Time.h">
       <Filter>Header Files\systems</Filter>
