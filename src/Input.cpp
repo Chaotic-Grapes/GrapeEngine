@@ -3,16 +3,43 @@
 #include <iomanip>
 #include <sstream>
 
-// Initialize static member
+// Initialize static members
 GLFWwindow* Input::m_window = nullptr;
+bool Input::m_keysPressed[GLFW_KEY_LAST] = { false };
+bool Input::m_keysJustPressed[GLFW_KEY_LAST] = { false };
+bool Input::m_keysJustReleased[GLFW_KEY_LAST] = { false };
+int Input::m_windowWidth = 0;
+int Input::m_windowHeight = 0;
+double Input::m_scrollX = 0.0;
+double Input::m_scrollY = 0.0;
 
 void Input::Init(GLFWwindow* pWin) {
     m_window = pWin;
+    // Get initial window size
+    glfwGetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
 }
 
 // Check if a specific key is currently pressed
 bool Input::IsKeyPressed(int key) {
     return glfwGetKey(m_window, key) == PRESS;
+}
+
+bool Input::WasKeyJustPressed(int key) {
+    if (key >= 0 && key < GLFW_KEY_LAST) {
+        bool result = m_keysJustPressed[key];
+        m_keysJustPressed[key] = false;  // Clear after reading (single-use)
+        return result;
+    }
+    return false;
+}
+
+bool Input::WasKeyJustReleased(int key) {
+    if (key >= 0 && key < GLFW_KEY_LAST) {
+        bool result = m_keysJustReleased[key];
+        m_keysJustReleased[key] = false;  // Clear after reading (single-use)
+        return result;
+    }
+    return false;
 }
 
 // Check if a specific mouse button is currently pressed  
@@ -41,11 +68,11 @@ double Input::GetMouseY() {
 
 // Sets up all GLFW event callbacks (keyboard, mouse, resize)
 void Input::SetupEventCallbacks() {
-    glfwSetFramebufferSizeCallback(m_window, _framebufferSizeCallback);
     glfwSetKeyCallback(m_window, _keyCallback);
     glfwSetMouseButtonCallback(m_window, _mouseButtonCallback);
     glfwSetCursorPosCallback(m_window, _mousePosCallback);
     glfwSetScrollCallback(m_window, _mouseScrollCallback);
+    glfwSetWindowSizeCallback(m_window, _windowSizeCallback);
 }
 
 // Called when GLFW encounters an error 
@@ -57,12 +84,17 @@ void Input::ErrorCallback(int error, char const* description) {
 }
 
 // Called when window is resized
-void Input::_framebufferSizeCallback(GLFWwindow* pWin, int width, int height) {
+void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
     (void)pWin;
-    (void)width;
-    (void)height;
+
+    // Store the new window dimensions
+    m_windowWidth = width;
+    m_windowHeight = height;
+
 #ifdef _DEBUG
-    std::cout << "\r" << std::setw(50) << std::left << "Window is being resized" << std::flush;
+    std::ostringstream oss;
+    oss << "Window is being resized: " << width << "x" << height;
+    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
 #endif
 }
 
@@ -73,6 +105,21 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
     (void)scancode;
     (void)action;
     (void)mod;
+
+    // Update event-based key tracking
+    if (key >= 0 && key < GLFW_KEY_LAST) {
+        if (action == PRESS) {
+            if (!m_keysPressed[key]) {  // Only set if wasn't already pressed
+                m_keysJustPressed[key] = true;
+            }
+            m_keysPressed[key] = true;
+        }
+        else if (action == RELEASE) {
+            m_keysJustReleased[key] = true;
+            m_keysPressed[key] = false;
+        }
+    }
+
 #ifdef _DEBUG
     const char* keyName = "";
     switch (key) {
@@ -136,6 +183,11 @@ void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffse
     (void)pWin;
     (void)xOffset;
     (void)yOffset;
+
+    // Store the scroll offsets
+    m_scrollX = xOffset;
+    m_scrollY = yOffset;
+
 #ifdef _DEBUG
     std::ostringstream oss;
     oss << "Mouse scroll wheel offset: (" << std::fixed << std::setprecision(1) << xOffset << ", " << yOffset << ")";

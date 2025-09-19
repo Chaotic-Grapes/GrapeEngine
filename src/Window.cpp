@@ -1,4 +1,4 @@
-﻿#include "systems/Window.h"
+#include "systems/Window.h"
 #include "Input.h"
 #include <iostream>
 #include "messaging/MessageBus.h"

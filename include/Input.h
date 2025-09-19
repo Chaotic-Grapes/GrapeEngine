@@ -11,11 +11,19 @@ public:
     static void Init(GLFWwindow* pWin);
 
     // Input utility functions (self-explanatory)
-    static bool IsKeyPressed(int key);
+    static bool IsKeyPressed(int key);       // Continuous pressing
+    static bool WasKeyJustPressed(int key);  // Single-event presses
+    static bool WasKeyJustReleased(int key);
     static bool IsMousePressed(int button);
     static void GetMousePos(double& xPos, double& yPos);
     static double GetMouseX();
     static double GetMouseY();
+
+    // Getter functions
+    static int GetWindowWidth() { return m_windowWidth; }
+    static int GetWindowHeight() { return m_windowHeight; }
+    static double GetScrollX() { return m_scrollX; }
+    static double GetScrollY() { return m_scrollY; }
 
     // Sets up all GLFW event callbacks
     static void SetupEventCallbacks();
@@ -29,9 +37,20 @@ public:
 private:
     static GLFWwindow* m_window;
 
+    // Event-based input tracking arrays
+    static bool m_keysPressed[GLFW_KEY_LAST];
+    static bool m_keysJustPressed[GLFW_KEY_LAST];
+    static bool m_keysJustReleased[GLFW_KEY_LAST];
+
+    // Tracking window width and height + scroll offsets
+    static int m_windowWidth;
+    static int m_windowHeight;
+    static double m_scrollX;
+    static double m_scrollY;
+
     // GLFW callback functions (input/window events)
     // Private functions must still have the exact function signatures that GLFW expects
-    static void _framebufferSizeCallback(GLFWwindow* pWin, int width, int height);   // Window resize
+    static void _windowSizeCallback(GLFWwindow* pWin, int width, int height);   // Window resize
     static void _keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod); // Key press/release
     static void _mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod);    // Mouse button press/release
     static void _mousePosCallback(GLFWwindow* pWin, double xPos, double yPos);              // Mouse cursor movement

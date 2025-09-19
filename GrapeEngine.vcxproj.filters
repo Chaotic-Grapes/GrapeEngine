@@ -14,6 +14,12 @@
     <Filter Include="Engine\Systems">
       <UniqueIdentifier>{2c14d2c2-851a-4c16-8683-c81a4bd3f40c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="External">
+      <UniqueIdentifier>{5d2f5d26-67a0-4d0c-8b0f-b10a66b0cd4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Messaging">
+      <UniqueIdentifier>{f1a03209-d55a-4108-be00-8a49c37a779e}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Engine\Systems\Core">
       <UniqueIdentifier>{9b26cd4e-3380-4616-8c4e-3205736f0cdf}</UniqueIdentifier>
     </Filter>
@@ -155,9 +161,6 @@
     </ClInclude>
     <ClInclude Include="include\graphics\font.hpp">
       <Filter>Engine\Systems\Core\Font</Filter>
-    </ClInclude>
-    <ClInclude Include="include\GLHelper.h">
-      <Filter>Helpers</Filter>
     </ClInclude>
     <ClInclude Include="include\Input.h">
       <Filter>Engine\Systems\Core\Input</Filter>

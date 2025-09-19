@@ -181,7 +181,6 @@
     <ClInclude Include="include\systems\Time.h" />
     <ClInclude Include="include\systems\Window.h" />
     <ClInclude Include="include\systems\WindowManager.h" />
-    <ClInclude Include="include\GLHelper.h" />
     <ClInclude Include="include\graphics\font.hpp" />
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />
