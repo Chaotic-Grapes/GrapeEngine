@@ -3,7 +3,7 @@
 
 class Vector4D {
 public:
-    float x, y, z, w;
+    float X, Y, Z, W;
 
     // Constructors
     Vector4D();
@@ -37,8 +37,8 @@ public:
     static float ClampValue(float component, float min, float max);
 
     // Some other functions
-    bool IsPoint() const;   // If w == 1.0f
-    bool IsVector() const;  // If w == 0.0f
+    bool IsPoint() const;   // If W == 1.0f
+    bool IsVector() const;  // If W == 0.0f
     Vector3D XYZ() const;   // Extract 3D components
 };
 

@@ -26,9 +26,9 @@ public:
         return { minPt, maxPt };
     }
     static AABB MakeAABB_CenterSize(const Vector2D& center, const Vector2D& size) {
-        Vector2D half = Vector2D(size.x * 0.5f, size.y * 0.5f);
-        return { Vector2D(center.x - half.x, center.y - half.y),
-                 Vector2D(center.x + half.x, center.y + half.y) };
+        Vector2D half = Vector2D(size.X * 0.5f, size.Y * 0.5f);
+        return { Vector2D(center.X - half.X, center.Y - half.Y),
+                 Vector2D(center.X + half.X, center.Y + half.Y) };
     }
 
     // Queries / Intersections

@@ -200,14 +200,14 @@ Matrix4x4 Matrix4x4::LookAt(const Vector3D& eye, const Vector3D& target, const V
 
 	// Create rotation matrix from basis vectors
 	Matrix4x4 rotation(
-		right.x, right.y, right.z, 0.0f,
-		newUp.x, newUp.y, newUp.z, 0.0f,
-		forward.x, forward.y, forward.z, 0.0f,
+		right.X, right.Y, right.Z, 0.0f,
+		newUp.X, newUp.Y, newUp.Z, 0.0f,
+		forward.X, forward.Y, forward.Z, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	);
 
 	// Create translation matrix (negative eye position)
-	Matrix4x4 translation = Matrix4x4::Translation(-eye.x, -eye.y, -eye.z);
+	Matrix4x4 translation = Matrix4x4::Translation(-eye.X, -eye.Y, -eye.Z);
 
 	// Combine rotation and translation: View = Rotation * Translation
 	return rotation * translation;
@@ -332,18 +332,18 @@ Matrix4x4 operator*(const Matrix4x4& a, const Matrix4x4& b) {
 
 // Vector transformations
 Vector3D operator*(const Matrix4x4& m, const Vector3D& v) {
-	// Assume w = 1 for points (affected by translation)
-	float x = m.m00 * v.x + m.m01 * v.y + m.m02 * v.z + m.m03;
-	float y = m.m10 * v.x + m.m11 * v.y + m.m12 * v.z + m.m13;
-	float z = m.m20 * v.x + m.m21 * v.y + m.m22 * v.z + m.m23;
+	// Assume W = 1 for points (affected by translation)
+	float x = m.m00 * v.X + m.m01 * v.Y + m.m02 * v.Z + m.m03;
+	float y = m.m10 * v.X + m.m11 * v.Y + m.m12 * v.Z + m.m13;
+	float z = m.m20 * v.X + m.m21 * v.Y + m.m22 * v.Z + m.m23;
 	return Vector3D(x, y, z);
 }
 
 Vector4D operator*(const Matrix4x4& m, const Vector4D& v) {
-	float x = m.m00 * v.x + m.m01 * v.y + m.m02 * v.z + m.m03 * v.w;
-	float y = m.m10 * v.x + m.m11 * v.y + m.m12 * v.z + m.m13 * v.w;
-	float z = m.m20 * v.x + m.m21 * v.y + m.m22 * v.z + m.m23 * v.w;
-	float w = m.m30 * v.x + m.m31 * v.y + m.m32 * v.z + m.m33 * v.w;
+	float x = m.m00 * v.X + m.m01 * v.Y + m.m02 * v.Z + m.m03 * v.W;
+	float y = m.m10 * v.X + m.m11 * v.Y + m.m12 * v.Z + m.m13 * v.W;
+	float z = m.m20 * v.X + m.m21 * v.Y + m.m22 * v.Z + m.m23 * v.W;
+	float w = m.m30 * v.X + m.m31 * v.Y + m.m32 * v.Z + m.m33 * v.W;
 	return Vector4D(x, y, z, w);
 }
 

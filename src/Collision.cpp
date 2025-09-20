@@ -19,8 +19,8 @@ Collision::LineSegment Collision::MakeSegment(const Vector2D& p0, const Vector2D
 
     Vector2D edge = p1 - p0;
 
-    // Legacy convention: outward normal from (edge.y, -edge.x), then normalize
-    Vector2D n(edge.y, -edge.x);
+    // Legacy convention: outward normal from (edge.Y, -edge.X), then normalize
+    Vector2D n(edge.Y, -edge.X);
     float L2 = n.SquareLength();
     s.normal = (L2 > 0.0f) ? n * (1.0f / std::sqrt(L2)) : Vector2D(0.0f, 1.0f);
     return s;
@@ -224,23 +224,23 @@ bool Collision::AABBvsAABB(
     Vector2D hA = (A.max - A.min) * 0.5f;
     Vector2D hB = (B.max - B.min) * 0.5f;
 
-    float dx = cB.x - cA.x;
-    float px = (hA.x + hB.x) - std::fabs(dx);
+    float dx = cB.X - cA.X;
+    float px = (hA.X + hB.X) - std::fabs(dx);
     if (px <= 0.0f) return false; // no overlap X
 
-    float dy = cB.y - cA.y;
-    float py = (hA.y + hB.y) - std::fabs(dy);
+    float dy = cB.Y - cA.Y;
+    float py = (hA.Y + hB.Y) - std::fabs(dy);
     if (py <= 0.0f) return false; // no overlap Y
 
     Vector2D n(0.0f, 0.0f);
     float pen = 0.0f;
 
     if (px < py) {
-        n.x = (dx < 0.0f) ? -1.0f : 1.0f;
+        n.X = (dx < 0.0f) ? -1.0f : 1.0f;
         pen = px;
     }
     else {
-        n.y = (dy < 0.0f) ? -1.0f : 1.0f;
+        n.Y = (dy < 0.0f) ? -1.0f : 1.0f;
         pen = py;
     }
 

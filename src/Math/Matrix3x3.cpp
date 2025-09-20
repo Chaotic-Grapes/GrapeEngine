@@ -214,8 +214,8 @@ Matrix3x3 operator*(const Matrix3x3& a, const Matrix3x3& b) {
 
 Vector2D operator*(const Matrix3x3& a, const Vector2D& b) {
 	// For 2D vectors, we assume z = 1 (affine transformation)
-	float x = a.m00 * b.x + a.m01 * b.y + a.m02;
-	float y = a.m10 * b.x + a.m11 * b.y + a.m12;
+	float x = a.m00 * b.X + a.m01 * b.Y + a.m02;
+	float y = a.m10 * b.X + a.m11 * b.Y + a.m12;
 	return Vector2D(x, y);
 }
 

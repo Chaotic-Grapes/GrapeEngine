@@ -1,10 +1,11 @@
 #ifndef PHYSICS_H
 #define PHYSICS_H
 
-#include "Time.h"
+#include "systems/Time.h"
 #include "Math/Vector3D.h"
-
 #include <vector>
+#include "ecs/ISystem.h"
+#include "ecs/World.h"
 
 namespace Engine {
 
@@ -35,11 +36,11 @@ namespace Engine {
             : position(0.0f, 0.0f, 0.0f)
             , velocity(0.0f, 0.0f, 0.0f)
             , acceleration (0.0f, 0.0f, 0.0f)
-            , damping(0.98f)                        // damping range from 0-1, higher means more resistance
-            , mass(1.0f)
-            , useGravity(true)                      // gravity is on by default
+            , angularVelocity(0.0f, 0.0f, 0.0f)                        // damping range from 0-1, higher means more resistance
+            , damping(0.98f)
+            , mass(1.0f)                      // gravity is on by default
 
-            , angularVelocity(0.0f, 0.0f, 0.0f)
+            , useGravity(true)
             , useBuoyancy(false)                    // buoyancy is off by default for backward compatibility (CHANGE WHEN NEEDED!)
             , buoyancy(0.8f)                        // 0 = sinks, 1 = neutral, >1 = floats        
             , dragCoefficient(2.0f)                 // water has higher drag than air
@@ -49,8 +50,10 @@ namespace Engine {
 
     class PhysicsSystem : public ISystem {
     public:
-        void Initialize() override;
-        void Update() override;
+        PhysicsSystem(World* world) : m_world(world) {}
+
+        void OnCreate() override;
+        void OnUpdate() override;
         std::string Name() const override { return "Physics"; }
 
         // Entities
@@ -71,6 +74,8 @@ namespace Engine {
         static Vector3D m_gravity;
 
         float m_accumulator = 0.0f;
+
+        World* m_world;
     };
 
 } // namespace Engine
