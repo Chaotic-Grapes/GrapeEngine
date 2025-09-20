@@ -10,10 +10,12 @@
 #include "collision.h"
 #include "../include/graphics/debugDraw2D.hpp"  
 #include <glm/gtc/constants.hpp>
+#include "input.h"
+#include "Math/Vector2D.h"
 
 // Tiny helpers for conversions (renderer uses glm::vec2)
-static inline glm::vec2 ToGLM2(const glm::vec3& v) { return { v.x, v.y }; }
-static inline Vector2D  ToV2(const glm::vec3& v) { return { v.x, v.y }; }
+static inline Vector2D ToGLM2(const Vector3D& v) { return { v.x, v.y }; }
+static inline Vector2D  ToV2(const Vector3D& v) { return { v.x, v.y }; }
 
 
 void TestScene::init(Engine::PhysicsSystem* physics, float winW, float winH, unsigned seed) {
@@ -22,7 +24,7 @@ void TestScene::init(Engine::PhysicsSystem* physics, float winW, float winH, uns
     height_ = winH;
 
     // lines with gap
-    const float gap = 40.0f; 
+    const float gap = 80.0f; 
     const float xMid = width_ * 0.5f;
     const float y0 = height_ * 0.25f;
     const float y1 = height_ * 0.75f;
@@ -33,18 +35,20 @@ void TestScene::init(Engine::PhysicsSystem* physics, float winW, float winH, uns
     segRight_ = Collision::MakeSegment(Vector2D(xMid + 0.5f * gap, y0),
         Vector2D(xMid + 0.5f * gap, y1));
 
-    spawnBalls(2500, seed);  // create & register 10 balls (randomized)
+    spawnBalls(20, seed);  // create & register 10 balls (randomized)
 }
 
 void TestScene::update(float dt) {
     elapsed_ += dt;
-
     // start damp
     if (!dampingEnabled_ && elapsed_ >= 7.0f) {
         dampingEnabled_ = true;
         for (auto& b : balls_) b.physics.damping = 0.98f;
     }
-
+    int seed = 0;
+    if (Input::IsKeyPressed(GLFW_KEY_W)) {
+        spawnBalls(1, seed);
+    }
     for (auto& b : balls_) {
         bounceAndClamp(b);                // reflect off world edges
         collideWithCenterLinesBounce(b);  // reflect off the two center lines
@@ -69,7 +73,7 @@ void TestScene::render(Renderer& r) {
 
     for (const auto& b : balls_) {
         DebugDraw2D::Circle(r,
-            glm::vec2(b.physics.position.x, b.physics.position.y),
+             glm::vec2(b.physics.position.x, b.physics.position.y),
             b.radius, b.color, 48, /*textureId*/ 0);
     }
 }
@@ -85,7 +89,7 @@ void TestScene::spawnBalls(int count, unsigned seed) {
 
     std::uniform_real_distribution<float> radDist(18.0f, 34.0f);
     std::uniform_real_distribution<float> hueDist(0.0f, 1.0f);
-    std::uniform_real_distribution<float> speedDist(350.0f, 1500.0f);
+    std::uniform_real_distribution<float> speedDist(.0f, 1500.0f);
     constexpr float TwoPi = 6.28318530718f;
     std::uniform_real_distribution<float> angleDist(0.0f, TwoPi);
 
@@ -106,12 +110,13 @@ void TestScene::spawnBalls(int count, unsigned seed) {
         // Random position fully inside the screen
         std::uniform_real_distribution<float> xDist(r, width_ - r);
         std::uniform_real_distribution<float> yDist(r, height_ - r);
-        e.physics.position = glm::vec3(xDist(rng), yDist(rng), 0.0f);
+        e.physics.position = Vector3D(xDist(rng), yDist(rng), 0.0f);
+     
 
         // Random velocity from speed + angle
         float ang = angleDist(rng);
         float speed = speedDist(rng);
-        e.physics.velocity = glm::vec3(std::cos(ang) * speed, std::sin(ang) * speed, 0.0f);
+        e.physics.velocity = Vector3D(std::cos(ang) * speed, std::sin(ang) * speed, 0.0f);
 
         // No damping initially
         e.physics.damping = 1.0f;
@@ -174,6 +179,102 @@ void TestScene::collideWithCenterLinesBounce(CircleEntity& e) {
 
         
             return;
+        }
+    }
+
+}
+
+void TestScene::updatePlayer(float /*dt*/) {
+    // input -> horizontal acceleration or velocity tweak
+    const float moveAccel = 2000.0f;  // px/s^2
+    if (Input::IsKeyPressed(GLFW_KEY_A)) {
+        physics_->ApplyForce(&player_.physics, Vector3D(-moveAccel * player_.physics.mass, 0, 0));
+    }
+    if (Input::IsKeyPressed(GLFW_KEY_D)) {
+        physics_->ApplyForce(&player_.physics, Vector3D(+moveAccel * player_.physics.mass, 0, 0));
+    }
+
+    // simple "ground": y = 0 (bottom of screen)
+    // clamp triangle center so its base doesn't go below y=0
+    auto& p = player_.physics.position;
+    auto& v = player_.physics.velocity;
+
+    float halfW = player_.width * 0.5f;
+    float halfH = player_.height * 0.5f;
+
+    // horizontal bounds
+    float minX = halfW, maxX = width_ - halfW;
+    float oldX = p.x;
+    p.x = Vector2D::ClampValue(p.x, minX, maxX);
+    if (p.x != oldX) v.x = 0.0f; // stop at walls
+
+    // vertical ground clamp (keep base >= 0)
+    float oldY = p.y;
+    p.y = Vector2D::ClampValue(p.y, halfH, height_ - halfH);
+    playerGrounded_ = (p.y != oldY && p.y == halfH);
+    if (p.y != oldY && p.y == halfH) v.y = 0.0f;
+
+    // Jump (W) — only if grounded
+    if (playerGrounded_ && Input::IsKeyPressed(GLFW_KEY_W)) {
+        v.y = 650.0f;               // jump impulse (px/s)
+        playerGrounded_ = false;
+    }
+
+    // Rebuild segments for collision
+    updatePlayerSegments();
+}
+
+void TestScene::updatePlayerSegments() {
+    // Triangle verts (upright):
+    //   top = (cx, cy + h/2)
+    //   bl  = (cx - w/2, cy - h/2)
+    //   br  = (cx + w/2, cy - h/2)
+    const auto& p = player_.physics.position;
+    float cx = p.x, cy = p.y;
+    float hw = player_.width * 0.5f;
+    float hh = player_.height * 0.5f;
+
+    Vector2D top(cx, cy + hh);
+    Vector2D bl(cx - hw, cy - hh);
+    Vector2D br(cx + hw, cy - hh);
+
+    triSeg_[0] = Collision::MakeSegment(top, bl);
+    triSeg_[1] = Collision::MakeSegment(bl, br);
+    triSeg_[2] = Collision::MakeSegment(br, top);
+}
+
+
+void TestScene::collideCircleWithTriangle(CircleEntity& e) {
+    const float r = e.radius;
+    auto& p = e.physics.position;
+    auto& v = e.physics.velocity;
+
+    const Collision::LineSegment segs[3] = { triSeg_[0], triSeg_[1], triSeg_[2] };
+    const Vector2D P = ToV2(p);
+
+    for (const auto& seg : segs) {
+        float t = 0.0f;
+        Vector2D Q; // closest point on edge to circle center
+
+        // Treat as "point within radius of segment"
+        if (Collision::PointVsSegment(P, seg.p0, seg.p1, r, &t, &Q)) {
+            // normal from edge to center
+            Vector2D m = P - Q;
+            float m2 = m.SquareLength();
+            Vector2D n = (m2 > 0.0f) ? m * (1.0f / std::sqrt(m2)) : seg.normal;
+
+            // push circle out to just touch the edge
+            Vector2D newC = Q + n * r;
+            p.x = newC.x; p.y = newC.y;
+
+            // reflect velocity: v' = v - 2*(v·n)*n
+            glm::vec2 ng(n.x, n.y);
+            glm::vec2 v2(v.x, v.y);
+            glm::vec2 vRef = v2 - 2.0f * glm::dot(v2, ng) * ng;
+
+            v.x = vRef.x; v.y = vRef.y;
+
+            return; // one edge is enough per frame
         }
     }
 }

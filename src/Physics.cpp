@@ -2,7 +2,6 @@
 #include "Math/Vector3D.h"  
 
 #include <iostream>
-#include <vector>
 
 namespace Engine {
 
