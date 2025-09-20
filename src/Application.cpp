@@ -1,5 +1,7 @@
 ﻿#include "Application.h"
 #include <windows.h>
+
+#include "Input.h"
 #include "Physics2D.h"
 #include "Renderer2D.h"
 #include "systems/Time.h"
@@ -19,8 +21,9 @@ namespace Engine {
         auto& world = *m_worlds.back();
 
         // Attach core systems to the world
-        world.AddSystem<Time>();
-        world.AddSystem<WindowManager>();
+		world.AddSystem<Time>();            // Time system must be attached first (FPS)
+
+		// Anything else can be attached after
         world.AddSystem<Physics2D>(&world);
         world.AddSystem<Renderer2D>(&world);
 
@@ -52,7 +55,7 @@ namespace Engine {
         return m_worlds.size();
     }
 
-    void Application::Run(const bool consoleFlag) {
+    void Application::Run(Game& game, const bool consoleFlag) {
 #if !_DEBUG
         if (consoleFlag)
             _enableConsole();
@@ -62,24 +65,32 @@ namespace Engine {
         (void)consoleFlag;
 #endif
 
-		Initialize();
+        World& world = CreateWorld();
+        Initialize();
 
-        // WindowManager must be attached
+        game.OnStart(world);
+
         if (WindowManager::GetWindows().empty()) {
             return;
         }
         
         while (!m_shouldStop) {
+			Input::_processInput();
             Update();
+			game.OnUpdate(world);
             
-            for (const auto* win : WindowManager::GetWindows())
+            for (const auto* win : WindowManager::GetWindows()) {
                 if (win->ShouldClose()) {
                     m_shouldStop = true;
                     break;
                 }
+                glfwSwapBuffers(win->Handle());
+            }
 		}
 
+        game.OnShutdown(world);
         m_worlds.clear();
+        WindowManager::DestroyAll();
     }
 
     void Application::Initialize() const {
@@ -91,6 +102,11 @@ namespace Engine {
         for (auto& world : m_worlds)
             world->_update();
     }
+
+    void Application::LateUpdate() const {
+       for (auto& world : m_worlds)
+		   world->_lateUpdate();
+	}
 
     void Application::Close() {
 		m_shouldStop = true;

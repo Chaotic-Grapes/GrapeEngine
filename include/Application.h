@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 #include "ecs/World.h"
+#include "Game.h"
 
 namespace Engine {
     class Application {
@@ -49,9 +50,10 @@ public:
         /**
          * @brief Starts the engine
          *
+		 * @param game Reference to the game instance
 		 * @param consoleFlag If true, runs with console output enabled
          */
-        void Run(bool consoleFlag);
+        void Run(Game& game, bool consoleFlag);
 
         /**
          * @brief Initializes engine and all attached systems. <br>
@@ -63,6 +65,11 @@ public:
          * @brief Ticks all attached systems and others as needed
          */
         void Update() const;
+
+        /**
+		 * @brief Ticks all attached systems after Update()
+		 */
+        void LateUpdate() const;
 
         /**
 		 * @brief Close worlds and release resources.

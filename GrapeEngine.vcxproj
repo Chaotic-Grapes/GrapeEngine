@@ -153,6 +153,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\BehaviourSystem.cpp" />
     <ClCompile Include="src\Physics2D.cpp" />
     <ClCompile Include="src\PhysicsCollision2DTestScene.cpp" />
     <ClCompile Include="src\Renderer2D.cpp" />
@@ -181,6 +182,9 @@
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
+    <ClInclude Include="include\systems\Behaviour.h" />
+    <ClInclude Include="include\systems\BehaviourSystem.h" />
+    <ClInclude Include="include\Game.h" />
     <ClInclude Include="include\Color.h" />
     <ClInclude Include="include\Input.h" />
     <ClInclude Include="include\ecs\ComponentManager.h" />

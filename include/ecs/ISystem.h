@@ -22,6 +22,11 @@ public:
         virtual void OnUpdate() = 0;
 
         /**
+		 * @brief Called every frame after OnUpdate for any late updates
+         */
+		virtual void OnLateUpdate() {}
+
+        /**
 		 * @brief Name of the system for debugging/logging purposes
 		 * 
 		 * @return std::string Name of the system

@@ -14,7 +14,7 @@
 #include "Math/Vector2D.h"
 
 // Tiny helpers for conversions (renderer uses glm::vec2)
-static inline Vector2D ToGLM2(const Vector3D& v) { return { v.x, v.y }; }
+static inline Vector2D ToGLM2(const Vector3D& v) { return { v.X, v.Y }; }
 static inline Vector2D ToV2(const Vector3D& v) { return { v.X, v.Y }; }
 
 
@@ -204,19 +204,19 @@ void TestScene::updatePlayer(float /*dt*/) {
 
     // horizontal bounds
     float minX = halfW, maxX = width_ - halfW;
-    float oldX = p.x;
-    p.x = Vector2D::ClampValue(p.x, minX, maxX);
-    if (p.x != oldX) v.x = 0.0f; // stop at walls
+    float oldX = p.X;
+    p.X = Vector2D::ClampValue(p.Y, minX, maxX);
+    if (p.X != oldX) v.X = 0.0f; // stop at walls
 
     // vertical ground clamp (keep base >= 0)
-    float oldY = p.y;
-    p.y = Vector2D::ClampValue(p.y, halfH, height_ - halfH);
-    playerGrounded_ = (p.y != oldY && p.y == halfH);
-    if (p.y != oldY && p.y == halfH) v.y = 0.0f;
+    float oldY = p.Y;
+    p.Y = Vector2D::ClampValue(p.Y, halfH, height_ - halfH);
+    playerGrounded_ = (p.Y != oldY && p.Y == halfH);
+    if (p.Y != oldY && p.Y == halfH) v.Y = 0.0f;
 
     // Jump (W) � only if grounded
     if (playerGrounded_ && Input::IsKeyPressed(GLFW_KEY_W)) {
-        v.y = 650.0f;               // jump impulse (px/s)
+        v.Y = 650.0f;               // jump impulse (px/s)
         playerGrounded_ = false;
     }
 
@@ -230,7 +230,7 @@ void TestScene::updatePlayerSegments() {
     //   bl  = (cx - w/2, cy - h/2)
     //   br  = (cx + w/2, cy - h/2)
     const auto& p = player_.physics.position;
-    float cx = p.x, cy = p.y;
+    float cx = p.X, cy = p.Y;
     float hw = player_.width * 0.5f;
     float hh = player_.height * 0.5f;
 
@@ -265,14 +265,14 @@ void TestScene::collideCircleWithTriangle(CircleEntity& e) {
 
             // push circle out to just touch the edge
             Vector2D newC = Q + n * r;
-            p.x = newC.x; p.y = newC.y;
+            p.X = newC.X; p.Y = newC.Y;
 
             // reflect velocity: v' = v - 2*(v�n)*n
-            glm::vec2 ng(n.x, n.y);
-            glm::vec2 v2(v.x, v.y);
+            glm::vec2 ng(n.X, n.Y);
+            glm::vec2 v2(v.Y, v.Y);
             glm::vec2 vRef = v2 - 2.0f * glm::dot(v2, ng) * ng;
 
-            v.x = vRef.x; v.y = vRef.y;
+            v.X = vRef.x; v.Y = vRef.y;
 
             return; // one edge is enough per frame
         }

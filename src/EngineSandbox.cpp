@@ -19,11 +19,9 @@ namespace {
 
 int main() {
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-    Engine::Application engine;
 
     RunTestMenu();
 
-    engine.Run(true);
     return 0;
 }
 
@@ -61,9 +59,9 @@ namespace {
     void TestPhysics2D() {
         std::cout << "Starting Physics2D Test..." << '\n';
 
-        // Create world and systems
-        World& world = CREATE_WORLD();
-		world.AddSystem<Sandbox::PhysicsCollision2DTestScene>(&world, 1600.f, 900.f, 7.f);
+        Engine::Application engine;
+        Sandbox::PhysicsCollision2DTestScene game = Sandbox::PhysicsCollision2DTestScene(1600.f, 900.f, 7.f);
+        engine.Run(game, true);
     }
 }
 

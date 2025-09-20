@@ -59,6 +59,9 @@
     <Filter Include="Engine\Systems\Core\Physics">
       <UniqueIdentifier>{c06e09d6-2f0c-447d-bb4e-176c712e4030}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Game">
+      <UniqueIdentifier>{66c11f33-f1b7-4ef7-89b0-b6613210918b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp">
@@ -233,6 +236,9 @@
     </ClInclude>
     <ClInclude Include="include\Renderer2D.h">
       <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Game.h">
+      <Filter>Game</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

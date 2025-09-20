@@ -55,7 +55,7 @@ private:
     void updatePlayerSegments();                  // build 3 segments from triangle verts
     void collideCircleWithTriangle(CircleEntity& e); // circle vs each triangle edge
 
-    static inline Vector2D ToV2(const Vector3D& v) { return { v.x, v.y }; }
+    static inline Vector2D ToV2(const Vector3D& v) { return { v.X, v.Y }; }
 
 private:
     Engine::PhysicsSystem* physics_ = nullptr;     // not owned

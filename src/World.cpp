@@ -11,6 +11,12 @@ void World::_update() const {
         sys->OnUpdate();
 }
 
+void World::_lateUpdate() const {
+	for (auto& sys : m_systems)
+		sys->OnLateUpdate();
+}
+
+
 void World::_shutdown() {
     // No need to destroy systems individually since they are managed by unique_ptr
 

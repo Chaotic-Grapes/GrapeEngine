@@ -6,34 +6,38 @@
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include "systems/Time.h"
+#include "systems/Window.h"
+#include "systems/WindowManager.h"
 
 constexpr float TWO_PI = 6.28318530718f;
 
-Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(World* world, const float width, const float height, const float dampingDelay, const unsigned seed) {
-    m_world = world;
-    m_worldWidth = width;
-    m_worldHeight = height;
+Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int width, const int height, const float dampingDelay) {
+    CREATE_WINDOW("Physics & Collision Test", width, height);
+    m_worldWidth = static_cast<float>(width);
+    m_worldHeight = static_cast<float>(height);
     m_elapsedTime = 0.0f;
 	m_dampingDelay = dampingDelay;
     m_dampingEnabled = false;
 
     // Disable gravity for this test (balls should fly around freely)
     Engine::Physics2D::SetGravity(Vector2D(0.0f, 0.0f));
+}
 
-    CreateBoundaryLines();
-    CreateBalls(50, seed); // Start with fewer balls
+void Sandbox::PhysicsCollision2DTestScene::OnStart(World& world) {
+    CreateBoundaryLines(world);
+    SpawnBalls(world, 50); // Start with fewer balls
 
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
 }
 
-void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines() {
+void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
 	constexpr float gap = 40.0f;
     const float xMid = m_worldWidth * 0.5f;
     const float y0 = m_worldHeight * 0.25f;
     const float y1 = m_worldHeight * 0.75f;
 
     // Create left boundary line
-    Entity leftLine = m_world->CreateEntity();
+    Entity leftLine = world.CreateEntity();
     leftLine.AddComponent<Component::LineRenderer>(
         Vector2D(xMid - gap * 0.5f, y0),
         Vector2D(xMid - gap * 0.5f, y1),
@@ -42,7 +46,7 @@ void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines() {
     m_boundaryLines.push_back(leftLine);
 
     // Create right boundary line  
-    Entity rightLine = m_world->CreateEntity();
+    Entity rightLine = world.CreateEntity();
     rightLine.AddComponent<Component::LineRenderer>(
         Vector2D(xMid + gap * 0.5f, y0),
         Vector2D(xMid + gap * 0.5f, y1),
@@ -51,7 +55,7 @@ void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines() {
     m_boundaryLines.push_back(rightLine);
 }
 
-void Sandbox::PhysicsCollision2DTestScene::CreateBalls(const int count, const unsigned seed) {
+void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int count, const unsigned seed) {
     m_balls.clear();
     m_balls.reserve(count);
 
@@ -68,7 +72,7 @@ void Sandbox::PhysicsCollision2DTestScene::CreateBalls(const int count, const un
         );
 
         // Create ball entity
-        Entity ball = m_world->CreateEntity();
+        Entity ball = world.CreateEntity();
 
         // Set random position
 		const float x = MathHelper::Randomize<float>(radius, m_worldWidth - radius, seed),
@@ -103,7 +107,9 @@ void Sandbox::PhysicsCollision2DTestScene::CreateBalls(const int count, const un
     }
 }
 
-void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
+void Sandbox::PhysicsCollision2DTestScene::OnUpdate(World& world) {
+    (void)world;
+
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
 
     // Enable damping after specified delay
@@ -165,7 +171,7 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
     }
 }
 
-void Sandbox::PhysicsCollision2DTestScene::Cleanup() {
+void Sandbox::PhysicsCollision2DTestScene::OnShutdown(World& world) {
     m_balls.clear();
     m_boundaryLines.clear();
 }

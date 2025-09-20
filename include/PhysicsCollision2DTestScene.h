@@ -1,5 +1,6 @@
 #ifndef PHYSICSCOLLISION2DTESTSCENE_H
 #define PHYSICSCOLLISION2DTESTSCENE_H
+#include "Game.h"
 #if _DEBUG
 
 #include <vector>
@@ -7,21 +8,17 @@
 #include "ecs/Entity.h"
 
 namespace Sandbox {
-    class PhysicsCollision2DTestScene : public Engine::ISystem {
+    class PhysicsCollision2DTestScene : public Game {
     public:
-        PhysicsCollision2DTestScene(World* world, float width, float height, float dampingDelay, unsigned seed = 0);
-        void Cleanup();
-
-        void OnCreate() override {}
-        void OnUpdate() override;
-
-        std::string Name() const override { return "PhysicsCollision2DTestScene"; }
+        PhysicsCollision2DTestScene(int width, int height, float dampingDelay);
+        void OnStart(World& world) override;
+        void OnUpdate(World& world) override;
+        void OnShutdown(World& world) override;
     private:
-        void CreateBalls(int count, unsigned seed);
-        void CreateBoundaryLines();
+        void SpawnBalls(World& world, int count, unsigned seed = 0);
+        void CreateBoundaryLines(World& world);
         void UpdateBallCollisions();
 
-        World* m_world = nullptr;
         std::vector<Entity> m_balls;
         std::vector<Entity> m_boundaryLines;
 
