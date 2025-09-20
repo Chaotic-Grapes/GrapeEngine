@@ -149,16 +149,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Debugger.cpp" />
     <ClCompile Include="src\Engine.cpp" />
     <ClCompile Include="src\glad.c" />
+    <ClCompile Include="src\Logger.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Profiler.cpp" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Debugger.h" />
     <ClInclude Include="src\Engine.h" />
     <ClInclude Include="src\ISystem.h" />
     <ClInclude Include="src\Logger.h" />
+    <ClInclude Include="src\Profiler.h" />
     <ClInclude Include="src\Time.h" />
     <ClInclude Include="src\Window.h" />
   </ItemGroup>

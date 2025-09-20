@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-#include <chrono>
+#include <GLFW/glfw3.h>
 
 /*naming conventions:
 
@@ -18,7 +18,7 @@ enum LogSeverity {
     INFO,
     DEBUG,
     WARNING,
-    ERROR
+    ERR // "ERROR" has been taken in wingd.h
 };
 
 class Logger : public Engine::ISystem {
@@ -53,9 +53,13 @@ private:
     // Logging functions
     //void writeCrashLog(LogSeverity level, const std::string& message);
     //void DebugMsg(const std::string& message);
-    void m_info(const std::string& message);
-    void m_warn(const std::string& message);
-    void m_error(const std::string& message);
+    void _info(const std::string& message);
+    void _warn(const std::string& message);
+    void _error(const std::string& message);
+
+    // Private helper functions for console color
+    void _setConsoleColor(LogSeverity type);
+    void _resetConsoleColor();
 
     // Configuration
     //void SetLogToFile(bool enable, const std::string& filename = "engine.log"); // don't need
@@ -71,8 +75,8 @@ private:
     bool m_logToConsole{ true };
     bool m_debugEnabled{ true };
 
-    std::chrono::steady_clock::time_point m_start_time;
-    std::chrono::steady_clock::time_point m_last_update_time;
+    double m_gameTime;
+    double m_lastUpdate;
 };
 
 #endif // LOGGER_H
