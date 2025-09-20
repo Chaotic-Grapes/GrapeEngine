@@ -7,8 +7,10 @@
 #include <imgui_impl_opengl3.h>
 #include <iostream>
 
-// Control whether UI is visible or hidden
+// Initialize static variables
 bool DebugUI::m_enabled = true;
+std::vector<GameObject> DebugUI::m_gameObjects;
+int DebugUI::m_nextGameObjectId = 1;  // Start with 1
 
 void DebugUI::Initialize(GLFWwindow* window) {
     IMGUI_CHECKVERSION();     // Verify ImGUI version compatibility
@@ -20,6 +22,10 @@ void DebugUI::Initialize(GLFWwindow* window) {
     ImGui::StyleColorsDark(); // Set dark theme colors
     ImGui_ImplGlfw_InitForOpenGL(window, true); // GLFW backend (window/input handling)
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
+
+    // Initialize with some default game objects for testing
+    AddGameObject("Player");
+    AddGameObject("Enemy");
 }
 
 void DebugUI::NewFrame() {
@@ -106,7 +112,7 @@ void DebugUI::_showInputDebugWindow() {
     ImGui::Separator();
     ImGui::Text("=== Keyboard ===");
 
-    // Show your WASD keys using your constants
+    // Show WASD keys using constants
     ImGui::Text("W: %s", Input::IsKeyPressed(KEY_W) ? "PRESSED" : "Released");
     ImGui::Text("A: %s", Input::IsKeyPressed(KEY_A) ? "PRESSED" : "Released");
     ImGui::Text("S: %s", Input::IsKeyPressed(KEY_S) ? "PRESSED" : "Released");
@@ -133,6 +139,36 @@ void DebugUI::_showInputDebugWindow() {
     }
 
     ImGui::End();
+}
+
+// Search for an object and return pointer (or nullptr)
+GameObject* DebugUI::FindGameObject(int id) {
+    // Search from start to end of vector; check if each object's ID matches what we're looking for
+    std::vector<GameObject>::iterator it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(),
+        [id](const GameObject& gameObject) { return gameObject.Id == id; });
+
+    // If iterator reached the end, object wasn't found
+    // &(*it) cause we want to dereference pointer to get object then take its address to return pointer
+    return (it != m_gameObjects.end()) ? &(*it) : nullptr;
+}
+
+// Create a new object
+void DebugUI::AddGameObject(const std::string& name) { 
+    // Increment ID
+    m_gameObjects.emplace_back(m_nextGameObjectId++, name); 
+}
+
+// Find and delete an object by ID
+void DebugUI::RemoveGameObject(int id) {
+    // Same thing
+    std::vector<GameObject>::iterator it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(),
+        [id](const GameObject& gameObject) { return gameObject.Id == id; });
+
+    // If object is found, erase
+    // No need for &(*it) cause not returning anything
+    if (it != m_gameObjects.end()) {
+        m_gameObjects.erase(it);
+    }
 }
 
 void DebugUI::Shutdown() {
