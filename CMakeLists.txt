@@ -42,6 +42,8 @@ file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS
 # Create executable
 add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 
+target_compile_definitions(GrapeEngine PRIVATE USE_IMGUI)
+
 # Preserve folder structure in Visual Studio
 foreach(source IN LISTS ENGINE_SOURCES)
     get_filename_component(source_path "${source}" PATH)

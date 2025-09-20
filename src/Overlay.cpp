@@ -1,6 +1,7 @@
+#include "systems/Overlay.h"
+#ifdef USE_IMGUI
 #include "DebugUI.h"
 #include "Input.h"
-#include "systems/Overlay.h"
 #include <systems/Window.h>
 #include <systems/WindowManager.h>
 #include <iostream>
@@ -42,3 +43,15 @@ void Overlay::OnUpdate() {
 Overlay::~Overlay() {
     DebugUI::Shutdown();
 }
+
+#else
+// Non-ImGui implementations
+void Overlay::OnCreate() {
+    // Empty implementation when ImGui is not available
+}
+
+void Overlay::OnUpdate() {
+    // Empty implementation when ImGui is not available
+}
+
+#endif
