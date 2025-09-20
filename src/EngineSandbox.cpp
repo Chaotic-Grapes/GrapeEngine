@@ -1,9 +1,7 @@
 // ******** NOTHING IS TO BE PLACED ABOVE _DEBUG ******** //
 #ifdef _DEBUG
 
-#include "Renderer2D.h"
-#include "Physics2D.h"
-#include "PhysicsCollision2DTestScene.h"
+#include "PhysicsCollision2DTest.h"
 #include <crtdbg.h>
 #include "Application.h"
 #include <iostream>
