@@ -25,13 +25,13 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
 
 void Sandbox::PhysicsCollision2DTestScene::OnStart(World& world) {
     CreateBoundaryLines(world);
-    SpawnBalls(world, 50); // Start with fewer balls
+    SpawnBalls(world, 10); // Start with fewer balls
 
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
 }
 
 void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
-	constexpr float gap = 40.0f;
+	constexpr float gap = 150.0f;
     const float xMid = m_worldWidth * 0.5f;
     const float y0 = m_worldHeight * 0.25f;
     const float y1 = m_worldHeight * 0.75f;
@@ -86,10 +86,10 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
         auto& rigidbody = ball.AddComponent<Component::Rigidbody2D>();
         rigidbody.Mass = 1.0f;
         rigidbody.Drag = 0.0f; // No drag initially
-        rigidbody.GravityScale = 0.0f; // No gravity for this test
+        rigidbody.GravityScale = 1.0f; // No gravity for this test
 
         // Set random velocity
-        const float speed = MathHelper::Randomize<float>(100.0f, 400.0f, seed); // Reduced speed for better visualization
+        const float speed = MathHelper::Randomize<float>(200.0f, 300.0f, seed); 
         const float angle = MathHelper::Randomize<float>(0.0f, TWO_PI, seed);
         rigidbody.Velocity.X = std::cos(angle) * speed;
         rigidbody.Velocity.Y = std::sin(angle) * speed;

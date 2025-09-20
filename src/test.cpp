@@ -35,7 +35,7 @@ void TestScene::init(Engine::PhysicsSystem* physics, float winW, float winH, uns
     segRight_ = Collision::MakeSegment(Vector2D(xMid + 0.5f * gap, y0),
         Vector2D(xMid + 0.5f * gap, y1));
 
-    spawnBalls(20, seed);  // create & register 10 balls (randomized)
+    spawnBalls(3, seed);  // create & register 10 balls (randomized)
 }
 
 void TestScene::update(float dt) {
@@ -214,7 +214,7 @@ void TestScene::updatePlayer(float /*dt*/) {
     playerGrounded_ = (p.Y != oldY && p.Y == halfH);
     if (p.Y != oldY && p.Y == halfH) v.Y = 0.0f;
 
-    // Jump (W) � only if grounded
+    // Jump (W) only if grounded
     if (playerGrounded_ && Input::IsKeyPressed(GLFW_KEY_W)) {
         v.Y = 650.0f;               // jump impulse (px/s)
         playerGrounded_ = false;
