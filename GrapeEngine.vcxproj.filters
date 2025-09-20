@@ -109,6 +109,7 @@
     <ClCompile Include="src\Input.cpp">
       <Filter>Engine\Systems\Core\Input</Filter>
     </ClCompile>
+    <ClCompile Include="src\Overlay.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
