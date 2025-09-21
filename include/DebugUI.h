@@ -43,6 +43,7 @@ private:
     static void _showEngineDebugWindow(bool& showDemo); // Main debug console window with engine status
     static void _showPerformanceWindow();  // Performance monitoring window
     static void _showInputDebugWindow();   // Input debugging
+    static void _showGameObjectEditor();   // Game object editor window
 };
 
 #endif

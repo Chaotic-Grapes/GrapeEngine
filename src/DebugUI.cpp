@@ -54,6 +54,7 @@ void DebugUI::Render() {
     _showEngineDebugWindow(showDemo); // Pass demo control to debug window
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
+    _showGameObjectEditor();   // Game object editor
 
     // Finalize the frame and send to GPU
     ImGui::Render();  // Generate draw commands from UI
@@ -82,7 +83,7 @@ void DebugUI::_showEngineDebugWindow(bool& showDemo) {
 }
 
 void DebugUI::_showPerformanceWindow() {
-    ImGui::SetNextWindowPos(ImVec2(10, 200), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(ImVec2(10, 170), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(300, 120), ImGuiCond_Once);
 
     ImGui::Begin("Performance Monitor");
@@ -96,7 +97,8 @@ void DebugUI::_showPerformanceWindow() {
 
 void DebugUI::_showInputDebugWindow() {
     // Same stuff as before
-    ImGui::SetNextWindowPos(ImVec2(320, 10), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(ImVec2(330, 10), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(320, 400), ImGuiCond_Once);
     ImGui::Begin("Input Debug");
 
     ImGui::Text("=== Mouse ===");
@@ -136,6 +138,90 @@ void DebugUI::_showInputDebugWindow() {
     if (ImGui::Button("Reset Counters")) {
         spacePressed = 0;
         spaceReleased = 0;
+    }
+
+    ImGui::End();
+}
+
+void DebugUI::_showGameObjectEditor() {
+    // Position the window to the right of existing windows
+    ImGui::SetNextWindowPos(ImVec2(670, 10), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(375, 400), ImGuiCond_Once);
+
+    ImGui::Begin("Game Object Editor");
+    ImGui::Text("Level Editor Tools");
+    ImGui::Separator();
+
+    // Add new game object section
+    ImGui::Text("Create New Object:");
+    static char newObjectName[64] = "NewObject";  // Store new object name
+    ImGui::InputText("Name", newObjectName, sizeof(newObjectName));
+
+    // When button is clicked, create the object
+    if (ImGui::Button("Add Object")) {
+        AddGameObject(std::string(newObjectName));
+    }
+
+    ImGui::Separator();
+
+    // Quick add buttons for common objects
+    ImGui::Text("Quick Add:");
+    if (ImGui::Button("Player")) AddGameObject("Player");
+    ImGui::SameLine();  // Make the next button appear on the same line instead of below
+    if (ImGui::Button("Enemy")) AddGameObject("Enemy");
+    ImGui::SameLine();
+    if (ImGui::Button("Collectible")) AddGameObject("Collectible");
+
+    ImGui::Separator();
+
+    // Display list of current objects
+    ImGui::Text("Current Objects (%zu):", m_gameObjects.size());
+
+    // For each object
+    for (const GameObject& gameObject : m_gameObjects) {
+        // Show object info
+        ImGui::Text("ID: %d - %s", gameObject.Id, gameObject.Name.c_str());
+
+        // Status indicator
+        ImGui::SameLine();
+        if (gameObject.IsActive) {
+            ImGui::TextColored(ImVec4(0, 1, 0, 1), "(Active)");
+        }
+        else {
+            ImGui::TextColored(ImVec4(1, 0, 0, 1), "(Inactive)");
+        }
+
+        // Toggle active/inactive button
+        ImGui::SameLine();
+        // If object is active, button shows deactivate; if object is inactive, other way around
+        // Again create unique button IDs
+        if (ImGui::SmallButton((std::string(gameObject.IsActive ? "Hide##" : "Show##") + 
+            std::to_string(gameObject.Id)).c_str())) {
+            // Find the object and toggle its state
+            GameObject* obj = FindGameObject(gameObject.Id);
+            if (obj) {
+                obj->IsActive = !obj->IsActive;
+            }
+        }
+
+        // Delete button for each object
+        ImGui::SameLine();
+        // Unique button IDs like Delete##1, Delete##2 (everything after ## is hidden from display)
+        // Otherwise ImGUI wouldn't know which button was clicked
+        if (ImGui::SmallButton(("Delete##" + std::to_string(gameObject.Id)).c_str())) {
+            RemoveGameObject(gameObject.Id);
+            break;
+        }
+
+        // What we see for each object:
+        /* ID: 1 - Player (Active) [Deactivate] [Delete]
+           ID: 2 - Enemy (Inactive) [Activate] [Delete] */
+    }
+    ImGui::Separator();
+
+    // Clear all buttons
+    if (ImGui::Button("Clear All Objects")) {
+        m_gameObjects.clear();
     }
 
     ImGui::End();
