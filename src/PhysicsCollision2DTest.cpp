@@ -171,16 +171,15 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer(World& world) {
     const float velDampScale = 0.996f;   // mild numerical damping
 
     Vector2D F(-1.0f, 0.0f);
-    if (Input::WasKeyJustPressed(KEY_A)) Engine::Physics2D::AddForce(*rb, F);
+    if (Input::IsKeyDown(KEY_A)) { Engine::Physics2D::AddForce(*rb, F); std::cout << F.X; }
     else if (Input::IsKeyPressed(KEY_D)) {std::cout << F.X; } 
     else if (Input::IsKeyPressed(KEY_W)) F.Y += 0.25f * thrust;
     else if (Input::IsKeyPressed(GLFW_KEY_S)) F.Y -= 0.25f * thrust;
 
-    if (F.X != 0.0f || F.Y != 0.0f) {
-        Engine::Physics2D::AddForce(*rb, F);
-    }
+   
     if (Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
         Engine::Physics2D::AddImpulse(*rb, Vector2D(0.0f, jumpImpulse));
+        Engine::Physics2D::AddForce(*rb, F);
         std::cout << jumpImpulse;
     }
     rb->Velocity *= velDampScale;
