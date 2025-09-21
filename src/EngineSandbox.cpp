@@ -58,7 +58,7 @@ namespace {
         std::cout << "Starting Physics2D Test..." << '\n';
 
         Engine::Application engine;
-        Sandbox::PhysicsCollision2DTestScene game = Sandbox::PhysicsCollision2DTestScene(1600.f, 900.f, 7.f);
+        Sandbox::PhysicsCollision2DTestScene game = Sandbox::PhysicsCollision2DTestScene(1600, 900, 7);
         engine.Run(game, true);
     }
 }

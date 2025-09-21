@@ -1,13 +1,21 @@
-#include "PhysicsCollision2DTest.h"
+﻿#include "PhysicsCollision2DTest.h"
 #include <cmath>
 #include <iostream>
 #include "math/MathHelper.h"
 #include "Physics2D.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
+#include "ecs/Components.h"
 #include "systems/Time.h"
 #include "systems/Window.h"
 #include "systems/WindowManager.h"
+#include "input.h"
+
+using Component::Rigidbody2D;
+using Component::ShapeRenderer2D;
+using Component::CircleCollider2D;
+using Component::LineRenderer;
+
 
 constexpr float TWO_PI = 6.28318530718f;
 
@@ -20,7 +28,7 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     m_dampingEnabled = false;
 
     // Disable gravity for this test (balls should fly around freely)
-    Engine::Physics2D::SetGravity(Vector2D(0.0f, 0.0f));
+    Engine::Physics2D::SetGravity(Vector2D(0.0f, -800.0f));
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnStart(World& world) {
@@ -28,6 +36,9 @@ void Sandbox::PhysicsCollision2DTestScene::OnStart(World& world) {
     SpawnBalls(world, 10); // Start with fewer balls
 
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
+    
+    //test tri
+    CreateTriangle(world);
 }
 
 void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
@@ -107,6 +118,108 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
     }
 }
 
+void Sandbox::PhysicsCollision2DTestScene::CreateTriangle(World& world) {
+    Entity e = world.CreateEntity();
+    m_playerId = e.GetId();
+
+    const float cx = m_worldWidth * 0.25f;
+    const float cy = m_worldHeight * 0.50f;
+
+    auto& tr = e.Transform();
+    tr.Position.X = cx;
+    tr.Position.Y = cy;
+
+    auto& rb = e.AddComponent<Component::Rigidbody2D>();
+    rb.Mass = 2.0f;
+    rb.GravityScale = 1.0f;     // gravity on (balls have 0)
+    rb.Drag = 0.10f;
+
+    e.AddComponent<Component::CircleCollider2D>(m_triHalfHeight);
+
+    // Give it a starting velocity like the balls do:
+    rb.Velocity.X = 250.0f;     // NEW: immediate visible motion
+    rb.Velocity.Y = 0.0f;
+
+    // Build world-space triangle points around (cx, cy)
+    std::vector<Vector2D> pts;
+    pts.emplace_back(cx + 0.0f, cy + m_triHalfHeight);
+    pts.emplace_back(cx - m_triHalfBase, cy - m_triHalfHeight);
+    pts.emplace_back(cx + m_triHalfBase, cy - m_triHalfHeight);
+
+    const Color fill(0.95f, 0.90f, 0.20f, 1.0f);
+    Component::ShapeRenderer2D triShape = Component::ShapeRenderer2D::Polygon(pts, fill, /*closed*/ true);
+    e.AddComponent<Component::ShapeRenderer2D>(triShape);
+}
+
+void Sandbox::PhysicsCollision2DTestScene::UpdateTriangleControls(float /*dt*/) {
+    // kept for symmetry; we apply input in ClampAndBouncePlayer(World&) where we have World&
+}
+
+void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer(World& world) {
+    if (m_playerId == UINT32_MAX) return;
+
+    // Rebuild a handle on-the-fly from (id, world)
+    Entity player(m_playerId, &world);
+    auto& tr = player.Transform();
+    auto* rb = player.GetComponent<Rigidbody2D>();
+    auto* shape = player.GetComponent<ShapeRenderer2D>();
+    if (!rb) return;
+
+    // input plus jump
+    const float thrust = 1.0f;  // continuous force
+    const float jumpImpulse = 20.0f;   // discrete impulse
+    const float velDampScale = 0.996f;   // mild numerical damping
+
+    Vector2D F(-1.0f, 0.0f);
+    if (Input::WasKeyJustPressed(KEY_A)) Engine::Physics2D::AddForce(*rb, F);
+    else if (Input::IsKeyPressed(KEY_D)) {std::cout << F.X; } 
+    else if (Input::IsKeyPressed(KEY_W)) F.Y += 0.25f * thrust;
+    else if (Input::IsKeyPressed(GLFW_KEY_S)) F.Y -= 0.25f * thrust;
+
+    if (F.X != 0.0f || F.Y != 0.0f) {
+        Engine::Physics2D::AddForce(*rb, F);
+    }
+    if (Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
+        Engine::Physics2D::AddImpulse(*rb, Vector2D(0.0f, jumpImpulse));
+        std::cout << jumpImpulse;
+    }
+    rb->Velocity *= velDampScale;
+
+    // clamp bounce against window sides
+    const float r = m_triHalfHeight; // simple bounding circle for the triangle
+
+    // Left / Right
+    if (tr.Position.X - r <= 0.0f) {
+        tr.Position.X = r;
+        if (rb->Velocity.X < 0.0f) rb->Velocity.X = -rb->Velocity.X;
+    }
+    else if (tr.Position.X + r >= m_worldWidth) {
+        tr.Position.X = m_worldWidth - r;
+        if (rb->Velocity.X > 0.0f) rb->Velocity.X = -rb->Velocity.X;
+    }
+
+    // Bottom / Top
+    if (tr.Position.Y - r <= 0.0f) {
+        tr.Position.Y = r;
+        if (rb->Velocity.Y < 0.0f) rb->Velocity.Y = -rb->Velocity.Y;
+    }
+    else if (tr.Position.Y + r >= m_worldHeight) {
+        tr.Position.Y = m_worldHeight - r;
+        if (rb->Velocity.Y > 0.0f) rb->Velocity.Y = -rb->Velocity.Y;
+    }
+
+    std::vector<Vector2D> pts;
+    pts.emplace_back(tr.Position.X + 0.0f, tr.Position.Y + m_triHalfHeight);
+    pts.emplace_back(tr.Position.X - m_triHalfBase, tr.Position.Y - m_triHalfHeight);
+    pts.emplace_back(tr.Position.X + m_triHalfBase, tr.Position.Y - m_triHalfHeight);
+
+    shape->Type = ShapeRenderer2D::ShapeType::Polygon;
+    shape->Points = pts;     // overwrite with fresh world-space points
+    shape->Closed = true;
+
+}
+
+
 void Sandbox::PhysicsCollision2DTestScene::OnUpdate(World& world) {
     (void)world;
 
@@ -125,7 +238,8 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate(World& world) {
 
         std::cout << "Damping enabled after " << m_dampingDelay << " seconds!" << '\n';
     }
-
+    // Triangle input plus bounce
+    ClampAndBouncePlayer(world);
     UpdateBallCollisions();
 }
 
