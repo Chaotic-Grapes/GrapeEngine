@@ -1,6 +1,7 @@
 #include "../include/graphics/renderer.hpp"
 #include "../include/graphics/vertex.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -26,7 +27,7 @@ int Renderer::getOrAssignTextureSlot(GLuint textureId, bool& flushed) {
 
     if ((int)textureSlots.size() >= MaxTextureSlots) {
         flushed = true;
-        return -1; // signal to caller: need to flush before retry
+        return -1; // signal to caller: need to flush before retry (Magic number; change to enum)
     }
 
     textureSlots.push_back(textureId);
@@ -106,7 +107,10 @@ void Renderer::drawQuad(const glm::vec2& pos,
     GLuint textureId,
     const glm::vec4& uvRect,
     const glm::vec4& color,
+    float rotation,
+    float uniformScale,
     int /*layer*/)
+    // Depth buffer kinda breaks transparency (Render everything back to front if u have transparent stuff)
 {
     float texIndex = -1.0f; // sentinel for "no texture"
 
@@ -123,13 +127,18 @@ void Renderer::drawQuad(const glm::vec2& pos,
     }
 
     glm::vec2 half = size * 0.5f;
-
-    glm::vec2 positions[4] = {
-        {pos.x - half.x, pos.y - half.y}, // BL
-        {pos.x + half.x, pos.y - half.y}, // BR
-        {pos.x + half.x, pos.y + half.y}, // TR
-        {pos.x - half.x, pos.y + half.y}  // TL
+    glm::vec2 local[4] = {
+        {-half.x, -half.y}, // BL
+        { half.x, -half.y}, // BR
+        { half.x,  half.y}, // TR
+        {-half.x,  half.y}  // TL
     };
+
+    // build transform (translate * rotate * scale)
+    glm::mat4 transform(1.0f);
+    transform = glm::translate(transform, glm::vec3(pos, 0.0f));
+    transform = glm::rotate(transform, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+    transform = glm::scale(transform, glm::vec3(uniformScale, uniformScale, 1.0f));
 
     glm::vec2 uvs[4] = {
         {uvRect.x, uvRect.y}, // BL
@@ -137,6 +146,12 @@ void Renderer::drawQuad(const glm::vec2& pos,
         {uvRect.z, uvRect.w}, // TR
         {uvRect.x, uvRect.w}  // TL
     };
+
+    glm::vec2 positions[4];
+    for (int i = 0; i < 4; ++i) {
+        glm::vec4 p = transform * glm::vec4(local[i], 0.0f, 1.0f);
+        positions[i] = glm::vec2(p);
+    }
 
     // check if adding this geometry would exceed capacity.
     // Prevent overflow: if adding this quad exceeds max capacity, flush first
@@ -199,5 +214,7 @@ void Renderer::submitTriangles(const Vertex* verts, size_t vCount,
 }
 
 void Renderer::drawSprite(const Sprite& sprite) {
-    drawQuad(sprite.pos, sprite.size, sprite.textureId, sprite.uv, sprite.color);
+    drawQuad(sprite.pos, sprite.size, sprite.textureId,
+        sprite.uv, sprite.color,
+        sprite.rotation, sprite.uniformScale);
 }
