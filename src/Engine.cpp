@@ -50,9 +50,21 @@ namespace Engine {
         int texWidth = idleTexture.Width();
         int texHeight = idleTexture.Height();
 
+        static SpriteAnimation idleAnim(texId, 96, 96, texWidth, texHeight);
+        idleAnim.setFPS(12.0f);
+
+        // Keep the sprite alive across frames
+        static Sprite playerSprite = idleAnim.play({ 400, 300 }, { 288, 288 }, 0.0f);
+
         while (!m_mainWindow.ShouldClose()) {
             m_mainWindow.PollEvents();
             Update();
+
+            // Let the sprite update itself
+            playerSprite.handleInput(m_mainWindow.GetWindow(), Time::DeltaTime());
+            // Update animation each frame
+            idleAnim.update(Time::DeltaTime());
+            playerSprite.uv = idleAnim.currentUV();
 
             //Batching pipeline:
             glClearColor(0.1f, 0.1f, 0.1f, 1.f);
@@ -64,12 +76,7 @@ namespace Engine {
             m_renderer->beginFrame();
 
             // Submit primitives here
-            static SpriteAnimation idleAnim(texId, 96, 96, texWidth, texHeight);
-            idleAnim.setFPS(12.0f);
-
-            m_renderer->drawSprite(
-                idleAnim.play({ 400, 300 }, { 288, 288 }, Time::DeltaTime())
-            );
+            m_renderer->drawSprite(playerSprite);
 
             m_renderer->endFrame();
 
