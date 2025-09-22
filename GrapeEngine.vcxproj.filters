@@ -1,42 +1,175 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
     <Filter Include="Resource Files">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{3de7846a-50f4-4ab4-b7bf-d12518bfdb16}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Core">
+      <UniqueIdentifier>{c2afce2d-22be-4f96-84c2-9db1b80e25b7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems">
+      <UniqueIdentifier>{2c14d2c2-851a-4c16-8683-c81a4bd3f40c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External">
+      <UniqueIdentifier>{5d2f5d26-67a0-4d0c-8b0f-b10a66b0cd4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Messaging">
+      <UniqueIdentifier>{f1a03209-d55a-4108-be00-8a49c37a779e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core">
+      <UniqueIdentifier>{9b26cd4e-3380-4616-8c4e-3205736f0cdf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Window">
+      <UniqueIdentifier>{902de7de-a4c5-4d4c-8562-b4e67e4871bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Time">
+      <UniqueIdentifier>{c067ea98-e5d2-4ea0-a14a-54b4400af31f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Graphics">
+      <UniqueIdentifier>{667dac92-3aef-4eeb-aba4-af03ecd87b5f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Font">
+      <UniqueIdentifier>{03cee0fd-278e-41ad-9d3d-ae4a597f81e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\Core\Input">
+      <UniqueIdentifier>{3724a06d-1fe0-4a00-bbbc-51d113375e37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Messaging">
+      <UniqueIdentifier>{f1a03209-d55a-4108-be00-8a49c37a779e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External">
+      <UniqueIdentifier>{5d2f5d26-67a0-4d0c-8b0f-b10a66b0cd4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Entity Component System">
+      <UniqueIdentifier>{657cef2d-7a43-4e43-91e9-a64e6ac5dad5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Entity Component System\Components">
+      <UniqueIdentifier>{fc74c7b1-f524-4fc2-88eb-77ae5d1c3ec0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Entity Component System\Entity">
+      <UniqueIdentifier>{4b788cc7-025c-402c-a32a-f3b0d0e14c70}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Helpers">
+      <UniqueIdentifier>{ee230339-05e3-45ac-b05f-ab01c52dcc00}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\glad.c">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\Application.cpp">
+      <Filter>Engine\Core</Filter>
     </ClCompile>
-    <ClCompile Include="src\Engine.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\main.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\EngineSandbox.cpp">
+      <Filter>Engine\Core</Filter>
     </ClCompile>
     <ClCompile Include="src\Time.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Engine\Systems\Core\Time</Filter>
     </ClCompile>
+    <ClCompile Include="src\Window.cpp">
+      <Filter>Engine\Systems\Core\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="src\WindowManager.cpp">
+      <Filter>Engine\Systems\Core\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="src\World.cpp">
+      <Filter>Engine\Entity Component System</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Entity.cpp">
+      <Filter>Engine\Entity Component System\Entity</Filter>
+    </ClCompile>
+    <ClCompile Include="src\EntityManager.cpp">
+      <Filter>Engine\Entity Component System\Entity</Filter>
+    </ClCompile>
+    <ClCompile Include="src\glad.c">
+      <Filter>External</Filter>
+    </ClCompile>
+    <ClCompile Include="src\World.cpp">
+      <Filter>Engine\Entity Component System</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Entity.cpp">
+      <Filter>Engine\Entity Component System\Entity</Filter>
+    </ClCompile>
+    <ClCompile Include="src\EntityManager.cpp">
+      <Filter>Engine\Entity Component System\Entity</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\renderer.cpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\shader.cpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\sprite.cpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\font.cpp">
+      <Filter>Engine\Systems\Core\Font</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Input.cpp">
+      <Filter>Engine\Systems\Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Overlay.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Engine.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="include\Application.h">
+      <Filter>Engine\Core</Filter>
     </ClInclude>
-    <ClInclude Include="src\ISystem.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="include\systems\Time.h">
+      <Filter>Engine\Systems\Core\Time</Filter>
     </ClInclude>
-    <ClInclude Include="src\Time.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="include\systems\Window.h">
+      <Filter>Engine\Systems\Core\Window</Filter>
     </ClInclude>
+    <ClInclude Include="include\systems\WindowManager.h">
+      <Filter>Engine\Systems\Core\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\World.h">
+      <Filter>Engine\Entity Component System</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\ComponentManager.h">
+      <Filter>Engine\Entity Component System\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\Components.h">
+      <Filter>Engine\Entity Component System\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\Entity.h">
+      <Filter>Engine\Entity Component System\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\EntityManager.h">
+      <Filter>Engine\Entity Component System\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\IComponent.h">
+      <Filter>Engine\Entity Component System\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="include\messaging\MessageBus.h">
+      <Filter>Engine\Messaging</Filter>
+    </ClInclude>
+    <ClInclude Include="include\messaging\MessageTypes.h">
+      <Filter>Engine\Messaging</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\ISystem.h">
+      <Filter>Engine\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\renderer.hpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\shader.hpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\sprite.hpp">
+      <Filter>Engine\Systems\Core\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\font.hpp">
+      <Filter>Engine\Systems\Core\Font</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Input.h">
+      <Filter>Engine\Systems\Core\Input</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\Entity.inl">
+      <Filter>Engine\Entity Component System\Entity</Filter>
+    </None>
   </ItemGroup>
 </Project>
