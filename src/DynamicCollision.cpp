@@ -1,9 +1,10 @@
-#include "Include/DynamicCollision.h"
+#include "../src/DyamicCollision.h"
 #include <algorithm>
 #include <cmath>
 
+
 //helpers for squared length and float clamp
-static inline float Dot(const Vector2D& a, const Vector2D& b) { return a.x * b.x + a.y * b.y; }
+static inline float Dot(const Vector2D& a, const Vector2D& b) { return a.X * b.X + a.Y * b.Y; }
 static inline float Len2(const Vector2D& v) { return Dot(v, v); }
 static inline float Clamp01(float t) { return (t < 0.f) ? 0.f : ((t > 1.f) ? 1.f : t); }
 
@@ -11,24 +12,24 @@ static inline float Clamp01(float t) { return (t < 0.f) ? 0.f : ((t > 1.f) ? 1.f
 // discrete means at the moment current frame
 // discrete AABB vs AABB 
 bool DynCol::Overlap(const AABB& A, const AABB& B, Manifold* m) {
-    const float dx1 = B.min.x - A.max.x; // separation if B is right of A
-    const float dx2 = A.min.x - B.max.x; // separation if A is right of B
-    const float dy1 = B.min.y - A.max.y;
-    const float dy2 = A.min.y - B.max.y;
+    const float dx1 = B.min.X - A.max.X; // separation if B is right of A
+    const float dx2 = A.min.X - B.max.X; // separation if A is right of B
+    const float dy1 = B.min.Y - A.max.Y;
+    const float dy2 = A.min.Y - B.max.Y;
 
     if (dx1 > 0.f || dx2 > 0.f || dy1 > 0.f || dy2 > 0.f) return false;
 
     if (!m) return true;
 
     // minimal translation along axis of least penetration
-    float px = std::min(A.max.x - B.min.x, B.max.x - A.min.x);
-    float py = std::min(A.max.y - B.min.y, B.max.y - A.min.y);
+    float px = std::min(A.max.X - B.min.X, B.max.X - A.min.X);
+    float py = std::min(A.max.Y - B.min.Y, B.max.Y - A.min.Y);
     if (px < py) {
-        m->normal = { (A.max.x + A.min.x < B.max.x + B.min.x) ? -1.f : 1.f, 0.f };
+        m->normal = { (A.max.X + A.min.X < B.max.X + B.min.X) ? -1.f : 1.f, 0.f };
         m->penetration = px;
     }
     else {
-        m->normal = { 0.f, (A.max.y + A.min.y < B.max.y + B.min.y) ? -1.f : 1.f };
+        m->normal = { 0.f, (A.max.Y + A.min.Y < B.max.Y + B.min.Y) ? -1.f : 1.f };
         m->penetration = py;
     }
     m->valid = true;
@@ -37,16 +38,16 @@ bool DynCol::Overlap(const AABB& A, const AABB& B, Manifold* m) {
 
 //discrete circle vs circle
 bool DynCol::Overlap(const Circle& A, const Circle& B, Manifold* m) {
-    Vector2D d = { A.c.x - B.c.x, A.c.y - B.c.y };
+    Vector2D d = { A.c.X - B.c.X, A.c.Y - B.c.Y };
     float r = A.r + B.r;
     float d2 = Len2(d);
     if (d2 > r * r) return false;
     if (!m) return true;
 
     float dlen = std::sqrt(std::max(d2, 1e-12f));
-    m->normal = (dlen > 0.f) ? Vector2D{ d.x / dlen, d.y / dlen } : Vector2D{ 0.f,1.f };
+    m->normal = (dlen > 0.f) ? Vector2D{ d.X / dlen, d.Y / dlen } : Vector2D{ 0.f,1.f };
     m->penetration = r - dlen;
-    m->contact = { B.c.x + m->normal.x * B.r, B.c.y + m->normal.y * B.r };
+    m->contact = { B.c.X + m->normal.X * B.r, B.c.Y + m->normal.Y * B.r };
     m->valid = true;
     return true;
 }
@@ -54,27 +55,27 @@ bool DynCol::Overlap(const Circle& A, const Circle& B, Manifold* m) {
 //discrete circle vs AABB
 bool DynCol::Overlap(const Circle& A, const AABB& B, Manifold* m) {
     // closest point on box to circle center
-    float cx = std::min(std::max(A.c.x, B.min.x), B.max.x);
-    float cy = std::min(std::max(A.c.y, B.min.y), B.max.y);
+    float cx = std::min(std::max(A.c.X, B.min.X), B.max.X);
+    float cy = std::min(std::max(A.c.Y, B.min.Y), B.max.Y);
     Vector2D q{ cx, cy };
-    Vector2D d{ A.c.x - q.x, A.c.y - q.y };
+    Vector2D d{ A.c.X - q.X, A.c.Y - q.Y };
 
     float d2 = Len2(d);
     if (d2 > A.r * A.r) return false;
     if (!m) return true;
 
     float dlen = std::sqrt(std::max(d2, 1e-12f));
-    Vector2D n = (dlen > 0.f) ? Vector2D{ d.x / dlen, d.y / dlen } : Vector2D{ 0.f,1.f };
+    Vector2D n = (dlen > 0.f) ? Vector2D{ d.X / dlen, d.Y / dlen } : Vector2D{ 0.f,1.f };
 
     // If center is inside box, push out along smallest axis
-    bool inside = (A.c.x >= B.min.x && A.c.x <= B.max.x && A.c.y >= B.min.y && A.c.y <= B.max.y);
+    bool inside = (A.c.X >= B.min.X && A.c.X <= B.max.X && A.c.Y >= B.min.Y && A.c.Y <= B.max.Y);
     if (inside) {
-        float dx = std::min(A.c.x - B.min.x, B.max.x - A.c.x);
-        float dy = std::min(A.c.y - B.min.y, B.max.y - A.c.y);
-        if (dx < dy) n = { (A.c.x - (B.min.x + B.max.x) * 0.5f) < 0.f ? -1.f : 1.f, 0.f };
-        else         n = { 0.f, (A.c.y - (B.min.y + B.max.y) * 0.5f) < 0.f ? -1.f : 1.f };
+        float dx = std::min(A.c.X - B.min.X, B.max.X - A.c.X);
+        float dy = std::min(A.c.Y - B.min.Y, B.max.Y - A.c.Y);
+        if (dx < dy) n = { (A.c.X - (B.min.X + B.max.X) * 0.5f) < 0.f ? -1.f : 1.f, 0.f };
+        else         n = { 0.f, (A.c.Y - (B.min.Y + B.max.Y) * 0.5f) < 0.f ? -1.f : 1.f };
         m->penetration = (dx < dy ? dx : dy) + A.r; // move circle out to surface
-        m->contact = { A.c.x - n.x * A.r, A.c.y - n.y * A.r };
+        m->contact = { A.c.X - n.X * A.r, A.c.Y - n.Y * A.r };
     }
     else {
         m->penetration = A.r - dlen;
@@ -104,10 +105,10 @@ bool DynCol::Overlap(const ConvexPolygon& A, const ConvexPolygon& B, Manifold* m
 
     auto checkAxes = [&](const std::vector<Vector2D>& vs) -> bool {
         for (size_t i = 0; i < vs.size(); ++i) {
-            Vector2D e{ vs[(i + 1) % vs.size()].x - vs[i].x, vs[(i + 1) % vs.size()].y - vs[i].y };
-            Vector2D n{ -e.y, e.x }; // edge normal
+            Vector2D e{ vs[(i + 1) % vs.size()].X - vs[i].X, vs[(i + 1) % vs.size()].Y - vs[i].Y };
+            Vector2D n{ -e.Y, e.X }; // edge normal
             float nlen2 = Len2(n); if (nlen2 < 1e-12f) continue;
-            n = { n.x / std::sqrt(nlen2), n.y / std::sqrt(nlen2) };
+            n = { n.X / std::sqrt(nlen2), n.Y / std::sqrt(nlen2) };
 
             float aMin, aMax, bMin, bMax;
             projectOntoAxis(A.verts, n, aMin, aMax);
@@ -127,12 +128,12 @@ bool DynCol::Overlap(const ConvexPolygon& A, const ConvexPolygon& B, Manifold* m
     if (m) {
         // Make normal point from B->A: compare polygon centroids
         Vector2D cA{ 0,0 }, cB{ 0,0 };
-        for (auto& v : A.verts) { cA.x += v.x; cA.y += v.y; }
-        for (auto& v : B.verts) { cB.x += v.x; cB.y += v.y; }
-        cA.x /= (float)A.verts.size(); cA.y /= (float)A.verts.size();
-        cB.x /= (float)B.verts.size(); cB.y /= (float)B.verts.size();
-        Vector2D dir{ cA.x - cB.x, cA.y - cB.y };
-        if (Dot(dir, bestN) < 0.f) { bestN.x = -bestN.x; bestN.y = -bestN.y; }
+        for (auto& v : A.verts) { cA.X += v.X; cA.Y += v.Y; }
+        for (auto& v : B.verts) { cB.X += v.X; cB.Y += v.Y; }
+        cA.X /= (float)A.verts.size(); cA.Y /= (float)A.verts.size();
+        cB.X /= (float)B.verts.size(); cB.Y /= (float)B.verts.size();
+        Vector2D dir{ cA.X - cB.X, cA.Y - cB.Y };
+        if (Dot(dir, bestN) < 0.f) { bestN.X = -bestN.X; bestN.Y = -bestN.Y; }
 
         m->normal = bestN;
         m->penetration = std::max(0.f, minPen);
@@ -146,20 +147,20 @@ DynCol::SweepHit DynCol::Sweep(const AABB& A, const Vector2D& A_end,
     const AABB& B, const Vector2D& B_end)
 {
     SweepHit H;
-    Vector2D vA{ A_end.x - ((A.min.x + A.max.x) * 0.5f), A_end.y - ((A.min.y + A.max.y) * 0.5f) };
-    Vector2D vB{ B_end.x - ((B.min.x + B.max.x) * 0.5f), B_end.y - ((B.min.y + B.max.y) * 0.5f) };
-    Vector2D vRel{ vA.x - vB.x, vA.y - vB.y };
+    Vector2D vA{ A_end.X - ((A.min.X + A.max.X) * 0.5f), A_end.Y - ((A.min.Y + A.max.Y) * 0.5f) };
+    Vector2D vB{ B_end.X - ((B.min.X + B.max.X) * 0.5f), B_end.Y - ((B.min.Y + B.max.Y) * 0.5f) };
+    Vector2D vRel{ vA.X - vB.X, vA.Y - vB.Y };
 
     // Expand B by A’s half extents (Minkowski sum) and test point vs expanded box:
-    Vector2D hA{ (A.max.x - A.min.x) * 0.5f, (A.max.y - A.min.y) * 0.5f };
+    Vector2D hA{ (A.max.X - A.min.X) * 0.5f, (A.max.Y - A.min.Y) * 0.5f };
     DynCol::AABB E; // expanded box with center at B
-    Vector2D cB{ (B.min.x + B.max.x) * 0.5f, (B.min.y + B.max.y) * 0.5f };
-    E.min = { B.min.x - hA.x, B.min.y - hA.y };
-    E.max = { B.max.x + hA.x, B.max.y + hA.y };
+    Vector2D cB{ (B.min.X + B.max.X) * 0.5f, (B.min.Y + B.max.Y) * 0.5f };
+    E.min = { B.min.X - hA.X, B.min.Y - hA.Y };
+    E.max = { B.max.X + hA.X, B.max.Y + hA.Y };
 
     // Start point is A’s center
-    Vector2D p0{ (A.min.x + A.max.x) * 0.5f, (A.min.y + A.max.y) * 0.5f };
-    Vector2D p1{ p0.x + vRel.x, p0.y + vRel.y };
+    Vector2D p0{ (A.min.X + A.max.X) * 0.5f, (A.min.Y + A.max.Y) * 0.5f };
+    Vector2D p1{ p0.X + vRel.X, p0.Y + vRel.Y };
 
     // Ray cast p0->p1 against expanded AABB
     float tEnter = 0.f, tExit = 1.f;
@@ -184,14 +185,14 @@ DynCol::SweepHit DynCol::Sweep(const AABB& A, const Vector2D& A_end,
         return tEnter <= tExit;
         };
 
-    if (!slab(p0.x, p1.x, E.min.x, E.max.x, -1.f, 0.f)) return H;
-    if (!slab(p0.y, p1.y, E.min.y, E.max.y, 0.f, -1.f)) return H;
+    if (!slab(p0.X, p1.X, E.min.X, E.max.X, -1.f, 0.f)) return H;
+    if (!slab(p0.Y, p1.Y, E.min.Y, E.max.Y, 0.f, -1.f)) return H;
 
     H.hit = (tEnter >= 0.f && tEnter <= 1.f);
     if (H.hit) {
         H.toi = tEnter;
         float nlen2 = Len2(nEnter);
-        if (nlen2 > 0.f) { float s = 1.f / std::sqrt(nlen2); nEnter.x *= s; nEnter.y *= s; }
+        if (nlen2 > 0.f) { float s = 1.f / std::sqrt(nlen2); nEnter.X *= s; nEnter.Y *= s; }
         H.normal = nEnter; // points from B -> A
     }
     return H;
@@ -203,11 +204,11 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
 {
     SweepHit H;
 
-    Vector2D vA{ A_end.x - A.c.x, A_end.y - A.c.y };
-    Vector2D vB{ B_end.x - B.c.x, B_end.y - B.c.y };
-    Vector2D v{ vA.x - vB.x, vA.y - vB.y }; // relative motion (A wrt B)
+    Vector2D vA{ A_end.X - A.c.X, A_end.Y - A.c.Y };
+    Vector2D vB{ B_end.X - B.c.X, B_end.Y - B.c.Y };
+    Vector2D v{ vA.Y - vB.Y, vA.Y - vB.Y }; // relative motion (A wrt B)
 
-    Vector2D w0{ A.c.x - B.c.x, A.c.y - B.c.y }; // initial offset
+    Vector2D w0{ A.c.X - B.c.X, A.c.Y - B.c.Y }; // initial offset
     float R = A.r + B.r;
 
     float a = Len2(v);
@@ -220,7 +221,7 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
             // Already overlapping
             H.hit = true; H.toi = 0.f;
             Vector2D n = w0;
-            float L2 = Len2(n); if (L2 > 0.f) { float s = 1.f / std::sqrt(L2); n.x *= s; n.y *= s; }
+            float L2 = Len2(n); if (L2 > 0.f) { float s = 1.f / std::sqrt(L2); n.X *= s; n.Y *= s; }
             else n = { 0.f,1.f };
             H.normal = n;
         }
@@ -245,11 +246,11 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
     H.hit = true;
     H.toi = tHit;
 
-    Vector2D Ac{ A.c.x + vA.x * tHit, A.c.y + vA.y * tHit };
-    Vector2D Bc{ B.c.x + vB.x * tHit, B.c.y + vB.y * tHit };
-    Vector2D n{ Ac.x - Bc.x, Ac.y - Bc.y };
+    Vector2D Ac{ A.c.X + vA.X * tHit, A.c.Y + vA.Y * tHit };
+    Vector2D Bc{ B.c.X + vB.X * tHit, B.c.Y + vB.Y * tHit };
+    Vector2D n{ Ac.X - Bc.X, Ac.Y - Bc.Y };
     float L2 = Len2(n);
-    if (L2 > 0.f) { float s = 1.f / std::sqrt(L2); n.x *= s; n.y *= s; }
+    if (L2 > 0.f) { float s = 1.f / std::sqrt(L2); n.X *= s; n.Y *= s; }
     else n = { 0.f,1.f };
     H.normal = n; // from B -> A at impact
     return H;
@@ -261,16 +262,16 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
 {
     // Expand box by circle radius
     AABB E;
-    E.min = { B.min.x - A.r, B.min.y - A.r };
-    E.max = { B.max.x + A.r, B.max.y + A.r };
+    E.min = { B.min.X - A.r, B.min.Y - A.r };
+    E.max = { B.max.X + A.r, B.max.Y + A.r };
 
     // Cast point A.c vs expanded box using the same slab routine as AABB sweep
     // Build a unit AABB with A centered; reuse the AABB sweep by giving half-extents/ZERO
     AABB AA;
-    AA.min = { A.c.x, A.c.y };
-    AA.max = { A.c.x, A.c.y };
+    AA.min = { A.c.X, A.c.Y };
+    AA.max = { A.c.X, A.c.Y };
 
     Vector2D Aend = A_end;
-    Vector2D Bend = { (B.min.x + B.max.x) * 0.5f, (B.min.y + B.max.y) * 0.5f }; // no movement
+    Vector2D Bend = { (B.min.X + B.max.X) * 0.5f, (B.min.Y + B.max.Y) * 0.5f }; // no movement
     return Sweep(AA, Aend, E, Bend);
 }
