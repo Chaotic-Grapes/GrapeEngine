@@ -7,7 +7,7 @@ class Game {
 public:
     virtual ~Game() = default;
 
-    virtual void OnStart(World& world) {}
+    virtual void OnStart(SceneManager& sceneManager) {}
     virtual void OnUpdate(World& world) {}
     virtual void OnShutdown(World& world) {}
 };

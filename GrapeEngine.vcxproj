@@ -215,6 +215,8 @@
     <ClInclude Include="include\Physics2D.h" />
     <ClInclude Include="include\PhysicsCollision2DTest.h" />
     <ClInclude Include="include\Renderer2D.h" />
+    <ClInclude Include="Scene.h" />
+    <ClInclude Include="SceneManager.h" />
     <ClInclude Include="src\Collision.h" />
     <ClInclude Include="src\Physics.h" />
     <ClInclude Include="src\test.h" />

@@ -65,6 +65,9 @@
     <Filter Include="Engine\Systems\ISystem Independent\Scripting">
       <UniqueIdentifier>{fea8b48e-c897-4deb-88ef-8d6f84822628}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Systems\ISystem Dependent\Scene">
+      <UniqueIdentifier>{0e64a6f7-4617-4ad7-ba74-a6503a78df4d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp">
@@ -251,6 +254,12 @@
     </ClInclude>
     <ClInclude Include="include\systems\BehaviourSystem.h">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneManager.h">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
