@@ -209,7 +209,6 @@
     <ClInclude Include="include\graphics\texture.hpp" />
     <ClInclude Include="include\graphics\debugDraw2D.hpp" />
     <ClInclude Include="include\graphics\polygon-utils.hpp" />
-    <ClInclude Include="include\graphics\texture.hpp" />
     <ClInclude Include="include\graphics\vertex.hpp" />
     <ClInclude Include="include\Math\Matrix3x3.h" />
     <ClInclude Include="include\Math\Matrix4x4.h" />

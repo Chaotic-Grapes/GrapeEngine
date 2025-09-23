@@ -8,6 +8,10 @@ GLFWwindow* Input::m_window = nullptr;
 std::unordered_map<int, bool> Input::m_keyDown{ 0 };
 std::unordered_map<int, bool> Input::m_keyPressed{ 0 };
 std::unordered_map<int, bool> Input::m_keyUp{ 0 };
+int Input::m_windowWidth{ 0 };
+int Input::m_windowHeight{ 0 };
+double Input::m_scrollX{ 0 };
+double Input::m_scrollY{ 0 };
 
 void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;

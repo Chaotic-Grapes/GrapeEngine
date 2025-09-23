@@ -131,9 +131,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Collision.cpp" />
-    <ClCompile Include="src\graphics\texture.cpp" />
-    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
-    <ClCompile Include="src\graphics\polygon-utils.cpp" />
     <ClCompile Include="src\Math\Matrix3x3.cpp" />
     <ClCompile Include="src\Math\Matrix4x4.cpp" />
     <ClCompile Include="src\Math\Vector2D.cpp" />
@@ -229,7 +226,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\Color.h" />
-    <ClInclude Include="include\graphics\texture.hpp" />
     <ClInclude Include="include\Math\Matrix3x3.h" />
     <ClInclude Include="include\Math\Matrix4x4.h" />
     <ClInclude Include="include\Math\Vector2D.h" />
