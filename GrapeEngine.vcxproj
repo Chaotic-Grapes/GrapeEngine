@@ -158,6 +158,9 @@
     <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\Entity.cpp" />
     <ClCompile Include="src\glad.c" />
+    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
+    <ClCompile Include="src\graphics\polygon-utils.cpp" />
+    <ClCompile Include="src\graphics\texture.cpp" />
     <ClCompile Include="src\Input.cpp" />
     <ClCompile Include="src\Overlay.cpp" />
     <ClCompile Include="src\Time.cpp" />
@@ -168,6 +171,10 @@
     <ClCompile Include="src\graphics\renderer.cpp" />
     <ClCompile Include="src\graphics\shader.cpp" />
     <ClCompile Include="src\graphics\sprite.cpp" />
+    <ClInclude Include="include\graphics\debugDraw2D.hpp" />
+    <ClInclude Include="include\graphics\polygon-utils.hpp" />
+    <ClInclude Include="include\graphics\texture.hpp" />
+    <ClInclude Include="include\graphics\vertex.hpp" />
     <ClInclude Include="include\Input.h" />
     <ClInclude Include="include\ecs\ComponentManager.h" />
     <ClInclude Include="include\ecs\EntityManager.h" />
