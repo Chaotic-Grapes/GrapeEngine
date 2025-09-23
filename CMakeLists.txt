@@ -19,10 +19,7 @@ importDependencies()
 
 # List of external libraries (updated for your dependencies)
 set(ALL_LIBS
-    PRIVATE glfw
-    PRIVATE glad
-    PRIVATE imgui
-    PRIVATE glm
+    PRIVATE glfw glad imgui glm
 )
 
 # ======================= SINGLE PROJECT CONFIGURATION =========================
@@ -40,7 +37,11 @@ file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS
 )
 
 # Create executable
-add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_library(GrapeEngine STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+else()
+    add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+endif()
 
 target_compile_definitions(GrapeEngine PRIVATE USE_IMGUI)
 
