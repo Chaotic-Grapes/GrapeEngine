@@ -9,6 +9,8 @@ struct IComponentManager {
     virtual ~IComponentManager() = default;
     virtual void Remove(EntityId id) = 0;
     virtual void Clone(EntityId from, EntityId to) = 0;
+
+    virtual Component::IComponent* GetBaseComponent(EntityId id) = 0;
 };
 
 template<typename T>
@@ -22,7 +24,13 @@ public:
 
     T* Get(EntityId id) {
         auto it = m_components.find(id);
-        return it != m_components.end() ? &it->second : nullptr;
+        if (it != m_components.end())
+            return &it->second; // returns IComponent*
+        return nullptr;
+    }
+
+    Component::IComponent* GetBaseComponent(EntityId id) override {
+        return Get(id); // implicit conversion to IComponent* works because T : IComponent
     }
 
     void Remove(EntityId id) override {

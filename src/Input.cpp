@@ -5,50 +5,32 @@
 
 // Initialize static members
 GLFWwindow* Input::m_window = nullptr;
-bool Input::m_keysPressed[GLFW_KEY_LAST] = { false };
-bool Input::m_keysJustPressed[GLFW_KEY_LAST] = { false };
-bool Input::m_keysJustReleased[GLFW_KEY_LAST] = { false };
-int Input::m_windowWidth = 0;
-int Input::m_windowHeight = 0;
-double Input::m_scrollX = 0.0;
-double Input::m_scrollY = 0.0;
+std::unordered_map<int, bool> Input::m_keyDown{ 0 };
+std::unordered_map<int, bool> Input::m_keyPressed{ 0 };
+std::unordered_map<int, bool> Input::m_keyUp{ 0 };
 
-void Input::Init(GLFWwindow* pWin) {
+void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;
     // Get initial window size
     glfwGetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
 }
 
 // Check if a specific key is currently pressed
-bool Input::IsKeyPressed(int key) {
-    return glfwGetKey(m_window, key) == PRESS;
-}
+bool Input::IsKeyPressed(const int key) { return m_keyPressed[key]; }
 
-bool Input::WasKeyJustPressed(int key) {
-    if (key >= 0 && key < GLFW_KEY_LAST) {
-        bool result = m_keysJustPressed[key];
-        m_keysJustPressed[key] = false;  // Clear after reading (single-use)
-        return result;
-    }
-    return false;
-}
+// Check if a specific key was just pressed this frame
+bool Input::IsKeyDown(const int key) { return m_keyDown[key]; }
 
-bool Input::WasKeyJustReleased(int key) {
-    if (key >= 0 && key < GLFW_KEY_LAST) {
-        bool result = m_keysJustReleased[key];
-        m_keysJustReleased[key] = false;  // Clear after reading (single-use)
-        return result;
-    }
-    return false;
-}
+// Check if a specific key was just released this frame
+bool Input::IsKeyUp(const int key) { return m_keyUp[key]; }
 
 // Check if a specific mouse button is currently pressed  
-bool Input::IsMousePressed(int button) {
+bool Input::IsMousePressed(const int button) {
     return glfwGetMouseButton(m_window, button) == PRESS;
 }
 
 // Get current mouse position
-void Input::GetMousePos(double& xPos, double& yPos) {
+void Input::GetMousePosition(double& xPos, double& yPos) {
     glfwGetCursorPos(m_window, &xPos, &yPos);
 }
 
@@ -76,7 +58,7 @@ void Input::SetupEventCallbacks() {
 }
 
 // Called when GLFW encounters an error 
-void Input::ErrorCallback(int error, char const* description) {
+void Input::ErrorCallback(const int error, char const* description) {
     (void)error;
 #ifdef _DEBUG
     std::cerr << "GLFW error: " << description << "\n";
@@ -98,26 +80,27 @@ void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
 #endif
 }
 
+void Input::_processInput() {
+    glfwPollEvents();
+
+    m_keyPressed.clear();
+    m_keyDown.clear();
+}
+
+
 // Called on keyboard key press/release
 void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
     (void)pWin;
-    (void)key;
     (void)scancode;
-    (void)action;
     (void)mod;
 
-    // Update event-based key tracking
-    if (key >= 0 && key < GLFW_KEY_LAST) {
-        if (action == PRESS) {
-            if (!m_keysPressed[key]) {  // Only set if wasn't already pressed
-                m_keysJustPressed[key] = true;
-            }
-            m_keysPressed[key] = true;
-        }
-        else if (action == RELEASE) {
-            m_keysJustReleased[key] = true;
-            m_keysPressed[key] = false;
-        }
+    if (action == GLFW_PRESS) {
+        m_keyDown[key] = true;
+        m_keyPressed[key] = true;
+    }
+    else if (action == GLFW_RELEASE) {
+        m_keyDown[key] = false;
+        m_keyUp[key] = true;
     }
 
 #ifdef _DEBUG

@@ -3,6 +3,7 @@
 #include "../include/graphics/vertex.hpp"
 #include "../include/graphics/polygon-utils.hpp"
 
+
 #include <glm/gtc/constants.hpp>
 #include <cmath>
 #include <cstdint>
