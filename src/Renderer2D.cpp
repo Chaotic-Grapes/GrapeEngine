@@ -12,7 +12,7 @@ namespace Engine {
     void Renderer2D::OnCreate() {
         m_shader = std::make_unique<Shader>("assets/shaders/batch.vert",
             "assets/shaders/batch.frag");
-        m_renderer = std::make_unique<Renderer>(1000);
+        m_renderer = std::make_unique<Renderer>(3000);
 
         const auto& mainWindow = WindowManager::GetMainWindow();
 
