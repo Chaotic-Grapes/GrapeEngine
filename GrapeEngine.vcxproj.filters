@@ -159,9 +159,13 @@
     <ClCompile Include="src\BehaviourSystem.cpp">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
     </ClCompile>
-    <ClCompile Include="src\SandboxGame.cpp" />
-    <ClCompile Include="src\SceneManager.cpp" />
     <ClCompile Include="src\Scene.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SandboxGame.cpp">
+      <Filter>Sandboxing</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SceneManager.cpp">
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClCompile>
   </ItemGroup>
@@ -266,12 +270,16 @@
     <ClInclude Include="include\ecs\SceneManager.h">
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="include\SandboxGame.h" />
+    <ClInclude Include="include\SandboxGame.h">
+      <Filter>Sandboxing</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">
       <Filter>Engine\Entity Component System\Entity</Filter>
     </None>
-    <None Include="src\World.inl" />
+    <None Include="src\World.inl">
+      <Filter>Engine\Entity Component System</Filter>
+    </None>
   </ItemGroup>
 </Project>
