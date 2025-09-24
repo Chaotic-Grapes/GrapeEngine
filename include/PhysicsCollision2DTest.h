@@ -24,9 +24,9 @@ namespace Sandbox {
         std::vector<Entity> m_boundaryLines;
 
         //triangle hero
-        void CreateTriangle(World& world);
+        void CreateTriangle();
         void UpdateTriangleControls(float dt);
-        void ClampAndBouncePlayer(World& world);
+        void ClampAndBouncePlayer();
 
         EntityId m_playerId = UINT32_MAX;
         float m_triHalfHeight = 48.0f;
