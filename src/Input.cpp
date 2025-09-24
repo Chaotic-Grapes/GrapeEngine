@@ -23,7 +23,10 @@ void Input::Initialize(GLFWwindow* pWin) {
 bool Input::IsKeyPressed(const int key) { return m_keyPressed[key]; }
 
 // Check if a specific key was just pressed this frame
-bool Input::IsKeyDown(const int key) { return m_keyDown[key]; }
+bool Input::IsKeyDown(const int key) { 
+    //quick fix
+    return glfwGetKey(m_window, key) == PRESS;
+}
 
 // Check if a specific key was just released this frame
 bool Input::IsKeyUp(const int key) { return m_keyUp[key]; }
@@ -85,10 +88,9 @@ void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
 }
 
 void Input::_processInput() {
-    glfwPollEvents();
-
-    m_keyPressed.clear();
     m_keyDown.clear();
+    m_keyUp.clear();
+    glfwPollEvents();
 }
 
 

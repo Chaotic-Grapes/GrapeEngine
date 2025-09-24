@@ -11,19 +11,7 @@ namespace Engine {
         std::cout << "Physics2D Initialized" << '\n';
     }
 
-    void Physics2D::OnUpdate() {
-        // Accumulate time for fixed timestep
-        m_accumulator += Time::DeltaTime();
-		const auto& fixedTime = Time::FixedDeltaTime();
-
-        // Fixed timestep physics updates
-        while (m_accumulator >= fixedTime) {
-            FixedUpdate();
-            m_accumulator -= fixedTime;
-        }
-    }
-
-    void Physics2D::FixedUpdate() {
+    void Physics2D::OnFixedUpdate() {
 		// Iterate over all entities with Rigidbody2D + Transform + Collider2D components
         const auto entities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform, Component::Collider2D>();
         for (auto& [rb, transform, collider] : entities) {
