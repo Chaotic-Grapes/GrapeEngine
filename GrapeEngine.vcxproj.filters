@@ -156,6 +156,7 @@
     <ClCompile Include="src\BehaviourSystem.cpp">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
     </ClCompile>
+    <ClCompile Include="src\DynamicCollision.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
@@ -252,6 +253,7 @@
     <ClInclude Include="include\systems\BehaviourSystem.h">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
     </ClInclude>
+    <ClInclude Include="include\DyamicCollision.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">

@@ -2,7 +2,7 @@
 #include <vector>
 #include <cfloat>
 #include "Math/Vector2D.h"  
-#include "src/Collision.h"  
+#include "../src/Collision.h"  
 
 namespace DynCol {
 

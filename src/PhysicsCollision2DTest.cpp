@@ -28,42 +28,42 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     m_dampingEnabled = false;
 
     // Disable gravity for this test (balls should fly around freely)
-    Engine::Physics2D::SetGravity(Vector2D(0.0f, -0.0f));
+    Engine::Physics2D::SetGravity(Vector2D(0.0f, -200.0f));
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnStart(World& world) {
-    CreateBoundaryLines(world);
+   // CreateBoundaryLines(world);
     SpawnBalls(world, 10); // Start with fewer balls
 
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
-    
+    SpawnCubes(world);
     //test tri
     CreateTriangle(world);
 }
 
 void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
-	constexpr float gap = 150.0f;
-    const float xMid = m_worldWidth * 0.5f;
-    const float y0 = m_worldHeight * 0.25f;
-    const float y1 = m_worldHeight * 0.75f;
+	//constexpr float gap = 150.0f;
+ //   const float xMid = m_worldWidth * 0.5f;
+ //   const float y0 = m_worldHeight * 0.25f;
+ //   const float y1 = m_worldHeight * 0.75f;
 
-    // Create left boundary line
-    Entity leftLine = world.CreateEntity();
-    leftLine.AddComponent<Component::LineRenderer>(
-        Vector2D(xMid - gap * 0.5f, y0),
-        Vector2D(xMid - gap * 0.5f, y1),
-        3.f
-    );
-    m_boundaryLines.push_back(leftLine);
+ //   // Create left boundary line
+ //   Entity leftLine = world.CreateEntity();
+ //   leftLine.AddComponent<Component::LineRenderer>(
+ //       Vector2D(xMid - gap * 0.5f, y0),
+ //       Vector2D(xMid - gap * 0.5f, y1),
+ //       3.f
+ //   );
+ //   m_boundaryLines.push_back(leftLine);
 
-    // Create right boundary line  
-    Entity rightLine = world.CreateEntity();
-    rightLine.AddComponent<Component::LineRenderer>(
-        Vector2D(xMid + gap * 0.5f, y0),
-        Vector2D(xMid + gap * 0.5f, y1),
-        3.f
-    );
-    m_boundaryLines.push_back(rightLine);
+ //   // Create right boundary line  
+ //   Entity rightLine = world.CreateEntity();
+ //   rightLine.AddComponent<Component::LineRenderer>(
+ //       Vector2D(xMid + gap * 0.5f, y0),
+ //       Vector2D(xMid + gap * 0.5f, y1),
+ //       3.f
+ //   );
+ //   m_boundaryLines.push_back(rightLine);
 }
 
 void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int count, const unsigned seed) {
@@ -86,8 +86,15 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
         Entity ball = world.CreateEntity();
 
         // Set random position
-		const float x = MathHelper::Randomize<float>(radius, m_worldWidth - radius, seed),
-    				y = MathHelper::Randomize<float>(radius, m_worldHeight - radius, seed);
+        const float minX = radius;
+        const float maxX = m_worldWidth - radius;
+        const float minY = radius;
+        const float maxY = m_worldHeight - radius;
+
+        const float x = (maxX > minX) ? MathHelper::Randomize<float>(minX, maxX, seed)
+            : 0.5f * m_worldWidth;
+        const float y = (maxY > minY) ? MathHelper::Randomize<float>(minY, maxY, seed)
+            : 0.5f * m_worldHeight;
 
         auto& transform = ball.Transform();
         transform.Position.X = x;
@@ -117,6 +124,140 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
         std::cout << "Created ball (" << i + 1 << ") with ENT ID " << ball.GetId() << " at (" << x << ", " << y << ") with radius " << radius << '\n';
     }
 }
+
+
+void Sandbox::PhysicsCollision2DTestScene::SpawnCubes(World& world) {
+    if ((int)m_seacubes.size() >= m_maxLeaves) return;
+
+    // random square size and x spawn at top
+    const float size = MathHelper::Randomize<float>(14.0f, 28.0f, 0);
+    const float half = size * 0.5f;
+    const float minX = half;
+    const float maxX = m_worldWidth - half;
+    const float x = MathHelper::Randomize<float>(half, m_worldWidth - half, 0);
+
+    const float y = m_worldHeight - half - 2.0f; 
+
+    Entity cube = world.CreateEntity();
+
+    auto& tr = cube.Transform();
+    tr.Position.X = x;
+    tr.Position.Y = y;
+
+    auto& rb = cube.AddComponent<Rigidbody2D>();
+    rb.Mass = 0.8f;
+    rb.GravityScale = 1.0f;
+    rb.Drag = 0.25f;
+    rb.Velocity.X = MathHelper::Randomize<float>(-20.0f, 20.0f, 0);
+    rb.Velocity.Y = 0.0f;
+        
+    // visual: make a square polygon in WORLD-SPACE (renderer polygon path)
+    std::vector<Vector2D> pts;
+    pts.emplace_back(x - half, y - half);
+    pts.emplace_back(x - half, y + half);
+    pts.emplace_back(x + half, y + half);
+    pts.emplace_back(x + half, y - half);
+
+    auto& shape = cube.AddComponent<ShapeRenderer2D>();
+    cube.AddComponent<Component::CircleCollider2D>(half);
+    shape.Type = ShapeRenderer2D::ShapeType::Polygon;
+    shape.Points = pts;
+    shape.Closed = true;
+    shape.FillColor = Color(0.15f, 0.65f, 0.95f, 1.0f); // sea-ish
+
+    // NOTE: no dedicated AABB collider component needed; we compute AABB on the fly
+    // from size + Transform.Position for DynamicCollision checks.
+
+    m_seacubes.push_back(cube);
+}
+
+void Sandbox::PhysicsCollision2DTestScene::SpawnCubes_T(World& world, float dt) {
+    m_spawnAcc += dt;
+    while (m_spawnAcc >= m_spawnIntervals) {
+        m_spawnAcc -= m_spawnIntervals;
+        // spawn 1–2 cubes per tick for variety
+        int batch = MathHelper::Randomize<int>(1, 2, 0);
+        for (int i = 0; i < batch; ++i) SpawnCubes(world);
+    }
+}
+
+void Sandbox::PhysicsCollision2DTestScene::CubeDisintegrate(World& world, size_t i) {
+    if (i >= m_seacubes.size()) return;
+    world.GetEntityManager().DestroyEntity(m_seacubes[i]);
+    m_seacubes[i] = m_seacubes.back();
+    m_seacubes.pop_back();
+}
+
+void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World& world) {
+    // hero handle + circle collider
+    if (m_playerId == UINT32_MAX) return;
+    Entity hero(m_playerId, &world);
+    auto* hc = hero.GetComponent<CircleCollider2D>();
+    auto& ht = hero.Transform();
+    if (!hc) return;
+
+    const float heroR = hc->Radius;
+    const float floorY = 0.0f;
+
+    // iterate cubes
+    for (size_t i = 0; i < m_seacubes.size(); /* increment in loop */) {
+        auto& ct = m_seacubes[i].Transform();
+        auto* rb = m_seacubes[i].GetComponent<Rigidbody2D>();
+
+        // rebuild square polygon points (WORLD-SPACE) so it renders at new Transform
+        // derive half from current polygon width (or keep a cached size if you add one)
+        float half;
+        if (auto* sh = m_seacubes[i].GetComponent<ShapeRenderer2D>()) {
+            if (sh->Type == ShapeRenderer2D::ShapeType::Polygon && sh->Points.size() >= 4) {
+                // compute half from current points bounding box (cheap)
+                float minX = sh->Points[0].X, maxX = sh->Points[0].X;
+                float minY = sh->Points[0].Y, maxY = sh->Points[0].Y;
+                for (auto& p : sh->Points) {
+                    if (p.X < minX) minX = p.X; if (p.X > maxX) maxX = p.X;
+                    if (p.Y < minY) minY = p.Y; if (p.Y > maxY) maxY = p.Y;
+                }
+                // original half in model = (max-min)/2
+                half = 0.5f * std::max(maxX - minX, maxY - minY);
+                // now rebuild the polygon around current transform:
+                const float x = ct.Position.X, y = ct.Position.Y;
+                sh->Points.clear();
+                sh->Points.emplace_back(x - half, y - half);
+                sh->Points.emplace_back(x - half, y + half);
+                sh->Points.emplace_back(x + half, y + half);
+                sh->Points.emplace_back(x + half, y - half);
+                sh->Closed = true;
+            }
+            else {
+                // fallback if something changed
+                half = 10.0f;
+            }
+        }
+        else {
+            half = 10.0f;
+        }
+
+        // --- floor evaporation (bottom of screen)
+        if (ct.Position.Y - half <= floorY) {
+            CubeDisintegrate(world, i);
+            continue;
+        }
+
+        // --- hero vs cube (DynCol: Circle vs AABB, DISCRETE)
+        DynCol::Circle Chero{ Vector2D(ht.Position.X, ht.Position.Y), heroR };
+        DynCol::AABB   Bcube{ Vector2D(ct.Position.X - half, ct.Position.Y - half),
+                              Vector2D(ct.Position.X + half, ct.Position.Y + half) };
+
+        if (DynCol::Overlap(Chero, Bcube, nullptr)) {
+            CubeDisintegrate(world, i);
+            continue;
+        }
+
+        // still alive
+        ++i;
+        (void)rb;
+    }
+}
+
 
 void Sandbox::PhysicsCollision2DTestScene::CreateTriangle(World& world) {
     Entity e = world.CreateEntity();
@@ -151,14 +292,12 @@ void Sandbox::PhysicsCollision2DTestScene::CreateTriangle(World& world) {
     e.AddComponent<Component::ShapeRenderer2D>(triShape);
 }
 
-void Sandbox::PhysicsCollision2DTestScene::UpdateTriangleControls(float /*dt*/) {
-    // kept for symmetry; we apply input in ClampAndBouncePlayer(World&) where we have World&
-}
+
 
 void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer(World& world) {
     if (m_playerId == UINT32_MAX) return;
 
-    // Rebuild a handle on-the-fly from (id, world)
+    // build player
     Entity player(m_playerId, &world);
     auto& tr = player.Transform();
     auto* rb = player.GetComponent<Rigidbody2D>();
@@ -231,6 +370,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate(World& world) {
     (void)world;
 
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
+    float dt = static_cast<float>(Time::DeltaTime());
 
     // Enable damping after specified delay
     if (!m_dampingEnabled && m_elapsedTime >= m_dampingDelay) {
@@ -248,6 +388,10 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate(World& world) {
     // Triangle input plus bounce
     ClampAndBouncePlayer(world);
     UpdateBallCollisions();
+
+    //cubess
+    SpawnCubes_T(world, dt);
+    UpdateCubesCollisions(world);
 }
 
 void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
@@ -294,5 +438,7 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
 
 void Sandbox::PhysicsCollision2DTestScene::OnShutdown(World& world) {
     m_balls.clear();
-    m_boundaryLines.clear();
+   // m_boundaryLines.clear();
+    m_seacubes.clear();
+    m_playerId = UINT32_MAX;
 }
