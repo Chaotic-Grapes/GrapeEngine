@@ -1,20 +1,20 @@
 #ifndef GRAPHICSTEST_H
 #define GRAPHICSTEST_H
-#include "Game.h"
 #if _DEBUG
 
+#include "Game.h"
 #include <vector>
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 
 namespace Sandbox {
-    class GraphicsTestScene : public Game {
+    class GraphicsTestScene : public Scene {
     public:
         GraphicsTestScene(int width, int height);
 
-        void OnStart(World& world) override;
-        void OnUpdate(World& world) override;
-        void OnShutdown(World& world) override;
+        void OnLoad() override;
+        void OnUpdate() override;
+        void OnUnload() override;
 
     private:
         enum class TestType {

@@ -9,18 +9,19 @@ using namespace Sandbox;
 using Component::SpriteRenderer;
 using Component::Transform;
 
-GraphicsTestScene::GraphicsTestScene(int width, int height) {
+GraphicsTestScene::GraphicsTestScene(int width, int height) : Scene("GraphicsTestScene") {
     CREATE_WINDOW("Graphics Test", width, height);
     m_worldWidth  = static_cast<float>(width);
     m_worldHeight = static_cast<float>(height);
     m_currentTest = TestType::BasicGraphics;
 }
 
-void GraphicsTestScene::OnStart(World& world) {
+void GraphicsTestScene::OnLoad() {
+    World& world = GetWorld();
     std::cout << "GraphicsTestScene initialized" << std::endl;
 }
 
-void GraphicsTestScene::OnUpdate(World& world) {
+void GraphicsTestScene::OnUpdate() {
     // Cycle through test types with G
     if (Input::IsKeyPressed(GLFW_KEY_G)) {
         int current = static_cast<int>(m_currentTest);
@@ -33,6 +34,8 @@ void GraphicsTestScene::OnUpdate(World& world) {
         m_currentTest = static_cast<TestType>(current);
         std::cout << "Switched to test " << current << std::endl;
     }
+
+    World& world = GetWorld();
 
     // Run the current test
     switch (m_currentTest) {
@@ -49,7 +52,7 @@ void GraphicsTestScene::OnUpdate(World& world) {
     }
 }
 
-void GraphicsTestScene::OnShutdown(World& world) {
+void GraphicsTestScene::OnUnload() {
     std::cout << "GraphicsTestScene shutting down" << std::endl;
     m_batchSprites.clear();
 }

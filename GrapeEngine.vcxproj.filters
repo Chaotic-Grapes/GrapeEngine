@@ -161,6 +161,13 @@
     <ClCompile Include="src\Scene.cpp">
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="src\graphics\texture.cpp" />
+    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
+    <ClCompile Include="src\graphics\polygon-utils.cpp" />
+    <ClCompile Include="src\Overlay.cpp" />
+    <ClCompile Include="src\GraphicsTest.cpp">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
@@ -260,6 +267,14 @@
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClInclude>
     <ClInclude Include="include\SandboxGame.h" />
+    <ClInclude Include="include\GLHelper.h" />
+    <ClInclude Include="include\graphics\texture.hpp" />
+    <ClInclude Include="include\graphics\debugDraw2D.hpp" />
+    <ClInclude Include="include\graphics\polygon-utils.hpp" />
+    <ClInclude Include="include\graphics\vertex.hpp" />
+    <ClInclude Include="include\GraphicsTest.hpp">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">
