@@ -1,3 +1,38 @@
+/* Start Header *****************************************************************/
+/*!
+\file   renderer.cpp
+\author Choi Meng Yew
+\par    choi.m@digipen.edu
+\date   24th September 2025
+\brief
+This Renderer class is a low-level batching system responsible for preparing
+geometry and sending it to the GPU efficiently. It manages vertex/index
+buffers, texture slots, and batched draw calls.
+
+Responsibilities:
+- Store vertices/indices in CPU buffers until flushed.
+- Manage GPU buffer objects (VAO, VBO, EBO).
+- Handle texture slot assignment and binding.
+- Provide APIs to submit quads, sprites, or raw triangles.
+- Flush batches automatically when capacity is exceeded.
+
+Not Responsible For:
+- Window/context creation or buffer swapping.
+- Clearing the screen or setting projection matrices.
+- Managing shaders or camera transforms.
+- High-level scene or ECS logic.
+
+Intended Usage:
+- Called by higher-level render systems 
+- Should always be used between beginFrame() and endFrame().
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #include "../include/graphics/renderer.hpp"
 #include "../include/graphics/vertex.hpp"
 
