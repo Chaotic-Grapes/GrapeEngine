@@ -8,13 +8,13 @@ public:
     virtual ~Game() = default;
 
     // Called once when the engine starts; set initial scene here
-    virtual void OnStart(SceneManager& sceneManager) {}
+    virtual void OnStart(SceneManager& sceneManager) { (void)sceneManager; }
 
     // Called every frame; use sceneManager to switch levels if needed
-    virtual void OnUpdate(SceneManager& sceneManager) {}
+    virtual void OnUpdate(SceneManager& sceneManager) { (void)sceneManager; }
 
     // Called once before shutdown
-    virtual void OnShutdown(SceneManager& sceneManager) {}
+    virtual void OnShutdown(SceneManager& sceneManager) { (void)sceneManager; }
 };
 
 #endif

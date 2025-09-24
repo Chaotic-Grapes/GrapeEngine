@@ -8,11 +8,11 @@
 // and loading progress
 class SceneManager final {
 public:
-    Scene& CreateScene(const std::string& name);
+    void AddScene(Scene* scene);
     void LoadScene(const std::string& name);
     void UnloadScene(const std::string& name);
     void RemoveScene(const std::string& name);
-    void ClearAllScenes();
+    void RemoveAllScenes();
 
     Scene* GetActiveScene() const;
     size_t GetSceneCount() const;

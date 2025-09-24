@@ -2,6 +2,7 @@
 #define ENTITYMANAGER_H
 
 #include <memory>
+#include <string>
 #include <typeindex>
 #include <unordered_map>
 #include <unordered_set>
@@ -14,7 +15,7 @@ class EntityManager {
 public:
     EntityManager() = default;
 
-    Entity CreateEntity();
+    Entity CreateEntity(const std::string& name = "GameObject");
 
     void SetWorld(World* world) { m_world = world; }
 

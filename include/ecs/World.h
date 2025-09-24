@@ -16,7 +16,7 @@ public:
 
     EntityManager& GetEntityManager();
 
-    Entity CreateEntity();
+    Entity CreateEntity(const std::string& name = "GameObject");
 
     template<typename T, typename... Args>
     T* AddSystem(Args&&... args);

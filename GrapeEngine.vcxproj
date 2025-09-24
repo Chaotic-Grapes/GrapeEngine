@@ -172,6 +172,7 @@
     <ClCompile Include="src\Math\Vector3D.cpp" />
     <ClCompile Include="src\Math\Vector4D.cpp" />
     <ClCompile Include="src\Physics.cpp" />
+    <ClCompile Include="src\SandboxGame.cpp" />
     <ClCompile Include="src\SceneManager.cpp" />
     <ClCompile Include="src\test.cpp" />
     <ClCompile Include="src\EntityManager.cpp" />
@@ -183,6 +184,7 @@
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
+    <ClInclude Include="include\SandboxGame.h" />
     <ClInclude Include="include\systems\Behaviour.h" />
     <ClInclude Include="include\systems\BehaviourSystem.h" />
     <ClInclude Include="include\Game.h" />

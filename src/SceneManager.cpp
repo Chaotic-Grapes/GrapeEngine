@@ -3,11 +3,8 @@
 #include <string>
 #include "ecs/SceneManager.h"
 
-Scene& SceneManager::CreateScene(const std::string& name) {
-    auto scene = std::make_unique<Scene>(name);
-    Scene* raw = scene.get();
-    m_scenes[name] = std::move(scene);
-    return *raw;
+void SceneManager::AddScene(Scene* scene) {
+    m_scenes[scene->GetName()] = std::unique_ptr<Scene>(scene);
 }
 
 void SceneManager::LoadScene(const std::string& name) {
@@ -41,7 +38,7 @@ void SceneManager::RemoveScene(const std::string& name) {
     }
 }
 
-void SceneManager::ClearAllScenes() {
+void SceneManager::RemoveAllScenes() {
     if (m_activeScene) {
         m_activeScene->Unload();
         m_activeScene = nullptr;

@@ -11,7 +11,7 @@
 
 constexpr float TWO_PI = 6.28318530718f;
 
-Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int width, const int height, const float dampingDelay) {
+Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int width, const int height, const float dampingDelay) : Scene("PhysicsCollision2DTestScene") {
     CREATE_WINDOW("Physics & Collision Test", width, height);
     m_worldWidth = static_cast<float>(width);
     m_worldHeight = static_cast<float>(height);
@@ -23,21 +23,22 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     Engine::Physics2D::SetGravity(Vector2D(0.0f, 0.0f));
 }
 
-void Sandbox::PhysicsCollision2DTestScene::OnStart(World& world) {
-    CreateBoundaryLines(world);
+void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
+    World& world = GetWorld();
+    CreateBoundaryLines();
     SpawnBalls(world, 10); // Start with fewer balls
 
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
 }
 
-void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
+void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines() {
 	constexpr float gap = 150.0f;
     const float xMid = m_worldWidth * 0.5f;
     const float y0 = m_worldHeight * 0.25f;
     const float y1 = m_worldHeight * 0.75f;
 
     // Create left boundary line
-    Entity leftLine = world.CreateEntity();
+    Entity leftLine = CreateEntity();
     leftLine.AddComponent<Component::LineRenderer>(
         Vector2D(xMid - gap * 0.5f, y0),
         Vector2D(xMid - gap * 0.5f, y1),
@@ -46,7 +47,7 @@ void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
     m_boundaryLines.push_back(leftLine);
 
     // Create right boundary line  
-    Entity rightLine = world.CreateEntity();
+    Entity rightLine = CreateEntity();
     rightLine.AddComponent<Component::LineRenderer>(
         Vector2D(xMid + gap * 0.5f, y0),
         Vector2D(xMid + gap * 0.5f, y1),
@@ -107,9 +108,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
     }
 }
 
-void Sandbox::PhysicsCollision2DTestScene::OnUpdate(World& world) {
-    (void)world;
-
+void Sandbox::PhysicsCollision2DTestScene::OnLateUpdate() {
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
 
     // Enable damping after specified delay
@@ -171,7 +170,7 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
     }
 }
 
-void Sandbox::PhysicsCollision2DTestScene::OnShutdown(World& world) {
+void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
     m_balls.clear();
     m_boundaryLines.clear();
 }

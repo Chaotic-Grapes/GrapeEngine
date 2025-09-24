@@ -2,7 +2,7 @@
 #define WORLD_INL
 
 #include <memory>
-#include "Entity.h"
+#include "ecs/Entity.h"
 
 template<typename T, typename... Args>
 T* World::AddSystem(Args&&... args) {
@@ -26,15 +26,15 @@ T* World::GetSystem() {
 template<typename T, typename... Args>
 T& World::AddBehaviour(Entity& entity, Args&&... args) {
     auto behaviour = std::make_unique<T>(std::forward<Args>(args)...);
-    T* raw = behaviour.get();
+    T* ptr = behaviour.get();
 
     // Track state
-    raw->Awake();              // Called immediately
-    raw->_enabled = true;      // Internal flag for OnEnable/Disable
-    raw->_started = false;     // Start will run on first Update
+    ptr->Awake();              // Called immediately
+    ptr->_enabled = true;      // Internal flag for OnEnable/Disable
+    ptr->_started = false;     // Start will run on first Update
 
     m_behaviours[entity.GetId()].push_back(std::move(behaviour));
-    return *raw;
+    return *ptr;
 }
 
 #endif

@@ -1,10 +1,10 @@
 ﻿#include "Application.h"
 #include <windows.h>
-
 #include "Input.h"
 #include "Physics2D.h"
 #include "Renderer2D.h"
 #include "systems/WindowManager.h"
+#include "ecs/Scene.h"
 
 namespace Engine {
     bool Application::m_shouldStop = false;
@@ -21,16 +21,16 @@ namespace Engine {
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
-        const Scene* currentScene = nullptr;
-        if (WindowManager::GetWindows().empty())
-            return;
+        Scene* currentScene = nullptr;
         
         while (!m_shouldStop) {
 			Input::_processInput();
-            const auto* newScene = m_sceneManager.GetActiveScene();
+            auto* newScene = m_sceneManager.GetActiveScene();
             const bool isNewScene = newScene == currentScene;
             if (!isNewScene) {
-                currentScene->Unload();
+                if (currentScene)
+                    currentScene->Unload();
+
                 newScene->Load();
 
                 delete currentScene;
@@ -38,9 +38,9 @@ namespace Engine {
             }
 
             if (currentScene) {
-                currentScene->GetWorld()._update();
-                game.OnUpdate(currentScene->GetWorld());
-                currentScene->GetWorld()._lateUpdate();
+                currentScene->Update();
+                game.OnUpdate(m_sceneManager);
+                currentScene->LateUpdate();
             }
             
             for (const auto* win : WindowManager::GetWindows()) {
@@ -53,7 +53,7 @@ namespace Engine {
 		}
 
         if (currentScene) {
-            game.OnShutdown(currentScene->GetWorld());
+            game.OnShutdown(m_sceneManager);
             currentScene->Unload();
 
             delete currentScene;
