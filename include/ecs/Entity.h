@@ -9,7 +9,7 @@ using EntityId = uint32_t;
 class World;
 class Entity {
 public:
-    Entity(EntityId id, World* world);
+    Entity(EntityId id, std::string& name, World* world);
     Entity(const Entity& other) = default;   // just copy the handle
     ~Entity() = default;
     Entity& operator=(const Entity& other) = default;
@@ -17,6 +17,7 @@ public:
     Entity& operator=(Entity&& other) noexcept = default;
 
     EntityId GetId() const;
+    std::string GetName() const;
     Entity Clone() const;
 
     Component::Transform& Transform();
@@ -28,15 +29,19 @@ public:
     T& AddComponent(Args&&... args);
 
     template<typename T>
-    void RemoveComponent();
+    void RemoveComponent() const;
 
     template<typename T>
     bool HasComponent() const;
+
+    template<typename T, typename... Args>
+    T& AddBehaviour(Args&&... args);
 
     void RemoveAllComponents() const;
 
 private:
     EntityId m_id;
+    std::string m_name;
     World* m_world = nullptr;
 };
 

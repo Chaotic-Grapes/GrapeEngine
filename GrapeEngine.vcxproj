@@ -172,6 +172,7 @@
     <ClCompile Include="src\Math\Vector3D.cpp" />
     <ClCompile Include="src\Math\Vector4D.cpp" />
     <ClCompile Include="src\Physics.cpp" />
+    <ClCompile Include="src\SceneManager.cpp" />
     <ClCompile Include="src\test.cpp" />
     <ClCompile Include="src\EntityManager.cpp" />
     <ClCompile Include="src\EngineSandbox.cpp" />
@@ -215,14 +216,15 @@
     <ClInclude Include="include\Physics2D.h" />
     <ClInclude Include="include\PhysicsCollision2DTest.h" />
     <ClInclude Include="include\Renderer2D.h" />
-    <ClInclude Include="Scene.h" />
-    <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="include\ecs\Scene.h" />
+    <ClInclude Include="include\ecs\SceneManager.h" />
     <ClInclude Include="src\Collision.h" />
     <ClInclude Include="src\Physics.h" />
     <ClInclude Include="src\test.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl" />
+    <None Include="src\World.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

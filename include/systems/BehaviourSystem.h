@@ -5,19 +5,19 @@
 #include <vector>
 #include "Behaviour.h"
 #include "ecs/ISystem.h"
+#include "ecs/World.h"
 #include "systems/Time.h"
 
 class BehaviourSystem : public Engine::ISystem {
 public:
+    explicit BehaviourSystem(World* world) : m_world(world) {}
+
     void OnCreate() override {}
 
     void OnUpdate() override;
 
-    void AddBehaviour(std::unique_ptr<Behaviour> behaviour);
-
-    void RemoveBehaviour(Behaviour* behaviour);
-
 private:
+    World* m_world;
     struct TrackedBehaviour {
         std::unique_ptr<Behaviour> m_instance;
         bool m_enabled = true;

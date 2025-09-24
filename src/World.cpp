@@ -24,5 +24,20 @@ void World::_shutdown() {
     m_systems.clear();
 }
 
-EntityManager& World::GetEntityManager() { return m_entityManager; }
-Entity World::CreateEntity()             { return m_entityManager.CreateEntity(); }
+void World::RemoveAllBehaviours(const Entity& entity) {
+    const auto it = m_behaviours.find(entity.GetId());
+    if (it != m_behaviours.end()) {
+        for (const auto& behaviour : it->second) {
+            behaviour->OnDestroy();
+        }
+        m_behaviours.erase(it);
+    }
+}
+
+
+EntityManager& World::GetEntityManager()               { return m_entityManager; }
+Entity World::CreateEntity()                           { return m_entityManager.CreateEntity(); }
+const std::unordered_map<EntityId,
+	std::vector<
+		std::unique_ptr<
+			Behaviour>>>& World::GetBehaviours() const { return m_behaviours; }

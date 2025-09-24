@@ -255,10 +255,10 @@
     <ClInclude Include="include\systems\BehaviourSystem.h">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
     </ClInclude>
-    <ClInclude Include="Scene.h">
+    <ClInclude Include="include\ecs\Scene.h">
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="SceneManager.h">
+    <ClInclude Include="include\ecs\SceneManager.h">
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClInclude>
   </ItemGroup>
