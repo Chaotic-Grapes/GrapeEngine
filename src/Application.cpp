@@ -55,9 +55,6 @@ namespace Engine {
         if (currentScene) {
             game.OnShutdown(m_sceneManager);
             currentScene->Unload();
-
-            delete currentScene;
-            currentScene = nullptr;
         }
 
         WindowManager::DestroyAll();

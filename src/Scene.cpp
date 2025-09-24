@@ -33,6 +33,7 @@ void Scene::Load() {
 }
 
 void Scene::Unload() {
+	if (!m_world) return;
     m_world->_shutdown();
     OnUnload();
 }

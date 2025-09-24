@@ -20,6 +20,8 @@ public:
         GLuint textureId,
         const glm::vec4& uvRect,   // (u0,v0,u1,v1)
         const glm::vec4& color,
+        float rotation = 0.0f,
+        float scale = 1.0f,
         int layer = 0);
 
     // Generic triangles for helpers (polygons/circles/etc.)

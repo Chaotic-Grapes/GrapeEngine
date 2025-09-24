@@ -23,6 +23,12 @@ public:
     static double GetMouseX();
     static double GetMouseY();
 
+    // Getter functions
+    static int GetWindowWidth() { return m_windowWidth; }
+    static int GetWindowHeight() { return m_windowHeight; }
+    static double GetScrollX() { return m_scrollX; }
+    static double GetScrollY() { return m_scrollY; }
+
     // Sets up all GLFW event callbacks
     static void SetupEventCallbacks();
 
@@ -40,9 +46,15 @@ private:
     static std::unordered_map<int, bool> m_keyPressed;
     static std::unordered_map<int, bool> m_keyUp;
 
+    // Tracking window width and height + scroll offsets
+    static int m_windowWidth;
+    static int m_windowHeight;
+    static double m_scrollX;
+    static double m_scrollY;
+
     // GLFW callback functions (input/window events)
     // Private functions must still have the exact function signatures that GLFW expects
-    static void _framebufferSizeCallback(GLFWwindow* pWin, int width, int height);   // Window resize
+    static void _windowSizeCallback(GLFWwindow* pWin, int width, int height);   // Window resize
     static void _keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod); // Key press/release
     static void _mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod);    // Mouse button press/release
     static void _mousePosCallback(GLFWwindow* pWin, double xPos, double yPos);              // Mouse cursor movement
