@@ -12,7 +12,7 @@ class Scene;
 class World {
 public:
     World() { m_entityManager.SetWorld(this); }
-	~World() { _shutdown(); }
+    ~World() = default;
 
     EntityManager& GetEntityManager();
 

@@ -48,7 +48,8 @@ void SandboxGame::OnUpdate(SceneManager& sceneManager) {
 }
 
 void SandboxGame::OnShutdown(SceneManager& sceneManager) {
+    (void)sceneManager;
     // Any global cleanup if needed
-    sceneManager.RemoveAllScenes();
+    // sceneManager.RemoveAllScenes();
     DESTROY_ALL_WINDOWS();
 }
