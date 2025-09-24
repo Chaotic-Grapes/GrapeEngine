@@ -8,8 +8,16 @@ GLFWwindow* Input::m_window = nullptr;
 std::unordered_map<int, bool> Input::m_keyDown{ 0 };
 std::unordered_map<int, bool> Input::m_keyPressed{ 0 };
 std::unordered_map<int, bool> Input::m_keyUp{ 0 };
+int Input::m_windowWidth{ 0 };
+int Input::m_windowHeight{ 0 };
+double Input::m_scrollX{ 0 };
+double Input::m_scrollY{ 0 };
 
-void Input::Initialize(GLFWwindow* pWin) { m_window = pWin; }
+void Input::Initialize(GLFWwindow* pWin) {
+    m_window = pWin;
+    // Get initial window size
+    glfwGetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
+}
 
 // Check if a specific key is currently pressed
 bool Input::IsKeyPressed(const int key) { return m_keyPressed[key]; }
@@ -49,11 +57,11 @@ double Input::GetMouseY() {
 
 // Sets up all GLFW event callbacks (keyboard, mouse, resize)
 void Input::SetupEventCallbacks() {
-    glfwSetFramebufferSizeCallback(m_window, _framebufferSizeCallback);
     glfwSetKeyCallback(m_window, _keyCallback);
     glfwSetMouseButtonCallback(m_window, _mouseButtonCallback);
     glfwSetCursorPosCallback(m_window, _mousePosCallback);
     glfwSetScrollCallback(m_window, _mouseScrollCallback);
+    glfwSetWindowSizeCallback(m_window, _windowSizeCallback);
 }
 
 // Called when GLFW encounters an error 
@@ -65,12 +73,17 @@ void Input::ErrorCallback(const int error, char const* description) {
 }
 
 // Called when window is resized
-void Input::_framebufferSizeCallback(GLFWwindow* pWin, int width, int height) {
+void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
     (void)pWin;
-    (void)width;
-    (void)height;
+
+    // Store the new window dimensions
+    m_windowWidth = width;
+    m_windowHeight = height;
+
 #ifdef _DEBUG
-    std::cout << "\r" << std::setw(50) << std::left << "Window is being resized" << std::flush;
+    std::ostringstream oss;
+    oss << "Window is being resized: " << width << "x" << height;
+    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
 #endif
 }
 
@@ -159,6 +172,11 @@ void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffse
     (void)pWin;
     (void)xOffset;
     (void)yOffset;
+
+    // Store the scroll offsets
+    m_scrollX = xOffset;
+    m_scrollY = yOffset;
+
 #ifdef _DEBUG
     std::ostringstream oss;
     oss << "Mouse scroll wheel offset: (" << std::fixed << std::setprecision(1) << xOffset << ", " << yOffset << ")";

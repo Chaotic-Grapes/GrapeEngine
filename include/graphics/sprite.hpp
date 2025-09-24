@@ -1,6 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <glad/glad.h>
+#include "../include/GLFW/glfw3.h"
 
 struct Sprite {
     glm::vec2 pos;              // center position
@@ -8,6 +9,11 @@ struct Sprite {
     glm::vec4 uv;               // {u0, v0, u1, v1}  -> top-left and bottom-right
     glm::vec4 color{ 1,1,1,1 }; // default tint (white = no tint)
     GLuint textureId;           // OpenGL texture handle
+
+    float rotation = 0.0f;      // in radians
+    float uniformScale = 1.0f;  // scaling
+
+    void handleInput(GLFWwindow* window, float deltaTime);
 };
 
 // Animation helper

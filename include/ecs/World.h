@@ -5,45 +5,48 @@
 #include <vector>
 #include "ecs/EntityManager.h"
 #include "ecs/ISystem.h"
+#include "systems/Behaviour.h"
 
 class Entity;
-namespace Engine { class Application; } // Forward declaration for friend class
+class Scene;
 class World {
 public:
     World() { m_entityManager.SetWorld(this); }
-	~World() { _shutdown(); }
+    ~World() = default;
 
     EntityManager& GetEntityManager();
 
-    Entity CreateEntity();
+    Entity CreateEntity(const std::string& name = "GameObject");
 
     template<typename T, typename... Args>
-    T* AddSystem(Args&&... args) {
-        auto sys = std::make_unique<T>(std::forward<Args>(args)...);
-        T* raw = sys.get();
-        m_systems.push_back(std::move(sys));
-        return raw;
-    }
+    T* AddSystem(Args&&... args);
 
     template<typename T>
-    T* GetSystem() {
-        for (auto& sys : m_systems) {
-            if (auto casted = dynamic_cast<T*>(sys.get()))
-                return casted;
-        }
-        return nullptr;
-    }
+    T* GetSystem();
+
+    // In World because World consists of logic
+    // Whereas EntityManager consists of only data
+    template<typename T, typename... Args>
+    T& AddBehaviour(Entity& entity, Args&&... args);
+
+    void RemoveAllBehaviours(const Entity& entity);
+
+    const std::unordered_map<EntityId, std::vector<std::unique_ptr<Behaviour>>>& GetBehaviours() const;
 
 private:
-	friend class Engine::Application;
+	friend class Scene;
 
 	EntityManager m_entityManager;
 	std::vector<std::unique_ptr<Engine::ISystem>> m_systems;
+    std::unordered_map<EntityId, std::vector<std::unique_ptr<Behaviour>>> m_behaviours;
 
     void _initialize() const;
     void _update() const;
     void _shutdown();
+    void _fixedUpdate() const;
     void _lateUpdate() const;
 };
+
+#include "World.inl"
 
 #endif

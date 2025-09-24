@@ -22,6 +22,11 @@ public:
         virtual void OnUpdate() = 0;
 
         /**
+		 * @brief Called at fixed intervals
+		 */
+        virtual void OnFixedUpdate() {}
+
+        /**
 		 * @brief Called every frame after OnUpdate for any late updates
          */
 		virtual void OnLateUpdate() {}

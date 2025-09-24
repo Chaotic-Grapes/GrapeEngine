@@ -1,59 +1,13 @@
 ﻿#include "Application.h"
 #include <windows.h>
-
 #include "Input.h"
 #include "Physics2D.h"
 #include "Renderer2D.h"
-#include "systems/Time.h"
 #include "systems/WindowManager.h"
+#include "ecs/Scene.h"
 
 namespace Engine {
-    // Global pointer to the core engine
-    Application* CORE = nullptr;
     bool Application::m_shouldStop = false;
-
-    Application::Application() {
-        CORE = this;
-    }
-
-    World& Application::CreateWorld() {
-        m_worlds.push_back(std::make_unique<World>());
-        auto& world = *m_worlds.back();
-
-        // Attach core systems to the world
-		world.AddSystem<Time>();            // Time system must be attached first (FPS)
-
-		// Anything else can be attached after
-        world.AddSystem<Physics2D>(&world);
-        world.AddSystem<Renderer2D>(&world);
-
-        return world;
-    }
-
-    void Application::DestroyWorld(World& world) {
-        const auto it = std::find_if(m_worlds.begin(), m_worlds.end(),
-            [&world](const std::unique_ptr<World>& ptr) {
-                return ptr.get() == &world;
-            });
-
-        if (it != m_worlds.end()) {
-            m_worlds.erase(it);
-        }
-    }
-
-    void Application::DestroyWorld(const size_t index) {
-        if (index < m_worlds.size()) {
-            m_worlds.erase(m_worlds.begin() + static_cast<long long>(index));
-        }
-    }
-
-    void Application::DestroyAllWorlds() {
-        m_worlds.clear();
-    }
-
-    size_t Application::GetWorldCount() const {
-        return m_worlds.size();
-    }
 
     void Application::Run(Game& game, const bool consoleFlag) {
 #if !_DEBUG
@@ -65,19 +19,29 @@ namespace Engine {
         (void)consoleFlag;
 #endif
 
-        World& world = CreateWorld();
-        Initialize();
-
-        game.OnStart(world);
-
-        if (WindowManager::GetWindows().empty()) {
-            return;
-        }
+        // Call OnStart() function of game then attempt to create a main window
+        game.OnStart(m_sceneManager);
+        Scene* currentScene = nullptr;
         
         while (!m_shouldStop) {
 			Input::_processInput();
-            Update();
-			game.OnUpdate(world);
+            auto* newScene = m_sceneManager.GetActiveScene();
+            const bool isNewScene = newScene == currentScene;
+            if (!isNewScene) {
+                if (currentScene)
+                    currentScene->Unload();
+
+                newScene->Load();
+
+                delete currentScene;
+                currentScene = newScene;
+            }
+
+            if (currentScene) {
+                currentScene->Update();
+                game.OnUpdate(m_sceneManager);
+                currentScene->LateUpdate();
+            }
             
             for (const auto* win : WindowManager::GetWindows()) {
                 if (win->ShouldClose()) {
@@ -88,25 +52,13 @@ namespace Engine {
             }
 		}
 
-        game.OnShutdown(world);
-        m_worlds.clear();
+        if (currentScene) {
+            game.OnShutdown(m_sceneManager);
+            currentScene->Unload();
+        }
+
         WindowManager::DestroyAll();
     }
-
-    void Application::Initialize() const {
-        for (auto& world : m_worlds)
-            world->_initialize();
-    }
-
-    void Application::Update() const {
-        for (auto& world : m_worlds)
-            world->_update();
-    }
-
-    void Application::LateUpdate() const {
-       for (auto& world : m_worlds)
-		   world->_lateUpdate();
-	}
 
     void Application::Close() {
 		m_shouldStop = true;

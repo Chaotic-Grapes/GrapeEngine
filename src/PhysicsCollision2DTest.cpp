@@ -19,7 +19,7 @@ using Component::LineRenderer;
 
 constexpr float TWO_PI = 6.28318530718f;
 
-Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int width, const int height, const float dampingDelay) {
+Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int width, const int height, const float dampingDelay) : Scene("PhysicsCollision2DTestScene") {
     CREATE_WINDOW("Physics & Collision Test", width, height);
     m_worldWidth = static_cast<float>(width);
     m_worldHeight = static_cast<float>(height);
@@ -38,7 +38,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnStart(World& world) {
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
     SpawnCubes(world);
     //test tri
-    CreateTriangle(world);
+    CreateTriangle();
 }
 
 void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
@@ -294,8 +294,9 @@ void Sandbox::PhysicsCollision2DTestScene::CreateTriangle(World& world) {
 
 
 
-void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer(World& world) {
+void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
     if (m_playerId == UINT32_MAX) return;
+    World& world = GetWorld();
 
     // build player
     Entity player(m_playerId, &world);
@@ -365,10 +366,7 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer(World& world) {
 
 }
 
-
-void Sandbox::PhysicsCollision2DTestScene::OnUpdate(World& world) {
-    (void)world;
-
+void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
     float dt = static_cast<float>(Time::DeltaTime());
 
@@ -386,7 +384,10 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate(World& world) {
         std::cout << "Damping enabled after " << m_dampingDelay << " seconds!" << '\n';
     }
     // Triangle input plus bounce
-    ClampAndBouncePlayer(world);
+    ClampAndBouncePlayer();
+}
+
+void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     UpdateBallCollisions();
 
     //cubess
@@ -436,7 +437,7 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
     }
 }
 
-void Sandbox::PhysicsCollision2DTestScene::OnShutdown(World& world) {
+void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
     m_balls.clear();
    // m_boundaryLines.clear();
     m_seacubes.clear();

@@ -4,6 +4,7 @@
 #define CREATE_WINDOW(title, width, height) WindowManager::CreateWindow(title, width, height)
 #define CREATE_CHILD_WINDOW(title, width, height, parent) WindowManager::CreateWindow(title, width, height, parent)
 #define DESTROY_WINDOW(window) WindowManager::DestroyWindow(window)
+#define DESTROY_ALL_WINDOWS() WindowManager::DestroyAll();
 
 #include <vector>
 #include "ecs/ISystem.h"

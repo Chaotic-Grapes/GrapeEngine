@@ -12,7 +12,8 @@ namespace Engine {
         Physics2D(World* world) : m_world(world) {}
 
         void OnCreate() override;
-        void OnUpdate() override;
+        void OnUpdate() override {}
+        void OnFixedUpdate() override;
         std::string Name() const override { return "Physics2D"; }
 
         static void SetGravity(const Vector2D& gravity) { m_gravity = gravity; }
@@ -22,13 +23,10 @@ namespace Engine {
         static void AddImpulse(Component::Rigidbody2D& rb, const Vector2D& impulse);
 
     private:
-        void FixedUpdate();
         void UpdateRigidbody(Component::Rigidbody2D& rb, Component::Transform& t, Component::Collider2D* col);
 
         World* m_world;
         static Vector2D m_gravity;
-
-        float m_accumulator = 0.0f;
     };
 }
 

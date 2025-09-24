@@ -14,13 +14,18 @@ T& Entity::AddComponent(Args&&... args) {
 }
 
 template<typename T>
-void Entity::RemoveComponent() {
+void Entity::RemoveComponent() const {
     m_world->GetEntityManager().RemoveComponent<T>(m_id);
 }
 
 template<typename T>
 bool Entity::HasComponent() const {
     return m_world->GetEntityManager().HasComponent<T>(m_id);
+}
+
+template<typename T, typename... Args>
+T& Entity::AddBehaviour(Args&&... args) {
+    return m_world->AddBehaviour<T>(*this, std::forward<Args>(args)...);
 }
 
 #endif

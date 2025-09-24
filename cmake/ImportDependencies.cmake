@@ -14,9 +14,6 @@ macro(import_glfw)
             set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
             FetchContent_MakeAvailable(glfw)
         endif()
-
-        add_subdirectory(${glfw_SOURCE_DIR})
-        include_directories(${GLFW_SOURCE_DIR}/include)
     endif()
 endmacro()
 
@@ -29,31 +26,29 @@ macro(import_glm)
             GIT_TAG master
         )
         FetchContent_MakeAvailable(glm)
-
-        include_directories(${glm_SOURCE_DIR})
     endif()
 endmacro()
 
 # Macro to import glad
 macro(import_glad)
     if(NOT TARGET glad)  # Guard to prevent multiple inclusion
-        include(FetchContent)
-
         FetchContent_Declare(
             glad
             GIT_REPOSITORY https://github.com/Dav1dde/glad.git
             GIT_TAG c
         )
-        if (NOT glad_POPULATED) 
-            FetchContent_MakeAvailable(glad)
-        endif()
-
+        FetchContent_MakeAvailable(glad)
+        
         add_library(glad STATIC
             ${glad_SOURCE_DIR}/src/glad.c
         )
         target_include_directories(glad PUBLIC 
             ${glad_SOURCE_DIR}/include
         )
+
+        # Add OpenGL dependency for GLAD
+        find_package(OpenGL REQUIRED)
+        target_link_libraries(glad PUBLIC ${OPENGL_LIBRARIES})
     endif()
 endmacro()
 
@@ -85,7 +80,14 @@ macro(import_imgui)
             ${imgui_SOURCE_DIR}
             ${imgui_SOURCE_DIR}/backends
         )
-        target_link_libraries(imgui PUBLIC glfw glad)
+
+        # Link dependencies; make sure OpenGL is available
+        find_package(OpenGL REQUIRED)
+        target_link_libraries(imgui PUBLIC 
+            glfw 
+            glad 
+            ${OPENGL_LIBRARIES}
+        )
         
         # Set C++ standard for ImGui (required for constexpr support)
         set_property(TARGET imgui PROPERTY CXX_STANDARD 11)

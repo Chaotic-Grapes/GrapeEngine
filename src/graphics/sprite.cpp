@@ -1,4 +1,5 @@
 #include "../include/graphics/sprite.hpp"
+#include <GLFW/glfw3.h>
 
 // ctor: figure out how many rows/cols the spritesheet has
 SpriteAnimation::SpriteAnimation(GLuint texId, int frameWidth, int frameHeight, int texWidth, int texHeight)
@@ -49,4 +50,25 @@ Sprite SpriteAnimation::currentFrame(const glm::vec2& pos, const glm::vec2& size
 Sprite SpriteAnimation::play(glm::vec2 pos, glm::vec2 size, float dt) {
     update(dt);
     return currentFrame(pos, size);
+}
+
+void Sprite::handleInput(GLFWwindow* window, float deltaTime) {
+    const float rotateSpeed = 2.0f;  // radians per second
+    const float scaleSpeed = 1.0f;  // units per second
+
+    // Rotate CCW with R
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+        rotation += rotateSpeed * deltaTime;
+    }
+
+    // Zoom out (J)
+    if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS) {
+        uniformScale -= scaleSpeed * deltaTime;
+        if (uniformScale < 0.1f) uniformScale = 0.1f; // clamp
+    }
+
+    // Zoom in (K)
+    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) {
+        uniformScale += scaleSpeed * deltaTime;
+    }
 }
