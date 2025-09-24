@@ -27,6 +27,11 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
 	m_dampingDelay = dampingDelay;
     m_dampingEnabled = false;
 
+    // step-by-step physics mode initialization
+    m_stepByStepMode = false;
+    m_stepRequested = false;
+    m_pausePhysics = false;
+
     // Disable gravity for this test (balls should fly around freely)
     Engine::Physics2D::SetGravity(Vector2D(0.0f, -200.0f));
 }
@@ -37,10 +42,10 @@ void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
     SpawnBalls(world, 10); // Start with fewer balls
 
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
+
     std::cout << "Step-by-step physics controls:" << '\n';
     std::cout << "  P - Toggle step-by-step mode" << '\n';
     std::cout << "  Space - Step physics (when in step mode)" << '\n';
-    std::cout << "  O - Toggle physics pause/play" << '\n';
 
     SpawnCubes(world);
     //test tri
@@ -399,12 +404,10 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
 
 void Sandbox::PhysicsCollision2DTestScene::HandleStepByStepControls() {
     static bool pWasDown = false;
-    static bool oWasDown = false;
     static bool spaceWasDown = false;
     static bool wasPaused = false;
 
     bool pIsDown = Input::IsKeyDown(KEY_P);
-    bool oIsDown = Input::IsKeyDown(KEY_O);
     bool spaceIsDown = Input::IsKeyDown(KEY_SPACE);
 
     // toggle step-by-step mode with P key
@@ -426,25 +429,6 @@ void Sandbox::PhysicsCollision2DTestScene::HandleStepByStepControls() {
         }
     }
 
-    // toggle physics mode with O key
-    if (oIsDown && !oWasDown) {
-        bool wasPausedBefore = m_pausePhysics;
-        m_pausePhysics = !m_pausePhysics;
-        Engine::Physics2D::SetEnabled(!m_pausePhysics);
-
-        if (m_pausePhysics) {
-            std::cout << "Physics PAUSED" << '\n';
-            StoreBallStates();
-        }
-        else {
-            std::cout << "Physics RESUMED" << '\n';
-            // Only restore if we were previously paused
-            if (wasPausedBefore) {
-                RestoreBallStates();
-            }
-        }
-    }
-
     // step physics with SPACE key
     if ((m_stepByStepMode || m_pausePhysics) && spaceIsDown && !spaceWasDown) {
         // for stepping: temporarily enable, step, then disable
@@ -456,7 +440,6 @@ void Sandbox::PhysicsCollision2DTestScene::HandleStepByStepControls() {
     }
 
     pWasDown = pIsDown;
-    oWasDown = oIsDown;
     spaceWasDown = spaceIsDown;
     wasPaused = m_pausePhysics;
 }

@@ -117,7 +117,6 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
     case KEY_S: keyName = "S"; break;
     case KEY_D: keyName = "D"; break;
     case KEY_P: keyName = "P"; break;
-    case KEY_O: keyName = "O"; break;
     case KEY_SPACE: keyName = "SPACE"; break;
     default: keyName = "Unknown"; break;
     }
