@@ -65,6 +65,9 @@
     <Filter Include="Engine\Systems\ISystem Independent\Scripting">
       <UniqueIdentifier>{fea8b48e-c897-4deb-88ef-8d6f84822628}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Systems\ISystem Dependent\Scene">
+      <UniqueIdentifier>{0e64a6f7-4617-4ad7-ba74-a6503a78df4d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp">
@@ -155,6 +158,11 @@
     </ClCompile>
     <ClCompile Include="src\BehaviourSystem.cpp">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SandboxGame.cpp" />
+    <ClCompile Include="src\SceneManager.cpp" />
+    <ClCompile Include="src\Scene.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -252,10 +260,18 @@
     <ClInclude Include="include\systems\BehaviourSystem.h">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
     </ClInclude>
+    <ClInclude Include="include\ecs\Scene.h">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\SceneManager.h">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SandboxGame.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">
       <Filter>Engine\Entity Component System\Entity</Filter>
     </None>
+    <None Include="src\World.inl" />
   </ItemGroup>
 </Project>

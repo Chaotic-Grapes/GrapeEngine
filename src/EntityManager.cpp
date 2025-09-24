@@ -1,11 +1,11 @@
 #include "ecs/EntityManager.h"
 #include "ecs/Entity.h"
 
-Entity EntityManager::CreateEntity() {
+Entity EntityManager::CreateEntity(const std::string& name) {
     const EntityId id = ++m_nextId;
     m_entities.insert(id);
 
-    return {id, m_world};
+    return {id, m_world, name};
 }
 
 bool EntityManager::IsAlive(const Entity& entity) const {
