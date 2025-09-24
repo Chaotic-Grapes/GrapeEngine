@@ -45,8 +45,34 @@ namespace Engine {
 		// TODO: Replace with actual Renderer2D calls
         for (auto& [transform, shape] : m_world->GetEntityManager().Query<Component::Transform, Component::ShapeRenderer2D>()) {
             switch (shape.Type) {
-            case Component::ShapeRenderer2D::ShapeType::Rectangle:
+            case Component::ShapeRenderer2D::ShapeType::Rectangle: {
+                // Compute rectangle bounds from Transform
+                glm::vec2 halfExtents = ToGlm(transform.Scale) * 0.5f;
+                glm::vec2 center = ToGlm(transform.Position);
+
+                glm::vec2 min = center - halfExtents;
+                glm::vec2 max = center + halfExtents;
+
+                if (shape.OutlineThickness > 0.0f) {
+                    // Stroke (outline rectangle)
+                    DebugDraw2D::RectStroke(*m_renderer,
+                        min,
+                        max,
+                        shape.OutlineThickness,
+                        ToGlm(shape.OutlineColor),
+                        0); // texture ID (0 = solid color)
+                }
+                else {
+                    // Solid filled rectangle
+                    DebugDraw2D::RectFill(*m_renderer,
+                        min,
+                        max,
+                        ToGlm(shape.FillColor),
+                        0); // texture ID (0 = solid color)
+                }
                 break;
+            }
+
             case Component::ShapeRenderer2D::ShapeType::Circle:
                 DebugDraw2D::Circle(*m_renderer,
                     ToGlm(transform.Position),
@@ -85,7 +111,7 @@ namespace Engine {
             m_renderer->drawSprite({
                 ToGlm(transform.Position),   // Position
                 ToGlm(transform.Scale),      // Scale
-                {0,0,0,0},
+                {0.f, 0.f, 1.f, 1.f},        // full texture rect
                 ToGlm(sprite.Color),         // Tint
                 sprite.Source.ID()           // Texture ID
             });
