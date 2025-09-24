@@ -37,6 +37,11 @@ void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
     SpawnBalls(world, 10); // Start with fewer balls
 
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
+    std::cout << "Step-by-step physics controls:" << '\n';
+    std::cout << "  P - Toggle step-by-step mode" << '\n';
+    std::cout << "  Space - Step physics (when in step mode)" << '\n';
+    std::cout << "  O - Toggle physics pause/play" << '\n';
+
     SpawnCubes(world);
     //test tri
     if (m_playerId == UINT32_MAX) {
@@ -372,6 +377,9 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
     float dt = static_cast<float>(Time::DeltaTime());
 
+    // handles step-by-step physics controls
+    HandleStepByStepControls();
+
     // Enable damping after specified delay
     if (!m_dampingEnabled && m_elapsedTime >= m_dampingDelay) {
         m_dampingEnabled = true;
@@ -389,10 +397,110 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     ClampAndBouncePlayer();
 }
 
+void Sandbox::PhysicsCollision2DTestScene::HandleStepByStepControls() {
+    static bool pWasDown = false;
+    static bool oWasDown = false;
+    static bool spaceWasDown = false;
+    static bool wasPaused = false;
+
+    bool pIsDown = Input::IsKeyDown(KEY_P);
+    bool oIsDown = Input::IsKeyDown(KEY_O);
+    bool spaceIsDown = Input::IsKeyDown(KEY_SPACE);
+
+    // toggle step-by-step mode with P key
+    if (pIsDown && !pWasDown) {
+        m_stepByStepMode = !m_stepByStepMode;
+        m_pausePhysics = m_stepByStepMode;
+
+        Engine::Physics2D::SetEnabled(!m_pausePhysics);
+
+        if (m_pausePhysics) {
+            std::cout << "Step-by-step physics mode ENABLED" << '\n';
+            // When pausing, store current velocities to restore later
+            StoreBallStates();
+        }
+        else {
+            std::cout << "Step-by-step physics mode DISABLED" << '\n';
+            // When resuming, restore velocities from before pause
+            RestoreBallStates();
+        }
+    }
+
+    // toggle physics mode with O key
+    if (oIsDown && !oWasDown) {
+        bool wasPausedBefore = m_pausePhysics;
+        m_pausePhysics = !m_pausePhysics;
+        Engine::Physics2D::SetEnabled(!m_pausePhysics);
+
+        if (m_pausePhysics) {
+            std::cout << "Physics PAUSED" << '\n';
+            StoreBallStates();
+        }
+        else {
+            std::cout << "Physics RESUMED" << '\n';
+            // Only restore if we were previously paused
+            if (wasPausedBefore) {
+                RestoreBallStates();
+            }
+        }
+    }
+
+    // step physics with SPACE key
+    if ((m_stepByStepMode || m_pausePhysics) && spaceIsDown && !spaceWasDown) {
+        // for stepping: temporarily enable, step, then disable
+        if (m_pausePhysics) {
+            Engine::Physics2D::SetEnabled(true);
+            m_stepRequested = true;
+            std::cout << "Physics step requested" << '\n';
+        }
+    }
+
+    pWasDown = pIsDown;
+    oWasDown = oIsDown;
+    spaceWasDown = spaceIsDown;
+    wasPaused = m_pausePhysics;
+}
+
+void Sandbox::PhysicsCollision2DTestScene::StoreBallStates() {
+    m_storedBallStates.clear();
+    for (auto& ball : m_balls) {
+        auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
+        if (rigidbody) {
+            m_storedBallStates[ball.GetId()] = {
+                rigidbody->Velocity,
+                ball.Transform().Position
+            };
+        }
+    }
+}
+
+void Sandbox::PhysicsCollision2DTestScene::RestoreBallStates() {
+    for (auto& ball : m_balls) {
+        auto it = m_storedBallStates.find(ball.GetId());
+        if (it != m_storedBallStates.end()) {
+            auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
+            if (rigidbody) {
+                rigidbody->Velocity = it->second.velocity;
+                ball.Transform().Position = it->second.position;
+            }
+        }
+    }
+    m_storedBallStates.clear();
+}
+
 void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     World& world = GetWorld();
     const float dt = static_cast<float>(Time::FixedDeltaTime());
-    UpdateBallCollisions();
+
+    if (!m_pausePhysics || m_stepRequested) {
+        UpdateBallCollisions();
+
+        if (m_stepRequested) {
+            // step, and pause physics
+            Engine::Physics2D::SetEnabled(false);
+        }
+        m_stepRequested = false;
+    }
 
     //cubess
     SpawnCubes_T(world, dt);

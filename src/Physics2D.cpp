@@ -6,12 +6,15 @@
 
 namespace Engine {
     Vector2D Physics2D::m_gravity = Vector2D(0.0f, -9.81f);
+    bool Physics2D::m_enabled = true;
 
     void Physics2D::OnCreate() {
         std::cout << "Physics2D Initialized" << '\n';
     }
 
     void Physics2D::OnFixedUpdate() {
+        if (!m_enabled) return;
+
 		// Iterate over all entities with Rigidbody2D + Transform + Collider2D components
         const auto entities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform, Component::Collider2D>();
         for (auto& [rb, transform, collider] : entities) {

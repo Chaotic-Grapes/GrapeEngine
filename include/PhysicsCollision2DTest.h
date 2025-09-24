@@ -4,6 +4,7 @@
 
 #include "Game.h"
 #include <vector>
+#include <unordered_map>
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include "DyamicCollision.h"
@@ -16,10 +17,27 @@ namespace Sandbox {
         void OnUpdate() override;
         void OnFixedUpdate() override;
         void OnUnload() override;
+
     private:
         void SpawnBalls(World& world, int count, unsigned seed = 0);
         //void CreateBoundaryLines();
         void UpdateBallCollisions();
+
+        // step-by-step physics debugging
+        bool m_stepByStepMode;
+        bool m_stepRequested;
+        bool m_pausePhysics;
+
+        void HandleStepByStepControls();
+        void StoreBallStates();
+        void RestoreBallStates();
+
+        struct BallState {
+            Vector2D velocity;
+            Vector2D position;
+        };
+
+        std::unordered_map<uint32_t, BallState> m_storedBallStates;
 
         std::vector<Entity> m_balls;
         //std::vector<Entity> m_boundaryLines;

@@ -19,6 +19,9 @@ namespace Engine {
         static void SetGravity(const Vector2D& gravity) { m_gravity = gravity; }
         static Vector2D GetGravity() { return m_gravity; }
 
+        static void SetEnabled(bool enabled) { m_enabled = enabled; }
+        static bool IsEnabled() { return m_enabled; }
+
         static void AddForce(Component::Rigidbody2D& rb, const Vector2D& force);
         static void AddImpulse(Component::Rigidbody2D& rb, const Vector2D& impulse);
 
@@ -27,6 +30,8 @@ namespace Engine {
 
         World* m_world;
         static Vector2D m_gravity;
+
+        static bool m_enabled;
     };
 }
 
