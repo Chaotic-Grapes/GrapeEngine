@@ -18,7 +18,7 @@ namespace Sandbox {
         void OnUnload() override;
     private:
         void SpawnBalls(World& world, int count, unsigned seed = 0);
-        void CreateBoundaryLines();
+        //void CreateBoundaryLines();
         void UpdateBallCollisions();
 
         std::vector<Entity> m_balls;
@@ -27,7 +27,7 @@ namespace Sandbox {
 
         //triangle hero
         void CreateTriangle(World& world);
-        void ClampAndBouncePlayer(World& world);
+        void ClampAndBouncePlayer();
 
         EntityId m_playerId = UINT32_MAX;
         float m_triHalfHeight = 48.0f;

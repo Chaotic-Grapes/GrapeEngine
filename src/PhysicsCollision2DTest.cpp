@@ -31,40 +31,43 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     Engine::Physics2D::SetGravity(Vector2D(0.0f, -200.0f));
 }
 
-void Sandbox::PhysicsCollision2DTestScene::OnStart(World& world) {
+void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
    // CreateBoundaryLines(world);
+    World& world = GetWorld();
     SpawnBalls(world, 10); // Start with fewer balls
 
     std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls" << '\n';
     SpawnCubes(world);
     //test tri
-    CreateTriangle();
+    if (m_playerId == UINT32_MAX) {
+        CreateTriangle(world);
+    }
 }
 
-void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
-	//constexpr float gap = 150.0f;
- //   const float xMid = m_worldWidth * 0.5f;
- //   const float y0 = m_worldHeight * 0.25f;
- //   const float y1 = m_worldHeight * 0.75f;
-
- //   // Create left boundary line
- //   Entity leftLine = world.CreateEntity();
- //   leftLine.AddComponent<Component::LineRenderer>(
- //       Vector2D(xMid - gap * 0.5f, y0),
- //       Vector2D(xMid - gap * 0.5f, y1),
- //       3.f
- //   );
- //   m_boundaryLines.push_back(leftLine);
-
- //   // Create right boundary line  
- //   Entity rightLine = world.CreateEntity();
- //   rightLine.AddComponent<Component::LineRenderer>(
- //       Vector2D(xMid + gap * 0.5f, y0),
- //       Vector2D(xMid + gap * 0.5f, y1),
- //       3.f
- //   );
- //   m_boundaryLines.push_back(rightLine);
-}
+//void Sandbox::PhysicsCollision2DTestScene::CreateBoundaryLines(World& world) {
+//	//constexpr float gap = 150.0f;
+// //   const float xMid = m_worldWidth * 0.5f;
+// //   const float y0 = m_worldHeight * 0.25f;
+// //   const float y1 = m_worldHeight * 0.75f;
+//
+// //   // Create left boundary line
+// //   Entity leftLine = world.CreateEntity();
+// //   leftLine.AddComponent<Component::LineRenderer>(
+// //       Vector2D(xMid - gap * 0.5f, y0),
+// //       Vector2D(xMid - gap * 0.5f, y1),
+// //       3.f
+// //   );
+// //   m_boundaryLines.push_back(leftLine);
+//
+// //   // Create right boundary line  
+// //   Entity rightLine = world.CreateEntity();
+// //   rightLine.AddComponent<Component::LineRenderer>(
+// //       Vector2D(xMid + gap * 0.5f, y0),
+// //       Vector2D(xMid + gap * 0.5f, y1),
+// //       3.f
+// //   );
+// //   m_boundaryLines.push_back(rightLine);
+//}
 
 void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int count, const unsigned seed) {
     m_balls.clear();
@@ -165,9 +168,6 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes(World& world) {
     shape.Closed = true;
     shape.FillColor = Color(0.15f, 0.65f, 0.95f, 1.0f); // sea-ish
 
-    // NOTE: no dedicated AABB collider component needed; we compute AABB on the fly
-    // from size + Transform.Position for DynamicCollision checks.
-
     m_seacubes.push_back(cube);
 }
 
@@ -176,7 +176,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes_T(World& world, float dt) 
     while (m_spawnAcc >= m_spawnIntervals) {
         m_spawnAcc -= m_spawnIntervals;
         // spawn 1–2 cubes per tick for variety
-        int batch = MathHelper::Randomize<int>(1, 2, 0);
+        int batch = MathHelper::Randomize<int>(1, 7, 0);
         for (int i = 0; i < batch; ++i) SpawnCubes(world);
     }
 }
@@ -260,6 +260,7 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World& world) {
 
 
 void Sandbox::PhysicsCollision2DTestScene::CreateTriangle(World& world) {
+    if (m_playerId != UINT32_MAX) return; // <-- guard
     Entity e = world.CreateEntity();
     m_playerId = e.GetId();
 
@@ -288,7 +289,7 @@ void Sandbox::PhysicsCollision2DTestScene::CreateTriangle(World& world) {
     pts.emplace_back(cx + m_triHalfBase, cy - m_triHalfHeight);
 
     const Color fill(0.95f, 0.90f, 0.20f, 1.0f);
-    Component::ShapeRenderer2D triShape = Component::ShapeRenderer2D::Polygon(pts, fill, /*closed*/ true);
+    Component::ShapeRenderer2D triShape = Component::ShapeRenderer2D::Polygon(pts, fill, true);
     e.AddComponent<Component::ShapeRenderer2D>(triShape);
 }
 
@@ -367,6 +368,7 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
+    World& world = GetWorld();
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
     float dt = static_cast<float>(Time::DeltaTime());
 
@@ -388,6 +390,8 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
+    World& world = GetWorld();
+    const float dt = static_cast<float>(Time::FixedDeltaTime());
     UpdateBallCollisions();
 
     //cubess
