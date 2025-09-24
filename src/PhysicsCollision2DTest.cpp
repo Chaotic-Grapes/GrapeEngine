@@ -28,7 +28,7 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     m_dampingEnabled = false;
 
     // Disable gravity for this test (balls should fly around freely)
-    Engine::Physics2D::SetGravity(Vector2D(0.0f, -800.0f));
+    Engine::Physics2D::SetGravity(Vector2D(0.0f, -0.0f));
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
@@ -173,16 +173,24 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
     const float jumpImpulse = 20.0f;   // discrete impulse
     const float velDampScale = 0.996f;   // mild numerical damping
 
-    Vector2D F(-1.0f, 0.0f);
-    if (Input::IsKeyDown(KEY_A)) { Engine::Physics2D::AddForce(*rb, F); std::cout << F.X; }
-    else if (Input::IsKeyPressed(KEY_D)) {std::cout << F.X; } 
-    else if (Input::IsKeyPressed(KEY_W)) F.Y += 0.25f * thrust;
-    else if (Input::IsKeyPressed(GLFW_KEY_S)) F.Y -= 0.25f * thrust;
+    bool leftHeld = Input::IsKeyDown(KEY_A);
+    bool rightHeld = Input::IsKeyDown(KEY_D);
+    bool upHeld = Input::IsKeyDown(KEY_W);
+    bool downHeld = Input::IsKeyDown(KEY_S);
 
-   
+    Vector2D F(0.0f, 0.0f);
+    if (leftHeld)  F.X -= thrust;
+    if (rightHeld) F.X += thrust;
+    if (upHeld)    F.Y += thrust;
+    if (downHeld)  F.Y -= thrust;
+
+    // Apply only when non-zero (no force added when keys are up)
+    if (F.X != 0.0f || F.Y != 0.0f) {
+        Engine::Physics2D::AddForce(*rb, F);
+    }
+
     if (Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
         Engine::Physics2D::AddImpulse(*rb, Vector2D(0.0f, jumpImpulse));
-        Engine::Physics2D::AddForce(*rb, F);
         std::cout << jumpImpulse;
     }
     rb->Velocity *= velDampScale;
