@@ -173,6 +173,7 @@
     <ClCompile Include="src\Math\Vector4D.cpp" />
     <ClCompile Include="src\Physics.cpp" />
     <ClCompile Include="src\SandboxGame.cpp" />
+    <ClCompile Include="src\Scene.cpp" />
     <ClCompile Include="src\SceneManager.cpp" />
     <ClCompile Include="src\test.cpp" />
     <ClCompile Include="src\EntityManager.cpp" />

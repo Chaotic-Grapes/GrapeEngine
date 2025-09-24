@@ -108,7 +108,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
     }
 }
 
-void Sandbox::PhysicsCollision2DTestScene::OnLateUpdate() {
+void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
 
     // Enable damping after specified delay
@@ -124,7 +124,9 @@ void Sandbox::PhysicsCollision2DTestScene::OnLateUpdate() {
 
         std::cout << "Damping enabled after " << m_dampingDelay << " seconds!" << '\n';
     }
+}
 
+void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     UpdateBallCollisions();
 }
 

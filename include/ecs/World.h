@@ -43,6 +43,7 @@ private:
     void _initialize() const;
     void _update() const;
     void _shutdown();
+    void _fixedUpdate() const;
     void _lateUpdate() const;
 };
 

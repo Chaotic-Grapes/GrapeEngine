@@ -19,37 +19,26 @@ public:
     // Called every frame
     virtual void OnUpdate() {}
 
+	// Called at fixed intervals (e.g. for physics updates)
+	virtual void OnFixedUpdate() {}
+
     // Called every frame after Update()
     virtual void OnLateUpdate() {}
 
     // Called when scene is unloaded
     virtual void OnUnload() {}
 
-    void Update() {
-	    m_world->_update();
-    	OnUpdate();
-    }
-
-    void LateUpdate() {
-	    m_world->_lateUpdate();
-    	OnLateUpdate();
-    }
-
-    void Load() {
-        OnLoad();
-        m_world->_initialize();
-    }
-
-    void Unload() {
-        m_world->_shutdown();
-        OnUnload();
-    }
+    void Update();
+    void LateUpdate();
+    void Load();
+    void Unload();
 
 protected:
     Entity CreateEntity() const { return m_world->CreateEntity(); }
 private:
     std::string m_name;
     std::unique_ptr<World> m_world;
+    float m_accumulator{ 0.f };
 };
 
 #endif
