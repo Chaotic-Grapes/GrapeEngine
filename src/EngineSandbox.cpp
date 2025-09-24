@@ -11,6 +11,7 @@
 // below RunTestMenu().
 namespace {
     void TestPhysics2D();
+    void TestGraphics();
     void RunTestMenu();
 }
 // ***************************************************** //
@@ -42,12 +43,12 @@ namespace {
         case 1:
             TestPhysics2D();
             break;
-            //case 2:
-            //    std::cout << "Rendering Test - TODO" << '\n';
-            //    break;
             //case 3:
             //    std::cout << "ECS Component Test - TODO" << '\n';
             //    break;
+        case 2:
+            TestGraphics();
+            break;
         default:
             std::cout << "Invalid choice" << '\n';
             break;
@@ -60,6 +61,12 @@ namespace {
         Engine::Application engine;
         Sandbox::PhysicsCollision2DTestScene game = Sandbox::PhysicsCollision2DTestScene(1600, 900, 7);
         engine.Run(game, true);
+    }
+
+    void TestGraphics() {
+        std::cout << "Starting Graphics Test..." << '\n';
+
+        Engine::Application engine;
     }
 }
 
