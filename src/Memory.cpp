@@ -24,8 +24,7 @@ void* Memory::RecordAlloc(size_t size, const char* file, int line, const char* f
 	info.file = file ? file : "unknown";
 	info.line = line;
 	info.function = function ? function : "unknown";
-	info.freed = false;
-	
+
 	// Store in the tracking map
 	std::cout << "Storing in map\n";
 	try {
@@ -67,9 +66,6 @@ void Memory::RecordDealloc(void* ptr) {
 	std::unordered_map<void*, AllocInfo>::iterator it = m_allocs.find(ptr);
 	if (it != m_allocs.end()) {
 		std::cout << "Found allocation record, removing...\n";
-
-		// Mark as freed (not needed anymore since we're removing it)
-		it->second.freed = true;
 
 		// Update current allocated memory
 		m_currentAlloc -= it->second.size;

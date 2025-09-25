@@ -1,4 +1,6 @@
-#pragma once
+#ifndef MEMORY_H
+#define MEMORY_H
+
 #include <cstddef>
 #include <string>
 #include <unordered_map>
@@ -10,7 +12,6 @@ struct AllocInfo {
 	size_t size = 0;
 	std::string file, function;
 	int line = 0;
-	bool freed = false;
 };
 
 class Memory {
@@ -39,6 +40,14 @@ public:
 	size_t GetAllocationCount() const;
 
 private:
+	// Make constructor private so no one can create instances
+	Memory();
+	~Memory();
+
+	// Prevent copying
+	Memory(const Memory&) = delete;
+	Memory& operator=(const Memory&) = delete;
+
 	// Memory tracking system that logs every allocation 
 	// and deallocation (AllocationInfo)
 	std::unordered_map<void*, AllocInfo> m_allocs;
@@ -53,13 +62,13 @@ private:
 	size_t m_currentAlloc = 0;  // Amount of memory currently in use
 	size_t m_peakAlloc = 0;     // Maximum amount of memory used at any one time
 
-	// Make constructor private so no one can create instances
-	Memory();
-	~Memory();
-
-	// Prevent copying
-	Memory(const Memory&) = delete;
-	Memory& operator=(const Memory&) = delete;
+	// Track what assets exist on the CPU side (textures, shaders, etc.)
+	// Current VRAM usage (how much is being used right now)
+	// Peak VRAM usage (max)
+	// VRAM budget (total available VRAM)
+	// Calculate VRAM sizes (method to find texture/buffer sizes)
+	// Report by type, e.g. "Textures: 1024MB/6GB"
+	// Profiler support
 };
 
 // Helper templates for typed allocation (new and new[])
@@ -82,3 +91,5 @@ T* TrackedAllocArray(size_t count, const char* file, int line, const char* funct
 #define NEW_ARRAY(type, count) TrackedAllocArray<type>(count, __FILE__, __LINE__, __FUNCTION__)
 #define DELETE(ptr) Memory::GetInstance().RecordDealloc(ptr)
 #define DELETE_ARRAY(ptr) Memory::GetInstance().RecordDealloc(ptr)
+
+#endif
