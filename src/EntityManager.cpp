@@ -1,15 +1,19 @@
 #include "ecs/EntityManager.h"
 #include <iostream>
 #include "ecs/Entity.h"
+#include "systems/Logger.h"
+#include <sstream>
 
 Entity EntityManager::CreateEntity(const std::string& name) {
     const EntityId id = ++m_nextId;
     m_entities.insert(id);
 
 #if _DEBUG
-    std::cout << "Entity created: "
-	          << '[' << id << ']'
-	          << ' ' << name << '\n';
+    std::ostringstream oss;
+    oss << "Entity created: "
+	    << '[' << id << ']'
+	    << ' ' << name;
+    LOG_DEBUG(oss.str());
 #endif
 
     return {id, m_world, name};
@@ -24,14 +28,20 @@ void EntityManager::DestroyEntity(const Entity& entity) {
     const auto& erased = m_entities.erase(entity.GetId());
 
 #if _DEBUG
-    if (erased == 0)
-		std::cerr << "Warning: Attempted to destroy non-existent entity "
-				  << '[' << entity.GetId() << ']'
-				  << ' ' << entity.GetName() << '\n';
-    else
-		std::cout << "Entity destroyed: "
-		          << '[' << entity.GetId() << ']'
-		          << ' ' << entity.GetName() << '\n';
+    if (erased == 0) {
+        std::ostringstream oss;
+        oss << "Warning: Attempted to destroy non-existent entity "
+            << '[' << entity.GetId() << ']'
+            << ' ' << entity.GetName();
+        LOG_WARNING(oss.str());
+    }
+    else {
+        std::ostringstream oss;
+        oss << "Entity destroyed: "
+            << '[' << entity.GetId() << ']'
+            << ' ' << entity.GetName();
+        LOG_DEBUG(oss.str());
+    }
 #endif
 }
 

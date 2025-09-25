@@ -51,7 +51,7 @@ namespace Grape_Engine
         // TODO: Linux handler (signal-based) if you want parity
 #endif
 
-        LOG_SUCCESS("CrashHandler initialized.");
+        Logger::Get().Log(LogLevel::INFO, "CrashHandler initialized.");
     }
 
 #ifdef _WIN32
@@ -130,7 +130,7 @@ namespace Grape_Engine
         }
         else
         {
-            LOG_DEBUG("Dump file creation disabled by user.");
+            Logger::Get().Log(LogLevel::DEBUG, "Dump file creation disabled by user.");
         }
 
         WriteLog(oss.str(), exePath, timeStamp);
@@ -151,14 +151,14 @@ namespace Grape_Engine
 
         if (!logFile.is_open())
         {
-            LOG_ERROR("Failed to open crash log file: " + fullPath);
+            Logger::Get().Log(LogLevel::ERR, "Failed to open crash log file: " + fullPath);
             return;
         }
 
         logFile << message;
         logFile.close();
 
-        LOG_SUCCESS("Crash log written to " + fullPath);
+        Logger::Get().Log(LogLevel::INFO, "Crash log written to " + fullPath);
     }
 
 #ifdef _WIN32
@@ -208,11 +208,11 @@ namespace Grape_Engine
                 nullptr);
 
             CloseHandle(hFile);
-            LOG_SUCCESS("Minidump file created.");
+            Logger::Get().Log(LogLevel::INFO, "Minidump file created.");
         }
         else
         {
-            LOG_ERROR("Failed to create minidump file.");
+            Logger::Get().Log(LogLevel::ERR, "Failed to create minidump file.");
         }
     }
 #endif // _WIN32
@@ -362,7 +362,7 @@ namespace Grape_Engine
     {
         string title = name + " has shut down";
 
-        LOG_ERROR("Program crashed:\n" + message);
+        Logger::Get().Log(LogLevel::ERR, "Program crashed:\n" + message);
 
 #ifdef _WIN32
         MessageBoxA(nullptr, message.c_str(), title.c_str(), MB_ICONERROR | MB_OK);

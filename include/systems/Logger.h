@@ -5,6 +5,12 @@
 #undef ERROR
 #endif
 
+#define LOG_INFO(msg)		Logger::Get().Log(LogLevel::INFO, msg)
+#define LOG_DEBUG(msg)		Logger::Get().Log(LogLevel::DEBUG, msg)
+#define LOG_WARNING(msg)	Logger::Get().Log(LogLevel::WARNING, msg)
+#define LOG_ERROR(msg)		Logger::Get().Log(LogLevel::ERROR, msg)
+#define LOG_CRITICAL(msg)	Logger::Get().Log(LogLevel::CRITICAL, msg)
+
 #include <iostream>
 #include <string>
 #include <fstream>

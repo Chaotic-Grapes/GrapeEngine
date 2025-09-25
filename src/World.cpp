@@ -7,8 +7,18 @@ void World::_initialize() const {
 }
 
 void World::_update() const {
-    for (auto& sys : m_systems)
+    // Start timing for overall game loop
+    // with std::chrono
+
+    for (auto& sys : m_systems) {
+        // Start timing for system loop
+        // with std::chrono
         sys->OnUpdate();
+        // End timing for system loop
+        // Name of system can be accessed with sys->Name();
+    }
+
+    // End timing for overall game loop
 }
 
 void World::_fixedUpdate() const {

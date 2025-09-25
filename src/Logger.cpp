@@ -17,10 +17,10 @@ void Logger::Log(const LogLevel level, const std::string& message) {
 
 	switch (level) {
 	case LogLevel::INFO:	_logInfo(message); break;
-	case LogLevel::DEBUG: _logDebug(message); break;
+	case LogLevel::DEBUG:	_logDebug(message); break;
 	case LogLevel::WARNING: _logWarning(message); break;
-	case LogLevel::ERROR: _logError(message); break;
-	case LogLevel::CRITICAL: _logCritical(message); break;
+	case LogLevel::ERROR:	_logError(message); break;
+	case LogLevel::CRITICAL:_logCritical(message); break;
 	}
 }
 
