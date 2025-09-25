@@ -55,6 +55,7 @@ void DebugUI::Render() {
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
     _showGameObjectEditor();   // Game object editor
+    _showAudioWindow();
 
     // Finalize the frame and send to GPU
     ImGui::Render();  // Generate draw commands from UI
@@ -87,11 +88,23 @@ void DebugUI::_showPerformanceWindow() {
     ImGui::SetNextWindowSize(ImVec2(300, 120), ImGuiCond_Once);
 
     ImGui::Begin("Performance Monitor");
-    // ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-    // ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
+    ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+    ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
     if (ImGui::Button("Print GPU Specs to Console")) {
         Input::PrintSpecs();
     }
+    ImGui::End();
+}
+
+void DebugUI::_showAudioWindow() {
+    ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(300, 150), ImGuiCond_Once);
+
+    ImGui::Begin("Audio Monitor");
+    ImGui::Text("volume up/down button");
+    ImGui::Button("play");
+    ImGui::Button("stop");
+    ImGui::Button("pause");
     ImGui::End();
 }
 

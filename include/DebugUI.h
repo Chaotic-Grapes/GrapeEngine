@@ -44,6 +44,7 @@ private:
     static void _showPerformanceWindow();  // Performance monitoring window
     static void _showInputDebugWindow();   // Input debugging
     static void _showGameObjectEditor();   // Game object editor window
+    static void _showAudioWindow();        // Audio editor window
 };
 
 #endif
