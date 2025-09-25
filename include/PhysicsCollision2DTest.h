@@ -44,7 +44,7 @@ namespace Sandbox {
         std::vector<Entity> m_seacubes;
 
         //triangle hero
-        void CreateTriangle(World& world);
+        void CreateTriangle();
         void ClampAndBouncePlayer();
 
         EntityId m_playerId = UINT32_MAX;
@@ -52,8 +52,8 @@ namespace Sandbox {
         float m_triHalfBase = 32.0f;
 
         //sea cubes
-        void SpawnCubes(World& world);
-        void SpawnCubes_T(World& world, float dt);
+        void SpawnCubes();
+        void SpawnCubes_T(float dt);
         void UpdateCubesCollisions(World& world);
         void CubeDisintegrate(World& world, size_t i);
 

@@ -12,8 +12,8 @@ namespace Engine {
         Physics2D(World* world) : m_world(world) {}
 
         void OnCreate() override;
-        void OnUpdate() override {}
-        void OnFixedUpdate() override;
+        void OnUpdate() override;
+        void OnFixedUpdate() override {}
         std::string Name() const override { return "Physics2D"; }
 
         static void SetGravity(const Vector2D& gravity) { m_gravity = gravity; }

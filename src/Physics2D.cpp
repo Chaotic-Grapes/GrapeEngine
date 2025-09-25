@@ -12,7 +12,7 @@ namespace Engine {
         std::cout << "Physics2D Initialized" << '\n';
     }
 
-    void Physics2D::OnFixedUpdate() {
+    void Physics2D::OnUpdate() {
         if (!m_enabled) return;
 
 		// Iterate over all entities with Rigidbody2D + Transform + Collider2D components

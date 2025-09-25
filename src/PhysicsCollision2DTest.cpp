@@ -47,10 +47,10 @@ void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
     std::cout << "  P - Toggle step-by-step mode" << '\n';
     std::cout << "  Space - Step physics (when in step mode)" << '\n';
 
-    SpawnCubes(world);
+    SpawnCubes();
     //test tri
     if (m_playerId == UINT32_MAX) {
-        CreateTriangle(world);
+        CreateTriangle();
     }
 }
 
@@ -139,7 +139,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
 }
 
 
-void Sandbox::PhysicsCollision2DTestScene::SpawnCubes(World& world) {
+void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
     if ((int)m_seacubes.size() >= m_maxLeaves) return;
 
     // random square size and x spawn at top
@@ -151,7 +151,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes(World& world) {
 
     const float y = m_worldHeight - half - 2.0f; 
 
-    Entity cube = world.CreateEntity();
+    Entity cube = CreateEntity();
 
     auto& tr = cube.Transform();
     tr.Position.X = x;
@@ -181,13 +181,13 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes(World& world) {
     m_seacubes.push_back(cube);
 }
 
-void Sandbox::PhysicsCollision2DTestScene::SpawnCubes_T(World& world, float dt) {
+void Sandbox::PhysicsCollision2DTestScene::SpawnCubes_T(float dt) {
     m_spawnAcc += dt;
     while (m_spawnAcc >= m_spawnIntervals) {
         m_spawnAcc -= m_spawnIntervals;
         // spawn 1–2 cubes per tick for variety
         int batch = MathHelper::Randomize<int>(1, 7, 0);
-        for (int i = 0; i < batch; ++i) SpawnCubes(world);
+        for (int i = 0; i < batch; ++i) SpawnCubes();
     }
 }
 
@@ -268,10 +268,9 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World& world) {
     }
 }
 
-
-void Sandbox::PhysicsCollision2DTestScene::CreateTriangle(World& world) {
+void Sandbox::PhysicsCollision2DTestScene::CreateTriangle() {
     if (m_playerId != UINT32_MAX) return; // <-- guard
-    Entity e = world.CreateEntity();
+    Entity e = CreateEntity();
     m_playerId = e.GetId();
 
     const float cx = m_worldWidth * 0.25f;
@@ -302,8 +301,6 @@ void Sandbox::PhysicsCollision2DTestScene::CreateTriangle(World& world) {
     Component::ShapeRenderer2D triShape = Component::ShapeRenderer2D::Polygon(pts, fill, true);
     e.AddComponent<Component::ShapeRenderer2D>(triShape);
 }
-
-
 
 void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
     if (m_playerId == UINT32_MAX) return;
@@ -380,7 +377,7 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
 void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     World& world = GetWorld();
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
-    float dt = static_cast<float>(Time::DeltaTime());
+    float dt = Time::DeltaTime();
 
     // handles step-by-step physics controls
     HandleStepByStepControls();
@@ -473,7 +470,7 @@ void Sandbox::PhysicsCollision2DTestScene::RestoreBallStates() {
 
 void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     World& world = GetWorld();
-    const float dt = static_cast<float>(Time::FixedDeltaTime());
+    const float dt = Time::FixedDeltaTime();
 
     if (!m_pausePhysics || m_stepRequested) {
         UpdateBallCollisions();
@@ -486,7 +483,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     }
 
     //cubess
-    SpawnCubes_T(world, dt);
+    //SpawnCubes_T(world, dt);
     UpdateCubesCollisions(world);
 }
 
