@@ -155,6 +155,7 @@
   <ItemGroup>
     <ClCompile Include="src\BehaviourSystem.cpp" />
     <ClCompile Include="src\DynamicCollision.cpp" />
+    <ClCompile Include="src\GraphicsTest.cpp" />
     <ClCompile Include="src\Physics2D.cpp" />
     <ClCompile Include="src\PhysicsCollision2DTest.cpp" />
     <ClCompile Include="src\Renderer2D.cpp" />
@@ -188,6 +189,7 @@
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
     <ClInclude Include="include\DyamicCollision.h" />
+    <ClInclude Include="include\GraphicsTest.hpp" />
     <ClInclude Include="include\SandboxGame.h" />
     <ClInclude Include="include\systems\Behaviour.h" />
     <ClInclude Include="include\systems\BehaviourSystem.h" />

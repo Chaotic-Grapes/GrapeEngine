@@ -2,13 +2,14 @@
 #include "Game.h"
 #include <iostream>
 #include "PhysicsCollision2DTest.h"
+#include "GraphicsTest.hpp"
 #include "systems/WindowManager.h"
 
 
 void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "Select test scene: \n";
     std::cout << "1. Physics & Collision 2D Test" << '\n';
-    //std::cout << "2. Rendering Test" << '\n';
+    std::cout << "2. GRAPHICS AND ART PIPELINE TEST" << '\n';
     //std::cout << "3. ECS Component Test" << '\n';
 
     int choice;
@@ -26,9 +27,13 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
         sceneManager.LoadScene("PhysicsCollision2DTestScene");
         break;
     }
-        //case 2:
-        //    std::cout << "Rendering Test - TODO" << '\n';
-        //    break;
+    case 2: {
+        std::cout << "Starting GRAPHICS AND ART PIPELINE TEST..." << '\n';
+
+        sceneManager.AddScene(new Sandbox::GraphicsTestScene(1600, 900));
+        sceneManager.LoadScene("GraphicsTestScene");
+        break;
+    }
         //case 3:
         //    std::cout << "ECS Component Test - TODO" << '\n';
         //    break;

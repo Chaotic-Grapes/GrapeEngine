@@ -25,7 +25,23 @@ namespace Engine {
     private:
         // Conversion helpers (keep glm isolated to graphics)
         glm::vec2 ToGlm(const Vector2D& v) { return glm::vec2 {v.X, v.Y}; }
-        glm::vec4 ToGlm(const Color& c) { return glm::vec4 {c.R, c.G, c.B, c.A}; }
+
+        /*!
+        \brief Convert an engine Color (0–255 per channel) to glm::vec4 (0–1).
+        \param c The Color to convert.
+        \return Normalized glm::vec4 suitable for shaders.
+        \note Color channels in our engine are stored as 8-bit [0–255].
+              GLSL expects floats in the range [0.0–1.0]. Forgetting this
+              will cause washed-out or grayscale rendering.
+        */
+        glm::vec4 ToGlm(const Color& c) {
+            return glm::vec4{
+                static_cast<float>(c.R) / 255.0f,
+                static_cast<float>(c.G) / 255.0f,
+                static_cast<float>(c.B) / 255.0f,
+                static_cast<float>(c.A) / 255.0f
+            };
+        }
 
         World* m_world;
         std::unique_ptr<Renderer> m_renderer;

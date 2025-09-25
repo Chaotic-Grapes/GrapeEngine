@@ -1,23 +1,26 @@
 #ifndef GRAPHICSTEST_H
 #define GRAPHICSTEST_H
-#include "Game.h"
 #if _DEBUG
 
+#include "Game.h"
 #include <vector>
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 
 namespace Sandbox {
-    class GraphicsTestScene : public Game {
+    class GraphicsTestScene : public Scene {
     public:
         GraphicsTestScene(int width, int height);
 
-        void OnStart(World& world) override;
-        void OnUpdate(World& world) override;
-        void OnShutdown(World& world) override;
+        void OnLoad() override;
+        void OnUpdate() override;
+        void OnUnload() override;
 
-    private:
+        // NOTE: The enum values (1201–1210) are aligned with the official
+        // rubric test IDs from M1. This makes it easy to cross-reference
+        // between engine code and grading requirements.
         enum class TestType {
+            // Required M1 rubric tests
             BasicGraphics       = 1201,
             DebugDrawing        = 1202,
             BasicSprites        = 1203,
@@ -28,11 +31,22 @@ namespace Sandbox {
             MultiAnimation      = 1208,
             PerformanceTest     = 1209,
             FontSystem          = 1210,
-        };
 
-        // Background, sprites
-        EntityId m_backgroundId = UINT32_MAX;
-        EntityId m_sprite1Id = UINT32_MAX;
+            // Extra experimental tests (outside rubric)
+            SplineDeformation   = 2001,
+            FrameBufferObject   = 2002,
+            PostProcessing      = 2003,
+            LightingTest        = 2004,
+            NormalMaps          = 2005,
+            ParticleSystem      = 2006,
+            SpriteAtlas         = 2007,
+            ShaderPlayground    = 2008
+        };
+    private:
+        bool m_gHandled = false;
+
+        // Background, sprites, debugObjects
+        std::vector<EntityId> m_activeTestEntities;
 
         // Stress test
         std::vector<Entity> m_batchSprites;

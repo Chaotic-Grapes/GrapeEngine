@@ -70,6 +70,7 @@ constexpr int KEY_S = GLFW_KEY_S;
 constexpr int KEY_D = GLFW_KEY_D;
 constexpr int KEY_P = GLFW_KEY_P;
 constexpr int KEY_SPACE = GLFW_KEY_SPACE;
+constexpr int KEY_G = GLFW_KEY_G;
 constexpr int MOUSE_LEFT = GLFW_MOUSE_BUTTON_LEFT;
 constexpr int MOUSE_RIGHT = GLFW_MOUSE_BUTTON_RIGHT;
 constexpr int PRESS = GLFW_PRESS;
