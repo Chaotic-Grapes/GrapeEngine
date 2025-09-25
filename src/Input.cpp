@@ -90,6 +90,7 @@ void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
 void Input::_processInput() {
     m_keyDown.clear();
     m_keyUp.clear();
+    m_keyPressed.clear();
     glfwPollEvents();
 }
 
