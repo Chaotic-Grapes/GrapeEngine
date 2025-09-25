@@ -371,11 +371,13 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
     shape->Type = ShapeRenderer2D::ShapeType::Polygon;
     shape->Points = pts;     // overwrite with fresh world-space points
     shape->Closed = true;
+
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     World& world = GetWorld();
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
+    float dt = Time::DeltaTime();
 
     // handles step-by-step physics controls
     HandleStepByStepControls();
@@ -481,7 +483,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     }
 
     //cubess
-    //SpawnCubes_T(world, dt);
+    SpawnCubes_T(dt);
     UpdateCubesCollisions(world);
 }
 
