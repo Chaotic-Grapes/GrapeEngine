@@ -8,15 +8,21 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <sstream>
+#include <mutex>
 #include <GLFW/glfw3.h>
 
-enum LogLevel {
+enum class LogLevel {
 	INFO,
 	DEBUG,
 	WARNING,
 	ERROR,
 	CRITICAL
 };
+
+// enums for colour codingscoped
+
+//AI states tracks what AI is doing at the current game loop
 
 class Logger {
 public:

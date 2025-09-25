@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -161,6 +161,7 @@
     <ClCompile Include="src\Input.cpp" />
     <ClCompile Include="src\Logger.cpp" />
     <ClCompile Include="src\Overlay.cpp" />
+    <ClCompile Include="src\Profiler.cpp" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
@@ -188,6 +189,7 @@
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />
     <ClInclude Include="include\graphics\sprite.hpp" />
+    <ClInclude Include="src\Profiler.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl" />
