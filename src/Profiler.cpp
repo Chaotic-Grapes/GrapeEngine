@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <numeric>
+#include "DebugUI.h"
 
 /*naming conventions:
 
@@ -13,7 +14,7 @@ private data member = m_fooRealQuick
 public macro = ALL_CAPS (includes global const)
 */
 
-Profiler::Profiler();
+// Profiler::Profiler();
 
  //   Logger::Get().Log(INFO, "Profiler system initialized."); // print upon initialization 
 
@@ -78,7 +79,7 @@ void Profiler::RenderUI() {
             data.avgTimeMs = 0.0f;
             data.maxTimeMs = 0.0f;
         }
-        Logger::Get().Log(INFO, "Performance history cleared.");
+        Logger::Get().Log(LogLevel::INFO, "Performance history cleared.");
     }
 
     ImGui::End();  // Complete window definition (like teammate's code)
@@ -94,7 +95,7 @@ void Profiler::BeginScope(const std::string& scopeName) {
 void Profiler::EndScope(const std::string& scopeName) {
     auto it = m_startTimes.find(scopeName);
     if (it == m_startTimes.end()) {
-        Logger::Get().Log(WARNING, "Profiler scope '" + scopeName + "' not found. Ignoring.");
+        Logger::Get().Log(LogLevel::WARNING, "Profiler scope '" + scopeName + "' not found. Ignoring.");
         return;
     }
     auto endTime = std::chrono::steady_clock::now();
@@ -114,7 +115,7 @@ void Profiler::EndScope(const std::string& scopeName) {
     scopeData.maxTimeMs = *std::max_element(scopeData.frameTimes.begin(), scopeData.frameTimes.end());
     // Log to the console for post-mortem analysis
     std::string output = "Scope '" + scopeName + "' took " + std::to_string(scopeData.lastTimeMs) + " ms.";
-    Logger::Get().Log(INFO, output);
+    Logger::Get().Log(LogLevel::INFO, output);
 }
 
 

@@ -190,6 +190,7 @@
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
+    <ClInclude Include="include\DebugUI.h" />
     <ClInclude Include="include\DyamicCollision.h" />
     <ClInclude Include="include\GraphicsTest.hpp" />
     <ClInclude Include="include\SandboxGame.h" />
