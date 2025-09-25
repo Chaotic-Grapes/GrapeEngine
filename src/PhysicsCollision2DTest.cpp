@@ -33,7 +33,7 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     m_pausePhysics = false;
 
     // Disable gravity for this test (balls should fly around freely)
-    Engine::Physics2D::SetGravity(Vector2D(0.0f, -30.0f));
+    Engine::Physics2D::SetGravity(Vector2D(0.0f, -15.0f));
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
