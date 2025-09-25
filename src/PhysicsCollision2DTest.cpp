@@ -96,7 +96,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
         );
 
         // Create ball entity
-        Entity ball = world.CreateEntity();
+        Entity ball = world.CreateEntity("Ball");
 
         // Set random position
         const float minX = radius;
@@ -151,7 +151,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
 
     const float y = m_worldHeight - half - 2.0f; 
 
-    Entity cube = CreateEntity();
+    Entity cube = CreateEntity("Cube");
 
     auto& tr = cube.Transform();
     tr.Position.X = x;
@@ -270,7 +270,7 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World& world) {
 
 void Sandbox::PhysicsCollision2DTestScene::CreateTriangle() {
     if (m_playerId != UINT32_MAX) return; // <-- guard
-    Entity e = CreateEntity();
+    Entity e = CreateEntity("Triangle");
     m_playerId = e.GetId();
 
     const float cx = m_worldWidth * 0.25f;

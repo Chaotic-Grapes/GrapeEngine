@@ -34,7 +34,7 @@ public:
     void Unload();
 
 protected:
-    Entity CreateEntity() const { return m_world->CreateEntity(); }
+    Entity CreateEntity(const std::string& name = "GameObject") const { return m_world->CreateEntity(name); }
 private:
     std::string m_name;
     std::unique_ptr<World> m_world;

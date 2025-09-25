@@ -33,7 +33,7 @@ namespace Component {
 	// TODO: SpriteShapeRenderer for splining shapes
 
     struct ShapeRenderer2D final : IComponent {
-        enum class ShapeType : std::uint8_t { Rectangle, Circle, Polygon, Line };
+        enum class ShapeType : std::uint8_t { Rectangle, Circle, Polygon };
 
         ShapeType Type = ShapeType::Rectangle;
 
@@ -45,8 +45,8 @@ namespace Component {
         // Shape-specific data
         Vector2D Size{ 100.f, 100.f };      // For rectangle
         float Radius = 50.f;                      // For circle
-        std::vector<Vector2D> Points;             // For polygon/line
-        bool Closed = true;                       // For polygons/lines
+        std::vector<Vector2D> Points;             // For polygon
+        bool Closed = true;                       // For polygons
 
         // Constructors
         ShapeRenderer2D() = default;
@@ -73,16 +73,6 @@ namespace Component {
             s.Points = points;
             s.FillColor = fill;
             s.Closed = closed;
-            return s;
-        }
-
-        static ShapeRenderer2D Line(const Vector2D& start, const Vector2D& end, const Color& color = { 1.f,1.f,1.f,1.f }, const float thickness = 1.f) {
-            ShapeRenderer2D s;
-            s.Type = ShapeType::Line;
-            s.Points = { start, end };
-            s.FillColor = color;
-            s.OutlineThickness = thickness;
-            s.Closed = false;
             return s;
         }
     };

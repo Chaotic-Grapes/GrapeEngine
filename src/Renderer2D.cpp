@@ -71,15 +71,23 @@ namespace Engine {
                     0);
                 break;
             }
-            case Component::ShapeRenderer2D::ShapeType::Line:
-                DebugDraw2D::Line(*m_renderer,
-                    ToGlm(transform.Position + shape.Points[0]),
-                    ToGlm(transform.Position + shape.Points[1]),
-                    shape.OutlineThickness,
-                    ToGlm(shape.FillColor), 0);
-                break;
+			//case Component::ShapeRenderer2D::ShapeType::Line:
+			//    DebugDraw2D::Line(*m_renderer,
+			//        ToGlm(transform.Position + shape.Points[0]),
+			//        ToGlm(transform.Position + shape.Points[1]),
+			//        shape.OutlineThickness,
+			//        ToGlm(shape.FillColor), 0);
+			//    break;
             }
         }
+
+        for (auto& [transform, line] : m_world->GetEntityManager().Query<Component::Transform, Component::LineRenderer>()) {
+            DebugDraw2D::Line(*m_renderer,
+                ToGlm(line.Start),
+                ToGlm(line.End),
+                2.0f,
+                ToGlm(line.Color), 0);
+		}
 
         for (auto& [transform, sprite] : m_world->GetEntityManager().Query<Component::Transform, Component::SpriteRenderer>()) {
             m_renderer->drawSprite({

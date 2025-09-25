@@ -39,7 +39,7 @@ void World::RemoveAllBehaviours(const Entity& entity) {
 }
 
 EntityManager& World::GetEntityManager()               { return m_entityManager; }
-Entity World::CreateEntity(const std::string& name)     { return m_entityManager.CreateEntity(name); }
+Entity World::CreateEntity(const std::string& name)    { return m_entityManager.CreateEntity(name); }
 const std::unordered_map<EntityId,
 	std::vector<
 		std::unique_ptr<
