@@ -14,30 +14,6 @@
     <Filter Include="Engine\Systems">
       <UniqueIdentifier>{2c14d2c2-851a-4c16-8683-c81a4bd3f40c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="External">
-      <UniqueIdentifier>{5d2f5d26-67a0-4d0c-8b0f-b10a66b0cd4f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Messaging">
-      <UniqueIdentifier>{f1a03209-d55a-4108-be00-8a49c37a779e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Systems\Core">
-      <UniqueIdentifier>{9b26cd4e-3380-4616-8c4e-3205736f0cdf}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Systems\Core\Window">
-      <UniqueIdentifier>{902de7de-a4c5-4d4c-8562-b4e67e4871bb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Systems\Core\Time">
-      <UniqueIdentifier>{c067ea98-e5d2-4ea0-a14a-54b4400af31f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Systems\Core\Graphics">
-      <UniqueIdentifier>{667dac92-3aef-4eeb-aba4-af03ecd87b5f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Systems\Core\Font">
-      <UniqueIdentifier>{03cee0fd-278e-41ad-9d3d-ae4a597f81e9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Systems\Core\Input">
-      <UniqueIdentifier>{3724a06d-1fe0-4a00-bbbc-51d113375e37}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Engine\Messaging">
       <UniqueIdentifier>{f1a03209-d55a-4108-be00-8a49c37a779e}</UniqueIdentifier>
     </Filter>
@@ -56,22 +32,55 @@
     <Filter Include="Helpers">
       <UniqueIdentifier>{ee230339-05e3-45ac-b05f-ab01c52dcc00}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sandboxing">
+      <UniqueIdentifier>{d2174dd4-2060-4ec1-a53e-a342c86dec39}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sandboxing\Physics Collision Test">
+      <UniqueIdentifier>{55cfc9c4-4bad-444f-822c-f287deb5871d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Independent">
+      <UniqueIdentifier>{66cc4778-e1be-4169-b891-fbc852d388c0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Dependent">
+      <UniqueIdentifier>{9b26cd4e-3380-4616-8c4e-3205736f0cdf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Dependent\Time">
+      <UniqueIdentifier>{c067ea98-e5d2-4ea0-a14a-54b4400af31f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Dependent\Graphics">
+      <UniqueIdentifier>{667dac92-3aef-4eeb-aba4-af03ecd87b5f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Dependent\Font">
+      <UniqueIdentifier>{03cee0fd-278e-41ad-9d3d-ae4a597f81e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Dependent\Physics">
+      <UniqueIdentifier>{c06e09d6-2f0c-447d-bb4e-176c712e4030}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Independent\Window">
+      <UniqueIdentifier>{902de7de-a4c5-4d4c-8562-b4e67e4871bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Independent\Input">
+      <UniqueIdentifier>{3724a06d-1fe0-4a00-bbbc-51d113375e37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Independent\Scripting">
+      <UniqueIdentifier>{fea8b48e-c897-4deb-88ef-8d6f84822628}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Systems\ISystem Dependent\Scene">
+      <UniqueIdentifier>{0e64a6f7-4617-4ad7-ba74-a6503a78df4d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp">
       <Filter>Engine\Core</Filter>
     </ClCompile>
-    <ClCompile Include="src\EngineSandbox.cpp">
-      <Filter>Engine\Core</Filter>
-    </ClCompile>
     <ClCompile Include="src\Time.cpp">
-      <Filter>Engine\Systems\Core\Time</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Time</Filter>
     </ClCompile>
     <ClCompile Include="src\Window.cpp">
-      <Filter>Engine\Systems\Core\Window</Filter>
+      <Filter>Engine\Systems\ISystem Independent\Window</Filter>
     </ClCompile>
     <ClCompile Include="src\WindowManager.cpp">
-      <Filter>Engine\Systems\Core\Window</Filter>
+      <Filter>Engine\Systems\ISystem Independent\Window</Filter>
     </ClCompile>
     <ClCompile Include="src\World.cpp">
       <Filter>Engine\Entity Component System</Filter>
@@ -95,34 +104,87 @@
       <Filter>Engine\Entity Component System\Entity</Filter>
     </ClCompile>
     <ClCompile Include="src\graphics\renderer.cpp">
-      <Filter>Engine\Systems\Core\Graphics</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="src\graphics\shader.cpp">
-      <Filter>Engine\Systems\Core\Graphics</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="src\graphics\sprite.cpp">
-      <Filter>Engine\Systems\Core\Graphics</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="src\graphics\font.cpp">
-      <Filter>Engine\Systems\Core\Font</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Font</Filter>
     </ClCompile>
     <ClCompile Include="src\Input.cpp">
-      <Filter>Engine\Systems\Core\Input</Filter>
+      <Filter>Engine\Systems\ISystem Independent\Input</Filter>
     </ClCompile>
+    <ClCompile Include="src\Window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\sprite.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Input.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Collision.cpp" />
+    <ClCompile Include="src\Math\Matrix3x3.cpp" />
+    <ClCompile Include="src\Math\Matrix4x4.cpp" />
+    <ClCompile Include="src\Math\Vector2D.cpp" />
+    <ClCompile Include="src\Math\Vector3D.cpp" />
+    <ClCompile Include="src\Math\Vector4D.cpp" />
+    <ClCompile Include="src\Physics.cpp" />
+    <ClCompile Include="src\test.cpp" />
+    <ClCompile Include="src\EngineSandbox.cpp">
+      <Filter>Sandboxing</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Physics2D.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer2D.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PhysicsCollision2DTest.cpp">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\BehaviourSystem.cpp">
+      <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DynamicCollision.cpp" />
+    <ClCompile Include="src\Scene.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SandboxGame.cpp">
+      <Filter>Sandboxing</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SceneManager.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
+    <ClCompile Include="src\graphics\texture.cpp" />
+    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
+    <ClCompile Include="src\graphics\polygon-utils.cpp" />
     <ClCompile Include="src\Overlay.cpp" />
+    <ClCompile Include="src\GraphicsTest.cpp">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
       <Filter>Engine\Core</Filter>
     </ClInclude>
     <ClInclude Include="include\systems\Time.h">
-      <Filter>Engine\Systems\Core\Time</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Time</Filter>
     </ClInclude>
     <ClInclude Include="include\systems\Window.h">
-      <Filter>Engine\Systems\Core\Window</Filter>
+      <Filter>Engine\Systems\ISystem Independent\Window</Filter>
     </ClInclude>
     <ClInclude Include="include\systems\WindowManager.h">
-      <Filter>Engine\Systems\Core\Window</Filter>
+      <Filter>Engine\Systems\ISystem Independent\Window</Filter>
     </ClInclude>
     <ClInclude Include="include\ecs\World.h">
       <Filter>Engine\Entity Component System</Filter>
@@ -152,24 +214,81 @@
       <Filter>Engine\Systems</Filter>
     </ClInclude>
     <ClInclude Include="include\graphics\renderer.hpp">
-      <Filter>Engine\Systems\Core\Graphics</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="include\graphics\shader.hpp">
-      <Filter>Engine\Systems\Core\Graphics</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="include\graphics\sprite.hpp">
-      <Filter>Engine\Systems\Core\Graphics</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="include\graphics\font.hpp">
-      <Filter>Engine\Systems\Core\Font</Filter>
+      <Filter>Engine\Systems\ISystem Dependent\Font</Filter>
     </ClInclude>
     <ClInclude Include="include\Input.h">
-      <Filter>Engine\Systems\Core\Input</Filter>
+      <Filter>Engine\Systems\ISystem Independent\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\sprite.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Input.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Color.h" />
+    <ClInclude Include="include\Math\Matrix3x3.h" />
+    <ClInclude Include="include\Math\Matrix4x4.h" />
+    <ClInclude Include="include\Math\Vector2D.h" />
+    <ClInclude Include="include\Math\Vector3D.h" />
+    <ClInclude Include="include\Math\Vector4D.h" />
+    <ClInclude Include="src\Collision.h" />
+    <ClInclude Include="src\Physics.h" />
+    <ClInclude Include="src\test.h" />
+    <ClInclude Include="include\Math\MathHelper.h">
+      <Filter>Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Physics2D.h">
+      <Filter>Engine\Systems\ISystem Dependent\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Renderer2D.h">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PhysicsCollision2DTest.h">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Game.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="include\systems\Behaviour.h">
+      <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="include\systems\BehaviourSystem.h">
+      <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DyamicCollision.h" />
+    <ClInclude Include="include\ecs\Scene.h">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\SceneManager.h">
+      <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SandboxGame.h">
+      <Filter>Sandboxing</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GLHelper.h" />
+    <ClInclude Include="include\graphics\texture.hpp" />
+    <ClInclude Include="include\graphics\debugDraw2D.hpp" />
+    <ClInclude Include="include\graphics\polygon-utils.hpp" />
+    <ClInclude Include="include\graphics\vertex.hpp" />
+    <ClInclude Include="include\GraphicsTest.hpp">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">
       <Filter>Engine\Entity Component System\Entity</Filter>
+    </None>
+    <None Include="src\World.inl">
+      <Filter>Engine\Entity Component System</Filter>
     </None>
   </ItemGroup>
 </Project>

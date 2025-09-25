@@ -53,7 +53,7 @@ bool Window::Create(const std::string& title, const int width, const int height,
 	}
 
 	// Initialize input system with the window
-	Input::Init(m_windowHandle);
+	Input::Initialize(m_windowHandle);
 
 	// Register all GLFW input and framebuffer callbacks
 	Input::SetupEventCallbacks();
