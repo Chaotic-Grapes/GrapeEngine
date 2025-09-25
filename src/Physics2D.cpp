@@ -28,12 +28,12 @@ namespace Engine {
         if (rb.BodyType == Component::Rigidbody2D::Static)
             return;
 
-        Vector2D intendedPos = t.Position + rb.Velocity * Time::FixedDeltaTime();
+        Vector2D intendedPos = t.Position + rb.LinearVelocity * Time::FixedDeltaTime();
 
         // Apply gravity and drag
         Vector2D acceleration(0.f, 0.f);
         acceleration += m_gravity * rb.GravityScale;
-        acceleration += Vector2D(-rb.Velocity.X * rb.Drag, -rb.Velocity.Y * rb.Drag) / rb.Mass;
+        acceleration += Vector2D(-rb.LinearVelocity.X * rb.LinearDamping, -rb.LinearVelocity.Y * rb.LinearDamping) / rb.Mass;
 
         // TODO: Add a PolygonCollider2D for line segments and complex shapes
 		// DO NOT ADD "LineCollider2D" as it is basically PolygonCollider2D with 2 points
@@ -50,7 +50,7 @@ namespace Engine {
                 if (Collision::CircleVsSegmentSweep(c, intendedPos, seg, contact, normal, tHit)) {
                     Vector2D reflectedDir;
                     Collision::CircleSegmentResponse(contact, normal, intendedPos, reflectedDir);
-                    rb.Velocity = reflectedDir * rb.Velocity.Length(); // preserve speed along new direction
+                    rb.LinearVelocity = reflectedDir * rb.LinearVelocity.Length(); // preserve speed along new direction
                 }
             }
         }
@@ -58,7 +58,7 @@ namespace Engine {
         // TODO: handle other collisions here
 
         // Integrate acceleration
-        rb.Velocity += acceleration * Time::FixedDeltaTime();
+        rb.LinearVelocity += acceleration * Time::FixedDeltaTime();
         t.Position = intendedPos;
 
         if (!rb.FreezeRotation)
@@ -68,11 +68,11 @@ namespace Engine {
     // Static force/impulse
     void Physics2D::AddForce(Component::Rigidbody2D& rb, const Vector2D& force) {
         if (rb.Mass > 0)
-            rb.Velocity += force / rb.Mass;
+            rb.LinearVelocity += force / rb.Mass;
     }
 
     void Physics2D::AddImpulse(Component::Rigidbody2D& rb, const Vector2D& impulse) {
         if (rb.Mass > 0)
-            rb.Velocity += impulse / rb.Mass;
+            rb.LinearVelocity += impulse / rb.Mass;
     }
 }

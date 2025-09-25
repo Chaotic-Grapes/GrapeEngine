@@ -78,11 +78,13 @@ namespace Component {
     };
 
     struct Rigidbody2D : IComponent {
-        Vector2D Velocity{ 0, 0 };
-        float AngularVelocity = 0.0f;
+        Vector2D LinearVelocity{ 0, 0 };
+        float Inertia = 0,
+    		  AngularVelocity = 0,
+			  AngularDamping = 0.05f,
+			  LinearDamping = 0;
+    	Vector2D CenterOfMass{ 0, 0 };
         float Mass = 1.0f;
-        float Drag = 0.0f;              // Linear drag
-        float AngularDrag = 0.05f;
         float GravityScale = 1.0f;
         bool FreezeRotation = false;
 

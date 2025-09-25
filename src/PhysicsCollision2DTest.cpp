@@ -116,14 +116,14 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
         // Add Rigidbody2D
         auto& rigidbody = ball.AddComponent<Component::Rigidbody2D>();
         rigidbody.Mass = 1.0f;
-        rigidbody.Drag = 0.0f; // No drag initially
+        rigidbody.LinearDamping = 0.0f; // No drag initially
         rigidbody.GravityScale = 1.0f; // No gravity for this test
 
         // Set random velocity
         const float speed = MathHelper::Randomize<float>(200.0f, 300.0f, seed); 
         const float angle = MathHelper::Randomize<float>(0.0f, TWO_PI, seed);
-        rigidbody.Velocity.X = std::cos(angle) * speed;
-        rigidbody.Velocity.Y = std::sin(angle) * speed;
+        rigidbody.LinearVelocity.X = std::cos(angle) * speed;
+        rigidbody.LinearVelocity.Y = std::sin(angle) * speed;
 
         // Add visual components
         auto& shapeRenderer = ball.AddComponent<Component::ShapeRenderer2D>();
@@ -160,9 +160,9 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
     auto& rb = cube.AddComponent<Rigidbody2D>();
     rb.Mass = 0.8f;
     rb.GravityScale = 1.0f;
-    rb.Drag = 0.25f;
-    rb.Velocity.X = MathHelper::Randomize<float>(-20.0f, 20.0f, 0);
-    rb.Velocity.Y = 0.0f;
+    rb.LinearDamping = 0.25f;
+    rb.LinearVelocity.X = MathHelper::Randomize<float>(-20.0f, 20.0f, 0);
+    rb.LinearVelocity.Y = 0.0f;
         
     // visual: make a square polygon in WORLD-SPACE (renderer polygon path)
     std::vector<Vector2D> pts;
@@ -283,13 +283,13 @@ void Sandbox::PhysicsCollision2DTestScene::CreateTriangle() {
     auto& rb = e.AddComponent<Component::Rigidbody2D>();
     rb.Mass = 2.0f;
     rb.GravityScale = 1.0f;     // gravity on (balls have 0)
-    rb.Drag = 0.10f;
+    rb.LinearDamping = 0.10f;
 
     e.AddComponent<Component::CircleCollider2D>(m_triHalfHeight);
 
     // Give it a starting velocity like the balls do:
-    rb.Velocity.X = 250.0f;     // NEW: immediate visible motion
-    rb.Velocity.Y = 0.0f;
+    rb.LinearVelocity.X = 250.0f;     // NEW: immediate visible motion
+    rb.LinearVelocity.Y = 0.0f;
 
     // Build world-space triangle points around (cx, cy)
     std::vector<Vector2D> pts;
@@ -338,7 +338,7 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
         Engine::Physics2D::AddImpulse(*rb, Vector2D(0.0f, jumpImpulse));
         std::cout << jumpImpulse;
     }
-    rb->Velocity *= velDampScale;
+    rb->LinearVelocity *= velDampScale;
 
     // clamp bounce against window sides
     const float r = m_triHalfHeight; // simple bounding circle for the triangle
@@ -346,21 +346,21 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
     // Left / Right
     if (tr.Position.X - r <= 0.0f) {
         tr.Position.X = r;
-        if (rb->Velocity.X < 0.0f) rb->Velocity.X = -rb->Velocity.X;
+        if (rb->LinearVelocity.X < 0.0f) rb->LinearVelocity.X = -rb->LinearVelocity.X;
     }
     else if (tr.Position.X + r >= m_worldWidth) {
         tr.Position.X = m_worldWidth - r;
-        if (rb->Velocity.X > 0.0f) rb->Velocity.X = -rb->Velocity.X;
+        if (rb->LinearVelocity.X > 0.0f) rb->LinearVelocity.X = -rb->LinearVelocity.X;
     }
 
     // Bottom / Top
     if (tr.Position.Y - r <= 0.0f) {
         tr.Position.Y = r;
-        if (rb->Velocity.Y < 0.0f) rb->Velocity.Y = -rb->Velocity.Y;
+        if (rb->LinearVelocity.Y < 0.0f) rb->LinearVelocity.Y = -rb->LinearVelocity.Y;
     }
     else if (tr.Position.Y + r >= m_worldHeight) {
         tr.Position.Y = m_worldHeight - r;
-        if (rb->Velocity.Y > 0.0f) rb->Velocity.Y = -rb->Velocity.Y;
+        if (rb->LinearVelocity.Y > 0.0f) rb->LinearVelocity.Y = -rb->LinearVelocity.Y;
     }
 
     std::vector<Vector2D> pts;
@@ -377,7 +377,6 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
 void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     World& world = GetWorld();
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
-    float dt = Time::DeltaTime();
 
     // handles step-by-step physics controls
     HandleStepByStepControls();
@@ -389,7 +388,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
         for (auto& ball : m_balls) {
             auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
             if (rigidbody) {
-                rigidbody->Drag = 0.5f;
+                rigidbody->LinearDamping = 0.5f;
             }
         }
 
@@ -447,7 +446,7 @@ void Sandbox::PhysicsCollision2DTestScene::StoreBallStates() {
         auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
         if (rigidbody) {
             m_storedBallStates[ball.GetId()] = {
-                rigidbody->Velocity,
+                rigidbody->LinearVelocity,
                 ball.Transform().Position
             };
         }
@@ -460,7 +459,7 @@ void Sandbox::PhysicsCollision2DTestScene::RestoreBallStates() {
         if (it != m_storedBallStates.end()) {
             auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
             if (rigidbody) {
-                rigidbody->Velocity = it->second.velocity;
+                rigidbody->LinearVelocity = it->second.velocity;
                 ball.Transform().Position = it->second.position;
             }
         }
@@ -504,24 +503,24 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
         // Left/Right walls
         if (transform.Position.X - radius <= 0.0f) {
             transform.Position.X = radius;
-            rigidbody->Velocity.X = std::abs(rigidbody->Velocity.X);
+            rigidbody->LinearVelocity.X = std::abs(rigidbody->LinearVelocity.X);
             bounced = true;
         }
         else if (transform.Position.X + radius >= m_worldWidth) {
             transform.Position.X = m_worldWidth - radius;
-            rigidbody->Velocity.X = -std::abs(rigidbody->Velocity.X);
+            rigidbody->LinearVelocity.X = -std::abs(rigidbody->LinearVelocity.X);
             bounced = true;
         }
 
         // Top/Bottom walls
         if (transform.Position.Y - radius <= 0.0f) {
             transform.Position.Y = radius;
-            rigidbody->Velocity.Y = std::abs(rigidbody->Velocity.Y);
+            rigidbody->LinearVelocity.Y = std::abs(rigidbody->LinearVelocity.Y);
             bounced = true;
         }
         else if (transform.Position.Y + radius >= m_worldHeight) {
             transform.Position.Y = m_worldHeight - radius;
-            rigidbody->Velocity.Y = -std::abs(rigidbody->Velocity.Y);
+            rigidbody->LinearVelocity.Y = -std::abs(rigidbody->LinearVelocity.Y);
             bounced = true;
         }
 
