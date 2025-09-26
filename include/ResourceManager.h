@@ -48,6 +48,10 @@ private:
     // Asset caches (store loaded assets)
     std::unordered_map<std::string, std::shared_ptr<RTexture>> m_textures;
     std::unordered_map<std::string, std::shared_ptr<RAudio>> m_audioFiles;
+
+    // Loading functions
+    std::shared_ptr<RTexture> _loadTexture(const std::string& filePath);
+    std::shared_ptr<RAudio> _loadAudio(const std::string& filePath);
 };
 
 #endif
