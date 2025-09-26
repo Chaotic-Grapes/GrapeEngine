@@ -97,15 +97,53 @@ void DebugUI::_showPerformanceWindow() {
 }
 
 void DebugUI::_showAudioWindow() {
-    ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(300, 150), ImGuiCond_Once);
 
+    static bool showAudioLibrary = false;
+    static int  selectedIndex = -1;
+    static float volume = 0.8f;
+    static std::vector<std::string> tracks = {
+    "Kick.wav", "Snare.wav", "Bass.mp3", "Lead.flac"
+    };
+
+    ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Once); 
     ImGui::Begin("Audio Monitor");
-    ImGui::Text("volume up/down button");
+    if (ImGui::SliderFloat("Volume", &volume, 0.0f, 1.0f)) {
+    
+    }
     ImGui::Button("play");
     ImGui::Button("stop");
     ImGui::Button("pause");
+    if (ImGui::Button("Add Object")) {
+        showAudioLibrary = true; // open/bring to front
+    }
     ImGui::End();
+
+    if (showAudioLibrary) {
+        if (ImGui::Begin("Audio Library", &showAudioLibrary)) {
+            // Optional: search
+            static char search[128] = {};
+            ImGui::InputTextWithHint("##search", "Search...", search, sizeof(search));
+
+            // List of tracks
+            ImGui::Separator();
+            for (int i = 0; i < (int)tracks.size(); ++i) {
+                if (search[0] && std::string(tracks[i]).find(search) == std::string::npos) continue;
+
+                bool selected = (i == selectedIndex);
+                if (ImGui::Selectable(tracks[i].c_str(), selected)) {
+                    selectedIndex = i;
+                }
+            }
+
+            ImGui::Separator();
+            if (ImGui::Button("Add files...")) {
+                // trigger a file dialog (see options 2 or 3)
+            }
+        }
+        ImGui::End();
+    }
+
 }
 
 void DebugUI::_showInputDebugWindow() {
