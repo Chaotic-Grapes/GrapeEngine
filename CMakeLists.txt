@@ -10,6 +10,7 @@ project(GrapeEngine)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+
 # Set the directory where custom CMake modules are stored
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
@@ -17,9 +18,16 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(ImportDependencies)
 importDependencies()
 
+# FMOD root before importing
+set(FMOD_ROOT "${CMAKE_CURRENT_LIST_DIR}/lib/Fmod" CACHE PATH "")
+
+# Import FMOD interface targets
+import_fmod()
+
 # List of external libraries (updated for your dependencies)
 set(ALL_LIBS
-    PRIVATE glfw glad imgui glm
+    PRIVATE glfw glad imgui glm FMOD::Core
+        # FMOD::Studio
 )
 
 # ======================= SINGLE PROJECT CONFIGURATION =========================
@@ -75,6 +83,10 @@ target_link_libraries(GrapeEngine ${ALL_LIBS})
 target_include_directories(GrapeEngine PRIVATE 
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
+
+if (TARGET GrapeEngine AND NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+    fmod_copy_runtime(GrapeEngine)
+endif()
 
 # Set C++ standard for the target
 set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 17)
