@@ -8,19 +8,19 @@
 #include <glad/glad.h>
 
 // Asset structs
-struct Texture {
+struct RTexture {
     GLuint TextureID = 0; // Default 0, invalid
     int Width = 0;
     int Height = 0;
     int Channels = 0;     // RGB = 3, RGBA = 4
     std::string Path;
-    ~Texture() {
+    ~RTexture() {
         if (TextureID != 0)
             glDeleteTextures(1, &TextureID);
     }
 };
 
-struct Audio {
+struct RAudio {
     std::vector<uint8_t> Data;
     int SampleRate = 0;
     int Channels = 0;      // Mono = 1, stereo = 2, etc.
@@ -40,14 +40,14 @@ public:
 
     // Template specializations (specific code for different assets)
     template <>
-    std::shared_ptr<Texture> Get<Texture>(const std::string& name);
+    std::shared_ptr<RTexture> Get<RTexture>(const std::string& name);
     template <>
-    std::shared_ptr<Audio> Get<Audio>(const std::string& name);
+    std::shared_ptr<RAudio> Get<RAudio>(const std::string& name);
 
 private:
     // Asset caches (store loaded assets)
-    std::unordered_map<std::string, std::shared_ptr<Texture>> m_textures;
-    std::unordered_map<std::string, std::shared_ptr<Audio>> m_audioFiles;
+    std::unordered_map<std::string, std::shared_ptr<RTexture>> m_textures;
+    std::unordered_map<std::string, std::shared_ptr<RAudio>> m_audioFiles;
 };
 
 #endif
