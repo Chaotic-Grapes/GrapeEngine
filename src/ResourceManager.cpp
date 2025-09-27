@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include "graphics/stb_image.h"
 
 using RM = ResourceManager;
 
