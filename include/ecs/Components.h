@@ -6,7 +6,13 @@
 #include "Math/Vector2D.h"
 #include "Color.h"
 #include "graphics/texture.hpp"
+#include "graphics/SpriteMetaData.hpp"
+#include <filesystem>
+#include <fstream>
+#include "../include/nlohmann/json.hpp"
+#include "../include/graphics/TextureCache.hpp"
 #include <vector>
+#include <iostream>
 
 namespace Component {
     // TODO: Replace with a math library vector type
@@ -20,14 +26,51 @@ namespace Component {
     };
 
     struct SpriteRenderer : IComponent {
-        Texture Source;
+        GLuint TextureId = 0;
+        int Width = 0;
+        int Height = 0;
+        const SpriteMetadata* Meta = nullptr;
         Color Color{ 1.f, 1.f, 1.f, 1.f };
         bool FlipX = false;
         bool FlipY = false;
-        int SortingOrder = 0;           // Rendering layer order
+        int SortingOrder = 0;
         std::string SortingLayerName = "Default";
 
-        SpriteRenderer(const std::string& spritePath = "") : Source(spritePath) {}
+        SpriteRenderer(const std::string& spritePath = "") {
+            if (!spritePath.empty()) {
+                const Texture& tex = TextureCache::Load(spritePath);
+                TextureId = tex.ID();
+                Width = tex.Width();
+                Height = tex.Height();
+
+                auto p = std::filesystem::path(spritePath);
+                auto filename = p.stem().string() + ".json";
+
+                auto parent = p.parent_path().parent_path(); // "assets/textures"
+                auto metadataPath = parent / "test-metadata" / filename;
+
+                std::ifstream in(metadataPath);
+                if (in) {
+                    nlohmann::json j;
+                    in >> j;
+
+                    auto key = p.filename().string(); // for example, "fishBoy.png"
+                    if (j.contains(key)) {
+                        static std::unordered_map<std::string, SpriteMetadata> cache;
+                        cache[key] = loadSingleSpriteMetadata(j[key], 0, 0);
+                        Meta = &cache[key];
+                    }
+                    else {
+                        std::cout << "Metadata file " << metadataPath
+                            << " missing entry for " << key << "\n";
+                    }
+                }
+                else {
+                    std::cout << "Could not open metadata file: "
+                        << metadataPath << "\n";
+                }
+            }
+        }
     };
 
 	// TODO: SpriteShapeRenderer for splining shapes
