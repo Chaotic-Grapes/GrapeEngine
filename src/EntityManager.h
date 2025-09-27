@@ -64,6 +64,12 @@ public:
             mgr->Clone(from, to);
     }
 
+    std::vector<EntityId> GetAllEntities() const {
+        return std::vector<EntityId>(m_entities.begin(), m_entities.end());
+    }
+
+    Entity GetEntity(EntityId id);
+
 private:
     EntityId m_nextId{ 0 };
     World* m_world = nullptr;

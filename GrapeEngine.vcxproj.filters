@@ -41,6 +41,9 @@
     <Filter Include="Engine\Systems\Component Systems">
       <UniqueIdentifier>{7081b69e-ec1e-485a-a14e-20df182f8715}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Serialization">
+      <UniqueIdentifier>{d6230e59-0d28-45eb-a856-1a2d5382b9c2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp">
@@ -111,11 +114,14 @@
     <ClInclude Include="src\ISystem.h">
       <Filter>Engine\Systems</Filter>
     </ClInclude>
-    <ClInclude Include="ComponentType.h">
-      <Filter>Engine\Entity Component System\Components</Filter>
+    <ClInclude Include="lib\json.hpp">
+      <Filter>External</Filter>
     </ClInclude>
-    <ClInclude Include="Archetype.h">
-      <Filter>Engine\Entity Component System\Components</Filter>
+    <ClInclude Include="src\Serialization.h">
+      <Filter>Engine\Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="src\EntitySerializer.h">
+      <Filter>Engine\Serialization</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

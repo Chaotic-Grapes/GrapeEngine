@@ -1,0 +1,32 @@
+{
+    "Entities": [
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "FlipX": false,
+                        "FlipY": false,
+                        "SortingLayerName": "Default",
+                        "SortingOrder": 0,
+                        "Sprite": "test_sprite.png"
+                    },
+                    "Type": "SpriteRenderer"
+                },
+                {
+                    "Data": {
+                        "Rotation": 0.0,
+                        "ScaleX": 1.0,
+                        "ScaleY": 1.0,
+                        "X": 13.699999809265137,
+                        "Y": 42.5
+                    },
+                    "Type": "Transform"
+                }
+            ],
+            "EntityId": 3
+        }
+    ],
+    "EntityCount": 1,
+    "SceneName": "TestScene",
+    "Version": "1.0"
+}

@@ -10,6 +10,10 @@ Entity EntityManager::CreateEntity() {
     return e;
 }
 
+Entity EntityManager::GetEntity(EntityId id) {
+    return Entity(id, m_world);
+}
+
 bool EntityManager::IsAlive(const Entity& entity) const {
 	return m_entities.find(entity.GetId()) != m_entities.end();
 }

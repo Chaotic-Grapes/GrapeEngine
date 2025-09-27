@@ -34,6 +34,15 @@ public:
         return nullptr;
     }
 
+    template<typename T>
+    void ForEachEntity(T func) {
+        auto entityIds = m_entityManager.GetAllEntities();
+        for (EntityId id : entityIds) {
+            Entity entity = m_entityManager.GetEntity(id);
+            func(entity);
+        }
+    }
+
 private:
 	friend class Engine::Application;
 

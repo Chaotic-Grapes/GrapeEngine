@@ -33,7 +33,7 @@ Entity& Entity::operator=(Entity&& entity) noexcept {
 }
 
 Entity::~Entity() {
-    RemoveAllComponents();
+   // RemoveAllComponents();
 }
 
 Entity Entity::Clone() const {
