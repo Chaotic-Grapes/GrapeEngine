@@ -4,9 +4,10 @@
 #include <memory>
 #include <unordered_map>
 #include <string>
-#include "../../Resources/Audio/SoundCue.h"
+#include "AudioLoader.h"
 #include "PlaySound.h"
 #include "AudioControl.h"
+#include "AudioBank.h"
 
 class AudioFMOD {
 public:

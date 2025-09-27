@@ -6,7 +6,7 @@
 
 // Keep this include pointing to your engine's SoundCue and low-level Audio::Sound.
 // If your paths differ, fix here.
-#include "../../Resources/Audio/SoundCue.h"  // Adjust if needed
+#include "AudioLoader.h"  // Adjust if needed
 #include "AudioControl.h"
 
 // Forward declare your low-level handle type if not included by SoundCue

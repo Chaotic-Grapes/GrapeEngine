@@ -1,9 +1,6 @@
 #pragma once
 #include "..\System.h"
-
-// Resources
-#include "..\..\Resources\Audio\SoundCue.h"
-#include "..\..\Resources\Audio\Bank.h"
+#include "AudioBank.h"
 #include "PlaySound.h"
 #include "AudioControl.h"
 
@@ -41,4 +38,3 @@ namespace Systems {
 	};
 
 } // namespace Systems
-#pragma once
