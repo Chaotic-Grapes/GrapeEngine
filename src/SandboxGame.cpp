@@ -4,13 +4,14 @@
 #include "PhysicsCollision2DTest.h"
 #include "GraphicsTest.hpp"
 #include "systems/WindowManager.h"
-
+#include "ResourceManagerTest.h"
 
 void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "Select test scene: \n";
     std::cout << "1. Physics & Collision 2D Test" << '\n';
     std::cout << "2. GRAPHICS AND ART PIPELINE TEST" << '\n';
     //std::cout << "3. ECS Component Test" << '\n';
+    std::cout << "3. Resource Manager Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -32,11 +33,23 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
 
         sceneManager.AddScene(new Sandbox::GraphicsTestScene(1600, 900));
         sceneManager.LoadScene("GraphicsTestScene");
+
         break;
     }
         //case 3:
         //    std::cout << "ECS Component Test - TODO" << '\n';
         //    break;
+    case 3: {
+        std::cout << "Starting ResourceManager Test..." << '\n';
+        // Create a minimal scene to get OpenGL context
+        sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(1600, 900, 7.f));
+        sceneManager.LoadScene("PhysicsCollision2DTestScene");
+
+        TestResourceManagerAdvanced();
+        CompareResourceManagerVsDirect();
+        TestEdgeCases();
+        break;
+    }
     default:
         std::cout << "Invalid choice" << '\n';
         break;

@@ -61,4 +61,6 @@ private:
     std::shared_ptr<RAudio> _loadAudio(const std::string& filePath);
 };
 
+extern ResourceManager RM;
+
 #endif

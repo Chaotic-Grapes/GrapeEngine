@@ -112,12 +112,6 @@
     <ClCompile Include="src\Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Memory.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\MemoryTest.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\graphics\shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -125,9 +119,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\graphics\sprite.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\ResourceManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Input.cpp">
@@ -165,7 +156,7 @@
     </ClCompile>
     <ClCompile Include="src\SceneManager.cpp">
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
-	</ClCompile>
+    </ClCompile>
     <ClCompile Include="src\graphics\texture.cpp" />
     <ClCompile Include="src\graphics\debugDraw2D.cpp" />
     <ClCompile Include="src\graphics\polygon-utils.cpp" />
@@ -173,6 +164,10 @@
     <ClCompile Include="src\GraphicsTest.cpp">
       <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClCompile>
+    <ClCompile Include="src\Memory.cpp" />
+    <ClCompile Include="src\MemoryTest.cpp" />
+    <ClCompile Include="src\ResourceManager.cpp" />
+    <ClCompile Include="src\ResourceManagerTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
@@ -275,7 +270,6 @@
     <ClInclude Include="include\SandboxGame.h">
       <Filter>Sandboxing</Filter>
     </ClInclude>
-    <ClInclude Include="include\GLHelper.h" />
     <ClInclude Include="include\graphics\texture.hpp" />
     <ClInclude Include="include\graphics\debugDraw2D.hpp" />
     <ClInclude Include="include\graphics\polygon-utils.hpp" />
@@ -283,18 +277,10 @@
     <ClInclude Include="include\GraphicsTest.hpp">
       <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClInclude>
-    <ClInclude Include="include\Memory.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\MemoryTest.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\ResourceManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <ClInclude Include="include\Memory.h" />
+    <ClInclude Include="include\MemoryTest.h" />
+    <ClInclude Include="include\ResourceManager.h" />
+    <ClInclude Include="include\ResourceManagerTest.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">

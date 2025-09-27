@@ -174,6 +174,7 @@
     <ClCompile Include="src\Math\Vector3D.cpp" />
     <ClCompile Include="src\Math\Vector4D.cpp" />
     <ClCompile Include="src\Physics.cpp" />
+    <ClCompile Include="src\ResourceManagerTest.cpp" />
     <ClCompile Include="src\SandboxGame.cpp" />
     <ClCompile Include="src\Scene.cpp" />
     <ClCompile Include="src\SceneManager.cpp" />
@@ -193,6 +194,7 @@
     <ClCompile Include="src\World.cpp" />
     <ClInclude Include="include\DyamicCollision.h" />
     <ClInclude Include="include\GraphicsTest.hpp" />
+    <ClInclude Include="include\ResourceManagerTest.h" />
     <ClInclude Include="include\SandboxGame.h" />
     <ClInclude Include="include\systems\Behaviour.h" />
     <ClInclude Include="include\systems\BehaviourSystem.h" />
@@ -212,7 +214,6 @@
     <ClInclude Include="include\systems\Time.h" />
     <ClInclude Include="include\systems\Window.h" />
     <ClInclude Include="include\systems\WindowManager.h" />
-    <ClInclude Include="include\GLHelper.h" />
     <ClInclude Include="include\graphics\font.hpp" />
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />

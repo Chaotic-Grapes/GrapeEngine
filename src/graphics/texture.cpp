@@ -1,14 +1,31 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../include/graphics/stb_image.h"
 #include "../include/graphics/texture.hpp"
+#include "../include/ResourceManager.h"
 #include <iostream>
+
+ResourceManager RM;
 
 // Private Helpers
 void Texture::loadFromFile(const std::string& path) {
     m_path = path; // keep for deep copies
+
+    // First, try to get cached texture info from ResourceManager
+    auto textureInfo = RM.Get<RTexture>(path);
+    if (!textureInfo) {
+        return;
+    }
+
+    // Use cached dimensions
+    m_width = textureInfo->Width;
+    m_height = textureInfo->Height;
+    m_channels = textureInfo->Channels;
+
     stbi_set_flip_vertically_on_load(true);
 
-    unsigned char* data = stbi_load(path.c_str(), &m_width, &m_height, &m_channels, 4);
+    // Don't want to overwrite cached values
+    int dummy_width, dummy_height, dummy_channels;
+    unsigned char* data = stbi_load(path.c_str(), &dummy_width, &dummy_height, &dummy_channels, 4);
     if (!data) {
         std::cerr << "Failed to load texture: " << path << std::endl;
         return;
