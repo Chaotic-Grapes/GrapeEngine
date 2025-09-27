@@ -1,0 +1,14 @@
+{
+  "fishBoy.png": {
+    "x": 9,
+    "y": 7,
+    "w": 14,
+    "h": 16,
+    "pivot": [0.5, 0.5],
+    "collider": {
+      "type": "aabb",
+      "offset": [9, 6],
+      "size": [14, 16]
+    }
+  }
+}
