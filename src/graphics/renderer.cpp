@@ -50,6 +50,7 @@ void Renderer::ensureCapacity(size_t vNeeded, size_t iNeeded) {
 void Renderer::clearTextureSlots() { textureSlots.clear(); }
 
 void Renderer::flush() {
+    flushCountThisFrame++;
     endFrame();
     beginFrame();
 }
@@ -137,7 +138,7 @@ void Renderer::endFrame() {
 }
 
 // ---------------- public API ----------------
-void Renderer::drawQuad(const glm::vec2& pos,
+void Renderer::submitQuad(const glm::vec2& pos,
     const glm::vec2& size,
     GLuint textureId,
     const glm::vec4& uvRect,
@@ -147,66 +148,55 @@ void Renderer::drawQuad(const glm::vec2& pos,
     int /*layer*/)
     // Depth buffer kinda breaks transparency (Render everything back to front if u have transparent stuff)
 {
-    float texIndex = -1.0f; // sentinel for "no texture"
-
+    float texIndex = -1.0f;
     if (textureId != 0) {
         bool flushed = false;
         int slot = getOrAssignTextureSlot(textureId, flushed);
-
         if (flushed) {
-            flush(); // finish current batch safely
-            slot = getOrAssignTextureSlot(textureId, flushed); // retry in fresh batch
+            flush();
+            slot = getOrAssignTextureSlot(textureId, flushed);
         }
-
         texIndex = static_cast<float>(slot);
     }
 
-    glm::vec2 half = size * 0.5f;
-    glm::vec2 local[4] = {
-        {-half.x, -half.y}, // BL
-        { half.x, -half.y}, // BR
-        { half.x,  half.y}, // TR
-        {-half.x,  half.y}  // TL
-    };
-
-    // build transform (translate * rotate * scale)
-    glm::mat4 transform(1.0f);
-    transform = glm::translate(transform, glm::vec3(pos, 0.0f));
-    transform = glm::rotate(transform, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
-    transform = glm::scale(transform, glm::vec3(uniformScale, uniformScale, 1.0f));
-
-    glm::vec2 uvs[4] = {
-        {uvRect.x, uvRect.y}, // BL
-        {uvRect.z, uvRect.y}, // BR
-        {uvRect.z, uvRect.w}, // TR
-        {uvRect.x, uvRect.w}  // TL
-    };
-
-    glm::vec2 positions[4];
-    for (int i = 0; i < 4; ++i) {
-        glm::vec4 p = transform * glm::vec4(local[i], 0.0f, 1.0f);
-        positions[i] = glm::vec2(p);
-    }
-
-    // check if adding this geometry would exceed capacity.
-    // Prevent overflow: if adding this quad exceeds max capacity, flush first
-    if (cpuBuffer.size() + 4 > vboCapacity ||
-        cpuIndices.size() + 6 > eboCapacity) {
+    if (cpuBuffer.size() + 4 > vboCapacity || cpuIndices.size() + 6 > eboCapacity) {
         flush();
     }
 
-    size_t base = cpuBuffer.size();
-    ensureCapacity(base + 4, cpuIndices.size() + 6);
+    glm::vec2 half = size * 0.5f * uniformScale;
+    glm::vec2 positions[4];
 
+    if (rotation == 0.0f) {
+        // Fast path for non-rotated quads
+        positions[0] = { pos.x - half.x, pos.y - half.y }; // BL
+        positions[1] = { pos.x + half.x, pos.y - half.y }; // BR
+        positions[2] = { pos.x + half.x, pos.y + half.y }; // TR
+        positions[3] = { pos.x - half.x, pos.y + half.y }; // TL
+    }
+    else {
+        // Only calculate sin/cos once per sprite
+        float c = cosf(rotation);
+        float s = sinf(rotation);
+
+        positions[0] = { pos.x + (-half.x * c + half.y * s), pos.y + (-half.x * s - half.y * c) };
+        positions[1] = { pos.x + (half.x * c + half.y * s), pos.y + (half.x * s - half.y * c) };
+        positions[2] = { pos.x + (half.x * c - half.y * s), pos.y + (half.x * s + half.y * c) };
+        positions[3] = { pos.x + (-half.x * c - half.y * s), pos.y + (-half.x * s + half.y * c) };
+    }
+
+    glm::vec2 uvs[4] = {
+        {uvRect.x, uvRect.y}, {uvRect.z, uvRect.y},
+        {uvRect.z, uvRect.w}, {uvRect.x, uvRect.w}
+    };
+
+    size_t base = cpuBuffer.size();
     for (int i = 0; i < 4; ++i)
         cpuBuffer.push_back({ positions[i], uvs[i], color, texIndex });
 
-    cpuIndices.push_back((uint32_t)base + 0);
-    cpuIndices.push_back((uint32_t)base + 1);
-    cpuIndices.push_back((uint32_t)base + 2);
-    cpuIndices.push_back((uint32_t)base + 2);
-    cpuIndices.push_back((uint32_t)base + 3);
-    cpuIndices.push_back((uint32_t)base + 0);
+    cpuIndices.insert(cpuIndices.end(), {
+        (uint32_t)base, (uint32_t)base + 1, (uint32_t)base + 2,
+        (uint32_t)base + 2, (uint32_t)base + 3, (uint32_t)base
+        });
 }
 
 void Renderer::submitTriangles(const Vertex* verts, size_t vCount,
@@ -248,8 +238,8 @@ void Renderer::submitTriangles(const Vertex* verts, size_t vCount,
         cpuIndices.push_back((uint32_t)base + indices[i]);
 }
 
-void Renderer::drawSprite(const Sprite& sprite) {
-    drawQuad(sprite.pos, sprite.size, sprite.textureId,
+void Renderer::submitSprite(const Sprite& sprite) {
+    submitQuad(sprite.pos, sprite.size, sprite.textureId,
         sprite.uv, sprite.color,
         sprite.rotation, sprite.uniformScale);
 }

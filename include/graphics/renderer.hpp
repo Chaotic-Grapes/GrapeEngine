@@ -8,14 +8,14 @@
 
 class Renderer {
 public:
-    Renderer(size_t maxQuads = 1000);
+    Renderer(size_t maxQuads = 3000);
     ~Renderer();
 
     void beginFrame();
     void endFrame();
 
-    // Draw a textured quad (sprite)
-    void drawQuad(const glm::vec2& pos,
+    // Submit textured quad (sprite) to the batcher
+    void submitQuad(const glm::vec2& pos,
         const glm::vec2& size,
         GLuint textureId,
         const glm::vec4& uvRect,   // (u0,v0,u1,v1)
@@ -30,7 +30,8 @@ public:
         GLuint textureId,
         int layer = 0);
 
-    void drawSprite(const Sprite& sprite);
+    void submitSprite(const Sprite& sprite);
+    int flushCountThisFrame = 0;
 
 private:
     // GL objects
