@@ -172,6 +172,12 @@
     <ClCompile Include="src\GraphicsTest.cpp">
       <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClCompile>
+    <ClCompile Include="src\graphics\SpriteMetaData.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\TextureCache.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
@@ -281,6 +287,13 @@
     <ClInclude Include="include\graphics\vertex.hpp" />
     <ClInclude Include="include\GraphicsTest.hpp">
       <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\SpriteMetaData.hpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\json.hpp" />
+    <ClInclude Include="include\graphics\TextureCache.hpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
