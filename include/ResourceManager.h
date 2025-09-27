@@ -44,6 +44,13 @@ public:
     template <>
     std::shared_ptr<RAudio> Get<RAudio>(const std::string& name);
 
+    // Utility functions
+    void ClearCache();  // Empty all 3 maps, free cached assets from memory
+    void UnloadAsset(const std::string& name); // Removes 1 specific asset from cache
+    size_t GetCacheSize() const;               // Total number of cached assets across all types
+    void PrintCacheInfo() const;               // Breakdown by asset type
+    bool IsAssetCached(const std::string& name) const;  // Check if asset's already loaded
+
 private:
     // Asset caches (store loaded assets)
     std::unordered_map<std::string, std::shared_ptr<RTexture>> m_textures;

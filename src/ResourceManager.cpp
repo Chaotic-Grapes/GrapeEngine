@@ -3,9 +3,6 @@
 #include <fstream>
 #include <cmath>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "graphics/stb_image.h"
-
 using RM = ResourceManager;
 
 // Template specialization for RTexture
@@ -178,4 +175,51 @@ std::shared_ptr<RAudio> RM::_loadAudio(const std::string& filePath) {
         << audio->Channels << " channels, " << audio->BitsPerSample << "-bit)" << std::endl;
 
     return audio;
+}
+
+// Clear all cached assets
+void RM::ClearCache() {
+    m_textures.clear();
+    m_audioFiles.clear();
+    std::cout << "Cleared all cached assets" << std::endl;
+}
+
+// Remove a specific asset from cache by name
+void RM::UnloadAsset(const std::string& name) {
+    bool removed = false;
+
+    // Try to remove from texture cache
+    if (m_textures.erase(name) > 0) {
+        std::cout << "Unloaded texture: " << name << std::endl;
+        removed = true;
+    }
+
+    // Try to remove from audio cache
+    if (m_audioFiles.erase(name) > 0) {
+        std::cout << "Unloaded audio: " << name << std::endl;
+        removed = true;
+    }
+
+    if (!removed) {
+        std::cout << "Asset not found in cache: " << name << std::endl;
+    }
+}
+
+// Get total number of cached assets
+size_t RM::GetCacheSize() const {
+    return m_textures.size() + m_audioFiles.size();
+}
+
+// Get cache info broken down by type
+void RM::PrintCacheInfo() const {
+    std::cout << "\n\nCache Info:" << std::endl;
+    std::cout << "Textures: " << m_textures.size() << std::endl;
+    std::cout << "Audio files: " << m_audioFiles.size() << std::endl;
+    std::cout << "Total assets: " << GetCacheSize() << std::endl;
+}
+
+// Check if a specific asset is cached
+bool RM::IsAssetCached(const std::string& name) const {
+    return (m_textures.find(name) != m_textures.end()) || 
+        (m_audioFiles.find(name) != m_audioFiles.end());
 }
