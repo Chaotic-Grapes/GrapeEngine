@@ -22,6 +22,8 @@ namespace Engine {
         void OnUpdate() override;
         std::string Name() const override { return "Renderer2D"; }
 
+        int GetFlushCount() const { return m_renderer ? m_renderer->flushCountThisFrame : -1; }
+
     private:
         // Conversion helpers (keep glm isolated to graphics)
         glm::vec2 ToGlm(const Vector2D& v) { return glm::vec2 {v.X, v.Y}; }
