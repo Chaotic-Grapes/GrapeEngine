@@ -92,6 +92,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -107,9 +108,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -123,6 +125,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -139,9 +142,10 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -149,39 +153,95 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\Engine.cpp" />
-    <ClCompile Include="src\glad.c" />
-    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
+    <ClCompile Include="src\BehaviourSystem.cpp" />
+    <ClCompile Include="src\DynamicCollision.cpp" />
+    <ClCompile Include="src\GraphicsTest.cpp" />
+    <ClCompile Include="src\Physics2D.cpp" />
+    <ClCompile Include="src\PhysicsCollision2DTest.cpp" />
+    <ClCompile Include="src\Renderer2D.cpp" />
+    <ClCompile Include="src\Collision.cpp" />
+    <ClCompile Include="src\Input.cpp" />
     <ClCompile Include="src\graphics\font.cpp" />
-    <ClCompile Include="src\graphics\polygon-utils.cpp" />
     <ClCompile Include="src\graphics\renderer.cpp" />
     <ClCompile Include="src\graphics\shader.cpp" />
     <ClCompile Include="src\graphics\sprite.cpp" />
     <ClCompile Include="src\graphics\texture.cpp" />
-    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\graphics\debugDraw2D.cpp" />
+    <ClCompile Include="src\graphics\polygon-utils.cpp" />
+    <ClCompile Include="src\Math\Matrix3x3.cpp" />
+    <ClCompile Include="src\Math\Matrix4x4.cpp" />
+    <ClCompile Include="src\Math\Vector2D.cpp" />
+    <ClCompile Include="src\Math\Vector3D.cpp" />
+    <ClCompile Include="src\Math\Vector4D.cpp" />
+    <ClCompile Include="src\Physics.cpp" />
+    <ClCompile Include="src\SandboxGame.cpp" />
+    <ClCompile Include="src\Scene.cpp" />
+    <ClCompile Include="src\SceneManager.cpp" />
+    <ClCompile Include="src\test.cpp" />
+    <ClCompile Include="src\EntityManager.cpp" />
+    <ClCompile Include="src\EngineSandbox.cpp" />
+    <ClCompile Include="src\Application.cpp" />
+    <ClCompile Include="src\Entity.cpp" />
+    <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\Memory.cpp" />
     <ClCompile Include="src\MemoryTest.cpp" />
     <ClCompile Include="src\ResourceManager.cpp" />
+    <ClCompile Include="src\Overlay.cpp" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="include\graphics\debugDraw2D.hpp" />
+    <ClCompile Include="src\WindowManager.cpp" />
+    <ClCompile Include="src\World.cpp" />
+    <ClInclude Include="include\DyamicCollision.h" />
+    <ClInclude Include="include\GraphicsTest.hpp" />
+    <ClInclude Include="include\SandboxGame.h" />
+    <ClInclude Include="include\systems\Behaviour.h" />
+    <ClInclude Include="include\systems\BehaviourSystem.h" />
+    <ClInclude Include="include\Game.h" />
+    <ClInclude Include="include\Color.h" />
+    <ClInclude Include="include\Input.h" />
+    <ClInclude Include="include\ecs\ComponentManager.h" />
+    <ClInclude Include="include\ecs\EntityManager.h" />
+    <ClInclude Include="include\ecs\Components.h" />
+    <ClInclude Include="include\ecs\Entity.h" />
+    <ClInclude Include="include\ecs\IComponent.h" />
+    <ClInclude Include="include\ecs\ISystem.h" />
+    <ClInclude Include="include\ecs\World.h" />
+    <ClInclude Include="include\messaging\MessageBus.h" />
+    <ClInclude Include="include\messaging\MessageTypes.h" />
+    <ClInclude Include="include\Application.h" />
+    <ClInclude Include="include\systems\Time.h" />
+    <ClInclude Include="include\systems\Window.h" />
+    <ClInclude Include="include\systems\WindowManager.h" />
+    <ClInclude Include="include\GLHelper.h" />
     <ClInclude Include="include\graphics\font.hpp" />
-    <ClInclude Include="include\graphics\polygon-utils.hpp" />
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />
     <ClInclude Include="include\graphics\sprite.hpp" />
-    <ClInclude Include="include\graphics\stb_image.h" />
     <ClInclude Include="include\graphics\texture.hpp" />
+    <ClInclude Include="include\graphics\debugDraw2D.hpp" />
+    <ClInclude Include="include\graphics\polygon-utils.hpp" />
     <ClInclude Include="include\graphics\vertex.hpp" />
+    <ClInclude Include="include\Math\Matrix3x3.h" />
+    <ClInclude Include="include\Math\Matrix4x4.h" />
+    <ClInclude Include="include\Math\Vector2D.h" />
+    <ClInclude Include="include\Math\Vector3D.h" />
+    <ClInclude Include="include\Math\Vector4D.h" />
+    <ClInclude Include="include\Math\MathHelper.h" />
+    <ClInclude Include="include\Physics2D.h" />
+    <ClInclude Include="include\PhysicsCollision2DTest.h" />
+    <ClInclude Include="include\Renderer2D.h" />
+    <ClInclude Include="include\ecs\Scene.h" />
+    <ClInclude Include="include\ecs\SceneManager.h" />
+    <ClInclude Include="src\Collision.h" />
+    <ClInclude Include="src\Physics.h" />
+    <ClInclude Include="src\test.h" />
     <ClInclude Include="include\Memory.h" />
     <ClInclude Include="include\MemoryTest.h" />
     <ClInclude Include="include\ResourceManager.h" />
-    <ClInclude Include="src\Engine.h" />
-    <ClInclude Include="src\ISystem.h" />
-    <ClInclude Include="src\Time.h" />
-    <ClInclude Include="src\Window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\Entity.inl" />
+    <None Include="src\World.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

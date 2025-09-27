@@ -3,6 +3,30 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Ignore build directories
+build/
+Build/
+bin/
+Bin/
+
+# Ignore CMake generated files
+*.cmake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+cmake.verify_globs
+generate.stamp.depend
+
+#ImGUI settings
+imgui.ini
+
+#Build artifacts
+*.bin
+*.exe
+*.cmake
+*.yaml
+
 # User-specific files
 *.rsuser
 *.suo

@@ -38,6 +38,13 @@ namespace DebugDraw2D {
         const glm::vec4& color,
         GLuint textureId);
 
+    // Rectangle
+    void RectFill(Renderer& r,
+        const glm::vec2& min,
+        const glm::vec2& max,
+        const glm::vec4& color,
+        GLuint textureId);
+
     // Filled polygon (concave OK; simple, CCW preferred)
     void Polygon(Renderer& r,
         const std::vector<glm::vec2>& points,

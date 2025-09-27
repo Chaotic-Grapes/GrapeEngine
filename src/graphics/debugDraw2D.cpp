@@ -3,6 +3,7 @@
 #include "../include/graphics/vertex.hpp"
 #include "../include/graphics/polygon-utils.hpp"
 
+
 #include <glm/gtc/constants.hpp>
 #include <cmath>
 #include <cstdint>
@@ -126,6 +127,26 @@ namespace DebugDraw2D {
         Line(r, v1, v2, thickness, color, textureId);
         Line(r, v2, v3, thickness, color, textureId);
         Line(r, v3, v0, thickness, color, textureId);
+    }
+
+    void RectFill(Renderer& r,
+        const glm::vec2& min,
+        const glm::vec2& max,
+        const glm::vec4& color,
+        GLuint textureId)
+    {
+        glm::vec2 v0 = { min.x, min.y }; // bottom-left
+        glm::vec2 v1 = { max.x, min.y }; // bottom-right
+        glm::vec2 v2 = { max.x, max.y }; // top-right
+        glm::vec2 v3 = { min.x, max.y }; // top-left
+
+        std::vector<Vertex> verts;
+        std::vector<uint32_t> idx;
+        verts.reserve(4); idx.reserve(6);
+
+        PushQuad(verts, idx, v0, v1, v2, v3, color);
+
+        r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
     void Polygon(Renderer& r,
