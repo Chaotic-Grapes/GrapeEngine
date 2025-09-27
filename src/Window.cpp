@@ -45,6 +45,10 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		return false;
 	}
 	glfwMakeContextCurrent(m_windowHandle);
+
+	// === ENABLE OR DISABLE VSYNC HERE ===
+	glfwSwapInterval(1);
+
 	if (!gladLoadGL()) {
 		// Log: "Failed to initialize GLAD";
 		glfwDestroyWindow(m_windowHandle);
