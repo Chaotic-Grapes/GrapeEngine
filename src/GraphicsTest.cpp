@@ -126,8 +126,6 @@ void GraphicsTestScene::runBasicGraphics() {
         m_TestEntities.push_back(square.GetId());
         std::cout << "Spawned BasicGraphics entity\n";
     }
-
-    std::cout << m_TestEntities.size() << "\n";
 }
 
 void GraphicsTestScene::runDebugDrawing() {
@@ -177,10 +175,11 @@ void GraphicsTestScene::runDebugDrawing() {
 //------------------------------------------------------------------------------
 /*!
 \brief
+    Important note for myself and whoever uses this:
     Test case for rendering basic sprites using the ECS + Renderer2D pipeline.
 
     This test spawns two entities, each with a SpriteRenderer component bound
-    to a PNG texture ("player.png" and "IDLE.png"). It verifies that textures
+    to a PNG texture ("player.png" and "fishBoy.png"). It verifies that textures
     can be loaded from disk, bound to OpenGL, and drawn as quads with correct
     positions, scaling, and tint colors.
 
@@ -233,7 +232,31 @@ void GraphicsTestScene::runBasicSprites() {
     }
 }
 
-void GraphicsTestScene::runBackground() { /* full background */ }
+void GraphicsTestScene::runBackground() {
+    World& world = GetWorld();
+
+    if (m_TestEntities.empty()) {
+        // Create an entity for the background
+        Entity bg = CreateEntity();
+        auto& tr = bg.Transform();
+
+        // Center it in the world
+        tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
+
+        // Scale to cover the entire viewport
+        tr.Scale = { m_worldWidth, m_worldHeight };
+
+        // Add a SpriteRenderer component bound to johnPork.png
+        auto& sr = bg.AddComponent<SpriteRenderer>("assets/textures/test/johnPork.png");
+        sr.Color = { 1.f, 1.f, 1.f, 1.f }; // no tint
+
+        // Store the entity ID so it persists across frames
+        m_TestEntities.push_back(bg.GetId());
+
+        std::cout << "Background loaded: johnPork.png covering "
+            << m_worldWidth << "x" << m_worldHeight << "\n";
+    }
+}
 
 void GraphicsTestScene::runSpriteScaling() {
     World& world = GetWorld();
@@ -295,10 +318,161 @@ void GraphicsTestScene::runSpriteRotation() {
 }
 
 void GraphicsTestScene::runAnimation() {
+    World& world = GetWorld();
+    auto* r2d = world.GetSystem<Engine::Renderer2D>();
+    if (!r2d) return;
+    auto* renderer = r2d->GetRenderer();
+    auto* shader = r2d->GetShader();
 
+    // Static variables for animation state
+    static bool initialized = false;
+    static std::unique_ptr<SpriteAnimation> anim;
+    static std::unique_ptr<Texture> animTexture; // Keep texture alive
+
+    // Initialize animation once
+    if (!initialized) {
+        try {
+            animTexture = std::make_unique<Texture>("assets/textures/test/FishfolkSheet.png");
+            GLuint texId = animTexture->ID();
+            if (texId == 0) { std::cout << "ERROR: Failed to load animation texture!\n"; return; }
+
+            // Use the sheet's real frame size
+            int frameWidth = 32;
+            int frameHeight = 32;
+
+            anim = std::make_unique<SpriteAnimation>(
+                texId, frameWidth, frameHeight, animTexture->Width(), animTexture->Height());
+            anim->setFPS(8.0f);
+
+            // tell the animation system how many frames each row really has
+            // Example: your sheet has 5 rows, with 8, 6, 4, 8, 2 frames respectively
+            anim->setRowFrameCounts({ 16, 8, 8, 8, 8 });
+
+            // Choose which row or frames to animate
+            anim->setRow(0);
+
+            initialized = true;
+            std::cout << "Animation initialized - Sheet: "
+                << animTexture->Width() << "x" << animTexture->Height()
+                << ", Frame: " << frameWidth << "x" << frameHeight << "\n";
+        }
+        catch (const std::exception& e) {
+            std::cout << "ERROR initializing animation: " << e.what() << "\n";
+            return;
+        }
+    }
+
+    if (!anim || !animTexture) {
+        std::cout << "Animation not properly initialized!\n";
+        return;
+    }
+
+    // Use the Time system's delta time directly
+    float deltaTime = Time::DeltaTime();
+
+    // Update animation and get current frame
+    glm::vec2 pos = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
+    glm::vec2 size = { 512.f, 512.f }; // Scale up for visibility
+
+    Sprite currentSprite = anim->play(pos, size, deltaTime);
+
+    // Submit to renderer
+    shader->use();
+    shader->setMat4("uProjection", r2d->GetProjection());
+    renderer->beginFrame();
+    renderer->submitSprite(currentSprite);
+    renderer->endFrame();
+
+    // Debug info (print occasionally)
+    static int frameCount = 0;
+    frameCount++;
+    if (frameCount % 120 == 0) { // Every 2 seconds at 60fps
+        std::cout << "Animation running - Current frame at: "
+            << currentSprite.pos.x << ", " << currentSprite.pos.y << "\n";
+    }
 }
 
-void GraphicsTestScene::runMultiAnimation() { /* switch animations */ }
+void GraphicsTestScene::runMultiAnimation() {
+    World& world = GetWorld();
+    auto* r2d = world.GetSystem<Engine::Renderer2D>();
+    if (!r2d) return;
+    auto* renderer = r2d->GetRenderer();
+    auto* shader = r2d->GetShader();
+
+    // Persistent animation state
+    static bool initialized = false;
+    static std::unique_ptr<Texture> animTexture;
+    static std::unique_ptr<SpriteAnimation> idleAnim;
+    static std::unique_ptr<SpriteAnimation> jumpAnim;
+    static SpriteAnimation* currentAnim = nullptr; // pointer to active animation
+
+    if (!initialized) {
+        try {
+            animTexture = std::make_unique<Texture>("assets/textures/test/FishfolkSheet.png");
+            GLuint texId = animTexture->ID();
+            if (texId == 0) {
+                std::cout << "ERROR: Failed to load animation texture!\n";
+                return;
+            }
+
+            int frameWidth = 32;
+            int frameHeight = 32;
+            int texWidth = animTexture->Width();
+            int texHeight = animTexture->Height();
+
+            // Build idle animation (row 0)
+            idleAnim = std::make_unique<SpriteAnimation>(texId, frameWidth, frameHeight, texWidth, texHeight);
+            idleAnim->setFPS(6.0f);
+            idleAnim->setRowFrameCounts({ 16, 8, 8, 8, 8 });
+            idleAnim->setRow(4);
+
+            // Build jump animation (row 3)
+            jumpAnim = std::make_unique<SpriteAnimation>(texId, frameWidth, frameHeight, texWidth, texHeight);
+            jumpAnim->setFPS(10.0f);
+            jumpAnim->setRowFrameCounts({ 16, 8, 8, 8, 8 });
+            jumpAnim->setRow(3);
+
+            // Start with idle
+            currentAnim = idleAnim.get();
+
+            initialized = true;
+            std::cout << "MultiAnimation initialized: Idle (row 0), Jump (row 1)\n";
+        }
+        catch (const std::exception& e) {
+            std::cout << "ERROR initializing MultiAnimation: " << e.what() << "\n";
+            return;
+        }
+    }
+
+    if (!animTexture || !currentAnim) {
+        std::cout << "MultiAnimation not properly initialized!\n";
+        return;
+    }
+
+    // Handle input to switch animations
+    if (Input::IsKeyDown(KEY_SPACE)) {
+        currentAnim = jumpAnim.get();
+    }
+    else {
+        currentAnim = idleAnim.get();
+    }
+
+    // Use delta time
+    float deltaTime = Time::DeltaTime();
+
+    // Position & size for the "main character"
+    glm::vec2 pos = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
+    glm::vec2 size = { 512.f, 512.f };
+
+    // Update and draw current animation
+    Sprite currentSprite = currentAnim->play(pos, size, deltaTime);
+
+    shader->use();
+    shader->setMat4("uProjection", r2d->GetProjection());
+    renderer->beginFrame();
+    renderer->submitSprite(currentSprite);
+    renderer->endFrame();
+}
 
 #if 0
 void GraphicsTestScene::runBatchStress() {
