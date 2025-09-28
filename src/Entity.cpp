@@ -47,7 +47,7 @@ Component::Transform& Entity::Transform() {
 }
 
 void Entity::RemoveAllComponents() const {
-    m_world->GetEntityManager().RemoveAllComponents(m_id);
+    if (m_world) m_world->GetEntityManager().RemoveAllComponents(m_id);
 }
 
 EntityId Entity::GetId() const { return m_id; }

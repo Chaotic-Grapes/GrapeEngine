@@ -19,7 +19,11 @@ namespace Engine {
 
         // Attach core systems to the world
         world.AddSystem<Time>();
-        world.AddSystem<Overlay>();
+
+        // Add Overlay and set its world reference
+        Overlay* overlay = world.AddSystem<Overlay>();
+        overlay->SetWorld(&world);
+
         world.AddSystem<WindowManager>();
 
         return world;

@@ -5,6 +5,7 @@
 #include <systems/Window.h>
 #include <systems/WindowManager.h>
 #include <iostream>
+#include "ecs/World.h"
 
 void Overlay::OnCreate() {
     // Don't initialize ImGUI here cause the window might not exist yet
@@ -24,6 +25,10 @@ void Overlay::OnUpdate() {
             // We can safely initialize ImGUI
             // ImGUI needs a valid OpenGL context (provided by the window)
             DebugUI::Initialize(mainWindow->Handle());
+
+            // Set the world reference for DebugUI
+            DebugUI::SetWorld(m_world);
+
             // Mark as initialized so we don't do this again
             initialized = true;
         }

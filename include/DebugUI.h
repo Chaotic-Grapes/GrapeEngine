@@ -3,20 +3,19 @@
 
 #include <vector>
 #include <string>
+#include "ecs/Entity.h"
 
-// Forward declare GLFWwindow to avoid including GLFW here
+// Forward declarations
 struct GLFWwindow;
+class World;
 
-// Simple GameObject structure for the editor
+// Just for UI display (real data is in ECS components)
 struct GameObject {
-    int Id;
+    EntityId Id;
     std::string Name;
-    float Position[3] = { 0.0f, 0.0f, 0.0f };  // x, y, z
-    float Rotation[3] = { 0.0f, 0.0f, 0.0f };  // Same same
-    float Scale[3] = { 1.0f, 1.0f, 1.0f };    
     bool IsActive = true;
 
-    GameObject(int id, const std::string& name) : Id(id), Name(name) {}
+    GameObject(EntityId id, const std::string& name) : Id(id), Name(name) {}
 };
 
 class DebugUI {
@@ -28,22 +27,30 @@ public:
     static void SetEnabled(bool enabled) { m_enabled = enabled; } // Enable or disable entire debug UI
     static bool IsEnabled() { return m_enabled; } // Check if UI is currently enabled
 
+    // Set the world reference so we can create/manage entities
+    static void SetWorld(World* world);
+
     // Game object management (find, add, remove)
     static std::vector<GameObject>& GetGameObjects() { return m_gameObjects; }
-    static GameObject* FindGameObject(int id);
+    static GameObject* FindGameObject(EntityId id);
     static void AddGameObject(const std::string& name);
-    static void RemoveGameObject(int id);
+    static void RemoveGameObject(EntityId id);
 
 private:
+    // World reference for entity creation/management
+    static World* m_world;
+
     // Game object storage
     static std::vector<GameObject> m_gameObjects;
-    static int m_nextGameObjectId;
-
     static bool m_enabled;  // Control whether UI is visible or hidden
+
     static void _showEngineDebugWindow(bool& showDemo); // Main debug console window with engine status
     static void _showPerformanceWindow();  // Performance monitoring window
     static void _showInputDebugWindow();   // Input debugging
     static void _showGameObjectEditor();   // Game object editor window
+
+    // Helper to create entities with basic components
+    static Entity _createGameEntity(const std::string& name);
 };
 
 #endif

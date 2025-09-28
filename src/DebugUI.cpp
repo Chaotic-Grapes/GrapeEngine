@@ -6,11 +6,12 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <iostream>
+#include "ecs/World.h"
 
 // Initialize static variables
 bool DebugUI::m_enabled = true;
 std::vector<GameObject> DebugUI::m_gameObjects;
-int DebugUI::m_nextGameObjectId = 1;  // Start with 1
+World* DebugUI::m_world = nullptr;
 
 void DebugUI::Initialize(GLFWwindow* window) {
     IMGUI_CHECKVERSION();     // Verify ImGUI version compatibility
@@ -22,10 +23,6 @@ void DebugUI::Initialize(GLFWwindow* window) {
     ImGui::StyleColorsDark(); // Set dark theme colors
     ImGui_ImplGlfw_InitForOpenGL(window, true); // GLFW backend (window/input handling)
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
-
-    // Initialize with some default game objects for testing
-    AddGameObject("Player");
-    AddGameObject("Enemy");
 }
 
 void DebugUI::NewFrame() {
@@ -221,14 +218,36 @@ void DebugUI::_showGameObjectEditor() {
 
     // Clear all buttons
     if (ImGui::Button("Clear All Objects")) {
+        // Destroy all entities in the ECS world
+        if (m_world) {
+            for (const GameObject& obj : m_gameObjects) {
+                Entity entity(obj.Id, m_world);
+                m_world->GetEntityManager().DestroyEntity(entity);
+            }
+        }
+        // Clear the UI list
         m_gameObjects.clear();
     }
 
     ImGui::End();
 }
 
+// Set the world reference and initialize default editor objects
+void DebugUI::SetWorld(World* world) {
+    m_world = world;
+
+    // Add default objects when world is first set
+    // (prevents duplicates on multiple calls)
+    static bool defaultsAdded = false;
+    if (m_world && !defaultsAdded) {
+        AddGameObject("Player");
+        AddGameObject("Enemy");
+        defaultsAdded = true;
+    }
+}
+
 // Search for an object and return pointer (or nullptr)
-GameObject* DebugUI::FindGameObject(int id) {
+GameObject* DebugUI::FindGameObject(EntityId id) {
     // Search from start to end of vector; check if each object's ID matches what we're looking for
     std::vector<GameObject>::iterator it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(),
         [id](const GameObject& gameObject) { return gameObject.Id == id; });
@@ -239,14 +258,21 @@ GameObject* DebugUI::FindGameObject(int id) {
 }
 
 // Create a new object
-void DebugUI::AddGameObject(const std::string& name) { 
-    // Increment ID
-    m_gameObjects.emplace_back(m_nextGameObjectId++, name); 
+void DebugUI::AddGameObject(const std::string& name) {
+    // Safety check
+    if (!m_world) return;
+    // Create real ECS entity with components
+    Entity entity = _createGameEntity(name);
+    // Add to editor list for UI display
+    m_gameObjects.emplace_back(entity.GetId(), name);
 }
 
 // Find and delete an object by ID
-void DebugUI::RemoveGameObject(int id) {
-    // Same thing
+void DebugUI::RemoveGameObject(EntityId id) {
+    // Safety check
+    if (!m_world) return;
+
+    // Remove from editor list FIRST to avoid iterator issues
     std::vector<GameObject>::iterator it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(),
         [id](const GameObject& gameObject) { return gameObject.Id == id; });
 
@@ -255,6 +281,43 @@ void DebugUI::RemoveGameObject(int id) {
     if (it != m_gameObjects.end()) {
         m_gameObjects.erase(it);
     }
+
+    // THEN remove from ECS world
+    Entity entity(id, m_world);
+    m_world->GetEntityManager().DestroyEntity(entity);
+}
+
+// Helper function to create entities with basic components
+Entity DebugUI::_createGameEntity(const std::string& name) {
+    Entity entity = m_world->CreateEntity();
+
+    // Add basic components that most game objects need
+    entity.AddComponent<Component::Transform>();
+
+    // Add different components based on object type
+    if (name == "Player") {
+        entity.AddComponent<Component::SpriteRenderer>("player_sprite.png");
+        entity.AddComponent<Component::Rigidbody2D>();
+        entity.AddComponent<Component::BoxCollider2D>();
+    }
+    else if (name == "Enemy") {
+        entity.AddComponent<Component::SpriteRenderer>("enemy_sprite.png");
+        entity.AddComponent<Component::Rigidbody2D>();
+        entity.AddComponent<Component::BoxCollider2D>();
+    }
+    else if (name == "Collectible") {
+        entity.AddComponent<Component::SpriteRenderer>("collectible_sprite.png");
+        entity.AddComponent<Component::CircleCollider2D>();
+        // Make it a trigger
+        auto* collider = entity.GetComponent<Component::CircleCollider2D>();
+        if (collider) collider->IsTrigger = true;
+    }
+    else {
+        // Default object: just transform and sprite
+        entity.AddComponent<Component::SpriteRenderer>();
+    }
+
+    return entity;
 }
 
 void DebugUI::Shutdown() {
