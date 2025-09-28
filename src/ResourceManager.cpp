@@ -1,7 +1,6 @@
 #include "ResourceManager.h"
 #include <iostream>
 #include <fstream>
-#include "graphics/stb_image.h"
 
 // Add compile-time debug control
 #ifdef _DEBUG
@@ -10,20 +9,24 @@
     #define RM_DEBUG_PRINT(x) // No output in release
 #endif
 
-// Template specialization for RTexture
+// Template specialization for Texture
 template <>
-std::shared_ptr<RTexture> ResourceManager::Get<RTexture>(const std::string& name) {
+std::shared_ptr<Texture> ResourceManager::Get<Texture>(const std::string& name) {
     // Check cache first
-    std::unordered_map<std::string, std::shared_ptr<RTexture>>::iterator it = m_textures.find(name);
+    std::unordered_map<std::string, std::shared_ptr<Texture>>::iterator it = m_textures.find(name);
     if (it != m_textures.end()) {
+        RM_DEBUG_PRINT("[CACHE HIT] Texture: " << name);
         return it->second;  // Cache hit
     }
 
     // Not in cache: try to load
-    std::shared_ptr<RTexture> texture = _loadTexture(name);
-    if (texture) {
+    RM_DEBUG_PRINT("[CACHE MISS] Loading texture: " << name);
+    std::shared_ptr<Texture> texture = _loadTexture(name);
+    if (texture && texture->ID() != 0) {
         m_textures[name] = texture;
-        RM_DEBUG_PRINT("Cached texture: " << name);
+        RM_DEBUG_PRINT("Cached texture: " << name
+            << " | TexID = " << texture->ID()
+            << " | Size = " << texture->Width() << "x" << texture->Height());
     }
     else {
         RM_DEBUG_PRINT("Failed to load texture: " << name);
@@ -37,14 +40,19 @@ std::shared_ptr<RAudio> ResourceManager::Get<RAudio>(const std::string& name) {
     // Check cache first
     std::unordered_map<std::string, std::shared_ptr<RAudio>>::iterator it = m_audioFiles.find(name);
     if (it != m_audioFiles.end()) {
+        RM_DEBUG_PRINT("[CACHE HIT] Audio: " << name);
         return it->second;  // Cache hit
     }
 
     // Not in cache: try to load
+    RM_DEBUG_PRINT("[CACHE MISS] Loading audio: " << name);
     std::shared_ptr<RAudio> audio = _loadAudio(name);
-    if (audio) {
+    if (audio && audio->IsValid) {
         m_audioFiles[name] = audio;
-        RM_DEBUG_PRINT("Cached audio: " << name);
+        RM_DEBUG_PRINT("Cached audio: " << name
+            << " | " << audio->SampleRate << "Hz"
+            << " | " << audio->Channels << " channels"
+            << " | " << audio->BitsPerSample << "-bit");
     }
     else {
         RM_DEBUG_PRINT("Failed to load audio: " << name);
@@ -53,36 +61,29 @@ std::shared_ptr<RAudio> ResourceManager::Get<RAudio>(const std::string& name) {
 }
 
 // Loading function for textures
-std::shared_ptr<RTexture> ResourceManager::_loadTexture(const std::string& filePath) {
+std::shared_ptr<Texture> ResourceManager::_loadTexture(const std::string& filePath) {
     // Check if the file actually exists before trying to open it
     // If not found, return nullptr immediately (fail fast)
     if (!std::filesystem::exists(filePath)) {
+        RM_DEBUG_PRINT("File not found: " << filePath);
         return nullptr;
     }
+    try {
+        // Use the existing Texture constructor to load the file
+        std::shared_ptr<Texture> texture = std::make_shared<Texture>(filePath);
 
-    // Use stb_image to load and decode the image
-    int width, height, channels;
-    unsigned char* imageData = stbi_load(filePath.c_str(), &width, &height, &channels, 0);
-
-    // Checks
-    if (!imageData) {
-        return nullptr;  // Fail fast
+        // Check if texture loaded successfully
+        if (texture->ID() == 0) {
+            RM_DEBUG_PRINT("Texture failed to load: " << filePath);
+            return nullptr;
+        }
+        // Successful
+        return texture;
     }
-
-    // Create texture object (with dimensions from imageData)
-    std::shared_ptr<RTexture> texture = std::make_shared<RTexture>();
-    texture->Path = filePath;
-    texture->Width = width;
-    texture->Height = height;
-    texture->Channels = channels;
-    texture->TextureID = 0;
-
-    RM_DEBUG_PRINT("Loaded image: " << filePath << " (" << width << "x" << height << ", "
-        << channels << " channels)");
-
-    // Free the image data since we're not storing pixels
-    stbi_image_free(imageData);
-    return texture;
+    catch (const std::exception& e) {
+        RM_DEBUG_PRINT("Exception loading texture " << filePath << ": " << e.what());
+        return nullptr;
+    }
 }
 
 // Loading function for audio
@@ -170,6 +171,7 @@ std::shared_ptr<RAudio> ResourceManager::_loadAudio(const std::string& filePath)
     RM_DEBUG_PRINT("Loaded WAV: " << filePath << " (" << audio->SampleRate << "Hz, "
         << audio->Channels << " channels, " << audio->BitsPerSample << "-bit)");
 
+    audio->IsValid = true;
     return audio;
 }
 
@@ -208,7 +210,7 @@ size_t ResourceManager::GetCacheSize() const {
 
 // Get cache info broken down by type
 void ResourceManager::PrintCacheInfo() const {
-    std::cout << "\n\nCache Info:" << std::endl;
+    std::cout << "\nCache Info:" << std::endl;
     std::cout << "Textures: " << m_textures.size() << std::endl;
     std::cout << "Audio files: " << m_audioFiles.size() << std::endl;
     std::cout << "Total assets: " << GetCacheSize() << std::endl;

@@ -10,26 +10,18 @@ ResourceManager RM;
 void Texture::loadFromFile(const std::string& path) {
     m_path = path; // keep for deep copies
 
-    // First, try to get cached texture info from ResourceManager
-    auto textureInfo = RM.Get<RTexture>(path);
-    if (!textureInfo) {
-        return;
-    }
-
-    // Use cached dimensions
-    m_width = textureInfo->Width;
-    m_height = textureInfo->Height;
-    m_channels = textureInfo->Channels;
-
     stbi_set_flip_vertically_on_load(true);
 
-    // Don't want to overwrite cached values
-    int dummy_width, dummy_height, dummy_channels;
-    unsigned char* data = stbi_load(path.c_str(), &dummy_width, &dummy_height, &dummy_channels, 4);
+    int width, height, channels;
+    unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
     if (!data) {
         std::cerr << "Failed to load texture: " << path << std::endl;
         return;
     }
+
+    m_width = width;
+    m_height = height;
+    m_channels = channels;
 
     glGenTextures(1, &m_id);
     glBindTexture(GL_TEXTURE_2D, m_id);

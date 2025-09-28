@@ -45,9 +45,7 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
         sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(1600, 900, 7.f));
         sceneManager.LoadScene("PhysicsCollision2DTestScene");
 
-        TestResourceManagerAdvanced();
-        CompareResourceManagerVsDirect();
-        TestEdgeCases();
+        TestResourceManager();
         break;
     }
     default:
