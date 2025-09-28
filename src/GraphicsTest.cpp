@@ -80,9 +80,23 @@ void GraphicsTestScene::OnUpdate() {
     }
 
     if (auto* r2d = world.GetSystem<Engine::Renderer2D>()) {
-        std::cout << "FPS: " << (1.0f / Time::DeltaTime())
-            << " | Flushes: " << r2d->GetFlushCount()
-            << std::endl;
+        static double lastTime = Time::ElapsedTime();
+        static int frameCount = 0;
+
+        frameCount++;
+        double now = Time::ElapsedTime();
+
+        if (now - lastTime >= 1.0) {
+            double elapsed = now - lastTime;
+            double fps = frameCount / elapsed;
+
+            std::cout << "FPS: " << fps
+                << " | Flushes: " << r2d->GetFlushCount()
+                << std::endl;
+
+            frameCount = 0;
+            lastTime = now; // reset baseline
+        }
     }
 }
 
@@ -286,6 +300,7 @@ void GraphicsTestScene::runAnimation() {
 
 void GraphicsTestScene::runMultiAnimation() { /* switch animations */ }
 
+#if 0
 void GraphicsTestScene::runBatchStress() {
     World& world = GetWorld();
 
@@ -359,6 +374,109 @@ void GraphicsTestScene::runBatchStress() {
         frameCounter = 0;
     }
 }
+#endif
+
+#if 1
+void GraphicsTestScene::runBatchStress() {
+    auto* r2d = GetWorld().GetSystem<Engine::Renderer2D>();
+    if (!r2d) {
+        std::cout << "Renderer2D not found!\n";
+        return;
+    }
+
+    auto* renderer = r2d->GetRenderer();
+    auto* shader = r2d->GetShader();
+
+    // Load texture once
+    static bool initialized = false;
+    static Texture texture("assets/textures/test/fishBoy.png");
+    static GLuint textureId = 0;
+
+    struct SpriteData {
+        glm::vec2 pos;
+        glm::vec2 size;
+        glm::vec4 baseColor;   // static hue
+        float rotationOffset;  // per-sprite random phase
+        float rotationSpeed;   // per-sprite spin speed
+    };
+
+    static std::vector<SpriteData> sprites;
+
+    if (!initialized) {
+        textureId = texture.ID();
+        sprites.reserve(2500);
+
+        for (int i = 0; i < 2500; ++i) {
+            float x = static_cast<float>(rand() % static_cast<int>(m_worldWidth));
+            float y = static_cast<float>(rand() % static_cast<int>(m_worldHeight));
+
+            // Random base color (RGB only, alpha = 1)
+            glm::vec4 col = {
+                (rand() % 100) / 100.f,
+                (rand() % 100) / 100.f,
+                (rand() % 100) / 100.f,
+                1.f
+            };
+
+            // Random speed between 30–120 degrees/sec
+            float speed = 30.f + (rand() % 90);
+
+            sprites.push_back({
+                { x, y },                 // position
+                { 32.f, 32.f },           // size
+                col,                      // base color
+                static_cast<float>(rand() % 360), // random phase
+                speed                     // per-sprite spin speed
+                });
+        }
+
+        initialized = true;
+        std::cout << "Initialized 2500 rotating quads with random colors\n";
+    }
+
+    // Prepare frame
+    shader->use();
+    shader->setMat4("uProjection", r2d->GetProjection());
+    renderer->beginFrame();
+
+    glm::vec4 uv = { 0.f, 0.f, 1.f, 1.f };
+
+    // Use absolute elapsed time for rotation
+    double elapsed = Time::ElapsedTime();
+
+    for (const auto& s : sprites) {
+        float rotation = s.rotationOffset + s.rotationSpeed * static_cast<float>(elapsed);
+
+        renderer->submitQuad(
+            s.pos,
+            s.size,
+            textureId,
+            uv,
+            s.baseColor,
+            glm::radians(rotation), // convert to radians
+            1.f,
+            0
+        );
+    }
+
+    renderer->endFrame();
+
+    // FPS counter
+    static float timeAccum = 0.0f;
+    static int frameCounter = 0;
+
+    timeAccum += Time::DeltaTime();
+    frameCounter++;
+
+    if (timeAccum >= 1.0f) {
+        float fps = frameCounter / timeAccum;
+        std::cout << "[Batcher test] FPS: " << fps << "\n";
+
+        timeAccum = 0.0f;
+        frameCounter = 0;
+    }
+}
+#endif
 
 void GraphicsTestScene::runFontSystem() { /* render text */ }
 
