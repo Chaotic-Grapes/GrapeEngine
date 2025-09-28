@@ -5,6 +5,7 @@
 #include "GraphicsTest.hpp"
 #include "systems/WindowManager.h"
 #include "ResourceManagerTest.h"
+#include "MemoryTest.h"
 
 void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "Select test scene: \n";
@@ -12,6 +13,7 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "2. GRAPHICS AND ART PIPELINE TEST" << '\n';
     //std::cout << "3. ECS Component Test" << '\n';
     std::cout << "3. Resource Manager Test" << '\n';
+    std::cout << "4. Memory Tracking Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -46,6 +48,11 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
         sceneManager.LoadScene("PhysicsCollision2DTestScene");
 
         TestResourceManager();
+        break;
+    }
+    case 4: {
+        std::cout << "Starting Memory Tracking Test..." << '\n';
+        RunMemoryTests();
         break;
     }
     default:
