@@ -24,6 +24,14 @@ namespace Engine {
 
         int GetFlushCount() const { return m_renderer ? m_renderer->flushCountThisFrame : -1; }
 
+        /* ============================================================
+        TEMPORARY ACCESSORS for raw renderer + shader (remove later!)
+        Used for bypassing ECS in stress tests and direct batch calls.
+        ============================================================ */
+        Renderer* GetRenderer() { return m_renderer.get(); }
+        Shader* GetShader() { return m_shader.get(); }
+        const glm::mat4& GetProjection() const { return m_projection; }
+
     private:
         // Conversion helpers (keep glm isolated to graphics)
         glm::vec2 ToGlm(const Vector2D& v) { return glm::vec2 {v.X, v.Y}; }
