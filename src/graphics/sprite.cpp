@@ -11,29 +11,65 @@ SpriteAnimation::SpriteAnimation(GLuint texId, int frameWidth, int frameHeight, 
 {
     m_totalCols = texWidth / frameWidth;
     m_totalRows = texHeight / frameHeight;
+
+    m_windowStart = 0;
+    m_windowCount = m_totalCols * m_totalRows;
+    m_localFrame = 0;
 }
 
 // advance frame timer
 void SpriteAnimation::update(float deltaTime) {
     m_accum += deltaTime;
-    if (m_accum >= m_frameTime) {
+    while (m_accum >= m_frameTime) {
         m_accum -= m_frameTime;
-        m_currentFrame = (m_currentFrame + 1) % (m_totalCols * m_totalRows);
+        m_localFrame = (m_localFrame + 1) % m_windowCount;
     }
 }
 
 // compute UV rect for current frame
 glm::vec4 SpriteAnimation::currentUV() const {
-    int col = m_currentFrame % m_totalCols;
-    int row = m_currentFrame / m_totalCols;
+    int absoluteFrame = m_windowStart + m_localFrame;
+
+    int col = absoluteFrame % m_totalCols;
+    int row = absoluteFrame / m_totalCols;
 
     float u0 = (col * m_frameWidth) / (float)m_texWidth;
     float v0 = (row * m_frameHeight) / (float)m_texHeight;
     float u1 = ((col + 1) * m_frameWidth) / (float)m_texWidth;
     float v1 = ((row + 1) * m_frameHeight) / (float)m_texHeight;
 
-    // Return (u0,v0,u1,v1)
     return { u0, v0, u1, v1 };
+}
+
+void SpriteAnimation::setFrameWindow(int startFrame, int count) {
+    int total = m_totalCols * m_totalRows;
+    if (startFrame < 0) startFrame = 0;
+    if (startFrame >= total) startFrame = total - 1;
+    if (count <= 0) count = 1;
+    if (startFrame + count > total) count = total - startFrame;
+
+    m_windowStart = startFrame;
+    m_windowCount = count;
+    m_localFrame = 0;
+}
+
+void SpriteAnimation::setRow(int rowIndex, int count, int startCol) {
+    if (rowIndex < 0 || rowIndex >= m_totalRows) return;
+
+    int available = m_totalCols;
+    if (!m_rowFrameCounts.empty() && rowIndex < (int)m_rowFrameCounts.size()) {
+        available = m_rowFrameCounts[rowIndex];  // override with actual count
+    }
+
+    // clamp startCol
+    if (startCol >= available) startCol = available - 1;
+
+    int start = rowIndex * m_totalCols + startCol;
+    int maxCount = available - startCol;
+
+    if (count < 0 || count > maxCount) count = maxCount;
+
+    setFrameWindow(start, count);
 }
 
 // Build a Sprite for the current frame
@@ -71,4 +107,8 @@ void Sprite::handleInput(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) {
         uniformScale += scaleSpeed * deltaTime;
     }
+}
+
+void SpriteAnimation::setRowFrameCounts(const std::vector<int>& counts) {
+    m_rowFrameCounts = counts;
 }
