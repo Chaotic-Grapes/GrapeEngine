@@ -64,7 +64,8 @@ void DebugUI::Render() {
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
     _showGameObjectEditor();   // Game object editor
-      _showAudioWindow(*gAudioPtr);
+    _showAudioWindow(*gAudioPtr);
+   
    
 
     // Finalize the frame and send to GPU
@@ -112,13 +113,7 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
     ImGui::SetNextWindowSize(ImVec2(360, 220), ImGuiCond_Once);
     ImGui::Begin("Audio Monitor");
 
-    // Master volume
-    {
-        float mv = audio.GetMasterVolume();
-        if (ImGui::SliderFloat("Master Volume", &mv, 0.0f, 1.0f, "%.2f")) {
-            audio.SetMasterVolume(mv);
-        }
-    }
+
 
     // Toggle library window
     static bool showLibrary = false;
@@ -156,6 +151,19 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
         if (ImGui::Button("Clear List")) rows.clear();
 
         ImGui::Separator();
+
+        // Master volume
+        if (!audio.IsReady()) {
+            ImGui::TextUnformatted("Audio not initialized yet...");
+            ImGui::End();
+            return;
+        }
+
+        // Safe to touch the backend now
+        float mv = audio.GetMasterVolume();
+        if (ImGui::SliderFloat("Master Volume", &mv, 0.0f, 1.0f, "%.2f")) {
+            audio.SetMasterVolume(mv);
+        }
 
         // Optional search filter
         static char filter[128] = {};

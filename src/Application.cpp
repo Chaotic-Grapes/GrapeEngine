@@ -21,6 +21,14 @@ namespace Engine {
         world.AddSystem<Time>();
         world.AddSystem<Overlay>();
         world.AddSystem<WindowManager>();
+        world.AddSystem<Systems::Audio>();
+
+        // Link Overlay with Audio
+        auto* overlay = world.GetSystem<Overlay>();
+        auto* audio = world.GetSystem<Systems::Audio>();
+        if (overlay && audio) {
+            overlay->SetAudio(audio);
+        }
 
         return world;
     }

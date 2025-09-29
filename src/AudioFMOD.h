@@ -28,6 +28,9 @@ public:
 	void  SetMasterVolume(float v);
 	float GetMasterVolume() const { return m_masterVolume; }
 
+	bool IsReady() const { return m_system != nullptr && m_masterGroup != nullptr; }
+
+
 private:
 	// Helpers
 	FMOD::Sound* getOrCreateSound(const Resources::SoundCue::Ptr& cue);

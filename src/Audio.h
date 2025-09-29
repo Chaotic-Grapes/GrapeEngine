@@ -32,6 +32,8 @@ namespace Systems {
 		void SetEnabled(bool e) { Enabled = e; }
 		bool IsEnabled() const { return Enabled; }
 
+		bool IsReady() const { return Interface.IsReady(); }
+
 		// Master volume passthrough
 		void SetMasterVolume(float v) { Interface.SetMasterVolume(v); }
 		float GetMasterVolume() const { return Interface.GetMasterVolume(); }
