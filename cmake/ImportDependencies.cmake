@@ -52,109 +52,6 @@ macro(import_glad)
     endif()
 endmacro()
 
-# Macro to import Fmod
-# Creates interface targets FMOD::Core (always) and FMOD::Studio (if studio/inc exists).
-# Uses FMOD_ROOT to locate the SDK (defaults to ${CMAKE_SOURCE_DIR}/lib/Fmod).
-macro(import_fmod)
-    if (TARGET FMOD::Core)
-        return()
-    endif()
-
-    # Set this to your repo path:
-   set(FMOD_ROOT "${CMAKE_SOURCE_DIR}/lib/Fmod" CACHE PATH "FMOD SDK root")
-
-    set(FMOD_CORE_INC   "${FMOD_ROOT}/core/inc")
-    set(FMOD_STUDIO_INC "${FMOD_ROOT}/studio/inc")
-
-    # Core interface target
-    add_library(FMOD_Core INTERFACE)
-    add_library(FMOD::Core ALIAS FMOD_Core)
-    target_include_directories(FMOD_Core INTERFACE "${FMOD_CORE_INC}")
-
-    if (WIN32)
-        # ---- Core (Windows x64) ----
-        set(FMOD_CORE_LIB_DIR "${FMOD_ROOT}/core/lib/x64")
-        target_link_directories(FMOD_Core INTERFACE "${FMOD_CORE_LIB_DIR}")
-        target_link_libraries(FMOD_Core INTERFACE
-            $<$<CONFIG:Debug>:fmodL_vc>
-            $<$<NOT:$<CONFIG:Debug>>:fmod_vc>)
-        # DLLs live in bin/x64, not lib/x64
-        set(FMOD_CORE_DLL_DEBUG   "${FMOD_ROOT}/core/bin/x64/fmodL.dll" CACHE INTERNAL "")
-        set(FMOD_CORE_DLL_RELEASE "${FMOD_ROOT}/core/bin/x64/fmod.dll"  CACHE INTERNAL "")
-
-    elseif(APPLE)
-        # (unchanged)
-        set(FMOD_CORE_LIB_DIR "${FMOD_ROOT}/core/lib/osx")
-        target_link_libraries(FMOD_Core INTERFACE
-            "$<IF:$<CONFIG:Debug>,${FMOD_CORE_LIB_DIR}/libfmodL.dylib,${FMOD_CORE_LIB_DIR}/libfmod.dylib>")
-        set(FMOD_CORE_DYLIB_DEBUG   "${FMOD_CORE_LIB_DIR}/libfmodL.dylib" CACHE INTERNAL "")
-        set(FMOD_CORE_DYLIB_RELEASE "${FMOD_CORE_LIB_DIR}/libfmod.dylib"  CACHE INTERNAL "")
-
-    elseif(UNIX)
-        # (unchanged)
-        set(FMOD_CORE_LIB_DIR "${FMOD_ROOT}/core/lib/linux/x86_64")
-        target_link_libraries(FMOD_Core INTERFACE
-            "$<IF:$<CONFIG:Debug>,${FMOD_CORE_LIB_DIR}/libfmodL.so,${FMOD_CORE_LIB_DIR}/libfmod.so>")
-        set(FMOD_CORE_SO_DEBUG   "${FMOD_CORE_LIB_DIR}/libfmodL.so" CACHE INTERNAL "")
-        set(FMOD_CORE_SO_RELEASE "${FMOD_CORE_LIB_DIR}/libfmod.so"  CACHE INTERNAL "")
-    endif()
-
-    # ---- Studio (optional) ----
-    if (EXISTS "${FMOD_STUDIO_INC}")
-        add_library(FMOD_Studio INTERFACE)
-        add_library(FMOD::Studio ALIAS FMOD_Studio)
-        target_include_directories(FMOD_Studio INTERFACE "${FMOD_STUDIO_INC}")
-
-        if (WIN32)
-            set(FMOD_STUDIO_LIB_DIR "${FMOD_ROOT}/studio/lib/x64")
-            target_link_directories(FMOD_Studio INTERFACE "${FMOD_STUDIO_LIB_DIR}")
-            target_link_libraries(FMOD_Studio INTERFACE
-                $<$<CONFIG:Debug>:fmodstudioL_vc>
-                $<$<NOT:$<CONFIG:Debug>>:fmodstudio_vc>)
-            set(FMOD_STUDIO_DLL_DEBUG   "${FMOD_ROOT}/studio/bin/x64/fmodstudioL.dll" CACHE INTERNAL "")
-            set(FMOD_STUDIO_DLL_RELEASE "${FMOD_ROOT}/studio/bin/x64/fmodstudio.dll"  CACHE INTERNAL "")
-
-        elseif(APPLE)
-            # (unchanged)
-            set(FMOD_STUDIO_LIB_DIR "${FMOD_ROOT}/studio/lib/osx")
-            target_link_libraries(FMOD_Studio INTERFACE
-                "$<IF:$<CONFIG:Debug>,${FMOD_STUDIO_LIB_DIR}/libfmodstudioL.dylib,${FMOD_STUDIO_LIB_DIR}/libfmodstudio.dylib>")
-            set(FMOD_STUDIO_DYLIB_DEBUG   "${FMOD_STUDIO_LIB_DIR}/libfmodstudioL.dylib" CACHE INTERNAL "")
-            set(FMOD_STUDIO_DYLIB_RELEASE "${FMOD_STUDIO_LIB_DIR}/libfmodstudio.dylib"  CACHE INTERNAL "")
-
-        elseif(UNIX)
-            # (unchanged)
-            set(FMOD_STUDIO_LIB_DIR "${FMOD_ROOT}/studio/lib/linux/x86_64")
-            target_link_libraries(FMOD_Studio INTERFACE
-                "$<IF:$<CONFIG:Debug>,${FMOD_STUDIO_LIB_DIR}/libfmodstudioL.so,${FMOD_STUDIO_LIB_DIR}/libfmodstudio.so>")
-            set(FMOD_STUDIO_SO_DEBUG   "${FMOD_STUDIO_LIB_DIR}/libfmodstudioL.so" CACHE INTERNAL "")
-            set(FMOD_STUDIO_SO_RELEASE "${FMOD_STUDIO_LIB_DIR}/libfmodstudio.so"  CACHE INTERNAL "")
-        endif()
-    endif()
-endmacro()
-
-function(fmod_copy_runtime target)
-    if (WIN32)
-        if (DEFINED FMOD_CORE_DLL_DEBUG AND DEFINED FMOD_CORE_DLL_RELEASE)
-            add_custom_command(TARGET ${target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<IF:$<CONFIG:Debug>,${FMOD_CORE_DLL_DEBUG},${FMOD_CORE_DLL_RELEASE}>"
-                    "$<TARGET_FILE_DIR:${target}>")
-        endif()
-        if (TARGET FMOD::Studio AND DEFINED FMOD_STUDIO_DLL_DEBUG AND DEFINED FMOD_STUDIO_DLL_RELEASE)
-            add_custom_command(TARGET ${target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<IF:$<CONFIG:Debug>,${FMOD_STUDIO_DLL_DEBUG},${FMOD_STUDIO_DLL_RELEASE}>"
-                    "$<TARGET_FILE_DIR:${target}>")
-        endif()
-    elseif(APPLE)
-        message(STATUS "On macOS, prefer setting @rpath or bundle the dylibs.")
-    elseif(UNIX)
-        message(STATUS "On Linux, ensure rpath/LD_LIBRARY_PATH finds the FMOD .so files.")
-    endif()
-endfunction()
-
-
 # Macro to import ImGui
 macro(import_imgui)
     if(NOT TARGET imgui)  # Guard to prevent multiple inclusion
@@ -198,6 +95,49 @@ macro(import_imgui)
     endif()
 endmacro()
 
+# Macro to import FreeType
+macro(import_freetype) 
+    if(NOT TARGET freetype)  # Guard to prevent multiple inclusion
+        FetchContent_Declare(
+            freetype
+            GIT_REPOSITORY https://github.com/freetype/freetype.git
+            GIT_TAG VER-2-14-1
+        )
+
+        if(NOT freetype_POPULATED) 
+            # Disable unnecessary FreeType features
+            # We only need .ttf, .otf for basic font rendering
+            set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+            set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+            set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+            set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+            set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+            
+            FetchContent_MakeAvailable(freetype)
+        endif()
+    endif()
+endmacro()
+
+# Macro to import FMOD
+macro(import_fmod)
+    if(NOT TARGET fmod) # Guard to prevent multiple inclusion
+        set(FMOD_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/include/fmod")
+        set(FMOD_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/fmod")
+
+        # Create an imported library target
+        add_library(fmod UNKNOWN IMPORTED)
+        set_target_properties(fmod PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${FMOD_INCLUDE_DIR}"
+        )
+
+        set_target_properties(fmod PROPERTIES
+            IMPORTED_LOCATION "${FMOD_LIB_DIR}/fmod_vc.lib"
+        )
+    endif()
+endmacro()
+
+
+
 # Macro to import all dependencies
 macro(importDependencies)
     message(STATUS "Starting to import dependencies...")
@@ -217,6 +157,14 @@ macro(importDependencies)
     message(STATUS "Importing ImGui...")
     import_imgui()
     message(STATUS "ImGui imported successfully.")
+
+    message(STATUS "Importing FreeType...")
+    import_freetype()
+    message(STATUS "FreeType imported successfully.")
+
+    message(STATUS "Importing FMOD...")
+    import_fmod()
+    message(STATUS "FMOD imported successfully.")
 
     message(STATUS "All dependencies have been imported successfully.")
 endmacro()
