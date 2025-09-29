@@ -1,14 +1,23 @@
 
 #include "AudioLoader.h"
 #include <algorithm>
+#include <filesystem>   
 
 namespace {
+
+    namespace fs = std::filesystem;   
 
     static inline std::string ToLower(std::string s) {
         std::transform(s.begin(), s.end(), s.begin(),
             [](unsigned char c) { return static_cast<char>(::tolower(c)); });
         return s;
     }
+
+    static inline bool EndsWith(const std::string& s, const char* suff) { // NEW (C++17)
+        const size_t n = std::char_traits<char>::length(suff);
+        return s.size() >= n && s.compare(s.size() - n, n, suff) == 0;
+    }
+
 
     static inline std::string FilenameOnly(const std::string& path) {
         // Handle both '/' and '\'
@@ -23,17 +32,45 @@ namespace {
         return filename.substr(0, dot);
     }
 
+    static inline void trim(std::string& s) {
+        auto sp = [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+        while (!s.empty() && sp(s.front())) s.erase(s.begin());
+        while (!s.empty() && sp(s.back()))  s.pop_back();
+    }
+    static inline void strip_surrounding_quotes(std::string& s) {
+        if (s.size() >= 2 && ((s.front() == '"' && s.back() == '"') || (s.front() == '\'' && s.back() == '\'')))
+            s = s.substr(1, s.size() - 2);
+    }
+
+
 } // anonymous namespace
 
 namespace Resources {
 
-    /*static*/ SoundCue::Ptr SoundCue::CreateFromFile(std::string path, std::string name) {
+    SoundCue::Ptr SoundCue::CreateFromFile(std::string path, std::string name) {
         if (name.empty())
             name = DeriveNameFromPath(path);
 
-        // Heuristic: stream long/compressed formats by default, keep small .wav in memory
-        const bool stream = GuessStreamFromExtension(path);
+        trim(path);
+        strip_surrounding_quotes(path);
 
+        // Reject bad paths early
+        if (!fs::exists(path)) {
+            // std::cerr << "[Audio] Not found: " << path << "\n";
+            return nullptr;
+        }
+
+        const std::string low = ToLower(path);
+        const bool okExt =
+            EndsWith(low, ".wav") || EndsWith(low, ".ogg") ||
+            EndsWith(low, ".mp3") || EndsWith(low, ".flac") ||
+            EndsWith(low, ".m4a") || EndsWith(low, ".aac");
+        if (!okExt) {
+            // std::cerr << "[Audio] Unsupported: " << path << "\n";
+            return nullptr;
+        }
+
+        const bool stream = GuessStreamFromExtension(path);
         return std::make_shared<SoundCue>(std::move(path), std::move(name),
             Audio::PlaybackSettings{}, stream);
     }

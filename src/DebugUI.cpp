@@ -108,7 +108,7 @@ void DebugUI::_showPerformanceWindow() {
 }
 
 void DebugUI::_showAudioWindow(Systems::Audio& audio) {
-    // ---------- Top-level Audio Monitor ----------
+
     ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(360, 220), ImGuiCond_Once);
     ImGui::Begin("Audio Monitor");
@@ -144,9 +144,19 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
                     audio.Add(cue);
                     rows.push_back(Row{ cue, nullptr, s.Volume, s.Loop });
                 }
+                else {
+                    ImGui::OpenPopup("Audio Add Error");
+                }
                 pathBuf[0] = '\0';
             }
         }
+
+        if (ImGui::BeginPopupModal("Audio Add Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextUnformatted("Invalid or unsupported audio file.\nCheck path and extension.");
+            if (ImGui::Button("OK", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+
         ImGui::SameLine();
         if (ImGui::Button("Clear List")) rows.clear();
 

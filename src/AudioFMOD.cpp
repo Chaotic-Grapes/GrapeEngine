@@ -1,5 +1,6 @@
 #include "AudioFMOD.h"
 #include <cassert>
+#include <iostream>
 
 static inline void FMOD_CHECK(FMOD_RESULT r) {
     assert(r == FMOD_OK);
@@ -80,19 +81,20 @@ SoundInstance::StrongPtr AudioFMOD::Play(const Resources::SoundCue::Ptr cue) {
 FMOD::Sound* AudioFMOD::getOrCreateSound(const Resources::SoundCue::Ptr& cue) {
     if (!m_system || !cue) return nullptr;
 
-    const std::string key = cue->getName(); // or cue->getPath()
-    auto it = m_soundCache.find(key);
-    if (it != m_soundCache.end()) return it->second;
+    const std::string& path = cue->getPath();         // use path as key
+    if (auto it = m_soundCache.find(path); it != m_soundCache.end())
+        return it->second;
 
-    // Decide stream vs memory based on your cue meta.
-    const bool stream = cue->isStream(); // if you have this; else derive from file length or extension
+    const bool stream = cue->isStream();
     FMOD_MODE mode = FMOD_DEFAULT | (stream ? FMOD_CREATESTREAM : 0);
 
     FMOD::Sound* snd = nullptr;
-    const std::string path = cue->getPath(); // ensure your SoundCue exposes path
     FMOD_RESULT r = m_system->createSound(path.c_str(), mode, nullptr, &snd);
-    if (r != FMOD_OK) return nullptr;
+    if (r != FMOD_OK) {
+        std::cerr << "[FMOD] createSound failed (" << r << ") for: " << path << "\n";
+        return nullptr;
+    }
 
-    m_soundCache.emplace(key, snd);
+    m_soundCache.emplace(path, snd);
     return snd;
 }
