@@ -3,19 +3,22 @@
     {
       "name": "Enemy1",
       "components": {
-        "Transform": { "X": 50.0, "Y": 100.0 }
+        "Transform": { "x": 550.0, "y": 600.0 },
+        "ShapeRenderer2D": { "type": "Circle", "radius": 35.0, "fillColor": [1,1,0,1] }
       }
     },
     {
       "name": "Enemy2",
       "components": {
-        "Transform": { "X": 150.0, "Y": 80.0 }
+        "Transform": { "x": 550.0, "y": 700.0 },
+        "ShapeRenderer2D": { "type": "Circle", "radius": 35.0, "fillColor": [1,1,0,1] }
       }
     },
     {
       "name": "PowerUp",
       "components": {
-        "Transform": { "X": 200.0, "Y": 200.0 }
+        "Transform": { "x": 550.0, "y": 800.0 },
+        "ShapeRenderer2D": { "type": "Circle", "radius": 35.0, "fillColor": [1,1,0,1] }
       }
     }
   ]

@@ -5,6 +5,7 @@
 Entity EntityManager::CreateEntity(const std::string& name) {
     const EntityId id = ++m_nextId;
     m_entities.insert(id);
+    m_names[id] = name;
 
 #if _DEBUG
     std::cout << "Entity created: "
@@ -48,5 +49,5 @@ std::vector<EntityId> EntityManager::GetAllEntities() const {
 }
 
 Entity EntityManager::GetEntity(const EntityId id) const {
-    return Entity{ id, m_world };
+    return Entity{ id, m_world, _getName(id) };
 }

@@ -23,7 +23,7 @@ namespace Engine {
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
-        Scene* currentScene = nullptr;
+        Scene* currentScene = m_sceneManager.GetActiveScene();
         
         while (!m_shouldStop) {
             const double frameStart = glfwGetTime();

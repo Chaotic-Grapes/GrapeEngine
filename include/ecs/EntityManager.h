@@ -100,6 +100,7 @@ private:
     World* m_world = nullptr;
 
     std::unordered_set<EntityId> m_entities;
+    std::unordered_map<EntityId, std::string> m_names;
     std::unordered_map<std::type_index, std::unique_ptr<IComponentManager>> m_managers;
 
     template<typename T>
@@ -143,6 +144,15 @@ private:
         }
 
         return nullptr;
+    }
+
+    const std::string& _getName(const EntityId id) const {
+        static std::string empty = "Unknown";
+        const auto it = m_names.find(id);
+
+        return (it != m_names.end())
+    		? it->second
+    		: empty;
     }
 };
 
