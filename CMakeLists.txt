@@ -19,10 +19,7 @@ importDependencies()
 
 # List of external libraries (updated for your dependencies)
 set(ALL_LIBS
-    PRIVATE glfw
-    PRIVATE glad
-    PRIVATE imgui
-    PRIVATE glm
+    PRIVATE glfw glad imgui glm freetype
 )
 
 # ======================= SINGLE PROJECT CONFIGURATION =========================
