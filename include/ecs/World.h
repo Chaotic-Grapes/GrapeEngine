@@ -18,6 +18,15 @@ public:
 
     Entity CreateEntity(const std::string& name = "GameObject");
 
+    template<typename T>
+    void ForEachEntity(T func) {
+        auto entityIds = m_entityManager.GetAllEntities();
+        for (EntityId id : entityIds) {
+            Entity entity = m_entityManager.GetEntity(id);
+            func(entity);
+        }
+    }
+
     template<typename T, typename... Args>
     T* AddSystem(Args&&... args);
 

@@ -1,6 +1,7 @@
 #ifndef COMPONENTMANAGER_H
 #define COMPONENTMANAGER_H
 
+#include "IComponent.h"
 #include <unordered_map>
 
 using EntityId = uint32_t;

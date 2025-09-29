@@ -5,6 +5,7 @@
 Entity EntityManager::CreateEntity(const std::string& name) {
     const EntityId id = ++m_nextId;
     m_entities.insert(id);
+    m_entityNames[id] = name;
 
 #if _DEBUG
     std::cout << "Entity created: "
@@ -22,6 +23,7 @@ bool EntityManager::IsAlive(const Entity& entity) const {
 void EntityManager::DestroyEntity(const Entity& entity) {
     RemoveAllComponents(entity.GetId());
     const auto& erased = m_entities.erase(entity.GetId());
+    m_entityNames.erase(entity.GetId());
 
 #if _DEBUG
     if (erased == 0)
@@ -40,6 +42,7 @@ void EntityManager::DestroyAllEntities() {
         RemoveAllComponents(id);
 
     m_entities.clear();
+    m_entityNames.clear();
     m_nextId = 0;
 }
 
@@ -48,5 +51,6 @@ std::vector<EntityId> EntityManager::GetAllEntities() const {
 }
 
 Entity EntityManager::GetEntity(const EntityId id) const {
-    return Entity{ id, m_world };
+    std::string name = GetEntityName(id);
+    return Entity{ id, m_world, name };
 }
