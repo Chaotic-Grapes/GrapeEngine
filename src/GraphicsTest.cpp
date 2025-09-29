@@ -109,8 +109,6 @@ void GraphicsTestScene::OnUnload() {
 // Stub functions (to be implemented later)
 // ------------------------------------
 void GraphicsTestScene::runBasicGraphics() { 
-    World& world = GetWorld();
-
     if (m_TestEntities.empty()) {
         Entity square = CreateEntity();
         auto& tr = square.Transform();
@@ -129,8 +127,6 @@ void GraphicsTestScene::runBasicGraphics() {
 }
 
 void GraphicsTestScene::runDebugDrawing() {
-    World& world = GetWorld();
-
     if (m_TestEntities.empty()) {
         Entity sprite = CreateEntity();
         auto& tr = sprite.Transform();
@@ -205,8 +201,6 @@ void GraphicsTestScene::runDebugDrawing() {
 */
 //------------------------------------------------------------------------------
 void GraphicsTestScene::runBasicSprites() {
-    World& world = GetWorld();
-
     if (m_TestEntities.empty()) {
         Entity sprite1 = CreateEntity();
         auto& tr1 = sprite1.Transform();
@@ -233,8 +227,6 @@ void GraphicsTestScene::runBasicSprites() {
 }
 
 void GraphicsTestScene::runBackground() {
-    World& world = GetWorld();
-
     if (m_TestEntities.empty()) {
         // Create an entity for the background
         Entity bg = CreateEntity();
@@ -280,12 +272,12 @@ void GraphicsTestScene::runSpriteScaling() {
     auto& tr = sprite.Transform();
 
     if (Input::IsKeyDown(KEY_J)) {
-        tr.Scale.X += scaleSpeed * Time::DeltaTime();
-        tr.Scale.Y += scaleSpeed * Time::DeltaTime();
+        tr.Scale.X += scaleSpeed * Time::FixedDeltaTime();
+        tr.Scale.Y += scaleSpeed * Time::FixedDeltaTime();
     }
     if (Input::IsKeyDown(KEY_K)) {
-        tr.Scale.X = std::max(10.f, tr.Scale.X - scaleSpeed * Time::DeltaTime());
-        tr.Scale.Y = std::max(10.f, tr.Scale.Y - scaleSpeed * Time::DeltaTime());
+        tr.Scale.X = std::max(10.f, tr.Scale.X - scaleSpeed * Time::FixedDeltaTime());
+        tr.Scale.Y = std::max(10.f, tr.Scale.Y - scaleSpeed * Time::FixedDeltaTime());
     }
 }
 
@@ -312,7 +304,7 @@ void GraphicsTestScene::runSpriteRotation() {
     auto& tr = sprite.Transform();
 
     if (Input::IsKeyDown(KEY_R)) {
-        tr.Rotation += rotationSpeed * Time::DeltaTime();
+        tr.Rotation += rotationSpeed * Time::FixedDeltaTime();
         if (tr.Rotation >= 360.f) tr.Rotation -= 360.f; // keep it normalized
     }
 }
@@ -368,7 +360,7 @@ void GraphicsTestScene::runAnimation() {
     }
 
     // Use the Time system's delta time directly
-    float deltaTime = Time::DeltaTime();
+    float deltaTime = Time::FixedDeltaTime();
 
     // Update animation and get current frame
     glm::vec2 pos = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
@@ -458,7 +450,7 @@ void GraphicsTestScene::runMultiAnimation() {
     }
 
     // Use delta time
-    float deltaTime = Time::DeltaTime();
+    float deltaTime = Time::FixedDeltaTime();
 
     // Position & size for the "main character"
     glm::vec2 pos = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
@@ -659,7 +651,6 @@ void GraphicsTestScene::runFontSystem() { /* render text */ }
 // ============================================================
 
 void GraphicsTestScene::debugPerformance() {
-    World& world = GetWorld();
     std::cout << "\n=== PERFORMANCE DEBUGGING ===" << std::endl;
     std::cout << "1) Run with no updates (baseline rendering)" << std::endl;
     std::cout << "2) Try small batch sizes (100, 500, 1000 sprites)" << std::endl;
@@ -669,8 +660,6 @@ void GraphicsTestScene::debugPerformance() {
 }
 
 void GraphicsTestScene::testSingleTexture() {
-    World& world = GetWorld();
-
     if (m_TestEntities.empty()) {
         const int count = 2500;
         const float spacingX = m_worldWidth / 50.0f;
@@ -734,8 +723,6 @@ void GraphicsTestScene::analyzeRenderer() {
 }
 
 void GraphicsTestScene::testSmallBatch() {
-    World& world = GetWorld();
-
     if (m_TestEntities.empty()) {
         const int count = 100;
         for (int i = 0; i < count; ++i) {
