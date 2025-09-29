@@ -6,8 +6,6 @@
 #include "System.h"
 #include "Audio.h"
 
-extern Systems::Audio gAudio;
-
 // Forward declare GLFWwindow to avoid including GLFW here
 struct GLFWwindow;
 

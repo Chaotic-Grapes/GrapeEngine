@@ -7,6 +7,7 @@
 #include <imgui_impl_opengl3.h>
 #include <iostream>
 #include "System.h"
+#include <algorithm>
 
 // Initialize static variables
 bool DebugUI::m_enabled = true;
@@ -51,7 +52,7 @@ void DebugUI::NewFrame() {
 
 void DebugUI::Render() {
     if (!m_enabled) return;  // Early exit if UI is toggled off
-    if (gAudioPtr) _showAudioWindow(*gAudioPtr);
+
     // Control variable for the ImGUI demo window
     static bool showDemo = false;
     if (showDemo) {
@@ -63,7 +64,8 @@ void DebugUI::Render() {
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
     _showGameObjectEditor();   // Game object editor
-    _showAudioWindow(gAudio);
+      _showAudioWindow(*gAudioPtr);
+   
 
     // Finalize the frame and send to GPU
     ImGui::Render();  // Generate draw commands from UI

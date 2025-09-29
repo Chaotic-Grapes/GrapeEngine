@@ -1,6 +1,7 @@
 #ifndef OVERLAY_H
 #define OVERLAY_H
 #include "ecs/ISystem.h"
+#include "Audio.h"
 
 // Overlay inherits from Engine::ISystem
 class Overlay : public Engine::ISystem {
@@ -11,6 +12,8 @@ public:
     ~Overlay() override;
 #endif
     std::string Name() const override { return "Overlay"; }  // Name of system as a string
+private: 
+    Systems::Audio* m_audio = nullptr;
 };
 
 #endif
