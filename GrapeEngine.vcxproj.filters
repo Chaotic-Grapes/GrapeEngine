@@ -182,8 +182,9 @@
     <ClCompile Include="src\graphics\TextureCache.cpp">
       <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="GameObjectFactoryTest.cpp">
-      <Filter>Sandboxing\GameObjectFactory Test</Filter>
+    <ClCompile Include="src\GameObjectFactoryTest.cpp" />
+    <ClCompile Include="src\SerializationTest.cpp">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -305,8 +306,11 @@
     <ClInclude Include="include\ecs\GameObjectFactory.h">
       <Filter>Engine\Entity Component System</Filter>
     </ClInclude>
-    <ClInclude Include="GameObjectFactoryTest.h">
-      <Filter>Sandboxing\GameObjectFactory Test</Filter>
+    <ClInclude Include="include\GameObjectFactoryTest.h" />
+    <ClInclude Include="src\EntitySerializer.h" />
+    <ClInclude Include="src\Serialization.h" />
+    <ClInclude Include="src\SerializationTest.h">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

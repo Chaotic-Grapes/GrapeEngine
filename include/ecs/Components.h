@@ -24,7 +24,6 @@ namespace Component {
         Transform(const float x = 0, const float y = 0, const float rotation = 0, const float scaleX = 1.f, const float scaleY = 1.f)
             : Position({ x, y }), Rotation(rotation), Scale({ scaleX, scaleY }) {}
 
-        // Add serialization methods
         json Serialize() const override {
             return {
                 {"PositionX", Position.X},

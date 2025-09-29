@@ -14,15 +14,20 @@
 using json = nlohmann::json;
 
 namespace Serialization {
+
+	// this class handles serialization and deserialziation of entities to/from JSON format.
 	class EntitySerializer {
 	private:
+
 		using SerializationFunction = std::function<json(Entity&)>;
 		using DeserializationFunction = std::function<void(Entity&, const json&)>;
 
+		// registry maps component types names to their serialization functions
 		static std::unordered_map<std::string, SerializationFunction> s_serializationRegistry;
 		static std::unordered_map<std::string, DeserializationFunction> s_deserializationRegistry;
 		static bool s_registryInitialized;
 
+		// initializes the component registry with all supported component types.
 		static void InitializeRegistry() {
 			if (s_registryInitialized) return;
 
@@ -41,32 +46,33 @@ namespace Serialization {
 				std::cout << "  - " << name << std::endl;
 			}
 
-			std::cout << "=== EntitySerializer::InitializeRegistry() called ===" << std::endl;
+			std::cout << "EntitySerializer::InitializeRegistry() called" << std::endl;
 			std::cout << "Initializing component registry..." << std::endl;
 
 			RegisterComponent<Component::Transform>("Transform");
-			// ... rest of the registrations
 
-			std::cout << "=== Registry initialization complete ===" << std::endl;
+			std::cout << "Registry initialization complete" << std::endl;
 
 			s_registryInitialized = true;
 		}
 
+		// registers a component type for serialization/deserialization
 		template<typename T>
 		static void RegisterComponent(const std::string& typeName) {
 			std::cout << "Registering component: " << typeName << std::endl;
 
+			// register serialization function
 			s_serializationRegistry[typeName] = [](Entity& entity) -> json {
 				if (auto* component = entity.GetComponent<T>()) {
 					return component->Serialize();
 				}
-				return json{};
+				return json{};	// returns empty JSON
 				};
 
+			// register deserialization function
 			s_deserializationRegistry[typeName] = [typeName](Entity& entity, const json& data) {
 				std::cout << "Deserializing " << typeName << "..." << std::endl;
 
-				// Check if component already exists
 				bool hasComponent = entity.HasComponent<T>();
 				std::cout << "  Entity already has " << typeName << ": " << (hasComponent ? "YES" : "NO") << std::endl;
 
@@ -82,6 +88,7 @@ namespace Serialization {
 					}
 				}
 
+				// deserialize the component data
 				if (auto* component = entity.GetComponent<T>()) {
 					std::cout << "  Got component pointer, deserializing data..." << std::endl;
 					try {
@@ -99,6 +106,7 @@ namespace Serialization {
 		}
 
 	public:
+		// serializes an entity to JSON format including all its components.
 		static json SerializeEntity(Entity entity) {
 			InitializeRegistry();
 
@@ -107,6 +115,7 @@ namespace Serialization {
 			entityJson["Components"] = json::array();
 			entityJson["Name"] = entity.GetName();
 
+			// serialize each component that the entity has
 			for (const auto& [typeName, serializeFunc] : s_serializationRegistry) {
 				json componentData = serializeFunc(entity);
 				if (!componentData.empty()) {
@@ -119,17 +128,20 @@ namespace Serialization {
 			return entityJson;
 		}
 
+		// deserializes an entity from JSON and adds it to the world
 		static void DeserializeEntity(World& world, const json& entityJson) {
 			InitializeRegistry();
 
 			std::string entityName = entityJson.value("Name", "GameObject");
 
+			// create new entity in the world
 			Entity entity = world.CreateEntity(entityName);
 
 			std::cout << "\n=== Deserializing Entity ===" << std::endl;
 			std::cout << "Created entity with ID: " << entity.GetId() << std::endl;
 			std::cout << "Entity name: " << entityName << std::endl;
 
+			// deserialize all components
 			if (entityJson.contains("Components")) {
 				std::cout << "Found " << entityJson["Components"].size() << " components to deserialize" << std::endl;
 
@@ -153,7 +165,6 @@ namespace Serialization {
 				}
 			}
 
-			// Final verification
 			std::cout << "\n=== Final Entity State ===" << std::endl;
 			std::cout << "Entity ID: " << entity.GetId() << std::endl;
 			std::cout << "Entity Name: " << entity.GetName() << std::endl;

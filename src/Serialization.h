@@ -47,6 +47,7 @@ namespace Serialization {
 
 		static bool LoadScene(World& world, const std::string& filename) {
 			try {
+				// open and parse JSON file
 				std::ifstream file(filename);
 				if (!file.is_open()) {
 					std::cout << " Cannot open file: " << filename << std::endl;
@@ -59,8 +60,10 @@ namespace Serialization {
 				std::cout << "Scene successfully loaded: " << scene["SceneName"] << std::endl;
 				std::cout << " Version: " << scene["Version"] << std::endl;
 
+				// clears existing entities before loading
 				world.GetEntityManager().DestroyAllEntities();
 
+				// deserialize each entity from JSON array
 				if (scene.contains("Entities")) {
 					int loadedCount = 0;
 					for (const auto& entityJson : scene["Entities"]) {
