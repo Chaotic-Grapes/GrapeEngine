@@ -5,6 +5,7 @@
 #include <vector>
 #include "ecs/EntityManager.h"
 #include "ecs/ISystem.h"
+#include "systems/AudioEngine.h"
 
 class Entity;
 namespace Engine { class Application; } // Forward declaration for friend class

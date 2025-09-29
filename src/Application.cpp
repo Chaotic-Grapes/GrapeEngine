@@ -3,6 +3,7 @@
 #include "systems/Time.h"
 #include "systems/WindowManager.h"
 #include "systems/Overlay.h"
+#include "systems/AudioEngine.h"
 
 namespace Engine {
     // Global pointer to the core engine
@@ -21,13 +22,13 @@ namespace Engine {
         world.AddSystem<Time>();
         world.AddSystem<Overlay>();
         world.AddSystem<WindowManager>();
-        world.AddSystem<Systems::Audio>();
+        world.AddSystem<AudioSystem>();
 
-        // Link Overlay with Audio
+        // Link Overlay -> Audio so DebugUI can use it
         auto* overlay = world.GetSystem<Overlay>();
-        auto* audio = world.GetSystem<Systems::Audio>();
-        if (overlay && audio) {
-            overlay->SetAudio(audio);
+        auto* audioSys = world.GetSystem<AudioSystem>();
+        if (overlay && audioSys) {
+            overlay->SetAudio(audioSys->GetAudio());
         }
 
         return world;
