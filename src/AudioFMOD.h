@@ -1,6 +1,6 @@
 #pragma once
 
-#include <../lib/Fmod/core/inc/fmod.hpp>
+#include <fmod.hpp>
 #include <memory>
 #include <unordered_map>
 #include <string>

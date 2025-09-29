@@ -60,66 +60,70 @@ macro(import_fmod)
         return()
     endif()
 
-    set(FMOD_ROOT "${CMAKE_SOURCE_DIR}/lib/Fmod" CACHE PATH "FMOD SDK root")
+    # Set this to your repo path:
+   set(FMOD_ROOT "${CMAKE_SOURCE_DIR}/lib/Fmod" CACHE PATH "FMOD SDK root")
 
-    # Include dirs
     set(FMOD_CORE_INC   "${FMOD_ROOT}/core/inc")
     set(FMOD_STUDIO_INC "${FMOD_ROOT}/studio/inc")
 
-    # core
+    # Core interface target
     add_library(FMOD_Core INTERFACE)
     add_library(FMOD::Core ALIAS FMOD_Core)
     target_include_directories(FMOD_Core INTERFACE "${FMOD_CORE_INC}")
 
-    # Platform-specific libs
     if (WIN32)
-        # Adjust x64/x86 as needed
-        set(FMOD_CORE_LIB_DIR "${FMOD_ROOT}/core/lib/windows/x64")
+        # ---- Core (Windows x64) ----
+        set(FMOD_CORE_LIB_DIR "${FMOD_ROOT}/core/lib/x64")
         target_link_directories(FMOD_Core INTERFACE "${FMOD_CORE_LIB_DIR}")
-        # Link debug logging lib in Debug, normal in others
         target_link_libraries(FMOD_Core INTERFACE
             $<$<CONFIG:Debug>:fmodL_vc>
             $<$<NOT:$<CONFIG:Debug>>:fmod_vc>)
-        # Record the runtime DLL path for the copy helper
-        set(FMOD_CORE_DLL_DEBUG   "${FMOD_CORE_LIB_DIR}/fmodL.dll"  CACHE INTERNAL "")
-        set(FMOD_CORE_DLL_RELEASE "${FMOD_CORE_LIB_DIR}/fmod.dll"   CACHE INTERNAL "")
+        # DLLs live in bin/x64, not lib/x64
+        set(FMOD_CORE_DLL_DEBUG   "${FMOD_ROOT}/core/bin/x64/fmodL.dll" CACHE INTERNAL "")
+        set(FMOD_CORE_DLL_RELEASE "${FMOD_ROOT}/core/bin/x64/fmod.dll"  CACHE INTERNAL "")
+
     elseif(APPLE)
+        # (unchanged)
         set(FMOD_CORE_LIB_DIR "${FMOD_ROOT}/core/lib/osx")
-        # On macOS you link the dylib by full path
         target_link_libraries(FMOD_Core INTERFACE
             "$<IF:$<CONFIG:Debug>,${FMOD_CORE_LIB_DIR}/libfmodL.dylib,${FMOD_CORE_LIB_DIR}/libfmod.dylib>")
         set(FMOD_CORE_DYLIB_DEBUG   "${FMOD_CORE_LIB_DIR}/libfmodL.dylib" CACHE INTERNAL "")
         set(FMOD_CORE_DYLIB_RELEASE "${FMOD_CORE_LIB_DIR}/libfmod.dylib"  CACHE INTERNAL "")
+
     elseif(UNIX)
+        # (unchanged)
         set(FMOD_CORE_LIB_DIR "${FMOD_ROOT}/core/lib/linux/x86_64")
-        # Prefer absolute libs on Linux
         target_link_libraries(FMOD_Core INTERFACE
             "$<IF:$<CONFIG:Debug>,${FMOD_CORE_LIB_DIR}/libfmodL.so,${FMOD_CORE_LIB_DIR}/libfmod.so>")
         set(FMOD_CORE_SO_DEBUG   "${FMOD_CORE_LIB_DIR}/libfmodL.so" CACHE INTERNAL "")
         set(FMOD_CORE_SO_RELEASE "${FMOD_CORE_LIB_DIR}/libfmod.so"  CACHE INTERNAL "")
     endif()
 
-    # Studio in case 
+    # ---- Studio (optional) ----
     if (EXISTS "${FMOD_STUDIO_INC}")
         add_library(FMOD_Studio INTERFACE)
         add_library(FMOD::Studio ALIAS FMOD_Studio)
         target_include_directories(FMOD_Studio INTERFACE "${FMOD_STUDIO_INC}")
 
         if (WIN32)
-            set(FMOD_STUDIO_LIB_DIR "${FMOD_ROOT}/studio/lib/windows/x64")
+            set(FMOD_STUDIO_LIB_DIR "${FMOD_ROOT}/studio/lib/x64")
             target_link_directories(FMOD_Studio INTERFACE "${FMOD_STUDIO_LIB_DIR}")
             target_link_libraries(FMOD_Studio INTERFACE
                 $<$<CONFIG:Debug>:fmodstudioL_vc>
                 $<$<NOT:$<CONFIG:Debug>>:fmodstudio_vc>)
-            set(FMOD_STUDIO_DLL_DEBUG   "${FMOD_STUDIO_LIB_DIR}/fmodstudioL.dll" CACHE INTERNAL "")
-            set(FMOD_STUDIO_DLL_RELEASE "${FMOD_STUDIO_LIB_DIR}/fmodstudio.dll"  CACHE INTERNAL "")
+            set(FMOD_STUDIO_DLL_DEBUG   "${FMOD_ROOT}/studio/bin/x64/fmodstudioL.dll" CACHE INTERNAL "")
+            set(FMOD_STUDIO_DLL_RELEASE "${FMOD_ROOT}/studio/bin/x64/fmodstudio.dll"  CACHE INTERNAL "")
+
         elseif(APPLE)
+            # (unchanged)
             set(FMOD_STUDIO_LIB_DIR "${FMOD_ROOT}/studio/lib/osx")
             target_link_libraries(FMOD_Studio INTERFACE
                 "$<IF:$<CONFIG:Debug>,${FMOD_STUDIO_LIB_DIR}/libfmodstudioL.dylib,${FMOD_STUDIO_LIB_DIR}/libfmodstudio.dylib>")
             set(FMOD_STUDIO_DYLIB_DEBUG   "${FMOD_STUDIO_LIB_DIR}/libfmodstudioL.dylib" CACHE INTERNAL "")
             set(FMOD_STUDIO_DYLIB_RELEASE "${FMOD_STUDIO_LIB_DIR}/libfmodstudio.dylib"  CACHE INTERNAL "")
+
         elseif(UNIX)
+            # (unchanged)
             set(FMOD_STUDIO_LIB_DIR "${FMOD_ROOT}/studio/lib/linux/x86_64")
             target_link_libraries(FMOD_Studio INTERFACE
                 "$<IF:$<CONFIG:Debug>,${FMOD_STUDIO_LIB_DIR}/libfmodstudioL.so,${FMOD_STUDIO_LIB_DIR}/libfmodstudio.so>")
@@ -129,7 +133,6 @@ macro(import_fmod)
     endif()
 endmacro()
 
-# Helper: copy FMOD runtime next to a target after build
 function(fmod_copy_runtime target)
     if (WIN32)
         if (DEFINED FMOD_CORE_DLL_DEBUG AND DEFINED FMOD_CORE_DLL_RELEASE)
@@ -145,11 +148,8 @@ function(fmod_copy_runtime target)
                     "$<TARGET_FILE_DIR:${target}>")
         endif()
     elseif(APPLE)
-        # Optionally copy dylibs into app bundle or set @rpath at install time
-        # add_custom_command(...) similar to above if you prefer copying
         message(STATUS "On macOS, prefer setting @rpath or bundle the dylibs.")
     elseif(UNIX)
-        # On Linux, prefer rpath or provide a copy rule here if desired
         message(STATUS "On Linux, ensure rpath/LD_LIBRARY_PATH finds the FMOD .so files.")
     endif()
 endfunction()

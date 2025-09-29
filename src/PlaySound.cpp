@@ -1,47 +1,66 @@
 #include "PlaySound.h"
+#include <fmod.hpp>
 
+// Construct from cue: copy name & default settings
 SoundInstance::SoundInstance(const Resources::SoundCue::Ptr cue)
-	: Name(cue->getName()), Sound(cue->getSound()), Settings(cue->getSettings())
+    : Name(cue ? cue->getName() : "")
+    , Settings(cue ? cue->getSettings() : Audio::PlaybackSettings{})
 {
 }
 
-SoundInstance::~SoundInstance()
-{
+SoundInstance::~SoundInstance() = default;
+
+// Optional: map parameter names to channel properties later
+void SoundInstance::SetParameter(std::string /*parameter*/, float /*value*/) {
+    // placeholder for future DSP/RTPC mapping
 }
 
-void SoundInstance::SetParameter(String parameter, Real value)
-{
-	Sound.SetParameter(parameter, value);
+void SoundInstance::InterpolateVolume(float newVolume, float /*time*/) {
+    Settings.Volume = newVolume;
+    if (mChannel) mChannel->setVolume(newVolume);
 }
 
-void SoundInstance::InterpolateVolume(Real newVolume, Real time)
-{
-	Settings.Volume = newVolume;
-	Sound.InterpolateVolume(newVolume, time);
+void SoundInstance::InterpolatePitch(float newPitch, float /*time*/) {
+    Settings.Pitch = newPitch;
+    if (mChannel) mChannel->setPitch(newPitch);
 }
 
-void SoundInstance::InterpolatePitch(Real newPitch, Real time)
-{
-	Settings.Pitch = newPitch;
-	Sound.InterpolatePitch(newPitch, time);
+void SoundInstance::Resume() {
+    if (mChannel) mChannel->setPaused(false);
 }
 
-void SoundInstance::Resume()
-{
-	Sound.Resume();
+void SoundInstance::Pause() {
+    if (mChannel) mChannel->setPaused(true);
 }
 
-void SoundInstance::Pause()
-{
-	Sound.Pause();
+void SoundInstance::SetLoop(bool enable) {
+    // remember in our settings so a future replay can inherit
+    Settings.Loop = enable;
+
+    // If currently playing, apply immediately on the channel
+    if (mChannel) {
+        mChannel->setMode(enable ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
+        mChannel->setLoopCount(enable ? -1 : 0);
+    }
+
+    // Also update the FMOD::Sound default so the next Play() inherits
+    if (mSound) {
+        mSound->setMode(enable ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
+        mSound->setLoopCount(enable ? -1 : 0);
+    }
 }
 
-void SoundInstance::Stop(Audio::StopMode mode)
-{
-	Sound.Stop(mode);
+void SoundInstance::Stop(Audio::StopMode /*mode*/) {
+    if (mChannel) {
+        // If you want fades, implement a short ramp here before stop()
+        mChannel->stop();
+        mChannel = nullptr;
+    }
 }
 
-bool SoundInstance::IsPlaying()
-{
-	return Sound.IsPlaying();
+bool SoundInstance::IsPlaying() {
+    if (!mChannel) return false;
+    bool playing = false;
+    if (mChannel->isPlaying(&playing) != FMOD_OK) return false;
+    return playing;
 }

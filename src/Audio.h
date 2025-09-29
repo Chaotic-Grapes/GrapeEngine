@@ -1,5 +1,5 @@
 #pragma once
-#include "..\System.h"
+#include "System.h"
 #include "AudioBank.h"
 #include "PlaySound.h"
 #include "AudioControl.h"

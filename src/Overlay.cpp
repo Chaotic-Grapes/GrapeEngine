@@ -5,6 +5,7 @@
 #include <systems/Window.h>
 #include <systems/WindowManager.h>
 #include <iostream>
+#include "audio.h"
 
 void Overlay::OnCreate() {
     // Don't initialize ImGUI here cause the window might not exist yet

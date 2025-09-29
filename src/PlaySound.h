@@ -4,45 +4,49 @@
 #include <string>
 #include <vector>
 
-// Keep this include pointing to your engine's SoundCue and low-level Audio::Sound.
-// If your paths differ, fix here.
-#include "AudioLoader.h"  // Adjust if needed
-#include "AudioControl.h"
+#include "AudioLoader.h"   // Resources::SoundCue (your SoundCue)
+#include "AudioControl.h"  // Audio::PlaybackSettings, PlayMode, StopMode
 
-// Forward declare your low-level handle type if not included by SoundCue
-namespace Audio { class Sound; }
+// Forward declare FMOD types so we can use pointers without including <fmod.hpp> here.
+namespace FMOD { class Sound; class Channel; }
 
 class SoundInstance {
+    std::string             Name;
+    Audio::PlaybackSettings Settings;
 
-	std::string              Name;
-	Audio::PlaybackSettings  Settings;
-	Audio::Sound             Sound;   // low-level object/handle (from your backend)
+    // FMOD backend handles (set by the audio backend after play)
+    FMOD::Sound* mSound = nullptr;
+    FMOD::Channel* mChannel = nullptr;
 
 public:
-	// Control
-	void SetParameter(std::string parameter, float value);
-	void InterpolateVolume(float newVolume, float time);
-	void InterpolatePitch(float newPitch, float time);
-	void Resume();
-	void Pause();
-	void Stop(Audio::StopMode mode = Audio::StopMode::AllowFadeOut);
-	bool IsPlaying();
+    // Control
+    void SetParameter(std::string parameter, float value);
+    void InterpolateVolume(float newVolume, float time);
+    void InterpolatePitch(float newPitch, float time);
+    void Resume();
+    void Pause();
+    void Stop(Audio::StopMode mode = Audio::StopMode::AllowFadeOut);
+    bool IsPlaying();
+    void SetLoop(bool enable);
 
-	// Lifetime
-	explicit SoundInstance(const Resources::SoundCue::Ptr);
-	~SoundInstance();
+    // Lifetime
+    explicit SoundInstance(const Resources::SoundCue::Ptr);
+    ~SoundInstance();
 
-	// Accessors
-	Audio::Sound& getSound() { return Sound; }
+    // Backend binding (called by AudioFMOD right after playSound)
+    void _bindBackend(FMOD::Sound* s, FMOD::Channel* c) { mSound = s; mChannel = c; }
 
-	// Properties (use your DEFINE_PROPERTY macros if needed)
-	const std::string& getName() const { return Name; }
-	void setName(const std::string& n) { Name = n; }
+    // Accessors
+    FMOD::Sound* sound() { return mSound; }
+    FMOD::Channel* channel() { return mChannel; }
 
-	const Audio::PlaybackSettings& getSettings() const { return Settings; }
-	void setSettings(const Audio::PlaybackSettings& s) { Settings = s; }
+    const std::string& getName() const { return Name; }
+    void setName(const std::string& n) { Name = n; }
 
-	using Ptr = SoundInstance*;
-	using StrongPtr = std::shared_ptr<SoundInstance>;
-	using Container = std::vector<StrongPtr>;
+    const Audio::PlaybackSettings& getSettings() const { return Settings; }
+    void setSettings(const Audio::PlaybackSettings& s) { Settings = s; }
+
+    using Ptr = SoundInstance*;
+    using StrongPtr = std::shared_ptr<SoundInstance>;
+    using Container = std::vector<StrongPtr>;
 };

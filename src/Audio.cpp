@@ -3,7 +3,7 @@
 namespace Systems {
 
     void Audio::Initialize() {
-        Trace("Initializing the interface!");
+        System::Trace("Initializing the interface!");
         Interface.Initialize();
     }
 

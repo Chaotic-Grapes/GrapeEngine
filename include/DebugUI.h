@@ -3,6 +3,10 @@
 
 #include <vector>
 #include <string>
+#include "System.h"
+#include "Audio.h"
+
+extern Systems::Audio gAudio;
 
 // Forward declare GLFWwindow to avoid including GLFW here
 struct GLFWwindow;
@@ -24,6 +28,8 @@ public:
     static void Initialize(GLFWwindow* pWin);  // Call after OpenGL context exists
     static void NewFrame();  // Start new ImGUI frame before creating UI elements
     static void Render();    // Render all debug windows and send to GPU 
+    static void AttachAudio(Systems::Audio * audio);
+    static void DetachAudio();                     
     static void Shutdown();  // Cleanup
     static void SetEnabled(bool enabled) { m_enabled = enabled; } // Enable or disable entire debug UI
     static bool IsEnabled() { return m_enabled; } // Check if UI is currently enabled
@@ -44,7 +50,7 @@ private:
     static void _showPerformanceWindow();  // Performance monitoring window
     static void _showInputDebugWindow();   // Input debugging
     static void _showGameObjectEditor();   // Game object editor window
-    static void _showAudioWindow();        // Audio editor window
+    static void _showAudioWindow(Systems::Audio& audio);        // Audio editor window
 };
 
 #endif
