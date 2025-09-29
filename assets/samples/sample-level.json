@@ -1,0 +1,22 @@
+{
+  "objects": [
+    {
+      "name": "Enemy1",
+      "components": {
+        "Transform": { "X": 50.0, "Y": 100.0 }
+      }
+    },
+    {
+      "name": "Enemy2",
+      "components": {
+        "Transform": { "X": 150.0, "Y": 80.0 }
+      }
+    },
+    {
+      "name": "PowerUp",
+      "components": {
+        "Transform": { "X": 200.0, "Y": 200.0 }
+      }
+    }
+  ]
+}

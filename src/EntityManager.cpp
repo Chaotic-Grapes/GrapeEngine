@@ -42,3 +42,11 @@ void EntityManager::DestroyAllEntities() {
     m_entities.clear();
     m_nextId = 0;
 }
+
+std::vector<EntityId> EntityManager::GetAllEntities() const {
+    return std::vector(m_entities.begin(), m_entities.end());
+}
+
+Entity EntityManager::GetEntity(const EntityId id) const {
+    return Entity{ id, m_world };
+}

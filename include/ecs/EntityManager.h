@@ -24,6 +24,10 @@ public:
 
     bool IsAlive(const Entity& entity) const;
 
+    std::vector<EntityId> GetAllEntities() const;
+
+    Entity GetEntity(EntityId id) const;
+
     //template<typename... Components>
     //std::vector<EntityId> Query() {
     //    std::vector<EntityId> result;

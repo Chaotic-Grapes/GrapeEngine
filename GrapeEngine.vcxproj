@@ -153,6 +153,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\GameObjectFactoryTest.cpp" />
     <ClCompile Include="src\BehaviourSystem.cpp" />
     <ClCompile Include="src\DynamicCollision.cpp" />
     <ClCompile Include="src\GraphicsTest.cpp" />
@@ -190,7 +191,9 @@
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
+    <ClInclude Include="include\GameObjectFactoryTest.h" />
     <ClInclude Include="include\DyamicCollision.h" />
+    <ClInclude Include="include\ecs\GameObjectFactory.h" />
     <ClInclude Include="include\GraphicsTest.hpp" />
     <ClInclude Include="include\graphics\SpriteMetaData.hpp" />
     <ClInclude Include="include\graphics\TextureCache.hpp" />

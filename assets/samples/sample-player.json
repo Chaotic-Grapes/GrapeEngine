@@ -1,0 +1,6 @@
+{
+  "name": "Player",
+  "components": {
+    "Transform": { "X": 10, "Y": 20 }
+  }
+}

@@ -68,6 +68,9 @@
     <Filter Include="Engine\Systems\ISystem Dependent\Scene">
       <UniqueIdentifier>{0e64a6f7-4617-4ad7-ba74-a6503a78df4d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sandboxing\GameObjectFactory Test">
+      <UniqueIdentifier>{ee44bc4e-c4f4-481d-a73f-2ddd98693170}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp">
@@ -178,6 +181,9 @@
     </ClCompile>
     <ClCompile Include="src\graphics\TextureCache.cpp">
       <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="GameObjectFactoryTest.cpp">
+      <Filter>Sandboxing\GameObjectFactory Test</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -295,6 +301,12 @@
     <ClInclude Include="include\json.hpp" />
     <ClInclude Include="include\graphics\TextureCache.hpp">
       <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\GameObjectFactory.h">
+      <Filter>Engine\Entity Component System</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObjectFactoryTest.h">
+      <Filter>Sandboxing\GameObjectFactory Test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
