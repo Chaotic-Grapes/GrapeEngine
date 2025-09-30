@@ -1,14 +1,17 @@
 ﻿#include "Application.h"
 #include <windows.h>
+#include <algorithm>
 #include "Input.h"
 #include "Physics2D.h"
 #include "Renderer2D.h"
 #include "systems/WindowManager.h"
+#include "systems/Time.h"
 #include "ecs/Scene.h"
 #include "systems/Overlay.h"
 #include "systems/AudioEngine.h"
 
 namespace Engine {
+    Application* CORE = nullptr;
     bool Application::m_shouldStop = false;
 
     Application::Application() {
@@ -109,6 +112,20 @@ namespace Engine {
         }
 
         WindowManager::DestroyAll();
+    }
+
+    void Application::Initialize() const {
+        for (auto& world : m_worlds)
+            world->_initialize();
+    }
+
+    void Application::Update() const {
+        // Clear screen FIRST
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        for (auto& world : m_worlds)
+            world->_update();
     }
 
     void Application::Close() {

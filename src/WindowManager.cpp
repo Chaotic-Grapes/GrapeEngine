@@ -3,6 +3,10 @@
 
 std::vector<Window*> WindowManager::m_windows;
 
+WindowManager::~WindowManager() {
+    DestroyAll();
+}
+
 Window* WindowManager::CreateWindow(const std::string& title, const int width, const int height, const Window* parent) {
     const auto window = new Window();
     // TODO: Hardware manager before supporting glfwGetPrimaryMonitor()
@@ -33,6 +37,25 @@ void WindowManager::DestroyAll() {
     m_windows.clear();
 }
 
+void WindowManager::OnCreate() {
+    // Create main window
+    if (m_windows.empty()) {
+        CreateWindow("GrapeEngine", 1920, 1080);
+    }
+}
+
+void WindowManager::OnUpdate() {
+    // Poll events once (GLFW applies to all windows)
+    glfwPollEvents();
+
+    for (const auto* window : m_windows) {
+        if (!window->ShouldClose()) {
+            window->SwapBuffers();
+        }
+    }
+}
+
+std::string WindowManager::Name()                       const { return "WindowManager"; }
 const std::vector<Window*>& WindowManager::GetWindows()       { return m_windows; }
 Window* WindowManager::GetMainWindow()                        { return m_windows.empty() ? nullptr : m_windows.front(); }
 

@@ -5,7 +5,7 @@
 #include "Application.h"
 
 // Overlay inherits from Engine::ISystem
-class Overlay : public Engine::ISystem {
+class Overlay final : public Engine::ISystem {
 public:
     void OnCreate() override;  // One-time initialization
     void OnUpdate() override;  // ImGUI initialization, input processing, UI rendering

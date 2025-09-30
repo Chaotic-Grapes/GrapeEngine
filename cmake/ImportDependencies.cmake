@@ -121,8 +121,8 @@ endmacro()
 # Macro to import FMOD
 macro(import_fmod)
     if(NOT TARGET fmod) # Guard to prevent multiple inclusion
-        set(FMOD_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/include/fmod")
-        set(FMOD_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/fmod")
+        set(FMOD_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include/fmod")
+        set(FMOD_LIB_DIR "${CMAKE_SOURCE_DIR}/lib/fmod")
 
         # Create an imported library target
         add_library(fmod UNKNOWN IMPORTED)

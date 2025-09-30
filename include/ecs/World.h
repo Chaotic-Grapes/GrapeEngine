@@ -10,6 +10,8 @@
 
 class Entity;
 class Scene;
+namespace Engine { class Application; } // Forward declaration for friend class
+
 class World {
 public:
     World() { m_entityManager.SetWorld(this); }
@@ -36,6 +38,7 @@ public:
 
 private:
 	friend class Scene;
+    friend class Engine::Application;
 
 	EntityManager m_entityManager;
 	std::vector<std::unique_ptr<Engine::ISystem>> m_systems;
