@@ -1,12 +1,10 @@
 #ifndef ENTITYSERIALIZER_H
 #define ENTITYSERIALIZER_H
 
-#include "../include/nlohmann/json.hpp"
-#include "../ecs/Entity.h"
-#include "../ecs/World.h"
-#include "../ecs/Components.h"
-
-#include <typeindex>
+#include <nlohmann/json.hpp>
+#include "ecs/Entity.h"
+#include "ecs/World.h"
+#include "ecs/Components.h"
 #include <unordered_map>
 #include <functional>
 #include <iostream>

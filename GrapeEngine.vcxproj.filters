@@ -307,9 +307,9 @@
       <Filter>Engine\Entity Component System</Filter>
     </ClInclude>
     <ClInclude Include="include\GameObjectFactoryTest.h" />
-    <ClInclude Include="src\EntitySerializer.h" />
-    <ClInclude Include="src\Serialization.h" />
-    <ClInclude Include="src\SerializationTest.h">
+    <ClInclude Include="include\EntitySerializer.h" />
+    <ClInclude Include="include\Serialization.h" />
+    <ClInclude Include="include\SerializationTest.h">
       <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClInclude>
   </ItemGroup>

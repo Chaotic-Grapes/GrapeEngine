@@ -9,8 +9,7 @@ using EntityId = uint32_t;
 class World;
 class Entity {
 public:
-    Entity(EntityId id, World* world, const std::string& name);
-    Entity(EntityId id, World* world);
+    Entity(EntityId id, World* world, const std::string& name = "GameObject");
     Entity(const Entity& other) = default;   // just copy the handle
     ~Entity() = default;
     Entity& operator=(const Entity& other) = default;

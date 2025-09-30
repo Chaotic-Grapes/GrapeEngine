@@ -239,10 +239,10 @@
     <ClInclude Include="include\ecs\Scene.h" />
     <ClInclude Include="include\ecs\SceneManager.h" />
     <ClInclude Include="src\Collision.h" />
-    <ClInclude Include="src\EntitySerializer.h" />
+    <ClInclude Include="include\EntitySerializer.h" />
     <ClInclude Include="src\Physics.h" />
-    <ClInclude Include="src\Serialization.h" />
-    <ClInclude Include="src\SerializationTest.h" />
+    <ClInclude Include="include\Serialization.h" />
+    <ClInclude Include="include\SerializationTest.h" />
     <ClInclude Include="src\test.h" />
   </ItemGroup>
   <ItemGroup>

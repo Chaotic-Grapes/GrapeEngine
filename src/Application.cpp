@@ -1,7 +1,5 @@
 ﻿#include "Application.h"
-
 #include <thread>
-#include <windows.h>
 #include "Input.h"
 #include "Physics2D.h"
 #include "systems/WindowManager.h"

@@ -1,4 +1,5 @@
 #include "GameObjectFactoryTest.h"
+#include "ecs/GameObjectFactory.h"
 
 void Sandbox::GameObjectFactoryTestScene::OnLoad() {
     // Load player from file

@@ -2,7 +2,7 @@
 #define WINDOW_H
 
 #include <string>
-#include <glad/glad.h>
+#include <glad/glad.h> // DO NOT REMOVE THIS LINE OR IT WILL NOT COMPILE
 #include <GLFW/glfw3.h>
 
 #pragma region WindowMode enum

@@ -3,12 +3,12 @@
 
 #include "Math/Vector2D.h"
 #include "ecs/IComponent.h"
-#include "../include/nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 #include <string>
 #include "Color.h"
 #include "graphics/texture.hpp"
 #include "graphics/SpriteMetaData.hpp"
-#include "../include/graphics/TextureCache.hpp"
+#include "graphics/TextureCache.hpp"
 #include <filesystem>
 #include <fstream>
 #include <vector>
@@ -35,11 +35,11 @@ namespace Component {
         }
 
         void Deserialize(const json& data) override {
-            Position.X = data.value("PositionX", 0.0f);
-            Position.Y = data.value("PositionY", 0.0f);
-            Rotation = data.value("Rotation", 0.0f);
-            Scale.X = data.value("ScaleX", 1.0f);
-            Scale.Y = data.value("ScaleY", 1.0f);
+            Position.X = data.value("PositionX", 0.f);
+            Position.Y = data.value("PositionY", 0.f);
+            Rotation = data.value("Rotation", 0.f);
+            Scale.X = data.value("ScaleX", 1.f);
+            Scale.Y = data.value("ScaleY", 1.f);
         }
 
         const char* GetTypeName() const override { return "Transform"; }
@@ -120,10 +120,10 @@ namespace Component {
                 Height = tex.Height();
             }
 
-            Color.R = data.value("ColorR", 1.0f);
-            Color.G = data.value("ColorG", 1.0f);
-            Color.B = data.value("ColorB", 1.0f);
-            Color.A = data.value("ColorA", 1.0f);
+            Color.R = data.value("ColorR", 255);
+            Color.G = data.value("ColorG", 255);
+            Color.B = data.value("ColorB", 255);
+            Color.A = data.value("ColorA", 255);
             FlipX = data.value("FlipX", false);
             FlipY = data.value("FlipY", false);
             SortingOrder = data.value("SortingOrder", 0);
@@ -208,18 +208,18 @@ namespace Component {
 
         void Deserialize(const json& data) override {
             Type = static_cast<ShapeType>(data.value("Type", 0));
-            FillColor.R = data.value("FillColorR", 1.0f);
-            FillColor.G = data.value("FillColorG", 1.0f);
-            FillColor.B = data.value("FillColorB", 1.0f);
-            FillColor.A = data.value("FillColorA", 1.0f);
-            OutlineColor.R = data.value("OutlineColorR", 0.0f);
-            OutlineColor.G = data.value("OutlineColorG", 0.0f);
-            OutlineColor.B = data.value("OutlineColorB", 0.0f);
-            OutlineColor.A = data.value("OutlineColorA", 1.0f);
-            OutlineThickness = data.value("OutlineThickness", 1.0f);
-            Size.X = data.value("SizeX", 100.0f);
-            Size.Y = data.value("SizeY", 100.0f);
-            Radius = data.value("Radius", 50.0f);
+            FillColor.R = data.value("FillColorR", 255);
+            FillColor.G = data.value("FillColorG", 255);
+            FillColor.B = data.value("FillColorB", 255);
+            FillColor.A = data.value("FillColorA", 255);
+            OutlineColor.R = data.value("OutlineColorR", 0);
+            OutlineColor.G = data.value("OutlineColorG", 0);
+            OutlineColor.B = data.value("OutlineColorB", 0);
+            OutlineColor.A = data.value("OutlineColorA", 255);
+            OutlineThickness = data.value("OutlineThickness", 1.f);
+            Size.X = data.value("SizeX", 100.f);
+            Size.Y = data.value("SizeY", 100.f);
+            Radius = data.value("Radius", 50.f);
             Closed = data.value("Closed", true);
 
             Points.clear();
@@ -267,13 +267,13 @@ namespace Component {
         }
 
         void Deserialize(const json& data) override {
-            LinearVelocity.X = data.value("LinearVelocityX", 0.0f);
-            LinearVelocity.Y = data.value("LinearVelocityY", 0.0f);
-            AngularVelocity = data.value("AngularVelocity", 0.0f);
+            LinearVelocity.X = data.value("LinearVelocityX", 0.f);
+            LinearVelocity.Y = data.value("LinearVelocityY", 0.f);
+            AngularVelocity = data.value("AngularVelocity", 0.f);
             Mass = data.value("Mass", 1.0f);
-            LinearDamping = data.value("LinearDamping", 0.0f);
+            LinearDamping = data.value("LinearDamping", 0.f);
             AngularDamping = data.value("AngularDamping", 0.05f);
-            GravityScale = data.value("GravityScale", 1.0f);
+            GravityScale = data.value("GravityScale", 1.f);
             FreezeRotation = data.value("FreezeRotation", false);
             BodyType = static_cast<enum BodyType>(data.value("BodyType", 0));
         }
@@ -299,8 +299,8 @@ namespace Component {
 
         void Deserialize(const json& data) override {
             IsTrigger = data.value("IsTrigger", false);
-            Offset.X = data.value("OffsetX", 0.0f);
-            Offset.Y = data.value("OffsetY", 0.0f);
+            Offset.X = data.value("OffsetX", 0.f);
+            Offset.Y = data.value("OffsetY", 0.f);
             Layer = data.value("Layer", 0);
         }
 
@@ -359,15 +359,15 @@ namespace Component {
         }
 
         void Deserialize(const json& data) override {
-            Start.X = data.value("StartX", 0.0f);
-            Start.Y = data.value("StartY", 0.0f);
-            End.X = data.value("EndX", 0.0f);
-            End.Y = data.value("EndY", 0.0f);
-            Thickness = data.value("Thickness", 1.0f);
-            Color.R = data.value("ColorR", 1.0f);
-            Color.G = data.value("ColorG", 1.0f);
-            Color.B = data.value("ColorB", 1.0f);
-            Color.A = data.value("ColorA", 1.0f);
+            Start.X = data.value("StartX", 0.f);
+            Start.Y = data.value("StartY", 0.f);
+            End.X = data.value("EndX", 0.f);
+            End.Y = data.value("EndY", 0.f);
+            Thickness = data.value("Thickness", 1.f);
+            Color.R = data.value("ColorR", 255);
+            Color.G = data.value("ColorG", 255);
+            Color.B = data.value("ColorB", 255);
+            Color.A = data.value("ColorA", 255);
         }
 
         const char* GetTypeName() const override { return "LineRenderer"; }

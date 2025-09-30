@@ -1,9 +1,8 @@
 #ifndef SERIALIZATION_H
 #define SERIALIZATION_H
 
-#include "../include/nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 #include "EntitySerializer.h"
-
 #include <fstream>
 #include <iostream>
 

@@ -1,7 +1,9 @@
-#pragma once
-#include <unordered_map>
+#ifndef INPUT_H
+#define INPUT_H
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <unordered_map>
 
 namespace Engine { class Application; } // Forward declaration for friend class
 class Input {
@@ -79,3 +81,5 @@ constexpr int MOUSE_RIGHT = GLFW_MOUSE_BUTTON_RIGHT;
 constexpr int PRESS = GLFW_PRESS;
 constexpr int REPEAT = GLFW_REPEAT;
 constexpr int RELEASE = GLFW_RELEASE;
+
+#endif
