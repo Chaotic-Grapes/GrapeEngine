@@ -18,6 +18,11 @@ namespace Sandbox {
         void OnFixedUpdate() override;
         void OnUnload() override;
 
+       /* enum class TestType {
+
+            
+        };*/
+
     private:
         void SpawnBalls(World& world, int count, unsigned seed = 0);
         //void CreateBoundaryLines();
