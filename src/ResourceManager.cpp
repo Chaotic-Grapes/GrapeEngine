@@ -4,9 +4,9 @@
 
 // Add compile-time debug control
 #ifdef _DEBUG
-    #define RM_DEBUG_PRINT(x) std::cout << x << std::endl
+#define RM_DEBUG_PRINT(x) std::cout << x << std::endl
 #else
-    #define RM_DEBUG_PRINT(x) // No output in release
+#define RM_DEBUG_PRINT(x) // No output in release
 #endif
 
 // Template specialization for Texture

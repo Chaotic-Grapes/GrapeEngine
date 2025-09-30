@@ -27,12 +27,6 @@ public:
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
 
-    // Template specializations (specific code for different assets)
-    template <>
-    std::shared_ptr<Texture> Get<Texture>(const std::string& name);
-    template <>
-    std::shared_ptr<RAudio> Get<RAudio>(const std::string& name);
-
     // Utility functions
     void ClearCache();  // Empty all maps, free cached assets from memory
     void UnloadAsset(const std::string& name); // Removes 1 specific asset from cache
