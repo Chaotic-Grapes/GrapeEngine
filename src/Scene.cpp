@@ -1,6 +1,9 @@
 #include "ecs/Scene.h"
+
+#include "DebugUI.h"
 #include "Physics2D.h"
 #include "Renderer2D.h"
+#include "systems/Overlay.h"
 #include "systems/Time.h"
 
 void Scene::Update() {
@@ -27,6 +30,11 @@ void Scene::Load() {
     m_world->AddSystem<Time>();
     m_world->AddSystem<Engine::Physics2D>(m_world.get());
     m_world->AddSystem<Engine::Renderer2D>(m_world.get());
+
+	// This must be added last so it renders on top of everything else
+#ifdef USE_IMGUI
+    m_world->AddSystem<Overlay>(m_world.get());
+#endif
 
     OnLoad();
     m_world->_initialize();

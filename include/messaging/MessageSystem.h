@@ -1,3 +1,35 @@
+/* Start Header *****************************************************************/
+/*!
+\file   MessageSystem.h
+\author Muhammad Nur Fadzly Bin Zulkifli
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+This file contains the declaration of a simple MessageBus system for decoupled
+communication between components.
+
+Usage:
+- Subscribe to messages of type T using Subscribe<T>(handler).
+- Broadcast messages of type T using Broadcast<T>(message).
+- Clear all subscriptions for type T using Clear<T>().
+
+Example:
+\code
+// Subscribe to int messages
+Messaging::MessageBus::Subscribe<int>([](const int& msg) {
+    std::cout << "Received int message: " << msg << '\n';
+});
+
+// Broadcast an int message
+Messaging::MessageBus::Broadcast<int>(42);
+\endcode
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #ifndef MESSAGEBUS_H
 #define MESSAGEBUS_H
 
@@ -5,7 +37,7 @@
 #include <functional>
 
 namespace Messaging {
-    class MessageBus {
+    class MessageSystem {
     public:
         template<typename T>
         using Handler = std::function<void(const T&)>;

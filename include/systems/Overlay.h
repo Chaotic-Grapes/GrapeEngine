@@ -12,7 +12,7 @@ class DebugUI;
 // Overlay inherits from Engine::ISystem
 class Overlay : public Engine::ISystem {
 public:
-    Overlay();
+    Overlay(World* world) : m_world(world) {}
     void OnCreate() override;  // One-time initialization
     void OnUpdate() override;  // ImGUI initialization, input processing, UI rendering
 

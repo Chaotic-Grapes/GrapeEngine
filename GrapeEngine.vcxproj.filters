@@ -237,7 +237,7 @@
     <ClInclude Include="include\ecs\IComponent.h">
       <Filter>Engine\Entity Component System\Components</Filter>
     </ClInclude>
-    <ClInclude Include="include\messaging\MessageBus.h">
+    <ClInclude Include="include\messaging\MessageSystem.h">
       <Filter>Engine\Messaging</Filter>
     </ClInclude>
     <ClInclude Include="include\messaging\MessageTypes.h">

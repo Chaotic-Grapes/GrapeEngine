@@ -153,6 +153,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\DebugUI.cpp" />
     <ClCompile Include="src\GameObjectFactoryTest.cpp" />
     <ClCompile Include="src\BehaviourSystem.cpp" />
     <ClCompile Include="src\DynamicCollision.cpp" />
@@ -190,6 +191,7 @@
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
+    <ClInclude Include="include\DebugUI.h" />
     <ClInclude Include="include\GameObjectFactoryTest.h" />
     <ClInclude Include="include\DynamicCollision.h" />
     <ClInclude Include="include\ecs\GameObjectFactory.h" />
@@ -209,13 +211,12 @@
     <ClInclude Include="include\ecs\IComponent.h" />
     <ClInclude Include="include\ecs\ISystem.h" />
     <ClInclude Include="include\ecs\World.h" />
-    <ClInclude Include="include\messaging\MessageBus.h" />
+    <ClInclude Include="include\messaging\MessageSystem.h" />
     <ClInclude Include="include\messaging\MessageTypes.h" />
     <ClInclude Include="include\Application.h" />
     <ClInclude Include="include\systems\Time.h" />
     <ClInclude Include="include\systems\Window.h" />
     <ClInclude Include="include\systems\WindowManager.h" />
-    <ClInclude Include="include\GLHelper.h" />
     <ClInclude Include="include\graphics\font.hpp" />
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />

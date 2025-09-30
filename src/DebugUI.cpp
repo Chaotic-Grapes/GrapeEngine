@@ -48,7 +48,7 @@ void DebugUI::NewFrame() {
     if (!m_initialized) return;
 
     // Interact with debug UI (start of every frame so it keeps getting checked)
-    if (Input::WasKeyJustPressed(GLFW_KEY_F1)) {
+    if (Input::IsKeyPressed(GLFW_KEY_F1)) {
         SetEnabled(!IsEnabled());
     }
 
@@ -236,8 +236,8 @@ void DebugUI::_showInputDebugWindow() {
     ImGui::Text("=== Event Testing ===");
 
     // For fun
-    if (Input::WasKeyJustPressed(GLFW_KEY_SPACE)) m_spacePressed++;
-    if (Input::WasKeyJustReleased(GLFW_KEY_SPACE)) m_spaceReleased++;
+    if (Input::IsKeyPressed(GLFW_KEY_SPACE)) m_spacePressed++;
+    if (Input::IsKeyUp(GLFW_KEY_SPACE)) m_spaceReleased++;
 
     ImGui::Text("Space Bar Events:");
     ImGui::Text("  Pressed: %d times", m_spacePressed);

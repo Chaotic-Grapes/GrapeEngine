@@ -20,7 +20,6 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cin >> choice;
 
     // Clear console
-    // Inefficient
     printf("\033[H\033[J");
 
     switch (choice) {
