@@ -1,6 +1,6 @@
+#include "Application.h"
 #include "Renderer2D.h"
 #include <iterator>
-#include "Application.h"
 #include "systems/WindowManager.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include "ecs/Components.h"

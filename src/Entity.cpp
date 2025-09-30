@@ -2,7 +2,11 @@
 #include "ecs/World.h"
 #include "ecs/Components.h"
 
-Entity::Entity(const EntityId id, World* world, const std::string& name) : m_id(id), m_world(world) { m_name = name; AddComponent<Component::Transform>(); }
+Entity::Entity(const EntityId id, World* world, const std::string& name) : m_id(id), m_world(world) {
+	// m_name is initialized here because std::move on a const std::string is not allowed
+	m_name = name;
+	AddComponent<Component::Transform>();
+}
 
 Entity Entity::Clone() const {
     const Entity copy = m_world->GetEntityManager().CreateEntity(m_name);

@@ -1,6 +1,7 @@
 ﻿#ifndef APPLICATION_H
 #define APPLICATION_H
 
+#include <windows.h>
 #include "Game.h"
 #include "ecs/SceneManager.h"
 

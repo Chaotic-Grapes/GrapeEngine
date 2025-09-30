@@ -33,6 +33,7 @@ public:
             const auto& s = comps["ShapeRenderer2D"];
             const std::string type = s["type"].get<std::string>();
 
+            // TODO: Default to hex value
             Color fill{ 1.f, 1.f, 1.f, 1.f };
             if (s.contains("fillColor") && s["fillColor"].is_array() && s["fillColor"].size() == 4) {
                 fill.R = s["fillColor"][0].get<float>() * 255.f;

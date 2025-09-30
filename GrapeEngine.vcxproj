@@ -179,6 +179,7 @@
     <ClCompile Include="src\SandboxGame.cpp" />
     <ClCompile Include="src\Scene.cpp" />
     <ClCompile Include="src\SceneManager.cpp" />
+    <ClCompile Include="src\SerializationTest.cpp" />
     <ClCompile Include="src\EntityManager.cpp" />
     <ClCompile Include="src\EngineSandbox.cpp" />
     <ClCompile Include="src\Application.cpp" />
@@ -235,6 +236,9 @@
     <ClInclude Include="include\ecs\Scene.h" />
     <ClInclude Include="include\ecs\SceneManager.h" />
     <ClInclude Include="src\Collision.h" />
+    <ClInclude Include="include\EntitySerializer.h" />
+    <ClInclude Include="include\Serialization.h" />
+    <ClInclude Include="include\SerializationTest.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl" />
