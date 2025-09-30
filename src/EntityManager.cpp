@@ -51,5 +51,5 @@ std::vector<EntityId> EntityManager::GetAllEntities() const {
 }
 
 Entity EntityManager::GetEntity(const EntityId id) const {
-    return Entity{id, m_world, GetEntityName(id)};
+    return Entity{id, m_world, GetName(id)};
 }

@@ -29,30 +29,8 @@ public:
     template<typename T, typename... Args>
     T& AddBehaviour(Entity& entity, Args&&... args);
 
-    void RemoveAllBehaviours(const Entity& entity);
-
-    const std::unordered_map<EntityId, std::vector<std::unique_ptr<Behaviour>>>& GetBehaviours() const;
-
-    // TODO: Put this in inl
     template<typename T>
-    void ForEachEntity(T func) {
-        auto entityIds = m_entityManager.GetAllEntities();
-        for (EntityId id : entityIds) {
-            Entity entity = m_entityManager.GetEntity(id);
-            func(entity);
-        }
-    }
-
-    template<typename T, typename... Args>
-    T* AddSystem(Args&&... args);
-
-    template<typename T>
-    T* GetSystem();
-
-    // In World because World consists of logic
-    // Whereas EntityManager consists of only data
-    template<typename T, typename... Args>
-    T& AddBehaviour(Entity& entity, Args&&... args);
+    void ForEachEntity(T func);
 
     void RemoveAllBehaviours(const Entity& entity);
 

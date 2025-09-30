@@ -40,12 +40,15 @@ public:
     //    return result;
     //}
 
-    std::string GetEntityName(EntityId id) const {
-        auto it = m_entityNames.find(id);
-        return (it != m_entityNames.end()) ? it->second : "";
+    std::string GetName(const EntityId id) const {
+        const auto it = m_entityNames.find(id);
+
+        return it != m_entityNames.end()
+    		? it->second
+    		: "";
     }
 
-    void SetEntityName(EntityId id, const std::string& name) {
+    void SetName(const EntityId id, const std::string& name) {
         m_entityNames[id] = name;
     }
 
@@ -154,15 +157,6 @@ private:
 
         return nullptr;
     }
-
-    // const std::string& _getName(const EntityId id) const {
-    //     static std::string empty = "Unknown";
-    //     const auto it = m_names.find(id);
-
-    //     return (it != m_names.end())
-    // 		? it->second
-    // 		: empty;
-    // }
 };
 
 #endif

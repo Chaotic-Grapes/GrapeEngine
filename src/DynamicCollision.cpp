@@ -259,6 +259,8 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
 DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
     const AABB& B, const Vector2D& B_end)
 {
+    (void)B_end;
+
     // Expand box by circle radius
     AABB E;
     E.min = { B.min.X - A.r, B.min.Y - A.r };

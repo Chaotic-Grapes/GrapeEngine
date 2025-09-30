@@ -22,5 +22,10 @@ void Entity::RemoveAllComponents() const {
     if (m_world) m_world->GetEntityManager().RemoveAllComponents(m_id);
 }
 
+void Entity::SetName(const std::string& newName) {
+    m_name = newName;
+    m_world->GetEntityManager().SetName(m_id, newName);
+}
+
 EntityId Entity::GetId()        const { return m_id; }
 std::string Entity::GetName()   const { return m_name; }

@@ -36,10 +36,10 @@ public:
             // TODO: Default to hex value
             Color fill{ 1.f, 1.f, 1.f, 1.f };
             if (s.contains("fillColor") && s["fillColor"].is_array() && s["fillColor"].size() == 4) {
-                fill.R = s["fillColor"][0].get<float>() * 255.f;
-                fill.G = s["fillColor"][1].get<float>() * 255.f;
-                fill.B = s["fillColor"][2].get<float>() * 255.f;
-                fill.A = s["fillColor"][3].get<float>() * 255.f;
+                fill.R = static_cast<HexValue>(s["fillColor"][0].get<float>() * 255.f);
+                fill.G = static_cast<HexValue>(s["fillColor"][1].get<float>() * 255.f);
+                fill.B = static_cast<HexValue>(s["fillColor"][2].get<float>() * 255.f);
+                fill.A = static_cast<HexValue>(s["fillColor"][3].get<float>() * 255.f);
             }
 
             if (type == "Rectangle") {

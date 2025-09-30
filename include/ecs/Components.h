@@ -15,7 +15,6 @@
 #include <iostream>
 
 namespace Component {
-    // TODO: Replace with a math library vector type
     struct Transform : IComponent {
         Vector2D Position {0, 0};
         float Rotation = 0;
