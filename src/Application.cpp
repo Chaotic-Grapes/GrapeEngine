@@ -5,9 +5,60 @@
 #include "Renderer2D.h"
 #include "systems/WindowManager.h"
 #include "ecs/Scene.h"
+#include "systems/Overlay.h"
+#include "systems/AudioEngine.h"
 
 namespace Engine {
     bool Application::m_shouldStop = false;
+
+    Application::Application() {
+        CORE = this;
+    }
+
+    World& Application::CreateWorld() {
+        m_worlds.push_back(std::make_unique<World>());
+        auto& world = *m_worlds.back();
+
+        // Attach core systems to the world
+        world.AddSystem<Time>();
+        world.AddSystem<Overlay>();
+        world.AddSystem<WindowManager>();
+        world.AddSystem<AudioSystem>();
+
+        // Link Overlay -> Audio so DebugUI can use it
+        auto* overlay = world.GetSystem<Overlay>();
+        auto* audioSys = world.GetSystem<AudioSystem>();
+        if (overlay && audioSys) {
+            overlay->SetAudio(audioSys->GetAudio());
+        }
+
+        return world;
+    }
+
+    void Application::DestroyWorld(World& world) {
+        const auto it = std::find_if(m_worlds.begin(), m_worlds.end(),
+            [&world](const std::unique_ptr<World>& ptr) {
+                return ptr.get() == &world;
+            });
+
+        if (it != m_worlds.end()) {
+            m_worlds.erase(it);
+        }
+    }
+
+    void Application::DestroyWorld(const size_t index) {
+        if (index < m_worlds.size()) {
+            m_worlds.erase(m_worlds.begin() + static_cast<long long>(index));
+        }
+    }
+
+    void Application::DestroyAllWorlds() {
+        m_worlds.clear();
+    }
+
+    size_t Application::GetWorldCount() const {
+        return m_worlds.size();
+    }
 
     void Application::Run(Game& game, const bool consoleFlag) {
 #if !_DEBUG

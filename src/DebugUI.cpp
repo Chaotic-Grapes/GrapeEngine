@@ -6,11 +6,20 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <iostream>
+#include "System.h"
+#include <algorithm>
 
 // Initialize static variables
 bool DebugUI::m_enabled = true;
 std::vector<GameObject> DebugUI::m_gameObjects;
 int DebugUI::m_nextGameObjectId = 1;  // Start with 1
+
+namespace {
+    Systems::Audio* gAudioPtr = nullptr;
+}
+
+void DebugUI::AttachAudio(Systems::Audio* audio) { gAudioPtr = audio; }
+void DebugUI::DetachAudio() { gAudioPtr = nullptr; }
 
 void DebugUI::Initialize(GLFWwindow* window) {
     IMGUI_CHECKVERSION();     // Verify ImGUI version compatibility
@@ -55,6 +64,9 @@ void DebugUI::Render() {
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
     _showGameObjectEditor();   // Game object editor
+    _showAudioWindow(*gAudioPtr);
+   
+   
 
     // Finalize the frame and send to GPU
     ImGui::Render();  // Generate draw commands from UI
@@ -87,10 +99,153 @@ void DebugUI::_showPerformanceWindow() {
     ImGui::SetNextWindowSize(ImVec2(300, 120), ImGuiCond_Once);
 
     ImGui::Begin("Performance Monitor");
-    // ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-    // ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
+    ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+    ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
     if (ImGui::Button("Print GPU Specs to Console")) {
         Input::PrintSpecs();
+    }
+    ImGui::End();
+}
+
+void DebugUI::_showAudioWindow(Systems::Audio& audio) {
+
+    ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(300, 220), ImGuiCond_Once);
+    ImGui::Begin("Audio Monitor");
+
+
+
+    // Toggle library window
+    static bool showLibrary = false;
+    if (ImGui::Button("Open Audio Library")) showLibrary = true;
+
+    ImGui::End();
+
+    if (!showLibrary) return;
+
+    ImGui::SetNextWindowSize(ImVec2(520, 420), ImGuiCond_Once);
+    if (ImGui::Begin("Audio Library", &showLibrary)) {
+        // Editor -> local library rows
+        struct Row { Resources::SoundCue::Ptr cue; SoundInstance::StrongPtr inst; float vol{ 1.f }; bool loop{ false }; };
+        static std::vector<Row> rows;
+
+        // Add-by-path (no file dialog dependency)
+        static char pathBuf[512] = {};
+        ImGui::InputTextWithHint("##AddPath", "Paste audio path (wav/mp3/ogg/flac...)", pathBuf, sizeof(pathBuf));
+        ImGui::SameLine();
+        if (ImGui::Button("Add")) {
+            std::string path = pathBuf;
+            if (!path.empty()) {
+                auto cue = Resources::SoundCue::CreateFromFile(path);
+                if (cue) {
+                    auto s = cue->getSettings();
+                    s.Volume = 1.0f; s.Loop = false;
+                    cue->setSettings(s);
+                    audio.Add(cue);
+                    rows.push_back(Row{ cue, nullptr, s.Volume, s.Loop });
+                }
+                else {
+                    ImGui::OpenPopup("Audio Add Error");
+                }
+                pathBuf[0] = '\0';
+            }
+        }
+
+        if (ImGui::BeginPopupModal("Audio Add Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextUnformatted("Invalid or unsupported audio file.\nCheck path and extension.");
+            if (ImGui::Button("OK", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Clear List")) rows.clear();
+
+        ImGui::Separator();
+
+        // Master volume
+        if (!audio.IsReady()) {
+            ImGui::TextUnformatted("Audio not initialized yet...");
+            ImGui::End();
+            return;
+        }
+
+        // Safe to touch the backend now
+        float mv = audio.GetMasterVolume();
+        if (ImGui::SliderFloat("Master Volume", &mv, 0.0f, 1.0f, "%.2f")) {
+            audio.SetMasterVolume(mv);
+        }
+
+        // Optional search filter
+        static char filter[128] = {};
+        ImGui::InputTextWithHint("##filter", "Filter...", filter, sizeof(filter));
+        const std::string filt = filter;
+
+        ImGui::Separator();
+
+        // Draw the rows
+        for (int i = 0; i < (int)rows.size(); ++i) {
+            auto& r = rows[i];
+            if (!r.cue) continue;
+            if (!filt.empty() && r.cue->getName().find(filt) == std::string::npos) continue;
+
+            ImGui::PushID(i);
+
+            ImGui::TextUnformatted(r.cue->getName().c_str());
+            ImGui::SameLine();
+
+            const bool playing = (r.inst && r.inst->IsPlaying());
+
+            // Play / Stop / Pause / Resume
+            if (!playing) {
+                if (ImGui::SmallButton("Play")) {
+                    auto s = r.cue->getSettings();
+                    s.Volume = r.vol; s.Loop = r.loop;
+                    r.cue->setSettings(s);
+                    r.inst = audio.Play(r.cue);
+                    if (r.inst) r.inst->InterpolateVolume(r.vol, 0.0f);
+                }
+            }
+            else {
+                if (ImGui::SmallButton("Stop")) { r.inst->Stop(); r.inst.reset(); }
+            }
+            ImGui::SameLine();
+            if (playing) {
+                if (ImGui::SmallButton("Pause")) { r.inst->Pause(); }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Resume")) { r.inst->Resume(); }
+                ImGui::SameLine();
+                ImGui::TextDisabled("[playing]");
+            }
+
+            // Loop toggle (apply immediately if playing)
+            bool loop = r.loop;
+            ImGui::SameLine();
+            if (ImGui::Checkbox("Loop", &loop)) {
+                r.loop = loop;
+                if (r.inst && r.inst->IsPlaying()) {
+                    // requires SoundInstance::SetLoop(bool)
+                    r.inst->SetLoop(loop);
+                }
+                else {
+                    auto s = r.cue->getSettings();
+                    s.Loop = loop;
+                    r.cue->setSettings(s);
+                }
+            }
+
+            // Per-track volume (live adjust if playing)
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(160.f);
+            float v = r.vol;
+            if (ImGui::SliderFloat("Vol", &v, 0.0f, 1.0f, "%.2f")) {
+                r.vol = v;
+                if (r.inst && r.inst->IsPlaying()) {
+                    r.inst->InterpolateVolume(v, 0.05f);
+                }
+            }
+
+            ImGui::PopID();
+        }
     }
     ImGui::End();
 }

@@ -6,6 +6,7 @@
 #include "ecs/EntityManager.h"
 #include "ecs/ISystem.h"
 #include "systems/Behaviour.h"
+#include "systems/AudioEngine.h"
 
 class Entity;
 class Scene;

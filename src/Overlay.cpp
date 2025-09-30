@@ -25,6 +25,7 @@ void Overlay::OnUpdate() {
             // ImGUI needs a valid OpenGL context (provided by the window)
             DebugUI::Initialize(mainWindow->Handle());
             // Mark as initialized so we don't do this again
+            if (m_audio) { DebugUI::AttachAudio(m_audio); } // attach the real instance
             initialized = true;
         }
         // Window doesn't exist yet
@@ -41,6 +42,7 @@ void Overlay::OnUpdate() {
 
 // Prevent memory leaks
 Overlay::~Overlay() {
+    DebugUI::DetachAudio();
     DebugUI::Shutdown();
 }
 

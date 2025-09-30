@@ -1,0 +1,36 @@
+# Doxyfile configuration for GrapeEngine
+
+PROJECT_NAME           = "GrapeEngine"
+PROJECT_NUMBER         = "1.0"
+PROJECT_BRIEF          = "A simple game engine"
+OUTPUT_DIRECTORY       = "@DOC_BUILD_PATH@"
+INPUT                  = "@DOC_INPUT_PATH@" "@DOC_SOURCE_PATH@"
+RECURSIVE              = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+HTML_OUTPUT            = html
+HAVE_DOT               = @HAVE_DOT@
+DOT_PATH               = "@DOT_EXECUTABLE_PATH@"
+COLLABORATION_GRAPH    = YES
+INCLUDE_GRAPH          = YES
+INCLUDED_BY_GRAPH      = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+GRAPHICAL_HIERARCHY    = YES
+DOT_IMAGE_FORMAT       = png
+INTERACTIVE_SVG        = YES
+QUIET                  = YES
+WARNINGS               = NO
+FILE_PATTERNS          = *.cpp *.c *.h *.hpp *.md
+EXCLUDE_PATTERNS       = */glad/* \
+                         */GLFW/* \
+                         */glm/* \
+                         */KHR/* \
+                         */imgui/* \
+                         */freetype/* \
+                         */build/* \
+                         */_deps/*
+USE_MDFILE_AS_MAINPAGE =
