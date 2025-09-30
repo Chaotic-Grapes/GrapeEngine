@@ -110,7 +110,7 @@ void DebugUI::_showPerformanceWindow() {
 void DebugUI::_showAudioWindow(Systems::Audio& audio) {
 
     ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(360, 220), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(300, 220), ImGuiCond_Once);
     ImGui::Begin("Audio Monitor");
 
 

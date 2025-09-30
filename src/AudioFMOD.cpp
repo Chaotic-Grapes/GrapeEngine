@@ -60,14 +60,17 @@ SoundInstance::StrongPtr AudioFMOD::Play(const Resources::SoundCue::Ptr cue) {
     // Start paused, then configure
     FMOD::Channel* ch = nullptr;
     FMOD_CHECK(m_system->playSound(snd, nullptr, true, &ch));
+    inst->_bindBackend(snd, ch);
 
     // Loop
     const auto& s = cue->getSettings();
     snd->setMode(s.Loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
-    if (s.Loop) snd->setLoopCount(-1);
+    snd->setLoopCount(s.Loop ? -1 : 0);
 
-    // Volume at start
+    // ADD THIS (apply to the playing Channel):
     if (ch) {
+        ch->setMode(s.Loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
+        ch->setLoopCount(s.Loop ? -1 : 0);
         ch->setVolume(s.Volume);
         ch->setPaused(false);
     }
