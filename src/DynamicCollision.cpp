@@ -206,7 +206,7 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
 
     Vector2D vA{ A_end.X - A.c.X, A_end.Y - A.c.Y };
     Vector2D vB{ B_end.X - B.c.X, B_end.Y - B.c.Y };
-    Vector2D v{ vA.Y - vB.Y, vA.Y - vB.Y }; // relative motion (A wrt B)
+    Vector2D v{ vA.X - vB.X, vA.Y - vB.Y }; // relative motion (A wrt B)
 
     Vector2D w0{ A.c.X - B.c.X, A.c.Y - B.c.Y }; // initial offset
     float R = A.r + B.r;

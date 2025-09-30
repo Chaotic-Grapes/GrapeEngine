@@ -176,11 +176,9 @@
     <ClCompile Include="src\Math\Vector2D.cpp" />
     <ClCompile Include="src\Math\Vector3D.cpp" />
     <ClCompile Include="src\Math\Vector4D.cpp" />
-    <ClCompile Include="src\Physics.cpp" />
     <ClCompile Include="src\SandboxGame.cpp" />
     <ClCompile Include="src\Scene.cpp" />
     <ClCompile Include="src\SceneManager.cpp" />
-    <ClCompile Include="src\test.cpp" />
     <ClCompile Include="src\EntityManager.cpp" />
     <ClCompile Include="src\EngineSandbox.cpp" />
     <ClCompile Include="src\Application.cpp" />
@@ -197,7 +195,6 @@
     <ClInclude Include="include\GraphicsTest.hpp" />
     <ClInclude Include="include\graphics\SpriteMetaData.hpp" />
     <ClInclude Include="include\graphics\TextureCache.hpp" />
-    <ClInclude Include="include\json.hpp" />
     <ClInclude Include="include\SandboxGame.h" />
     <ClInclude Include="include\systems\Behaviour.h" />
     <ClInclude Include="include\systems\BehaviourSystem.h" />
@@ -238,8 +235,6 @@
     <ClInclude Include="include\ecs\Scene.h" />
     <ClInclude Include="include\ecs\SceneManager.h" />
     <ClInclude Include="src\Collision.h" />
-    <ClInclude Include="src\Physics.h" />
-    <ClInclude Include="src\test.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl" />
