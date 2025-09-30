@@ -18,8 +18,8 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cin >> choice;
 
     // Clear console
-    // Not thread-safe but does it matter?
-    system("cls");
+    // Inefficient
+    printf("\033[H\033[J");
 
     switch (choice) {
     case 1: { // PhysicsCollision

@@ -1,8 +1,8 @@
-#pragma once
+#ifndef DYNAMICCOLLISION_H
+#define DYNAMICCOLLISION_H
+
 #include <vector>
-#include <cfloat>
 #include "Math/Vector2D.h"  
-#include "../src/Collision.h"  
 
 namespace DynCol {
 
@@ -45,3 +45,5 @@ namespace DynCol {
         const AABB& B, const Vector2D& B_end);
 
 } // namespace DynCol
+
+#endif

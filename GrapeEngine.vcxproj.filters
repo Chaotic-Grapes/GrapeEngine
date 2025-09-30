@@ -322,7 +322,7 @@
     <ClInclude Include="src\Collision.h">
       <Filter>Engine\Systems\ISystem Dependent\Physics</Filter>
     </ClInclude>
-    <ClInclude Include="include\DyamicCollision.h">
+    <ClInclude Include="include\DynamicCollision.h">
       <Filter>Engine\Systems\ISystem Dependent\Physics</Filter>
     </ClInclude>
     <ClInclude Include="include\Math\Matrix3x3.h">

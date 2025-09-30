@@ -1,7 +1,6 @@
-#include "../src/DyamicCollision.h"
+#include "DynamicCollision.h"
 #include <algorithm>
 #include <cmath>
-
 
 //helpers for squared length and float clamp
 static inline float Dot(const Vector2D& a, const Vector2D& b) { return a.X * b.X + a.Y * b.Y; }

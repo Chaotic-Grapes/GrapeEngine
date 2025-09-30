@@ -190,7 +190,7 @@
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
     <ClInclude Include="include\GameObjectFactoryTest.h" />
-    <ClInclude Include="include\DyamicCollision.h" />
+    <ClInclude Include="include\DynamicCollision.h" />
     <ClInclude Include="include\ecs\GameObjectFactory.h" />
     <ClInclude Include="include\GraphicsTest.hpp" />
     <ClInclude Include="include\graphics\SpriteMetaData.hpp" />
