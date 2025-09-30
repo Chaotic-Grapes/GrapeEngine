@@ -95,6 +95,30 @@ macro(import_imgui)
     endif()
 endmacro()
 
+# Macro to import FreeType
+macro(import_freetype) 
+    if(NOT TARGET freetype)  # Guard to prevent multiple inclusion
+        FetchContent_Declare(
+            freetype
+            GIT_REPOSITORY https://github.com/freetype/freetype.git
+            GIT_TAG VER-2-14-1
+        )
+
+        if(NOT freetype_POPULATED) 
+            # Disable unnecessary FreeType features
+            # We only need .ttf, .otf for basic font rendering
+            set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+            set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+            set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+            set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+            set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+            
+            FetchContent_MakeAvailable(freetype)
+        endif()
+    endif()
+endmacro()
+
+
 # Macro to import all dependencies
 macro(importDependencies)
     message(STATUS "Starting to import dependencies...")
@@ -114,6 +138,10 @@ macro(importDependencies)
     message(STATUS "Importing ImGui...")
     import_imgui()
     message(STATUS "ImGui imported successfully.")
+
+    message(STATUS "Importing FreeType...")
+    import_freetype()
+    message(STATUS "FreeType imported successfully.")
 
     message(STATUS "All dependencies have been imported successfully.")
 endmacro()

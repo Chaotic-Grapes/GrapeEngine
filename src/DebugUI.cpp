@@ -6,32 +6,50 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <iostream>
+#include "ecs/World.h"
 
-// Initialize static variables
-bool DebugUI::m_enabled = true;
-std::vector<GameObject> DebugUI::m_gameObjects;
-int DebugUI::m_nextGameObjectId = 1;  // Start with 1
+// Standard constructor and destructor
+// raw ptr: DebugUI doesn't own the world
+DebugUI::DebugUI(World* world, const DebugUIConfig& config)
+    : m_config(config), m_world(world) {
+}
+
+DebugUI::~DebugUI() {
+    // Clean up resources only if UI was initialized
+    if (m_initialized) Shutdown();
+}
 
 void DebugUI::Initialize(GLFWwindow* window) {
+    // Avoid reinitializing ImGUI
+    if (!window || m_initialized) return;
+
     IMGUI_CHECKVERSION();     // Verify ImGUI version compatibility
     ImGui::CreateContext();   // Create ImGUI rendering context
+
     ImGuiIO& io = ImGui::GetIO();  // Get input/output config
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Allow keyboard navigation
-    io.FontGlobalScale = 1.35f;    // Scale the entire UI
+    io.FontGlobalScale = m_config.FontScale;    // Scale the entire UI
 
     ImGui::StyleColorsDark(); // Set dark theme colors
     ImGui_ImplGlfw_InitForOpenGL(window, true); // GLFW backend (window/input handling)
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
 
-    // Initialize with some default game objects for testing
-    AddGameObject("Player");
-    AddGameObject("Enemy");
+    m_initialized = true;  // Mark that DebugUI has been initialized
+
+    // If the world exists then create some default game objects
+    if (HasValidWorld()) {
+        AddGameObject("Player");
+        AddGameObject("Enemy");
+    }
 }
 
 void DebugUI::NewFrame() {
+    // Check
+    if (!m_initialized) return;
+
     // Interact with debug UI (start of every frame so it keeps getting checked)
     if (Input::WasKeyJustPressed(GLFW_KEY_F1)) {
-        DebugUI::SetEnabled(!DebugUI::IsEnabled());
+        SetEnabled(!IsEnabled());
     }
 
     if (!m_enabled) return;  // Early exit if UI is toggled off
@@ -42,49 +60,139 @@ void DebugUI::NewFrame() {
 }
 
 void DebugUI::Render() {
-    if (!m_enabled) return;  // Early exit if UI is toggled off
-
-    // Control variable for the ImGUI demo window
-    static bool showDemo = false;
-    if (showDemo) {
-        ImGui::ShowDemoWindow(&showDemo);  // Show ImGUI's built-in demo window
-    }
+    if (!m_initialized || !m_enabled) return;  // Early exit if UI is toggled off
 
     // Render custom debug windows
-    _showEngineDebugWindow(showDemo); // Pass demo control to debug window
+    _showEngineDebugWindow(); // Pass demo control to debug window
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
     _showGameObjectEditor();   // Game object editor
 
+    // Show ImGUI's built-in demo window
+    if (m_showDemo) {
+        // Toggle functionality shown later in engine debug window func
+        ImGui::ShowDemoWindow(&m_showDemo);
+    }
+
     // Finalize the frame and send to GPU
     ImGui::Render();  // Generate draw commands from UI
     ImDrawData* drawData = ImGui::GetDrawData();  // Get rendering data structure
-    ImGui_ImplOpenGL3_RenderDrawData(drawData);   // Submit to OpenGL for GPU execution
+
+    if (drawData) {
+        // Submit to OpenGL for GPU execution
+        ImGui_ImplOpenGL3_RenderDrawData(drawData);
+    }
 }
 
-void DebugUI::_showEngineDebugWindow(bool& showDemo) {
-    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Once);     // Position window (only on first appearance)
-    ImGui::SetNextWindowSize(ImVec2(300, 150), ImGuiCond_Once);  // Size
+void DebugUI::Shutdown() {
+    if (!m_initialized) return;
+
+    // Standard cleanup stuff
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    m_initialized = false;
+}
+
+// Check if World object exists
+bool DebugUI::HasValidWorld() const {
+    return m_world != nullptr;
+}
+
+// Search for an object and return pointer (or nullptr)
+GameObject* DebugUI::FindGameObject(EntityId id) {
+    // Search for game object in list by EntityId
+    for (GameObject& obj : m_gameObjects) {
+        // If found, return ptr to that object
+        if (obj.Id == id) return &obj;
+    }
+    // Not found
+    return nullptr;
+}
+
+// Create a new object
+void DebugUI::AddGameObject(const std::string& name) {
+    // Safety check
+    if (name.empty() || name.length() > m_config.MAX_OBJECT_NAME_LENGTH
+        || !HasValidWorld()) return;
+
+    // Create real ECS entity with components
+    Entity entity = _createGameEntity(name);
+
+    // Add to editor list for UI display + clear cached toggle/delete
+    // button labels so new objects get proper unique labels
+    m_gameObjects.emplace_back(entity.GetId(), name);
+    _invalidateButtonCache();
+}
+
+// Find and delete an object by ID
+void DebugUI::RemoveGameObject(EntityId id) {
+    // Safety check
+    if (!HasValidWorld()) return;
+
+    // Loop through game objects
+    for (std::vector<GameObject>::iterator it = m_gameObjects.begin();
+        it != m_gameObjects.end(); it++) {
+        // If this object matches the ID
+        if (it->Id == id) {
+            // Remove from ECS world first
+            Entity entity(id, m_world);  // Temporary handle pointing to ECS world to use in below func
+            m_world->GetEntityManager().DestroyEntity(entity); // Wants an Entity handle (not ID)
+
+            // Remove from UI list + clear cached toggle/delete button labels
+            m_gameObjects.erase(it);
+            _invalidateButtonCache();
+
+            // Already found the object so no need to keep looping
+            break;
+        }
+    }
+}
+
+void DebugUI::ClearAllGameObjects() {
+    // Safety check
+    if (!HasValidWorld()) return;
+
+    // Loop through game objects, same thing as above
+    for (const GameObject& obj : m_gameObjects) {
+        Entity entity(obj.Id, m_world);
+        m_world->GetEntityManager().DestroyEntity(entity);
+    }
+
+    // Clear vector, clear caches 
+    m_gameObjects.clear();
+    _invalidateButtonCache();
+}
+
+void DebugUI::_showEngineDebugWindow() {
+    // Use config values
+    const DebugUIConfig::WindowLayout& layout = m_config.Layout;
+    ImGui::SetNextWindowPos(ImVec2(layout.EngineX, layout.EngineY), ImGuiCond_Once);   // Position window (only on first appearance)
+    ImGui::SetNextWindowSize(ImVec2(layout.EngineW, layout.EngineH), ImGuiCond_Once);  // Size
 
     // Display current engine state info
     ImGui::Begin("GrapeEngine Debug Console");
     ImGui::Text("Engine Status: Running");
-    ImGui::Text("Debug UI: Active");
+    ImGui::Text("Debug UI: %s", m_enabled ? "Active" : "Inactive");
+    ImGui::Text("World: %s", HasValidWorld() ? "Connected" : "Not Set");
+
     ImGui::Separator();  // Visual divider line
 
     // Interactive button to toggle visibility
     if (ImGui::Button("Toggle Demo Window")) {
-        showDemo = !showDemo;
+        m_showDemo = !m_showDemo;
     }
-
     ImGui::Text("Press F1 to toggle debug UI");
 
     ImGui::End();  // Complete window definition
 }
 
 void DebugUI::_showPerformanceWindow() {
-    ImGui::SetNextWindowPos(ImVec2(10, 170), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(300, 120), ImGuiCond_Once);
+    // Use config values
+    const DebugUIConfig::WindowLayout& layout = m_config.Layout;
+    ImGui::SetNextWindowPos(ImVec2(layout.PerfX, layout.PerfY), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(layout.PerfW, layout.PerfH), ImGuiCond_Once);
 
     ImGui::Begin("Performance Monitor");
     // ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
@@ -96,9 +204,12 @@ void DebugUI::_showPerformanceWindow() {
 }
 
 void DebugUI::_showInputDebugWindow() {
+    // Use config values
+    const DebugUIConfig::WindowLayout& layout = m_config.Layout;
     // Same stuff as before
-    ImGui::SetNextWindowPos(ImVec2(330, 10), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(320, 400), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(ImVec2(layout.InputX, layout.InputY), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(layout.InputW, layout.InputH), ImGuiCond_Once);
+
     ImGui::Begin("Input Debug");
 
     ImGui::Text("=== Mouse ===");
@@ -125,28 +236,27 @@ void DebugUI::_showInputDebugWindow() {
     ImGui::Text("=== Event Testing ===");
 
     // For fun
-    static int spacePressed = 0;
-    static int spaceReleased = 0;
-
-    if (Input::WasKeyJustPressed(GLFW_KEY_SPACE)) spacePressed++;
-    if (Input::WasKeyJustReleased(GLFW_KEY_SPACE)) spaceReleased++;
+    if (Input::WasKeyJustPressed(GLFW_KEY_SPACE)) m_spacePressed++;
+    if (Input::WasKeyJustReleased(GLFW_KEY_SPACE)) m_spaceReleased++;
 
     ImGui::Text("Space Bar Events:");
-    ImGui::Text("  Pressed: %d times", spacePressed);
-    ImGui::Text("  Released: %d times", spaceReleased);
+    ImGui::Text("  Pressed: %d times", m_spacePressed);
+    ImGui::Text("  Released: %d times", m_spaceReleased);
 
     if (ImGui::Button("Reset Counters")) {
-        spacePressed = 0;
-        spaceReleased = 0;
+        m_spacePressed = 0;
+        m_spaceReleased = 0;
     }
 
     ImGui::End();
 }
 
 void DebugUI::_showGameObjectEditor() {
+    // Same same
+    const DebugUIConfig::WindowLayout& layout = m_config.Layout;
     // Position the window to the right of existing windows
-    ImGui::SetNextWindowPos(ImVec2(670, 10), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(375, 400), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(ImVec2(layout.EditorX, layout.EditorY), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(layout.EditorW, layout.EditorH), ImGuiCond_Once);
 
     ImGui::Begin("Game Object Editor");
     ImGui::Text("Level Editor Tools");
@@ -154,12 +264,20 @@ void DebugUI::_showGameObjectEditor() {
 
     // Add new game object section
     ImGui::Text("Create New Object:");
-    static char newObjectName[64] = "NewObject";  // Store new object name
-    ImGui::InputText("Name", newObjectName, sizeof(newObjectName));
+    static char nameBuffer[DebugUIConfig::MAX_OBJECT_NAME_LENGTH];
+    if (m_newObjectName.length() < sizeof(nameBuffer)) {
+        // Store new object name
+        strcpy_s(nameBuffer, m_newObjectName.c_str());
+    }
+
+    if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))) {
+        m_newObjectName = nameBuffer;
+    }
 
     // When button is clicked, create the object
-    if (ImGui::Button("Add Object")) {
-        AddGameObject(std::string(newObjectName));
+    if (ImGui::Button("Add Object") && !m_newObjectName.empty()) {
+        AddGameObject(m_newObjectName);
+        m_newObjectName = "NewObject"; // Reset
     }
 
     ImGui::Separator();
@@ -178,7 +296,7 @@ void DebugUI::_showGameObjectEditor() {
     ImGui::Text("Current Objects (%zu):", m_gameObjects.size());
 
     // For each object
-    for (const GameObject& gameObject : m_gameObjects) {
+    for (GameObject& gameObject : m_gameObjects) {
         // Show object info
         ImGui::Text("ID: %d - %s", gameObject.Id, gameObject.Name.c_str());
 
@@ -194,21 +312,14 @@ void DebugUI::_showGameObjectEditor() {
         // Toggle active/inactive button
         ImGui::SameLine();
         // If object is active, button shows deactivate; if object is inactive, other way around
-        // Again create unique button IDs
-        if (ImGui::SmallButton((std::string(gameObject.IsActive ? "Hide##" : "Show##") + 
-            std::to_string(gameObject.Id)).c_str())) {
-            // Find the object and toggle its state
-            GameObject* obj = FindGameObject(gameObject.Id);
-            if (obj) {
-                obj->IsActive = !obj->IsActive;
-            }
+        if (ImGui::SmallButton(_getToggleLabel(gameObject).c_str())) {
+            gameObject.IsActive = !gameObject.IsActive;
         }
 
         // Delete button for each object
         ImGui::SameLine();
-        // Unique button IDs like Delete##1, Delete##2 (everything after ## is hidden from display)
-        // Otherwise ImGUI wouldn't know which button was clicked
-        if (ImGui::SmallButton(("Delete##" + std::to_string(gameObject.Id)).c_str())) {
+        // Unique button IDs
+        if (ImGui::SmallButton(_getDeleteLabel(gameObject).c_str())) {
             RemoveGameObject(gameObject.Id);
             break;
         }
@@ -221,45 +332,72 @@ void DebugUI::_showGameObjectEditor() {
 
     // Clear all buttons
     if (ImGui::Button("Clear All Objects")) {
-        m_gameObjects.clear();
+        ClearAllGameObjects();
     }
 
     ImGui::End();
 }
 
-// Search for an object and return pointer (or nullptr)
-GameObject* DebugUI::FindGameObject(int id) {
-    // Search from start to end of vector; check if each object's ID matches what we're looking for
-    std::vector<GameObject>::iterator it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(),
-        [id](const GameObject& gameObject) { return gameObject.Id == id; });
+// Helper function to create entities with basic components
+Entity DebugUI::_createGameEntity(const std::string& name) {
+    // Create new entity in ECS
+    Entity entity = m_world->CreateEntity();
 
-    // If iterator reached the end, object wasn't found
-    // &(*it) cause we want to dereference pointer to get object then take its address to return pointer
-    return (it != m_gameObjects.end()) ? &(*it) : nullptr;
-}
+    // Add basic components that most game objects need
+    entity.AddComponent<Component::Transform>();
 
-// Create a new object
-void DebugUI::AddGameObject(const std::string& name) { 
-    // Increment ID
-    m_gameObjects.emplace_back(m_nextGameObjectId++, name); 
-}
-
-// Find and delete an object by ID
-void DebugUI::RemoveGameObject(int id) {
-    // Same thing
-    std::vector<GameObject>::iterator it = std::find_if(m_gameObjects.begin(), m_gameObjects.end(),
-        [id](const GameObject& gameObject) { return gameObject.Id == id; });
-
-    // If object is found, erase
-    // No need for &(*it) cause not returning anything
-    if (it != m_gameObjects.end()) {
-        m_gameObjects.erase(it);
+    // Add different components based on object type
+    if (name == "Player") {
+        entity.AddComponent<Component::SpriteRenderer>("player_sprite.png");
+        entity.AddComponent<Component::Rigidbody2D>();
+        entity.AddComponent<Component::BoxCollider2D>();
     }
+    else if (name == "Enemy") {
+        entity.AddComponent<Component::SpriteRenderer>("enemy_sprite.png");
+        entity.AddComponent<Component::Rigidbody2D>();
+        entity.AddComponent<Component::BoxCollider2D>();
+    }
+    else if (name == "Collectible") {
+        entity.AddComponent<Component::SpriteRenderer>("collectible_sprite.png");
+        entity.AddComponent<Component::CircleCollider2D>();
+        // Make it a trigger; entity can detect collisions without physically blocking movement
+        Component::CircleCollider2D* collider = entity.GetComponent<Component::CircleCollider2D>();
+        if (collider) collider->IsTrigger = true;
+    }
+    else {
+        // Default object: just transform and sprite
+        entity.AddComponent<Component::SpriteRenderer>();
+    }
+
+    return entity;
 }
 
-void DebugUI::Shutdown() {
-    // Standard cleanup stuff
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+// Clear cached button labels
+void DebugUI::_invalidateButtonCache() {
+    m_cachedToggleLabels.clear();
+    m_cachedDeleteLabels.clear();
+}
+
+const std::string& DebugUI::_getToggleLabel(const GameObject& obj) const {
+    std::unordered_map<EntityId, std::string>::iterator it = m_cachedToggleLabels.find(obj.Id);
+    // If label for obj.Id doesn't exist
+    if (it == m_cachedToggleLabels.end()) {
+        // Build label (Hide##1233 if active, Show##123 if inactive)
+        std::string label = (obj.IsActive ? "Hide##" : "Show##") + std::to_string(obj.Id);
+        // Insert new label into cache
+        it = m_cachedToggleLabels.insert({ obj.Id, label }).first;
+    }
+    // Return ref to cached string
+    return it->second;
+}
+
+const std::string& DebugUI::_getDeleteLabel(const GameObject& obj) const {
+    // Same thing
+    std::unordered_map<EntityId, std::string>::iterator it = m_cachedDeleteLabels.find(obj.Id);
+    if (it == m_cachedDeleteLabels.end()) {
+        // Build label
+        std::string label = "Delete##" + std::to_string(obj.Id);
+        it = m_cachedDeleteLabels.insert({ obj.Id, label }).first;
+    }
+    return it->second;
 }
