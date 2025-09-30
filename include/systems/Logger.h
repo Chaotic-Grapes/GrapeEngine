@@ -33,6 +33,7 @@ enum class LogLevel {
 class Logger {
 public:
 	Logger();
+	~Logger();
 
 	/**
 	 * @brief Get the singleton instance of the Logger
@@ -65,15 +66,17 @@ public:
 
 private:
 	// void _writeCrashLog(LogLevel level, const std::string& message);
-	void _logInfo(const std::string& message);
-	void _logDebug(const std::string& message);
-	void _logWarning(const std::string& message);
-	void _logError(const std::string& message);
-	void _logCritical(const std::string& message);
+	void _logInfo(const std::string& message, const std::string& timestamp);
+	void _logDebug(const std::string& message, const std::string& timestamp);
+	void _logWarning(const std::string& message, const std::string& timestamp);
+	void _logError(const std::string& message, const std::string& timestamp);
+	void _logCritical(const std::string& message, const std::string& timestamp);
 
 	// Private helper functions for console color
 	void _setConsoleColor(LogLevel level);
 	void _resetConsoleColor();
+
+	std::string _getCurrentTimestamp(); // Add timestamp to log entries
 
 	std::string m_infoFile{ "engine.log" }; // Default log file name
 	std::string m_errorFile{ "error.log" }; // Default error log file name

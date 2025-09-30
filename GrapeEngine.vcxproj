@@ -154,6 +154,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\BehaviourSystem.cpp" />
+    <ClCompile Include="src\CrashDumping.cpp" />
     <ClCompile Include="src\DynamicCollision.cpp" />
     <ClCompile Include="src\GraphicsTest.cpp" />
     <ClCompile Include="src\Physics2D.cpp" />
@@ -218,6 +219,7 @@
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />
     <ClInclude Include="include\graphics\sprite.hpp" />
+    <ClInclude Include="src\CrashDumping.h" />
     <ClInclude Include="src\Profiler.h" />
     <ClInclude Include="include\graphics\texture.hpp" />
     <ClInclude Include="include\graphics\debugDraw2D.hpp" />

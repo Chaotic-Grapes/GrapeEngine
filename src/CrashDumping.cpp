@@ -23,9 +23,9 @@
 #endif
 
 // logging shortcuts mapped to your Logger system
-#define LOG_DEBUG(msg)   Logger::GetInstance().Log("DEBUG", msg)
-#define LOG_SUCCESS(msg) Logger::GetInstance().Log("SUCCESS", msg)
-#define LOG_ERROR(msg)   Logger::GetInstance().Log("ERROR", msg)
+//#define LOG_DEBUG(msg)   Logger::GetInstance().Log("DEBUG", msg)
+//#define LOG_SUCCESS(msg) Logger::GetInstance().Log("SUCCESS", msg)
+//#define LOG_ERROR(msg)   Logger::GetInstance().Log("ERROR", msg)
 
 using std::string;
 using std::ostringstream;
@@ -51,7 +51,8 @@ namespace Grape_Engine
         // TODO: Linux handler (signal-based) if you want parity
 #endif
 
-        Logger::Get().Log(LogLevel::INFO, "CrashHandler initialized.");
+       // Logger::Get().Log(LogLevel::INFO, "CrashHandler initialized.");
+        std::cout << "[CrashHandler] Initialized.\n";
     }
 
 #ifdef _WIN32
@@ -130,7 +131,8 @@ namespace Grape_Engine
         }
         else
         {
-            Logger::Get().Log(LogLevel::DEBUG, "Dump file creation disabled by user.");
+          //  Logger::Get().Log(LogLevel::DEBUG, "Dump file creation disabled by user.");
+            std::cout << "[CrashHandler] Dump creation disabled.\n";
         }
 
         WriteLog(oss.str(), exePath, timeStamp);
@@ -151,14 +153,17 @@ namespace Grape_Engine
 
         if (!logFile.is_open())
         {
-            Logger::Get().Log(LogLevel::ERR, "Failed to open crash log file: " + fullPath);
+          //  Logger::Get().Log(LogLevel::ERR, "Failed to open crash log file: " + fullPath);
+            std::cout << "[CrashHandler] Failed to open crash log file: " << fullPath << "\n";
             return;
         }
 
         logFile << message;
         logFile.close();
 
-        Logger::Get().Log(LogLevel::INFO, "Crash log written to " + fullPath);
+       // Logger::Get().Log(LogLevel::INFO, "Crash log written to " + fullPath);
+        std::cout << "[CrashHandler] Crash log written to " << fullPath << "\n"; // write for mini dump
+
     }
 
 #ifdef _WIN32
@@ -208,11 +213,13 @@ namespace Grape_Engine
                 nullptr);
 
             CloseHandle(hFile);
-            Logger::Get().Log(LogLevel::INFO, "Minidump file created.");
+           // Logger::Get().Log(LogLevel::INFO, "Minidump file created.");
+            std::cout << "[CrashHandler] Minidump file created.\n"; // need the full file path
         }
         else
         {
-            Logger::Get().Log(LogLevel::ERR, "Failed to create minidump file.");
+           // Logger::Get().Log(LogLevel::ERR, "Failed to create minidump file.");
+            std::cout << "[CrashHandler] Failed to create minidump file.\n"; // need the full file path
         }
     }
 #endif // _WIN32
@@ -362,7 +369,8 @@ namespace Grape_Engine
     {
         string title = name + " has shut down";
 
-        Logger::Get().Log(LogLevel::ERR, "Program crashed:\n" + message);
+       // Logger::Get().Log(LogLevel::ERR, "Program crashed:\n" + message);
+        std::cout << "[CrashHandler] Program crashed:\n" << message << "\n";
 
 #ifdef _WIN32
         MessageBoxA(nullptr, message.c_str(), title.c_str(), MB_ICONERROR | MB_OK);
