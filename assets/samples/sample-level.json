@@ -1,0 +1,25 @@
+{
+  "objects": [
+    {
+      "name": "Enemy1",
+      "components": {
+        "Transform": { "x": 550.0, "y": 600.0 },
+        "ShapeRenderer2D": { "type": "Circle", "radius": 35.0, "fillColor": [1,1,0,1] }
+      }
+    },
+    {
+      "name": "Enemy2",
+      "components": {
+        "Transform": { "x": 550.0, "y": 700.0 },
+        "ShapeRenderer2D": { "type": "Circle", "radius": 35.0, "fillColor": [1,1,0,1] }
+      }
+    },
+    {
+      "name": "PowerUp",
+      "components": {
+        "Transform": { "x": 550.0, "y": 800.0 },
+        "ShapeRenderer2D": { "type": "Circle", "radius": 35.0, "fillColor": [1,1,0,1] }
+      }
+    }
+  ]
+}

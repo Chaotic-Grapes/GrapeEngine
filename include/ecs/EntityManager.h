@@ -2,9 +2,11 @@
 #define ENTITYMANAGER_H
 
 #include <memory>
+#include <string>
 #include <typeindex>
 #include <unordered_map>
 #include <unordered_set>
+#include "IComponent.h"
 #include "ecs/ComponentManager.h"
 
 class Entity;
@@ -13,7 +15,7 @@ class EntityManager {
 public:
     EntityManager() = default;
 
-    Entity CreateEntity();
+    Entity CreateEntity(const std::string& name = "GameObject");
 
     void SetWorld(World* world) { m_world = world; }
 
@@ -22,13 +24,42 @@ public:
 
     bool IsAlive(const Entity& entity) const;
 
+    std::vector<EntityId> GetAllEntities() const;
+
+    Entity GetEntity(EntityId id) const;
+
+    //template<typename... Components>
+    //std::vector<EntityId> Query() {
+    //    std::vector<EntityId> result;
+
+    //    for (EntityId id : m_entities) {
+    //        if ((HasComponent<Components>(id) && ...)) {
+    //            result.push_back(id);
+    //        }
+    //    }
+    //    return result;
+    //}
+
+    template<typename... Components>
+    std::vector<std::tuple<Components&...>> Query() {
+        std::vector<std::tuple<Components&...>> result;
+
+        for (const EntityId id : m_entities) {
+            if ((_hasComponentOrDerived<Components>(id) && ...)) {
+                result.emplace_back(*_getComponentOrDerived<Components>(id)...);
+            }
+        }
+
+        return result;
+    }
+
     template<typename T, typename... Args>
     T& AddComponent(EntityId id, Args&&... args) {
         auto& mgr = _getOrCreateManager<T>();
         if (!mgr.Get(id))
             mgr.Add(id, T(std::forward<Args>(args)...));
 
-        return *_getOrCreateManager<T>().Get(id);
+        return *mgr.Get(id);
     }
 
     template<typename T>
@@ -69,6 +100,7 @@ private:
     World* m_world = nullptr;
 
     std::unordered_set<EntityId> m_entities;
+    std::unordered_map<EntityId, std::string> m_names;
     std::unordered_map<std::type_index, std::unique_ptr<IComponentManager>> m_managers;
 
     template<typename T>
@@ -81,6 +113,46 @@ private:
             return *ptr;
         }
         return *static_cast<ComponentManager<T>*>(m_managers[typeid(T)].get());
+    }
+
+    template<typename T>
+    bool _hasComponentOrDerived(const EntityId id) {
+        // Exact type first
+        if (HasComponent<T>(id)) return true;
+
+        // Check all managers for derived types
+        for (auto& [type, mgr] : m_managers) {
+            Component::IComponent* baseComp = mgr->GetBaseComponent(id);
+            if (baseComp && dynamic_cast<T*>(baseComp))
+                return true;
+        }
+        return false;
+    }
+
+    template<typename T>
+    T* _getComponentOrDerived(const EntityId id) {
+        // Exact type first
+        if (auto* comp = GetComponent<T>(id)) return comp;
+
+        // Check all managers for derived types
+        for (auto& [type, mgr] : m_managers) {
+            Component::IComponent* baseComp = mgr->GetBaseComponent(id);
+            if (baseComp) {
+                if (auto* derived = dynamic_cast<T*>(baseComp))
+                    return derived;
+            }
+        }
+
+        return nullptr;
+    }
+
+    const std::string& _getName(const EntityId id) const {
+        static std::string empty = "Unknown";
+        const auto it = m_names.find(id);
+
+        return (it != m_names.end())
+    		? it->second
+    		: empty;
     }
 };
 
