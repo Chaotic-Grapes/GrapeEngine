@@ -18,12 +18,29 @@ namespace Sandbox {
         void OnFixedUpdate() override;
         void OnUnload() override;
 
-       /* enum class TestType {
-
-            
-        };*/
+        enum class TestType {
+            test_CharacterMovement = 1301,
+            test_CollisionDetection,
+            test_PhysicsHero,
+            test_DynvStatResponse,
+            test_DynvDynResponse,
+            test_StepbyStepUpdate
+        };
+        
 
     private:
+        bool test_handler = false;
+        bool m_stepInit = false;
+        TestType m_currentTest{ TestType::test_CharacterMovement };
+        // test types 
+         void Test_CharacterMovement();
+         void Test_CollisionDetection();
+         void Test_PhysicsHero();
+         void Test_DynVStatResponse();
+         void Test_DynVDynResponse();
+         void Test_StepByStepUpdate(World &world);
+        
+
         void SpawnBalls(World& world, int count, unsigned seed = 0);
         //void CreateBoundaryLines();
         void UpdateBallCollisions();

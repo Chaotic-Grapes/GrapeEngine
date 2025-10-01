@@ -67,6 +67,7 @@ private:
 constexpr int KEY_W = GLFW_KEY_W;
 constexpr int KEY_A = GLFW_KEY_A;
 constexpr int KEY_S = GLFW_KEY_S;
+constexpr int KEY_C = GLFW_KEY_C;
 constexpr int KEY_D = GLFW_KEY_D;
 constexpr int KEY_P = GLFW_KEY_P;
 constexpr int KEY_SPACE = GLFW_KEY_SPACE;
