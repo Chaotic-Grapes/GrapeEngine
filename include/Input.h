@@ -1,7 +1,9 @@
-#pragma once
-#include <unordered_map>
+#ifndef INPUT_H
+#define INPUT_H
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <unordered_map>
 
 namespace Engine { class Application; } // Forward declaration for friend class
 class Input {
@@ -64,15 +66,26 @@ private:
 };
 
 // Constexpr variables (for key codes if needed) - I might park this in another file (like Keys.hpp or smt)
-constexpr int KEY_W = GLFW_KEY_W;
-constexpr int KEY_A = GLFW_KEY_A;
-constexpr int KEY_S = GLFW_KEY_S;
-constexpr int KEY_D = GLFW_KEY_D;
-constexpr int KEY_P = GLFW_KEY_P;
+
+// Actions
+constexpr int PRESS     = GLFW_PRESS;
+constexpr int REPEAT    = GLFW_REPEAT;
+constexpr int RELEASE   = GLFW_RELEASE;
+
+// Keys
+constexpr int KEY_W     = GLFW_KEY_W;
+constexpr int KEY_A     = GLFW_KEY_A;
+constexpr int KEY_S     = GLFW_KEY_S;
+constexpr int KEY_D     = GLFW_KEY_D;
+constexpr int KEY_P     = GLFW_KEY_P;
 constexpr int KEY_SPACE = GLFW_KEY_SPACE;
-constexpr int KEY_G = GLFW_KEY_G;
-constexpr int MOUSE_LEFT = GLFW_MOUSE_BUTTON_LEFT;
-constexpr int MOUSE_RIGHT = GLFW_MOUSE_BUTTON_RIGHT;
-constexpr int PRESS = GLFW_PRESS;
-constexpr int REPEAT = GLFW_REPEAT;
-constexpr int RELEASE = GLFW_RELEASE;
+constexpr int KEY_G     = GLFW_KEY_G;
+constexpr int KEY_J     = GLFW_KEY_J;
+constexpr int KEY_K     = GLFW_KEY_K;
+constexpr int KEY_R     = GLFW_KEY_R;
+
+// Mouse buttons
+constexpr int MOUSE_LEFT    = GLFW_MOUSE_BUTTON_LEFT;
+constexpr int MOUSE_RIGHT   = GLFW_MOUSE_BUTTON_RIGHT;
+
+#endif

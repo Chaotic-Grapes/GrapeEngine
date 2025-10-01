@@ -3,21 +3,24 @@
 #include <iostream>
 #include "PhysicsCollision2DTest.h"
 #include "GraphicsTest.hpp"
+#include "GameObjectFactoryTest.h"
+#include "SerializationTest.h"
 #include "systems/WindowManager.h"
 
 
 void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "Select test scene: \n";
     std::cout << "1. Physics & Collision 2D Test" << '\n';
-    std::cout << "2. GRAPHICS AND ART PIPELINE TEST" << '\n';
+    std::cout << "2. Graphics & Art Pipeline Test" << '\n';
     //std::cout << "3. ECS Component Test" << '\n';
+	std::cout << "4. Game Object Factory Test" << '\n';
+    std::cout << "5. Serialization Check Test" << '\n';
 
     int choice;
     std::cin >> choice;
 
     // Clear console
-    // Not thread-safe but does it matter?
-    system("cls");
+    printf("\033[H\033[J");
 
     switch (choice) {
     case 1: { // PhysicsCollision
@@ -28,7 +31,7 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
         break;
     }
     case 2: {
-        std::cout << "Starting GRAPHICS AND ART PIPELINE TEST..." << '\n';
+        std::cout << "Starting Graphics & Art Pipeline Test..." << '\n';
 
         sceneManager.AddScene(new Sandbox::GraphicsTestScene(1600, 900));
         sceneManager.LoadScene("GraphicsTestScene");
@@ -37,6 +40,20 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
         //case 3:
         //    std::cout << "ECS Component Test - TODO" << '\n';
         //    break;
+    case 4: {
+		std::cout << "Starting Game Object Factory Test..." << '\n';
+
+		sceneManager.AddScene(new Sandbox::GameObjectFactoryTestScene());
+		sceneManager.LoadScene("GameObjectFactoryTestScene");
+        break;
+	}
+    case 5: {
+        std::cout << "Starting Serialization Integrity Test..." << '\n';
+
+        sceneManager.AddScene(new Sandbox::SerializationTestScene());
+        sceneManager.LoadScene("SerializationTestScene");
+        break;
+    }
     default:
         std::cout << "Invalid choice" << '\n';
         break;

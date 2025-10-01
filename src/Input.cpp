@@ -2,6 +2,8 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include "messaging/MessageSystem.h"
+#include "messaging/MessageTypes.h"
 
 // Initialize static members
 GLFWwindow* Input::m_window = nullptr;
@@ -98,30 +100,25 @@ void Input::_processInput() {
 // Called on keyboard key press/release
 void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
     (void)pWin;
-    (void)scancode;
     (void)mod;
+#ifndef _DEBUG
+	(void)scancode;
+#endif
 
     if (action == GLFW_PRESS) {
         m_keyDown[key] = true;
         m_keyPressed[key] = true;
+        Messaging::MessageSystem::Broadcast(Messaging::KeyPressed{ key });
     }
     else if (action == GLFW_RELEASE) {
         m_keyDown[key] = false;
         m_keyUp[key] = true;
+        Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key });
     }
 
 #ifdef _DEBUG
-    const char* keyName = "";
-    switch (key) {
-    case KEY_W: keyName = "W"; break;
-    case KEY_A: keyName = "A"; break;
-    case KEY_S: keyName = "S"; break;
-    case KEY_D: keyName = "D"; break;
-    case KEY_P: keyName = "P"; break;
-    case KEY_SPACE: keyName = "SPACE"; break;
-    case KEY_G: keyName = "G"; break;
-    default: keyName = "Unknown"; break;
-    }
+    const char* keyName = glfwGetKeyName(key, scancode);
+	if (!keyName) keyName = "Unknown";
     // Debug-only code
     std::string message;
     if (action == PRESS)

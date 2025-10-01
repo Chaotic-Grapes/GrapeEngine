@@ -131,7 +131,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
 		shapeRenderer.Radius = radius;
         shapeRenderer.FillColor = color;
 
-        auto& circleCollider = ball.AddComponent<Component::CircleCollider2D>(radius);
+    	ball.AddComponent<Component::CircleCollider2D>(radius);
 
         m_balls.push_back(ball);
         std::cout << "Created ball (" << i + 1 << ") with ENT ID " << ball.GetId() << " at (" << x << ", " << y << ") with radius " << radius << '\n';
@@ -145,8 +145,8 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
     // random square size and x spawn at top
     const float size = MathHelper::Randomize<float>(14.0f, 28.0f, 0);
     const float half = size * 0.5f;
-    const float minX = half;
-    const float maxX = m_worldWidth - half;
+    //const float minX = half;
+    //const float maxX = m_worldWidth - half;
     const float x = MathHelper::Randomize<float>(half, m_worldWidth - half, 0);
 
     const float y = m_worldHeight - half - 2.0f; 
@@ -375,7 +375,6 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
-    World& world = GetWorld();
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
 
     // handles step-by-step physics controls

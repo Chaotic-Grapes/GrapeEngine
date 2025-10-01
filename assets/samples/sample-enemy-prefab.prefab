@@ -1,0 +1,7 @@
+{
+  "name": "EnemyPrefab",
+  "components": {
+    "Transform": { "x": 250.0, "y": 250.0 },
+    "ShapeRenderer2D": { "type": "Circle", "radius": 25.0, "fillColor": [1,1,1,1] }
+  }
+}

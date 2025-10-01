@@ -1,33 +1,24 @@
 @echo off
-REM ===============================================
-REM Windows Run Script
-REM ===============================================
-
-echo.
-echo ===============================================
-echo   Running GrapeEngine - Windows
-echo ===============================================
-echo.
+set CONFIG=%1
+if "%CONFIG%"=="" set CONFIG=Debug
 
 REM Check if build directory exists
 if not exist build (
-    echo ERROR: Build directory not found!
-    echo Please run script_build_and_run.bat first to build the project.
+    echo ERROR: Build directory not found! Build first.
     pause
     exit /b 1
 )
 
 REM Check if executable exists
-if not exist build\Debug\GrapeEngine.exe (
-    echo ERROR: Executable not found!
-    echo Please run script_build_and_run.bat first to build the project.
+if not exist build\%CONFIG%\GrapeEngine.exe (
+    echo ERROR: Executable not found! Build first.
     pause
     exit /b 1
 )
 
 echo Running GrapeEngine...
 echo.
-cd build\Debug
+cd build\%CONFIG%
 GrapeEngine.exe
 if %errorlevel% neq 0 (
     echo.

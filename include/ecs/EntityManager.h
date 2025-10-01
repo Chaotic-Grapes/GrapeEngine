@@ -24,6 +24,10 @@ public:
 
     bool IsAlive(const Entity& entity) const;
 
+    std::vector<EntityId> GetAllEntities() const;
+
+    Entity GetEntity(EntityId id) const;
+
     //template<typename... Components>
     //std::vector<EntityId> Query() {
     //    std::vector<EntityId> result;
@@ -35,6 +39,18 @@ public:
     //    }
     //    return result;
     //}
+
+    std::string GetName(const EntityId id) const {
+        const auto it = m_entityNames.find(id);
+
+        return it != m_entityNames.end()
+    		? it->second
+    		: "";
+    }
+
+    void SetName(const EntityId id, const std::string& name) {
+        m_entityNames[id] = name;
+    }
 
     template<typename... Components>
     std::vector<std::tuple<Components&...>> Query() {
@@ -96,6 +112,7 @@ private:
     World* m_world = nullptr;
 
     std::unordered_set<EntityId> m_entities;
+    std::unordered_map<EntityId, std::string> m_entityNames;
     std::unordered_map<std::type_index, std::unique_ptr<IComponentManager>> m_managers;
 
     template<typename T>

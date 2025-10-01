@@ -1,6 +1,4 @@
-#ifndef GRAPHICSTEST_H
-#define GRAPHICSTEST_H
-#if _DEBUG
+#pragma once
 
 #include "Game.h"
 #include <vector>
@@ -40,13 +38,20 @@ namespace Sandbox {
             NormalMaps          = 2005,
             ParticleSystem      = 2006,
             SpriteAtlas         = 2007,
-            ShaderPlayground    = 2008
+            ShaderPlayground    = 2008,
+
+            // PERFORMANCE / PROFILING DEBUG TESTS
+            DebugPerformance = 3001,
+            SingleTextureTest = 3002,
+            AnalyzeRenderer = 3003,
+            SmallBatchTest = 3004
         };
+
     private:
         bool m_gHandled = false;
 
         // Background, sprites, debugObjects
-        std::vector<EntityId> m_activeTestEntities;
+        std::vector<EntityId> m_TestEntities;
 
         // Stress test
         std::vector<Entity> m_batchSprites;
@@ -60,18 +65,31 @@ namespace Sandbox {
         // ------------------------------------
         // Private test runners (declared here)
         // ------------------------------------
-        void runBasicGraphics(World& world);
-        void runDebugDrawing(World& world);
-        void runBasicSprites(World& world);
-        void runBackground(World& world);
-        void runSpriteScaling(World& world);
-        void runSpriteRotation(World& world);
-        void runAnimation(World& world);
-        void runMultiAnimation(World& world);
-        void runBatchStress(World& world);
-        void runFontSystem(World& world);
+        void runBasicGraphics();
+        void runDebugDrawing();
+        void runBasicSprites();
+        void runBackground();
+        void runSpriteScaling();
+        void runSpriteRotation();
+        void runAnimation();
+        void runMultiAnimation();
+        void runBatchStress();
+        void runFontSystem();
+
+        // ===================================================
+        // PERFORMANCE PROFILING + DEBUGGING 
+        // ===================================================
+
+        //! Run one-off profiling inside stress test
+        void debugPerformance();
+
+        //! Spawn all sprites with SAME texture and color
+        void testSingleTexture();
+
+        //! Inspect renderer flush behavior and give warnings
+        void analyzeRenderer();
+
+        //! Test small batch baseline (100 sprites only)
+        void testSmallBatch();
     };
 }
-
-#endif
-#endif
