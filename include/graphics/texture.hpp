@@ -38,6 +38,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 class Texture {
 public:
+    Texture() : m_id(0), m_width(0), m_height(0), m_channels(0) {}
+
     // Constructor & Destructor
     Texture(const std::string& path);
     ~Texture();
