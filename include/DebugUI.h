@@ -37,6 +37,7 @@ struct GameObject {
     EntityId Id;
     std::string Name;
     bool IsActive = true;
+    float X = 0.0f, Y = 0.0f;
 
     GameObject(EntityId id, const std::string& name) : Id(id), Name(name) {}
 };
@@ -67,13 +68,14 @@ public:
     void AddGameObject(const std::string& name);
     void RemoveGameObject(EntityId id);
     void ClearAllGameObjects();
+    void SyncWithWorld();
 
 private:
     // Configuration and state
     DebugUIConfig m_config;
     World* m_world;  // World reference for entity creation/management
     std::vector<GameObject> m_gameObjects;
-    bool m_enabled = true;
+    bool m_enabled = false;
     bool m_initialized = false;
 
     // UI state

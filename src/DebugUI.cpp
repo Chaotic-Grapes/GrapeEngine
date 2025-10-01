@@ -13,8 +13,7 @@
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the world
 DebugUI::DebugUI(World* world, const DebugUIConfig& config)
-    : m_config(config), m_world(world) {
-}
+    : m_config(config), m_world(world) {}
 
 DebugUI::~DebugUI() {
     // Clean up resources only if UI was initialized
@@ -37,12 +36,7 @@ void DebugUI::Initialize(GLFWwindow* window) {
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
 
     m_initialized = true;  // Mark that DebugUI has been initialized
-
-    // If the world exists then create some default game objects
-    if (HasValidWorld()) {
-        AddGameObject("Player");
-        AddGameObject("Enemy");
-    }
+    srand(static_cast<unsigned int>(time(nullptr)));  // Seed random number generator
 }
 
 void DebugUI::NewFrame() {
@@ -102,6 +96,34 @@ bool DebugUI::HasValidWorld() const {
     return m_world != nullptr;
 }
 
+// Scan world for existing entities and populate GameObject list
+void DebugUI::SyncWithWorld() {
+    if (!HasValidWorld()) return;
+
+    // Clear existing list
+    m_gameObjects.clear();
+
+    // Get all entity IDs from world
+    std::vector<EntityId> allEntities = m_world->GetEntityManager().GetAllEntities();
+
+    for (EntityId id : allEntities) {
+        Entity entity = m_world->GetEntityManager().GetEntity(id);
+        auto* transform = entity.GetComponent<Component::Transform>();
+
+        if (transform) {
+            std::string entityName = m_world->GetEntityManager().GetName(id);
+            if (entityName.empty()) entityName = "Entity";
+
+            GameObject gameObj(id, entityName);
+            gameObj.X = transform->Position.X;
+            gameObj.Y = transform->Position.Y;
+            m_gameObjects.push_back(gameObj);
+        }
+    }
+
+    _invalidateButtonCache();
+}
+
 // Search for an object and return pointer (or nullptr)
 GameObject* DebugUI::FindGameObject(EntityId id) {
     // Search for game object in list by EntityId
@@ -122,9 +144,18 @@ void DebugUI::AddGameObject(const std::string& name) {
     // Create real ECS entity with components
     Entity entity = _createGameEntity(name);
 
+    GameObject gameObj(entity.GetId(), name);
+    gameObj.X = ((float)rand() / RAND_MAX) * Input::GetWindowWidth();
+    gameObj.Y = ((float)rand() / RAND_MAX) * Input::GetWindowHeight();
+
+    // Sync with ECS Transform
+    auto& transform = entity.Transform();
+    transform.Position.X = gameObj.X;
+    transform.Position.Y = gameObj.Y;
+
     // Add to editor list for UI display + clear cached toggle/delete
     // button labels so new objects get proper unique labels
-    m_gameObjects.emplace_back(entity.GetId(), name);
+    m_gameObjects.push_back(gameObj);
     _invalidateButtonCache();
 }
 
