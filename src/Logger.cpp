@@ -24,15 +24,17 @@ void Logger::Log(const LogLevel level, const std::string& message) {
 		return; // No logging destination available
 	}
 
-	std::string timestamp = _getCurrentTimestamp();
-
 	switch (level) {
-	case LogLevel::INFO:	_logInfo(message, timestamp); break;
-	case LogLevel::DEBUG:	_logDebug(message, timestamp); break;
-	case LogLevel::WARNING: _logWarning(message, timestamp); break;
-	case LogLevel::ERROR:	_logError(message, timestamp); break;
-	case LogLevel::CRITICAL:_logCritical(message, timestamp); break;
+	case LogLevel::INFO:	_logInfo(message); break;
+	case LogLevel::DEBUG:	_logDebug(message); break;
+	case LogLevel::WARNING: _logWarning(message); break;
+	case LogLevel::ERROR:	_logError(message); break;
+	case LogLevel::CRITICAL:_logCritical(message); break;
 	}
+}
+
+void Logger::Log(const LogLevel level, const std::stringstream& oss) {
+	Log(level, oss.str()); // forward to the string version
 }
 
 void Logger::SetLogFile(const LogLevel level, const std::string& filename) {
@@ -52,50 +54,71 @@ void Logger::SetLogFile(const LogLevel level, const std::string& filename) {
 	}
 }
 
-void Logger::_logInfo(const std::string& message, const std::string& timestamp) {
+void Logger::_logInfo(const std::string& message) {
 	if (m_LogConsoleEnabled)
-		std::cout << "[" << timestamp << "] [INF] " << message << '\n';
+		std::cout << "[" << _getCurrentTimestamp("%H:%M") << "] [INF] " << message << '\n';
 	if (m_infoStream.is_open())
-		m_infoStream << "[" << timestamp << "] [INF] " << message << '\n';
+		m_infoStream << "[" << _getCurrentTimestamp() << "] [INF] " << message << '\n';
 }
 
-void Logger::_logDebug(const std::string& message, const std::string& timestamp) {
+void Logger::_logDebug(const std::string& message) {
 	if (!m_debugEnabled) return;
 	if (m_LogConsoleEnabled)
-		std::cout << "[" << timestamp << "] [DBG] " << message << '\n';
+		std::cout << "[" << _getCurrentTimestamp("%H:%M") << "] [DBG] " << message << '\n';
 	if (m_infoStream.is_open())
-		m_infoStream << "[" << timestamp << "] [DBG] " << message << '\n';
+		m_infoStream << "[" << _getCurrentTimestamp() << "] [DBG] " << message << '\n';
 }
 
-void Logger::_logWarning(const std::string& message, const std::string& timestamp) {
+void Logger::_logWarning(const std::string& message) {
 	if (m_LogConsoleEnabled) {
 		_setConsoleColor(LogLevel::WARNING);
-		std::cout << "[" << timestamp << "] [WRN] " << message << '\n';
+		std::cout << "[" << _getCurrentTimestamp("%H:%M") << "] [WRN] " << message << '\n';
 		_resetConsoleColor();
 	}
 	if (m_infoStream.is_open())
-		m_infoStream << "[" << timestamp << "] [WRN] " << message << '\n';
+		m_infoStream << "[" << _getCurrentTimestamp() << "] [WRN] " << message << '\n';
 }
 
-void Logger::_logError(const std::string& message, const std::string& timestamp) {
+void Logger::_logError(const std::string& message) {
 	if (m_LogConsoleEnabled) {
 		_setConsoleColor(LogLevel::ERROR);
-		std::cout << "[" << timestamp << "] [ERR] " << message << '\n';
+		std::cout << "[" << _getCurrentTimestamp("%H:%M") << "] [ERR] " << message << '\n';
 		_resetConsoleColor();
 	}
 	if (m_errorStream.is_open())
-		m_errorStream << "[" << timestamp << "] [ERR] " << message << '\n';
+		m_errorStream << "[" << _getCurrentTimestamp() << "] [ERR] " << message << '\n';
 }
 
-void Logger::_logCritical(const std::string& message, const std::string& timestamp) {
+void Logger::_logCritical(const std::string& message) {
 	if (m_LogConsoleEnabled) {
 		_setConsoleColor(LogLevel::CRITICAL);
-		std::cout << "[" << timestamp << "] [CRT] " << message << '\n';
+		std::cout << "[" << _getCurrentTimestamp("%H:%M") << "] [CRT] " << message << '\n';
 		_resetConsoleColor();
 	}
 	if (m_errorStream.is_open())
-		m_errorStream << "[" << timestamp << "] [CRT] " << message << '\n';
+		m_errorStream << "[" << _getCurrentTimestamp() << "] [CRT] " << message << '\n';
 }
+
+void Logger::_logInfo(const std::stringstream& oss) {
+	_logInfo(oss.str());
+}
+
+void Logger::_logDebug(const std::stringstream& oss) {
+	_logDebug(oss.str());
+}
+
+void Logger::_logWarning(const std::stringstream& oss) {
+	_logWarning(oss.str());
+}
+
+void Logger::_logError(const std::stringstream& oss) {
+	_logError(oss.str());
+}
+
+void Logger::_logCritical(const std::stringstream& oss) {
+	_logCritical(oss.str());
+}
+
 
 void Logger::SetLogConsole(const bool enable) {
 	m_LogConsoleEnabled = enable;
@@ -135,7 +158,7 @@ void Logger::_resetConsoleColor() {
 #endif
 }
 
-std::string Logger::_getCurrentTimestamp() {
+std::string Logger::_getCurrentTimestamp(const std::string& format) {
 	auto now = std::chrono::system_clock::now();
 	auto time_t = std::chrono::system_clock::to_time_t(now);
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -145,7 +168,7 @@ std::string Logger::_getCurrentTimestamp() {
 	localtime_s(&timeInfo, &time_t);  // Safe version
 
 	std::stringstream ss;
-	ss << std::put_time(&timeInfo, "%Y-%m-%d %H:%M:%S");
-	ss << '.' << std::setfill('0') << std::setw(3) << ms.count();
+	ss << std::put_time(&timeInfo, format.c_str());
+	// ss << '.' << std::setfill('0') << std::setw(3) << ms.count(); // milliseconds if needed
 	return ss.str();
 }

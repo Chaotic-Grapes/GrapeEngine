@@ -5,11 +5,18 @@
 #undef ERROR
 #endif
 
-#define LOG_INFO(msg)		Logger::Get().Log(LogLevel::INFO, msg)
-#define LOG_DEBUG(msg)		Logger::Get().Log(LogLevel::DEBUG, msg)
-#define LOG_WARNING(msg)	Logger::Get().Log(LogLevel::WARNING, msg)
-#define LOG_ERROR(msg)		Logger::Get().Log(LogLevel::ERROR, msg)
-#define LOG_CRITICAL(msg)	Logger::Get().Log(LogLevel::CRITICAL, msg)
+#define LOG_STREAM(level, msg)                 \
+    do {                                       \
+        std::ostringstream oss;                \
+        oss << msg;                            \
+        Logger::Get().Log(level, oss.str());   \
+    } while(0)
+
+#define LOG_INFO(msg)     LOG_STREAM(LogLevel::INFO, msg)
+#define LOG_DEBUG(msg)    LOG_STREAM(LogLevel::DEBUG, msg)
+#define LOG_WARNING(msg)  LOG_STREAM(LogLevel::WARNING, msg)
+#define LOG_ERROR(msg)    LOG_STREAM(LogLevel::ERROR, msg)
+#define LOG_CRITICAL(msg) LOG_STREAM(LogLevel::CRITICAL, msg)
 
 #include <iostream>
 #include <string>
@@ -51,6 +58,13 @@ public:
 	void Log(LogLevel level, const std::string& message);
 
 	/**
+	 * @brief Log a message from a stringstream with a specific log level
+	 * @param level The severity level of the log
+	 * @param oss The stringstream containing the message to log
+	 */
+	void Log(LogLevel level, const std::stringstream& oss);
+
+	/**
 	 * @brief Set the log file name
 	 * @param level The log level for which to set the file
 	 * @param filename The name of the log file
@@ -65,17 +79,23 @@ public:
 
 private:
 	// void _writeCrashLog(LogLevel level, const std::string& message);
-	void _logInfo(const std::string& message, const std::string& timestamp);
-	void _logDebug(const std::string& message, const std::string& timestamp);
-	void _logWarning(const std::string& message, const std::string& timestamp);
-	void _logError(const std::string& message, const std::string& timestamp);
-	void _logCritical(const std::string& message, const std::string& timestamp);
+	void _logInfo(const std::string& message);
+	void _logDebug(const std::string& message);
+	void _logWarning(const std::string& message);
+	void _logError(const std::string& message);
+	void _logCritical(const std::string& message);
+
+	void _logInfo(const std::stringstream& oss);
+	void _logDebug(const std::stringstream& oss);
+	void _logWarning(const std::stringstream& oss);
+	void _logError(const std::stringstream& oss);
+	void _logCritical(const std::stringstream& oss);
 
 	// Private helper functions for console color
 	void _setConsoleColor(LogLevel level);
 	void _resetConsoleColor();
 
-	std::string _getCurrentTimestamp(); // Add timestamp to log entries
+	std::string _getCurrentTimestamp(const std::string& format = "%Y-%m-%d %H:%M:%S"); // Add timestamp to log entries
 
 	std::string m_infoFile{ "engine.log" }; // Default log file name
 	std::string m_errorFile{ "error.log" }; // Default error log file name

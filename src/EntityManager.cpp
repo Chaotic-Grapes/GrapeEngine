@@ -10,11 +10,9 @@ Entity EntityManager::CreateEntity(const std::string& name) {
     m_entityNames[id] = name;
 
 #if _DEBUG
-    std::ostringstream oss;
-    oss << "Entity created: "
-	    << '[' << id << ']'
-	    << ' ' << name;
-    LOG_DEBUG(oss.str());
+    LOG_DEBUG("Entity created: "
+			  << '[' << id << ']'
+			  << ' ' << name);
 #endif
 
     return {id, m_world, name};
@@ -31,18 +29,14 @@ void EntityManager::DestroyEntity(const Entity& entity) {
 
 #if _DEBUG
     if (erased == 0) {
-        std::ostringstream oss;
-        oss << "Warning: Attempted to destroy non-existent entity "
-            << '[' << entity.GetId() << ']'
-            << ' ' << entity.GetName();
-        LOG_WARNING(oss.str());
+        LOG_WARNING("Warning: Attempted to destroy non-existent entity "
+		            << '[' << entity.GetId() << ']'
+		            << ' ' << entity.GetName());
     }
     else {
-        std::ostringstream oss;
-        oss << "Entity destroyed: "
-            << '[' << entity.GetId() << ']'
-            << ' ' << entity.GetName();
-        LOG_DEBUG(oss.str());
+        LOG_DEBUG("Entity destroyed: "
+				  << '[' << entity.GetId() << ']'
+		          << ' ' << entity.GetName());
     }
 #endif
 }

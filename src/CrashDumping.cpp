@@ -52,7 +52,7 @@ namespace Grape_Engine
 #endif
 
        // Logger::Get().Log(LogLevel::INFO, "CrashHandler initialized.");
-        std::cout << "[CrashHandler] Initialized.\n";
+        LOG_INFO("[CrashHandler] Initialized.");
     }
 
 #ifdef _WIN32
@@ -132,7 +132,7 @@ namespace Grape_Engine
         else
         {
           //  Logger::Get().Log(LogLevel::DEBUG, "Dump file creation disabled by user.");
-            std::cout << "[CrashHandler] Dump creation disabled.\n";
+            LOG_INFO("[CrashHandler] Dump creation disabled.");
         }
 
         WriteLog(oss.str(), exePath, timeStamp);
@@ -154,7 +154,7 @@ namespace Grape_Engine
         if (!logFile.is_open())
         {
           //  Logger::Get().Log(LogLevel::ERR, "Failed to open crash log file: " + fullPath);
-            std::cout << "[CrashHandler] Failed to open crash log file: " << fullPath << "\n";
+            LOG_ERROR("[CrashHandler] Failed to open crash log file: " << fullPath);
             return;
         }
 
@@ -162,7 +162,7 @@ namespace Grape_Engine
         logFile.close();
 
        // Logger::Get().Log(LogLevel::INFO, "Crash log written to " + fullPath);
-        std::cout << "[CrashHandler] Crash log written to " << fullPath << "\n"; // write for mini dump
+        LOG_INFO("[CrashHandler] Crash log written to " << fullPath); // write for mini dump
 
     }
 
