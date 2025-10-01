@@ -6,6 +6,16 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+namespace {
+    constexpr int AtlasWidth = 1024;
+    constexpr int AtlasHeight = 1024;
+
+    constexpr int SDFPadding = 8;
+    constexpr int SDFOnEdgeValue = 180;
+    constexpr float SDFPixelDistScale =
+        static_cast<float>(SDFOnEdgeValue) / static_cast<float>(SDFPadding);
+}
+
 Font::Font(const std::string& path, int pixelSize)
     : m_path(path), m_pixelSize(pixelSize)
 {
@@ -75,30 +85,23 @@ void Font::cleanup() {
 }
 
 void Font::loadAtlas() {
-    // 2) Init stb_truetype
     stbtt_fontinfo font;
     if (!stbtt_InitFont(&font, m_fontBuffer.data(),
         stbtt_GetFontOffsetForIndex(m_fontBuffer.data(), 0))) {
         throw std::runtime_error("[Font] ERROR: stb_truetype init failed");
     }
 
-    // Line metrics
     int ascent, descent, lineGap;
     stbtt_GetFontVMetrics(&font, &ascent, &descent, &lineGap);
-    float scale = stbtt_ScaleForPixelHeight(&font, (float)m_pixelSize);
+    float scale = stbtt_ScaleForPixelHeight(&font, static_cast<float>(m_pixelSize));
     m_lineHeight = (ascent - descent + lineGap) * scale;
 
-    // 3) Bake SDF atlas
-    const int atlasW = 1024;
-    const int atlasH = 1024;
-    m_atlasSize = { atlasW, atlasH };
-
-    std::vector<unsigned char> atlasData(atlasW * atlasH, 0);
+    m_atlasSize = { AtlasWidth, AtlasHeight };
+    std::vector<unsigned char> atlasData(AtlasWidth * AtlasHeight, 0);
 
     int xOffset = 0, yOffset = 0, rowHeight = 0;
 
     for (unsigned char c = 32; c < 127; ++c) {
-        // Space handling
         if (c == ' ') {
             int advance, lsb;
             stbtt_GetCodepointHMetrics(&font, c, &advance, &lsb);
@@ -106,9 +109,8 @@ void Font::loadAtlas() {
             Glyph glyph;
             glyph.size = { 0, 0 };
             glyph.bearing = { 0, 0 };
-            glyph.advance = (unsigned int)(advance * scale);
+            glyph.advance = static_cast<unsigned int>(advance * scale);
             glyph.uv = { 0, 0, 0, 0 };
-
             m_glyphs[c] = glyph;
             continue;
         }
@@ -116,9 +118,9 @@ void Font::loadAtlas() {
         int w, h, xoff, yoff;
         unsigned char* sdf = stbtt_GetCodepointSDF(
             &font, scale, c,
-            8,             // padding
-            180,           // on-edge value
-            180.0f / 8.0f, // pixel_dist_scale
+            SDFPadding,
+            SDFOnEdgeValue,
+            SDFPixelDistScale,
             &w, &h, &xoff, &yoff
         );
 
@@ -127,38 +129,40 @@ void Font::loadAtlas() {
             continue;
         }
 
-        // Atlas row management
-        if (xOffset + w >= atlasW) {
+        if (xOffset + w >= AtlasWidth) {
             xOffset = 0;
             yOffset += rowHeight + 1;
             rowHeight = 0;
         }
-        if (yOffset + h >= atlasH) {
+        if (yOffset + h >= AtlasHeight) {
             STBTT_free(sdf, nullptr);
             throw std::runtime_error("[Font] ERROR: Atlas overflow, increase atlas size!!!");
         }
 
-        // Copy glyph into atlas
+        // Copy each glyph row into the atlas using memcpy instead of an inner x-loop.
+        // This is faster than assigning pixels one at a time because memcpy performs
+        // a contiguous block transfer per row (often SIMD-optimized), reducing loop
+        // overhead and improving cache efficiency.
         for (int y = 0; y < h; ++y) {
-            for (int x = 0; x < w; ++x) {
-                atlasData[(yOffset + y) * atlasW + (xOffset + x)] =
-                    sdf[y * w + x];
-            }
+            std::memcpy(
+                &atlasData[(yOffset + y) * AtlasWidth + xOffset],
+                &sdf[y * w],
+                w
+            );
         }
 
-        // Metrics
         int advance, lsb;
         stbtt_GetCodepointHMetrics(&font, c, &advance, &lsb);
 
         Glyph glyph;
         glyph.size = { w, h };
         glyph.bearing = { xoff, -yoff };
-        glyph.advance = (unsigned int)(advance * scale);
+        glyph.advance = static_cast<unsigned int>(advance * scale);
         glyph.uv = {
-            (float)xOffset / atlasW,
-            (float)(yOffset + h) / atlasH,
-            (float)(xOffset + w) / atlasW,
-            (float)yOffset / atlasH
+            static_cast<float>(xOffset) / AtlasWidth,
+            static_cast<float>(yOffset + h) / AtlasHeight,
+            static_cast<float>(xOffset + w) / AtlasWidth,
+            static_cast<float>(yOffset) / AtlasHeight
         };
 
         m_glyphs[c] = glyph;
@@ -169,10 +173,9 @@ void Font::loadAtlas() {
         STBTT_free(sdf, nullptr);
     }
 
-    // 4) Upload atlas to OpenGL
     glGenTextures(1, &m_atlasTex);
     glBindTexture(GL_TEXTURE_2D, m_atlasTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlasW, atlasH, 0,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, AtlasWidth, AtlasHeight, 0,
         GL_RED, GL_UNSIGNED_BYTE, atlasData.data());
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -182,7 +185,7 @@ void Font::loadAtlas() {
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    std::cout << "[Font] SDF Atlas built: " << atlasW << "x" << atlasH
+    std::cout << "[Font] SDF Atlas built: " << AtlasWidth << "x" << AtlasHeight
         << " with " << m_glyphs.size() << " glyphs\n";
 }
 
