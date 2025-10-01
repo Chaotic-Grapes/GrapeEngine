@@ -21,7 +21,7 @@ GraphicsTestScene::GraphicsTestScene(int width, int height) : Scene("GraphicsTes
     CREATE_WINDOW("Graphics Test", width, height);
     m_worldWidth  = static_cast<float>(width);
     m_worldHeight = static_cast<float>(height);
-    m_currentTest = TestType::FontSystem;
+    m_currentTest = TestType::BasicGraphics;
 }
 
 void GraphicsTestScene::OnLoad() {

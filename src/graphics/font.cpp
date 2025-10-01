@@ -134,7 +134,7 @@ void Font::loadAtlas() {
             rowHeight = 0;
         }
         if (yOffset + h >= atlasH) {
-            free(sdf);
+            STBTT_free(sdf, nullptr);
             throw std::runtime_error("[Font] ERROR: Atlas overflow, increase atlas size!!!");
         }
 
@@ -166,7 +166,7 @@ void Font::loadAtlas() {
         xOffset += w + 1;
         rowHeight = std::max(rowHeight, h);
 
-        free(sdf);
+        STBTT_free(sdf, nullptr);
     }
 
     // 4) Upload atlas to OpenGL
