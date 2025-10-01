@@ -18,14 +18,14 @@ struct DebugUIConfig {
         float EngineX = 10.0f, EngineY = 10.0f;
         float EngineW = 300.0f, EngineH = 150.0f;
 
-        float PerfX = 10.0f, PerfY = 170.0f;
-        float PerfW = 300.0f, PerfH = 120.0f;
-
         float InputX = 330.0f, InputY = 10.0f;
         float InputW = 320.0f, InputH = 400.0f;
 
         float EditorX = 670.0f, EditorY = 10.0f;
         float EditorW = 375.0f, EditorH = 400.0f;
+
+        float PerfX = 1065.0f, PerfY = 10.0f;
+        float PerfW = 300.0f, PerfH = 400.0f;
     } Layout;
 
     // Buffer sizes

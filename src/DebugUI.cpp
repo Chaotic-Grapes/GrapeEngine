@@ -5,7 +5,9 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <algorithm>
 #include <iostream>
+#include "Profiler.h"
 #include "ecs/World.h"
 
 // Standard constructor and destructor
@@ -195,11 +197,55 @@ void DebugUI::_showPerformanceWindow() {
     ImGui::SetNextWindowSize(ImVec2(layout.PerfW, layout.PerfH), ImGuiCond_Once);
 
     ImGui::Begin("Performance Monitor");
-    // ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-    // ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
+
+    // FPS and frame time
+    ImGui::Text("FPS: %.1f", Profiler::GetFPS());
+    ImGui::Text("Frame Time: %.3f ms", Profiler::GetFrameTimeMs());
+
+    static int fpsCap = Time::FpsCap();
+    ImGui::InputInt("FPS Cap", &fpsCap);
+    fpsCap = std::max(fpsCap, 0); // 0 = uncapped
+    if (ImGui::Button("Apply FPS Cap")) {
+        Time::FpsCap(fpsCap);
+    }
+
+    ImGui::Separator();
+
+    // Scope data
+    const auto& scopes = Profiler::GetAllScopeData();
+    for (const auto& [name, data] : scopes) {
+		if (name == "Time" || name == "Overlay") 
+            continue; // Skip these special scopes
+
+        ImGui::Text("%s:", name.c_str());
+        ImGui::BulletText("Last: %.3f ms", data.lastTimeMs);
+        ImGui::BulletText("Avg:  %.3f ms", data.avgTimeMs);
+        ImGui::BulletText("Max:  %.3f ms", data.maxTimeMs);
+
+        if (!data.frameTimes.empty()) {
+            ImGui::PlotLines(("##" + name).c_str(),
+                data.frameTimes.data(),
+                static_cast<int>(data.frameTimes.size()),
+                0,
+                nullptr,
+                0.0f,
+                data.maxTimeMs,
+                ImVec2(0, 50));
+        }
+    }
+
+    ImGui::Separator();
+
+    // Reset profiler history
+    if (ImGui::Button("Clear Performance History")) {
+        Profiler::ClearHistory();
+    }
+
+	// Print GPU specs button
     if (ImGui::Button("Print GPU Specs to Console")) {
         Input::PrintSpecs();
     }
+
     ImGui::End();
 }
 

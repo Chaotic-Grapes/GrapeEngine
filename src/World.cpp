@@ -1,4 +1,5 @@
 #include "ecs/World.h"
+#include "Profiler.h"
 #include "ecs/Entity.h"
 
 void World::_initialize() const {
@@ -13,6 +14,9 @@ void World::_update() const {
     for (auto& sys : m_systems) {
         // Start timing for system loop
         // with std::chrono
+#ifdef _DEBUG
+		ProfileScope scope(sys->Name());
+#endif
         sys->OnUpdate();
         // End timing for system loop
         // Name of system can be accessed with sys->Name();

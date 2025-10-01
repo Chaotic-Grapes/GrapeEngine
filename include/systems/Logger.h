@@ -16,7 +16,6 @@
 #include <fstream>
 #include <sstream>
 #include <mutex>
-#include <GLFW/glfw3.h>
 
 enum class LogLevel {
 	INFO,
