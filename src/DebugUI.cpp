@@ -9,6 +9,7 @@
 #include <iostream>
 #include "Profiler.h"
 #include "ecs/World.h"
+#include "Math/MathHelper.h"
 
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the world
@@ -36,7 +37,6 @@ void DebugUI::Initialize(GLFWwindow* window) {
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
 
     m_initialized = true;  // Mark that DebugUI has been initialized
-    srand(static_cast<unsigned int>(time(nullptr)));  // Seed random number generator
 }
 
 void DebugUI::NewFrame() {
@@ -106,21 +106,27 @@ void DebugUI::SyncWithWorld() {
     // Get all entity IDs from world
     std::vector<EntityId> allEntities = m_world->GetEntityManager().GetAllEntities();
 
+    // Iterate over every Entity ID
     for (EntityId id : allEntities) {
+        // Get the actual Entity object for this ID
         Entity entity = m_world->GetEntityManager().GetEntity(id);
-        auto* transform = entity.GetComponent<Component::Transform>();
+        // Transform (position data)
+        Component::Transform* transform = entity.GetComponent<Component::Transform>();
 
+        // If Entity has an actual transform
         if (transform) {
+            // Get name or use fallback name "Entity"
             std::string entityName = m_world->GetEntityManager().GetName(id);
             if (entityName.empty()) entityName = "Entity";
 
+            // Sync position data, add synced object to debug UI list
             GameObject gameObj(id, entityName);
             gameObj.X = transform->Position.X;
             gameObj.Y = transform->Position.Y;
             m_gameObjects.push_back(gameObj);
         }
     }
-
+    // Refresh any cached button state now that the object list has changed
     _invalidateButtonCache();
 }
 
@@ -145,11 +151,11 @@ void DebugUI::AddGameObject(const std::string& name) {
     Entity entity = _createGameEntity(name);
 
     GameObject gameObj(entity.GetId(), name);
-    gameObj.X = ((float)rand() / RAND_MAX) * Input::GetWindowWidth();
-    gameObj.Y = ((float)rand() / RAND_MAX) * Input::GetWindowHeight();
+    gameObj.X = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
+    gameObj.Y = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
 
     // Sync with ECS Transform
-    auto& transform = entity.Transform();
+    Component::Transform& transform = entity.Transform();
     transform.Position.X = gameObj.X;
     transform.Position.Y = gameObj.Y;
 
@@ -418,33 +424,32 @@ void DebugUI::_showGameObjectEditor() {
 // Helper function to create entities with basic components
 Entity DebugUI::_createGameEntity(const std::string& name) {
     // Create new entity in ECS
-    Entity entity = m_world->CreateEntity();
+    Entity entity = m_world->CreateEntity(name);
 
     // Add basic components that most game objects need
     entity.AddComponent<Component::Transform>();
 
-    // Add different components based on object type
+    // Set position based on GameObject data
+    auto& shapeRenderer = entity.AddComponent<Component::ShapeRenderer2D>();
+    shapeRenderer.Type = Component::ShapeRenderer2D::ShapeType::Circle;
+    shapeRenderer.Radius = 25.0f;
+
+    // Set color based on type
     if (name == "Player") {
-        entity.AddComponent<Component::SpriteRenderer>("player_sprite.png");
-        entity.AddComponent<Component::Rigidbody2D>();
-        entity.AddComponent<Component::BoxCollider2D>();
+        shapeRenderer.FillColor = Color(0.0f, 0.0f, 1.0f, 1.0f);
     }
     else if (name == "Enemy") {
-        entity.AddComponent<Component::SpriteRenderer>("enemy_sprite.png");
-        entity.AddComponent<Component::Rigidbody2D>();
-        entity.AddComponent<Component::BoxCollider2D>();
+        shapeRenderer.FillColor = Color(1.0f, 0.0f, 0.0f, 1.0f);
     }
     else if (name == "Collectible") {
-        entity.AddComponent<Component::SpriteRenderer>("collectible_sprite.png");
-        entity.AddComponent<Component::CircleCollider2D>();
-        // Make it a trigger; entity can detect collisions without physically blocking movement
-        Component::CircleCollider2D* collider = entity.GetComponent<Component::CircleCollider2D>();
-        if (collider) collider->IsTrigger = true;
+        shapeRenderer.FillColor = Color(1.0f, 1.0f, 0.0f, 1.0f); 
     }
     else {
-        // Default object: just transform and sprite
-        entity.AddComponent<Component::SpriteRenderer>();
+        shapeRenderer.FillColor = Color(1.0f, 1.0f, 1.0f, 1.0f);
     }
+
+    // Add CircleCollider2D so physics test can detect and add physics
+    entity.AddComponent<Component::CircleCollider2D>(25.0f);
 
     return entity;
 }
