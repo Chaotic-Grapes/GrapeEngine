@@ -9,6 +9,7 @@
 #include <fstream>
 #include "systems/Time.h"
 #include "../include/Renderer2D.h"
+#include "../include/graphics/font.hpp"
 
 using namespace Sandbox;
 using Component::LineRenderer;
@@ -20,7 +21,7 @@ GraphicsTestScene::GraphicsTestScene(int width, int height) : Scene("GraphicsTes
     CREATE_WINDOW("Graphics Test", width, height);
     m_worldWidth  = static_cast<float>(width);
     m_worldHeight = static_cast<float>(height);
-    m_currentTest = TestType::BasicGraphics;
+    m_currentTest = TestType::FontSystem;
 }
 
 void GraphicsTestScene::OnLoad() {
@@ -644,7 +645,47 @@ void GraphicsTestScene::runBatchStress() {
 }
 #endif
 
-void GraphicsTestScene::runFontSystem() { /* render text */ }
+void GraphicsTestScene::runFontSystem() {
+    auto* r2d = GetWorld().GetSystem<Engine::Renderer2D>();
+    if (!r2d) return;
+    auto* renderer = r2d->GetRenderer();
+    auto* shader = r2d->GetTextShader(); // returns m_shaderText
+    if (!shader) return;
+
+    static bool initialized = false;
+    static std::unique_ptr<Font> font;
+
+    if (!initialized) {
+        font = std::make_unique<Font>("assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf", 96);
+        initialized = true;
+    }
+
+    shader->use();
+    shader->setMat4("uProjection", r2d->GetProjection());
+
+    renderer->beginFrame();
+    renderer->submitText(*font, "Do not go gentle into that good night,\n Old age should burn and rave at close of day; ", 
+                        { 50.f, 200.f }, { 1.f, 1.f, 1.f, 1.f }, 61.f);
+
+    // Test string covers:
+    // - Kerning-sensitive pairs (AV, To, Yo, Wa, Fo)
+    // - Ascender/descender overlaps (if, fl, yj, yp)
+    // - Baseline/bearing alignment (mmm, iii, lll, HHO)
+    // - Mixed-case spacing (UI, Il, Ty, Fo)
+    // - Punctuation placement (.,?!;:“”‘’ -- …)
+    // Render this to visually inspect spacing, kerning, and glyph metrics accuracy
+    renderer->submitText(*font,
+        "AV AW To Yo Wa Fo\n"
+        "if fi fl fj fk yj yp\n"
+        "mmm iii lll HHO UI Il Ty Fo\n"
+        "i.i i,i i!i i?i T.T T,T T!T T?T\n",
+        { 400.f, 500.f }, { 1.f, 1.f, 1.f, 0.8f }, 40.f);
+
+    renderer->submitText(*font, "Men at some time are masters of their fates.\n The fault, dear Brutus, is not in our stars, but in ourselves, that we are underlings.",
+                        { 100.f, 800.f }, { 1.f, 1.f, 1.f, 0.8f }, 24.f);
+
+    renderer->endFrame();
+}
 
 // ============================================================
 // PERFORMANCE / PROFILING DEBUG TESTS
