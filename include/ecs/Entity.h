@@ -17,6 +17,7 @@ public:
     Entity& operator=(Entity&& other) noexcept = default;
 
     EntityId GetId() const;
+    void SetName(const std::string& newName);
     std::string GetName() const;
     Entity Clone() const;
 

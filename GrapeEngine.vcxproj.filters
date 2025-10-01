@@ -68,6 +68,12 @@
     <Filter Include="Engine\Systems\ISystem Dependent\Scene">
       <UniqueIdentifier>{0e64a6f7-4617-4ad7-ba74-a6503a78df4d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sandboxing\GameObjectFactory Test">
+      <UniqueIdentifier>{ee44bc4e-c4f4-481d-a73f-2ddd98693170}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Math">
+      <UniqueIdentifier>{f3aeaf44-64a5-4f47-a71b-54bd00471200}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp">
@@ -109,29 +115,6 @@
     <ClCompile Include="src\Input.cpp">
       <Filter>Engine\Systems\ISystem Independent\Input</Filter>
     </ClCompile>
-    <ClCompile Include="src\Window.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\graphics\shader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\graphics\renderer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\graphics\sprite.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Input.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Collision.cpp" />
-    <ClCompile Include="src\Math\Matrix3x3.cpp" />
-    <ClCompile Include="src\Math\Matrix4x4.cpp" />
-    <ClCompile Include="src\Math\Vector2D.cpp" />
-    <ClCompile Include="src\Math\Vector3D.cpp" />
-    <ClCompile Include="src\Math\Vector4D.cpp" />
-    <ClCompile Include="src\Physics.cpp" />
-    <ClCompile Include="src\test.cpp" />
     <ClCompile Include="src\EngineSandbox.cpp">
       <Filter>Sandboxing</Filter>
     </ClCompile>
@@ -147,7 +130,6 @@
     <ClCompile Include="src\BehaviourSystem.cpp">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
     </ClCompile>
-    <ClCompile Include="src\DynamicCollision.cpp" />
     <ClCompile Include="src\Scene.cpp">
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClCompile>
@@ -159,7 +141,6 @@
     </ClCompile>
     <ClCompile Include="src\graphics\texture.cpp" />
     <ClCompile Include="src\graphics\debugDraw2D.cpp" />
-    <ClCompile Include="src\graphics\polygon-utils.cpp" />
     <ClCompile Include="src\Overlay.cpp" />
     <ClCompile Include="src\GraphicsTest.cpp">
       <Filter>Sandboxing\Physics Collision Test</Filter>
@@ -168,6 +149,42 @@
     <ClCompile Include="src\MemoryTest.cpp" />
     <ClCompile Include="src\ResourceManager.cpp" />
     <ClCompile Include="src\ResourceManagerTest.cpp" />
+    <ClCompile Include="src\graphics\SpriteMetaData.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\TextureCache.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GameObjectFactoryTest.cpp">
+      <Filter>Sandboxing\GameObjectFactory Test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\polygon-utils.cpp">
+      <Filter>Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Collision.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DynamicCollision.cpp">
+      <Filter>Engine\Systems\ISystem Dependent\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Math\Matrix3x3.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Math\Matrix4x4.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Math\Vector2D.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Math\Vector3D.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Math\Vector4D.cpp">
+      <Filter>Math</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SerializationTest.cpp">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
@@ -200,7 +217,7 @@
     <ClInclude Include="include\ecs\IComponent.h">
       <Filter>Engine\Entity Component System\Components</Filter>
     </ClInclude>
-    <ClInclude Include="include\messaging\MessageBus.h">
+    <ClInclude Include="include\messaging\MessageSystem.h">
       <Filter>Engine\Messaging</Filter>
     </ClInclude>
     <ClInclude Include="include\messaging\MessageTypes.h">
@@ -224,21 +241,7 @@
     <ClInclude Include="include\Input.h">
       <Filter>Engine\Systems\ISystem Independent\Input</Filter>
     </ClInclude>
-    <ClInclude Include="include\graphics\sprite.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Input.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\Color.h" />
-    <ClInclude Include="include\Math\Matrix3x3.h" />
-    <ClInclude Include="include\Math\Matrix4x4.h" />
-    <ClInclude Include="include\Math\Vector2D.h" />
-    <ClInclude Include="include\Math\Vector3D.h" />
-    <ClInclude Include="include\Math\Vector4D.h" />
-    <ClInclude Include="src\Collision.h" />
-    <ClInclude Include="src\Physics.h" />
-    <ClInclude Include="src\test.h" />
     <ClInclude Include="include\Math\MathHelper.h">
       <Filter>Helpers</Filter>
     </ClInclude>
@@ -260,7 +263,6 @@
     <ClInclude Include="include\systems\BehaviourSystem.h">
       <Filter>Engine\Systems\ISystem Independent\Scripting</Filter>
     </ClInclude>
-    <ClInclude Include="include\DyamicCollision.h" />
     <ClInclude Include="include\ecs\Scene.h">
       <Filter>Engine\Systems\ISystem Dependent\Scene</Filter>
     </ClInclude>
@@ -272,7 +274,6 @@
     </ClInclude>
     <ClInclude Include="include\graphics\texture.hpp" />
     <ClInclude Include="include\graphics\debugDraw2D.hpp" />
-    <ClInclude Include="include\graphics\polygon-utils.hpp" />
     <ClInclude Include="include\graphics\vertex.hpp" />
     <ClInclude Include="include\GraphicsTest.hpp">
       <Filter>Sandboxing\Physics Collision Test</Filter>
@@ -281,6 +282,50 @@
     <ClInclude Include="include\MemoryTest.h" />
     <ClInclude Include="include\ResourceManager.h" />
     <ClInclude Include="include\ResourceManagerTest.h" />
+    <ClInclude Include="include\graphics\SpriteMetaData.hpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\TextureCache.hpp">
+      <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ecs\GameObjectFactory.h">
+      <Filter>Engine\Entity Component System</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GameObjectFactoryTest.h">
+      <Filter>Sandboxing\GameObjectFactory Test</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GLHelper.h">
+      <Filter>Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="include\graphics\polygon-utils.hpp">
+      <Filter>Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Collision.h">
+      <Filter>Engine\Systems\ISystem Dependent\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DynamicCollision.h">
+      <Filter>Engine\Systems\ISystem Dependent\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Math\Matrix3x3.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Math\Matrix4x4.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Math\Vector2D.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Math\Vector3D.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Math\Vector4D.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EntitySerializer.h" />
+    <ClInclude Include="include\Serialization.h" />
+    <ClInclude Include="include\SerializationTest.h">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">

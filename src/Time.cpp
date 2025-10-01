@@ -14,6 +14,7 @@ double Time::m_timeElapsed        = 0.f;
 float  Time::m_timeScale          = 1.f;
 int    Time::m_frameCounter       = 0;
 float  Time::m_maximumDeltaTime   = 0.4f;
+int    Time::m_fpsCap             = 0; // 0 = uncapped
 
 void Time::OnCreate() {
     m_lastFrameTime = m_startTime = glfwGetTime();
@@ -50,3 +51,6 @@ double Time::ElapsedTime()               { return m_timeElapsed; }
 float  Time::TimeScale()                 { return m_timeScale; }
 int    Time::FrameCount()                { return m_frameCounter; }
 float  Time::MaximumDeltaTime()          { return m_maximumDeltaTime; }
+
+void   Time::FpsCap(const int fps)       { m_fpsCap = std::max(fps, 0); }
+int    Time::FpsCap()                    { return m_fpsCap; }

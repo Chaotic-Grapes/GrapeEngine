@@ -1,7 +1,6 @@
-#include "../src/DyamicCollision.h"
+#include "DynamicCollision.h"
 #include <algorithm>
 #include <cmath>
-
 
 //helpers for squared length and float clamp
 static inline float Dot(const Vector2D& a, const Vector2D& b) { return a.X * b.X + a.Y * b.Y; }
@@ -151,14 +150,14 @@ DynCol::SweepHit DynCol::Sweep(const AABB& A, const Vector2D& A_end,
     Vector2D vB{ B_end.X - ((B.min.X + B.max.X) * 0.5f), B_end.Y - ((B.min.Y + B.max.Y) * 0.5f) };
     Vector2D vRel{ vA.X - vB.X, vA.Y - vB.Y };
 
-    // Expand B by A’s half extents (Minkowski sum) and test point vs expanded box:
+    // Expand B by Aï¿½s half extents (Minkowski sum) and test point vs expanded box:
     Vector2D hA{ (A.max.X - A.min.X) * 0.5f, (A.max.Y - A.min.Y) * 0.5f };
     DynCol::AABB E; // expanded box with center at B
     Vector2D cB{ (B.min.X + B.max.X) * 0.5f, (B.min.Y + B.max.Y) * 0.5f };
     E.min = { B.min.X - hA.X, B.min.Y - hA.Y };
     E.max = { B.max.X + hA.X, B.max.Y + hA.Y };
 
-    // Start point is A’s center
+    // Start point is Aï¿½s center
     Vector2D p0{ (A.min.X + A.max.X) * 0.5f, (A.min.Y + A.max.Y) * 0.5f };
     Vector2D p1{ p0.X + vRel.X, p0.Y + vRel.Y };
 
@@ -206,7 +205,7 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
 
     Vector2D vA{ A_end.X - A.c.X, A_end.Y - A.c.Y };
     Vector2D vB{ B_end.X - B.c.X, B_end.Y - B.c.Y };
-    Vector2D v{ vA.Y - vB.Y, vA.Y - vB.Y }; // relative motion (A wrt B)
+    Vector2D v{ vA.X - vB.X, vA.Y - vB.Y }; // relative motion (A wrt B)
 
     Vector2D w0{ A.c.X - B.c.X, A.c.Y - B.c.Y }; // initial offset
     float R = A.r + B.r;
@@ -260,6 +259,8 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
 DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
     const AABB& B, const Vector2D& B_end)
 {
+    (void)B_end;
+
     // Expand box by circle radius
     AABB E;
     E.min = { B.min.X - A.r, B.min.Y - A.r };

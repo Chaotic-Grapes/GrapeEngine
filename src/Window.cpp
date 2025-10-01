@@ -1,7 +1,7 @@
 #include "systems/Window.h"
 #include "Input.h"
 #include <iostream>
-#include "messaging/MessageBus.h"
+#include "messaging/MessageSystem.h"
 #include "messaging/MessageTypes.h"
 
 namespace {
@@ -15,7 +15,7 @@ static void FramebufferSizeCallback(GLFWwindow* window, const int width, const i
 	glViewport(0, 0, width, height);
 
 	// Broadcast resize message
-	Messaging::MessageBus::Broadcast(Messaging::WindowResized{ width, height });
+	Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
 }
 
 Window::~Window() { Destroy(); }
@@ -45,6 +45,10 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		return false;
 	}
 	glfwMakeContextCurrent(m_windowHandle);
+
+	// === ENABLE OR DISABLE VSYNC HERE ===
+	glfwSwapInterval(1);
+
 	if (!gladLoadGL()) {
 		// Log: "Failed to initialize GLAD";
 		glfwDestroyWindow(m_windowHandle);

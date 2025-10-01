@@ -1,9 +1,10 @@
 ﻿#include "Application.h"
 #include <windows.h>
 #include <algorithm>
+#include <thread>
 #include "Input.h"
 #include "Physics2D.h"
-#include "Renderer2D.h"
+#include "Profiler.h"
 #include "systems/WindowManager.h"
 #include "systems/Time.h"
 #include "ecs/Scene.h"
@@ -75,9 +76,12 @@ namespace Engine {
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
-        Scene* currentScene = nullptr;
+        Scene* currentScene = m_sceneManager.GetActiveScene();
         
         while (!m_shouldStop) {
+            const double frameStart = glfwGetTime();
+            Profiler::update_time();
+            // --- Input & Game Update ---
 			Input::_processInput();
             auto* newScene = m_sceneManager.GetActiveScene();
             const bool isNewScene = newScene == currentScene;
@@ -87,6 +91,7 @@ namespace Engine {
 
                 newScene->Load();
 
+                // This *might* cause a memory access violation
                 delete currentScene;
                 currentScene = newScene;
             }
@@ -96,13 +101,28 @@ namespace Engine {
                 game.OnUpdate(m_sceneManager);
                 currentScene->LateUpdate();
             }
-            
+
+            // --- Rendering ---
             for (const auto* win : WindowManager::GetWindows()) {
                 if (win->ShouldClose()) {
                     m_shouldStop = true;
                     break;
                 }
                 glfwSwapBuffers(win->Handle());
+            }
+
+            // --- FPS Controller ---
+            const double frameEnd = glfwGetTime();
+            double frameDuration = frameEnd - frameStart;
+
+            // Apply FPS cap (if set)
+            if (Time::FpsCap() > 0) {
+                const double targetFrameTime = 1.0 / Time::FpsCap();
+                if (frameDuration < targetFrameTime) {
+                    std::this_thread::sleep_for(
+                        std::chrono::duration<double>(targetFrameTime - frameDuration)
+                    );
+                }
             }
 		}
 

@@ -7,7 +7,6 @@
 #define DESTROY_ALL_WINDOWS() WindowManager::DestroyAll();
 
 #include <vector>
-#include "ecs/ISystem.h"
 #include "Window.h"
 
 #ifdef CreateWindow

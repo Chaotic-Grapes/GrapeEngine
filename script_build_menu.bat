@@ -31,9 +31,9 @@ echo ===============================================
 echo          GrapeEngine - Build Menu
 echo ===============================================
 echo.
-echo 1. Build Debug
-echo 2. Build Release
-echo 3. Clean Build Folder
+echo 1. Clean Build Folder
+echo 2. Build Debug
+echo 3. Build Release
 echo 4. Run Debug
 echo 5. Run Release
 echo 6. Clean, Build ^& Run Debug
@@ -42,9 +42,9 @@ echo 8. Exit
 echo.
 set /p choice=Enter your choice (1-8): 
 
-if "%choice%"=="1" call script_build.bat Debug
-if "%choice%"=="2" call script_build.bat Release
-if "%choice%"=="3" call script_clean.bat pause
+if "%choice%"=="1" call script_clean.bat pause
+if "%choice%"=="2" call script_build.bat Debug
+if "%choice%"=="3" call script_build.bat Release
 if "%choice%"=="4" script_run.bat Debug
 if "%choice%"=="5" script_run.bat Release
 if "%choice%"=="6" (

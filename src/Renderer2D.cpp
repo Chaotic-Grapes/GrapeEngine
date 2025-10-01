@@ -1,6 +1,6 @@
+#include "Application.h"
 #include "Renderer2D.h"
 #include <iterator>
-#include "Application.h"
 #include "systems/WindowManager.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include "ecs/Components.h"
@@ -116,12 +116,14 @@ namespace Engine {
 		}
 
         for (auto& [transform, sprite] : m_world->GetEntityManager().Query<Component::Transform, Component::SpriteRenderer>()) {
-            m_renderer->drawSprite({
-                ToGlm(transform.Position),   // Position
-                ToGlm(transform.Scale),      // Scale
-                {0.f, 0.f, 1.f, 1.f},        // full texture rect
-                ToGlm(sprite.Color),         // Tint
-                sprite.Source.ID()           // Texture ID
+            m_renderer->submitSprite({
+                ToGlm(transform.Position),          // pos
+                ToGlm(transform.Scale),             // size
+                {0.f, 0.f, 1.f, 1.f},               // uv
+                ToGlm(sprite.Color),                // color
+                sprite.TextureId,                   // textureId (GLuint)
+                glm::radians(transform.Rotation),   // rotation (radians)
+                1.0f                                // uniformScale
             });
         }
 

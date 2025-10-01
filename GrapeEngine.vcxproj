@@ -97,7 +97,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;opengl32.lib;freetype.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -130,7 +130,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;opengl32.lib;freetype.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -153,9 +153,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\DebugUI.cpp" />
+    <ClCompile Include="src\GameObjectFactoryTest.cpp" />
     <ClCompile Include="src\BehaviourSystem.cpp" />
+    <ClCompile Include="src\CrashDumping.cpp" />
     <ClCompile Include="src\DynamicCollision.cpp" />
     <ClCompile Include="src\GraphicsTest.cpp" />
+    <ClCompile Include="src\graphics\SpriteMetaData.cpp" />
+    <ClCompile Include="src\graphics\TextureCache.cpp" />
     <ClCompile Include="src\Physics2D.cpp" />
     <ClCompile Include="src\PhysicsCollision2DTest.cpp" />
     <ClCompile Include="src\Renderer2D.cpp" />
@@ -178,7 +183,7 @@
     <ClCompile Include="src\SandboxGame.cpp" />
     <ClCompile Include="src\Scene.cpp" />
     <ClCompile Include="src\SceneManager.cpp" />
-    <ClCompile Include="src\test.cpp" />
+    <ClCompile Include="src\SerializationTest.cpp" />
     <ClCompile Include="src\EntityManager.cpp" />
     <ClCompile Include="src\EngineSandbox.cpp" />
     <ClCompile Include="src\Application.cpp" />
@@ -187,14 +192,21 @@
     <ClCompile Include="src\Memory.cpp" />
     <ClCompile Include="src\MemoryTest.cpp" />
     <ClCompile Include="src\ResourceManager.cpp" />
+    <ClCompile Include="src\Logger.cpp" />
     <ClCompile Include="src\Overlay.cpp" />
+    <ClCompile Include="src\Profiler.cpp" />
     <ClCompile Include="src\Time.cpp" />
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
-    <ClInclude Include="include\DyamicCollision.h" />
+    <ClInclude Include="include\DebugUI.h" />
+    <ClInclude Include="include\GameObjectFactoryTest.h" />
+    <ClInclude Include="include\DynamicCollision.h" />
+    <ClInclude Include="include\ecs\GameObjectFactory.h" />
     <ClInclude Include="include\GraphicsTest.hpp" />
     <ClInclude Include="include\ResourceManagerTest.h" />
+    <ClInclude Include="include\graphics\SpriteMetaData.hpp" />
+    <ClInclude Include="include\graphics\TextureCache.hpp" />
     <ClInclude Include="include\SandboxGame.h" />
     <ClInclude Include="include\systems\Behaviour.h" />
     <ClInclude Include="include\systems\BehaviourSystem.h" />
@@ -208,9 +220,10 @@
     <ClInclude Include="include\ecs\IComponent.h" />
     <ClInclude Include="include\ecs\ISystem.h" />
     <ClInclude Include="include\ecs\World.h" />
-    <ClInclude Include="include\messaging\MessageBus.h" />
+    <ClInclude Include="include\messaging\MessageSystem.h" />
     <ClInclude Include="include\messaging\MessageTypes.h" />
     <ClInclude Include="include\Application.h" />
+    <ClInclude Include="include\systems\Logger.h" />
     <ClInclude Include="include\systems\Time.h" />
     <ClInclude Include="include\systems\Window.h" />
     <ClInclude Include="include\systems\WindowManager.h" />
@@ -218,6 +231,8 @@
     <ClInclude Include="include\graphics\renderer.hpp" />
     <ClInclude Include="include\graphics\shader.hpp" />
     <ClInclude Include="include\graphics\sprite.hpp" />
+    <ClInclude Include="src\CrashDumping.h" />
+    <ClInclude Include="src\Profiler.h" />
     <ClInclude Include="include\graphics\texture.hpp" />
     <ClInclude Include="include\graphics\debugDraw2D.hpp" />
     <ClInclude Include="include\graphics\polygon-utils.hpp" />
@@ -239,6 +254,9 @@
     <ClInclude Include="include\Memory.h" />
     <ClInclude Include="include\MemoryTest.h" />
     <ClInclude Include="include\ResourceManager.h" />
+    <ClInclude Include="include\EntitySerializer.h" />
+    <ClInclude Include="include\Serialization.h" />
+    <ClInclude Include="include\SerializationTest.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl" />

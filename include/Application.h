@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 #include "ecs/World.h"
+#include <windows.h>
 #include "Game.h"
 #include "ecs/SceneManager.h"
 

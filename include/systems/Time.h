@@ -20,6 +20,8 @@ public:
     static int    FrameCount();
     static void   MaximumDeltaTime(const float& maxDelta);
     static float  MaximumDeltaTime();
+    static void   FpsCap(int fps);
+    static int    FpsCap();
     
 private:
     static double m_startTime;
@@ -31,5 +33,7 @@ private:
     static float  m_timeScale;
     static int    m_frameCounter;
     static float  m_maximumDeltaTime;
+
+    static int    m_fpsCap; // 0 = uncapped
 };
 #endif // TIME_H

@@ -1,14 +1,15 @@
 #include "systems/Overlay.h"
+
 #ifdef USE_IMGUI
 #include "DebugUI.h"
 #include "Input.h"
 #include <systems/Window.h>
 #include <systems/WindowManager.h>
 #include <iostream>
+#include "ecs/World.h"
 
 void Overlay::OnCreate() {
-    // Don't initialize ImGUI here cause the window might not exist yet
-    // due to system initialization order (Overlay runs before WindowManager)
+    // Don't create DebugUI here since we might not have world yet
 }
 
 void Overlay::OnUpdate() {
@@ -34,10 +35,25 @@ void Overlay::OnUpdate() {
             return;
         }
     }
-    // Start a new ImGUI frame
-    DebugUI::NewFrame();
-    // Draw all the ImGUI windows and widgets
-    DebugUI::Render();
+
+    // If still no instance, then return
+    if (!m_debugUI) return;
+
+    // Try to initialize ImGui if not done yet
+    if (!m_initialized) {
+        // Get main window handle and set up ImGUI
+        Window* mainWindow = WindowManager::GetMainWindow();
+        if (mainWindow) {
+            m_debugUI->Initialize(mainWindow->Handle());
+            m_debugUI->SyncWithWorld();
+            m_initialized = true;
+        }
+        else return;
+    }
+
+    // Update UI every frame
+    m_debugUI->NewFrame();
+    m_debugUI->Render();
 }
 
 // Prevent memory leaks
@@ -48,6 +64,8 @@ Overlay::~Overlay() {
 
 #else
 // Non-ImGui implementations
+Overlay::Overlay() = default;
+
 void Overlay::OnCreate() {
     // Empty implementation when ImGui is not available
 }
