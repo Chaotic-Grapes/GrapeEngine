@@ -70,6 +70,7 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     case 7: {
         std::cout << "Starting Memory Tracking Test..." << '\n';
         RunMemoryTests();
+        break;
     }
     default:
         std::cout << "Invalid choice" << '\n';

@@ -1,6 +1,4 @@
 #include <Input.h>
-#include <iostream>
-#include <iomanip>
 #include <sstream>
 #include "messaging/MessageSystem.h"
 #include "messaging/MessageTypes.h"
@@ -26,7 +24,7 @@ void Input::Initialize(GLFWwindow* pWin) {
 bool Input::IsKeyPressed(const int key) { return m_keyPressed[key]; }
 
 // Check if a specific key was just pressed this frame
-bool Input::IsKeyDown(const int key) { 
+bool Input::IsKeyDown(const int key) {
     //quick fix
     return glfwGetKey(m_window, key) == PRESS;
 }
@@ -80,12 +78,6 @@ void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
     // Store the new window dimensions
     m_windowWidth = width;
     m_windowHeight = height;
-
-//#ifdef _DEBUG
-//    std::ostringstream oss;
-//    oss << "Window is being resized: " << width << "x" << height;
-//    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
-//#endif
 }
 
 void Input::_processInput() {
@@ -100,9 +92,7 @@ void Input::_processInput() {
 void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
     (void)pWin;
     (void)mod;
-#ifndef _DEBUG
-	(void)scancode;
-#endif
+    (void)scancode;
 
     if (action == GLFW_PRESS) {
         m_keyDown[key] = true;
@@ -114,21 +104,6 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
         m_keyUp[key] = true;
         Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key });
     }
-
-//#ifdef _DEBUG
-//    const char* keyName = glfwGetKeyName(key, scancode);
-//	if (!keyName) keyName = "Unknown";
-//    // Debug-only code
-//    std::string message;
-//    if (action == PRESS)
-//        message = "[Key] " + std::string(keyName) + " key pressed";
-//    else if (action == REPEAT)
-//        message = "[Key] " + std::string(keyName) + " key repeatedly pressed";
-//    else if (action == RELEASE)
-//        message = "[Key] " + std::string(keyName) + " key released";
-//
-//    std::cout << "\r" << std::setw(50) << std::left << message << std::flush;
-//#endif
 }
 
 // Called on mouse button press/release
@@ -137,22 +112,6 @@ void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int m
     (void)button;
     (void)action;
     (void)mod;
-//#ifdef _DEBUG
-//    const char* buttonName = "";
-//    switch (button) {
-//    case MOUSE_LEFT: buttonName = "Left mouse button"; break;
-//    case MOUSE_RIGHT: buttonName = "Right mouse button"; break;
-//    default: buttonName = "Mouse button"; break;
-//    }
-//    // Debug-only code
-//    std::string message;
-//    if (action == PRESS)
-//        message = "[Mouse] " + std::string(buttonName) + " pressed";
-//    else if (action == RELEASE)
-//        message = "[Mouse] " + std::string(buttonName) + " released";
-//
-//    std::cout << "\r" << std::setw(50) << std::left << message << std::flush;
-//#endif
 }
 
 // Called when mouse cursor moves
@@ -160,11 +119,9 @@ void Input::_mousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
     (void)pWin;
     (void)xPos;
     (void)yPos;
-//#ifdef _DEBUG
-//    std::ostringstream oss;
-//    oss << "Mouse cursor position: (" << std::fixed << std::setprecision(1) << xPos << ", " << yPos << ")";
-//    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
-//#endif
+
+    // Optional: Enable for mouse position debugging (very spammy!)
+    // LOG_DEBUG("Mouse position: (" << xPos << ", " << yPos << ")");
 }
 
 // Called when mouse wheel is scrolled
@@ -176,12 +133,6 @@ void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffse
     // Store the scroll offsets
     m_scrollX = xOffset;
     m_scrollY = yOffset;
-
-//#ifdef _DEBUG
-//    std::ostringstream oss;
-//    oss << "Mouse scroll wheel offset: (" << std::fixed << std::setprecision(1) << xOffset << ", " << yOffset << ")";
-//    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
-//#endif
 }
 
 // Prints OpenGL system info (GPU, version, limits, etc.)
@@ -212,18 +163,18 @@ void Input::PrintSpecs() {
     glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBufferBindings); // Max buffer bindings
 
     // Print to output
-    LOG_INFO("GPU Vendor: " << vendorStr << "\n"
-        << '\t' << "GL Renderer: " << rendererStr << "\n"
-        << '\t' << "GL Version: " << versionStr << "\n"
-        << '\t' << "GL Shader Version: " << shaderVersionStr << "\n"
-        << '\t' << "GL Major Version: " << majorVersion << "\n"
-        << '\t' << "GL Minor Version: " << minorVersion << "\n"
-        << '\t' << (doubleBuffer ? "Current OpenGL Context is double-buffered\n" : "Current OpenGL Context is not double-buffered\n")
-        << '\t' << "Maximum Vertex Count: " << maxVertices << "\n"
-        << '\t' << "Maximum Indices Count: " << maxIndices << "\n"
-        << '\t' << "GL Maximum texture size: " << maxTextureSize << "\n"
-        << '\t' << "Maximum Viewport Dimensions: " << maxViewportDims[0]
-        << '\t' << " x " << maxViewportDims[1] << "\n"
-        << '\t' << "Maximum generic vertex attributes: " << maxVertexAttribs << "\n"
-        << '\t' << "Maximum vertex buffer bindings: " << maxBufferBindings << "\n");
+    LOG_INFO("=== GPU Specifications ===" << "\n"
+        << "GPU Vendor: " << vendorStr << "\n"
+        << "GL Renderer: " << rendererStr << "\n"
+        << "GL Version: " << versionStr << "\n"
+        << "GL Shader Version: " << shaderVersionStr << "\n"
+        << "GL Major Version: " << majorVersion << "\n"
+        << "GL Minor Version: " << minorVersion << "\n"
+        << (doubleBuffer ? "Current OpenGL Context is double-buffered\n" : "Current OpenGL Context is not double-buffered\n")
+        << "Maximum Vertex Count: " << maxVertices << "\n"
+        << "Maximum Indices Count: " << maxIndices << "\n"
+        << "GL Maximum texture size: " << maxTextureSize << "\n"
+        << "Maximum Viewport Dimensions: " << maxViewportDims[0] << " x " << maxViewportDims[1] << "\n"
+        << "Maximum generic vertex attributes: " << maxVertexAttribs << "\n"
+        << "Maximum vertex buffer bindings: " << maxBufferBindings);
 }

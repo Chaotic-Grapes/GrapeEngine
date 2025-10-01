@@ -1,11 +1,12 @@
 #include "Memory.h"
+#include "systems/Logger.h"
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
 
 // Store allocation details in map
 void* Memory::RecordAlloc(size_t size, const char* file, int line, const char* function) {
-	std::cout << "\nEntered RecordAlloc()\n";
+	LOG_DEBUG("Entered RecordAlloc()");
 	// Lock the mutex to ensure thread safety (allow multiple 
 	// threads to use code/functions without causing UDB)
 	std::lock_guard<std::mutex> lock(m_mutex);
@@ -14,7 +15,7 @@ void* Memory::RecordAlloc(size_t size, const char* file, int line, const char* f
 	// Trying to avoid infinite recursion by using malloc even though it's C and not C++
 	void* ptr = malloc(size);
 	if (!ptr) {
-		std::cerr << "ERROR: malloc failed\n";
+		LOG_ERROR("malloc failed");
 		return nullptr;
 	}
 
@@ -26,13 +27,13 @@ void* Memory::RecordAlloc(size_t size, const char* file, int line, const char* f
 	info.function = function ? function : "unknown";
 
 	// Store in the tracking map
-	std::cout << "Storing in map\n";
+	LOG_DEBUG("Storing in map");
 	try {
 		m_allocs[ptr] = info;
-		std::cout << "Stored successfully\n";
+		LOG_DEBUG("Stored successfully");
 	}
 	catch (...) {
-		std::cerr << "ERROR: failed to store in map\n";
+		LOG_ERROR("Failed to store in map");
 		free(ptr);
 		return nullptr;
 	}
@@ -46,8 +47,10 @@ void* Memory::RecordAlloc(size_t size, const char* file, int line, const char* f
 		m_peakAlloc = m_currentAlloc;
 	}
 
-	std::cout << "Allocated " << size << " bytes at " << ptr << " from " << file
-		<< ":" << line << " (" << function << "())\n";
+	std::ostringstream oss;
+	oss << "Allocated " << size << " bytes at " << ptr << " from "
+		<< file << ":" << line << " (" << function << "())";
+	LOG_DEBUG(oss.str());
 
 	// Return allocated memory
 	return ptr;
@@ -57,7 +60,7 @@ void* Memory::RecordAlloc(size_t size, const char* file, int line, const char* f
 // Mark it as freed
 void Memory::RecordDealloc(void* ptr) { 
 	if (!ptr) return;
-	std::cout << "\nEntered RecordDealloc() for: " << ptr << '\n';
+	LOG_DEBUG("Entered RecordDealloc() for: " << ptr);
 
 	// Lock the mutex to ensure thread safety
 	std::lock_guard<std::mutex> lock(m_mutex);
@@ -65,7 +68,7 @@ void Memory::RecordDealloc(void* ptr) {
 	// Find the allocation record
 	std::unordered_map<void*, AllocInfo>::iterator it = m_allocs.find(ptr);
 	if (it != m_allocs.end()) {
-		std::cout << "Found allocation record, removing...\n";
+		LOG_DEBUG("Found allocation record, removing...");
 
 		// Update current allocated memory
 		m_currentAlloc -= it->second.size;
@@ -74,13 +77,13 @@ void Memory::RecordDealloc(void* ptr) {
 		m_allocs.erase(it);
 
 		// Print deallocation info for debugging
-		std::cout << "Removed from map successfully\n";
+		LOG_DEBUG("Removed from map successfully");
 	}
-	else std::cout << "WARNING: pointer not found in tracking map\n";
+	else LOG_WARNING("Pointer not found in tracking map");
 		
 	// Free the actual memory
 	// Again trying to avoid infinite recursion
-	std::cout << "Freeing memory at " << ptr << '\n';
+	LOG_DEBUG("Freeing memory at " << ptr);
 	free(ptr);
 }
 
@@ -90,21 +93,24 @@ void Memory::ReportLeaks() const {
 	std::lock_guard<std::mutex> lock(m_mutex);
 
 	if (m_allocs.empty()) {
-		std::cout << "No memory leaks detected\n";
+		LOG_INFO("No memory leaks detected");
 		return;
 	}
 
-	std::cout << "\n===== MEMORY LEAK REPORT =====\n";
-	std::cout << "Total leaks: " << m_allocs.size() << "\n";
-	std::cout << "Total leaked memory: " << m_currentAlloc << " bytes\n";
+	std::ostringstream oss;
+	oss << "\n===== MEMORY LEAK REPORT =====\n";
+	oss << "Total leaks: " << m_allocs.size() << "\n";
+	oss << "Total leaked memory: " << m_currentAlloc << " bytes\n";
 
 	// Display each leak
 	std::unordered_map<void*, AllocInfo>::const_iterator it;
 	for (it = m_allocs.begin(); it != m_allocs.end(); it++) {
 		const AllocInfo& info = it->second;
-		std::cout << "Leak: " << info.size << " bytes at address " << it->first << "\n";
-		std::cout << "Location: " << info.file << ":" << info.line << " in " << info.function << "()\n";
+		oss << "Leak: " << info.size << " bytes at address " << it->first << "\n";
+		oss << "Location: " << info.file << ":" << info.line << " in " << info.function << "()\n";
 	}
+
+	LOG_WARNING(oss.str());
 }
 
 // Updated after storing allocation details (recordAllocation)
@@ -113,25 +119,30 @@ void Memory::PrintStats() const {
 	// Lock the mutex to ensure thread safety
 	std::lock_guard<std::mutex> lock(m_mutex);
 
-	std::cout << "\n===== MEMORY STATISTICS =====\n";
-	std::cout << "Current allocated: " << m_currentAlloc << " bytes\n";
-	std::cout << "Peak allocated: " << m_peakAlloc << " bytes\n";
-	std::cout << "Total allocated: " << m_totalAlloc << " bytes\n";
-	std::cout << "Active allocations: " << m_allocs.size() << "\n";
+	std::ostringstream oss;
+	oss << "\n===== MEMORY STATISTICS =====\n";
+	oss << "Current allocated: " << m_currentAlloc << " bytes\n";
+	oss << "Peak allocated: " << m_peakAlloc << " bytes\n";
+	oss << "Total allocated: " << m_totalAlloc << " bytes\n";
+	oss << "Active allocations: " << m_allocs.size() << "\n";
+
+	LOG_INFO(oss.str());
 }
 
 // Constructor implementation
 Memory::Memory() : m_totalAlloc(0), m_currentAlloc(0), m_peakAlloc(0) {
 	// Initialization code
-	std::cout << "MemoryManager initialized\n";
+	LOG_INFO("MemoryManager initialized");
 }
 
 // Destructor implementation
 Memory::~Memory() {
 	if (!m_allocs.empty()) {
-		std::cerr << "\n\nWARNING: memory manager destroyed with " << m_allocs.size()
+		std::ostringstream oss;
+		oss << "\n\nWARNING: memory manager destroyed with " << m_allocs.size()
 			<< (m_allocs.size() == 1 ? " allocation " : " allocations ")
-			<< "still active\n";
+			<< "still active";
+		LOG_WARNING(oss.str());
 		ReportLeaks();
 	}
 }

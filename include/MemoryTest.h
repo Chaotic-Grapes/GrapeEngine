@@ -4,6 +4,6 @@
 void RunMemoryTests();
 
 // Individual test functions
-void TestBasicAllocation();
+void TestBasicAlloc();
 void TestMemoryLeak();
-void TestMultipleAllocations();
+void TestMultipleAllocs();

@@ -1,8 +1,8 @@
 #include "Memory.h"
-#include <iostream>
+#include "systems/Logger.h"
 
 void TestBasicAlloc() {
-    std::cout << "=== Testing Basic Allocation ===\n\n";
+    LOG_INFO("=== Testing Basic Allocation ===\n");
 
     // Basic allocations
     float* floatArray = NEW_ARRAY(float, 10);  // 10 * sizeof(float) = 40 bytes
@@ -14,7 +14,7 @@ void TestBasicAlloc() {
     }
     *intPtr = 42;
 
-    std::cout << "Created float array and int\n";
+    LOG_INFO("Created float array and int");
     Memory::GetInstance().PrintStats();
 
     // SHOULD BE 44 BYTES OF MEMORY AT THIS STAGE
@@ -24,36 +24,36 @@ void TestBasicAlloc() {
     DELETE(intPtr);
     // AND FINALLY 0 (EVERYTHING'S RELEASED)
 
-    std::cout << "Cleaned up\n";
+    LOG_INFO("Cleaned up");
     Memory::GetInstance().PrintStats();
 }
 
 void TestMemoryLeak() {
-    std::cout << "\n=== Testing Memory Leak Detection ===\n";
+    LOG_INFO("\n=== Testing Memory Leak Detection ===");
 
     // Create some data but forget to delete it
-    unsigned char* largeData = NEW_ARRAY(unsigned char, 1024); // 1024 * sizeof(unsigned char) = 1024 bytes (1 KB)
+    unsigned char* largeData = NEW_ARRAY(unsigned char, 1024); // 1024 bytes (1 KB)
     int* buffer = NEW_ARRAY(int, 50);  // 50 * sizeof(int) = 200 bytes
 
-    std::cout << "Created large data and buffer\n";
+    LOG_INFO("Created large data and buffer");
     Memory::GetInstance().PrintStats();
 
     // SHOULD BE 1224 BYTES AT THIS STAGE
-    
+
     // Only delete one of them (simulate forgetting the other)
     DELETE_ARRAY(buffer);
     // THEN 1024 BYTES
 
-    std::cout << "Deleted buffer but forgot large data\n";
+    LOG_WARNING("Deleted buffer but forgot large data - intentional leak for testing");
     // largeData is intentionally leaked
 }
 
 void TestMultipleAllocs() {
-    std::cout << "\n=== Testing Multiple Small Allocations ===\n";
+    LOG_INFO("\n=== Testing Multiple Small Allocations ===");
 
     // Create multiple small objects
     struct Point {
-        float x, y, z; 
+        float x, y, z;
     };
 
     Point* p1 = NEW(Point);  // 3 * sizeof(float) = 12 bytes
@@ -64,7 +64,7 @@ void TestMultipleAllocs() {
     p2->x = 4.0f; p2->y = 5.0f; p2->z = 6.0f;
     p3->x = 7.0f; p3->y = 8.0f; p3->z = 9.0f;
 
-    std::cout << "Created 3 points\n";
+    LOG_INFO("Created 3 points");
     Memory::GetInstance().PrintStats();
 
     // SHOULD BE 36 BYTES AT THIS STAGE
@@ -76,18 +76,19 @@ void TestMultipleAllocs() {
     DELETE(p3);
     // 0
 
-    std::cout << "Deleted all points\n";
+    LOG_INFO("Deleted all points");
     Memory::GetInstance().PrintStats();
 }
 
 void RunMemoryTests() {
-    std::cout << "Starting OpenGL Memory Tracking Tests...\n\n";
+    LOG_INFO("Starting Memory Tracking Tests...\n");
 
     TestBasicAlloc();
     TestMultipleAllocs();
     TestMemoryLeak();
 
     // Memory leak report and statistics
+    LOG_INFO("\n=== Final Memory Report ===");
     Memory::GetInstance().ReportLeaks();
     Memory::GetInstance().PrintStats();
 }

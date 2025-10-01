@@ -76,8 +76,6 @@ void DebugUI::Render() {
     _showInputDebugWindow();   // Input debugging
     _showGameObjectEditor();   // Game object editor
     _showAudioWindow(*gAudioPtr);
-   
-   
 
     // Show ImGUI's built-in demo window
     if (m_showDemo) {
@@ -307,8 +305,6 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
     ImGui::SetNextWindowSize(ImVec2(300, 220), ImGuiCond_Once);
     ImGui::Begin("Audio Monitor");
 
-
-
     // Toggle library window
     static bool showLibrary = false;
     if (ImGui::Button("Open Audio Library")) showLibrary = true;
@@ -467,11 +463,11 @@ void DebugUI::_showInputDebugWindow() {
     ImGui::Text("=== Keyboard ===");
 
     // Show WASD keys using constants
-    ImGui::Text("W: %s", Input::IsKeyPressed(KEY_W) ? "PRESSED" : "Released");
-    ImGui::Text("A: %s", Input::IsKeyPressed(KEY_A) ? "PRESSED" : "Released");
-    ImGui::Text("S: %s", Input::IsKeyPressed(KEY_S) ? "PRESSED" : "Released");
-    ImGui::Text("D: %s", Input::IsKeyPressed(KEY_D) ? "PRESSED" : "Released");
-    ImGui::Text("F1: %s", Input::IsKeyPressed(GLFW_KEY_F1) ? "PRESSED" : "Released");
+    ImGui::Text("W: %s", Input::IsKeyDown(KEY_W) ? "PRESSED" : "Released");
+    ImGui::Text("A: %s", Input::IsKeyDown(KEY_A) ? "PRESSED" : "Released");
+    ImGui::Text("S: %s", Input::IsKeyDown(KEY_S) ? "PRESSED" : "Released");
+    ImGui::Text("D: %s", Input::IsKeyDown(KEY_D) ? "PRESSED" : "Released");
+    ImGui::Text("F1: %s", Input::IsKeyDown(GLFW_KEY_F1) ? "PRESSED" : "Released");
 
     ImGui::Separator();
     ImGui::Text("=== Event Testing ===");
@@ -596,23 +592,15 @@ Entity DebugUI::_createGameEntity(const std::string& name) {
     entity.AddComponent<Component::Transform>();
 
     // Set position based on GameObject data
-    auto& shapeRenderer = entity.AddComponent<Component::ShapeRenderer2D>();
+    Component::ShapeRenderer2D& shapeRenderer = entity.AddComponent<Component::ShapeRenderer2D>();
     shapeRenderer.Type = Component::ShapeRenderer2D::ShapeType::Circle;
     shapeRenderer.Radius = 25.0f;
 
     // Set color based on type
-    if (name == "Player") {
-        shapeRenderer.FillColor = Color(0.0f, 0.0f, 1.0f, 1.0f);
-    }
-    else if (name == "Enemy") {
-        shapeRenderer.FillColor = Color(1.0f, 0.0f, 0.0f, 1.0f);
-    }
-    else if (name == "Collectible") {
-        shapeRenderer.FillColor = Color(1.0f, 1.0f, 0.0f, 1.0f); 
-    }
-    else {
-        shapeRenderer.FillColor = Color(1.0f, 1.0f, 1.0f, 1.0f);
-    }
+    if (name == "Player") shapeRenderer.FillColor = Color(0.0f, 0.0f, 1.0f, 1.0f);
+    else if (name == "Enemy") shapeRenderer.FillColor = Color(1.0f, 0.0f, 0.0f, 1.0f);
+    else if (name == "Collectible") shapeRenderer.FillColor = Color(1.0f, 1.0f, 0.0f, 1.0f); 
+    else shapeRenderer.FillColor = Color(1.0f, 1.0f, 1.0f, 1.0f);
 
     // Add CircleCollider2D so physics test can detect and add physics
     entity.AddComponent<Component::CircleCollider2D>(25.0f);

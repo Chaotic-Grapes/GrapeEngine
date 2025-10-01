@@ -2,35 +2,36 @@
 #include <memory>
 #include "ResourceManager.h"
 #include "graphics/texture.hpp"
+#include "systems/Logger.h"
 
 void TestResourceManager() {
-    std::cout << "\n=== ResourceManager Tests ===" << std::endl;
+    LOG_INFO("\n=== ResourceManager Tests ===");
     extern ResourceManager RM;
 
     // Test 1: Basic caching
-    std::cout << "\n--- Basic Cache Test ---" << std::endl;
+    LOG_INFO("\n--- Basic Cache Test ---");
     std::shared_ptr<Texture> tex1 = RM.Get<Texture>("assets/textures/test/shadow_death.png");
     std::shared_ptr<Texture> tex2 = RM.Get<Texture>("assets/textures/test/shadow_death.png"); // Should be cache hit
-    std::cout << "Same texture object: " << (tex1 == tex2 ? "YES" : "NO") << std::endl;
+    LOG_INFO("Same texture object: " << (tex1 == tex2 ? "YES" : "NO"));
 
     // Test 2: Multiple assets
-    std::cout << "\n--- Multiple Assets ---" << std::endl;
+    LOG_INFO("\n--- Multiple Assets ---");
     std::shared_ptr<Texture> different = RM.Get<Texture>("assets/textures/test/shadow_single.png");
     std::shared_ptr<AudioData> audio = RM.Get<AudioData>("assets/audio/test.wav");
     RM.PrintCacheInfo();
 
     // Test 3: Error handling
-    std::cout << "\n--- Error Handling ---" << std::endl;
+    LOG_INFO("\n--- Error Handling ---");
     std::shared_ptr<Texture> invalid = RM.Get<Texture>("nonexistent.png");
-    std::cout << "Invalid file handled: " << (invalid == nullptr ? "YES" : "NO") << std::endl;
+    LOG_INFO("Invalid file handled: " << (invalid == nullptr ? "YES" : "NO"));
 
     // Test 4: Cache management
-    std::cout << "\n--- Cache Management ---" << std::endl;
+    LOG_INFO("\n--- Cache Management ---");
     RM.UnloadAsset("assets/textures/test/shadow_death.png");
     std::shared_ptr<Texture> reloaded = RM.Get<Texture>("assets/textures/test/shadow_death.png");
-    std::cout << "Reload after unload: " << (reloaded != nullptr ? "YES" : "NO") << std::endl;
-
+    LOG_INFO("Reload after unload: " << (reloaded != nullptr ? "YES" : "NO"));
     RM.ClearCache();
-    std::cout << "Final cache size: " << RM.GetCacheSize() << std::endl;
-    std::cout << "\n=== Tests Complete ===" << std::endl;
+    LOG_INFO("Final cache size: " << RM.GetCacheSize());
+
+    LOG_INFO("\n=== Tests Complete ===");
 }
