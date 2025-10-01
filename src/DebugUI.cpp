@@ -397,6 +397,14 @@ void DebugUI::_showGameObjectEditor() {
         // If object is active, button shows deactivate; if object is inactive, other way around
         if (ImGui::SmallButton(_getToggleLabel(gameObject).c_str())) {
             gameObject.IsActive = !gameObject.IsActive;
+
+            // Apply to actual ECS entity
+            Entity entity(gameObject.Id, m_world);
+            Component::ShapeRenderer2D* renderer = entity.GetComponent<Component::ShapeRenderer2D>();
+            if (renderer) {
+                // Hide by setting alpha to 0, show by setting alpha to 1
+                renderer->FillColor.A = gameObject.IsActive ? 255 : 0;
+            }
         }
 
         // Delete button for each object
