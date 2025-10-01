@@ -25,7 +25,7 @@ namespace Engine {
 
         // Attach core systems to the world
         world.AddSystem<Time>();
-        world.AddSystem<Overlay>();
+        world.AddSystem<Overlay>(&world);
         world.AddSystem<WindowManager>();
         world.AddSystem<AudioSystem>();
 

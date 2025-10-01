@@ -8,6 +8,7 @@
 
 #include <vector>
 #include "Window.h"
+#include "ecs/ISystem.h"
 
 #ifdef CreateWindow
 #undef CreateWindow

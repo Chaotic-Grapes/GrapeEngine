@@ -3,6 +3,7 @@
 #include <memory>
 #include "ecs/ISystem.h"
 #include "Audio.h"
+#include "DebugUI.h"
 #include "Application.h"
 
 // Forward declaration

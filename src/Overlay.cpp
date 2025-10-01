@@ -9,31 +9,15 @@
 #include "ecs/World.h"
 
 void Overlay::OnCreate() {
-    // Don't create DebugUI here since we might not have world yet
+    if (m_world) {
+        m_debugUI = std::make_unique<DebugUI>(m_world);
+    }
 }
 
 void Overlay::OnUpdate() {
-    // Use static bool to track if ImGUI has been initialized
-    static bool initialized = false;
-    // If not, initialize it now
-    if (!initialized) {
-        // Get the main window from WindowManager
-        Window* mainWindow = WindowManager::GetMainWindow();
-
-        // If window exists
-        if (mainWindow) {
-            // We can safely initialize ImGUI
-            // ImGUI needs a valid OpenGL context (provided by the window)
-            DebugUI::Initialize(mainWindow->Handle());
-            // Mark as initialized so we don't do this again
-            if (m_audio) { DebugUI::AttachAudio(m_audio); } // attach the real instance
-            initialized = true;
-        }
-        // Window doesn't exist yet
-        else {
-            // Skip rendering this frame and try again next frame
-            return;
-        }
+    // If we don't have a DebugUI instance yet, try to create it
+    if (!m_debugUI && m_world) {
+        m_debugUI = std::make_unique<DebugUI>(m_world);  // Just pass the raw pointer directly
     }
 
     // If still no instance, then return
@@ -45,6 +29,7 @@ void Overlay::OnUpdate() {
         Window* mainWindow = WindowManager::GetMainWindow();
         if (mainWindow) {
             m_debugUI->Initialize(mainWindow->Handle());
+            if (m_audio) DebugUI::AttachAudio(m_audio);
             m_debugUI->SyncWithWorld();
             m_initialized = true;
         }
@@ -58,8 +43,8 @@ void Overlay::OnUpdate() {
 
 // Prevent memory leaks
 Overlay::~Overlay() {
+    if (m_debugUI) m_debugUI->Shutdown();
     DebugUI::DetachAudio();
-    DebugUI::Shutdown();
 }
 
 #else
