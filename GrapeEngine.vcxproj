@@ -191,11 +191,13 @@
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
     <ClInclude Include="include\DyamicCollision.h" />
+    <ClInclude Include="include\ft2build.h" />
     <ClInclude Include="include\GraphicsTest.hpp" />
     <ClInclude Include="include\graphics\SpriteMetaData.hpp" />
     <ClInclude Include="include\graphics\TextureCache.hpp" />
     <ClInclude Include="include\json.hpp" />
     <ClInclude Include="include\SandboxGame.h" />
+    <ClInclude Include="include\stb_truetype.h" />
     <ClInclude Include="include\systems\Behaviour.h" />
     <ClInclude Include="include\systems\BehaviourSystem.h" />
     <ClInclude Include="include\Game.h" />
