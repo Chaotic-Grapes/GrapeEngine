@@ -36,6 +36,8 @@ private:
         static void _enableConsole();
         static void _disableConsole();
 	};
+
+    extern Application* CORE;
 }
 
 #endif

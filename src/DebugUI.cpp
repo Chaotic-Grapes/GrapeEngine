@@ -11,6 +11,10 @@
 #include "ecs/World.h"
 #include "Math/MathHelper.h"
 
+#ifdef max
+#undef max  // Undefine macro to avoid conflicts with std::max
+#endif
+
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the world
 DebugUI::DebugUI(World* world, const DebugUIConfig& config)

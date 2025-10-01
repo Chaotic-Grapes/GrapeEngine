@@ -8,6 +8,8 @@
 #include "systems/Time.h"
 
 namespace Engine {
+    // Global pointer to the core engine
+    Application* CORE = nullptr;
     bool Application::m_shouldStop = false;
 
     void Application::Run(Game& game, const bool consoleFlag) {
