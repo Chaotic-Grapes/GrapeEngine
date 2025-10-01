@@ -243,3 +243,57 @@ void Renderer::submitSprite(const Sprite& sprite) {
         sprite.uv, sprite.color,
         sprite.rotation, sprite.uniformScale);
 }
+
+void Renderer::submitText(const Font& font,
+    std::string_view text,
+    glm::vec2 pos,
+    glm::vec4 color,
+    float pixelSize)
+{
+    float scale = pixelSize / font.getPixelSize();
+    float lineHeight = pixelSize * 1.2f; // we set a simple line height based on pixel size
+
+    float startX = pos.x;
+    float x = startX;
+    float y = pos.y;
+
+    for (char c : text) {
+        // Handle newline
+        if (c == '\n') {
+            x = startX;
+            y -= lineHeight; // Move DOWN (subtract because Y increases upwards in OpenGL)
+            continue;
+        }
+
+        // Skip leading spaces on new lines
+        if (x == startX && c == ' ') {
+            continue;
+        }
+
+        const Glyph& g = font.getGlyph(c);
+
+        // Only render if glyph has visible geometry
+        if (g.size.x > 0 && g.size.y > 0) {
+            float xpos = x + g.bearing.x * scale;
+            float ypos = y - (g.size.y - g.bearing.y) * scale;
+
+            float w = g.size.x * scale;
+            float h = g.size.y * scale;
+
+            glm::vec2 glyphPos = { xpos + w * 0.5f, ypos + h * 0.5f };
+            glm::vec2 glyphSize = { w, h };
+
+            submitQuad(glyphPos, glyphSize,
+                font.getAtlasTexture(),
+                g.uv,
+                color,
+                0.0f, 1.0f, 0);
+        }
+        // Apply global tracking adjustment
+        float tracking = 1.05f;          // 5% extra spacing
+        // float tracking = 1.0f;        // normal spacing
+        
+        // Always advance cursor (even for space)
+        x += g.advance * scale * tracking;
+    }
+}

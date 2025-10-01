@@ -3,8 +3,9 @@
 #include <vector>
 #include <cstdint>
 #include <glad/glad.h>
-#include "../include/graphics/vertex.hpp"
-#include "../include/graphics/sprite.hpp"
+#include "vertex.hpp"
+#include "sprite.hpp"
+#include "font.hpp"
 
 class Renderer {
 public:
@@ -31,6 +32,13 @@ public:
         int layer = 0);
 
     void submitSprite(const Sprite& sprite);
+
+    void submitText(const Font& font,
+        std::string_view text,
+        glm::vec2 pos,
+        glm::vec4 color,
+        float pixelSize);
+
     int flushCountThisFrame = 0;
 
 private:
