@@ -16,7 +16,7 @@ void TestResourceManager() {
     // Test 2: Multiple assets
     std::cout << "\n--- Multiple Assets ---" << std::endl;
     std::shared_ptr<Texture> different = RM.Get<Texture>("assets/textures/test/shadow_single.png");
-    std::shared_ptr<RAudio> audio = RM.Get<RAudio>("assets/audio/test.wav");
+    std::shared_ptr<AudioData> audio = RM.Get<AudioData>("assets/audio/test.wav");
     RM.PrintCacheInfo();
 
     // Test 3: Error handling

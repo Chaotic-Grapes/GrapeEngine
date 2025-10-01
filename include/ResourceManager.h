@@ -8,12 +8,10 @@
 #include <glad/glad.h>
 #include "graphics/texture.hpp"
 
-struct RAudio {
+struct AudioData {
     std::vector<uint8_t> Data;
-    int SampleRate = 0;
-    int Channels = 0;      // Mono = 1, stereo = 2, etc.
-    int BitsPerSample = 0; // Quality: 8-bit, 16-bit, 24-bit, etc.
     std::string Path;
+    std::string Format;  // "wav", "mp3", "ogg", etc.
     bool IsValid = false;
 };
 
@@ -37,11 +35,11 @@ public:
 private:
     // Asset caches (store loaded assets)
     std::unordered_map<std::string, std::shared_ptr<Texture>> m_textures;
-    std::unordered_map<std::string, std::shared_ptr<RAudio>> m_audioFiles;
+    std::unordered_map<std::string, std::shared_ptr<AudioData>> m_audioFiles;
 
     // Loading functions
     std::shared_ptr<Texture> _loadTexture(const std::string& filePath);
-    std::shared_ptr<RAudio> _loadAudio(const std::string& filePath);
+    std::shared_ptr<AudioData> _loadAudio(const std::string& filePath);
 };
 
 // Global instance
