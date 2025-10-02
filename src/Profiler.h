@@ -10,21 +10,13 @@
 #include <unordered_map>
 #include "systems/Time.h"
 
-/*naming conventions:
-
-public functions = files = FooBar()
-private functions = _fooBar()
-public data member = FooRealQuick
-private data member = m_fooRealQuick
-public macro = ALL_CAPS (includes global const)*/
-
 // A structure to hold profiling data for a single scope
 struct ScopeData {
     // Stores a history of the last N frame times (in milliseconds)
-    std::vector<float> frameTimes;
-    float lastTimeMs = 0.0f;
-    float avgTimeMs = 0.0f;
-    float maxTimeMs = 0.0f;
+    std::vector<float> FrameTimes;
+    float LastTimeMs = 0.0f;
+    float AverageTimeMs = 0.0f;
+    float MaxTimeMs = 0.0f;
 };
 
 class Profiler {
@@ -42,11 +34,11 @@ public:
         return instance;
     }
 
-    static void update_time(double fpsCalcInt = 1.0);
+    static void UpdateTime(double fpsCalcInt = 1.0);
 
     // Static member declarations
-    static double fps;
-    static double frameTimeMs;
+    static double Fps;
+    static double FrameTimeMs;
 
     /// Gets a const reference to the map of all profiling scopes.
     /// This allows other systems (like the DebugUI) to read the data.
@@ -56,6 +48,7 @@ public:
     static float GetFPS();
     static float GetFrameTimeMs();
     static const ScopeDataMap& GetAllScopeData();
+    static double GetTotalScopeTimes();
     static void ClearHistory();
 
     /// Starts a timing scope. This is a public method but is
@@ -73,6 +66,8 @@ private:
 
     std::map<std::string, std::chrono::steady_clock::time_point> m_startTimes;
     std::map<std::string, ScopeData> m_scopes;
+
+    static double m_lastTotalScopeTime;
 
     static const int MAX_HISTORY_FRAMES = 120;
 };

@@ -30,7 +30,6 @@ void Overlay::OnUpdate() {
         if (mainWindow) {
             m_debugUI->Initialize(mainWindow->Handle());
             if (m_audio) DebugUI::AttachAudio(m_audio);
-            m_debugUI->SyncWithWorld();
             m_initialized = true;
         }
         else return;

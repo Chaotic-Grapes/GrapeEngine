@@ -32,11 +32,13 @@ file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS
 )
 
 # Create executable or library
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_library(GrapeEngine STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
-else()
-    add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
-endif()
+# Right now, both should be .exe
+add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+#if(CMAKE_BUILD_TYPE STREQUAL "Release")
+#    add_library(GrapeEngine STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+#else()
+#    add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+#endif()
 
 # Set C++ standard for the target
 set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 17)
@@ -86,18 +88,24 @@ endforeach()
 
 # Compiler warnings
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(GrapeEngine PRIVATE -Wall -Wextra)
+    target_compile_options(GrapeEngine PRIVATE -Wall -Wextra -Wpedantic -Werror)
 elseif (MSVC)
-    target_compile_options(GrapeEngine PRIVATE /W3)
+    target_compile_options(GrapeEngine PRIVATE /W4)
 endif()
 
-# Copy assets to build directory (if you have any)
+# Copy assets to build directory
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
     add_custom_command(TARGET GrapeEngine POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_LIST_DIR}/assets"
         "$<TARGET_FILE_DIR:GrapeEngine>/assets"
         COMMENT "Copying assets to build directory"
+    )
+    add_custom_command(TARGET GrapeEngine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_LIST_DIR}/assets"
+        "${CMAKE_BINARY_DIR}/assets"
+        COMMENT "Copying assets to project folder"
     )
 endif()
 
