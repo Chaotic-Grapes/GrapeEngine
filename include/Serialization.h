@@ -8,6 +8,7 @@
 
 using json = nlohmann::json;
 
+// TODO: Merge with SceneManager
 namespace Serialization {
 	class SceneSerializer {
 	public:
@@ -33,13 +34,13 @@ namespace Serialization {
 				file << scene.dump(4);
 				file.close();
 
-				std::cout << "Scene successfully saved to: " << filename << std::endl;
-				std::cout << " Entities: " << entityCount << std::endl;
+				std::cout << "Scene successfully saved to: " << filename << '\n';
+				std::cout << " Entities: " << entityCount << '\n';
 				return true;
 
 			}
 			catch (const std::exception& e) {
-				std::cout << "Error saving scene: " << e.what() << std::endl;
+				std::cout << "Error saving scene: " << e.what() << '\n';
 				return false;
 			}
 		}
@@ -49,15 +50,15 @@ namespace Serialization {
 				// open and parse JSON file
 				std::ifstream file(filename);
 				if (!file.is_open()) {
-					std::cout << " Cannot open file: " << filename << std::endl;
+					std::cout << " Cannot open file: " << filename << '\n';
 					return false;
 				}
 
 				json scene = json::parse(file);
 				file.close();
 
-				std::cout << "Scene successfully loaded: " << scene["SceneName"] << std::endl;
-				std::cout << " Version: " << scene["Version"] << std::endl;
+				std::cout << "Scene successfully loaded: " << scene["SceneName"] << '\n';
+				std::cout << " Version: " << scene["Version"] << '\n';
 
 				// clears existing entities before loading
 				world.GetEntityManager().DestroyAllEntities();
@@ -69,17 +70,17 @@ namespace Serialization {
 						EntitySerializer::DeserializeEntity(world, entityJson);
 						loadedCount++;
 					}
-					std::cout << " Entities loaded: " << loadedCount << std::endl;
+					std::cout << " Entities loaded: " << loadedCount << '\n';
 				}
 				return true;
 
 			}
 			catch (const json::parse_error& e) {
-				std::cout << " JSON parse error: " << e.what() << std::endl;
+				std::cout << " JSON parse error: " << e.what() << '\n';
 				return false;
 			}
 			catch (const std::exception& e) {
-				std::cout << " Error loading scene: " << e.what() << std::endl;
+				std::cout << " Error loading scene: " << e.what() << '\n';
 				return false;
 			}
 		}

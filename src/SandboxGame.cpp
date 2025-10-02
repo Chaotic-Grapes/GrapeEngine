@@ -3,7 +3,6 @@
 #include <iostream>
 #include "PhysicsCollision2DTest.h"
 #include "GraphicsTest.hpp"
-#include "GameObjectFactoryTest.h"
 #include "SerializationTest.h"
 #include "systems/WindowManager.h"
 
@@ -12,9 +11,7 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "Select test scene: \n";
     std::cout << "1. Physics & Collision 2D Test" << '\n';
     std::cout << "2. Graphics & Art Pipeline Test" << '\n';
-    //std::cout << "3. ECS Component Test" << '\n';
-	std::cout << "4. Game Object Factory Test" << '\n';
-    std::cout << "5. Serialization Check Test" << '\n';
+    std::cout << "3. Serialization Check Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -37,17 +34,7 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
         sceneManager.LoadScene("GraphicsTestScene");
         break;
     }
-        //case 3:
-        //    std::cout << "ECS Component Test - TODO" << '\n';
-        //    break;
-    case 4: {
-		std::cout << "Starting Game Object Factory Test..." << '\n';
-
-		sceneManager.AddScene(new Sandbox::GameObjectFactoryTestScene());
-		sceneManager.LoadScene("GameObjectFactoryTestScene");
-        break;
-	}
-    case 5: {
+    case 3: {
         std::cout << "Starting Serialization Integrity Test..." << '\n';
 
         sceneManager.AddScene(new Sandbox::SerializationTestScene());

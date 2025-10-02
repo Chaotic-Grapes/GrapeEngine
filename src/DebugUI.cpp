@@ -8,9 +8,10 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
+#include "EntitySerializer.h"
 #include "Profiler.h"
-#include "ecs/World.h"
 #include "Math/MathHelper.h"
+#include "systems/Logger.h"
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
@@ -195,7 +196,7 @@ void DebugUI::_showPerformanceWindow() {
     const auto& scopes = Profiler::GetAllScopeData();
     for (const auto& [name, data] : scopes) {
 		if (name == "Time")// || name == "Overlay") 
-            continue; // Skip these special scopes
+            continue; // Skip these special scopes (Time has negligible usage times)
 
         ImGui::Text("%s:", name.c_str());
         ImGui::BulletText("Last: %.3f ms", data.LastTimeMs);
@@ -317,7 +318,20 @@ void DebugUI::_showGameObjectEditor() {
 
     ImGui::Separator();
 
-    ImGui::Text("Load Prefab");
+    static char prefabName[128] = "sample-enemy-prefab";
+	ImGui::InputText("Prefab Name", prefabName, sizeof(prefabName));
+    if (ImGui::Button("Load Prefab") && strlen(prefabName) > 0) {
+        std::ifstream file("assets/samples/" + std::string(prefabName) + ".prefab");
+        if (!file.is_open())
+            LOG_ERROR("Cannot open file: " << prefabName);
+        else {
+            nlohmann::json entityJson = nlohmann::json::parse(file);
+            file.close();
+
+            Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+            _invalidateCache();
+        }
+	}
 
     // Display list of current objects
     const auto entities = m_world->GetEntityManager().GetAllEntities();
@@ -332,6 +346,19 @@ void DebugUI::_showGameObjectEditor() {
         std::stringstream oss;
     	oss << "[" << entity.GetId() << "] " << entity.GetName();
         if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(entId))) {
+            // Delete button for each object
+            if (ImGui::SmallButton(_getDeleteLabel(entId).c_str())) {
+                RemoveGameObject(entId);
+                break;
+            }
+
+            // Clone button for each object
+            ImGui::SameLine();
+            if (ImGui::SmallButton(_getCloneLabel(entId).c_str())) {
+                CloneGameObject(entity);
+                break;
+            }
+
             ImGui::SeparatorText("Transform");
 
             ImGui::Text("Position");
@@ -358,22 +385,6 @@ void DebugUI::_showGameObjectEditor() {
 		//          renderer->FillColor.A = entity.IsActive ? 255 : 0;
 		//      }
 		//  }
-
-        // Delete button for each object
-        ImGui::SameLine();
-        // Unique button IDs
-        if (ImGui::SmallButton(_getDeleteLabel(entId).c_str())) {
-            RemoveGameObject(entId);
-            break;
-        }
-
-        // Clone button for each object
-        ImGui::SameLine();
-        // Unique button IDs
-        if (ImGui::SmallButton(_getCloneLabel(entId).c_str())) {
-            CloneGameObject(entity);
-            break;
-        }
     }
     ImGui::Separator();
 
