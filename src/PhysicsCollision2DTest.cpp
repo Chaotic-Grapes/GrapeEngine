@@ -16,7 +16,6 @@ using Component::ShapeRenderer2D;
 using Component::CircleCollider2D;
 using Component::LineRenderer;
 
-
 constexpr float TWO_PI = 6.28318530718f;
 
 Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int width, const int height, const float dampingDelay) : Scene("PhysicsCollision2DTestScene") {
@@ -113,31 +112,20 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
         transform.Position.X = x;
         transform.Position.Y = y;
 
-        // Add Rigidbody2D
-        auto& rigidbody = ball.AddComponent<Component::Rigidbody2D>();
-        rigidbody.Mass = 1.0f;
-        rigidbody.LinearDamping = 0.0f; // No drag initially
-        rigidbody.GravityScale = 1.0f; // No gravity for this test
-
-        // Set random velocity
-        const float speed = MathHelper::Randomize<float>(200.0f, 300.0f, seed); 
-        const float angle = MathHelper::Randomize<float>(0.0f, TWO_PI, seed);
-        rigidbody.LinearVelocity.X = std::cos(angle) * speed;
-        rigidbody.LinearVelocity.Y = std::sin(angle) * speed;
-
         // Add visual components
         auto& shapeRenderer = ball.AddComponent<Component::ShapeRenderer2D>();
 		shapeRenderer.Type = Component::ShapeRenderer2D::ShapeType::Circle;
 		shapeRenderer.Radius = radius;
         shapeRenderer.FillColor = color;
 
-    	ball.AddComponent<Component::CircleCollider2D>(radius);
+        auto& collider = ball.AddComponent<Component::CircleCollider2D>(radius);
+
+        InitializePhysicsForEntity(ball, &collider);
 
         m_balls.push_back(ball);
         std::cout << "Created ball (" << i + 1 << ") with ENT ID " << ball.GetId() << " at (" << x << ", " << y << ") with radius " << radius << '\n';
     }
 }
-
 
 void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
     if ((int)m_seacubes.size() >= m_maxLeaves) return;
@@ -384,8 +372,12 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     if (!m_dampingEnabled && m_elapsedTime >= m_dampingDelay) {
         m_dampingEnabled = true;
 
-        for (auto& ball : m_balls) {
-            auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
+        // Apply damping to ALL entities with Rigidbody2D
+        World& world = GetWorld();
+        std::vector<EntityId> allEntities = world.GetEntityManager().GetAllEntities();
+        for (EntityId id : allEntities) {
+            Entity entity = world.GetEntityManager().GetEntity(id);
+            Component::Rigidbody2D* rigidbody = entity.GetComponent<Component::Rigidbody2D>();
             if (rigidbody) {
                 rigidbody->LinearDamping = 0.5f;
             }
@@ -468,6 +460,14 @@ void Sandbox::PhysicsCollision2DTestScene::RestoreBallStates() {
 
 void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     World& world = GetWorld();
+    // Scan for entities needing physics initialization
+    std::vector<EntityId> allEntities = world.GetEntityManager().GetAllEntities();
+    for (EntityId id : allEntities) {
+        Entity entity = world.GetEntityManager().GetEntity(id);
+        Component::CircleCollider2D* collider = entity.GetComponent<Component::CircleCollider2D>();
+        InitializePhysicsForEntity(entity, collider);
+    }
+
     const float dt = Time::FixedDeltaTime();
 
     if (!m_pausePhysics || m_stepRequested) {
@@ -486,7 +486,11 @@ void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
 }
 
 void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
-    for (auto& ball : m_balls) {
+    World& world = GetWorld();
+    std::vector<EntityId> allEntities = world.GetEntityManager().GetAllEntities();
+
+    for (EntityId id : allEntities) {
+        Entity ball = world.GetEntityManager().GetEntity(id);
         auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
         const auto* circleCollider = ball.GetComponent<Component::CircleCollider2D>();
         auto& transform = ball.Transform();
@@ -532,4 +536,19 @@ void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
    // m_boundaryLines.clear();
     m_seacubes.clear();
     m_playerId = UINT32_MAX;
+}
+
+void Sandbox::PhysicsCollision2DTestScene::InitializePhysicsForEntity(Entity& entity, Component::CircleCollider2D* collider) {
+    if (!collider) return;
+    if (entity.GetComponent<Component::Rigidbody2D>()) return; // Already has physics
+
+    Component::Rigidbody2D& rigidbody = entity.AddComponent<Component::Rigidbody2D>();
+    rigidbody.Mass = 1.0f;
+    rigidbody.LinearDamping = m_dampingEnabled ? 0.5f : 0.0f;  // Check damping state
+    rigidbody.GravityScale = 1.0f;
+
+    float speed = MathHelper::Randomize<float>(200.0f, 300.0f);
+    float angle = MathHelper::Randomize<float>(0.0f, TWO_PI);
+    rigidbody.LinearVelocity.X = std::cos(angle) * speed;
+    rigidbody.LinearVelocity.Y = std::sin(angle) * speed;
 }

@@ -591,10 +591,10 @@ Entity DebugUI::_createGameEntity(const std::string& name) {
     // Add basic components that most game objects need
     entity.AddComponent<Component::Transform>();
 
-    // Set position based on GameObject data
+    // Visual components
     Component::ShapeRenderer2D& shapeRenderer = entity.AddComponent<Component::ShapeRenderer2D>();
     shapeRenderer.Type = Component::ShapeRenderer2D::ShapeType::Circle;
-    shapeRenderer.Radius = 25.0f;
+    shapeRenderer.Radius = 35.0f;
 
     // Set color based on type
     if (name == "Player") shapeRenderer.FillColor = Color(0.0f, 0.0f, 1.0f, 1.0f);
@@ -603,7 +603,7 @@ Entity DebugUI::_createGameEntity(const std::string& name) {
     else shapeRenderer.FillColor = Color(1.0f, 1.0f, 1.0f, 1.0f);
 
     // Add CircleCollider2D so physics test can detect and add physics
-    entity.AddComponent<Component::CircleCollider2D>(25.0f);
+    entity.AddComponent<Component::CircleCollider2D>(35.0f);
 
     return entity;
 }

@@ -119,9 +119,6 @@ void Input::_mousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
     (void)pWin;
     (void)xPos;
     (void)yPos;
-
-    // Optional: Enable for mouse position debugging (very spammy!)
-    // LOG_DEBUG("Mouse position: (" << xPos << ", " << yPos << ")");
 }
 
 // Called when mouse wheel is scrolled
