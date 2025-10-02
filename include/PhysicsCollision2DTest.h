@@ -31,7 +31,7 @@ namespace Sandbox {
     private:
         bool test_handler = false;
         bool m_stepInit = false;
-        TestType m_currentTest{ TestType::test_PhysicsMovement };
+        TestType m_currentTest{ TestType::test_DynvStatResponse };
         // test types 
          void Test_PhysicsMovement();
          void Test_CollisionDetection();

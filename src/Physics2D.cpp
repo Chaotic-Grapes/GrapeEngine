@@ -3,6 +3,7 @@
 #include <iostream>
 #include "Collision.h"
 #include "ecs/Entity.h"
+#include "systems/Logger.h"
 
 namespace Engine {
     Vector2D Physics2D::m_gravity = Vector2D(0.0f, -9.81f);
@@ -22,6 +23,11 @@ namespace Engine {
             // Skip static bodies
             if (rb.BodyType == Component::Rigidbody2D::Static)
                 return;
+
+            // Log linear velocity and position for debugging
+            LOG_DEBUG("Position: (" + std::to_string(transform.Position.X) + ", " + std::to_string(transform.Position.Y) + ")" +
+                " | Linear Velocity: (" + std::to_string(rb.LinearVelocity.X) + ", " + std::to_string(rb.LinearVelocity.Y) + ")");
+
 
             Vector2D intendedPos = transform.Position + rb.LinearVelocity * Time::FixedDeltaTime();
 
@@ -59,6 +65,10 @@ namespace Engine {
             // Integrate acceleration
             rb.LinearVelocity += acceleration * Time::FixedDeltaTime();
             transform.Position = intendedPos;
+
+			// Log linear velocity and position for debugging
+            LOG_DEBUG("Position: (" + std::to_string(transform.Position.X) + ", " + std::to_string(transform.Position.Y) + ")" +
+					  " | Linear Velocity: (" + std::to_string(rb.LinearVelocity.X) + ", " + std::to_string(rb.LinearVelocity.Y) + ")");
 
             if (!rb.FreezeRotation)
                 transform.Rotation += rb.AngularVelocity * Time::FixedDeltaTime();
