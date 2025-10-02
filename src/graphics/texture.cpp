@@ -1,18 +1,27 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../include/graphics/stb_image.h"
 #include "../include/graphics/texture.hpp"
+#include "../include/ResourceManager.h"
 #include <iostream>
+
+ResourceManager RM;
 
 // Private Helpers
 void Texture::loadFromFile(const std::string& path) {
     m_path = path; // keep for deep copies
+
     stbi_set_flip_vertically_on_load(true);
 
-    unsigned char* data = stbi_load(path.c_str(), &m_width, &m_height, &m_channels, 4);
+    int width, height, channels;
+    unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 4);
     if (!data) {
         std::cerr << "Failed to load texture: " << path << std::endl;
         return;
     }
+
+    m_width = width;
+    m_height = height;
+    m_channels = channels;
 
     glGenTextures(1, &m_id);
     glBindTexture(GL_TEXTURE_2D, m_id);

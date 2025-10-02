@@ -8,11 +8,12 @@
 #include "Color.h"
 #include "graphics/texture.hpp"
 #include "graphics/SpriteMetaData.hpp"
-#include "graphics/TextureCache.hpp"
+// #include "graphics/TextureCache.hpp"
 #include <filesystem>
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include "ResourceManager.h"
 
 namespace Component {
     struct Transform : IComponent {
@@ -59,10 +60,10 @@ namespace Component {
 
         SpriteRenderer(const std::string& spritePath = "") : TexturePath(spritePath), Sprite(spritePath) {
             if (!spritePath.empty()) {
-                const Texture& tex = TextureCache::Load(spritePath);
-                TextureId = tex.ID();
-                Width = tex.Width();
-                Height = tex.Height();
+                auto tex = RM.Get<Texture>(spritePath);
+                TextureId = tex->ID();
+                Width = tex->Width();
+                Height = tex->Height();
 
                 auto p = std::filesystem::path(spritePath);
                 auto filename = p.stem().string() + ".json";
@@ -113,10 +114,10 @@ namespace Component {
             Sprite = data.value("Sprite", "");
 
             if (!TexturePath.empty()) {
-                const Texture& tex = TextureCache::Load(TexturePath);
-                TextureId = tex.ID();
-                Width = tex.Width();
-                Height = tex.Height();
+                auto tex = RM.Get<Texture>(TexturePath);
+                TextureId = tex->ID();
+                Width = tex->Width();
+                Height = tex->Height();
             }
 
             Color.R = data.value("ColorR", 255);

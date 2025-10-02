@@ -6,7 +6,8 @@
 #include "GameObjectFactoryTest.h"
 #include "SerializationTest.h"
 #include "systems/WindowManager.h"
-
+#include "ResourceManagerTest.h"
+#include "MemoryTest.h"
 
 void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "Select test scene: \n";
@@ -15,6 +16,8 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     //std::cout << "3. ECS Component Test" << '\n';
 	std::cout << "4. Game Object Factory Test" << '\n';
     std::cout << "5. Serialization Check Test" << '\n';
+    std::cout << "6. Resource Manager Test" << '\n';
+    std::cout << "7. Memory Tracking Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -35,6 +38,7 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
 
         sceneManager.AddScene(new Sandbox::GraphicsTestScene(1600, 900));
         sceneManager.LoadScene("GraphicsTestScene");
+
         break;
     }
         //case 3:
@@ -52,6 +56,20 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
 
         sceneManager.AddScene(new Sandbox::SerializationTestScene());
         sceneManager.LoadScene("SerializationTestScene");
+        break;
+    }
+    case 6: {
+        std::cout << "Starting ResourceManager Test..." << '\n';
+        // Create a minimal scene to get OpenGL context
+        sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(1600, 900, 7.f));
+        sceneManager.LoadScene("PhysicsCollision2DTestScene");
+
+        TestResourceManager();
+        break;
+    }
+    case 7: {
+        std::cout << "Starting Memory Tracking Test..." << '\n';
+        RunMemoryTests();
         break;
     }
     default:

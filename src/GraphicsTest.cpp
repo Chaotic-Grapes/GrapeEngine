@@ -130,7 +130,7 @@ void GraphicsTestScene::runDebugDrawing() {
         auto& tr = sprite.Transform();
         tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/player.png");
+        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
         sr.Color = { 1.f, 1.f, 1.f, 1.f };
 
         tr.Scale = {
@@ -205,7 +205,7 @@ void GraphicsTestScene::runBasicSprites() {
         tr1.Position = { m_worldWidth * 0.4f, m_worldHeight * 0.5f };
         tr1.Scale = { 256.f, 256.f };
 
-        auto& sr1 = sprite1.AddComponent<SpriteRenderer>("assets/textures/test/player.png");
+        auto& sr1 = sprite1.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
         sr1.Color = { 1.f, 1.f, 1.f, 1.f };
 
         m_TestEntities.push_back(sprite1.GetId());
@@ -215,7 +215,7 @@ void GraphicsTestScene::runBasicSprites() {
         tr2.Position = { m_worldWidth * 0.6f, m_worldHeight * 0.5f };
         tr2.Scale = { 512.f, 512.f };
 
-        auto& sr2 = sprite2.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+        auto& sr2 = sprite2.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
         sr2.Color = { 1.f, 1.f, 1.f, 1.f };
 
         m_TestEntities.push_back(sprite2.GetId());
@@ -237,7 +237,7 @@ void GraphicsTestScene::runBackground() {
         tr.Scale = { m_worldWidth, m_worldHeight };
 
         // Add a SpriteRenderer component bound to johnPork.png
-        auto& sr = bg.AddComponent<SpriteRenderer>("assets/textures/test/johnPork.png");
+        auto& sr = bg.AddComponent<SpriteRenderer>("../assets/textures/test/johnPork.png");
         sr.Color = { 1.f, 1.f, 1.f, 1.f }; // no tint
 
         // Store the entity ID so it persists across frames
@@ -257,7 +257,7 @@ void GraphicsTestScene::runSpriteScaling() {
         tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
         tr.Scale = { 256.f, 256.f };
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/player.png");
+        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
         sr.Color = { 1.f, 1.f, 1.f, 1.f };
 
         m_TestEntities.push_back(sprite.GetId()); // store ID for later
@@ -288,7 +288,7 @@ void GraphicsTestScene::runSpriteRotation() {
         tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
         tr.Scale = { 512.f, 512.f };
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
         sr.Color = { 1.f, 1.f, 1.f, 1.f };
 
         m_TestEntities.push_back(sprite.GetId());
@@ -322,7 +322,7 @@ void GraphicsTestScene::runAnimation() {
     // Initialize animation once
     if (!initialized) {
         try {
-            animTexture = std::make_unique<Texture>("assets/textures/test/FishfolkSheet.png");
+            animTexture = std::make_unique<Texture>("../assets/textures/test/FishfolkSheet.png");
             GLuint texId = animTexture->ID();
             if (texId == 0) { std::cout << "ERROR: Failed to load animation texture!\n"; return; }
 
@@ -398,7 +398,7 @@ void GraphicsTestScene::runMultiAnimation() {
 
     if (!initialized) {
         try {
-            animTexture = std::make_unique<Texture>("assets/textures/test/FishfolkSheet.png");
+            animTexture = std::make_unique<Texture>("../assets/textures/test/FishfolkSheet.png");
             GLuint texId = animTexture->ID();
             if (texId == 0) {
                 std::cout << "ERROR: Failed to load animation texture!\n";
@@ -491,7 +491,7 @@ void GraphicsTestScene::runBatchStress() {
             tr.Rotation = static_cast<float>(rand() % 360);
 
             // Add sprite renderer with a test texture
-            auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
 
             // Vary tint color (optional visual variety)
             sr.Color = {
@@ -553,7 +553,7 @@ void GraphicsTestScene::runBatchStress() {
 
     // Load texture once
     static bool initialized = false;
-    static Texture texture("assets/textures/test/fishBoy.png");
+    static Texture texture("../assets/textures/test/fishBoy.png");
     static GLuint textureId = 0;
 
     struct SpriteData {
@@ -676,7 +676,7 @@ void GraphicsTestScene::testSingleTexture() {
             tr.Scale = { 32.f, 32.f };
 
             // All sprites share the same texture
-            auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
             sr.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
             m_TestEntities.push_back(sprite.GetId());
@@ -730,7 +730,7 @@ void GraphicsTestScene::testSmallBatch() {
             tr.Position = { 100.0f + (i % 10) * 64.0f, 100.0f + (i / 10) * 64.0f };
             tr.Scale = { 32.f, 32.f };
 
-            auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
             sr.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
             m_TestEntities.push_back(sprite.GetId());

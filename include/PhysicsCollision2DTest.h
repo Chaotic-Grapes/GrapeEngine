@@ -89,7 +89,7 @@ namespace Sandbox {
         float m_dampingDelay = 7.f;
         bool m_dampingEnabled = false;
 
-        
+        void InitializePhysicsForEntity(Entity& entity, Component::CircleCollider2D* collider);
     };
 }
 

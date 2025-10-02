@@ -118,6 +118,23 @@ macro(import_freetype)
     endif()
 endmacro()
 
+# Macro to import FMOD
+macro(import_fmod)
+    if(NOT TARGET fmod) # Guard to prevent multiple inclusion
+        set(FMOD_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include/fmod")
+        set(FMOD_LIB_DIR "${CMAKE_SOURCE_DIR}/lib/fmod")
+
+        # Create an imported library target
+        add_library(fmod UNKNOWN IMPORTED)
+        set_target_properties(fmod PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${FMOD_INCLUDE_DIR}"
+        )
+
+        set_target_properties(fmod PROPERTIES
+            IMPORTED_LOCATION "${FMOD_LIB_DIR}/fmod_vc.lib"
+        )
+    endif()
+endmacro()
 
 # Macro to import all dependencies
 macro(importDependencies)
@@ -142,6 +159,10 @@ macro(importDependencies)
     message(STATUS "Importing FreeType...")
     import_freetype()
     message(STATUS "FreeType imported successfully.")
+
+    message(STATUS "Importing FMOD...")
+    import_fmod()
+    message(STATUS "FMOD imported successfully.")
 
     message(STATUS "All dependencies have been imported successfully.")
 endmacro()

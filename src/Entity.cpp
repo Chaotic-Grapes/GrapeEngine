@@ -27,5 +27,10 @@ void Entity::SetName(const std::string& newName) {
     m_world->GetEntityManager().SetName(m_id, newName);
 }
 
+//void Entity::SetActive(const bool active) {
+//	m_isActive = active;
+//}
+
 EntityId Entity::GetId()        const { return m_id; }
 std::string Entity::GetName()   const { return m_name; }
+//bool Entity::IsActive()         const { return m_isActive; }

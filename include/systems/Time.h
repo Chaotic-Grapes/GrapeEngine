@@ -3,6 +3,7 @@
 
 #include "ecs/ISystem.h"
 
+// TODO: Possibly detach this from ISystem
 class Time final : public Engine::ISystem {
 public:
 	void OnCreate() override;

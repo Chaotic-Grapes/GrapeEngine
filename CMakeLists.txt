@@ -60,6 +60,7 @@ target_link_libraries(GrapeEngine
         imgui
         glm
         freetype
+        fmod
 )
 
 # Preserve folder structure in Visual Studio
@@ -109,6 +110,14 @@ if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
 endif()
 
 message(STATUS "GrapeEngine configured successfully!")
+
+# ======================= Copy FMOD DLL (Windows) =========================
+add_custom_command(TARGET GrapeEngine POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_LIST_DIR}/lib/fmod/fmod.dll"
+        $<TARGET_FILE_DIR:GrapeEngine>
+    COMMENT "Copying FMOD DLL to output directory"
+)
 
 # ======================= DOCUMENTATION GENERATION =========================
 find_package(Doxygen OPTIONAL_COMPONENTS dot)

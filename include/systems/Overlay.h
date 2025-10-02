@@ -2,6 +2,9 @@
 #define OVERLAY_H
 #include <memory>
 #include "ecs/ISystem.h"
+#include "Audio.h"
+#include "DebugUI.h"
+#include "Application.h"
 
 // Forward declaration
 class World;
@@ -10,9 +13,9 @@ class DebugUI;
 #endif
 
 // Overlay inherits from Engine::ISystem
-class Overlay : public Engine::ISystem {
+class Overlay final : public Engine::ISystem {
 public:
-    Overlay(World* world) : m_world(world) {}
+    explicit Overlay(World* world) : m_world(world) {}
     void OnCreate() override;  // One-time initialization
     void OnUpdate() override;  // ImGUI initialization, input processing, UI rendering
 
@@ -20,11 +23,11 @@ public:
     ~Overlay() override;
 #endif
     std::string Name() const override { return "Overlay"; }  // Name of system as a string
-
+    void SetAudio(Systems::Audio* a) { m_audio = a; }
+private:
+    Systems::Audio* m_audio = nullptr;
     // Setter method to provide world reference
     void SetWorld(World* world) { m_world = world; }
-
-private:
     // Store world reference
     World* m_world = nullptr;
 #ifdef USE_IMGUI

@@ -9,7 +9,9 @@
 #include "ecs/World.h"
 
 void Overlay::OnCreate() {
-    // Don't create DebugUI here since we might not have world yet
+    if (m_world) {
+        m_debugUI = std::make_unique<DebugUI>(m_world);
+    }
 }
 
 void Overlay::OnUpdate() {
@@ -27,7 +29,7 @@ void Overlay::OnUpdate() {
         Window* mainWindow = WindowManager::GetMainWindow();
         if (mainWindow) {
             m_debugUI->Initialize(mainWindow->Handle());
-            m_debugUI->SyncWithWorld();
+            if (m_audio) DebugUI::AttachAudio(m_audio);
             m_initialized = true;
         }
         else return;
@@ -38,8 +40,11 @@ void Overlay::OnUpdate() {
     m_debugUI->Render();
 }
 
-// Destructor
-Overlay::~Overlay() = default;
+// Prevent memory leaks
+Overlay::~Overlay() {
+    if (m_debugUI) m_debugUI->Shutdown();
+    DebugUI::DetachAudio();
+}
 
 #else
 // Non-ImGui implementations

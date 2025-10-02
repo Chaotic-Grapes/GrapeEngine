@@ -17,7 +17,6 @@ using Component::ShapeRenderer2D;
 using Component::CircleCollider2D;
 using Component::LineRenderer;
 
-
 constexpr float TWO_PI = 6.28318530718f;
 
 namespace {
@@ -745,7 +744,11 @@ void Sandbox::PhysicsCollision2DTestScene::RestoreBallStates() {
 }
 
 void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
-    for (auto& ball : m_balls) {
+    World& world = GetWorld();
+    std::vector<EntityId> allEntities = world.GetEntityManager().GetAllEntities();
+
+    for (EntityId id : allEntities) {
+        Entity ball = world.GetEntityManager().GetEntity(id);
         auto* rigidbody = ball.GetComponent<Component::Rigidbody2D>();
         const auto* circleCollider = ball.GetComponent<Component::CircleCollider2D>();
         auto& transform = ball.Transform();
