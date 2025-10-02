@@ -177,7 +177,6 @@ void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
     // Destroy blocker squares too
     for (EntityId id : m_staticsquares) {
         world.GetEntityManager().DestroyEntity(Entity(id, &world));
-
     }
     m_balls.clear();
     m_seacubes.clear();
@@ -225,9 +224,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
     Entity hero(m_playerId, &world);
     auto& htr = hero.Transform();                         // Component::Transform&  :contentReference[oaicite:4]{index=4}
     const Vector2D oldPos = htr.Position;
-
     ClampAndBouncePlayer();
-
 
     // --- Create two static polygon squares once ---
     if (m_staticsquares.empty()) {
@@ -363,11 +360,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsHero() {
 }
 
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVStatResponse() {
-    World& world = GetWorld();
-    if (!m_stepInit) {
-        SpawnCubes();
-        m_stepInit = true;
-    }
+
 
 }
 
@@ -388,7 +381,6 @@ void Sandbox::PhysicsCollision2DTestScene::Test_StepByStepUpdate() {
         std::cout << "  P - Toggle step-by-step mode\n";
         std::cout << "  Space - Step physics (when in step mode)\n";
 
-        SpawnCubes();
         if (m_playerId == UINT32_MAX) {
             CreateTriangle();
         }
@@ -518,7 +510,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes_T(float dt) {
     m_spawnAcc += dt;
     while (m_spawnAcc >= m_spawnIntervals) {
         m_spawnAcc -= m_spawnIntervals;
-        int batch = MathHelper::Randomize<int>(2, 7, 0);
+        int batch = MathHelper::Randomize<int>(1, 2, 0);
         for (int i = 0; i < batch; ++i) SpawnCubes();
     }
 }
@@ -531,13 +523,13 @@ void Sandbox::PhysicsCollision2DTestScene::CubeDisintegrate(World& world, size_t
 }
 
 void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World & world) {
-    if (m_playerId == UINT32_MAX) return;
-    Entity hero(m_playerId, &world);
-    auto* hc = hero.GetComponent<CircleCollider2D>();
-    auto& ht = hero.Transform();
-    if (!hc) return;
 
-    const float heroR = hc->Radius;
+    Entity hero(m_playerId, &world);
+ 
+    auto& ht = hero.Transform();
+ 
+
+    const float heroR = m_triHalfHeight;
     const float floorY = 0.0f;
 
     for (size_t i = 0; i < m_seacubes.size();) {

@@ -237,7 +237,7 @@ namespace Component {
 
     struct Rigidbody2D : IComponent {
         Vector2D LinearVelocity{ 0, 0 };
-        float Inertia = 0,
+             float Inertia = 0,
     		  AngularVelocity = 0,
 			  AngularDamping = 0.05f,
 			  LinearDamping = 0;
