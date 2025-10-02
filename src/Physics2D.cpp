@@ -3,6 +3,7 @@
 #include <iostream>
 #include "Collision.h"
 #include "ecs/Entity.h"
+#include "systems/Logger.h"
 
 namespace Engine {
     Vector2D Physics2D::m_gravity = Vector2D(0.0f, -9.81f);
@@ -23,6 +24,11 @@ namespace Engine {
             if (rb.BodyType == Component::Rigidbody2D::Static)
                 return;
 
+            // Log linear velocity and position for debugging
+            LOG_DEBUG("Position: (" + std::to_string(transform.Position.X) + ", " + std::to_string(transform.Position.Y) + ")" +
+                " | Linear Velocity: (" + std::to_string(rb.LinearVelocity.X) + ", " + std::to_string(rb.LinearVelocity.Y) + ")");
+
+
             Vector2D intendedPos = transform.Position + rb.LinearVelocity * Time::FixedDeltaTime();
 
             // Apply gravity and drag
@@ -36,29 +42,33 @@ namespace Engine {
             // Collision: Circle vs boundary lines
             const auto colliderEntities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform, Component::Collider2D>();
 
-            //for (auto& [crb, ctransform, collider] : colliderEntities) {
-            //    if (const auto* circle = dynamic_cast<Component::CircleCollider2D*>(&collider)) {
-            //        auto lines = m_world->GetEntityManager().Query<Component::LineRenderer>();
-            //        for (auto& [lineEntity] : lines) {
-            //            Collision::LineSegment seg = Collision::MakeSegment(lineEntity.Start, lineEntity.End);
-            //            Vector2D contact, normal;
-            //            float tHit;
+            for (auto& [crb, ctransform, collider] : colliderEntities) {
+                if (const auto* circle = dynamic_cast<Component::CircleCollider2D*>(&collider)) {
+                    auto lines = m_world->GetEntityManager().Query<Component::LineRenderer>();
+                    for (auto& [lineEntity] : lines) {
+                        Collision::LineSegment seg = Collision::MakeSegment(lineEntity.Start, lineEntity.End);
+                        Vector2D contact, normal;
+                        float tHit;
 
-            //            Collision::Circle c{ ctransform.Position, circle->Radius };
-            //            if (Collision::CircleVsSegmentSweep(c, intendedPos, seg, contact, normal, tHit)) {
-            //                Vector2D reflectedDir;
-            //                Collision::CircleSegmentResponse(contact, normal, intendedPos, reflectedDir);
-            //                crb.LinearVelocity = reflectedDir * crb.LinearVelocity.Length(); // preserve speed along new direction
-            //            }
-            //        }
-            //    }
-            //}
+                        Collision::Circle c{ ctransform.Position, circle->Radius };
+                        if (Collision::CircleVsSegmentSweep(c, intendedPos, seg, contact, normal, tHit)) {
+                            Vector2D reflectedDir;
+                            Collision::CircleSegmentResponse(contact, normal, intendedPos, reflectedDir);
+                            crb.LinearVelocity = reflectedDir * crb.LinearVelocity.Length(); // preserve speed along new direction
+                        }
+                    }
+                }
+            }
 
             // TODO: handle other collisions here
 
             // Integrate acceleration
             rb.LinearVelocity += acceleration * Time::FixedDeltaTime();
             transform.Position = intendedPos;
+
+			// Log linear velocity and position for debugging
+            LOG_DEBUG("Position: (" + std::to_string(transform.Position.X) + ", " + std::to_string(transform.Position.Y) + ")" +
+					  " | Linear Velocity: (" + std::to_string(rb.LinearVelocity.X) + ", " + std::to_string(rb.LinearVelocity.Y) + ")");
 
             if (!rb.FreezeRotation)
                 transform.Rotation += rb.AngularVelocity * Time::FixedDeltaTime();

@@ -365,10 +365,10 @@ void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsHero() {
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVStatResponse() {
     World& world = GetWorld();
     if (!m_stepInit) {
-        SpawnCubes();
+		SpawnCubes();
         m_stepInit = true;
     }
-
+    //CreateTriangle();
 }
 
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVDynResponse() {
@@ -468,7 +468,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int co
 }
 
 void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
-    if ((int)m_seacubes.size() >= m_maxLeaves) return;
+    if ((int)m_seacubes.size() >= 1) return;
 
     const float size = MathHelper::Randomize<float>(14.0f, 28.0f, 0);
     const float half = size * 0.5f;
