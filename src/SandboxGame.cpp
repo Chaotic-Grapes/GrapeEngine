@@ -4,6 +4,7 @@
 #include "PhysicsCollision2DTest.h"
 #include "GraphicsTest.hpp"
 #include "GameObjectFactoryTest.h"
+#include "SerializationTest.h"
 #include "systems/WindowManager.h"
 
 
@@ -13,12 +14,12 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "2. Graphics & Art Pipeline Test" << '\n';
     //std::cout << "3. ECS Component Test" << '\n';
 	std::cout << "4. Game Object Factory Test" << '\n';
+    std::cout << "5. Serialization Check Test" << '\n';
 
     int choice;
     std::cin >> choice;
 
     // Clear console
-    // Inefficient
     printf("\033[H\033[J");
 
     switch (choice) {
@@ -46,6 +47,13 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
 		sceneManager.LoadScene("GameObjectFactoryTestScene");
         break;
 	}
+    case 5: {
+        std::cout << "Starting Serialization Integrity Test..." << '\n';
+
+        sceneManager.AddScene(new Sandbox::SerializationTestScene());
+        sceneManager.LoadScene("SerializationTestScene");
+        break;
+    }
     default:
         std::cout << "Invalid choice" << '\n';
         break;

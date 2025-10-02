@@ -202,6 +202,9 @@
     <ClCompile Include="src\Math\Vector4D.cpp">
       <Filter>Math</Filter>
     </ClCompile>
+    <ClCompile Include="src\SerializationTest.cpp">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
@@ -234,7 +237,7 @@
     <ClInclude Include="include\ecs\IComponent.h">
       <Filter>Engine\Entity Component System\Components</Filter>
     </ClInclude>
-    <ClInclude Include="include\messaging\MessageBus.h">
+    <ClInclude Include="include\messaging\MessageSystem.h">
       <Filter>Engine\Messaging</Filter>
     </ClInclude>
     <ClInclude Include="include\messaging\MessageTypes.h">
@@ -339,6 +342,11 @@
     </ClInclude>
     <ClInclude Include="include\Math\Vector4D.h">
       <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="include\EntitySerializer.h" />
+    <ClInclude Include="include\Serialization.h" />
+    <ClInclude Include="include\SerializationTest.h">
+      <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

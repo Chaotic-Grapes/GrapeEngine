@@ -29,6 +29,9 @@ public:
     template<typename T, typename... Args>
     T& AddBehaviour(Entity& entity, Args&&... args);
 
+    template<typename T>
+    void ForEachEntity(T func);
+
     void RemoveAllBehaviours(const Entity& entity);
 
     const std::unordered_map<EntityId, std::vector<std::unique_ptr<Behaviour>>>& GetBehaviours() const;

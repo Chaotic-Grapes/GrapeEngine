@@ -3,8 +3,8 @@
 #include <vector>
 #include <cstdint>
 #include <glad/glad.h>
-#include "../include/graphics/vertex.hpp"
-#include "../include/graphics/sprite.hpp"
+#include "graphics/vertex.hpp"
+#include "graphics/sprite.hpp"
 
 class Renderer {
 public:

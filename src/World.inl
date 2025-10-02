@@ -37,4 +37,13 @@ T& World::AddBehaviour(Entity& entity, Args&&... args) {
     return *ptr;
 }
 
+template<typename T>
+void World::ForEachEntity(T func) {
+    const auto entityIds = m_entityManager.GetAllEntities();
+    for (const EntityId id : entityIds) {
+        Entity entity = m_entityManager.GetEntity(id);
+        func(entity);
+    }
+}
+
 #endif

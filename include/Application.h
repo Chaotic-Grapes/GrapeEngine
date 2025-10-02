@@ -1,6 +1,7 @@
 ﻿#ifndef APPLICATION_H
 #define APPLICATION_H
 
+#include <windows.h>
 #include "Game.h"
 #include "ecs/SceneManager.h"
 
@@ -35,6 +36,8 @@ private:
         static void _enableConsole();
         static void _disableConsole();
 	};
+
+    extern Application* CORE;
 }
 
 #endif

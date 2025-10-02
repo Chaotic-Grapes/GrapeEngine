@@ -1,14 +1,15 @@
 ﻿#include "Application.h"
-
 #include <thread>
-#include <windows.h>
 #include "Input.h"
 #include "Physics2D.h"
+#include "Profiler.h"
 #include "systems/WindowManager.h"
 #include "ecs/Scene.h"
 #include "systems/Time.h"
 
 namespace Engine {
+    // Global pointer to the core engine
+    Application* CORE = nullptr;
     bool Application::m_shouldStop = false;
 
     void Application::Run(Game& game, const bool consoleFlag) {
@@ -27,7 +28,7 @@ namespace Engine {
         
         while (!m_shouldStop) {
             const double frameStart = glfwGetTime();
-
+            Profiler::update_time();
             // --- Input & Game Update ---
 			Input::_processInput();
             auto* newScene = m_sceneManager.GetActiveScene();
@@ -70,14 +71,6 @@ namespace Engine {
                         std::chrono::duration<double>(targetFrameTime - frameDuration)
                     );
                 }
-            }
-
-            // Apply forced set FPS (forces artificial slowdown like simulated)
-            if (Time::Fps() > 0) {
-                const double simulatedFrameTime = 1.0 / Time::Fps();
-                std::this_thread::sleep_for(
-                    std::chrono::duration<double>(simulatedFrameTime)
-                );
             }
 		}
 

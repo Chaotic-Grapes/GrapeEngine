@@ -5,14 +5,20 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <algorithm>
 #include <iostream>
+#include "Profiler.h"
 #include "ecs/World.h"
+#include "Math/MathHelper.h"
+
+#ifdef max
+#undef max  // Undefine macro to avoid conflicts with std::max
+#endif
 
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the world
 DebugUI::DebugUI(World* world, const DebugUIConfig& config)
-    : m_config(config), m_world(world) {
-}
+    : m_config(config), m_world(world) {}
 
 DebugUI::~DebugUI() {
     // Clean up resources only if UI was initialized
@@ -35,12 +41,6 @@ void DebugUI::Initialize(GLFWwindow* window) {
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
 
     m_initialized = true;  // Mark that DebugUI has been initialized
-
-    // If the world exists then create some default game objects
-    if (HasValidWorld()) {
-        AddGameObject("Player");
-        AddGameObject("Enemy");
-    }
 }
 
 void DebugUI::NewFrame() {
@@ -48,7 +48,7 @@ void DebugUI::NewFrame() {
     if (!m_initialized) return;
 
     // Interact with debug UI (start of every frame so it keeps getting checked)
-    if (Input::WasKeyJustPressed(GLFW_KEY_F1)) {
+    if (Input::IsKeyPressed(GLFW_KEY_F1)) {
         SetEnabled(!IsEnabled());
     }
 
@@ -100,6 +100,40 @@ bool DebugUI::HasValidWorld() const {
     return m_world != nullptr;
 }
 
+// Scan world for existing entities and populate GameObject list
+void DebugUI::SyncWithWorld() {
+    if (!HasValidWorld()) return;
+
+    // Clear existing list
+    m_gameObjects.clear();
+
+    // Get all entity IDs from world
+    std::vector<EntityId> allEntities = m_world->GetEntityManager().GetAllEntities();
+
+    // Iterate over every Entity ID
+    for (EntityId id : allEntities) {
+        // Get the actual Entity object for this ID
+        Entity entity = m_world->GetEntityManager().GetEntity(id);
+        // Transform (position data)
+        Component::Transform* transform = entity.GetComponent<Component::Transform>();
+
+        // If Entity has an actual transform
+        if (transform) {
+            // Get name or use fallback name "Entity"
+            std::string entityName = m_world->GetEntityManager().GetName(id);
+            if (entityName.empty()) entityName = "Entity";
+
+            // Sync position data, add synced object to debug UI list
+            GameObject gameObj(id, entityName);
+            gameObj.X = transform->Position.X;
+            gameObj.Y = transform->Position.Y;
+            m_gameObjects.push_back(gameObj);
+        }
+    }
+    // Refresh any cached button state now that the object list has changed
+    _invalidateButtonCache();
+}
+
 // Search for an object and return pointer (or nullptr)
 GameObject* DebugUI::FindGameObject(EntityId id) {
     // Search for game object in list by EntityId
@@ -120,9 +154,18 @@ void DebugUI::AddGameObject(const std::string& name) {
     // Create real ECS entity with components
     Entity entity = _createGameEntity(name);
 
+    GameObject gameObj(entity.GetId(), name);
+    gameObj.X = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
+    gameObj.Y = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
+
+    // Sync with ECS Transform
+    Component::Transform& transform = entity.Transform();
+    transform.Position.X = gameObj.X;
+    transform.Position.Y = gameObj.Y;
+
     // Add to editor list for UI display + clear cached toggle/delete
     // button labels so new objects get proper unique labels
-    m_gameObjects.emplace_back(entity.GetId(), name);
+    m_gameObjects.push_back(gameObj);
     _invalidateButtonCache();
 }
 
@@ -195,11 +238,55 @@ void DebugUI::_showPerformanceWindow() {
     ImGui::SetNextWindowSize(ImVec2(layout.PerfW, layout.PerfH), ImGuiCond_Once);
 
     ImGui::Begin("Performance Monitor");
-    // ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-    // ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
+
+    // FPS and frame time
+    ImGui::Text("FPS: %.1f", Profiler::GetFPS());
+    ImGui::Text("Frame Time: %.3f ms", Profiler::GetFrameTimeMs());
+
+    static int fpsCap = Time::FpsCap();
+    ImGui::InputInt("FPS Cap", &fpsCap);
+    fpsCap = std::max(fpsCap, 0); // 0 = uncapped
+    if (ImGui::Button("Apply FPS Cap")) {
+        Time::FpsCap(fpsCap);
+    }
+
+    ImGui::Separator();
+
+    // Scope data
+    const auto& scopes = Profiler::GetAllScopeData();
+    for (const auto& [name, data] : scopes) {
+		if (name == "Time" || name == "Overlay") 
+            continue; // Skip these special scopes
+
+        ImGui::Text("%s:", name.c_str());
+        ImGui::BulletText("Last: %.3f ms", data.lastTimeMs);
+        ImGui::BulletText("Avg:  %.3f ms", data.avgTimeMs);
+        ImGui::BulletText("Max:  %.3f ms", data.maxTimeMs);
+
+        if (!data.frameTimes.empty()) {
+            ImGui::PlotLines(("##" + name).c_str(),
+                data.frameTimes.data(),
+                static_cast<int>(data.frameTimes.size()),
+                0,
+                nullptr,
+                0.0f,
+                data.maxTimeMs,
+                ImVec2(0, 50));
+        }
+    }
+
+    ImGui::Separator();
+
+    // Reset profiler history
+    if (ImGui::Button("Clear Performance History")) {
+        Profiler::ClearHistory();
+    }
+
+	// Print GPU specs button
     if (ImGui::Button("Print GPU Specs to Console")) {
         Input::PrintSpecs();
     }
+
     ImGui::End();
 }
 
@@ -236,8 +323,8 @@ void DebugUI::_showInputDebugWindow() {
     ImGui::Text("=== Event Testing ===");
 
     // For fun
-    if (Input::WasKeyJustPressed(GLFW_KEY_SPACE)) m_spacePressed++;
-    if (Input::WasKeyJustReleased(GLFW_KEY_SPACE)) m_spaceReleased++;
+    if (Input::IsKeyPressed(GLFW_KEY_SPACE)) m_spacePressed++;
+    if (Input::IsKeyUp(GLFW_KEY_SPACE)) m_spaceReleased++;
 
     ImGui::Text("Space Bar Events:");
     ImGui::Text("  Pressed: %d times", m_spacePressed);
@@ -314,6 +401,14 @@ void DebugUI::_showGameObjectEditor() {
         // If object is active, button shows deactivate; if object is inactive, other way around
         if (ImGui::SmallButton(_getToggleLabel(gameObject).c_str())) {
             gameObject.IsActive = !gameObject.IsActive;
+
+            // Apply to actual ECS entity
+            Entity entity(gameObject.Id, m_world);
+            Component::ShapeRenderer2D* renderer = entity.GetComponent<Component::ShapeRenderer2D>();
+            if (renderer) {
+                // Hide by setting alpha to 0, show by setting alpha to 1
+                renderer->FillColor.A = gameObject.IsActive ? 255 : 0;
+            }
         }
 
         // Delete button for each object
@@ -341,33 +436,32 @@ void DebugUI::_showGameObjectEditor() {
 // Helper function to create entities with basic components
 Entity DebugUI::_createGameEntity(const std::string& name) {
     // Create new entity in ECS
-    Entity entity = m_world->CreateEntity();
+    Entity entity = m_world->CreateEntity(name);
 
     // Add basic components that most game objects need
     entity.AddComponent<Component::Transform>();
 
-    // Add different components based on object type
+    // Set position based on GameObject data
+    auto& shapeRenderer = entity.AddComponent<Component::ShapeRenderer2D>();
+    shapeRenderer.Type = Component::ShapeRenderer2D::ShapeType::Circle;
+    shapeRenderer.Radius = 25.0f;
+
+    // Set color based on type
     if (name == "Player") {
-        entity.AddComponent<Component::SpriteRenderer>("player_sprite.png");
-        entity.AddComponent<Component::Rigidbody2D>();
-        entity.AddComponent<Component::BoxCollider2D>();
+        shapeRenderer.FillColor = Color(0.0f, 0.0f, 1.0f, 1.0f);
     }
     else if (name == "Enemy") {
-        entity.AddComponent<Component::SpriteRenderer>("enemy_sprite.png");
-        entity.AddComponent<Component::Rigidbody2D>();
-        entity.AddComponent<Component::BoxCollider2D>();
+        shapeRenderer.FillColor = Color(1.0f, 0.0f, 0.0f, 1.0f);
     }
     else if (name == "Collectible") {
-        entity.AddComponent<Component::SpriteRenderer>("collectible_sprite.png");
-        entity.AddComponent<Component::CircleCollider2D>();
-        // Make it a trigger; entity can detect collisions without physically blocking movement
-        Component::CircleCollider2D* collider = entity.GetComponent<Component::CircleCollider2D>();
-        if (collider) collider->IsTrigger = true;
+        shapeRenderer.FillColor = Color(1.0f, 1.0f, 0.0f, 1.0f); 
     }
     else {
-        // Default object: just transform and sprite
-        entity.AddComponent<Component::SpriteRenderer>();
+        shapeRenderer.FillColor = Color(1.0f, 1.0f, 1.0f, 1.0f);
     }
+
+    // Add CircleCollider2D so physics test can detect and add physics
+    entity.AddComponent<Component::CircleCollider2D>(25.0f);
 
     return entity;
 }

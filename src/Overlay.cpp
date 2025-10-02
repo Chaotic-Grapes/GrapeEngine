@@ -8,9 +8,6 @@
 #include <iostream>
 #include "ecs/World.h"
 
-// Define constructor here where DebugUI is complete
-Overlay::Overlay() = default;
-
 void Overlay::OnCreate() {
     // Don't create DebugUI here since we might not have world yet
 }
@@ -30,6 +27,7 @@ void Overlay::OnUpdate() {
         Window* mainWindow = WindowManager::GetMainWindow();
         if (mainWindow) {
             m_debugUI->Initialize(mainWindow->Handle());
+            m_debugUI->SyncWithWorld();
             m_initialized = true;
         }
         else return;

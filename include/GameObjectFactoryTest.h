@@ -1,9 +1,7 @@
 #ifndef GAMEOBJECTFACTORYTEST_H
 #define GAMEOBJECTFACTORYTEST_H
-#include "systems/WindowManager.h"
 #if _DEBUG
-
-#include "ecs/GameObjectFactory.h"
+#include "systems/WindowManager.h"
 #include "ecs/Scene.h"
 
 namespace Sandbox {

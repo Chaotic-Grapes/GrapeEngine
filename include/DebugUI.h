@@ -18,14 +18,14 @@ struct DebugUIConfig {
         float EngineX = 10.0f, EngineY = 10.0f;
         float EngineW = 300.0f, EngineH = 150.0f;
 
-        float PerfX = 10.0f, PerfY = 170.0f;
-        float PerfW = 300.0f, PerfH = 120.0f;
-
         float InputX = 330.0f, InputY = 10.0f;
         float InputW = 320.0f, InputH = 400.0f;
 
         float EditorX = 670.0f, EditorY = 10.0f;
         float EditorW = 375.0f, EditorH = 400.0f;
+
+        float PerfX = 1065.0f, PerfY = 10.0f;
+        float PerfW = 300.0f, PerfH = 400.0f;
     } Layout;
 
     // Buffer sizes
@@ -37,6 +37,7 @@ struct GameObject {
     EntityId Id;
     std::string Name;
     bool IsActive = true;
+    float X = 0.0f, Y = 0.0f;
 
     GameObject(EntityId id, const std::string& name) : Id(id), Name(name) {}
 };
@@ -67,13 +68,14 @@ public:
     void AddGameObject(const std::string& name);
     void RemoveGameObject(EntityId id);
     void ClearAllGameObjects();
+    void SyncWithWorld();
 
 private:
     // Configuration and state
     DebugUIConfig m_config;
     World* m_world;  // World reference for entity creation/management
     std::vector<GameObject> m_gameObjects;
-    bool m_enabled = true;
+    bool m_enabled = false;
     bool m_initialized = false;
 
     // UI state

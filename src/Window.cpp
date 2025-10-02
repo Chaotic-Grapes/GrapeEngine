@@ -1,7 +1,7 @@
 #include "systems/Window.h"
 #include "Input.h"
 #include <iostream>
-#include "messaging/MessageBus.h"
+#include "messaging/MessageSystem.h"
 #include "messaging/MessageTypes.h"
 
 namespace {
@@ -15,7 +15,7 @@ static void FramebufferSizeCallback(GLFWwindow* window, const int width, const i
 	glViewport(0, 0, width, height);
 
 	// Broadcast resize message
-	Messaging::MessageBus::Broadcast(Messaging::WindowResized{ width, height });
+	Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
 }
 
 Window::~Window() { Destroy(); }
