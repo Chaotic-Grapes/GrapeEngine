@@ -85,9 +85,9 @@ endforeach()
 
 # Compiler warnings
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(GrapeEngine PRIVATE -Wall -Wextra)
+    target_compile_options(GrapeEngine PRIVATE -Wall -Wextra -Wpedantic -Werror)
 elseif (MSVC)
-    target_compile_options(GrapeEngine PRIVATE /W3)
+    target_compile_options(GrapeEngine PRIVATE /W4)
 endif()
 
 # Copy assets to build directory (if you have any)
