@@ -68,9 +68,6 @@
     <Filter Include="Engine\Systems\ISystem Dependent\Scene">
       <UniqueIdentifier>{0e64a6f7-4617-4ad7-ba74-a6503a78df4d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Sandboxing\GameObjectFactory Test">
-      <UniqueIdentifier>{ee44bc4e-c4f4-481d-a73f-2ddd98693170}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Math">
       <UniqueIdentifier>{f3aeaf44-64a5-4f47-a71b-54bd00471200}</UniqueIdentifier>
     </Filter>
@@ -175,9 +172,6 @@
     <ClCompile Include="src\graphics\TextureCache.cpp">
       <Filter>Engine\Systems\ISystem Dependent\Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="src\GameObjectFactoryTest.cpp">
-      <Filter>Sandboxing\GameObjectFactory Test</Filter>
-    </ClCompile>
     <ClCompile Include="src\graphics\polygon-utils.cpp">
       <Filter>Helpers</Filter>
     </ClCompile>
@@ -205,6 +199,10 @@
     <ClCompile Include="src\SerializationTest.cpp">
       <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClCompile>
+    <ClCompile Include="src\DebugUI.cpp" />
+    <ClCompile Include="src\CrashDumping.cpp" />
+    <ClCompile Include="src\Logger.cpp" />
+    <ClCompile Include="src\Profiler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Application.h">
@@ -313,12 +311,6 @@
     <ClInclude Include="include\ecs\GameObjectFactory.h">
       <Filter>Engine\Entity Component System</Filter>
     </ClInclude>
-    <ClInclude Include="include\GameObjectFactoryTest.h">
-      <Filter>Sandboxing\GameObjectFactory Test</Filter>
-    </ClInclude>
-    <ClInclude Include="include\GLHelper.h">
-      <Filter>Helpers</Filter>
-    </ClInclude>
     <ClInclude Include="include\graphics\polygon-utils.hpp">
       <Filter>Helpers</Filter>
     </ClInclude>
@@ -348,6 +340,10 @@
     <ClInclude Include="include\SerializationTest.h">
       <Filter>Sandboxing\Physics Collision Test</Filter>
     </ClInclude>
+    <ClInclude Include="include\DebugUI.h" />
+    <ClInclude Include="include\systems\Logger.h" />
+    <ClInclude Include="src\CrashDumping.h" />
+    <ClInclude Include="src\Profiler.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Entity.inl">

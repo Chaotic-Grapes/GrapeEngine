@@ -154,7 +154,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\DebugUI.cpp" />
-    <ClCompile Include="src\GameObjectFactoryTest.cpp" />
     <ClCompile Include="src\BehaviourSystem.cpp" />
     <ClCompile Include="src\CrashDumping.cpp" />
     <ClCompile Include="src\DynamicCollision.cpp" />
@@ -195,7 +194,6 @@
     <ClCompile Include="src\WindowManager.cpp" />
     <ClCompile Include="src\World.cpp" />
     <ClInclude Include="include\DebugUI.h" />
-    <ClInclude Include="include\GameObjectFactoryTest.h" />
     <ClInclude Include="include\DynamicCollision.h" />
     <ClInclude Include="include\ecs\GameObjectFactory.h" />
     <ClInclude Include="include\GraphicsTest.hpp" />

@@ -1,6 +1,5 @@
 #ifndef PHYSICSCOLLISION2DTEST_H
 #define PHYSICSCOLLISION2DTEST_H
-#if _DEBUG
 
 #include "Game.h"
 #include <vector>
@@ -70,5 +69,4 @@ namespace Sandbox {
     };
 }
 
-#endif
 #endif
