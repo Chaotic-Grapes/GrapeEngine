@@ -44,15 +44,15 @@ namespace Engine {
                         Vector2D contact, normal;
                         float tHit;
 
-            //            Collision::Circle c{ ctransform.Position, circle->Radius };
-            //            if (Collision::CircleVsSegmentSweep(c, intendedPos, seg, contact, normal, tHit)) {
-            //                Vector2D reflectedDir;
-            //                Collision::CircleSegmentResponse(contact, normal, intendedPos, reflectedDir);
-            //                crb.LinearVelocity = reflectedDir * crb.LinearVelocity.Length(); // preserve speed along new direction
-            //            }
-            //        }
-            //    }
-            //}
+                        Collision::Circle c{ ctransform.Position, circle->Radius };
+                        if (Collision::CircleVsSegmentSweep(c, intendedPos, seg, contact, normal, tHit)) {
+                            Vector2D reflectedDir;
+                            Collision::CircleSegmentResponse(contact, normal, intendedPos, reflectedDir);
+                            crb.LinearVelocity = reflectedDir * crb.LinearVelocity.Length(); // preserve speed along new direction
+                        }
+                    }
+                }
+            }
 
             // TODO: handle other collisions here
 
