@@ -88,8 +88,6 @@ namespace Sandbox {
         float m_worldWidth = 1600.f, m_worldHeight = 900.f;
         float m_dampingDelay = 7.f;
         bool m_dampingEnabled = false;
-
-        void InitializePhysicsForEntity(Entity& entity, Component::CircleCollider2D* collider);
     };
 }
 
