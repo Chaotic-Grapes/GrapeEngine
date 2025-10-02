@@ -9,65 +9,65 @@ using namespace Sandbox;
 
 SerializationTestScene::SerializationTestScene()
     : Scene("SerializationTestScene") {
-    CREATE_WINDOW("Serialization Test", 800, 600);
+    CREATE_WINDOW("Serialization Test", 1600, 900);
 }
 
 void SerializationTestScene::OnLoad() {
-    std::cout << "\nSERIALIZATION INTEGRITY TEST" << std::endl;
-    std::cout << "Running automated serialization test..." << std::endl;
+    std::cout << "\nSERIALIZATION INTEGRITY TEST" << '\n';
+    std::cout << "Running automated serialization test..." << '\n';
 
     RunAutomatedTest();
 }
 
 void SerializationTestScene::RunAutomatedTest() {
-    std::cout << "\nPHASE 1: Creating Test Entities" << std::endl;
+    std::cout << "\nPHASE 1: Creating Test Entities" << '\n';
     CreateTestEntities();
 
-    std::cout << "\nPHASE 2: Saving Scene" << std::endl;
+    std::cout << "\nPHASE 2: Saving Scene" << '\n';
     SaveScene();
 
     if (!m_testPassed) {
-        std::cout << "TEST STOPPED: Save failed" << std::endl;
+        std::cout << "TEST STOPPED: Save failed" << '\n';
         return;
     }
 
-    std::cout << "\nHASE 3: Loading Scene" << std::endl;
+    std::cout << "\nPHASE 3: Loading Scene" << '\n';
     LoadScene();
 
     if (!m_testPassed) {
-        std::cout << "TEST STOPPED: Load failed" << std::endl;
+        std::cout << "TEST STOPPED: Load failed" << '\n';
         return;
     }
 
-    std::cout << "\nPHASE 4: Verifying Loaded Data" << std::endl;
+    std::cout << "\nPHASE 4: Verifying Loaded Data" << '\n';
     VerifyLoadedEntities();
 
     PrintTestResults();
 
-    std::cout << "\nTest complete. Check above for any failures." << std::endl;
+    std::cout << "\nTest complete. Check above for any failures." << '\n';
 }
 
 void SerializationTestScene::CreateTestEntities() {
-    std::cout << "CreateTestEntities() started" << std::endl;
+    std::cout << "CreateTestEntities() started" << '\n';
 
     World& world = GetWorld();
-    std::cout << "Got world reference" << std::endl;
+    std::cout << "Got world reference" << '\n';
 
     // test 1: Basic Transform + SpriteRenderer
-    std::cout << "Creating TestSprite entity..." << std::endl;
+    std::cout << "Creating TestSprite entity..." << '\n';
     Entity sprite = world.CreateEntity("TestSprite");
-    std::cout << "Entity created with ID: " << sprite.GetId() << std::endl;
+    std::cout << "Entity created with ID: " << sprite.GetId() << '\n';
 
     auto& spriteTransform = sprite.Transform();
     spriteTransform.Position = { 400.0f, 450.0f };
     spriteTransform.Scale = { 128.0f, 128.0f };
     spriteTransform.Rotation = 45.0f;
-    std::cout << "Transform set" << std::endl;
+    std::cout << "Transform set" << '\n';
 
     auto& spriteRenderer = sprite.AddComponent<Component::SpriteRenderer>(
         "assets/textures/test/player.png"
     );
-    std::cout << "SpriteRenderer component added" << std::endl;
+    std::cout << "SpriteRenderer component added" << '\n';
     spriteRenderer.Color = { 1.0f, 0.5f, 0.5f, 1.0f };
 
     m_originalEntities.push_back(sprite);
@@ -79,10 +79,10 @@ void SerializationTestScene::CreateTestEntities() {
             0.0f, 0.0f
         });
 
-    std::cout << "Created Sprite entity: " << sprite.GetName() << std::endl;
+    std::cout << "Created Sprite entity: " << sprite.GetName() << '\n';
 
     // test 2: Simple entity with only transform
-    std::cout << "Creating simple entity without complex components..." << std::endl;
+    std::cout << "Creating simple entity without complex components..." << '\n';
     Entity simpleEntity = world.CreateEntity("SimpleEntity");
     auto& simpleTransform = simpleEntity.Transform();
     simpleTransform.Position = { 100.0f, 100.0f };
@@ -99,111 +99,111 @@ void SerializationTestScene::CreateTestEntities() {
         0.0f
         });
 
-    std::cout << "Created Simple entity: " << simpleEntity.GetName() << std::endl;
-    std::cout << "Total entities created: " << m_originalEntities.size() << std::endl;
-    std::cout << "CreateTestEntities() completed successfully" << std::endl;
+    std::cout << "Created Simple entity: " << simpleEntity.GetName() << '\n';
+    std::cout << "Total entities created: " << m_originalEntities.size() << '\n';
+    std::cout << "CreateTestEntities() completed successfully" << '\n';
 }
 
 void SerializationTestScene::SaveScene() {
-    std::cout << "SaveScene() started" << std::endl;
+    std::cout << "SaveScene() started" << '\n';
 
     World& world = GetWorld();
-    std::cout << "Got world reference for saving" << std::endl;
+    std::cout << "Got world reference for saving" << '\n';
 
-    std::cout << "Creating save directory..." << std::endl;
+    std::cout << "Creating save directory..." << '\n';
     std::filesystem::create_directories("assets/saves");
-    std::cout << "Save directory ready" << std::endl;
+    std::cout << "Save directory ready" << '\n';
 
-    std::cout << "Calling SceneSerializer::SaveScene..." << std::endl;
+    std::cout << "Calling SceneSerializer::SaveScene..." << '\n';
     bool success = Serialization::SceneSerializer::SaveScene(
         world,
         "assets/saves/serialization_test.json"
     );
-    std::cout << "SceneSerializer::SaveScene returned: " << success << std::endl;
+    std::cout << "SceneSerializer::SaveScene returned: " << success << '\n';
 
     if (success) {
-        std::cout << "Scene save operation reported success" << std::endl;
+        std::cout << "Scene save operation reported success" << '\n';
 
         if (std::filesystem::exists("assets/saves/serialization_test.json")) {
             auto fileSize = std::filesystem::file_size("assets/saves/serialization_test.json");
-            std::cout << "File created with size: " << fileSize << " bytes" << std::endl;
+            std::cout << "File created with size: " << fileSize << " bytes" << '\n';
 
             std::ifstream testFile("assets/saves/serialization_test.json");
             std::string firstLine;
             std::getline(testFile, firstLine);
-            std::cout << "First line of file: " << firstLine.substr(0, 50) << "..." << std::endl;
+            std::cout << "First line of file: " << firstLine.substr(0, 50) << "..." << '\n';
             testFile.close();
         }
         else {
-            std::cout << "ERROR: File was not created!" << std::endl;
+            std::cout << "ERROR: File was not created!" << '\n';
             m_testPassed = false;
             return;
         }
     }
     else {
-        std::cout << "Scene save failed!" << std::endl;
+        std::cout << "Scene save failed!" << '\n';
         m_testPassed = false;
         return;
     }
 
-    std::cout << "SaveScene() completed successfully" << std::endl;
+    std::cout << "SaveScene() completed successfully" << '\n';
 }
 
 void SerializationTestScene::LoadScene() {
-    std::cout << "LoadScene() started" << std::endl;
+    std::cout << "LoadScene() started" << '\n';
 
     World& world = GetWorld();
-    std::cout << "Got world reference for loading" << std::endl;
+    std::cout << "Got world reference for loading" << '\n';
 
     if (!std::filesystem::exists("assets/saves/serialization_test.json")) {
-        std::cout << "ERROR: Save file doesn't exist for loading!" << std::endl;
+        std::cout << "ERROR: Save file doesn't exist for loading!" << '\n';
         m_testPassed = false;
         return;
     }
 
-    std::cout << "Clearing original entities..." << std::endl;
+    std::cout << "Clearing original entities..." << '\n';
     for (auto& entity : m_originalEntities) {
         world.GetEntityManager().DestroyEntity(entity);
     }
     m_originalEntities.clear();
-    std::cout << "Original entities cleared" << std::endl;
+    std::cout << "Original entities cleared" << '\n';
 
-    std::cout << "Calling SceneSerializer::LoadScene..." << std::endl;
+    std::cout << "Calling SceneSerializer::LoadScene..." << '\n';
     bool success = Serialization::SceneSerializer::LoadScene(
         world,
         "assets/saves/serialization_test.json"
     );
-    std::cout << "SceneSerializer::LoadScene returned: " << success << std::endl;
+    std::cout << "SceneSerializer::LoadScene returned: " << success << '\n';
 
     if (success) {
-        std::cout << "Scene load operation reported success" << std::endl;
+        std::cout << "Scene load operation reported success" << '\n';
 
         auto entityIds = world.GetEntityManager().GetAllEntities();
-        std::cout << "Found " << entityIds.size() << " entities after load" << std::endl;
+        std::cout << "Found " << entityIds.size() << " entities after load" << '\n';
 
         for (EntityId id : entityIds) {
             Entity newEntity = world.GetEntityManager().GetEntity(id);
-            std::cout << "Loaded entity: [" << id << "] " << newEntity.GetName() << std::endl;
+            std::cout << "Loaded entity: [" << id << "] " << newEntity.GetName() << '\n';
             m_originalEntities.push_back(newEntity);
         }
-        std::cout << "Loaded entities: " << m_originalEntities.size() << std::endl;
+        std::cout << "Loaded entities: " << m_originalEntities.size() << '\n';
     }
     else {
-        std::cout << "Scene load failed!" << std::endl;
+        std::cout << "Scene load failed!" << '\n';
         m_testPassed = false;
         return;
     }
 
-    std::cout << "LoadScene() completed successfully" << std::endl;
+    std::cout << "LoadScene() completed successfully" << '\n';
 }
 
 void SerializationTestScene::VerifyLoadedEntities() {
-    std::cout << "VerifyLoadedEntities() started" << std::endl;
+    std::cout << "VerifyLoadedEntities() started" << '\n';
 
     World& world = GetWorld();
     auto entityIds = world.GetEntityManager().GetAllEntities();
 
-    std::cout << "Verifying " << entityIds.size() << " loaded entities..." << std::endl;
+    std::cout << "Verifying " << entityIds.size() << " loaded entities..." << '\n';
 
     bool allTestsPassed = true;
 
@@ -211,7 +211,7 @@ void SerializationTestScene::VerifyLoadedEntities() {
         Entity entity = world.GetEntityManager().GetEntity(id);
         std::string name = entity.GetName();
 
-        std::cout << "\nChecking entity: [" << id << "] " << name << std::endl;
+        std::cout << "\nChecking entity: [" << id << "] " << name << '\n';
 
         ExpectedData* expected = nullptr;
         for (auto& exp : m_expectedData) {
@@ -222,7 +222,7 @@ void SerializationTestScene::VerifyLoadedEntities() {
         }
 
         if (!expected) {
-            std::cout << "No expected data for entity" << name << "'" << std::endl;
+            std::cout << "No expected data for entity" << name << "'" << '\n';
             continue;
         }
 
@@ -234,11 +234,11 @@ void SerializationTestScene::VerifyLoadedEntities() {
         bool rotMatch = std::abs(transform.Rotation - expected->rotation) < 0.01f;
 
         std::cout << "  Position: " << (posMatch ? "Success" : "Fail")
-            << " (" << transform.Position.X << ", " << transform.Position.Y << ")" << std::endl;
+            << " (" << transform.Position.X << ", " << transform.Position.Y << ")" << '\n';
         std::cout << "  Scale: " << (scaleMatch ? "Success" : "Fail")
-            << " (" << transform.Scale.X << ", " << transform.Scale.Y << ")" << std::endl;
+            << " (" << transform.Scale.X << ", " << transform.Scale.Y << ")" << '\n';
         std::cout << "  Rotation: " << (rotMatch ? "Success" : "Fail")
-            << " (" << transform.Rotation << " deg)" << std::endl;
+            << " (" << transform.Rotation << " deg)" << '\n';
 
         if (!posMatch || !scaleMatch || !rotMatch) {
             allTestsPassed = false;
@@ -246,24 +246,24 @@ void SerializationTestScene::VerifyLoadedEntities() {
 
         if (name == "TestSprite") {
             bool hasSprite = entity.HasComponent<Component::SpriteRenderer>();
-            std::cout << "  SpriteRenderer: " << (hasSprite ? "Success" : "Fail") << std::endl;
+            std::cout << "  SpriteRenderer: " << (hasSprite ? "Success" : "Fail") << '\n';
             if (!hasSprite) allTestsPassed = false;
         }
     }
 
     m_testPassed = allTestsPassed;
-    std::cout << "VerifyLoadedEntities() completed" << std::endl;
+    std::cout << "VerifyLoadedEntities() completed" << '\n';
 }
 
 void SerializationTestScene::PrintTestResults() {
-    std::cout << "\nFINAL TEST RESULTS" << std::endl;
+    std::cout << "\nFINAL TEST RESULTS" << '\n';
     if (m_testPassed) {
-        std::cout << "ALL TESTS PASSED - Serialization system is working correctly!" << std::endl;
+        std::cout << "ALL TESTS PASSED - Serialization system is working correctly!" << '\n';
     }
     else {
-        std::cout << "SOME TESTS FAILED - Serialization system has issues!" << std::endl;
+        std::cout << "SOME TESTS FAILED - Serialization system has issues!" << '\n';
     }
-    std::cout << "==========================" << std::endl;
+    std::cout << "==========================" << '\n';
 }
 
 void SerializationTestScene::OnUpdate() {}

@@ -255,22 +255,23 @@ void DebugUI::_showPerformanceWindow() {
     // Scope data
     const auto& scopes = Profiler::GetAllScopeData();
     for (const auto& [name, data] : scopes) {
-		if (name == "Time" || name == "Overlay") 
+		if (name == "Time")// || name == "Overlay") 
             continue; // Skip these special scopes
 
         ImGui::Text("%s:", name.c_str());
-        ImGui::BulletText("Last: %.3f ms", data.lastTimeMs);
-        ImGui::BulletText("Avg:  %.3f ms", data.avgTimeMs);
-        ImGui::BulletText("Max:  %.3f ms", data.maxTimeMs);
+        ImGui::BulletText("Last: %.3f ms", data.LastTimeMs);
+        ImGui::BulletText("Avg:  %.3f ms", data.AverageTimeMs);
+        ImGui::BulletText("Max:  %.3f ms", data.MaxTimeMs);
+		ImGui::BulletText("Usage: %.1f%%", data.LastTimeMs / Profiler::GetTotalScopeTimes() * 100.f);
 
-        if (!data.frameTimes.empty()) {
+        if (!data.FrameTimes.empty()) {
             ImGui::PlotLines(("##" + name).c_str(),
-                data.frameTimes.data(),
-                static_cast<int>(data.frameTimes.size()),
+                data.FrameTimes.data(),
+                static_cast<int>(data.FrameTimes.size()),
                 0,
                 nullptr,
                 0.0f,
-                data.maxTimeMs,
+                data.MaxTimeMs,
                 ImVec2(0, 50));
         }
     }

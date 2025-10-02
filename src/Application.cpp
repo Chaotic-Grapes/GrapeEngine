@@ -28,7 +28,7 @@ namespace Engine {
         
         while (!m_shouldStop) {
             const double frameStart = glfwGetTime();
-            Profiler::update_time();
+            Profiler::UpdateTime();
             // --- Input & Game Update ---
 			Input::_processInput();
             auto* newScene = m_sceneManager.GetActiveScene();

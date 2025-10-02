@@ -100,9 +100,7 @@ void Input::_processInput() {
 void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
     (void)pWin;
     (void)mod;
-#ifndef _DEBUG
 	(void)scancode;
-#endif
 
     if (action == GLFW_PRESS) {
         m_keyDown[key] = true;
@@ -114,21 +112,6 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
         m_keyUp[key] = true;
         Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key });
     }
-
-//#ifdef _DEBUG
-//    const char* keyName = glfwGetKeyName(key, scancode);
-//	if (!keyName) keyName = "Unknown";
-//    // Debug-only code
-//    std::string message;
-//    if (action == PRESS)
-//        message = "[Key] " + std::string(keyName) + " key pressed";
-//    else if (action == REPEAT)
-//        message = "[Key] " + std::string(keyName) + " key repeatedly pressed";
-//    else if (action == RELEASE)
-//        message = "[Key] " + std::string(keyName) + " key released";
-//
-//    std::cout << "\r" << std::setw(50) << std::left << message << std::flush;
-//#endif
 }
 
 // Called on mouse button press/release
@@ -137,22 +120,6 @@ void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int m
     (void)button;
     (void)action;
     (void)mod;
-//#ifdef _DEBUG
-//    const char* buttonName = "";
-//    switch (button) {
-//    case MOUSE_LEFT: buttonName = "Left mouse button"; break;
-//    case MOUSE_RIGHT: buttonName = "Right mouse button"; break;
-//    default: buttonName = "Mouse button"; break;
-//    }
-//    // Debug-only code
-//    std::string message;
-//    if (action == PRESS)
-//        message = "[Mouse] " + std::string(buttonName) + " pressed";
-//    else if (action == RELEASE)
-//        message = "[Mouse] " + std::string(buttonName) + " released";
-//
-//    std::cout << "\r" << std::setw(50) << std::left << message << std::flush;
-//#endif
 }
 
 // Called when mouse cursor moves
@@ -160,11 +127,6 @@ void Input::_mousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
     (void)pWin;
     (void)xPos;
     (void)yPos;
-//#ifdef _DEBUG
-//    std::ostringstream oss;
-//    oss << "Mouse cursor position: (" << std::fixed << std::setprecision(1) << xPos << ", " << yPos << ")";
-//    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
-//#endif
 }
 
 // Called when mouse wheel is scrolled
@@ -176,12 +138,6 @@ void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffse
     // Store the scroll offsets
     m_scrollX = xOffset;
     m_scrollY = yOffset;
-
-//#ifdef _DEBUG
-//    std::ostringstream oss;
-//    oss << "Mouse scroll wheel offset: (" << std::fixed << std::setprecision(1) << xOffset << ", " << yOffset << ")";
-//    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
-//#endif
 }
 
 // Prints OpenGL system info (GPU, version, limits, etc.)
