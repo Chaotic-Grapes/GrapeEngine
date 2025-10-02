@@ -66,16 +66,14 @@ void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
    
 }
 
-// ---------------------------------------------------------
-// Per-frame Update — enum controller + input to cycle tests
-// Press H to cycle tests (wraps around) like GraphicsTestScene
-// ---------------------------------------------------------
+
 void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     World& world = GetWorld();
 
 
     // Input trigger to cycle tests (H key)
     if (Input::IsKeyDown(KEY_C)) {
+        
         if (!test_handler) {
             int current = static_cast<int>(m_currentTest);
             current++;
@@ -101,7 +99,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
 
     // Dispatch to active test
     switch (m_currentTest) {
-    case TestType::test_PhysicsMovement:  Test_PhysicsMovement();  break;
+    case TestType::test_PhysicsMovement:    Test_PhysicsMovement();    break;
     case TestType::test_CollisionDetection: Test_CollisionDetection(); break;
     case TestType::test_PhysicsHero:        Test_PhysicsHero();        break;
     case TestType::test_DynvStatResponse:   Test_DynVStatResponse();   break;
@@ -110,43 +108,13 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
     }
 }
 
-// ---------------------------------------------------------
-// FixedUpdate — only run step code for the StepByStep test
-// ---------------------------------------------------------
+
 void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     World& world = GetWorld();
-    Engine::Physics2D::SetEnabled(true);
     const float dt = Time::FixedDeltaTime();
-    if (m_currentTest != TestType::test_StepbyStepUpdate){
-
-        if (m_currentTest == TestType::test_PhysicsMovement) {
-            UpdateBallCollisions();
-        }
-        if (m_currentTest == TestType::test_DynvStatResponse) {
-            if (!m_pausePhysics || m_stepRequested) {
-                UpdateBallCollisions();
-
-                if (m_stepRequested) {
-                    // step, and pause physics
-                    Engine::Physics2D::SetEnabled(false);
-                }
-                m_stepRequested = false;
-            }
-
-            // cubes
-            SpawnCubes_T(dt);
-            UpdateCubesCollisions(world);
-        }
-        if (m_currentTest == TestType::test_DynvDynResponse) {
-            UpdateBallCollisions();
-        }
-     
-
+    if (m_currentTest != TestType::test_StepbyStepUpdate) {
         return;
     }
-
-  
-
     if (!m_pausePhysics || m_stepRequested) {
         UpdateBallCollisions();
 
@@ -162,9 +130,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     UpdateCubesCollisions(world);
 }
 
-// ---------------------------------------------------------
-// OnUnload — unchanged
-// ---------------------------------------------------------
+
 void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
     World& world = GetWorld();
 
@@ -198,9 +164,8 @@ void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
 void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsMovement() {
     World& world = GetWorld();
     if (!m_stepInit) {
-        SpawnBalls(world, 10);
+        SpawnBalls(world, 4);
         m_stepInit = true;
-        UpdateBallCollisions();
             m_dampingEnabled = true;
             for (auto& ball : m_balls) {
                 if (auto* rb = ball.GetComponent<Component::Rigidbody2D>()) {
@@ -209,6 +174,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsMovement() {
             }
             std::cout << "Damping enabled after " << m_dampingDelay << " seconds!\n";
     }
+    UpdateBallCollisions();
 }
 
 void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
@@ -221,14 +187,12 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
     }
 
     Entity hero(m_playerId, &world);
-    auto& htr = hero.Transform();                         // Component::Transform&  :contentReference[oaicite:4]{index=4}
+    auto& htr = hero.Transform();                        
     const Vector2D oldPos = htr.Position;
     ClampAndBouncePlayer();
 
-    // --- Create two static polygon squares once ---
     if (m_staticsquares.empty()) {
-        // <<< Make squares bigger/smaller by changing this >>>
-        const float sideLen = 200.0f;           // e.g. 200.f for larger squares
+        const float sideLen = 200.0f;          
         const float half = sideLen * 0.5f;
 
         auto makeSquare = [&](const char* name, float cx, float cy) {
@@ -238,7 +202,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
             auto& tr = sq.Transform();
             tr.Position = { cx, cy };
 
-            // 4 points (counter-clockwise) around center -> Polygon square
+            // 4 points (counter-clockwise) around center 
             std::vector<Vector2D> pts;
             pts.emplace_back(cx - half, cy - half); // bottom-left
             pts.emplace_back(cx - half, cy + half); // top-left
@@ -250,7 +214,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
                 Component::ShapeRenderer2D::Polygon(pts, Color(0.95f, 0.20f, 0.20f, 1.0f), /*closed*/true);
             sq.AddComponent<Component::ShapeRenderer2D>(shapePoly);
 
-            // (Optional but nice) add a static body + box collider that matches the square size
+            // add a static body + box collider 
             auto& rb = sq.AddComponent<Component::Rigidbody2D>();
             rb.BodyType = Component::Rigidbody2D::Static;
             sq.AddComponent<Component::BoxCollider2D>(sideLen, sideLen);
@@ -266,6 +230,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
 
     auto* hcc = hero.GetComponent<Component::CircleCollider2D>();
     auto* hrb = hero.GetComponent<Component::Rigidbody2D>();
+
     if (!hcc) return;
 
     const float R = hcc->Radius;
@@ -359,8 +324,10 @@ void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsHero() {
 }
 
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVStatResponse() {
-
-
+    World& world = GetWorld();
+    float dt = Time::FixedDeltaTime();
+    SpawnCubes_T(dt);
+    UpdateCubesCollisions(world);
 }
 
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVDynResponse() {
@@ -369,6 +336,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_DynVDynResponse() {
         SpawnBalls(world, 10);
         m_stepInit = true;
     }
+    UpdateBallCollisions();
 }
 
 void Sandbox::PhysicsCollision2DTestScene::Test_StepByStepUpdate() {
@@ -524,9 +492,7 @@ void Sandbox::PhysicsCollision2DTestScene::CubeDisintegrate(World& world, size_t
 void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World & world) {
 
     Entity hero(m_playerId, &world);
- 
     auto& ht = hero.Transform();
- 
 
     const float heroR = m_triHalfHeight;
     const float floorY = 0.0f;
@@ -561,7 +527,7 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World & world) 
             half = 10.0f;
         }
 
-        if (ct.Position.Y - half <= floorY) {
+        if (ct.Position.Y - half <= m_worldHeight/3.0f) {
             CubeDisintegrate(world, i);
             continue;
         }
