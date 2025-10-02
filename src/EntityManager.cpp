@@ -7,7 +7,7 @@
 Entity EntityManager::CreateEntity(const std::string& name) {
     const EntityId id = ++m_nextId;
     m_entities.insert(id);
-    m_entityNames[id] = name;
+    m_names[id] = name;
 
 #if _DEBUG
     LOG_DEBUG("Entity created: "
@@ -25,7 +25,7 @@ bool EntityManager::IsAlive(const Entity& entity) const {
 void EntityManager::DestroyEntity(const Entity& entity) {
     RemoveAllComponents(entity.GetId());
     const auto& erased = m_entities.erase(entity.GetId());
-    m_entityNames.erase(entity.GetId());
+    m_names.erase(entity.GetId());
 
 #if _DEBUG
     if (erased == 0) {
@@ -46,7 +46,7 @@ void EntityManager::DestroyAllEntities() {
         RemoveAllComponents(id);
 
     m_entities.clear();
-    m_entityNames.clear();
+    m_names.clear();
     m_nextId = 0;
 }
 
