@@ -59,30 +59,33 @@ namespace {
     static void AddCueFromPath(Systems::Audio* audio, const std::string& path) {
         if (!audio || path.empty()) return;
 
-        // Create the cue from a file path (uses AudioLoader)
         auto cue = Resources::SoundCue::CreateFromFile(path);
         if (!cue) {
-            // optional: show a toast/popup here if you like
+            ImGui::OpenPopup("Audio Add Error");
+            if (ImGui::BeginPopupModal("Audio Add Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Text("Could not add:\n%s", path.c_str());
+                ImGui::Separator();
+                if (ImGui::Button("OK")) ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+            }
             return;
         }
 
-        // Default settings you want new rows to start with
         auto s = cue->getSettings();
         s.Volume = 1.0f;
         s.Loop = false;
         cue->setSettings(s);
 
-        // Let the audio system see the cue (so it can cache/preload if desired)
         audio->Add(cue);
 
-        // Push into your UI list (adapt to your row struct)
-        // Example if you use a vector<TrackRow> s_Library; with fields cue/inst/vol/loop:
         TrackRow row;
         row.cue = cue;
         row.vol = s.Volume;
         row.loop = s.Loop;
         s_Library.push_back(std::move(row));
     }
+
+
 
 }
 
@@ -99,6 +102,8 @@ void DebugUI::Initialize(GLFWwindow* window) {
     ImGui::StyleColorsDark(); // Set dark theme colors
     ImGui_ImplGlfw_InitForOpenGL(window, true); // GLFW backend (window/input handling)
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
+
+   
 
     // Initialize with some default game objects for testing
     AddGameObject("Player");
@@ -184,7 +189,7 @@ static bool ShowAudioBrowserPopup(std::string& outSelected) {
         ImGui::Separator();
 
         static int selectedLoc = 0; // 0=BGMs, 1=SFX, 2=scene Music
-        const char* locations[] = { "BGMs", "SFX", "scene Music" };
+        const char* locations[] = { "BGMs", "SFX", "Scene Music" };
 
         ImGui::BeginChild("Locations", ImVec2(140, 260), true);
         for (int i = 0; i < 3; ++i) {
@@ -224,6 +229,7 @@ static bool ShowAudioBrowserPopup(std::string& outSelected) {
                 outSelected = files[selIndex];
                 confirmed = true;
                 ImGui::CloseCurrentPopup();
+
             }
         }
         ImGui::SameLine();
@@ -255,8 +261,6 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
     ImGui::SetNextWindowSize(ImVec2(520, 420), ImGuiCond_Once);
     if (ImGui::Begin("Audio Library", &showLibrary)) {
         // Editor -> local library rows
-        struct Row { Resources::SoundCue::Ptr cue; SoundInstance::StrongPtr inst; float vol{ 1.f }; bool loop{ false }; };
-        static std::vector<Row> rows;
 
         // Add-by-path (no file dialog dependency)
         static char pathBuf[512] = {};
@@ -271,7 +275,13 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
                     s.Volume = 1.0f; s.Loop = false;
                     cue->setSettings(s);
                     audio.Add(cue);
-                    rows.push_back(Row{ cue, nullptr, s.Volume, s.Loop });
+
+                    TrackRow row;
+                    row.cue = cue;
+                    row.inst = nullptr;
+                    row.vol = s.Volume;
+                    row.loop = s.Loop;
+                    s_Library.push_back(std::move(row));
                 }
                 else {
                     ImGui::OpenPopup("Audio Add Error");
@@ -287,7 +297,7 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Clear List")) rows.clear();
+        if (ImGui::Button("Clear List")) s_Library.clear();
 
         // browse assets
         ImGui::SameLine();
@@ -334,8 +344,8 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
         ImGui::Separator();
 
         // Draw the rows
-        for (int i = 0; i < (int)rows.size(); ++i) {
-            auto& r = rows[i];
+        for (int i = 0; i < (int)s_Library.size(); ++i) {
+            auto& r = s_Library[i];
             if (!r.cue) continue;
             if (!filt.empty() && r.cue->getName().find(filt) == std::string::npos) continue;
 
