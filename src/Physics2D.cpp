@@ -36,13 +36,13 @@ namespace Engine {
             // Collision: Circle vs boundary lines
             const auto colliderEntities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform, Component::Collider2D>();
 
-            //for (auto& [crb, ctransform, collider] : colliderEntities) {
-            //    if (const auto* circle = dynamic_cast<Component::CircleCollider2D*>(&collider)) {
-            //        auto lines = m_world->GetEntityManager().Query<Component::LineRenderer>();
-            //        for (auto& [lineEntity] : lines) {
-            //            Collision::LineSegment seg = Collision::MakeSegment(lineEntity.Start, lineEntity.End);
-            //            Vector2D contact, normal;
-            //            float tHit;
+            for (auto& [crb, ctransform, collider] : colliderEntities) {
+                if (const auto* circle = dynamic_cast<Component::CircleCollider2D*>(&collider)) {
+                    auto lines = m_world->GetEntityManager().Query<Component::LineRenderer>();
+                    for (auto& [lineEntity] : lines) {
+                        Collision::LineSegment seg = Collision::MakeSegment(lineEntity.Start, lineEntity.End);
+                        Vector2D contact, normal;
+                        float tHit;
 
             //            Collision::Circle c{ ctransform.Position, circle->Radius };
             //            if (Collision::CircleVsSegmentSweep(c, intendedPos, seg, contact, normal, tHit)) {
