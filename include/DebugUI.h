@@ -39,6 +39,7 @@ public:
     static void RemoveGameObject(int id);
 
 private:
+  
     // Game object storage
     static std::vector<GameObject> m_gameObjects;
     static int m_nextGameObjectId;

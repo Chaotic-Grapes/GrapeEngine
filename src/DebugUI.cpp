@@ -8,6 +8,7 @@
 #include <iostream>
 #include "System.h"
 #include <algorithm>
+#include <filesystem>
 
 // Initialize static variables
 bool DebugUI::m_enabled = true;
@@ -16,6 +17,73 @@ int DebugUI::m_nextGameObjectId = 1;  // Start with 1
 
 namespace {
     Systems::Audio* gAudioPtr = nullptr;
+
+    namespace fs = std::filesystem;
+
+    struct TrackRow {
+        Resources::SoundCue::Ptr  cue;
+        SoundInstance::StrongPtr  inst;
+        float vol = 1.0f;
+        bool  loop = false;
+    };
+
+    // Editor-local list of tracks shown in the Audio Library window
+    static std::vector<TrackRow> s_Library;
+
+    // Change this if your asset path moves (must be double-escaped on Windows)
+    static const char* kAudioBaseDir = "C:\\Users\\dalto\\Documents\\GitHub\\GrapeEngine\\assets\\Audio";
+
+    // Acceptable audio extensions (lowercase, leading dot)
+    static const char* kAudioExts[] = { ".wav", ".ogg", ".mp3", ".flac", ".m4a", ".aac" };
+
+    static bool IsAudioFile(const fs::directory_entry& de) {
+        if (!de.is_regular_file()) return false;
+        std::string ext = de.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return char(::tolower(c)); });
+        for (auto* e : kAudioExts) if (ext == e) return true;
+        return false;
+    }
+
+    // Returns full paths of audio files in `folder` (does not recurse)
+    static std::vector<std::string> ListAudioFiles(const fs::path& folder) {
+        std::vector<std::string> out;
+        std::error_code ec;
+        if (!fs::exists(folder, ec) || !fs::is_directory(folder, ec)) return out;
+        for (const auto& de : fs::directory_iterator(folder, ec)) {
+            if (IsAudioFile(de)) out.push_back(de.path().string());
+        }
+        std::sort(out.begin(), out.end());
+        return out;
+    }
+
+    static void AddCueFromPath(Systems::Audio* audio, const std::string& path) {
+        if (!audio || path.empty()) return;
+
+        // Create the cue from a file path (uses AudioLoader)
+        auto cue = Resources::SoundCue::CreateFromFile(path);
+        if (!cue) {
+            // optional: show a toast/popup here if you like
+            return;
+        }
+
+        // Default settings you want new rows to start with
+        auto s = cue->getSettings();
+        s.Volume = 1.0f;
+        s.Loop = false;
+        cue->setSettings(s);
+
+        // Let the audio system see the cue (so it can cache/preload if desired)
+        audio->Add(cue);
+
+        // Push into your UI list (adapt to your row struct)
+        // Example if you use a vector<TrackRow> s_Library; with fields cue/inst/vol/loop:
+        TrackRow row;
+        row.cue = cue;
+        row.vol = s.Volume;
+        row.loop = s.Loop;
+        s_Library.push_back(std::move(row));
+    }
+
 }
 
 void DebugUI::AttachAudio(Systems::Audio* audio) { gAudioPtr = audio; }
@@ -107,6 +175,67 @@ void DebugUI::_showPerformanceWindow() {
     ImGui::End();
 }
 
+static bool ShowAudioBrowserPopup(std::string& outSelected) {
+    bool confirmed = false;
+
+    if (ImGui::BeginPopupModal("Select Audio", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        // Left-side “locations”
+        ImGui::TextUnformatted(kAudioBaseDir);
+        ImGui::Separator();
+
+        static int selectedLoc = 0; // 0=BGMs, 1=SFX, 2=scene Music
+        const char* locations[] = { "BGMs", "SFX", "scene Music" };
+
+        ImGui::BeginChild("Locations", ImVec2(140, 260), true);
+        for (int i = 0; i < 3; ++i) {
+            if (ImGui::Selectable(locations[i], selectedLoc == i)) selectedLoc = i;
+        }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+
+        // Right-side files list for the chosen location
+        fs::path folder = fs::path(kAudioBaseDir) / locations[selectedLoc];
+        auto files = ListAudioFiles(folder);
+
+        ImGui::BeginChild("Files", ImVec2(420, 260), true);
+        static int selIndex = -1;
+        for (int i = 0; i < (int)files.size(); ++i) {
+            const std::string& full = files[i];
+            std::string filename = fs::path(full).filename().string();
+            bool selected = (selIndex == i);
+            if (ImGui::Selectable(filename.c_str(), selected)) {
+                selIndex = i;
+            }
+            // Double-click to confirm immediately
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+                outSelected = full;
+                selIndex = i;
+                confirmed = true;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndChild();
+
+        ImGui::Separator();
+
+        if (ImGui::Button("Add Selected")) {
+            if (selIndex >= 0 && selIndex < (int)files.size()) {
+                outSelected = files[selIndex];
+                confirmed = true;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+    return confirmed;
+}
+
 void DebugUI::_showAudioWindow(Systems::Audio& audio) {
 
     ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
@@ -159,6 +288,28 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
 
         ImGui::SameLine();
         if (ImGui::Button("Clear List")) rows.clear();
+
+        // browse assets
+        ImGui::SameLine();
+        static bool openBrowser = false;
+        if (ImGui::Button("Browse Assets...")) {
+            openBrowser = true;
+            ImGui::OpenPopup("Select Audio");
+        }
+
+        static std::string chosenPath;
+        if (openBrowser) {
+            // Draw the popup; if user confirms a selection, add it
+            if (ShowAudioBrowserPopup(chosenPath)) {
+                AddCueFromPath(gAudioPtr, chosenPath);
+                openBrowser = false;
+                chosenPath.clear();
+            }
+            // If popup is closed without selection, reset the flag
+            if (!ImGui::IsPopupOpen("Select Audio")) {
+                openBrowser = false;
+            }
+        }
 
         ImGui::Separator();
 
