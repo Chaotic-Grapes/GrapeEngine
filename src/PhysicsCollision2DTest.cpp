@@ -10,6 +10,7 @@
 #include "systems/Window.h"
 #include "systems/WindowManager.h"
 #include "input.h"
+#include "DynamicCollision.h"
 
 using Component::Rigidbody2D;
 using Component::ShapeRenderer2D;
@@ -18,6 +19,32 @@ using Component::LineRenderer;
 
 
 constexpr float TWO_PI = 6.28318530718f;
+
+namespace {
+    using TestType = Sandbox::PhysicsCollision2DTestScene::TestType;
+
+    // Define the exact order you want to cycle through
+    constexpr TestType kCycleOrder[] = {
+        TestType::test_PhysicsMovement,
+        TestType::test_CollisionDetection,
+        TestType::test_PhysicsHero,
+        TestType::test_DynvStatResponse,
+        TestType::test_DynvDynResponse,
+        TestType::test_StepbyStepUpdate, // last
+    };
+
+    inline TestType NextTest(TestType cur) {
+        const size_t N = sizeof(kCycleOrder) / sizeof(kCycleOrder[0]);
+        for (size_t i = 0; i < N; ++i) {
+            if (kCycleOrder[i] == cur) {
+                return kCycleOrder[(i + 1) % N];  // wrap around
+            }
+        }
+        // Fallback if cur isn't in the list
+        return kCycleOrder[0];
+    }
+}
+
 
 Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int width, const int height, const float dampingDelay) : Scene("PhysicsCollision2DTestScene") {
     CREATE_WINDOW("Physics & Collision Test", width, height);
@@ -37,28 +64,7 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
-    World& world = GetWorld();
-
-    //switch (m_currentTest) {
-    //case TestType::test_CharacterMovement:
-    //    Test_CharacterMovement();
-    //    break;
-    //case TestType::test_CollisionDetection:
-    //    Test_CollisionDetection();
-    //    break;
-    //case TestType::test_DynvDynResponse:
-    //    Test_DynVDynResponse();
-    //    break;
-    //   
-    //case TestType::test_StepbyStepUpdate:
-    //    // Original OnLoad content
-    //    Test_StepByStepUpdate(world);
-    //    break;
-
-    //default:
-    //    // Stubs for other tests; initialize what you need here later
-    //    break;
-    //}
+   
 }
 
 // ---------------------------------------------------------
@@ -75,7 +81,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
             int current = static_cast<int>(m_currentTest);
             current++;
             if (current > static_cast<int>(TestType::test_StepbyStepUpdate)) {
-                current = static_cast<int>(TestType::test_CharacterMovement);
+                current = static_cast<int>(TestType::test_PhysicsMovement);
             }
             m_currentTest = static_cast<TestType>(current);
             std::cout << "Switched to physics test " << current << std::endl;
@@ -96,12 +102,12 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
 
     // Dispatch to active test
     switch (m_currentTest) {
-    case TestType::test_CharacterMovement:  Test_CharacterMovement();  break;
+    case TestType::test_PhysicsMovement:  Test_PhysicsMovement();  break;
     case TestType::test_CollisionDetection: Test_CollisionDetection(); break;
     case TestType::test_PhysicsHero:        Test_PhysicsHero();        break;
     case TestType::test_DynvStatResponse:   Test_DynVStatResponse();   break;
     case TestType::test_DynvDynResponse:    Test_DynVDynResponse();    break;
-    case TestType::test_StepbyStepUpdate:   Test_StepByStepUpdate(world);   break;
+    case TestType::test_StepbyStepUpdate:   Test_StepByStepUpdate();   break;
     }
 }
 
@@ -109,13 +115,38 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
 // FixedUpdate — only run step code for the StepByStep test
 // ---------------------------------------------------------
 void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
-    if (m_currentTest != TestType::test_StepbyStepUpdate) {
-        // Other tests can put their physics step here later
+    World& world = GetWorld();
+    Engine::Physics2D::SetEnabled(true);
+    const float dt = Time::FixedDeltaTime();
+    if (m_currentTest != TestType::test_StepbyStepUpdate){
+
+        if (m_currentTest == TestType::test_PhysicsMovement) {
+            UpdateBallCollisions();
+        }
+        if (m_currentTest == TestType::test_DynvStatResponse) {
+            if (!m_pausePhysics || m_stepRequested) {
+                UpdateBallCollisions();
+
+                if (m_stepRequested) {
+                    // step, and pause physics
+                    Engine::Physics2D::SetEnabled(false);
+                }
+                m_stepRequested = false;
+            }
+
+            // cubes
+            SpawnCubes_T(dt);
+            UpdateCubesCollisions(world);
+        }
+        if (m_currentTest == TestType::test_DynvDynResponse) {
+            UpdateBallCollisions();
+        }
+     
+
         return;
     }
 
-    World& world = GetWorld();
-    const float dt = Time::FixedDeltaTime();
+  
 
     if (!m_pausePhysics || m_stepRequested) {
         UpdateBallCollisions();
@@ -136,28 +167,191 @@ void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
 // OnUnload — unchanged
 // ---------------------------------------------------------
 void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
-
     World& world = GetWorld();
 
-    for (auto& e : m_balls) {
-        world.GetEntityManager().DestroyEntity(e);
-    }
-    for (auto& e : m_seacubes) {
-        world.GetEntityManager().DestroyEntity(e);
-    }
-    if (m_playerId != UINT32_MAX) {
+    for (auto& e : m_balls)   world.GetEntityManager().DestroyEntity(e);
+    for (auto& e : m_seacubes)world.GetEntityManager().DestroyEntity(e);
+    if (m_playerId != UINT32_MAX)
         world.GetEntityManager().DestroyEntity(Entity(m_playerId, &world));
-    }
 
+    // Destroy blocker squares too
+    for (EntityId id : m_staticsquares) {
+        world.GetEntityManager().DestroyEntity(Entity(id, &world));
+
+    }
     m_balls.clear();
     m_seacubes.clear();
+    m_staticsquares.clear();
     m_playerId = UINT32_MAX;
+ 
+
+   // reset state
+    m_stepInit = false;    
+    m_dampingEnabled = false;  
+    m_spawnAcc = 0.0f;      
+
+    m_stepByStepMode = false;
+    m_pausePhysics = false;
+    m_stepRequested = false;
+    Engine::Physics2D::SetEnabled(true);
 }
 
 // running test codes
-void Sandbox::PhysicsCollision2DTestScene::Test_CharacterMovement() {
+void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsMovement() {
+    World& world = GetWorld();
+    if (!m_stepInit) {
+        SpawnBalls(world, 10);
+        m_stepInit = true;
+        UpdateBallCollisions();
+            m_dampingEnabled = true;
+            for (auto& ball : m_balls) {
+                if (auto* rb = ball.GetComponent<Component::Rigidbody2D>()) {
+                    rb->LinearDamping = 0.5f;
+                }
+            }
+            std::cout << "Damping enabled after " << m_dampingDelay << " seconds!\n";
+    }
+}
+
+void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
+    World& world = GetWorld();
+
+    // Create hero if missing
+    if (m_playerId == UINT32_MAX) {
+        CreateTriangle();
+        std::cout << "[CollisionDetection] Hero triangle created\n";
+    }
+
+    Entity hero(m_playerId, &world);
+    auto& htr = hero.Transform();                         // Component::Transform&  :contentReference[oaicite:4]{index=4}
+    const Vector2D oldPos = htr.Position;
+
+    ClampAndBouncePlayer();
 
 
+    // --- Create two static polygon squares once ---
+    if (m_staticsquares.empty()) {
+        // <<< Make squares bigger/smaller by changing this >>>
+        const float sideLen = 200.0f;           // e.g. 200.f for larger squares
+        const float half = sideLen * 0.5f;
+
+        auto makeSquare = [&](const char* name, float cx, float cy) {
+            Entity sq = CreateEntity(name);
+
+            // Position
+            auto& tr = sq.Transform();
+            tr.Position = { cx, cy };
+
+            // 4 points (counter-clockwise) around center -> Polygon square
+            std::vector<Vector2D> pts;
+            pts.emplace_back(cx - half, cy - half); // bottom-left
+            pts.emplace_back(cx - half, cy + half); // top-left
+            pts.emplace_back(cx + half, cy + half); // top-right
+            pts.emplace_back(cx + half, cy - half); // bottom-right
+
+            // Render: Polygon (filled) in red
+            Component::ShapeRenderer2D shapePoly =
+                Component::ShapeRenderer2D::Polygon(pts, Color(0.95f, 0.20f, 0.20f, 1.0f), /*closed*/true);
+            sq.AddComponent<Component::ShapeRenderer2D>(shapePoly);
+
+            // (Optional but nice) add a static body + box collider that matches the square size
+            auto& rb = sq.AddComponent<Component::Rigidbody2D>();
+            rb.BodyType = Component::Rigidbody2D::Static;
+            sq.AddComponent<Component::BoxCollider2D>(sideLen, sideLen);
+
+            m_staticsquares.push_back(sq.GetId());
+            };
+
+        // Put them mid-screen so they’re clearly visible
+        makeSquare("StaticSquareL", m_worldWidth * 0.40f, m_worldHeight * 0.50f);
+        makeSquare("StaticSquareR", m_worldWidth * 0.70f, m_worldHeight * 0.50f);
+
+    }
+
+    auto* hcc = hero.GetComponent<Component::CircleCollider2D>();
+    auto* hrb = hero.GetComponent<Component::Rigidbody2D>();
+    if (!hcc) return;
+
+    const float R = hcc->Radius;
+
+    // Minimal push-out against one AABB. Returns true if we adjusted the hero.
+    auto resolveCircleAABB = [&](const Vector2D& C,
+        const Vector2D& bmin,
+        const Vector2D& bmax) -> bool
+        {
+            // Closest point on AABB to circle center
+            const Vector2D closest(
+                std::max(bmin.X, std::min(C.X, bmax.X)),
+                std::max(bmin.Y, std::min(C.Y, bmax.Y))
+            );
+
+            Vector2D diff = C - closest;
+            float d2 = diff.Dot(diff);
+
+            if (d2 >= R * R)
+                return false; // no overlap
+
+            // Outside case: push out along edge normal
+            if (d2 > 1e-6f) {
+                float d = std::sqrt(d2);
+                Vector2D n = diff / d;            // outward normal from box toward circle center
+                float penetration = R - d;
+
+                htr.Position += n * penetration;  // move just enough to clear
+
+                if (hrb) {                        // kill only inward velocity (slide preserved)
+                    float vn = hrb->LinearVelocity.Dot(n);
+                    if (vn < 0.0f) hrb->LinearVelocity -= n * vn;
+                }
+                std::cout<<"collision detected sir"<<std::endl;
+                return true;
+            }
+
+            // Inside case (center inside box): push along smallest axis to exit
+            float left = C.X - bmin.X;
+            float right = bmax.X - C.X;
+            float down = C.Y - bmin.Y;
+            float up = bmax.Y - C.Y;
+
+            Vector2D n(0, 0);
+            float push = 0.0f;
+            if (std::min(left, right) < std::min(down, up)) {
+                if (left < right) { n = { 1, 0 }; push = left; }  // push right
+                else { n = { -1, 0 }; push = right; }  // push left
+            }
+            else {
+                if (down < up) { n = { 0, 1 }; push = down; }  // push up
+                else { n = { 0,-1 }; push = up; }  // push down
+            }
+
+            htr.Position += n * (push + 0.001f);   // tiny epsilon prevents re-penetration
+            if (hrb) {
+                float vn = hrb->LinearVelocity.Dot(n);
+                if (vn < 0.0f) hrb->LinearVelocity -= n * vn;
+            }
+            return true;
+        };
+
+    // Use the SAME sideLen here as in creation above
+    const float sideLen = 200.0f;  // <<< keep in sync with creation
+    const float half = sideLen * 0.5f;
+
+    // Resolve against both squares (can resolve multiple in one frame)
+    for (EntityId eid : m_staticsquares) {
+        Entity sq = world.GetEntityManager().GetEntity(eid);
+        const auto& btr = sq.Transform();
+
+        const Vector2D bmin(btr.Position.X - half, btr.Position.Y - half);
+        const Vector2D bmax(btr.Position.X + half, btr.Position.Y + half);
+
+        (void)resolveCircleAABB(htr.Position, bmin, bmax);
+    }
+
+    // (Optional) If your triangle render uses cached points, you can refresh them
+    // here after the position correction so visuals match the new position.
+}
+
+void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsHero() {
     // Ensure hero exists
     if (m_playerId == UINT32_MAX) {
         CreateTriangle();
@@ -168,24 +362,25 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CharacterMovement() {
     ClampAndBouncePlayer();
 }
 
-void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
-    // Placeholder
-}
-
-void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsHero() {
-    // Placeholder
-}
-
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVStatResponse() {
-    // Placeholder
+    World& world = GetWorld();
+    if (!m_stepInit) {
+        SpawnCubes();
+        m_stepInit = true;
+    }
+
 }
 
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVDynResponse() {
-    // Placeholder
+    World& world = GetWorld();
+    if (!m_stepInit) {
+        SpawnBalls(world, 10);
+        m_stepInit = true;
+    }
 }
 
-// === Your current behavior lives here each frame ===
-void Sandbox::PhysicsCollision2DTestScene::Test_StepByStepUpdate(World& world) {
+void Sandbox::PhysicsCollision2DTestScene::Test_StepByStepUpdate() {
+    World& world = GetWorld();
     if (!m_stepInit) {
         SpawnBalls(world, 10);
         std::cout << "PhysicsCollision2DTestScene initialized with " << m_balls.size() << " balls\n";
@@ -197,10 +392,9 @@ void Sandbox::PhysicsCollision2DTestScene::Test_StepByStepUpdate(World& world) {
         if (m_playerId == UINT32_MAX) {
             CreateTriangle();
         }
-        m_stepInit = true;  // <- prevents re-spawning every frame
+        m_stepInit = true; 
     }
 
-    // ---- per-frame logic (no entity creation here) ----
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
     HandleStepByStepControls();
 
@@ -287,13 +481,24 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
     tr.Position.X = x;
     tr.Position.Y = y;
 
+    // Rigidbody (dynamic so gravity applies)
     auto& rb = cube.AddComponent<Rigidbody2D>();
+    rb.BodyType = Component::Rigidbody2D::Dynamic;
     rb.Mass = 0.8f;
     rb.GravityScale = 1.0f;
     rb.LinearDamping = 0.25f;
     rb.LinearVelocity.X = MathHelper::Randomize<float>(-20.0f, 20.0f, 0);
-    rb.LinearVelocity.Y = 0.0f;
+    rb.LinearVelocity.Y = -5.0f;
 
+    // --- COLLIDER (pick ONE) ---
+
+    // A) Box collider that matches the rendered square (recommended)
+    cube.AddComponent<Component::BoxCollider2D>(size, size);
+
+    // B) Or: circle collider roughly matching the square’s size
+    // cube.AddComponent<Component::CircleCollider2D>(half);
+
+    // Render shape (square polygon)
     std::vector<Vector2D> pts;
     pts.emplace_back(x - half, y - half);
     pts.emplace_back(x - half, y + half);
@@ -301,7 +506,6 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
     pts.emplace_back(x + half, y - half);
 
     auto& shape = cube.AddComponent<ShapeRenderer2D>();
-    cube.AddComponent<Component::CircleCollider2D>(half);
     shape.Type = ShapeRenderer2D::ShapeType::Polygon;
     shape.Points = pts;
     shape.Closed = true;
@@ -404,7 +608,7 @@ void Sandbox::PhysicsCollision2DTestScene::CreateTriangle() {
 
     e.AddComponent<Component::CircleCollider2D>(m_triHalfHeight);
 
-    rb.LinearVelocity.X = 250.0f;
+    rb.LinearVelocity.X = 50.0f;
     rb.LinearVelocity.Y = 0.0f;
 
     std::vector<Vector2D> pts;
@@ -456,20 +660,20 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
 
     if (tr.Position.X - r <= 0.0f) {
         tr.Position.X = r;
-        if (rb->LinearVelocity.X < 0.0f) rb->LinearVelocity.X = -rb->LinearVelocity.X;
+        if (rb->LinearVelocity.X < 0.0f) rb->LinearVelocity.X =0.0f;
     }
     else if (tr.Position.X + r >= m_worldWidth) {
         tr.Position.X = m_worldWidth - r;
-        if (rb->LinearVelocity.X > 0.0f) rb->LinearVelocity.X = -rb->LinearVelocity.X;
+        if (rb->LinearVelocity.X > 0.0f) rb->LinearVelocity.X = 0.0f;
     }
 
     if (tr.Position.Y - r <= 0.0f) {
         tr.Position.Y = r;
-        if (rb->LinearVelocity.Y < 0.0f) rb->LinearVelocity.Y = -rb->LinearVelocity.Y;
+        if (rb->LinearVelocity.Y < 0.0f) rb->LinearVelocity.Y = 0.0f;
     }
     else if (tr.Position.Y + r >= m_worldHeight) {
         tr.Position.Y = m_worldHeight - r;
-        if (rb->LinearVelocity.Y > 0.0f) rb->LinearVelocity.Y = -rb->LinearVelocity.Y;
+        if (rb->LinearVelocity.Y > 0.0f) rb->LinearVelocity.Y = 0.0f;
     }
 
     std::vector<Vector2D> pts;

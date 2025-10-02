@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include "ecs/World.h"
 #include "ecs/Entity.h"
-#include "DyamicCollision.h"
+#include "DynamicCollision.h"
 
 namespace Sandbox {
     class PhysicsCollision2DTestScene : public Scene {
@@ -19,7 +19,7 @@ namespace Sandbox {
         void OnUnload() override;
 
         enum class TestType {
-            test_CharacterMovement = 1301,
+            test_PhysicsMovement = 1301,
             test_CollisionDetection,
             test_PhysicsHero,
             test_DynvStatResponse,
@@ -31,14 +31,14 @@ namespace Sandbox {
     private:
         bool test_handler = false;
         bool m_stepInit = false;
-        TestType m_currentTest{ TestType::test_CharacterMovement };
+        TestType m_currentTest{ TestType::test_PhysicsMovement };
         // test types 
-         void Test_CharacterMovement();
+         void Test_PhysicsMovement();
          void Test_CollisionDetection();
          void Test_PhysicsHero();
          void Test_DynVStatResponse();
          void Test_DynVDynResponse();
-         void Test_StepByStepUpdate(World &world);
+         void Test_StepByStepUpdate();
         
 
         void SpawnBalls(World& world, int count, unsigned seed = 0);
@@ -64,6 +64,7 @@ namespace Sandbox {
         std::vector<Entity> m_balls;
         //std::vector<Entity> m_boundaryLines;
         std::vector<Entity> m_seacubes;
+        std::vector<uint32_t>m_staticsquares;
 
         //triangle hero
         void CreateTriangle();
@@ -71,7 +72,7 @@ namespace Sandbox {
 
         EntityId m_playerId = UINT32_MAX;
         float m_triHalfHeight = 48.0f;
-        float m_triHalfBase = 32.0f;
+        float m_triHalfBase = 48.0f;
 
         //sea cubes
         void SpawnCubes();

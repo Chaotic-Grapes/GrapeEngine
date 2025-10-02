@@ -7,6 +7,70 @@ static inline float Dot(const Vector2D& a, const Vector2D& b) { return a.X * b.X
 static inline float Len2(const Vector2D& v) { return Dot(v, v); }
 static inline float Clamp01(float t) { return (t < 0.f) ? 0.f : ((t > 1.f) ? 1.f : t); }
 
+static inline Vector2D perp(const Vector2D& e) { return Vector2D(-e.Y, e.X); } // 90° CCW
+
+static inline void projectPolygonOnAxis(const Vector2D* verts, int count,
+    const Vector2D& axis, float& outMin, float& outMax)
+{
+    
+    float p = verts[0].Dot(axis);
+    outMin = outMax = p;
+    for (int i = 1; i < count; ++i) {
+        p = verts[i].Dot(axis);
+        outMin = std::min(outMin, p);
+        outMax = std::max(outMax, p);
+    }
+}
+
+static inline void boxCorners(const DynCol::AABB& b, Vector2D out[4]) {
+    out[0] = { b.min.X, b.min.Y }; // BL
+    out[1] = { b.min.X, b.max.Y }; // TL
+    out[2] = { b.max.X, b.max.Y }; // TR
+    out[3] = { b.max.X, b.min.Y }; // BR
+}
+
+
+bool DynCol::Overlap(const Triangle& tri, const AABB& box) {
+    // Build lists of axes (triangle edge normals + box axes)
+    // SAT: if any axis separates the projections, shapes do NOT overlap.
+    Vector2D triVerts[3] = { tri.v0, tri.v1, tri.v2 };
+    Vector2D triEdges[3] = {
+        tri.v1 - tri.v0,
+        tri.v2 - tri.v1,
+        tri.v0 - tri.v2
+    };
+
+    Vector2D axes[5];
+    // Triangle edge normals (perp vectors)
+    axes[0] = perp(triEdges[0]);
+    axes[1] = perp(triEdges[1]);
+    axes[2] = perp(triEdges[2]);
+    // AABB axes (x and y) — sufficient for a box
+    axes[3] = Vector2D(1.0f, 0.0f);
+    axes[4] = Vector2D(0.0f, 1.0f);
+
+    // Box corners
+    Vector2D boxVerts[4];
+    boxCorners(box, boxVerts);
+
+    // Test all axes
+    for (int i = 0; i < 5; ++i) {
+        const Vector2D& axis = axes[i];
+
+        float tmin, tmax;
+        projectPolygonOnAxis(triVerts, 3, axis, tmin, tmax);
+
+        float bmin, bmax;
+        projectPolygonOnAxis(boxVerts, 4, axis, bmin, bmax);
+
+        // If projections are disjoint on any axis, no overlap
+        if (tmax < bmin || bmax < tmin) {
+            return false;
+        }
+    }
+    // No separating axis found -> overlap
+    return true;
+}
 
 // discrete means at the moment current frame
 // discrete AABB vs AABB 
