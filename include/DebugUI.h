@@ -32,16 +32,6 @@ struct DebugUIConfig {
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;
 };
 
-// Just for UI display (real data is in ECS components)
-struct GameObject {
-    EntityId Id;
-    std::string Name;
-    bool IsActive = true;
-    float X = 0.0f, Y = 0.0f;
-
-    GameObject(EntityId id, const std::string& name) : Id(id), Name(name) {}
-};
-
 class DebugUI {
 public:
     // 2 args: ref to World obj and ref to config struct
@@ -63,18 +53,15 @@ public:
     bool HasValidWorld() const;
 
     // Game object management (find, add, remove)
-    const std::vector<GameObject>& GetGameObjects() const { return m_gameObjects; }
-    GameObject* FindGameObject(EntityId id);
     void AddGameObject(const std::string& name);
     void RemoveGameObject(EntityId id);
+    void CloneGameObject(const Entity& entity);
     void ClearAllGameObjects();
-    void SyncWithWorld();
 
 private:
     // Configuration and state
     DebugUIConfig m_config;
     World* m_world;  // World reference for entity creation/management
-    std::vector<GameObject> m_gameObjects;
     bool m_enabled = false;
     bool m_initialized = false;
 
@@ -89,8 +76,9 @@ private:
     // Cached button labels to avoid string creation every frame
     // Avoid doing stuff like Delete##something
     // Mutable because the methods that access these caches are marked const
-    mutable std::unordered_map<EntityId, std::string> m_cachedToggleLabels;
     mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;
+    mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;
+    mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;
 
     // UI rendering methods
     void _showEngineDebugWindow();  // Main debug console window with engine status
@@ -100,9 +88,10 @@ private:
 
     // Helper to create entities with basic components
     Entity _createGameEntity(const std::string& name);
-    void _invalidateButtonCache();
-    const std::string& _getToggleLabel(const GameObject& obj) const;
-    const std::string& _getDeleteLabel(const GameObject& obj) const;
+    void _invalidateCache();
+    const std::string& _getDeleteLabel(EntityId id) const;
+    const std::string& _getCloneLabel(EntityId id) const;
+    const bool& _getCollapsedHeaderBool(EntityId id) const;
 };
 
 #endif

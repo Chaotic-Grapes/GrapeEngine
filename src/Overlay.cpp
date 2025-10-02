@@ -27,7 +27,6 @@ void Overlay::OnUpdate() {
         Window* mainWindow = WindowManager::GetMainWindow();
         if (mainWindow) {
             m_debugUI->Initialize(mainWindow->Handle());
-            m_debugUI->SyncWithWorld();
             m_initialized = true;
         }
         else return;
