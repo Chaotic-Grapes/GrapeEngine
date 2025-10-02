@@ -58,7 +58,7 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     m_stepRequested = false;
     m_pausePhysics = false;
 
-    // Disable gravity for this test (balls should fly around freely)
+   // set gravity
     Engine::Physics2D::SetGravity(Vector2D(0.0f, -15.0f));
 }
 
@@ -166,12 +166,6 @@ void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsMovement() {
     if (!m_stepInit) {
         SpawnBalls(world, 4);
         m_stepInit = true;
-            m_dampingEnabled = true;
-            for (auto& ball : m_balls) {
-                if (auto* rb = ball.GetComponent<Component::Rigidbody2D>()) {
-                    rb->LinearDamping = 0.5f;
-                }
-            }
             std::cout << "Damping enabled after " << m_dampingDelay << " seconds!\n";
     }
     UpdateBallCollisions();
@@ -180,16 +174,16 @@ void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsMovement() {
 void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
     World& world = GetWorld();
 
-    // Create hero if missing
     if (m_playerId == UINT32_MAX) {
-        CreateTriangle();
-        std::cout << "[CollisionDetection] Hero triangle created\n";
+        CreateHeroCircle();
     }
 
     Entity hero(m_playerId, &world);
-    auto& htr = hero.Transform();                        
+    auto& htr = hero.Transform();
     const Vector2D oldPos = htr.Position;
-    ClampAndBouncePlayer();
+
+    // Circle-specific movement/clamp
+    ClampAndBounceCircleHero();
 
     if (m_staticsquares.empty()) {
         const float sideLen = 200.0f;          
@@ -333,10 +327,11 @@ void Sandbox::PhysicsCollision2DTestScene::Test_DynVStatResponse() {
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVDynResponse() {
     World& world = GetWorld();
     if (!m_stepInit) {
-        SpawnBalls(world, 10);
+        SpawnBalls(world, 50);
         m_stepInit = true;
     }
-    UpdateBallCollisions();
+    UpdateBallCollisions(); // walls / floor / bounds
+    BallCollide();          // ball–ball
 }
 
 void Sandbox::PhysicsCollision2DTestScene::Test_StepByStepUpdate() {
@@ -369,9 +364,102 @@ void Sandbox::PhysicsCollision2DTestScene::Test_StepByStepUpdate() {
     ClampAndBouncePlayer();
 }
 
-// ---------------------------------------------------------
-// Original helpers (unchanged, reused by StepByStep test)
-// ---------------------------------------------------------
+void Sandbox::PhysicsCollision2DTestScene::CreateHeroCircle() {
+    if (m_playerId != UINT32_MAX) return;
+
+    Entity e = CreateEntity("HeroCircle");
+    m_playerId = e.GetId();
+
+    const float cx = m_worldWidth * 0.25f;
+    const float cy = m_worldHeight * 0.50f;
+
+    auto& tr = e.Transform();
+    tr.Position.X = cx;
+    tr.Position.Y = cy;
+
+    auto& rb = e.AddComponent<Component::Rigidbody2D>();
+    rb.Mass = 2.0f;
+    rb.GravityScale = 1.0f;
+    rb.LinearDamping = 0.10f;
+
+    // Visual: circle
+    auto& sh = e.AddComponent<Component::ShapeRenderer2D>();
+    sh.Type = Component::ShapeRenderer2D::ShapeType::Circle;
+    sh.Radius = Cradius;
+    sh.FillColor = Color(0.95f, 0.90f, 0.20f, 1.0f); // same feel as triangle
+
+    // Collider: circle
+    e.AddComponent<Component::CircleCollider2D>(Cradius);
+}
+
+void Sandbox::PhysicsCollision2DTestScene::ClampAndBounceCircleHero() {
+    if (m_playerId == UINT32_MAX) return;
+    World& world = GetWorld();
+
+    Entity player(m_playerId, &world);
+    auto& tr = player.Transform();
+    auto* rb = player.GetComponent<Rigidbody2D>();
+    auto* sh = player.GetComponent<ShapeRenderer2D>();
+    auto* cc = player.GetComponent<CircleCollider2D>();
+    if (!rb || !cc) return;
+
+    const float thrust = 1.0f;
+    const float jumpImpulse = 20.0f;      // keep parity with triangle handler
+    const float velDampScale = 0.996f;
+
+    bool leftHeld = Input::IsKeyDown(KEY_A);
+    bool rightHeld = Input::IsKeyDown(KEY_D);
+    bool upHeld = Input::IsKeyDown(KEY_W);
+    bool downHeld = Input::IsKeyDown(KEY_S);
+
+    Vector2D F(0.0f, 0.0f);
+    if (leftHeld)  F.X -= thrust;
+    if (rightHeld) F.X += thrust;
+    if (upHeld)    F.Y += thrust;
+    if (downHeld)  F.Y -= thrust;
+
+    if (F.X != 0.0f || F.Y != 0.0f) {
+        // same semantics as your player handler: treat as force this frame
+        Engine::Physics2D::AddForce(*rb, F);
+    }
+
+    // Optional: SPACE to jump (if you were using it before)
+    if (Input::IsKeyPressed(KEY_SPACE)) {
+        rb->LinearVelocity.Y += jumpImpulse;
+    }
+
+    // Light velocity damp
+    rb->LinearVelocity *= velDampScale;
+
+    // Clamp within world bounds and kill inward velocity on impact
+    const float r = cc->Radius;
+
+    if (tr.Position.X - r <= 0.0f) {
+        tr.Position.X = r;
+        if (rb->LinearVelocity.X < 0.0f) rb->LinearVelocity.X = 0.0f;
+    }
+    else if (tr.Position.X + r >= m_worldWidth) {
+        tr.Position.X = m_worldWidth - r;
+        if (rb->LinearVelocity.X > 0.0f) rb->LinearVelocity.X = 0.0f;
+    }
+
+    if (tr.Position.Y - r <= 0.0f) {
+        tr.Position.Y = r;
+        if (rb->LinearVelocity.Y < 0.0f) rb->LinearVelocity.Y = 0.0f;
+    }
+    else if (tr.Position.Y + r >= m_worldHeight) {
+        tr.Position.Y = m_worldHeight - r;
+        if (rb->LinearVelocity.Y > 0.0f) rb->LinearVelocity.Y = 0.0f;
+    }
+
+    // Keep the visual in sync (in case something else changed it)
+    if (sh) {
+        sh->Type = Component::ShapeRenderer2D::ShapeType::Circle;
+        sh->Radius = r;
+        // sh->FillColor stays as-is
+    }
+}
+
 void Sandbox::PhysicsCollision2DTestScene::SpawnBalls(World& world, const int count, const unsigned seed) {
     m_balls.clear();
     m_balls.reserve(count);
@@ -449,15 +537,9 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
     rb.LinearVelocity.X = MathHelper::Randomize<float>(-20.0f, 20.0f, 0);
     rb.LinearVelocity.Y = -5.0f;
 
-    // --- COLLIDER (pick ONE) ---
-
-    // A) Box collider that matches the rendered square (recommended)
     cube.AddComponent<Component::CircleCollider2D>(size);
 
-    // B) Or: circle collider roughly matching the square’s size
-    // cube.AddComponent<Component::CircleCollider2D>(half);
 
-    // Render shape (square polygon)
     std::vector<Vector2D> pts;
     pts.emplace_back(x - half, y - half);
     pts.emplace_back(x - half, y + half);
@@ -477,7 +559,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes_T(float dt) {
     m_spawnAcc += dt;
     while (m_spawnAcc >= m_spawnIntervals) {
         m_spawnAcc -= m_spawnIntervals;
-        int batch = MathHelper::Randomize<int>(1, 2, 0);
+        int batch = MathHelper::Randomize<int>(1, 7, 0);
         for (int i = 0; i < batch; ++i) SpawnCubes();
     }
 }
@@ -527,11 +609,23 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World & world) 
             half = 10.0f;
         }
 
-        if (ct.Position.Y - half <= m_worldHeight/3.0f) {
+
+        if (m_currentTest == TestType::test_DynvStatResponse) {
+            if (ct.Position.Y - half <= m_worldHeight / 3.0f) {
+                CubeDisintegrate(world, i);
+                continue;
+            }
+        }
+        else if (m_currentTest == TestType::test_StepbyStepUpdate) {
+            if (ct.Position.Y - half <= 0) {
+                CubeDisintegrate(world, i);
+                continue;
+            }
+        }
+        else {
             CubeDisintegrate(world, i);
             continue;
         }
-
         DynCol::Circle Chero{ Vector2D(ht.Position.X, ht.Position.Y), heroR };
         DynCol::AABB   Bcube{ Vector2D(ct.Position.X - half, ct.Position.Y - half),
                               Vector2D(ct.Position.X + half, ct.Position.Y + half) };
@@ -707,6 +801,103 @@ void Sandbox::PhysicsCollision2DTestScene::RestoreBallStates() {
         }
     }
     m_storedBallStates.clear();
+}
+void Sandbox::PhysicsCollision2DTestScene::BallCollide() {
+    World& world = GetWorld();
+    auto& em = world.GetEntityManager();
+
+    // Positional correction knobs
+    constexpr float kSlop = 0.01f;   // allow tiny overlap before correcting
+    constexpr float kPercent = 0.80f;   // proportion of penetration to correct
+
+    const size_t n = m_balls.size();
+    for (size_t i = 0; i < n; ++i) {
+        Entity& a = m_balls[i];
+        if (!em.IsAlive(a)) continue;
+
+        auto* rba = a.GetComponent<Component::Rigidbody2D>();
+        auto* cca = a.GetComponent<Component::CircleCollider2D>();
+        if (!rba || !cca) continue;
+
+        auto& ta = a.Transform();
+        const float ra = cca->Radius;
+        const float invMa = (rba->Mass > 0.0f) ? 1.0f / rba->Mass : 0.0f;
+
+        for (size_t j = i + 1; j < n; ++j) {
+            Entity& b = m_balls[j];
+            if (!em.IsAlive(b)) continue;
+
+            auto* rbb = b.GetComponent<Component::Rigidbody2D>();
+            auto* ccb = b.GetComponent<Component::CircleCollider2D>();
+            if (!rbb || !ccb) continue;
+
+            auto& tb = b.Transform();
+            const float rb = ccb->Radius;
+            const float invMb = (rbb->Mass > 0.0f) ? 1.0f / rbb->Mass : 0.0f;
+
+            // Skip if both are immovable
+            const float invMassSum = invMa + invMb;
+            if (invMassSum == 0.0f) continue;
+
+            DynCol::Circle A{ ta.Position, ra };
+            DynCol::Circle B{ tb.Position, rb };
+            DynCol::Manifold m{};
+
+            if (!DynCol::Overlap(A, B, &m) || !m.valid) continue;
+            {
+                const Vector2D va = rba->LinearVelocity;
+                const Vector2D vb = rbb->LinearVelocity;
+                const Vector2D rv = vb - va;
+
+                const float velN = rv.X * m.normal.X + rv.Y * m.normal.Y;
+                if (velN > 0.0f) continue; // already separating along normal
+
+                const float e = std::clamp(restitution, 0.0f, 1.0f);
+                const float j = -(1.0f + e) * velN / invMassSum;
+                const Vector2D J = m.normal * j;
+
+                rba->LinearVelocity -= J * invMa;
+                rbb->LinearVelocity += J * invMb;
+            }
+
+            // --- Optional Coulomb friction ---
+            if (friction > 0.0f) {
+                // Recompute relative velocity after normal impulse
+                const Vector2D rv2 = rbb->LinearVelocity - rba->LinearVelocity;
+
+                const float vn2 = rv2.X * m.normal.X + rv2.Y * m.normal.Y;
+                Vector2D t = { rv2.X - m.normal.X * vn2, rv2.Y - m.normal.Y * vn2 };
+                const float tlen2 = t.X * t.X + t.Y * t.Y;
+
+                if (tlen2 > 1e-12f) {
+                    t = t / std::sqrt(tlen2);
+
+                    const float jt = -(rv2.X * t.X + rv2.Y * t.Y) / invMassSum;
+                    const float mu = std::max(0.0f, friction);
+
+                    // Use normal impulse magnitude from above as scale; recompute cheapest way:
+                    // normal impulse magnitude equals |(vb-va)·n|*(1+e)/invMassSum for this contact.
+                    const Vector2D va = rba->LinearVelocity;
+                    const Vector2D vb = rbb->LinearVelocity;
+                    const float velN_after = (vb.X - va.X) * m.normal.X + (vb.Y - va.Y) * m.normal.Y;
+                    const float jn_mag = std::abs(velN_after) / invMassSum; // sufficient for Coulomb clamp
+
+                    Vector2D Jt;
+                    if (std::abs(jt) < jn_mag * mu) {
+                        // static friction
+                        Jt = t * jt;
+                    }
+                    else {
+                        // dynamic friction
+                        Jt = t * (-jn_mag * mu * (jt < 0 ? -1.0f : 1.0f));
+                    }
+
+                    rba->LinearVelocity -= Jt * invMa;
+                    rbb->LinearVelocity += Jt * invMb;
+                }
+            }
+        }
+    }
 }
 
 void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {

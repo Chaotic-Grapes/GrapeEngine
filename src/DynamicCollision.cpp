@@ -101,7 +101,7 @@ bool DynCol::Overlap(const AABB& A, const AABB& B, Manifold* m) {
 
 //discrete circle vs circle
 bool DynCol::Overlap(const Circle& A, const Circle& B, Manifold* m) {
-    Vector2D d = { A.c.X - B.c.X, A.c.Y - B.c.Y };
+    Vector2D d = { B.c.X - A.c.X, B.c.Y - A.c.Y };
     float r = A.r + B.r;
     float d2 = Len2(d);
     if (d2 > r * r) return false;

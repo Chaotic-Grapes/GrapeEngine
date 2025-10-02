@@ -53,7 +53,7 @@ namespace Sandbox {
         void HandleStepByStepControls();
         void StoreBallStates();
         void RestoreBallStates();
-
+        void BallCollide();
         struct BallState {
             Vector2D velocity;
             Vector2D position;
@@ -70,10 +70,19 @@ namespace Sandbox {
         void CreateTriangle();
         void ClampAndBouncePlayer();
 
+        //circle tester
+        void CreateHeroCircle();
+        void ClampAndBounceCircleHero();
+
+        float Cradius = 70.0f;
+
+
         EntityId m_playerId = UINT32_MAX;
         float m_triHalfHeight = 48.0f;
         float m_triHalfBase = 48.0f;
 
+        float restitution = 0.5f;
+        float friction = 0.0f;
         //sea cubes
         void SpawnCubes();
         void SpawnCubes_T(float dt);
