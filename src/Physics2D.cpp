@@ -15,13 +15,16 @@ namespace Engine {
     void Physics2D::OnUpdate() {
         if (!m_enabled) return;
 
-		// Iterate over all entities with Rigidbody2D + Transform + Collider2D components
+        // Query once
         const auto entities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform>();
+        const auto colliderEntities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform, Component::Collider2D>();
+        const auto lines = m_world->GetEntityManager().Query<Component::LineRenderer>();
+
         for (auto& [rb, transform] : entities) {
             // There's STATIC, KINEMATIC, and DYNAMIC body types
             // Skip static bodies
             if (rb.BodyType == Component::Rigidbody2D::Static)
-                return;
+                continue;
 
             Vector2D intendedPos = transform.Position + rb.LinearVelocity * Time::FixedDeltaTime();
 
@@ -31,14 +34,11 @@ namespace Engine {
             acceleration += Vector2D(-rb.LinearVelocity.X * rb.LinearDamping, -rb.LinearVelocity.Y * rb.LinearDamping) / rb.Mass;
 
             // TODO: Add a PolygonCollider2D for line segments and complex shapes
-            // DO NOT ADD "LineCollider2D" as it is basically PolygonCollider2D with 2 points
-            // Using "LineRenderer" component for boundary lines for now
+			// DO NOT ADD "LineCollider2D" as it is basically PolygonCollider2D with 2 points
+			// Using "LineRenderer" component for boundary lines for now
             // Collision: Circle vs boundary lines
-            const auto colliderEntities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform, Component::Collider2D>();
-
             for (auto& [crb, ctransform, collider] : colliderEntities) {
                 if (const auto* circle = dynamic_cast<Component::CircleCollider2D*>(&collider)) {
-                    auto lines = m_world->GetEntityManager().Query<Component::LineRenderer>();
                     for (auto& [lineEntity] : lines) {
                         Collision::LineSegment seg = Collision::MakeSegment(lineEntity.Start, lineEntity.End);
                         Vector2D contact, normal;
