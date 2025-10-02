@@ -493,7 +493,7 @@ void Sandbox::PhysicsCollision2DTestScene::SpawnCubes() {
     // --- COLLIDER (pick ONE) ---
 
     // A) Box collider that matches the rendered square (recommended)
-    cube.AddComponent<Component::BoxCollider2D>(size, size);
+    cube.AddComponent<Component::CircleCollider2D>(size);
 
     // B) Or: circle collider roughly matching the square’s size
     // cube.AddComponent<Component::CircleCollider2D>(half);
