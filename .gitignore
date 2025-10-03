@@ -471,3 +471,6 @@ http-client.private.env.json
 # Apifox Helper cache
 .idea/.cache/.Apifox_Helper
 .idea/ApifoxUploaderProjectSetting.xml
+
+# VS Code Counter Extension
+/.VSCodeCounter/.VSCodeCounterCountRealtime
