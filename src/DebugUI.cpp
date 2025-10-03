@@ -12,8 +12,6 @@
 #include "Profiler.h"
 #include "ecs/World.h"
 #include "Math/MathHelper.h"
-#include <algorithm>
-#include <filesystem>
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
