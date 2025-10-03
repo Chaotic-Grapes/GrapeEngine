@@ -228,6 +228,13 @@ void DebugUI::_showPerformanceWindow() {
         Input::PrintSpecs();
     }
 
+    ImGui::Separator();
+
+    if (ImGui::Button("Simulate Crash")) {
+        int* p = nullptr;
+        *p = 42; // Dereference null pointer to cause crash
+	}
+
     ImGui::End();
 }
 

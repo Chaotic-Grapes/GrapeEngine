@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include "ecs/World.h"
 #include "ecs/Entity.h"
-#include "DyamicCollision.h"
+#include "DynamicCollision.h"
 
 namespace Sandbox {
     class PhysicsCollision2DTestScene : public Scene {

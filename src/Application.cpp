@@ -1,5 +1,7 @@
 #include "Application.h"
 #include <thread>
+
+#include "CrashDumping.h"
 #include "Input.h"
 #include "Physics2D.h"
 #include "Profiler.h"
@@ -15,6 +17,11 @@ namespace Engine {
     void Application::Run(Game& game, const bool consoleFlag) {
         // Set global pointer to this application instance
         CORE = this;
+
+		// Initialize crash dumping system
+        Grape_Engine::CrashDumping::Initialize();
+        Grape_Engine::CrashDumping::SetProgramName("GrapeEngine");
+        Grape_Engine::CrashDumping::SetDumpCreateState(true);
 
         // Load configuration first
         Serialization::ConfigLoader::LoadConfig("../config.json", m_config);
