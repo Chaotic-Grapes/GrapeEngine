@@ -20,8 +20,7 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     std::cout << "1. Physics & Collision 2D Test" << '\n';
     std::cout << "2. Graphics & Art Pipeline Test" << '\n';
     std::cout << "3. Serialization Check Test" << '\n';
-    std::cout << "4. Resource Manager Test" << '\n';
-    std::cout << "5. Memory Tracking Test" << '\n';
+    std::cout << "4. Memory Tracking Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -53,15 +52,6 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
         break;
     }
     case 4: {
-        std::cout << "Starting ResourceManager Test..." << '\n';
-        // Create a minimal scene to get OpenGL context
-        sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(1600, 900, 7.f));
-        sceneManager.LoadScene("PhysicsCollision2DTestScene");
-
-        TestResourceManager();
-        break;
-    }
-    case 5: {
         std::cout << "Starting Memory Tracking Test..." << '\n';
         RunMemoryTests();
         break;
