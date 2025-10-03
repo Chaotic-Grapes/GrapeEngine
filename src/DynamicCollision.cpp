@@ -1,3 +1,36 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu 
+ * 
+ * @file    DynamicCollision.cpp
+ * @brief   Discrete overlap tests and swept (continuous) collision queries for 2D shapes.
+ *
+ * @details Implements:
+ *   • SAT overlap for Triangle vs AABB (triangle edge normals + box axes). :contentReference[oaicite:10]{index=10}
+ *   • Discrete overlap:
+ *       - AABB vs AABB (with minimal translation vector in Manifold). :contentReference[oaicite:11]{index=11}
+ *       - Circle vs Circle (normal, penetration, contact). :contentReference[oaicite:12]{index=12}
+ *       - Circle vs AABB (closest point, inside/outside handling). :contentReference[oaicite:13]{index=13}
+ *       - Convex vs Convex (edge normals on both polygons). :contentReference[oaicite:14]{index=14}
+ *   • Swept tests (continuous):
+ *       - AABB vs AABB using Minkowski expansion + slab raycast. :contentReference[oaicite:15]{index=15}
+ *       - Circle vs Circle analytical TOI (quadratic). :contentReference[oaicite:16]{index=16}
+ *       - Circle vs AABB via box expansion by radius + AABB sweep reuse. :contentReference[oaicite:17]{index=17}
+ *
+ * @usage
+ *   - Use Overlap(...) for discrete frame-by-frame tests (broad/narrow phase).
+ *   - Use Sweep(...) to compute time of impact and separating normal for CCD (continuous collision detection).
+ *
+ * @notes
+ *   - Helper functions provide dot/length/clamp/perp and polygon projection. :contentReference[oaicite:18]{index=18}
+ *   - All normals in sweep results point from target (B) to mover (A) at impact. :contentReference[oaicite:19]{index=19}
+ *
+ * @dependencies
+ *   - DynamicCollision.h, Vector2D, <algorithm>, <cmath>. :contentReference[oaicite:20]{index=20}
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
 #include "DynamicCollision.h"
 #include <algorithm>
 #include <cmath>

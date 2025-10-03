@@ -1,3 +1,34 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu  
+ * @file    Collision.cpp
+ * @brief   Narrow-phase helpers for 2D collisions and simple sweep tests.
+ *
+ * @details Implements:
+ *   • Line segment builder with outward unit normal (MakeSegment). :contentReference[oaicite:0]{index=0}
+ *   • Robust quadratic solver used by sweep tests (solveQuadratic). :contentReference[oaicite:1]{index=1}
+ *   • Point-sweep hit against a circle (endpoint corner test). :contentReference[oaicite:2]{index=2}
+ *   • Moving circle vs static segment sweep, including optional endpoint checks. :contentReference[oaicite:3]{index=3}
+ *   • Post-impact response: reflect remaining motion about contact normal. :contentReference[oaicite:4]{index=4}
+ *   • Point vs segment proximity test with tolerance. :contentReference[oaicite:5]{index=5}
+ *   • AABB vs AABB overlap test with separating normal & penetration. :contentReference[oaicite:6]{index=6}
+ *
+ * @usage
+ *   - Use CircleVsSegmentSweep() to detect the earliest TOI (time of impact) for a moving
+ *     circle against a static segment; if it hits, call CircleSegmentResponse() to reflect
+ *     your intended end position for simple sliding. :contentReference[oaicite:7]{index=7}
+ *
+ * @note
+ *   - Coordinates assume a standard 2D screen space with X right, Y up (adjust as needed).
+ *   - EPS and BIGF constants are local helpers for numerical stability. :contentReference[oaicite:8]{index=8}
+ *
+ * @dependencies
+ *   - Math/Vector2D, Collision.h, <cmath>, <limits>, <algorithm>. :contentReference[oaicite:9]{index=9}
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+
 #include "Collision.h"
 #include <cmath>      // std::sqrt, std::fabs
 #include <limits>     // std::numeric_limits
