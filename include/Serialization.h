@@ -1,3 +1,16 @@
+/**
+ * @file    Serialization.h
+ * @author  k.danielneozuofeng@digipen.edu
+ * @date    26/09/2025
+ * @brief   Scene serialization and deserialization to JSON
+ *
+ * This header defines the SceneSerializer class, which provides
+ * static methods to save and load an entire World (all entities
+ * and their components) to and from JSON files using the
+ * nlohmann::json library and EntitySerializer utilities.
+ */
+
+
 #ifndef SERIALIZATION_H
 #define SERIALIZATION_H
 
