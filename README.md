@@ -1,5 +1,4 @@
 # GrapeEngine
-
 GrapeEngine is a custom game engine developed for academic and personal projects at DigiPen.
 
 ---
@@ -22,3 +21,7 @@ cd GrapeEngine
 ### Building the Engine
 
 TODO
+
+
+### Credits
+Image “johnPork.png” by Dariomartinezpinto, CC BY 4.0, via Wikimedia Commons. (Modified for project use.)

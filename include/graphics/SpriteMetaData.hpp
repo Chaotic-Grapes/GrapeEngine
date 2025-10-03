@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   SpriteMetadata.hpp
-\author Choi Meng Yew
+\author Choi Meng Yew (100%)
 \par    choi.m@digipen.edu
 \date   26th September 2025
 \brief

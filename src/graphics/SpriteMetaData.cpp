@@ -1,3 +1,21 @@
+/* Start Header *****************************************************************/
+/*!
+\file   SpriteMetadata.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Implements helper functions for loading sprite metadata from JSON files. Each
+JSON entry specifies trimming information, pivot, and optional collider data,
+which are parsed into SpriteMetadata structures.
+
+Functions:
+- loadSingleSpriteMetadata: Parses one JSON entry into a SpriteMetadata object.
+- loadSpriteMetadataFile: Loads and parses a JSON file containing multiple
+  sprite definitions into a dictionary keyed by sprite name.
+*/
+/* End Header *******************************************************************/
+
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include "../include/graphics/SpriteMetaData.hpp"

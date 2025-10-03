@@ -1,3 +1,22 @@
+/* Start Header *****************************************************************/
+/*!
+\file   GraphicsTest.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Defines the GraphicsTestScene, a sandbox testbed for verifying rendering
+features and performance in the engine. It includes rubric-aligned tests
+(e.g., basic graphics, sprites, animation, font system) as well as
+experimental and performance-focused scenarios such as post-processing,
+FBOs, particle systems, and renderer stress tests.
+
+The scene provides a structured way to validate correctness against grading
+requirements while also experimenting with advanced rendering features.
+*/
+/* End Header *******************************************************************/
+
+
 #pragma once
 
 #include "Game.h"

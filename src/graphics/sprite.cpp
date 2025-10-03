@@ -1,3 +1,24 @@
+/* Start Header *****************************************************************/
+/*!
+\file   sprite.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Implements the Sprite and SpriteAnimation classes for handling sprite rendering
+and frame-based animation. SpriteAnimation manages timing, frame windows, and UV
+calculations for spritesheets, while Sprite provides simple per-instance
+properties like position, size, color, rotation, and scale.
+
+Features:
+- SpriteAnimation supports uniform frame timing and row-based animations.
+- Computes UV coordinates for the current animation frame.
+- Allows custom frame windows and per-row frame counts.
+- Provides utility to build a Sprite for the current animation frame.
+- Sprite includes basic input handling for rotation and scaling.
+*/
+/* End Header *******************************************************************/
+
 #include "graphics/sprite.hpp"
 #include <GLFW/glfw3.h>
 

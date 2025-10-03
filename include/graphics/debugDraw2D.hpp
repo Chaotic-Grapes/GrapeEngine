@@ -1,3 +1,26 @@
+/* Start Header *****************************************************************/
+/*!
+\file   debugDraw2D.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Declares a lightweight 2D debug drawing API built on top of the Renderer. It
+provides helper functions for drawing basic primitives such as circles, lines,
+points, rectangles, and polygons. These utilities are primarily intended for
+visual debugging (e.g., colliders, bounding boxes, paths) rather than
+production rendering.
+
+Functions:
+- Circle: Draws a filled circle with configurable segments.
+- Line: Renders a thick line as a quad.
+- Point: Marks a position using a small square.
+- RectStroke: Renders a rectangle outline with thick edges.
+- RectFill: Renders a filled rectangle.
+- Polygon: Renders a filled polygon (supports concave shapes).
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include <glm/glm.hpp>
 #include <vector>

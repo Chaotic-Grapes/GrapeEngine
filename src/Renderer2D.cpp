@@ -10,8 +10,10 @@ namespace Engine {
     Renderer2D::Renderer2D(World* world) : m_world(world) {}
 
     void Renderer2D::OnCreate() {
-        m_shader = std::make_unique<Shader>("../assets/shaders/batch.vert",
-            "../assets/shaders/batch.frag");
+        m_shader = std::make_unique<Shader>("assets/shaders/batch.vert",
+                                            "assets/shaders/batch.frag");
+        m_textShader = std::make_unique<Shader>("assets/shaders/sdf_text.vert",
+                                                "assets/shaders/sdf_text.frag");
         m_renderer = std::make_unique<Renderer>(3000);
 
         const auto& mainWindow = WindowManager::GetMainWindow();

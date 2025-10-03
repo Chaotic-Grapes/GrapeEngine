@@ -30,6 +30,8 @@ namespace Engine {
         ============================================================ */
         Renderer* GetRenderer() { return m_renderer.get(); }
         Shader* GetShader() { return m_shader.get(); }
+        Shader* GetTextShader() { return m_textShader.get(); }
+
         const glm::mat4& GetProjection() const { return m_projection; }
 
     private:
@@ -56,6 +58,7 @@ namespace Engine {
         World* m_world;
         std::unique_ptr<Renderer> m_renderer;
 		std::unique_ptr<Shader> m_shader;
+        std::unique_ptr<Shader> m_textShader; // for sdf text
         glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();
     };
 }

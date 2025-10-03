@@ -1,3 +1,27 @@
+/* Start Header *****************************************************************/
+/*!
+\file   sprite.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Declares the Sprite struct and SpriteAnimation class for 2D rendering.
+
+Sprite:
+- Represents a single textured quad in world space.
+- Stores position, size, UV coordinates, color tint, rotation, and scale.
+- Provides basic input handling for rotation and scaling via GLFW.
+
+SpriteAnimation:
+- Utility class for handling spritesheet-based animations.
+- Manages frame timing, UV calculation, and playback windows.
+- Supports row-based animations, custom frame windows, and per-row frame counts.
+- Provides methods to update animation state and build a Sprite for the
+  current frame.
+
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include <glm/glm.hpp>
 #include <glad/glad.h>
