@@ -1,3 +1,38 @@
+/**
+ * @file Overlay.cpp
+ * @author Foo Rui Qin
+ * @date 2024
+ * @brief Implementation of the Overlay system for debug UI management
+ * 
+ * This file implements the Overlay class which serves as a system-level wrapper
+ * for managing debug UI functionality within the engine's ECS architecture.
+ * The implementation provides:
+ * 
+ * Core Functionality:
+ * - ImGui initialization and integration with GLFW/OpenGL backends
+ * - DebugUI instance lifecycle management (creation, updates, cleanup)
+ * - Audio system integration for real-time debug monitoring
+ * - Window management integration for UI rendering context
+ * - Conditional compilation support for ImGui features
+ * 
+ * System Integration:
+ * - ECS system interface implementation (OnCreate, OnUpdate)
+ * - World reference management for entity debugging
+ * - Window manager integration for main window access
+ * - Audio system attachment for debug monitoring
+ * - Proper resource cleanup and memory management
+ * 
+ * Conditional Compilation:
+ * - Full ImGui implementation when USE_IMGUI is defined
+ * - Empty stub implementations when ImGui is not available
+ * - Proper destructor handling for ImGui-specific resources
+ * - Compile-time feature toggling for different build configurations
+ * 
+ * The Overlay system acts as a bridge between the engine's core systems
+ * and the debug interface, ensuring proper initialization order and
+ * resource management while maintaining clean separation of concerns.
+ */
+
 #include "systems/Overlay.h"
 
 #ifdef USE_IMGUI

@@ -1,3 +1,21 @@
+/**
+ * @file Memory.cpp
+ * @author Foo Rui Qin
+ * @date 2024
+ * @brief Implementation of the Memory class for memory tracking and leak detection
+ * 
+ * This file implements the Memory class which provides comprehensive memory tracking
+ * capabilities for debugging and optimization. Key implementation features include:
+ * - Thread-safe memory allocation and deallocation using mutex protection
+ * - Detailed allocation tracking with source location information
+ * - Memory leak detection and comprehensive reporting
+ * - Real-time memory usage statistics and monitoring
+ * - Integration with malloc/free for low-level memory management
+ * - Singleton pattern implementation for global access
+ * - Comprehensive logging integration for debugging output
+ * - Exception handling for robust memory operations
+ */
+
 #include "Memory.h"
 #include "systems/Logger.h"
 #include <iostream>

@@ -1,3 +1,25 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Input.cpp
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   3rd October 2025
+\brief
+Implements the Input class for handling keyboard and mouse input events through
+GLFW. Provides static functions for checking input states, managing window
+events, and accessing system specifications. Integrates with the engine's
+message system for event broadcasting and logging system for error reporting.
+
+Features:
+- GLFW window initialization and event callback setup
+- Real-time input state checking and frame-based state tracking
+- Mouse position and scroll event handling
+- Window resize event management
+- OpenGL system specification reporting with detailed GPU information
+- Message system integration for input event broadcasting
+*/
+/* End Header *******************************************************************/
+
 #include <Input.h>
 #include <sstream>
 #include "messaging/MessageSystem.h"

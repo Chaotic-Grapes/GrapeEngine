@@ -1,3 +1,20 @@
+/**
+ * @file ResourceManager.cpp
+ * @author Foo Rui Qin
+ * @date 2024
+ * @brief Implementation of the ResourceManager class for asset caching and loading
+ * 
+ * This file implements the ResourceManager class which provides centralized asset management
+ * for the game engine. Key features include:
+ * - Template specializations for Texture and AudioData loading
+ * - Automatic caching system to prevent redundant file operations
+ * - File validation and error handling with comprehensive logging
+ * - Support for multiple audio formats (WAV, MP3, OGG, FLAC, M4A, AAC)
+ * - Memory-efficient binary file reading for audio assets
+ * - Cache management utilities for memory optimization
+ * - Integration with the engine's logging system for debugging
+ */
+
 #include "ResourceManager.h"
 #include "systems/Logger.h"
 #include <fstream>
