@@ -1,5 +1,4 @@
 #include "ecs/Scene.h"
-
 #include "DebugUI.h"
 #include "Physics2D.h"
 #include "Renderer2D.h"
@@ -28,8 +27,16 @@ void Scene::LateUpdate() {
 
 void Scene::Load() {
     m_world->AddSystem<Time>();
+    m_world->AddSystem<Engine::AudioSystem>();
     m_world->AddSystem<Engine::Physics2D>(m_world.get());
     m_world->AddSystem<Engine::Renderer2D>(m_world.get());
+
+    // Link Overlay -> Audio so DebugUI can use it
+    auto* overlay = m_world->GetSystem<Overlay>();
+    auto* audioSys = m_world->GetSystem<Engine::AudioSystem>();
+    if (overlay && audioSys) {
+        overlay->SetAudio(audioSys->GetAudio());
+    }
 
 	// This must be added last so it renders on top of everything else
 #ifdef USE_IMGUI

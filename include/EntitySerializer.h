@@ -1,13 +1,14 @@
 #ifndef ENTITYSERIALIZER_H
 #define ENTITYSERIALIZER_H
 
+#include "ecs/Components.h"
 #include <nlohmann/json.hpp>
 #include "ecs/Entity.h"
 #include "ecs/World.h"
-#include "ecs/Components.h"
 #include <unordered_map>
 #include <functional>
 #include <iostream>
+#include "systems/Logger.h"
 
 using json = nlohmann::json;
 
@@ -71,15 +72,15 @@ namespace Serialization {
 		using DeserializationFunction = std::function<void(Entity&, const json&)>;
 
 		// registry maps component types names to their serialization functions
-		static std::unordered_map<std::string, SerializationFunction> s_serializationRegistry;
-		static std::unordered_map<std::string, DeserializationFunction> s_deserializationRegistry;
-		static bool s_registryInitialized;
+		inline static std::unordered_map<std::string, SerializationFunction> s_serializationRegistry;
+		inline static std::unordered_map<std::string, DeserializationFunction> s_deserializationRegistry;
+		inline static bool s_registryInitialized = false;
 
 		// initializes the component registry with all supported component types.
 		static void InitializeRegistry() {
 			if (s_registryInitialized) return;
 
-			std::cout << "Initializing component registry..." << std::endl;
+			LOG_DEBUG("Initializing component registry...");
 
 			RegisterComponent<Component::Transform>("Transform");
 			RegisterComponent<Component::SpriteRenderer>("SpriteRenderer");
@@ -89,17 +90,13 @@ namespace Serialization {
 			RegisterComponent<Component::ShapeRenderer2D>("ShapeRenderer2D");
 			RegisterComponent<Component::LineRenderer>("LineRenderer");
 
-			std::cout << "Registered components:" << std::endl;
-			for (const auto& [name, func] : s_deserializationRegistry) {
-				std::cout << "  - " << name << std::endl;
+			LOG_DEBUG("Registered components:");
+			for (const auto& [name, _] : s_deserializationRegistry) {
+				LOG_DEBUG("  - " << name);
 			}
 
-			std::cout << "EntitySerializer::InitializeRegistry() called" << std::endl;
-			std::cout << "Initializing component registry..." << std::endl;
-
-			RegisterComponent<Component::Transform>("Transform");
-
-			std::cout << "Registry initialization complete" << std::endl;
+			LOG_DEBUG("EntitySerializer::InitializeRegistry() called");
+			LOG_DEBUG("Initializing component registry...");
 
 			s_registryInitialized = true;
 		}
@@ -107,52 +104,27 @@ namespace Serialization {
 		// registers a component type for serialization/deserialization
 		template<typename T>
 		static void RegisterComponent(const std::string& typeName) {
-			std::cout << "Registering component: " << typeName << std::endl;
-
 			// register serialization function
 			s_serializationRegistry[typeName] = [](Entity& entity) -> json {
 				if (auto* component = entity.GetComponent<T>()) {
-					return component->Serialize();
+					json j;
+					to_json(j, *component);
+					return j;
 				}
-				return json{};	// returns empty JSON
-				};
+				return json{}; // returns empty JSON
+			};
 
 			// register deserialization function
 			s_deserializationRegistry[typeName] = [typeName](Entity& entity, const json& data) {
-				std::cout << "Deserializing " << typeName << "..." << std::endl;
-
-				bool hasComponent = entity.HasComponent<T>();
-				std::cout << "  Entity already has " << typeName << ": " << (hasComponent ? "YES" : "NO") << std::endl;
-
-				if (!hasComponent) {
-					std::cout << "  Adding " << typeName << " component..." << std::endl;
-					try {
-						entity.AddComponent<T>();
-						std::cout << "  Successfully added " << typeName << std::endl;
-					}
-					catch (const std::exception& e) {
-						std::cout << "  ERROR adding " << typeName << ": " << e.what() << std::endl;
-						return;
-					}
+				if (!entity.HasComponent<T>()) {
+					LOG_DEBUG("Adding " << typeName << " component to entity ID " << entity.GetId());
+					entity.AddComponent<T>();
 				}
-
-				// deserialize the component data
 				if (auto* component = entity.GetComponent<T>()) {
-					std::cout << "  Got component pointer, deserializing data..." << std::endl;
-					try {
-						component->Deserialize(data);
-						std::cout << "  Successfully deserialized " << typeName << std::endl;
-					}
-					catch (const std::exception& e) {
-						std::cout << "  ERROR deserializing " << typeName << ": " << e.what() << std::endl;
-					}
+					from_json(data, *component);
 				}
-				else {
-					std::cout << "  ERROR: Failed to get " << typeName << " component after adding!" << std::endl;
-				}
-				};
+			};
 		}
-
 	public:
 		// serializes an entity to JSON format including all its components.
 		static json SerializeEntity(Entity entity) {
@@ -167,10 +139,10 @@ namespace Serialization {
 			for (const auto& [typeName, serializeFunc] : s_serializationRegistry) {
 				json componentData = serializeFunc(entity);
 				if (!componentData.empty()) {
-					json componentEntry;
-					componentEntry["Type"] = typeName;
-					componentEntry["Data"] = componentData;
-					entityJson["Components"].push_back(componentEntry);
+					entityJson["Components"].push_back({
+						{"Type", typeName},
+						{"Data", componentData}
+					});
 				}
 			}
 			return entityJson;
@@ -190,12 +162,10 @@ namespace Serialization {
 
 			// deserialize all components
 			if (entityJson.contains("Components")) {
-				std::cout << "Found " << entityJson["Components"].size() << " components to deserialize" << std::endl;
-
 				for (const auto& componentEntry : entityJson["Components"]) {
 					if (componentEntry.contains("Type") && componentEntry.contains("Data")) {
 						std::string typeName = componentEntry["Type"];
-						std::cout << "\nProcessing component: " << typeName << std::endl;
+						auto it = s_deserializationRegistry.find(typeName);
 
 						// A little messy but needed
 						// SpriteRenderer has a custom constructor that takes a texture path
@@ -215,11 +185,7 @@ namespace Serialization {
 							}
 						}
 						else {
-							std::cout << "Warning: Unknown component type: " << typeName << std::endl;
-							std::cout << "Available types:" << std::endl;
-							for (const auto& [name, func] : s_deserializationRegistry) {
-								std::cout << "  - " << name << std::endl;
-							}
+							LOG_WARNING("Unknown component type: " << typeName);
 						}
 					}
 				}
@@ -229,10 +195,6 @@ namespace Serialization {
 			return entity;
 		}
 	};
-
-	std::unordered_map<std::string, EntitySerializer::SerializationFunction> EntitySerializer::s_serializationRegistry;
-	std::unordered_map<std::string, EntitySerializer::DeserializationFunction> EntitySerializer::s_deserializationRegistry;
-	bool EntitySerializer::s_registryInitialized = false;
 }
 
 #endif
