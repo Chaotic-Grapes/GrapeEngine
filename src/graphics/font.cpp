@@ -1,3 +1,24 @@
+/* Start Header *****************************************************************/
+/*!
+\file   font.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Implements the Font class, which loads font data using stb_truetype, generates
+a signed distance field (SDF) atlas, and provides glyph metrics for text
+rendering. The atlas is stored in an OpenGL texture, and each glyph entry
+contains size, bearing, advance, and UV coordinates.
+
+Features:
+- Reads font file into memory and initializes stb_truetype font info.
+- Generates an SDF texture atlas for ASCII glyphs (32–126).
+- Packs glyphs into a fixed-size atlas with row-based layout.
+- Stores glyph metrics (size, bearing, advance, UV) for text layout.
+- Provides cleanup, move semantics, and safe access to glyphs.
+*/
+/* End Header *******************************************************************/
+
 #include "../include/graphics/font.hpp"
 #include <fstream>
 #include <iostream>

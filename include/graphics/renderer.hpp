@@ -1,3 +1,23 @@
+/* Start Header *****************************************************************/
+/*!
+\file   renderer.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   24th September 2025
+\brief
+Declares the Renderer class, a low-level batching system responsible for
+efficiently sending geometry to the GPU. It manages vertex/index buffers,
+texture slots, and batched draw calls, automatically flushing when capacity
+is exceeded.
+
+Features:
+- Batches quads, sprites, text, and generic triangles.
+- Manages OpenGL buffer objects (VAO, VBO, EBO).
+- Provides a texture slot cache for array-based texture binding.
+- Designed to be called between beginFrame() and endFrame().
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include <glm/glm.hpp>
 #include <vector>

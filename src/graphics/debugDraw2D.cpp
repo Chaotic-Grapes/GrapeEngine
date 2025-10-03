@@ -1,8 +1,30 @@
+/* Start Header *****************************************************************/
+/*!
+\file   debugDraw2D.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Implements the DebugDraw2D namespace, providing helper functions for drawing
+basic 2D primitives using the Renderer. These utilities are intended for
+visual debugging, such as displaying colliders, bounding boxes, or guides
+during development.
+
+Functions:
+- Circle: Renders a filled circle using triangle fan.
+- Line: Renders a thick line as a quad between two points.
+- Point: Marks a position with a square marker.
+- RectStroke: Draws a rectangle outline with thick edges.
+- RectFill: Draws a solid filled rectangle.
+- Polygon: Renders a filled polygon (convex or concave) by triangulating
+  the input vertices with the ear clipping algorithm.
+*/
+/* End Header *******************************************************************/
+
 #include "../include/graphics/debugDraw2D.hpp"
 #include "../include/graphics/renderer.hpp"
 #include "../include/graphics/vertex.hpp"
 #include "../include/graphics/polygon-utils.hpp"
-
 
 #include <glm/gtc/constants.hpp>
 #include <cmath>

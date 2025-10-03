@@ -1,3 +1,25 @@
+/* Start Header *****************************************************************/
+/*!
+\file   GraphicsTest.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Implements the GraphicsTestScene, a sandbox scene for testing and validating
+rendering features in the engine. This includes rubric-aligned milestone tests
+(e.g., basic graphics, sprites, animation, font system) as well as experimental
+and performance-focused scenarios.
+
+Features:
+- Cycles through test cases interactively with keyboard input (G key).
+- Provides tests for basic shapes, sprite rendering, background rendering,
+  scaling, rotation, and animation.
+- Includes stress tests and profiling utilities for batching performance.
+- Validates text rendering with fonts, glyph metrics, kerning, and spacing.
+- Outputs FPS and flush counts to the console for performance feedback.
+*/
+/* End Header *******************************************************************/
+
 #include "GraphicsTest.hpp"
 #include "input.h"
 #include "ecs/Components.h"

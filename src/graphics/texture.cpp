@@ -1,3 +1,23 @@
+/* Start Header *****************************************************************/
+/*!
+\file   texture.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   24th September 2025
+\brief
+Implements the Texture class, a lightweight RAII wrapper around an OpenGL
+texture object. It loads images via stb_image, creates and configures the
+GPU texture, and ensures proper cleanup of the OpenGL resource.
+
+Features:
+- Loads textures from disk with vertical flip enabled.
+- Configures filtering and wrapping parameters.
+- Supports deep copy semantics by reloading from the original file path.
+- Provides move semantics for safe transfer of ownership.
+- Ensures GPU texture deletion exactly once in the destructor.
+*/
+/* End Header *******************************************************************/
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "../include/graphics/stb_image.h"
 #include "../include/graphics/texture.hpp"

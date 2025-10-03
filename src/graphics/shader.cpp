@@ -1,3 +1,24 @@
+/* Start Header *****************************************************************/
+/*!
+\file   shader.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Implements the Shader class, a lightweight RAII wrapper around an OpenGL
+shader program. The class loads GLSL source files, compiles vertex and
+fragment shaders, links them into a program, and provides uniform setters
+for common data types.
+
+Features:
+- Reads shader source code from disk and compiles it.
+- Handles program linking and error logging for compilation/linking failures.
+- Provides move semantics for safe GPU resource ownership transfer.
+- Exposes helper functions to bind the shader and set uniforms (bool, int,
+  float, vectors, and matrices).
+*/
+/* End Header *******************************************************************/
+
 #include "../include/graphics/shader.hpp"
 #include <fstream>
 #include <sstream>

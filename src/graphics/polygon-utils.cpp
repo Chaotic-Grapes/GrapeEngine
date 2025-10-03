@@ -1,3 +1,22 @@
+/* Start Header *****************************************************************/
+/*!
+\file   polygon-utils.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Implements a polygon triangulation utility based on the ear clipping algorithm.
+The function `triangulateEarClipping` takes a simple polygon (list of vertices)
+and decomposes it into non-overlapping triangles suitable for rendering.
+
+Details:
+- Ensures polygon winding is counter-clockwise (reverses if necessary).
+- Iteratively clips convex "ears" while checking that no other vertex lies inside.
+- Returns a list of Triangle structs containing vertex positions.
+- Handles both convex and concave polygons; degeneracy stops triangulation early.
+*/
+/* End Header *******************************************************************/
+
 #include "../include/graphics/polygon-utils.hpp"
 #include <algorithm>  // for std::reverse
 #include <numeric>    // for std::iota

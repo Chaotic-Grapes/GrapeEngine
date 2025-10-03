@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file   shader.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+The Shader class is a lightweight RAII wrapper for an OpenGL shader program.
+It compiles and links vertex/fragment shaders from source files, manages the
+underlying OpenGL program object, and provides helper functions to set uniform
+variables of various types (bool, int, float, vectors, and matrices).
+
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include <string>
 #include <glm/glm.hpp>

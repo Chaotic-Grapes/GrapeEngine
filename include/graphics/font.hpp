@@ -1,3 +1,25 @@
+/* Start Header *****************************************************************/
+/*!
+\file   font.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   3rd October 2025
+\brief
+Declares the Font class and supporting Glyph struct for text rendering.
+Each glyph stores its metrics (size, bearing, advance) and UV coordinates
+into an SDF-based atlas. The Font class handles loading a font file via
+stb_truetype, generating a signed distance field (SDF) atlas, and managing
+the associated OpenGL texture.
+
+Features:
+- Loads font data from disk into memory.
+- Builds an SDF atlas containing all required glyphs.
+- Stores glyph metrics for layout (size, bearing, advance).
+- Provides access to atlas texture, dimensions, and line height.
+- Move-only type to safely manage GPU texture ownership.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 #include <string>
 #include <map>
