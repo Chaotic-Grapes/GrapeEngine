@@ -12,6 +12,7 @@
 #include "EntitySerializer.h"
 #include "Profiler.h"
 #include "Math/MathHelper.h"
+#include <filesystem>
 #include "systems/Logger.h"
 
 #ifdef max
