@@ -192,9 +192,15 @@ void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
 void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsMovement() {
     World& world = GetWorld();
     if (!m_stepInit) {
-        SpawnBalls(world, 4);
+        SpawnBalls(world, 10);
         m_stepInit = true;
-            std::cout << "Damping enabled after " << m_dampingDelay << " seconds!\n";
+        m_dampingEnabled = true;
+        for (auto& ball : m_balls) {
+            if (auto* rb = ball.GetComponent<Component::Rigidbody2D>()) {
+                rb->LinearDamping = 0.5f; // physics added
+            }
+        }
+        std::cout << "Damping enabled after " << m_dampingDelay << " seconds!\n";
     }
     UpdateBallCollisions();
 }
