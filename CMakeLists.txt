@@ -93,6 +93,8 @@ elseif (MSVC)
     target_compile_options(GrapeEngine PRIVATE /W4)
 endif()
 
+# ======================= Copy files and assets =========================
+
 # Copy assets to build directory
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
     add_custom_command(TARGET GrapeEngine POST_BUILD
@@ -109,15 +111,15 @@ if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
     )
 endif()
 
-message(STATUS "GrapeEngine configured successfully!")
-
-# ======================= Copy FMOD DLL (Windows) =========================
+# Copy FMOD DLL (Windows)
 add_custom_command(TARGET GrapeEngine POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_LIST_DIR}/lib/fmod/fmod.dll"
         $<TARGET_FILE_DIR:GrapeEngine>
     COMMENT "Copying FMOD DLL to output directory"
 )
+
+message(STATUS "GrapeEngine configured successfully!")
 
 # ======================= DOCUMENTATION GENERATION =========================
 find_package(Doxygen OPTIONAL_COMPONENTS dot)
