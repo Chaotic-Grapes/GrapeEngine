@@ -70,6 +70,10 @@ private:
     World* m_world;  // World reference for entity creation/management
     bool m_enabled = false;
     bool m_initialized = false;
+  
+    // Game object storage
+    static std::vector<GameObject> m_gameObjects;
+    static int m_nextGameObjectId;
 
     // UI state
     bool m_showDemo = false;
