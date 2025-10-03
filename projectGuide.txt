@@ -1,0 +1,289 @@
+================================================================================
+                            GRAPEENGINE PROJECT GUIDE
+================================================================================
+
+This guide will help you set up the development environment and build the 
+GrapeEngine project from scratch.
+
+================================================================================
+PREREQUISITES
+================================================================================
+
+1. VISUAL STUDIO 2022
+   - Download: https://visualstudio.microsoft.com/downloads/
+   - Install "Desktop development with C++" workload
+   - Ensure C++17 support is included
+
+2. GIT
+   - Download: https://git-scm.com/downloads
+   - Required for cloning the repository
+
+================================================================================
+STEP 1: INSTALL CMAKE
+================================================================================
+
+CMAKE is required to generate the Visual Studio solution files.
+
+OPTION A: Download from Official Website (Recommended)
+----------------------------------------------------------
+1. Go to: https://cmake.org/download/
+2. Download "Windows x64 Installer" (cmake-X.XX.X-windows-x86_64.msi)
+3. Run the installer
+4. IMPORTANT: During installation, select "Add CMake to the system PATH for all users"
+5. Complete the installation
+
+OPTION B: Using Visual Studio Installer
+----------------------------------------
+1. Open Visual Studio Installer
+2. Modify your Visual Studio 2022 installation
+3. Go to "Individual components" tab
+4. Search for "CMake tools for Visual Studio"
+5. Check the box and install
+
+OPTION C: Using Chocolatey (if you have it installed)
+-----------------------------------------------------
+1. Open PowerShell as Administrator
+2. Run: choco install cmake
+
+VERIFICATION:
+-------------
+Open Command Prompt or PowerShell and run:
+    cmake --version
+
+You should see output like: cmake version 3.XX.X
+
+================================================================================
+STEP 2: CLONE THE REPOSITORY
+================================================================================
+
+1. Open Command Prompt or PowerShell
+2. Navigate to your desired directory:
+   cd C:\YourProjects\
+
+3. Clone the repository:
+   git clone https://github.com/Chaotic-Grapes/GrapeEngine.git
+
+4. Navigate to the project directory:
+   cd GrapeEngine
+
+================================================================================
+STEP 3: GENERATE VISUAL STUDIO SOLUTION
+================================================================================
+
+METHOD 1: Using the Provided Script (Easiest)
+----------------------------------------------
+1. In the GrapeEngine directory, double-click: script_build.bat
+   OR
+   Open Command Prompt in the project directory and run:
+   script_build.bat
+
+This will automatically:
+- Create a 'build' directory
+- Generate Visual Studio 2022 solution files
+- Configure for x64 Debug build
+
+METHOD 2: Manual CMake Commands
+-------------------------------
+1. Open Command Prompt or PowerShell in the GrapeEngine directory
+
+2. Create and enter build directory:
+   mkdir build
+   cd build
+
+3. Generate Visual Studio solution:
+   cmake .. -G "Visual Studio 17 2022" -A x64
+
+4. (Optional) Build from command line:
+   cmake --build . --config Debug
+
+================================================================================
+STEP 4: OPEN AND BUILD IN VISUAL STUDIO
+================================================================================
+
+1. Navigate to the 'build' directory in your file explorer
+2. Double-click 'GrapeEngine.sln' to open in Visual Studio 2022
+3. Set the build configuration to 'Debug' and platform to 'x64'
+4. Right-click the 'GrapeEngine' project in Solution Explorer
+5. Select 'Set as StartUp Project'
+6. Press F5 or click 'Local Windows Debugger' to build and run
+
+================================================================================
+STEP 5: RUNNING THE ENGINE
+================================================================================
+
+OPTION A: From Visual Studio
+----------------------------
+- Press F5 to run with debugging
+- Press Ctrl+F5 to run without debugging
+
+OPTION B: Using the Run Script
+------------------------------
+- Double-click: script_run.bat
+- OR run from command line: script_run.bat
+
+OPTION C: Direct Execution
+--------------------------
+- Navigate to: build\Debug\
+- Run: GrapeEngine.exe
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+PROBLEM: "cmake is not recognized as an internal or external command"
+SOLUTION: CMake is not in your PATH. Reinstall CMake and ensure you select
+          "Add CMake to the system PATH" during installation.
+
+PROBLEM: "Visual Studio 17 2022" generator not found
+SOLUTION: Ensure Visual Studio 2022 is installed. You can also try:
+          cmake .. -G "Visual Studio 16 2019" -A x64
+
+PROBLEM: Build errors related to missing dependencies
+SOLUTION: Ensure all submodules are initialized:
+          git submodule update --init --recursive
+
+PROBLEM: "MSBuild version X.X not found"
+SOLUTION: Install or repair Visual Studio 2022 with C++ development tools.
+
+================================================================================
+ADDITIONAL COMMANDS
+================================================================================
+
+CLEAN BUILD:
+- Run: script_clean.bat (removes build directory)
+- Or manually delete the 'build' folder
+
+REGENERATE SOLUTION:
+- Delete the 'build' folder
+- Run script_build.bat again
+- Or use the manual CMake commands above
+
+BUILD AND RUN IN ONE STEP:
+- Run: script_build_and_run.bat
+
+================================================================================
+PROJECT STRUCTURE
+================================================================================
+
+GrapeEngine/
+├── assets/          # Game assets (textures, shaders, etc.)
+├── build/           # Generated build files (created by CMake)
+├── cmake/           # CMake modules and configuration
+├── include/         # Header files
+├── lib/             # Static libraries
+├── src/             # Source code files
+├── CMakeLists.txt   # Main CMake configuration
+├── script_*.bat     # Build and run scripts
+├── config.json      # Application configuration file
+└── README.md        # Project overview
+
+================================================================================
+PROJECT SETTINGS AND CONFIGURATION
+================================================================================
+
+BUILD CONFIGURATIONS
+--------------------
+
+The GrapeEngine supports two main build configurations:
+
+1. DEBUG CONFIGURATION
+   - Executable location: build\Debug\GrapeEngine.exe
+   - Includes debug symbols and assertions
+   - Optimizations disabled for easier debugging
+   - Additional logging and error checking enabled
+
+2. RELEASE CONFIGURATION
+   - Executable location: build\Release\GrapeEngine.exe
+   - Optimized for performance
+   - Debug symbols stripped
+   - Minimal logging for better performance
+
+To switch between configurations in Visual Studio:
+- Use the dropdown in the toolbar to select "Debug" or "Release"
+- Rebuild the solution after changing configurations
+
+APPLICATION CONFIGURATION (config.json)
+---------------------------------------
+
+The engine uses a config.json file for runtime configuration. The config.json 
+file is located in the project root directory and is automatically found by the 
+executable using a relative path (../config.json).
+
+Default config.json structure (located in project root):
+{
+  "application": {
+    "title": "GrapeEngine",
+    "window": {
+      "width": 1600,
+      "height": 900,
+      "fullscreen": false,
+      "vsync": true
+    }
+  }
+}
+
+Configuration Options:
+- title: Window title displayed in the title bar
+- width: Initial window width in pixels
+- height: Initial window height in pixels
+- fullscreen: Whether to start in fullscreen mode (true/false)
+- vsync: Enable vertical synchronization (true/false)
+
+**TROUBLESHOOTING:** If you encounter "Could not open config file: config.json" 
+warnings:
+
+1. Verify config.json exists in the project root directory
+2. Ensure the executable is running from the build directory (build/Debug/ or 
+   build/Release/)
+3. Check that the working directory is set correctly when running from an IDE
+
+The config.json file should remain in the project root and does NOT need to be 
+copied to build directories.
+
+IMGUI DEBUG INTERFACE
+---------------------
+
+The GrapeEngine includes a comprehensive ImGui-based debug interface with 
+multiple windows:
+
+Available Debug Windows:
+1. GrapeEngine Debug Console - Main debug interface
+2. Performance Monitor - FPS and frame timing information
+3. Input Debug - Real-time input state monitoring
+4. Game Object Editor - Edit game object properties
+
+Controls:
+- F1: Toggle debug UI on/off
+- W, A, S, D: Movement keys (monitored in Input Debug)
+- SPACE: Action key (press count tracked)
+- P: Pause/unpause functionality
+- G, J, K, R: Additional test keys for engine features
+
+TROUBLESHOOTING CONFIGURATION ISSUES
+------------------------------------
+
+Config File Not Found:
+- Ensure config.json exists in the same directory as the executable
+- Copy config.json from project root to build/Debug/ or build/Release/
+- Check that the JSON syntax is valid
+
+ImGui Not Showing:
+- Press F1 to toggle the debug interface
+- Ensure the application window has focus
+- Check that ImGui is properly initialized (no console errors)
+
+Build Configuration Issues:
+- Verify the correct configuration (Debug/Release) is selected
+- Clean and rebuild the solution if switching configurations
+- Check that all dependencies are properly linked
+
+================================================================================
+SUPPORT
+================================================================================
+
+For additional help:
+- Check the README.md file in the project root
+- Review the source code documentation
+- Contact the development team (see README.md for contacts)
+
+================================================================================
