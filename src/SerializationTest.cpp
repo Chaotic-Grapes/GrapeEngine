@@ -1,4 +1,25 @@
-﻿#include "SerializationTest.h"
+﻿/**
+ * @file    SerializationTest.cpp
+ * @author  k.danielneozuofeng
+ * @date    26/09/2025
+ * @brief   Implementation of automated serialization test scene
+ *
+ * This source file implements the SerializationTestScene class,
+ * which performs a multi-phase integrity test of the serialization
+ * system. It creates sample entities, saves them to a JSON scene file,
+ * reloads them, and verifies that entity data (such as transform,
+ * components, and names) are preserved correctly across the process.
+ *
+ * Test phases include:
+ *  - Creating controlled test entities
+ *  - Saving the current world to disk
+ *  - Loading the saved world back into memory
+ *  - Verifying loaded entities against expected values
+ *  - Printing final pass/fail test results
+ */
+
+
+#include "SerializationTest.h"
 #include "Serialization.h"
 #include "ecs/Components.h"
 #include "systems/WindowManager.h"

@@ -1,3 +1,16 @@
+/**
+ * @file    EntitySerializer.h
+ * @author  k.danielneozuofeng
+ * @date    26/09/2025
+ * @brief   Entity serialization and deserialization to JSON
+ *
+ * This header defines the EntitySerializer class, which manages
+ * the conversion of individual entities (and their components)
+ * to and from JSON format. It maintains a registry of supported
+ * component types and their serialization/deserialization logic,
+ * allowing entities to be reconstructed within a World.
+ */
+
 #ifndef ENTITYSERIALIZER_H
 #define ENTITYSERIALIZER_H
 
