@@ -23,6 +23,8 @@ Features:
 #include <vector>
 #include <cstdint>
 #include <glad/glad.h>
+
+#include "font.hpp"
 #include "graphics/vertex.hpp"
 #include "graphics/sprite.hpp"
 

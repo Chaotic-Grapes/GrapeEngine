@@ -35,6 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "graphics/renderer.hpp"
 #include "graphics/vertex.hpp"
+#include "graphics/font.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>

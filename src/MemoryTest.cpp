@@ -33,6 +33,7 @@ void TestMemoryLeak() {
 
     // Create some data but forget to delete it
     unsigned char* largeData = NEW_ARRAY(unsigned char, 1024); // 1024 bytes (1 KB)
+    (void)largeData;
     int* buffer = NEW_ARRAY(int, 50);  // 50 * sizeof(int) = 200 bytes
 
     LOG_INFO("Created large data and buffer");
