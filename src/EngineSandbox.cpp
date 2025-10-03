@@ -1,6 +1,5 @@
 // ******** NOTHING IS TO BE PLACED ABOVE _DEBUG ******** //
-// TODO: Remove later
-//#ifdef _DEBUG
+#ifdef _DEBUG
 
 #include <crtdbg.h>
 #include "Application.h"
@@ -16,4 +15,4 @@ int main() {
     return 0;
 }
 
-//#endif
+#endif
