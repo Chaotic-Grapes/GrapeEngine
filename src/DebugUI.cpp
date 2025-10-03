@@ -9,11 +9,10 @@
 #include <iostream>
 #include "System.h"
 #include <sstream>
+#include "EntitySerializer.h"
 #include "Profiler.h"
-#include "ecs/World.h"
 #include "Math/MathHelper.h"
-#include <algorithm>
-#include <filesystem>
+#include "systems/Logger.h"
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
@@ -522,6 +521,19 @@ void DebugUI::_showGameObjectEditor() {
         std::stringstream oss;
         oss << "[" << entity.GetId() << "] " << entity.GetName();
         if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(entId))) {
+            // Delete button for each object
+            if (ImGui::SmallButton(_getDeleteLabel(entId).c_str())) {
+                RemoveGameObject(entId);
+                break;
+            }
+
+            // Clone button for each object
+            ImGui::SameLine();
+            if (ImGui::SmallButton(_getCloneLabel(entId).c_str())) {
+                CloneGameObject(entity);
+                break;
+            }
+
             ImGui::SeparatorText("Transform");
 
             // Get pointer to transform component to ensure we're modifying the actual component

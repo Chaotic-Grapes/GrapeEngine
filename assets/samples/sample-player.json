@@ -1,7 +1,0 @@
-{
-  "name": "Player",
-  "components": {
-    "Transform": { "x": 100.0, "y": 200.0 },
-    "ShapeRenderer2D": { "type": "Circle", "radius": 55.0, "fillColor": [0,0,1,1] }
-  }
-}
