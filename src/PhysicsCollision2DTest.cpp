@@ -107,7 +107,6 @@ void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
 
 
 void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
-    World& world = GetWorld();
 
 
     // Input trigger to cycle tests (H key)
@@ -772,8 +771,6 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World& world) {
 
     // Apply transform scale to collision radius
     const float heroR = m_triHalfHeight * ((ht.Scale.X + ht.Scale.Y) * 0.5f);
-    const float floorY = 0.0f;
-
     for (size_t i = 0; i < m_seacubes.size();) {
         auto& ct = m_seacubes[i].Transform();
         auto* rb = m_seacubes[i].GetComponent<Rigidbody2D>();
@@ -1003,9 +1000,7 @@ void Sandbox::PhysicsCollision2DTestScene::BallCollide() {
     World& world = GetWorld();
     auto& em = world.GetEntityManager();
 
-    // Positional correction knobs
-    constexpr float kSlop = 0.01f;   // allow tiny overlap before correcting
-    constexpr float kPercent = 0.80f;   // proportion of penetration to correct
+  
 
     const size_t n = m_balls.size();
     for (size_t i = 0; i < n; ++i) {
@@ -1052,8 +1047,8 @@ void Sandbox::PhysicsCollision2DTestScene::BallCollide() {
                 if (velN > 0.0f) continue; // already separating along normal
 
                 const float e = std::clamp(restitution, 0.0f, 1.0f);
-                const float j = -(1.0f + e) * velN / invMassSum;
-                const Vector2D J = m.normal * j;
+                const float z = -(1.0f + e) * velN / invMassSum;
+                const Vector2D J = m.normal * z;
 
                 rba->LinearVelocity -= J * invMa;
                 rbb->LinearVelocity += J * invMb;

@@ -10,7 +10,7 @@
 *   • Utility: MakeEquilateral(center, side, angle) — builds a triangle oriented by angle.
 *   • Contact data:
 *       - Manifold { normal (B->A), penetration, contact, valid } for discrete tests.
-*       - SweepHit { toi?[0,1], normal (B->A), contactA/B, hit } for TOI queries. 
+*       - SweepHit { toi[0,1], normal (B->A), contactA/B, hit } for TOI queries. 
 *   • Discrete overlaps: Triangle×AABB, AABB×AABB, Circle×Circle, Circle×AABB, Convex×Convex. 
 *   • Swept tests (continuous): AABB×AABB, Circle×Circle, Circle×AABB (with end positions). 
 *
