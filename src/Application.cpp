@@ -1,4 +1,4 @@
-﻿#include "Application.h"
+#include "Application.h"
 #include <thread>
 #include "Input.h"
 #include "Physics2D.h"
@@ -13,6 +13,12 @@ namespace Engine {
     bool Application::m_shouldStop = false;
 
     void Application::Run(Game& game, const bool consoleFlag) {
+        // Set global pointer to this application instance
+        CORE = this;
+
+        // Load configuration first
+        Serialization::ConfigLoader::LoadConfig("../config.json", m_config);
+
 #if !_DEBUG
         if (consoleFlag)
             _enableConsole();
