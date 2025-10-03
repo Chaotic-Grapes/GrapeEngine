@@ -9,11 +9,11 @@
 #include <iostream>
 #include "System.h"
 #include <sstream>
+#include "EntitySerializer.h"
 #include "Profiler.h"
-#include "ecs/World.h"
 #include "Math/MathHelper.h"
-#include <algorithm>
 #include <filesystem>
+#include "systems/Logger.h"
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
@@ -22,7 +22,8 @@
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the world
 DebugUI::DebugUI(World* world, const DebugUIConfig& config)
-    : m_config(config), m_world(world) {}
+    : m_config(config), m_world(world) {
+}
 
 DebugUI::~DebugUI() {
     // Clean up resources only if UI was initialized
@@ -43,7 +44,7 @@ void DebugUI::Initialize(GLFWwindow* window) {
     IMGUI_CHECKVERSION();     // Verify ImGUI version compatibility
     ImGui::CreateContext();   // Create ImGUI rendering context
 
-    ImGuiIO& io = ImGui::GetIO();  // Get input/output config
+    auto& io = ImGui::GetIO();  // Get input/output config
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Allow keyboard navigation
     io.FontGlobalScale = m_config.FontScale;    // Scale the entire UI
 
@@ -88,7 +89,7 @@ void DebugUI::Render() {
 
     // Finalize the frame and send to GPU
     ImGui::Render();  // Generate draw commands from UI
-    ImDrawData* drawData = ImGui::GetDrawData();  // Get rendering data structure
+    auto* drawData = ImGui::GetDrawData();  // Get rendering data structure
 
     if (drawData) {
         // Submit to OpenGL for GPU execution
@@ -119,7 +120,7 @@ void DebugUI::AddGameObject(const std::string& name) {
         || !HasValidWorld()) return;
 
     // Create real ECS entity with components
-    Entity entity = _createGameEntity(name);
+    auto entity = _createGameEntity(name);
 
     entity.Transform().Position.X = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
     entity.Transform().Position.Y = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
@@ -134,7 +135,7 @@ void DebugUI::RemoveGameObject(const EntityId id) {
     // Safety check
     if (!HasValidWorld()) return;
 
-    const Entity entity = m_world->GetEntityManager().GetEntity(id);
+    const auto entity = m_world->GetEntityManager().GetEntity(id);
     m_world->GetEntityManager().DestroyEntity(entity);
 
     _invalidateCache();
@@ -144,7 +145,16 @@ void DebugUI::CloneGameObject(const Entity& entity) {
     // Safety check
     if (!HasValidWorld()) return;
 
-    (void)entity.Clone();
+    // Get entity count before cloning
+    const auto entitiesBefore = m_world->GetEntityManager().GetAllEntities();
+    const auto beforeCount = entitiesBefore.size();
+
+    auto cloned = entity.Clone();
+
+    // Offset position so clone doesn't overlap original
+    auto& transform = cloned.Transform();
+    transform.Position.X += 50.0f;
+    transform.Position.Y += 50.0f;
 
     _invalidateCache();
 }
@@ -153,14 +163,14 @@ void DebugUI::ClearAllGameObjects() {
     // Safety check
     if (!HasValidWorld()) return;
 
-	m_world->GetEntityManager().DestroyAllEntities();
+    m_world->GetEntityManager().DestroyAllEntities();
 
     _invalidateCache();
 }
 
 void DebugUI::_showEngineDebugWindow() {
     // Use config values
-    const DebugUIConfig::WindowLayout& layout = m_config.Layout;
+    const auto& layout = m_config.Layout;
     ImGui::SetNextWindowPos(ImVec2(layout.EngineX, layout.EngineY), ImGuiCond_Once);   // Position window (only on first appearance)
     ImGui::SetNextWindowSize(ImVec2(layout.EngineW, layout.EngineH), ImGuiCond_Once);  // Size
 
@@ -183,7 +193,7 @@ void DebugUI::_showEngineDebugWindow() {
 
 void DebugUI::_showPerformanceWindow() {
     // Use config values
-    const DebugUIConfig::WindowLayout& layout = m_config.Layout;
+    const auto& layout = m_config.Layout;
     ImGui::SetNextWindowPos(ImVec2(layout.PerfX, layout.PerfY), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(layout.PerfW, layout.PerfH), ImGuiCond_Once);
 
@@ -205,14 +215,14 @@ void DebugUI::_showPerformanceWindow() {
     // Scope data
     const auto& scopes = Profiler::GetAllScopeData();
     for (const auto& [name, data] : scopes) {
-		if (name == "Time")// || name == "Overlay") 
-            continue; // Skip these special scopes
+        if (name == "Time")// || name == "Overlay") 
+            continue; // Skip these special scopes (Time has negligible usage times)
 
         ImGui::Text("%s:", name.c_str());
         ImGui::BulletText("Last: %.3f ms", data.LastTimeMs);
         ImGui::BulletText("Avg:  %.3f ms", data.AverageTimeMs);
         ImGui::BulletText("Max:  %.3f ms", data.MaxTimeMs);
-		ImGui::BulletText("Usage: %.1f%%", data.LastTimeMs / Profiler::GetTotalScopeTimes() * 100.f);
+        ImGui::BulletText("Usage: %.1f%%", data.LastTimeMs / Profiler::GetTotalScopeTimes() * 100.f);
 
         if (!data.FrameTimes.empty()) {
             ImGui::PlotLines(("##" + name).c_str(),
@@ -233,9 +243,16 @@ void DebugUI::_showPerformanceWindow() {
         Profiler::ClearHistory();
     }
 
-	// Print GPU specs button
+    // Print GPU specs button
     if (ImGui::Button("Print GPU Specs to Console")) {
         Input::PrintSpecs();
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::Button("Simulate Crash")) {
+        int* p = nullptr;
+        *p = 42; // Dereference null pointer to cause crash
     }
 
     ImGui::End();
@@ -384,7 +401,7 @@ void DebugUI::_showAudioWindow(Systems::Audio& audio) {
 
 void DebugUI::_showInputDebugWindow() {
     // Use config values
-    const DebugUIConfig::WindowLayout& layout = m_config.Layout;
+    const auto& layout = m_config.Layout;
     // Same stuff as before
     ImGui::SetNextWindowPos(ImVec2(layout.InputX, layout.InputY), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(layout.InputW, layout.InputH), ImGuiCond_Once);
@@ -432,7 +449,7 @@ void DebugUI::_showInputDebugWindow() {
 
 void DebugUI::_showGameObjectEditor() {
     // Same same
-    const DebugUIConfig::WindowLayout& layout = m_config.Layout;
+    const auto& layout = m_config.Layout;
     // Position the window to the right of existing windows
     ImGui::SetNextWindowPos(ImVec2(layout.EditorX, layout.EditorY), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(layout.EditorW, layout.EditorH), ImGuiCond_Once);
@@ -469,63 +486,93 @@ void DebugUI::_showGameObjectEditor() {
 
     ImGui::Separator();
 
-    ImGui::Text("Load Prefab");
+    static char prefabName[128] = "sample-enemy-prefab";
+    ImGui::InputText("Prefab Name", prefabName, sizeof(prefabName));
+    if (ImGui::Button("Load Prefab") && strlen(prefabName) > 0) {
+        std::ifstream file("assets/samples/" + std::string(prefabName) + ".prefab");
+        if (!file.is_open()) {
+            LOG_ERROR("Cannot open file: " << prefabName);
+        }
+        else {
+            try {
+                auto entityJson = nlohmann::json::parse(file);
+                file.close();
+
+                // Deserialize creates the entity internally
+                (void)Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+
+                _invalidateCache();
+            }
+            catch (const std::exception& e) {
+                LOG_ERROR("Failed to parse prefab file: " << e.what());
+            }
+        }
+    }
 
     // Display list of current objects
     const auto entities = m_world->GetEntityManager().GetAllEntities();
     ImGui::Text("Current Objects (%zu):", entities.size());
 
     // For each object
-    for (const EntityId& entId : entities) {
-		Entity entity = m_world->GetEntityManager().GetEntity(entId); // Ensure entity is valid
+    for (const auto& entId : entities) {
+        auto entity = m_world->GetEntityManager().GetEntity(entId); // Ensure entity is valid
 
         // Active status
         //ImGui::Text("%s", entity.GetName());
         std::stringstream oss;
-    	oss << "[" << entity.GetId() << "] " << entity.GetName();
+        oss << "[" << entity.GetId() << "] " << entity.GetName();
         if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(entId))) {
+            // Delete button for each object
+            if (ImGui::SmallButton(_getDeleteLabel(entId).c_str())) {
+                RemoveGameObject(entId);
+                break;
+            }
+
+            // Clone button for each object
+            ImGui::SameLine();
+            if (ImGui::SmallButton(_getCloneLabel(entId).c_str())) {
+                CloneGameObject(entity);
+                break;
+            }
+
             ImGui::SeparatorText("Transform");
 
-            ImGui::Text("Position");
-            ImGui::SetNextItemWidth(100.f);
-            ImGui::InputFloat(std::string("X##P" + std::to_string(entId)).c_str(), &entity.Transform().Position.X);
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(100.f);
-            ImGui::InputFloat(std::string("Y##P" + std::to_string(entId)).c_str(), &entity.Transform().Position.Y);
+            // Get pointer to transform component to ensure we're modifying the actual component
+            auto* transform = entity.GetComponent<Component::Transform>();
+            if (transform) {
+                // BEFORE modification
+                ImGui::Text("DEBUG: Current Scale: (%.2f, %.2f)", transform->Scale.X, transform->Scale.Y);
 
-            ImGui::SetNextItemWidth(100.f);
-            ImGui::InputFloat(std::string("Rotation##" + std::to_string(entId)).c_str(), &entity.Transform().Rotation);
+                ImGui::Text("Position");
+                ImGui::SetNextItemWidth(100.f);
+                ImGui::InputFloat(std::string("X##P" + std::to_string(entId)).c_str(), &transform->Position.X);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(100.f);
+                ImGui::InputFloat(std::string("Y##P" + std::to_string(entId)).c_str(), &transform->Position.Y);
 
-            ImGui::Text("Scale");
-            ImGui::SetNextItemWidth(100.f);
-            ImGui::InputFloat(std::string("X##S" + std::to_string(entId)).c_str(), &entity.Transform().Scale.X);
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(100.f);
-            ImGui::InputFloat(std::string("Y##S" + std::to_string(entId)).c_str(), &entity.Transform().Scale.Y);
+                ImGui::SetNextItemWidth(100.f);
+                ImGui::InputFloat(std::string("Rotation##" + std::to_string(entId)).c_str(), &transform->Rotation);
+
+                ImGui::Text("Scale");
+                ImGui::SetNextItemWidth(100.f);
+                if (ImGui::InputFloat(std::string("X##S" + std::to_string(entId)).c_str(), &transform->Scale.X)) {
+                    // Print when value changes
+                    std::cout << "Scale.X changed to: " << transform->Scale.X << std::endl;
+                }
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(100.f);
+                if (ImGui::InputFloat(std::string("Y##S" + std::to_string(entId)).c_str(), &transform->Scale.Y)) {
+                    std::cout << "Scale.Y changed to: " << transform->Scale.Y << std::endl;
+                }
+            }
         }
-		//  if (ImGui::Checkbox(oss.str().c_str(), &entity.IsActive)) {
-		//      Component::ShapeRenderer2D* renderer = entity.GetComponent<Component::ShapeRenderer2D>();
-		//      if (renderer) {
-		//          // Hide by setting alpha to 0, show by setting alpha to 1
-		//          renderer->FillColor.A = entity.IsActive ? 255 : 0;
-		//      }
-		//  }
-
-        // Delete button for each object
-        ImGui::SameLine();
-        // Unique button IDs
-        if (ImGui::SmallButton(_getDeleteLabel(entId).c_str())) {
-            RemoveGameObject(entId);
-            break;
-        }
-
-        // Clone button for each object
-        ImGui::SameLine();
-        // Unique button IDs
-        if (ImGui::SmallButton(_getCloneLabel(entId).c_str())) {
-            CloneGameObject(entity);
-            break;
-        }
+        //  if (ImGui::Checkbox(oss.str().c_str(), &entity.IsActive)) {
+        //      Component::ShapeRenderer2D* renderer = entity.GetComponent<Component::ShapeRenderer2D>();
+        //      if (renderer) {
+        //          // Hide by setting alpha to 0, show by setting alpha to 1
+        //          renderer->FillColor.A = entity.IsActive ? 255 : 0;
+        //      }
+        //  }
     }
     ImGui::Separator();
 
@@ -540,20 +587,20 @@ void DebugUI::_showGameObjectEditor() {
 // Helper function to create entities with basic components
 Entity DebugUI::_createGameEntity(const std::string& name) {
     // Create new entity in ECS
-    Entity entity = m_world->CreateEntity(name);
+    auto entity = m_world->CreateEntity(name);
 
     // Add basic components that most game objects need
     entity.AddComponent<Component::Transform>();
 
     // Visual components
-    Component::ShapeRenderer2D& shapeRenderer = entity.AddComponent<Component::ShapeRenderer2D>();
+    auto& shapeRenderer = entity.AddComponent<Component::ShapeRenderer2D>();
     shapeRenderer.Type = Component::ShapeRenderer2D::ShapeType::Circle;
     shapeRenderer.Radius = 35.0f;
 
     // Set color based on type
     if (name == "Player") shapeRenderer.FillColor = Color(0.0f, 0.0f, 1.0f, 1.0f);
     else if (name == "Enemy") shapeRenderer.FillColor = Color(1.0f, 0.0f, 0.0f, 1.0f);
-    else if (name == "Collectible") shapeRenderer.FillColor = Color(1.0f, 1.0f, 0.0f, 1.0f); 
+    else if (name == "Collectible") shapeRenderer.FillColor = Color(1.0f, 1.0f, 0.0f, 1.0f);
     else shapeRenderer.FillColor = Color(1.0f, 1.0f, 1.0f, 1.0f);
 
     // Add CircleCollider2D so physics test can detect and add physics
@@ -570,7 +617,7 @@ void DebugUI::_invalidateCache() {
 
 const std::string& DebugUI::_getDeleteLabel(const EntityId id) const {
     // Same thing
-    std::unordered_map<EntityId, std::string>::iterator it = m_cachedDeleteLabels.find(id);
+    auto it = m_cachedDeleteLabels.find(id);
     if (it == m_cachedDeleteLabels.end()) {
         // Build label
         std::string label = "Delete##" + std::to_string(id);
@@ -581,7 +628,7 @@ const std::string& DebugUI::_getDeleteLabel(const EntityId id) const {
 
 const std::string& DebugUI::_getCloneLabel(const EntityId id) const {
     // Same thing
-    std::unordered_map<EntityId, std::string>::iterator it = m_cachedCloneLabels.find(id);
+    auto it = m_cachedCloneLabels.find(id);
     if (it == m_cachedCloneLabels.end()) {
         // Build label
         std::string label = "Clone##" + std::to_string(id);
@@ -591,7 +638,7 @@ const std::string& DebugUI::_getCloneLabel(const EntityId id) const {
 }
 
 const bool& DebugUI::_getCollapsedHeaderBool(const EntityId id) const {
-    std::unordered_map<EntityId, bool>::iterator it = m_cachedCollapsedHeaders.find(id);
+    auto it = m_cachedCollapsedHeaders.find(id);
     if (it == m_cachedCollapsedHeaders.end()) {
         it = m_cachedCollapsedHeaders.insert({ id, false }).first;
     }

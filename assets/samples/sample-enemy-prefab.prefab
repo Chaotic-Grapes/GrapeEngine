@@ -1,7 +1,39 @@
 {
-  "name": "EnemyPrefab",
-  "components": {
-    "Transform": { "x": 250.0, "y": 250.0 },
-    "ShapeRenderer2D": { "type": "Circle", "radius": 25.0, "fillColor": [1,1,1,1] }
-  }
+  "Name": "PrefabSample",
+  "Components": [
+    {
+      "Type": "SpriteRenderer",
+      "Data": {
+        "Color": {
+          "A": 255,
+          "B": 127,
+          "G": 127,
+          "R": 255
+        },
+        "FlipX": false,
+        "FlipY": false,
+        "Height": 449,
+        "SortingLayerName": "Default",
+        "SortingOrder": 0,
+        "Sprite": "assets/textures/test/player.png",
+        "TextureId": 1,
+        "TexturePath": "assets/textures/test/player.png",
+        "Width": 224
+      }
+    },
+    {
+      "Type": "Transform",
+      "Data": {
+        "Position": {
+          "X": 650,
+          "Y": 750
+        },
+        "Rotation": 0,
+        "Scale": {
+          "X": 256,
+          "Y": 256
+        }
+      }
+    }
+  ]
 }

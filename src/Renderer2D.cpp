@@ -73,13 +73,18 @@ namespace Engine {
                 break;
             }
 
-            case Component::ShapeRenderer2D::ShapeType::Circle:
+            case Component::ShapeRenderer2D::ShapeType::Circle: {
+                // Apply transform scale to radius
+                // Use average of X and Y scale for uniform circle scaling
+                float scaledRadius = shape.Radius * ((transform.Scale.X + transform.Scale.Y) * 0.5f);
+                
                 DebugDraw2D::Circle(*m_renderer,
                     ToGlm(transform.Position),
-                    shape.Radius,
+                    scaledRadius,
                     ToGlm(shape.FillColor),
                     48, 0);
                 break;
+            }
             case Component::ShapeRenderer2D::ShapeType::Polygon: {
                 // Convert std::vector<Vector2> to std::vector<glm::vec2>
                 std::vector<glm::vec2> points;

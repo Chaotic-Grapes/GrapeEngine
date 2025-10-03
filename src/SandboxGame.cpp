@@ -3,21 +3,24 @@
 #include <iostream>
 #include "PhysicsCollision2DTest.h"
 #include "GraphicsTest.hpp"
-#include "GameObjectFactoryTest.h"
 #include "SerializationTest.h"
 #include "systems/WindowManager.h"
 #include "ResourceManagerTest.h"
 #include "MemoryTest.h"
+#include "Application.h"
+
 
 void SandboxGame::OnStart(SceneManager& sceneManager) {
+    // Get configuration from the application
+    const auto& config = Engine::CORE->GetConfig();
+    const int windowWidth = config.WindowConfig.Width;
+    const int windowHeight = config.WindowConfig.Height;
+
     std::cout << "Select test scene: \n";
     std::cout << "1. Physics & Collision 2D Test" << '\n';
     std::cout << "2. Graphics & Art Pipeline Test" << '\n';
-    //std::cout << "3. ECS Component Test" << '\n';
-	std::cout << "4. Game Object Factory Test" << '\n';
-    std::cout << "5. Serialization Check Test" << '\n';
-    std::cout << "6. Resource Manager Test" << '\n';
-    std::cout << "7. Memory Tracking Test" << '\n';
+    std::cout << "3. Serialization Check Test" << '\n';
+    std::cout << "4. Memory Tracking Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -29,45 +32,26 @@ void SandboxGame::OnStart(SceneManager& sceneManager) {
     case 1: { // PhysicsCollision
         std::cout << "Starting Physics & Collision 2D Test..." << '\n';
 
-        sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(1600, 900, 7.f));
+        sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(windowWidth, windowHeight, 7.0f));
         sceneManager.LoadScene("PhysicsCollision2DTestScene");
         break;
     }
     case 2: {
         std::cout << "Starting Graphics & Art Pipeline Test..." << '\n';
 
-        sceneManager.AddScene(new Sandbox::GraphicsTestScene(1600, 900));
+        sceneManager.AddScene(new Sandbox::GraphicsTestScene(windowWidth, windowHeight));
         sceneManager.LoadScene("GraphicsTestScene");
 
         break;
     }
-        //case 3:
-        //    std::cout << "ECS Component Test - TODO" << '\n';
-        //    break;
-    case 4: {
-		std::cout << "Starting Game Object Factory Test..." << '\n';
-
-		sceneManager.AddScene(new Sandbox::GameObjectFactoryTestScene());
-		sceneManager.LoadScene("GameObjectFactoryTestScene");
-        break;
-	}
-    case 5: {
+    case 3: {
         std::cout << "Starting Serialization Integrity Test..." << '\n';
 
         sceneManager.AddScene(new Sandbox::SerializationTestScene());
         sceneManager.LoadScene("SerializationTestScene");
         break;
     }
-    case 6: {
-        std::cout << "Starting ResourceManager Test..." << '\n';
-        // Create a minimal scene to get OpenGL context
-        sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(1600, 900, 7.f));
-        sceneManager.LoadScene("PhysicsCollision2DTestScene");
-
-        TestResourceManager();
-        break;
-    }
-    case 7: {
+    case 4: {
         std::cout << "Starting Memory Tracking Test..." << '\n';
         RunMemoryTests();
         break;
