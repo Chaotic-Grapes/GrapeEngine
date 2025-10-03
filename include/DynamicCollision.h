@@ -1,25 +1,28 @@
 /**
- * @file    DynamicCollision.h
- * @brief   2D collision types and APIs for discrete overlaps and swept (continuous) tests.
- *
- * @details Declares:
- *   • Shape primitives: AABB, Circle, Segment, ConvexPolygon, Triangle. :contentReference[oaicite:0]{index=0}
- *   • Utility: MakeEquilateral(center, side, angle) — builds a triangle oriented by angle. :contentReference[oaicite:1]{index=1}
- *   • Contact data:
- *       - Manifold { normal (B->A), penetration, contact, valid } for discrete tests. :contentReference[oaicite:2]{index=2}
- *       - SweepHit { toi?[0,1], normal (B->A), contactA/B, hit } for TOI queries. :contentReference[oaicite:3]{index=3}
- *   • Discrete overlaps: Triangle×AABB, AABB×AABB, Circle×Circle, Circle×AABB, Convex×Convex. :contentReference[oaicite:4]{index=4}
- *   • Swept tests (continuous): AABB×AABB, Circle×Circle, Circle×AABB (with end positions). :contentReference[oaicite:5]{index=5}
- *
- * @usage
- *   - Call Overlap(...) for frame-by-frame checks; use Sweep(...) to compute time-of-impact (TOI)
- *     and an impact normal suitable for basic response/slide logic. :contentReference[oaicite:6]{index=6}
- *
- * @dependencies
- *   - Math/Vector2D, <vector>, <cmath>. :contentReference[oaicite:7]{index=7}
- *
- * SPDX-License-Identifier: MIT
- */
+*   
+* @Name: Dalton koh, 2403250
+* @email: d.koh@digipen.edu
+* @file    DynamicCollision.h
+* @brief   2D collision types and APIs for discrete overlaps and swept (continuous) tests.
+* 
+* @details Declares:
+*   • Shape primitives: AABB, Circle, Segment, ConvexPolygon, Triangle. 
+*   • Utility: MakeEquilateral(center, side, angle) — builds a triangle oriented by angle.
+*   • Contact data:
+*       - Manifold { normal (B->A), penetration, contact, valid } for discrete tests.
+*       - SweepHit { toi?[0,1], normal (B->A), contactA/B, hit } for TOI queries. 
+*   • Discrete overlaps: Triangle×AABB, AABB×AABB, Circle×Circle, Circle×AABB, Convex×Convex. 
+*   • Swept tests (continuous): AABB×AABB, Circle×Circle, Circle×AABB (with end positions). 
+*
+* @usage
+*   - Call Overlap(...) for frame-by-frame checks; use Sweep(...) to compute time-of-impact (TOI)
+*     and an impact normal suitable for basic response/slide logic.
+*
+* @dependencies
+*   - Math/Vector2D, <vector>, <cmath>. 
+*
+* SPDX-License-Identifier: MIT
+*/
 
 #ifndef DYNAMICCOLLISION_H
 #define DYNAMICCOLLISION_H

@@ -28,7 +28,6 @@
  * @dependencies
  *   - DynamicCollision.h, Vector2D, <algorithm>, <cmath>. :contentReference[oaicite:20]{index=20}
  *
- * SPDX-License-Identifier: MIT
  */
 
 #include "DynamicCollision.h"

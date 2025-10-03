@@ -3,29 +3,27 @@
  * @brief   Sandbox scene for exercising 2D physics & collision features.
  *
  * @details Provides a switchable set of test modes:
- *   • PhysicsMovement — spawns balls, applies damping after a delay, and bounces within bounds. :contentReference[oaicite:21]{index=21}
- *   • CollisionDetection — hero circle vs static squares (AABB push-out). :contentReference[oaicite:22]{index=22}
- *   • PhysicsHero — triangle “hero” movement & clamping. :contentReference[oaicite:23]{index=23}
- *   • DynVStatResponse — falling cubes removed on swept hit against static squares. :contentReference[oaicite:24]{index=24}
- *   • DynVDynResponse — ball/ball collision with restitution & friction. :contentReference[oaicite:25]{index=25}
- *   • StepByStepUpdate — togglable (P) pause/step (Space) with state store/restore. :contentReference[oaicite:26]{index=26}
+ *   • PhysicsMovement — spawns balls, applies damping after a delay, and bounces within bounds. 
+ *   • CollisionDetection — hero circle vs static squares (AABB push-out).
+ *   • PhysicsHero — triangle "hero" movement & clamping. 
+ *   • DynVStatResponse — falling cubes removed on swept hit against static squares.
+ *   • DynVDynResponse — ball/ball collision with restitution & friction.
+ *   • StepByStepUpdate — togglable (P) pause/step (Space) with state store/restore. 
  *
  * Core helpers:
- *   - SpawnBalls/SpawnCubes and timed batch spawner. :contentReference[oaicite:27]{index=27}
- *   - UpdateBallCollisions: border resolution with scaled colliders. :contentReference[oaicite:28]{index=28}
- *   - CubeDisintegrate + UpdateCubesCollisions (hero/cube culling). :contentReference[oaicite:29]{index=29}
+ *   - SpawnBalls/SpawnCubes and timed batch spawner. 
+ *   - UpdateBallCollisions: border resolution with scaled colliders. 
+ *   - CubeDisintegrate + UpdateCubesCollisions (hero/cube culling).
  *
  * Controls
- *   - Press **P** to toggle step-by-step mode; **Space** to step while paused. :contentReference[oaicite:30]{index=30}
+ *   - Press **P** to toggle step-by-step mode; **Space** to step while paused. 
  *
  * @dependencies
- *   - World/ECS, Physics2D, Components (Rigidbody2D, ShapeRenderer2D, Colliders), Window/Time/Input. :contentReference[oaicite:31]{index=31}
- *
+ *   - World/ECS, Physics2D, Components (Rigidbody2D, ShapeRenderer2D, Colliders), Window/Time/Input. 
  * @notes
- *   - Apply transform scale to collision radii for visual-physics consistency. :contentReference[oaicite:32]{index=32}
- *   - Cubes are kept polygonal; half-size inferred from point bounds each frame. :contentReference[oaicite:33]{index=33}
+ *   - Apply transform scale to collision radii for visual-physics consistency.
+ *   - Cubes are kept polygonal; half-size inferred from point bounds each frame. 
  *
- * SPDX-License-Identifier: MIT
  */
 
 
