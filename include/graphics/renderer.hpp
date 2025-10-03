@@ -23,9 +23,8 @@ Features:
 #include <vector>
 #include <cstdint>
 #include <glad/glad.h>
-#include "vertex.hpp"
-#include "sprite.hpp"
-#include "font.hpp"
+#include "graphics/vertex.hpp"
+#include "graphics/sprite.hpp"
 
 class Renderer {
 public:

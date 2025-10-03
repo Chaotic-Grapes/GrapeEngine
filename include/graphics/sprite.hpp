@@ -26,7 +26,7 @@ SpriteAnimation:
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 #include <vector>
-#include "../include/GLFW/glfw3.h"
+#include <GLFW/glfw3.h>
 
 struct Sprite {
     glm::vec2 pos;              // center position

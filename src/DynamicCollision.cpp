@@ -1,13 +1,109 @@
-#include "../src/DyamicCollision.h"
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu 
+ * 
+ * @file    DynamicCollision.cpp
+ * @brief   Discrete overlap tests and swept (continuous) collision queries for 2D shapes.
+ *
+ * @details Implements:
+ *   • SAT overlap for Triangle vs AABB (triangle edge normals + box axes). :contentReference[oaicite:10]{index=10}
+ *   • Discrete overlap:
+ *       - AABB vs AABB (with minimal translation vector in Manifold). :contentReference[oaicite:11]{index=11}
+ *       - Circle vs Circle (normal, penetration, contact). :contentReference[oaicite:12]{index=12}
+ *       - Circle vs AABB (closest point, inside/outside handling). :contentReference[oaicite:13]{index=13}
+ *       - Convex vs Convex (edge normals on both polygons). :contentReference[oaicite:14]{index=14}
+ *   • Swept tests (continuous):
+ *       - AABB vs AABB using Minkowski expansion + slab raycast. :contentReference[oaicite:15]{index=15}
+ *       - Circle vs Circle analytical TOI (quadratic). :contentReference[oaicite:16]{index=16}
+ *       - Circle vs AABB via box expansion by radius + AABB sweep reuse. :contentReference[oaicite:17]{index=17}
+ *
+ * @usage
+ *   - Use Overlap(...) for discrete frame-by-frame tests (broad/narrow phase).
+ *   - Use Sweep(...) to compute time of impact and separating normal for CCD (continuous collision detection).
+ *
+ * @notes
+ *   - Helper functions provide dot/length/clamp/perp and polygon projection. :contentReference[oaicite:18]{index=18}
+ *   - All normals in sweep results point from target (B) to mover (A) at impact. :contentReference[oaicite:19]{index=19}
+ *
+ * @dependencies
+ *   - DynamicCollision.h, Vector2D, <algorithm>, <cmath>. :contentReference[oaicite:20]{index=20}
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include "DynamicCollision.h"
 #include <algorithm>
 #include <cmath>
-
 
 //helpers for squared length and float clamp
 static inline float Dot(const Vector2D& a, const Vector2D& b) { return a.X * b.X + a.Y * b.Y; }
 static inline float Len2(const Vector2D& v) { return Dot(v, v); }
 static inline float Clamp01(float t) { return (t < 0.f) ? 0.f : ((t > 1.f) ? 1.f : t); }
 
+static inline Vector2D perp(const Vector2D& e) { return Vector2D(-e.Y, e.X); } // 90° CCW
+
+static inline void projectPolygonOnAxis(const Vector2D* verts, int count,
+    const Vector2D& axis, float& outMin, float& outMax)
+{
+    
+    float p = verts[0].Dot(axis);
+    outMin = outMax = p;
+    for (int i = 1; i < count; ++i) {
+        p = verts[i].Dot(axis);
+        outMin = std::min(outMin, p);
+        outMax = std::max(outMax, p);
+    }
+}
+
+static inline void boxCorners(const DynCol::AABB& b, Vector2D out[4]) {
+    out[0] = { b.min.X, b.min.Y }; // BL
+    out[1] = { b.min.X, b.max.Y }; // TL
+    out[2] = { b.max.X, b.max.Y }; // TR
+    out[3] = { b.max.X, b.min.Y }; // BR
+}
+
+
+bool DynCol::Overlap(const Triangle& tri, const AABB& box) {
+    // Build lists of axes (triangle edge normals + box axes)
+    // SAT: if any axis separates the projections, shapes do NOT overlap.
+    Vector2D triVerts[3] = { tri.v0, tri.v1, tri.v2 };
+    Vector2D triEdges[3] = {
+        tri.v1 - tri.v0,
+        tri.v2 - tri.v1,
+        tri.v0 - tri.v2
+    };
+
+    Vector2D axes[5];
+    // Triangle edge normals (perp vectors)
+    axes[0] = perp(triEdges[0]);
+    axes[1] = perp(triEdges[1]);
+    axes[2] = perp(triEdges[2]);
+    // AABB axes (x and y) — sufficient for a box
+    axes[3] = Vector2D(1.0f, 0.0f);
+    axes[4] = Vector2D(0.0f, 1.0f);
+
+    // Box corners
+    Vector2D boxVerts[4];
+    boxCorners(box, boxVerts);
+
+    // Test all axes
+    for (int i = 0; i < 5; ++i) {
+        const Vector2D& axis = axes[i];
+
+        float tmin, tmax;
+        projectPolygonOnAxis(triVerts, 3, axis, tmin, tmax);
+
+        float bmin, bmax;
+        projectPolygonOnAxis(boxVerts, 4, axis, bmin, bmax);
+
+        // If projections are disjoint on any axis, no overlap
+        if (tmax < bmin || bmax < tmin) {
+            return false;
+        }
+    }
+    // No separating axis found -> overlap
+    return true;
+}
 
 // discrete means at the moment current frame
 // discrete AABB vs AABB 
@@ -38,7 +134,7 @@ bool DynCol::Overlap(const AABB& A, const AABB& B, Manifold* m) {
 
 //discrete circle vs circle
 bool DynCol::Overlap(const Circle& A, const Circle& B, Manifold* m) {
-    Vector2D d = { A.c.X - B.c.X, A.c.Y - B.c.Y };
+    Vector2D d = { B.c.X - A.c.X, B.c.Y - A.c.Y };
     float r = A.r + B.r;
     float d2 = Len2(d);
     if (d2 > r * r) return false;
@@ -151,14 +247,14 @@ DynCol::SweepHit DynCol::Sweep(const AABB& A, const Vector2D& A_end,
     Vector2D vB{ B_end.X - ((B.min.X + B.max.X) * 0.5f), B_end.Y - ((B.min.Y + B.max.Y) * 0.5f) };
     Vector2D vRel{ vA.X - vB.X, vA.Y - vB.Y };
 
-    // Expand B by A’s half extents (Minkowski sum) and test point vs expanded box:
+    // Expand B by Aï¿½s half extents (Minkowski sum) and test point vs expanded box:
     Vector2D hA{ (A.max.X - A.min.X) * 0.5f, (A.max.Y - A.min.Y) * 0.5f };
     DynCol::AABB E; // expanded box with center at B
     Vector2D cB{ (B.min.X + B.max.X) * 0.5f, (B.min.Y + B.max.Y) * 0.5f };
     E.min = { B.min.X - hA.X, B.min.Y - hA.Y };
     E.max = { B.max.X + hA.X, B.max.Y + hA.Y };
 
-    // Start point is A’s center
+    // Start point is Aï¿½s center
     Vector2D p0{ (A.min.X + A.max.X) * 0.5f, (A.min.Y + A.max.Y) * 0.5f };
     Vector2D p1{ p0.X + vRel.X, p0.Y + vRel.Y };
 
@@ -206,7 +302,7 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
 
     Vector2D vA{ A_end.X - A.c.X, A_end.Y - A.c.Y };
     Vector2D vB{ B_end.X - B.c.X, B_end.Y - B.c.Y };
-    Vector2D v{ vA.Y - vB.Y, vA.Y - vB.Y }; // relative motion (A wrt B)
+    Vector2D v{ vA.X - vB.X, vA.Y - vB.Y }; // relative motion (A wrt B)
 
     Vector2D w0{ A.c.X - B.c.X, A.c.Y - B.c.Y }; // initial offset
     float R = A.r + B.r;
@@ -260,6 +356,8 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
 DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
     const AABB& B, const Vector2D& B_end)
 {
+    (void)B_end;
+
     // Expand box by circle radius
     AABB E;
     E.min = { B.min.X - A.r, B.min.Y - A.r };

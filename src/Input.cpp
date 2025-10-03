@@ -1,7 +1,8 @@
 #include <Input.h>
-#include <iostream>
-#include <iomanip>
 #include <sstream>
+#include "messaging/MessageSystem.h"
+#include "messaging/MessageTypes.h"
+#include "systems/Logger.h"
 
 // Initialize static members
 GLFWwindow* Input::m_window = nullptr;
@@ -23,7 +24,7 @@ void Input::Initialize(GLFWwindow* pWin) {
 bool Input::IsKeyPressed(const int key) { return m_keyPressed[key]; }
 
 // Check if a specific key was just pressed this frame
-bool Input::IsKeyDown(const int key) { 
+bool Input::IsKeyDown(const int key) {
     //quick fix
     return glfwGetKey(m_window, key) == PRESS;
 }
@@ -67,9 +68,7 @@ void Input::SetupEventCallbacks() {
 // Called when GLFW encounters an error 
 void Input::ErrorCallback(const int error, char const* description) {
     (void)error;
-#ifdef _DEBUG
-    std::cerr << "GLFW error: " << description << "\n";
-#endif
+    LOG_ERROR("GLFW error: " << description);
 }
 
 // Called when window is resized
@@ -79,12 +78,6 @@ void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
     // Store the new window dimensions
     m_windowWidth = width;
     m_windowHeight = height;
-
-#ifdef _DEBUG
-    std::ostringstream oss;
-    oss << "Window is being resized: " << width << "x" << height;
-    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
-#endif
 }
 
 void Input::_processInput() {
@@ -98,41 +91,19 @@ void Input::_processInput() {
 // Called on keyboard key press/release
 void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
     (void)pWin;
-    (void)scancode;
     (void)mod;
+    (void)scancode;
 
     if (action == GLFW_PRESS) {
         m_keyDown[key] = true;
         m_keyPressed[key] = true;
+        Messaging::MessageSystem::Broadcast(Messaging::KeyPressed{ key });
     }
     else if (action == GLFW_RELEASE) {
         m_keyDown[key] = false;
         m_keyUp[key] = true;
+        Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key });
     }
-
-#ifdef _DEBUG
-    const char* keyName = "";
-    switch (key) {
-    case KEY_W: keyName = "W"; break;
-    case KEY_A: keyName = "A"; break;
-    case KEY_S: keyName = "S"; break;
-    case KEY_D: keyName = "D"; break;
-    case KEY_P: keyName = "P"; break;
-    case KEY_SPACE: keyName = "SPACE"; break;
-    case KEY_G: keyName = "G"; break;
-    default: keyName = "Unknown"; break;
-    }
-    // Debug-only code
-    std::string message;
-    if (action == PRESS)
-        message = "[Key] " + std::string(keyName) + " key pressed";
-    else if (action == REPEAT)
-        message = "[Key] " + std::string(keyName) + " key repeatedly pressed";
-    else if (action == RELEASE)
-        message = "[Key] " + std::string(keyName) + " key released";
-
-    std::cout << "\r" << std::setw(50) << std::left << message << std::flush;
-#endif
 }
 
 // Called on mouse button press/release
@@ -141,22 +112,6 @@ void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int m
     (void)button;
     (void)action;
     (void)mod;
-#ifdef _DEBUG
-    const char* buttonName = "";
-    switch (button) {
-    case MOUSE_LEFT: buttonName = "Left mouse button"; break;
-    case MOUSE_RIGHT: buttonName = "Right mouse button"; break;
-    default: buttonName = "Mouse button"; break;
-    }
-    // Debug-only code
-    std::string message;
-    if (action == PRESS)
-        message = "[Mouse] " + std::string(buttonName) + " pressed";
-    else if (action == RELEASE)
-        message = "[Mouse] " + std::string(buttonName) + " released";
-
-    std::cout << "\r" << std::setw(50) << std::left << message << std::flush;
-#endif
 }
 
 // Called when mouse cursor moves
@@ -164,11 +119,6 @@ void Input::_mousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
     (void)pWin;
     (void)xPos;
     (void)yPos;
-#ifdef _DEBUG
-    std::ostringstream oss;
-    oss << "Mouse cursor position: (" << std::fixed << std::setprecision(1) << xPos << ", " << yPos << ")";
-    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
-#endif
 }
 
 // Called when mouse wheel is scrolled
@@ -180,12 +130,6 @@ void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffse
     // Store the scroll offsets
     m_scrollX = xOffset;
     m_scrollY = yOffset;
-
-#ifdef _DEBUG
-    std::ostringstream oss;
-    oss << "Mouse scroll wheel offset: (" << std::fixed << std::setprecision(1) << xOffset << ", " << yOffset << ")";
-    std::cout << "\r" << std::setw(50) << std::left << oss.str() << std::flush;
-#endif
 }
 
 // Prints OpenGL system info (GPU, version, limits, etc.)
@@ -216,7 +160,8 @@ void Input::PrintSpecs() {
     glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBufferBindings); // Max buffer bindings
 
     // Print to output
-    std::cout << "GPU Vendor: " << vendorStr << "\n"
+    LOG_INFO("=== GPU Specifications ===" << "\n"
+        << "GPU Vendor: " << vendorStr << "\n"
         << "GL Renderer: " << rendererStr << "\n"
         << "GL Version: " << versionStr << "\n"
         << "GL Shader Version: " << shaderVersionStr << "\n"
@@ -226,8 +171,7 @@ void Input::PrintSpecs() {
         << "Maximum Vertex Count: " << maxVertices << "\n"
         << "Maximum Indices Count: " << maxIndices << "\n"
         << "GL Maximum texture size: " << maxTextureSize << "\n"
-        << "Maximum Viewport Dimensions: " << maxViewportDims[0]
-        << " x " << maxViewportDims[1] << "\n"
+        << "Maximum Viewport Dimensions: " << maxViewportDims[0] << " x " << maxViewportDims[1] << "\n"
         << "Maximum generic vertex attributes: " << maxVertexAttribs << "\n"
-        << "Maximum vertex buffer bindings: " << maxBufferBindings << "\n\n";
+        << "Maximum vertex buffer bindings: " << maxBufferBindings);
 }

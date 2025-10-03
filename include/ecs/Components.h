@@ -1,21 +1,54 @@
 #ifndef COMPONENTS_H
 #define COMPONENTS_H
 
-#include "ecs/IComponent.h"
-#include <string>
 #include "Math/Vector2D.h"
+#include "ecs/IComponent.h"
+#include <nlohmann/json.hpp>
+#include <string>
 #include "Color.h"
 #include "graphics/texture.hpp"
 #include "graphics/SpriteMetaData.hpp"
+// #include "graphics/TextureCache.hpp"
 #include <filesystem>
 #include <fstream>
-#include "../include/nlohmann/json.hpp"
-#include "../include/graphics/TextureCache.hpp"
 #include <vector>
 #include <iostream>
+#include "ResourceManager.h"
+
+/*
+================================================================================
+NOTE FOR DEVELOPERS:
+--------------------------------------------------------------------------------
+This project uses **nlohmann::json** for serialisation of all ECS Components.
+
+IMPORTANT CHANGES:
+    - All `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE` macros are now defined in
+      `EntitySerializer.h` instead of the bottom of this file.
+    - If you add a new Component struct, you MUST also add a corresponding macro
+      in `EntitySerializer.h` so that the type can be serialised/deserialised
+      properly.
+    - Nested types (like `Vector2D`, `Color`, etc.) must also have their macros
+      defined in `EntitySerializer.h` if they are used inside Components.
+    - Likewise, if you add/remove a data member/property to a Component, you
+      need to update the macro in `EntitySerializer.h`.
+
+Example:
+   struct MyComponent : IComponent {
+       int Value = 0;
+       std::string Name;
+   };
+
+   // In EntitySerializer.h:
+   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Component::MyComponent, Value, Name)
+
+This ensures that `nlohmann::json` can automatically handle conversions like:
+   json j = myComponent;                 // serialise
+   MyComponent c = j.get<MyComponent>(); // deserialise
+================================================================================
+*/
+
 
 namespace Component {
-    // TODO: Replace with a math library vector type
     struct Transform : IComponent {
         Vector2D Position {0, 0};
         float Rotation = 0;
@@ -23,6 +56,8 @@ namespace Component {
 
         Transform(const float x = 0, const float y = 0, const float rotation = 0, const float scaleX = 1.f, const float scaleY = 1.f)
             : Position({ x, y }), Rotation(rotation), Scale({ scaleX, scaleY }) {}
+
+        const char* GetTypeName() const override { return "Transform"; }
     };
 
     struct SpriteRenderer : IComponent {
@@ -35,13 +70,15 @@ namespace Component {
         bool FlipY = false;
         int SortingOrder = 0;
         std::string SortingLayerName = "Default";
+        std::string TexturePath;
+        std::string Sprite;
 
-        SpriteRenderer(const std::string& spritePath = "") {
+        SpriteRenderer(const std::string& spritePath = "") : TexturePath(spritePath), Sprite(spritePath) {
             if (!spritePath.empty()) {
-                const Texture& tex = TextureCache::Load(spritePath);
-                TextureId = tex.ID();
-                Width = tex.Width();
-                Height = tex.Height();
+                auto tex = RM.Get<Texture>(spritePath);
+                TextureId = tex->ID();
+                Width = tex->Width();
+                Height = tex->Height();
 
                 auto p = std::filesystem::path(spritePath);
                 auto filename = p.stem().string() + ".json";
@@ -71,6 +108,8 @@ namespace Component {
                 }
             }
         }
+
+        const char* GetTypeName() const override { return "SpriteRenderer"; }
     };
 
 	// TODO: SpriteShapeRenderer for splining shapes
@@ -118,11 +157,13 @@ namespace Component {
             s.Closed = closed;
             return s;
         }
+
+        const char* GetTypeName() const override { return "ShapeRenderer2D"; }
     };
 
     struct Rigidbody2D : IComponent {
         Vector2D LinearVelocity{ 0, 0 };
-        float Inertia = 0,
+             float Inertia = 0,
     		  AngularVelocity = 0,
 			  AngularDamping = 0.05f,
 			  LinearDamping = 0;
@@ -135,6 +176,8 @@ namespace Component {
         BodyType BodyType = Dynamic;
 
         Rigidbody2D(const float mass = 1.0f) : Mass(mass) {}
+
+        const char* GetTypeName() const override { return "Rigidbody2D"; }
     };
 
     struct Collider2D : IComponent {
@@ -143,18 +186,24 @@ namespace Component {
         int Layer = 0;                          // Physics layer
 
         Collider2D() = default;
+
+        const char* GetTypeName() const override { return "Collider2D"; }
     };
 
     struct BoxCollider2D : Collider2D {
         Vector2D Size{ 1.0f, 1.0f };       // Box dimensions
 
         BoxCollider2D(const float width = 1.f, const float height = 1.f) : Size(width, height) {}
+
+        const char* GetTypeName() const override { return "BoxCollider2D"; }
     };
 
     struct CircleCollider2D : Collider2D {
         float Radius = 0.5f;
 
         CircleCollider2D(const float radius = 0.5f) : Radius(radius) {}
+
+        const char* GetTypeName() const override { return "CircleCollider2D"; }
     };
 
     // Line renderer for static geometry
@@ -166,6 +215,8 @@ namespace Component {
 
         LineRenderer(const Vector2D& start = { 0,0 }, const Vector2D& end = { 0,0 }, const float thickness = 1.f)
             : Start(start), End(end), Thickness(thickness) {}
+
+        const char* GetTypeName() const override { return "LineRenderer"; }
     };
 }
 

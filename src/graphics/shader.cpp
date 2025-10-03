@@ -60,7 +60,7 @@ GLuint Shader::compileShader(GLenum type, const std::string& src) const {
 // Constructor: build shader program from vertex + fragment files
 Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
     std::cout << "Current working directory: "
-        << std::filesystem::current_path() << std::endl;
+        << std::filesystem::current_path() << std::endl << std::endl;
     std::string vsrc = loadFile(vertexPath);
     std::string fsrc = loadFile(fragmentPath);
 

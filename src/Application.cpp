@@ -1,17 +1,30 @@
-﻿#include "Application.h"
-
+#include "Application.h"
 #include <thread>
-#include <windows.h>
+#include "CrashDumping.h"
 #include "Input.h"
 #include "Physics2D.h"
+#include "Profiler.h"
 #include "systems/WindowManager.h"
 #include "ecs/Scene.h"
 #include "systems/Time.h"
 
 namespace Engine {
+    // Global pointer to the core engine
+    Application* CORE = nullptr;
     bool Application::m_shouldStop = false;
 
     void Application::Run(Game& game, const bool consoleFlag) {
+        // Set global pointer to this application instance
+        CORE = this;
+
+        // Initialize crash dumping system
+        Grape_Engine::CrashDumping::Initialize();
+        Grape_Engine::CrashDumping::SetProgramName("GrapeEngine");
+        Grape_Engine::CrashDumping::SetDumpCreateState(true);
+
+        // Load configuration first
+        Serialization::ConfigLoader::LoadConfig("../config.json", m_config);
+
 #if !_DEBUG
         if (consoleFlag)
             _enableConsole();
@@ -23,16 +36,16 @@ namespace Engine {
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
-        Scene* currentScene = nullptr;
-        
+        Scene* currentScene = m_sceneManager.GetActiveScene();
+
         while (!m_shouldStop) {
             const double frameStart = glfwGetTime();
-
+            Profiler::UpdateTime();
             // --- Input & Game Update ---
-			Input::_processInput();
+            Input::_processInput();
             auto* newScene = m_sceneManager.GetActiveScene();
-            const bool isNewScene = newScene == currentScene;
-            if (!isNewScene) {
+            const bool isNewScene = newScene != currentScene;
+            if (isNewScene) {
                 if (currentScene)
                     currentScene->Unload();
 
@@ -71,15 +84,7 @@ namespace Engine {
                     );
                 }
             }
-
-            // Apply forced set FPS (forces artificial slowdown like simulated)
-            if (Time::Fps() > 0) {
-                const double simulatedFrameTime = 1.0 / Time::Fps();
-                std::this_thread::sleep_for(
-                    std::chrono::duration<double>(simulatedFrameTime)
-                );
-            }
-		}
+        }
 
         if (currentScene) {
             game.OnShutdown(m_sceneManager);
@@ -90,7 +95,7 @@ namespace Engine {
     }
 
     void Application::Close() {
-		m_shouldStop = true;
+        m_shouldStop = true;
     }
 
     void Application::_enableConsole() {
@@ -105,7 +110,7 @@ namespace Engine {
 
     void Application::_disableConsole() {
 #ifdef _WIN32
-	    if (const HWND console = GetConsoleWindow())
+        if (const HWND console = GetConsoleWindow())
             ShowWindow(console, SW_HIDE);
 #endif
     }

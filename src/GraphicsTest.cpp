@@ -27,11 +27,9 @@ Features:
 #include "systems/WindowManager.h"
 #include <glm/glm.hpp>
 #include <iostream>
-#include <filesystem>
-#include <fstream>
 #include "systems/Time.h"
-#include "../include/Renderer2D.h"
-#include "../include/graphics/font.hpp"
+#include "graphics/font.hpp"
+#include "Renderer2D.h"
 
 using namespace Sandbox;
 using Component::LineRenderer;
@@ -47,7 +45,7 @@ GraphicsTestScene::GraphicsTestScene(int width, int height) : Scene("GraphicsTes
 }
 
 void GraphicsTestScene::OnLoad() {
-    std::cout << "\nGraphicsTestScene initialized" << std::endl;
+    std::cout << "\nGraphicsTestScene initialized" << '\n';
 }
 
 void GraphicsTestScene::OnUpdate() {
@@ -71,7 +69,7 @@ void GraphicsTestScene::OnUpdate() {
             m_TestEntities.clear();
 
             m_currentTest = static_cast<TestType>(current);
-            std::cout << "Switched to test " << current << std::endl;
+            std::cout << "Switched to test " << current << '\n';
 
             m_gHandled = true; // mark handled until key released
         }
@@ -115,7 +113,7 @@ void GraphicsTestScene::OnUpdate() {
 
             std::cout << "FPS: " << fps
                 << " | Flushes: " << r2d->GetFlushCount()
-                << std::endl;
+                << '\n';
 
             frameCount = 0;
             lastTime = now; // reset baseline
@@ -124,7 +122,7 @@ void GraphicsTestScene::OnUpdate() {
 }
 
 void GraphicsTestScene::OnUnload() {
-    std::cout << "GraphicsTestScene shutting down" << std::endl;
+    std::cout << "GraphicsTestScene shutting down" << '\n';
     m_batchSprites.clear();
 }
 
@@ -155,7 +153,7 @@ void GraphicsTestScene::runDebugDrawing() {
         auto& tr = sprite.Transform();
         tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/player.png");
+        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
         sr.Color = { 1.f, 1.f, 1.f, 1.f };
 
         tr.Scale = {
@@ -218,7 +216,7 @@ void GraphicsTestScene::runDebugDrawing() {
     GL_LINEAR may still be appropriate.
 
 \test
-    Expected outcome: Two 256×256 sprites appear centered at 40% and 60% of the
+    Expected outcome: Two 256ï¿½256 sprites appear centered at 40% and 60% of the
     screen width, showing their PNG textures accurately without color distortion
     at the edges.
 */
@@ -230,7 +228,7 @@ void GraphicsTestScene::runBasicSprites() {
         tr1.Position = { m_worldWidth * 0.4f, m_worldHeight * 0.5f };
         tr1.Scale = { 256.f, 256.f };
 
-        auto& sr1 = sprite1.AddComponent<SpriteRenderer>("assets/textures/test/player.png");
+        auto& sr1 = sprite1.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
         sr1.Color = { 1.f, 1.f, 1.f, 1.f };
 
         m_TestEntities.push_back(sprite1.GetId());
@@ -240,7 +238,7 @@ void GraphicsTestScene::runBasicSprites() {
         tr2.Position = { m_worldWidth * 0.6f, m_worldHeight * 0.5f };
         tr2.Scale = { 512.f, 512.f };
 
-        auto& sr2 = sprite2.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+        auto& sr2 = sprite2.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
         sr2.Color = { 1.f, 1.f, 1.f, 1.f };
 
         m_TestEntities.push_back(sprite2.GetId());
@@ -262,7 +260,7 @@ void GraphicsTestScene::runBackground() {
         tr.Scale = { m_worldWidth, m_worldHeight };
 
         // Add a SpriteRenderer component bound to johnPork.png
-        auto& sr = bg.AddComponent<SpriteRenderer>("assets/textures/test/johnPork.png");
+        auto& sr = bg.AddComponent<SpriteRenderer>("../assets/textures/test/johnPork.png");
         sr.Color = { 1.f, 1.f, 1.f, 1.f }; // no tint
 
         // Store the entity ID so it persists across frames
@@ -282,7 +280,7 @@ void GraphicsTestScene::runSpriteScaling() {
         tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
         tr.Scale = { 256.f, 256.f };
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/player.png");
+        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
         sr.Color = { 1.f, 1.f, 1.f, 1.f };
 
         m_TestEntities.push_back(sprite.GetId()); // store ID for later
@@ -313,7 +311,7 @@ void GraphicsTestScene::runSpriteRotation() {
         tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
         tr.Scale = { 512.f, 512.f };
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
         sr.Color = { 1.f, 1.f, 1.f, 1.f };
 
         m_TestEntities.push_back(sprite.GetId());
@@ -347,7 +345,7 @@ void GraphicsTestScene::runAnimation() {
     // Initialize animation once
     if (!initialized) {
         try {
-            animTexture = std::make_unique<Texture>("assets/textures/test/FishfolkSheet.png");
+            animTexture = std::make_unique<Texture>("../assets/textures/test/FishfolkSheet.png");
             GLuint texId = animTexture->ID();
             if (texId == 0) { std::cout << "ERROR: Failed to load animation texture!\n"; return; }
 
@@ -423,7 +421,7 @@ void GraphicsTestScene::runMultiAnimation() {
 
     if (!initialized) {
         try {
-            animTexture = std::make_unique<Texture>("assets/textures/test/FishfolkSheet.png");
+            animTexture = std::make_unique<Texture>("../assets/textures/test/FishfolkSheet.png");
             GLuint texId = animTexture->ID();
             if (texId == 0) {
                 std::cout << "ERROR: Failed to load animation texture!\n";
@@ -512,11 +510,11 @@ void GraphicsTestScene::runBatchStress() {
                 16.f + (rand() % 32)
             };
 
-            // Randomize rotation (0–359 degrees)
+            // Randomize rotation (0ï¿½359 degrees)
             tr.Rotation = static_cast<float>(rand() % 360);
 
             // Add sprite renderer with a test texture
-            auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
 
             // Vary tint color (optional visual variety)
             sr.Color = {
@@ -557,7 +555,7 @@ void GraphicsTestScene::runBatchStress() {
 
     if (timeAccum >= 1.0f) {
         float fps = frameCounter / timeAccum;
-        std::cout << "FPS: " << fps << std::endl;
+        std::cout << "FPS: " << fps << '\n';
 
         timeAccum = 0.0f;
         frameCounter = 0;
@@ -578,7 +576,7 @@ void GraphicsTestScene::runBatchStress() {
 
     // Load texture once
     static bool initialized = false;
-    static Texture texture("assets/textures/test/fishBoy.png");
+    static Texture texture("../assets/textures/test/fishBoy.png");
     static GLuint textureId = 0;
 
     struct SpriteData {
@@ -607,7 +605,7 @@ void GraphicsTestScene::runBatchStress() {
                 1.f
             };
 
-            // Random speed between 30–120 degrees/sec
+            // Random speed between 30ï¿½120 degrees/sec
             float speed = 30.f + (rand() % 90);
 
             sprites.push_back({
@@ -694,7 +692,7 @@ void GraphicsTestScene::runFontSystem() {
     // - Ascender/descender overlaps (if, fl, yj, yp)
     // - Baseline/bearing alignment (mmm, iii, lll, HHO)
     // - Mixed-case spacing (UI, Il, Ty, Fo)
-    // - Punctuation placement (.,?!;:“”‘’ -- …)
+    // - Punctuation placement (.,?!;:ï¿½ï¿½ï¿½ï¿½ -- ï¿½)
     // Render this to visually inspect spacing, kerning, and glyph metrics accuracy
     renderer->submitText(*font,
         "AV AW To Yo Wa Fo\n"
@@ -714,12 +712,12 @@ void GraphicsTestScene::runFontSystem() {
 // ============================================================
 
 void GraphicsTestScene::debugPerformance() {
-    std::cout << "\n=== PERFORMANCE DEBUGGING ===" << std::endl;
-    std::cout << "1) Run with no updates (baseline rendering)" << std::endl;
-    std::cout << "2) Try small batch sizes (100, 500, 1000 sprites)" << std::endl;
-    std::cout << "3) Verify if all sprites use same texture" << std::endl;
-    std::cout << "4) Check buffer capacity vs 2500 sprites (~10k verts, 15k indices)" << std::endl;
-    std::cout << "=============================\n" << std::endl;
+    std::cout << "\n=== PERFORMANCE DEBUGGING ===" << '\n';
+    std::cout << "1) Run with no updates (baseline rendering)" << '\n';
+    std::cout << "2) Try small batch sizes (100, 500, 1000 sprites)" << '\n';
+    std::cout << "3) Verify if all sprites use same texture" << '\n';
+    std::cout << "4) Check buffer capacity vs 2500 sprites (~10k verts, 15k indices)" << '\n';
+    std::cout << "=============================\n" << '\n';
 }
 
 void GraphicsTestScene::testSingleTexture() {
@@ -741,21 +739,21 @@ void GraphicsTestScene::testSingleTexture() {
             tr.Scale = { 32.f, 32.f };
 
             // All sprites share the same texture
-            auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
             sr.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
             m_TestEntities.push_back(sprite.GetId());
         }
 
-        std::cout << "Spawned " << count << " identical sprites (same texture & color)" << std::endl;
+        std::cout << "Spawned " << count << " identical sprites (same texture & color)" << '\n';
         return;
     }
 
-    // No updates — measure raw rendering cost
+    // No updates ï¿½ measure raw rendering cost
     static int frameCount = 0;
     frameCount++;
     if (frameCount % 60 == 0) {
-        std::cout << "SingleTexture FPS: " << (1.0f / Time::DeltaTime()) << std::endl;
+        std::cout << "SingleTexture FPS: " << (1.0f / Time::DeltaTime()) << '\n';
     }
 }
 
@@ -764,7 +762,7 @@ void GraphicsTestScene::analyzeRenderer() {
     auto* renderer2D = world.GetSystem<Engine::Renderer2D>();
 
     if (!renderer2D) {
-        std::cout << "ERROR: Renderer2D system not found!" << std::endl;
+        std::cout << "ERROR: Renderer2D system not found!" << '\n';
         return;
     }
 
@@ -772,16 +770,16 @@ void GraphicsTestScene::analyzeRenderer() {
     frameCount++;
     if (frameCount % 60 == 0) {
         int flushes = renderer2D->GetFlushCount();
-        std::cout << "\n=== RENDERER ANALYSIS ===" << std::endl;
-        std::cout << "Flushes this frame: " << flushes << std::endl;
+        std::cout << "\n=== RENDERER ANALYSIS ===" << '\n';
+        std::cout << "Flushes this frame: " << flushes << '\n';
         if (flushes > 10) {
-            std::cout << "Too many flushes! Likely texture switches or buffer overflows..." << std::endl;
+            std::cout << "Too many flushes! Likely texture switches or buffer overflows..." << '\n';
         }
         else if (flushes == 1) {
-            std::cout << "Single batch, bottleneck is CPU-side or GPU fillrate" << std::endl;
+            std::cout << "Single batch, bottleneck is CPU-side or GPU fillrate" << '\n';
         }
-        std::cout << "FPS: " << (1.0f / Time::DeltaTime()) << std::endl;
-        std::cout << "=========================\n" << std::endl;
+        std::cout << "FPS: " << (1.0f / Time::DeltaTime()) << '\n';
+        std::cout << "=========================\n" << '\n';
     }
 }
 
@@ -795,13 +793,13 @@ void GraphicsTestScene::testSmallBatch() {
             tr.Position = { 100.0f + (i % 10) * 64.0f, 100.0f + (i / 10) * 64.0f };
             tr.Scale = { 32.f, 32.f };
 
-            auto& sr = sprite.AddComponent<SpriteRenderer>("assets/textures/test/fishBoy.png");
+            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
             sr.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
             m_TestEntities.push_back(sprite.GetId());
         }
 
-        std::cout << "Spawned small batch: " << count << " sprites" << std::endl;
+        std::cout << "Spawned small batch: " << count << " sprites" << '\n';
         return;
     }
 
@@ -809,9 +807,9 @@ void GraphicsTestScene::testSmallBatch() {
     frameCount++;
     if (frameCount % 60 == 0) {
         float fps = (1.0f / Time::DeltaTime());
-        std::cout << "100-sprite test FPS: " << fps << std::endl;
+        std::cout << "100-sprite test FPS: " << fps << '\n';
         if (fps < 100) {
-            std::cout << "Even 100 sprites are slow, that means the bottleneck is NOT batch size!!!" << std::endl;
+            std::cout << "Even 100 sprites are slow, that means the bottleneck is NOT batch size!!!" << '\n';
         }
     }
 }

@@ -1,49 +1,104 @@
 #ifndef DEBUGUI_H
 #define DEBUGUI_H
-
 #include <vector>
 #include <string>
+#include "System.h"
+#include "Audio.h"
+#include <unordered_map>
+#include "ecs/Entity.h"
 
-// Forward declare GLFWwindow to avoid including GLFW here
+// Forward declarations (avoid unnecessary includes)
 struct GLFWwindow;
+class World;
 
-// Simple GameObject structure for the editor
-struct GameObject {
-    int Id;
-    std::string Name;
-    float Position[3] = { 0.0f, 0.0f, 0.0f };  // x, y, z
-    float Rotation[3] = { 0.0f, 0.0f, 0.0f };  // Same same
-    float Scale[3] = { 1.0f, 1.0f, 1.0f };    
-    bool IsActive = true;
+// Configuration for DebugUI
+struct DebugUIConfig {
+    float FontScale = 1.35f;
 
-    GameObject(int id, const std::string& name) : Id(id), Name(name) {}
+    // Window positions and sizes
+    struct WindowLayout {
+        float EngineX = 10.0f, EngineY = 10.0f;
+        float EngineW = 300.0f, EngineH = 150.0f;
+
+        float InputX = 330.0f, InputY = 10.0f;
+        float InputW = 320.0f, InputH = 400.0f;
+
+        float EditorX = 670.0f, EditorY = 10.0f;
+        float EditorW = 375.0f, EditorH = 400.0f;
+
+        float PerfX = 1065.0f, PerfY = 10.0f;
+        float PerfW = 300.0f, PerfH = 400.0f;
+    } Layout;
+
+    // Buffer sizes
+    static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;
 };
 
 class DebugUI {
 public:
-    static void Initialize(GLFWwindow* pWin);  // Call after OpenGL context exists
-    static void NewFrame();  // Start new ImGUI frame before creating UI elements
-    static void Render();    // Render all debug windows and send to GPU 
-    static void Shutdown();  // Cleanup
-    static void SetEnabled(bool enabled) { m_enabled = enabled; } // Enable or disable entire debug UI
-    static bool IsEnabled() { return m_enabled; } // Check if UI is currently enabled
+    // 2 args: ref to World obj and ref to config struct
+    explicit DebugUI(World* world, const DebugUIConfig& config = {});
+    ~DebugUI();
+
+    // Core functionality
+    void Initialize(GLFWwindow* pWin);  // Call after OpenGL context exists
+    void NewFrame();  // Start new ImGUI frame before creating UI elements
+    void Render();    // Render all debug windows and send to GPU 
+    void Shutdown();  // Cleanup
+
+    // State management
+    void SetEnabled(bool enabled) { m_enabled = enabled; } // Enable or disable entire debug UI
+    bool IsEnabled() const { return m_enabled; } // Check if UI is currently enabled
+
+    // Set the world reference so we can create/manage entities
+    void SetWorld(World* world) { m_world = world; }
+    bool HasValidWorld() const;
+
+    // Audio management
+    static void AttachAudio(Systems::Audio * audio);
+    static void DetachAudio();
 
     // Game object management (find, add, remove)
-    static std::vector<GameObject>& GetGameObjects() { return m_gameObjects; }
-    static GameObject* FindGameObject(int id);
-    static void AddGameObject(const std::string& name);
-    static void RemoveGameObject(int id);
+    void AddGameObject(const std::string& name);
+    void RemoveGameObject(EntityId id);
+    void CloneGameObject(const Entity& entity);
+    void ClearAllGameObjects();
 
 private:
-    // Game object storage
-    static std::vector<GameObject> m_gameObjects;
-    static int m_nextGameObjectId;
+    // Configuration and state
+    DebugUIConfig m_config;
+    World* m_world;  // World reference for entity creation/management
+    bool m_enabled = false;
+    bool m_initialized = false;
 
-    static bool m_enabled;  // Control whether UI is visible or hidden
-    static void _showEngineDebugWindow(bool& showDemo); // Main debug console window with engine status
-    static void _showPerformanceWindow();  // Performance monitoring window
-    static void _showInputDebugWindow();   // Input debugging
-    static void _showGameObjectEditor();   // Game object editor window
+    // UI state
+    bool m_showDemo = false;
+    std::string m_newObjectName = "NewObject";
+
+    // Event counters for input debugging
+    int m_spacePressed = 0;
+    int m_spaceReleased = 0;
+
+    // Cached button labels to avoid string creation every frame
+    // Avoid doing stuff like Delete##something
+    // Mutable because the methods that access these caches are marked const
+    mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;
+    mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;
+    mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;
+
+    // UI rendering methods
+    void _showEngineDebugWindow();  // Main debug console window with engine status
+    void _showPerformanceWindow();  // Performance monitoring window
+    void _showInputDebugWindow();   // Input debugging
+    void _showGameObjectEditor();   // Game object editor window
+    static void _showAudioWindow(Systems::Audio& audio);  // Audio editor window
+
+    // Helper to create entities with basic components
+    Entity _createGameEntity(const std::string& name);
+    void _invalidateCache();
+    const std::string& _getDeleteLabel(EntityId id) const;
+    const std::string& _getCloneLabel(EntityId id) const;
+    const bool& _getCollapsedHeaderBool(EntityId id) const;
 };
 
 #endif

@@ -17,6 +17,9 @@ public:
     Entity& operator=(Entity&& other) noexcept = default;
 
     EntityId GetId() const;
+    void SetName(const std::string& newName);
+	// bool IsActive() const;
+	// void SetActive(bool active);
     std::string GetName() const;
     Entity Clone() const;
 
@@ -43,6 +46,7 @@ private:
     EntityId m_id;
     std::string m_name;
     World* m_world = nullptr;
+	// bool m_isActive{ true };
 };
 
 #include "Entity.inl"

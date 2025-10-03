@@ -19,7 +19,7 @@ Features:
 */
 /* End Header *******************************************************************/
 
-#include "../include/graphics/sprite.hpp"
+#include "graphics/sprite.hpp"
 #include <GLFW/glfw3.h>
 
 // ctor: figure out how many rows/cols the spritesheet has

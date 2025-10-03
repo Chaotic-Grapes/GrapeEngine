@@ -1,4 +1,5 @@
 #include "ecs/World.h"
+#include "Profiler.h"
 #include "ecs/Entity.h"
 
 void World::_initialize() const {
@@ -7,8 +8,14 @@ void World::_initialize() const {
 }
 
 void World::_update() const {
-    for (auto& sys : m_systems)
+    for (auto& sys : m_systems) {
+#ifdef _DEBUG
+		ProfileScope scope(sys->Name());
+#endif
         sys->OnUpdate();
+    }
+
+    // End timing for overall game loop
 }
 
 void World::_fixedUpdate() const {

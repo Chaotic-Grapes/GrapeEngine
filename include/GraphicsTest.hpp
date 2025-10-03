@@ -33,7 +33,7 @@ namespace Sandbox {
         void OnUpdate() override;
         void OnUnload() override;
 
-        // NOTE: The enum values (1201–1210) are aligned with the official
+        // NOTE: The enum values (1201ï¿½1210) are aligned with the official
         // rubric test IDs from M1. This makes it easy to cross-reference
         // between engine code and grading requirements.
         enum class TestType {

@@ -6,9 +6,12 @@
 #include "ecs/EntityManager.h"
 #include "ecs/ISystem.h"
 #include "systems/Behaviour.h"
+#include "systems/AudioEngine.h"
 
 class Entity;
 class Scene;
+namespace Engine { class Application; } // Forward declaration for friend class
+
 class World {
 public:
     World() { m_entityManager.SetWorld(this); }
@@ -29,12 +32,16 @@ public:
     template<typename T, typename... Args>
     T& AddBehaviour(Entity& entity, Args&&... args);
 
+    template<typename T>
+    void ForEachEntity(T func);
+
     void RemoveAllBehaviours(const Entity& entity);
 
     const std::unordered_map<EntityId, std::vector<std::unique_ptr<Behaviour>>>& GetBehaviours() const;
 
 private:
 	friend class Scene;
+    friend class Engine::Application;
 
 	EntityManager m_entityManager;
 	std::vector<std::unique_ptr<Engine::ISystem>> m_systems;
