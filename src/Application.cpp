@@ -1,4 +1,4 @@
-﻿#include "Application.h"
+#include "Application.h"
 #include <thread>
 #include "CrashDumping.h"
 #include "Input.h"
@@ -21,6 +21,9 @@ namespace Engine {
         Grape_Engine::CrashDumping::Initialize();
         Grape_Engine::CrashDumping::SetProgramName("GrapeEngine");
         Grape_Engine::CrashDumping::SetDumpCreateState(true);
+
+        // Load configuration first
+        Serialization::ConfigLoader::LoadConfig("../config.json", m_config);
 
 #if !_DEBUG
         if (consoleFlag)

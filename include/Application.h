@@ -1,4 +1,4 @@
-﻿#ifndef APPLICATION_H
+#ifndef APPLICATION_H
 #define APPLICATION_H
 
 #include <windows.h>
@@ -13,6 +13,11 @@ namespace Engine {
          * @brief Access the SceneManager for creating/loading/unloading scenes
          */
         SceneManager& GetSceneManager() { return m_sceneManager; }
+
+        /**
+         * @brief Get the application configuration
+         */
+        const ApplicationConfig& GetConfig() const { return m_config; }
 
         /**
          * @brief Starts the engine
@@ -33,7 +38,10 @@ namespace Engine {
         // Scene manager
         SceneManager m_sceneManager;
 
-        // Functions to enable/disable console output
+        // Application configuration
+        ApplicationConfig m_config;
+
+		// Functions to enable/disable console output
         static void _enableConsole();
         static void _disableConsole();
     };
