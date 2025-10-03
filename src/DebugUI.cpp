@@ -148,36 +148,12 @@ void DebugUI::CloneGameObject(const Entity& entity) {
     const auto entitiesBefore = m_world->GetEntityManager().GetAllEntities();
     const auto beforeCount = entitiesBefore.size();
 
-    entity.Clone();
+    auto cloned = entity.Clone();
 
-    // Get the newly cloned entity (should be the last one)
-    const auto entitiesAfter = m_world->GetEntityManager().GetAllEntities();
-    if (entitiesAfter.size() > beforeCount) {
-        // Find the new entity ID by comparing before/after
-        EntityId newId = 0;
-        for (const auto& id : entitiesAfter) {
-            bool isNew = true;
-            for (const auto& oldId : entitiesBefore) {
-                if (id == oldId) {
-                    isNew = false;
-                    break;
-                }
-            }
-            if (isNew) {
-                newId = id;
-                break;
-            }
-        }
-
-        if (newId != 0) {
-            auto cloned = m_world->GetEntityManager().GetEntity(newId);
-
-            // Offset position so clone doesn't overlap original
-            auto& transform = cloned.Transform();
-            transform.Position.X += 50.0f;
-            transform.Position.Y += 50.0f;
-        }
-    }
+    // Offset position so clone doesn't overlap original
+    auto& transform = cloned.Transform();
+    transform.Position.X += 50.0f;
+    transform.Position.Y += 50.0f;
 
     _invalidateCache();
 }
@@ -521,41 +497,8 @@ void DebugUI::_showGameObjectEditor() {
                 auto entityJson = nlohmann::json::parse(file);
                 file.close();
 
-                // Get entity count before deserialization
-                const auto entitiesBefore = m_world->GetEntityManager().GetAllEntities();
-                const auto beforeCount = entitiesBefore.size();
-
                 // Deserialize creates the entity internally
-                Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
-
-                // Get the newly created entity (should be the last one added)
-                const auto entitiesAfter = m_world->GetEntityManager().GetAllEntities();
-                if (entitiesAfter.size() > beforeCount) {
-                    // Find the new entity ID by comparing before/after
-                    EntityId newId = 0;
-                    for (const auto& id : entitiesAfter) {
-                        bool isNew = true;
-                        for (const auto& oldId : entitiesBefore) {
-                            if (id == oldId) {
-                                isNew = false;
-                                break;
-                            }
-                        }
-                        if (isNew) {
-                            newId = id;
-                            break;
-                        }
-                    }
-
-                    if (newId != 0) {
-                        auto loadedEntity = m_world->GetEntityManager().GetEntity(newId);
-
-                        // Randomize position to avoid spawning at (0,0)
-                        auto& transform = loadedEntity.Transform();
-                        transform.Position.X = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
-                        transform.Position.Y = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
-                    }
-                }
+                (void)Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
 
                 _invalidateCache();
             }

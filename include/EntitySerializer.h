@@ -21,9 +21,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Component::Transform,
 	Position, Rotation, Scale
 )
 
-// SpriteRenderer (excluding TextureId, Width, Height, Meta)
+// SpriteRenderer (excluding TextureId, Meta)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Component::SpriteRenderer,
-	TextureId, Width, Height,
+	Width, Height,
 	Color, FlipX, FlipY,
 	SortingOrder, SortingLayerName,
 	TexturePath, Sprite
@@ -149,7 +149,7 @@ namespace Serialization {
 		}
 
 		// deserializes an entity from JSON and adds it to the world
-		static void DeserializeEntity(World& world, const json& entityJson) {
+		static Entity DeserializeEntity(World& world, const json& entityJson) {
 			InitializeRegistry();
 
 			std::string entityName = entityJson.value("Name", "GameObject");
@@ -157,7 +157,7 @@ namespace Serialization {
 			// create new entity in the world
 			Entity entity = world.CreateEntity(entityName);
 
-			LOG_DEBUG("\n=== Deserializing Entity ===");
+			LOG_DEBUG("=== Deserializing Entity ===");
 			LOG_DEBUG("Created entity ID: " << entity.GetId() << ", Name: " << entityName);
 
 			// deserialize all components
@@ -167,8 +167,22 @@ namespace Serialization {
 						std::string typeName = componentEntry["Type"];
 						auto it = s_deserializationRegistry.find(typeName);
 
+						// A little messy but needed
+						// SpriteRenderer has a custom constructor that takes a texture path
+						// and is needed to initialize the component properly.
 						if (it != s_deserializationRegistry.end()) {
-							it->second(entity, componentEntry["Data"]);
+							if (typeName == "SpriteRenderer") {
+								const auto& data = componentEntry["Data"];
+								if (!entity.HasComponent<Component::SpriteRenderer>()) {
+									std::string path = data.value("TexturePath", "");
+									entity.AddComponent<Component::SpriteRenderer>(path);
+								}
+								if (auto* component = entity.GetComponent<Component::SpriteRenderer>()) {
+									from_json(data, *component);
+								}
+							} else {
+								it->second(entity, componentEntry["Data"]);
+							}
 						}
 						else {
 							LOG_WARNING("Unknown component type: " << typeName);
@@ -178,6 +192,7 @@ namespace Serialization {
 			}
 
 			LOG_DEBUG("=== Finished Deserializing Entity ===");
+			return entity;
 		}
 	};
 }

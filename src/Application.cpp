@@ -44,8 +44,8 @@ namespace Engine {
             // --- Input & Game Update ---
             Input::_processInput();
             auto* newScene = m_sceneManager.GetActiveScene();
-            const bool isNewScene = newScene == currentScene;
-            if (!isNewScene) {
+            const bool isNewScene = newScene != currentScene;
+            if (isNewScene) {
                 if (currentScene)
                     currentScene->Unload();
 
