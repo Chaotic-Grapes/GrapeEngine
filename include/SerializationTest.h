@@ -1,16 +1,3 @@
-/**
- * @file    SerializationTest.h
- * @author  k.danielneozuofeng
- * @date    26/09/2025
- * @brief   Automated test scene for serialization system
- *
- * This header defines the SerializationTestScene class, a sandbox
- * scene used to verify serialization and deserialization of entities
- * and components. It creates test entities, saves and reloads a scene,
- * and compares the results against expected data to ensure correctness.
- */
-
-
 #ifndef SERIALIZATIONTEST_H
 #define SERIALIZATIONTEST_H
 
