@@ -8,6 +8,7 @@
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include "DynamicCollision.h"
+#include "collision.h"
 
 namespace Sandbox {
     class PhysicsCollision2DTestScene : public Scene {
@@ -61,8 +62,8 @@ namespace Sandbox {
 
         std::unordered_map<uint32_t, BallState> m_storedBallStates;
 
+        //storage for entities
         std::vector<Entity> m_balls;
-        //std::vector<Entity> m_boundaryLines;
         std::vector<Entity> m_seacubes;
         std::vector<uint32_t>m_staticsquares;
 
@@ -74,9 +75,10 @@ namespace Sandbox {
         void CreateHeroCircle();
         void ClampAndBounceCircleHero();
 
+
         float Cradius = 70.0f;
 
-
+        EntityId m_midLineId = UINT32_MAX;
         EntityId m_playerId = UINT32_MAX;
         float m_triHalfHeight = 48.0f;
         float m_triHalfBase = 48.0f;

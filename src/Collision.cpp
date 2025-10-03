@@ -9,9 +9,8 @@ namespace {
     constexpr float BIGF = std::numeric_limits<float>::max();
 }
 
-/* ================================================================
-   Builders
-   ================================================================ */
+
+//Builders
 Collision::LineSegment Collision::MakeSegment(const Vector2D& p0, const Vector2D& p1) {
     LineSegment s;
     s.p0 = p0;
@@ -26,9 +25,8 @@ Collision::LineSegment Collision::MakeSegment(const Vector2D& p0, const Vector2D
     return s;
 }
 
-/* ================================================================
-   Quadratic solver
-   ================================================================ */
+
+//Quadratic solver
 bool Collision::solveQuadratic(float a, float b, float c, float& t0, float& t1) {
     if (std::fabs(a) < EPS) {
         if (std::fabs(b) < EPS) return false;
@@ -46,9 +44,8 @@ bool Collision::solveQuadratic(float a, float b, float c, float& t0, float& t1) 
     return true;
 }
 
-/* ================================================================
-   Swept point (circle center) vs point (segment endpoint)
-   ================================================================ */
+
+// Swept point (circle center) vs point (segment endpoint)
 bool Collision::pointSweepHitCircle(const Vector2D& C0, const Vector2D& C1,
     const Vector2D& P, float radius,
     float& tHit, Vector2D& normalAtHit)

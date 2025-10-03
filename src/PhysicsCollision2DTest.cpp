@@ -42,6 +42,16 @@ namespace {
         // Fallback if cur isn't in the list
         return kCycleOrder[0];
     }
+
+    inline EntityId ToId(EntityId id) { return id; }
+    inline EntityId ToId(const Entity& e) { return e.GetId(); }
+
+    // Call IsAlive when you only have an id
+    inline bool IsAliveById(EntityManager& em, World& world, EntityId id) {
+        Entity tmp{ id, &world, "" };                 // matches your ctor (id, world*, name)
+        return em.IsAlive(tmp);                     // your IsAlive(const Entity&) overload
+    }
+
 }
 
 
@@ -130,35 +140,53 @@ void Sandbox::PhysicsCollision2DTestScene::OnFixedUpdate() {
     UpdateCubesCollisions(world);
 }
 
-
 void Sandbox::PhysicsCollision2DTestScene::OnUnload() {
     World& world = GetWorld();
+    auto& em = world.GetEntityManager();
 
-    for (auto& e : m_balls)   world.GetEntityManager().DestroyEntity(e);
-    for (auto& e : m_seacubes)world.GetEntityManager().DestroyEntity(e);
-    if (m_playerId != UINT32_MAX)
-        world.GetEntityManager().DestroyEntity(Entity(m_playerId, &world));
+    Engine::Physics2D::SetEnabled(false);
 
-    // Destroy blocker squares too
-    for (EntityId id : m_staticsquares) {
-        world.GetEntityManager().DestroyEntity(Entity(id, &world));
+    std::unordered_set<EntityId> ids;
+    ids.reserve(m_balls.size() + m_seacubes.size() + m_staticsquares.size() + 4);
+
+    auto add_if_valid = [&](EntityId id) {
+        if (id != UINT32_MAX) ids.insert(id);
+        };
+
+    // only if valid
+    for (const auto& it : m_balls)    add_if_valid(ToId(it));
+    for (const auto& it : m_seacubes) add_if_valid(ToId(it));
+    for (EntityId id : m_staticsquares) add_if_valid(id);
+
+    add_if_valid(m_playerId);
+    add_if_valid(m_midLineId);
+
+    // Destroy each exactly once, only if still alive
+    for (EntityId id : ids) {
+        if (IsAliveById(em, world, id)) {
+            Entity e{ id, &world, "" };
+            em.DestroyEntity(e);                // or em.DestroyEntity(id) if you have that overload
+        }
     }
+
+    // Clear containers 
     m_balls.clear();
     m_seacubes.clear();
     m_staticsquares.clear();
     m_playerId = UINT32_MAX;
- 
+    m_midLineId = UINT32_MAX;
 
-   // reset state
-    m_stepInit = false;    
-    m_dampingEnabled = false;  
-    m_spawnAcc = 0.0f;      
-
+    // Reset flags
+    m_stepInit = false;
+    m_dampingEnabled = false;
+    m_spawnAcc = 0.0f;
     m_stepByStepMode = false;
     m_pausePhysics = false;
     m_stepRequested = false;
+
     Engine::Physics2D::SetEnabled(true);
 }
+
 
 // running test codes
 void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsMovement() {
@@ -254,7 +282,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
 
                 htr.Position += n * penetration;  // move just enough to clear
 
-                if (hrb) {                        // kill only inward velocity (slide preserved)
+                if (hrb) {                        // kill only inward velocity 
                     float vn = hrb->LinearVelocity.Dot(n);
                     if (vn < 0.0f) hrb->LinearVelocity -= n * vn;
                 }
@@ -279,7 +307,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
                 else { n = { 0,-1 }; push = up; }  // push down
             }
 
-            htr.Position += n * (push + 0.001f);   // tiny epsilon prevents re-penetration
+            htr.Position += n * (push + 0.001f);   // tiny epsilon prevents repenetration
             if (hrb) {
                 float vn = hrb->LinearVelocity.Dot(n);
                 if (vn < 0.0f) hrb->LinearVelocity -= n * vn;
@@ -287,11 +315,11 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
             return true;
         };
 
-    // Use the SAME sideLen here as in creation above
-    const float sideLen = 200.0f;  // <<< keep in sync with creation
+    // Use the sideLen here as in creation above
+    const float sideLen = 200.0f;  // to sync with original implementationsss
     const float half = sideLen * 0.5f;
 
-    // Resolve against both squares (can resolve multiple in one frame)
+    // Resolve against both squares 
     for (EntityId eid : m_staticsquares) {
         Entity sq = world.GetEntityManager().GetEntity(eid);
         const auto& btr = sq.Transform();
@@ -301,8 +329,6 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
 
         (void)resolveCircleAABB(htr.Position, bmin, bmax);
     }
-
-    // (Optional) If your triangle render uses cached points, you can refresh them
     // here after the position correction so visuals match the new position.
 }
 
@@ -319,10 +345,141 @@ void Sandbox::PhysicsCollision2DTestScene::Test_PhysicsHero() {
 
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVStatResponse() {
     World& world = GetWorld();
-    float dt = Time::FixedDeltaTime();
+    auto& em = world.GetEntityManager();
+    const float dt = Time::FixedDeltaTime();
+
+    //  Ensure two static squares tracked via m_staticsquares
+    const float side = 200.0f;
+    const float half = side * 0.5f;
+
+    auto ensureSquareAt = [&](size_t slot, const char* name, float cx, float cy) {
+        if (m_staticsquares.size() <= slot) m_staticsquares.resize(slot + 1, UINT32_MAX);
+        EntityId& id = m_staticsquares[slot];
+
+        auto makeSquare = [&](const char* nm) {
+            Entity sq = CreateEntity(nm);
+            id = sq.GetId();
+
+            // Transform
+            auto& tr = sq.Transform();
+            tr.Position = { cx, cy };
+
+            // Visual: filled square polygon (matches CollisionDetection look)
+            std::vector<Vector2D> pts{
+                {cx - half, cy - half}, {cx - half, cy + half},
+                {cx + half, cy + half}, {cx + half, cy - half}
+            };
+            Component::ShapeRenderer2D shp =
+                Component::ShapeRenderer2D::Polygon(pts, Color(0.95f, 0.20f, 0.20f, 1.0f), /*closed*/ true);
+            sq.AddComponent<Component::ShapeRenderer2D>(shp);
+
+            // Physics tag (static) + box collider (handy elsewhere)
+            auto& rb = sq.AddComponent<Component::Rigidbody2D>();
+            rb.BodyType = Component::Rigidbody2D::Static;
+            sq.AddComponent<Component::BoxCollider2D>(side, side);
+            };
+
+        if (id == UINT32_MAX) {
+            makeSquare(name);
+            return;
+        }
+
+        Entity sq(id, &world, name);
+        if (!em.IsAlive(sq)) {
+            id = UINT32_MAX;
+            makeSquare(name);
+        }
+        else {
+            // keep square pinned (in case something moved it)
+            sq.Transform().Position = { cx, cy };
+        }
+        };
+
+    ensureSquareAt(0, "StaticSquareL", m_worldWidth * 0.40f, m_worldHeight * 0.50f);
+    ensureSquareAt(1, "StaticSquareR", m_worldWidth * 0.70f, m_worldHeight * 0.50f);
+
+    // Spawn/update your falling cubes as usual 
     SpawnCubes_T(dt);
+
+    // Build static AABBs for the two squares (targets for sweep)
+    DynCol::AABB targets[2];
+    int targetCount = 0;
+    for (size_t k = 0; k < 2 && k < m_staticsquares.size(); ++k) {
+        EntityId id = m_staticsquares[k];
+        if (id == UINT32_MAX) continue;
+        Entity sq(id, &world, "sq");
+        if (!em.IsAlive(sq)) continue;
+
+        const auto& tr = sq.Transform();
+        targets[targetCount++] = DynCol::AABB{
+            { tr.Position.X - half, tr.Position.Y - half },
+            { tr.Position.X + half, tr.Position.Y + half }
+        };
+    }
+
+    //  Delete cubes whose swept AABB hits either square this frame
+    for (size_t i = 0; i < m_seacubes.size(); /* no ++ here its set in loop for case types  */) {
+        Entity& cube = m_seacubes[i];
+        if (!em.IsAlive(cube)) {                         // drop dead handles
+            m_seacubes[i] = m_seacubes.back();
+            m_seacubes.pop_back();
+            continue;
+        }
+
+        auto& ct = cube.Transform();
+        auto* rb = cube.GetComponent<Component::Rigidbody2D>();
+        auto* sh = cube.GetComponent<Component::ShapeRenderer2D>();
+        if (!rb) { ++i; continue; }
+
+        // Derive cube half-size from its polygon points (matches your update logic)
+        float halfCube = 10.0f;
+        if (sh && sh->Type == Component::ShapeRenderer2D::ShapeType::Polygon && sh->Points.size() >= 4) {
+            float minX = sh->Points[0].X, maxX = sh->Points[0].X;
+            float minY = sh->Points[0].Y, maxY = sh->Points[0].Y;
+            for (const auto& p : sh->Points) {
+                if (p.X < minX) minX = p.X; if (p.X > maxX) maxX = p.X;
+                if (p.Y < minY) minY = p.Y; if (p.Y > maxY) maxY = p.Y;
+            }
+            halfCube = 0.5f * std::max(maxX - minX, maxY - minY);
+        }
+
+        // Moving AABB for the cube
+        DynCol::AABB A = {
+            { ct.Position.X - halfCube, ct.Position.Y - halfCube },
+            { ct.Position.X + halfCube, ct.Position.Y + halfCube }
+        };
+        const Vector2D A_endCenter = {
+            ct.Position.X + rb->LinearVelocity.X * dt,
+            ct.Position.Y + rb->LinearVelocity.Y * dt
+        };
+
+        bool hit = false;
+        for (int s = 0; s < targetCount && !hit; ++s) {
+            // Static target end center is irrelevant to the math; pass its current center
+            const Vector2D B_endCenter = {
+                (targets[s].min.X + targets[s].max.X) * 0.5f,
+                (targets[s].min.Y + targets[s].max.Y) * 0.5f
+            };
+            DynCol::SweepHit H = DynCol::Sweep(A, A_endCenter, targets[s], B_endCenter);
+            if (H.hit && H.toi >= 0.0f && H.toi <= 1.0f) hit = true;
+        }
+
+        if (hit) {
+            // Erase this cube (swap-with-back + pop is fine; ECS destroy if you want)
+            // CubeDisintegrate(world, i);  // if you have this, use it; otherwise:
+            em.DestroyEntity(cube);
+            m_seacubes[i] = m_seacubes.back();
+            m_seacubes.pop_back();
+            continue;                     // do NOT ++i after erase
+        }
+        ++i; // to prevent ++ for continue cases
+    }
+
+    // --- 5) Regular maintenance (bounds etc.). Do NOT move cubes in this function.
     UpdateCubesCollisions(world);
 }
+
+
 
 void Sandbox::PhysicsCollision2DTestScene::Test_DynVDynResponse() {
     World& world = GetWorld();
@@ -423,7 +580,7 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBounceCircleHero() {
         Engine::Physics2D::AddForce(*rb, F);
     }
 
-    // Optional: SPACE to jump (if you were using it before)
+    // SPACE to jump (if you were using it before)
     if (Input::IsKeyPressed(KEY_SPACE)) {
         rb->LinearVelocity.Y += jumpImpulse;
     }
@@ -456,7 +613,7 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBounceCircleHero() {
     if (sh) {
         sh->Type = Component::ShapeRenderer2D::ShapeType::Circle;
         sh->Radius = r;
-        // sh->FillColor stays as-is
+    
     }
 }
 
@@ -860,7 +1017,7 @@ void Sandbox::PhysicsCollision2DTestScene::BallCollide() {
                 rbb->LinearVelocity += J * invMb;
             }
 
-            // --- Optional Coulomb friction ---
+            // friction
             if (friction > 0.0f) {
                 // Recompute relative velocity after normal impulse
                 const Vector2D rv2 = rbb->LinearVelocity - rba->LinearVelocity;
