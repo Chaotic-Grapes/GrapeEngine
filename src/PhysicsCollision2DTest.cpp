@@ -60,7 +60,7 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     m_worldWidth = static_cast<float>(width);
     m_worldHeight = static_cast<float>(height);
     m_elapsedTime = 0.0f;
-	m_dampingDelay = dampingDelay;
+    m_dampingDelay = dampingDelay;
     m_dampingEnabled = false;
 
     // step-by-step physics mode initialization
@@ -68,12 +68,12 @@ Sandbox::PhysicsCollision2DTestScene::PhysicsCollision2DTestScene(const int widt
     m_stepRequested = false;
     m_pausePhysics = false;
 
-   // set gravity
+    // set gravity
     Engine::Physics2D::SetGravity(Vector2D(0.0f, -15.0f));
 }
 
 void Sandbox::PhysicsCollision2DTestScene::OnLoad() {
-   
+
 }
 
 
@@ -83,7 +83,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
 
     // Input trigger to cycle tests (H key)
     if (Input::IsKeyDown(KEY_C)) {
-        
+
         if (!test_handler) {
             int current = static_cast<int>(m_currentTest);
             current++;
@@ -92,7 +92,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
             }
             m_currentTest = static_cast<TestType>(current);
             std::cout << "Switched to physics test " << current << std::endl;
-            
+
             OnUnload();
             OnLoad();
 
@@ -105,7 +105,7 @@ void Sandbox::PhysicsCollision2DTestScene::OnUpdate() {
         test_handler = false;
     }
 
-  
+
 
     // Dispatch to active test
     switch (m_currentTest) {
@@ -220,7 +220,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
     ClampAndBounceCircleHero();
 
     if (m_staticsquares.empty()) {
-        const float sideLen = 200.0f;          
+        const float sideLen = 200.0f;
         const float half = sideLen * 0.5f;
 
         auto makeSquare = [&](const char* name, float cx, float cy) {
@@ -250,7 +250,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
             m_staticsquares.push_back(sq.GetId());
             };
 
-        // Put them mid-screen so they’re clearly visible
+        // Put them mid-screen so they're clearly visible
         makeSquare("StaticSquareL", m_worldWidth * 0.40f, m_worldHeight * 0.50f);
         makeSquare("StaticSquareR", m_worldWidth * 0.70f, m_worldHeight * 0.50f);
 
@@ -261,7 +261,8 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
 
     if (!hcc) return;
 
-    const float R = hcc->Radius;
+    // Apply transform scale to collision radius
+    const float R = hcc->Radius * ((htr.Scale.X + htr.Scale.Y) * 0.5f);
 
     // Minimal push-out against one AABB. Returns true if we adjusted the hero.
     auto resolveCircleAABB = [&](const Vector2D& C,
@@ -292,7 +293,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_CollisionDetection() {
                     float vn = hrb->LinearVelocity.Dot(n);
                     if (vn < 0.0f) hrb->LinearVelocity -= n * vn;
                 }
-                std::cout<<"collision detected sir"<<std::endl;
+                std::cout << "collision detected sir" << std::endl;
                 return true;
             }
 
@@ -509,7 +510,7 @@ void Sandbox::PhysicsCollision2DTestScene::Test_StepByStepUpdate() {
         if (m_playerId == UINT32_MAX) {
             CreateTriangle();
         }
-        m_stepInit = true; 
+        m_stepInit = true;
     }
 
     m_elapsedTime = static_cast<float>(Time::ElapsedTime());
@@ -594,9 +595,10 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBounceCircleHero() {
     // Light velocity damp
     rb->LinearVelocity *= velDampScale;
 
-    // Clamp within world bounds and kill inward velocity on impact
-    const float r = cc->Radius;
+    // Apply transform scale to collision radius
+    const float r = cc->Radius * ((tr.Scale.X + tr.Scale.Y) * 0.5f);
 
+    // Clamp within world bounds and kill inward velocity on impact
     if (tr.Position.X - r <= 0.0f) {
         tr.Position.X = r;
         if (rb->LinearVelocity.X < 0.0f) rb->LinearVelocity.X = 0.0f;
@@ -618,8 +620,8 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBounceCircleHero() {
     // Keep the visual in sync (in case something else changed it)
     if (sh) {
         sh->Type = Component::ShapeRenderer2D::ShapeType::Circle;
-        sh->Radius = r;
-    
+        sh->Radius = cc->Radius; // Keep visual at base radius
+
     }
 }
 
@@ -734,12 +736,13 @@ void Sandbox::PhysicsCollision2DTestScene::CubeDisintegrate(World& world, size_t
     m_seacubes.pop_back();
 }
 
-void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World & world) {
+void Sandbox::PhysicsCollision2DTestScene::UpdateCubesCollisions(World& world) {
 
     Entity hero(m_playerId, &world);
     auto& ht = hero.Transform();
 
-    const float heroR = m_triHalfHeight;
+    // Apply transform scale to collision radius
+    const float heroR = m_triHalfHeight * ((ht.Scale.X + ht.Scale.Y) * 0.5f);
     const float floorY = 0.0f;
 
     for (size_t i = 0; i < m_seacubes.size();) {
@@ -870,11 +873,12 @@ void Sandbox::PhysicsCollision2DTestScene::ClampAndBouncePlayer() {
     }
     rb->LinearVelocity *= velDampScale;
 
-    const float r = m_triHalfHeight;
+    // Apply transform scale to collision radius
+    const float r = m_triHalfHeight * ((tr.Scale.X + tr.Scale.Y) * 0.5f);
 
     if (tr.Position.X - r <= 0.0f) {
         tr.Position.X = r;
-        if (rb->LinearVelocity.X < 0.0f) rb->LinearVelocity.X =0.0f;
+        if (rb->LinearVelocity.X < 0.0f) rb->LinearVelocity.X = 0.0f;
     }
     else if (tr.Position.X + r >= m_worldWidth) {
         tr.Position.X = m_worldWidth - r;
@@ -965,6 +969,7 @@ void Sandbox::PhysicsCollision2DTestScene::RestoreBallStates() {
     }
     m_storedBallStates.clear();
 }
+
 void Sandbox::PhysicsCollision2DTestScene::BallCollide() {
     World& world = GetWorld();
     auto& em = world.GetEntityManager();
@@ -983,7 +988,8 @@ void Sandbox::PhysicsCollision2DTestScene::BallCollide() {
         if (!rba || !cca) continue;
 
         auto& ta = a.Transform();
-        const float ra = cca->Radius;
+        // Apply transform scale to collision radius
+        const float ra = cca->Radius * ((ta.Scale.X + ta.Scale.Y) * 0.5f);
         const float invMa = (rba->Mass > 0.0f) ? 1.0f / rba->Mass : 0.0f;
 
         for (size_t j = i + 1; j < n; ++j) {
@@ -995,7 +1001,8 @@ void Sandbox::PhysicsCollision2DTestScene::BallCollide() {
             if (!rbb || !ccb) continue;
 
             auto& tb = b.Transform();
-            const float rb = ccb->Radius;
+            // Apply transform scale to collision radius
+            const float rb = ccb->Radius * ((tb.Scale.X + tb.Scale.Y) * 0.5f);
             const float invMb = (rbb->Mass > 0.0f) ? 1.0f / rbb->Mass : 0.0f;
 
             // Skip if both are immovable
@@ -1076,7 +1083,8 @@ void Sandbox::PhysicsCollision2DTestScene::UpdateBallCollisions() {
         if (!rigidbody || !circleCollider)
             continue;
 
-        const float radius = circleCollider->Radius;
+        // Apply transform scale to collision radius
+        const float radius = circleCollider->Radius * ((transform.Scale.X + transform.Scale.Y) * 0.5f);
 
         bool bounced = false;
 
