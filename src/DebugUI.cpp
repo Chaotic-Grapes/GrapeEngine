@@ -22,8 +22,7 @@
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the world
 DebugUI::DebugUI(World* world, const DebugUIConfig& config)
-    : m_config(config), m_world(world) {
-}
+    : m_config(config), m_world(world) {}
 
 DebugUI::~DebugUI() {
     // Clean up resources only if UI was initialized
@@ -53,6 +52,8 @@ void DebugUI::Initialize(GLFWwindow* window) {
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
 
     m_initialized = true;  // Mark that DebugUI has been initialized
+
+    AttachAudio(m_world->GetSystem<Engine::AudioSystem>()->GetAudio());
 }
 
 void DebugUI::NewFrame() {
@@ -144,10 +145,6 @@ void DebugUI::RemoveGameObject(const EntityId id) {
 void DebugUI::CloneGameObject(const Entity& entity) {
     // Safety check
     if (!HasValidWorld()) return;
-
-    // Get entity count before cloning
-    const auto entitiesBefore = m_world->GetEntityManager().GetAllEntities();
-    const auto beforeCount = entitiesBefore.size();
 
     auto cloned = entity.Clone();
 
