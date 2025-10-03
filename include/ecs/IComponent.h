@@ -9,8 +9,6 @@ namespace Component {
     struct IComponent {
         virtual ~IComponent() = default;
 
-        virtual json Serialize() const = 0;
-        virtual void Deserialize(const json& data) = 0;
         virtual const char* GetTypeName() const = 0;
     };
 }

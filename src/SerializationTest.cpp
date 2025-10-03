@@ -115,20 +115,20 @@ void SerializationTestScene::SaveScene() {
     std::cout << "Save directory ready" << '\n';
 
     std::cout << "Calling SceneSerializer::SaveScene..." << '\n';
-    bool success = Serialization::SceneSerializer::SaveScene(
+    const bool success = Serialization::SceneSerializer::SaveScene(
         world,
-        "assets/saves/serialization_test.json"
+        "assets/samples/sample-scene.json"
     );
     std::cout << "SceneSerializer::SaveScene returned: " << success << '\n';
 
     if (success) {
         std::cout << "Scene save operation reported success" << '\n';
 
-        if (std::filesystem::exists("assets/saves/serialization_test.json")) {
-            auto fileSize = std::filesystem::file_size("assets/saves/serialization_test.json");
+        if (std::filesystem::exists("assets/samples/sample-scene.json")) {
+            const auto fileSize = std::filesystem::file_size("assets/samples/sample-scene.json");
             std::cout << "File created with size: " << fileSize << " bytes" << '\n';
 
-            std::ifstream testFile("assets/saves/serialization_test.json");
+            std::ifstream testFile("assets/samples/sample-scene.json");
             std::string firstLine;
             std::getline(testFile, firstLine);
             std::cout << "First line of file: " << firstLine.substr(0, 50) << "..." << '\n';
@@ -155,7 +155,7 @@ void SerializationTestScene::LoadScene() {
     World& world = GetWorld();
     std::cout << "Got world reference for loading" << '\n';
 
-    if (!std::filesystem::exists("assets/saves/serialization_test.json")) {
+    if (!std::filesystem::exists("assets/samples/sample-scene.json")) {
         std::cout << "ERROR: Save file doesn't exist for loading!" << '\n';
         m_testPassed = false;
         return;
@@ -169,19 +169,19 @@ void SerializationTestScene::LoadScene() {
     std::cout << "Original entities cleared" << '\n';
 
     std::cout << "Calling SceneSerializer::LoadScene..." << '\n';
-    bool success = Serialization::SceneSerializer::LoadScene(
+    const bool success = Serialization::SceneSerializer::LoadScene(
         world,
-        "assets/saves/serialization_test.json"
+        "assets/samples/sample-scene.json"
     );
     std::cout << "SceneSerializer::LoadScene returned: " << success << '\n';
 
     if (success) {
         std::cout << "Scene load operation reported success" << '\n';
 
-        auto entityIds = world.GetEntityManager().GetAllEntities();
+        const auto entityIds = world.GetEntityManager().GetAllEntities();
         std::cout << "Found " << entityIds.size() << " entities after load" << '\n';
 
-        for (EntityId id : entityIds) {
+        for (const EntityId id : entityIds) {
             Entity newEntity = world.GetEntityManager().GetEntity(id);
             std::cout << "Loaded entity: [" << id << "] " << newEntity.GetName() << '\n';
             m_originalEntities.push_back(newEntity);
@@ -201,19 +201,19 @@ void SerializationTestScene::VerifyLoadedEntities() {
     std::cout << "VerifyLoadedEntities() started" << '\n';
 
     World& world = GetWorld();
-    auto entityIds = world.GetEntityManager().GetAllEntities();
+    const auto entityIds = world.GetEntityManager().GetAllEntities();
 
     std::cout << "Verifying " << entityIds.size() << " loaded entities..." << '\n';
 
     bool allTestsPassed = true;
 
-    for (EntityId id : entityIds) {
+    for (const EntityId id : entityIds) {
         Entity entity = world.GetEntityManager().GetEntity(id);
         std::string name = entity.GetName();
 
         std::cout << "\nChecking entity: [" << id << "] " << name << '\n';
 
-        ExpectedData* expected = nullptr;
+        const ExpectedData* expected = nullptr;
         for (auto& exp : m_expectedData) {
             if (exp.name == name) {
                 expected = &exp;
@@ -226,12 +226,12 @@ void SerializationTestScene::VerifyLoadedEntities() {
             continue;
         }
 
-        auto& transform = entity.Transform();
-        bool posMatch = (std::abs(transform.Position.X - expected->position.X) < 0.01f &&
+        const auto& transform = entity.Transform();
+        const bool posMatch = (std::abs(transform.Position.X - expected->position.X) < 0.01f &&
             std::abs(transform.Position.Y - expected->position.Y) < 0.01f);
-        bool scaleMatch = (std::abs(transform.Scale.X - expected->scale.X) < 0.01f &&
+        const bool scaleMatch = (std::abs(transform.Scale.X - expected->scale.X) < 0.01f &&
             std::abs(transform.Scale.Y - expected->scale.Y) < 0.01f);
-        bool rotMatch = std::abs(transform.Rotation - expected->rotation) < 0.01f;
+        const bool rotMatch = std::abs(transform.Rotation - expected->rotation) < 0.01f;
 
         std::cout << "  Position: " << (posMatch ? "Success" : "Fail")
             << " (" << transform.Position.X << ", " << transform.Position.Y << ")" << '\n';
@@ -245,7 +245,7 @@ void SerializationTestScene::VerifyLoadedEntities() {
         }
 
         if (name == "TestSprite") {
-            bool hasSprite = entity.HasComponent<Component::SpriteRenderer>();
+            const bool hasSprite = entity.HasComponent<Component::SpriteRenderer>();
             std::cout << "  SpriteRenderer: " << (hasSprite ? "Success" : "Fail") << '\n';
             if (!hasSprite) allTestsPassed = false;
         }
