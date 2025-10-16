@@ -33,6 +33,8 @@ namespace Engine {
 #else
         (void)consoleFlag;
 #endif
+        m_audio = new Services::AudioService();
+        m_audio->Initialize();
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
@@ -55,6 +57,9 @@ namespace Engine {
                 delete currentScene;
                 currentScene = newScene;
             }
+
+            // --- Update Services ---
+            m_audio->Update();
 
             if (currentScene) {
                 currentScene->Update();
@@ -90,6 +95,9 @@ namespace Engine {
             game.OnShutdown(m_sceneManager);
             currentScene->Unload();
         }
+
+        // Clean up services
+        delete m_audio;
 
         WindowManager::DestroyAll();
     }

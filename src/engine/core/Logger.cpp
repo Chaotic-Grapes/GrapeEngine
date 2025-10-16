@@ -10,7 +10,7 @@
  * easier to trace and debug program execution.
  *
  * Features:
- *   - Logs messages at levels: INFO, DEBUG, WARNING, ERROR, CRITICAL.
+ *   - Logs messages at levels: TRACE, INFO, DEBUG, WARNING, ERROR, CRITICAL.
  *   - Timestamped entries with millisecond precision.
  *   - Console output with optional color-coding by severity level.
  *   - File logging separated into info/warning logs and error/critical logs.
@@ -81,6 +81,7 @@ void Logger::Log(const LogLevel level, const std::string& message) {
 	}
 
 	switch (level) {
+	case LogLevel::TRACE:	_logTrace(message); break;
 	case LogLevel::INFO:	_logInfo(message); break;
 	case LogLevel::DEBUG:	_logDebug(message); break;
 	case LogLevel::WARNING: _logWarning(message); break;
@@ -122,10 +123,21 @@ void Logger::SetLogFile(const LogLevel level, const std::string& filename) {
 }
 
 /**
+ * @brief Logs a TRACE message to console and/or log file
+ * 
+ * @param message	The message string to log.
+ */
+void Logger::_logTrace(const std::string& message) {
+	if (m_LogConsoleEnabled)
+		std::cout << "[" << _getCurrentTimestamp("%H:%M") << "] [TRC] " << message << '\n';
+	if (m_infoStream.is_open())
+		m_infoStream << "[" << _getCurrentTimestamp() << "] [TRC] " << message << '\n';
+}
+
+/**
  * @brief Logs an INFO message to console and/or info log file.
  *
  * @param message   The message string to log.
- * @param timestamp Formatted timestamp string.
  */
 void Logger::_logInfo(const std::string& message) {
 	if (m_LogConsoleEnabled)
@@ -140,7 +152,6 @@ void Logger::_logInfo(const std::string& message) {
  * Only logs if debug mode is enabled.
  *
  * @param message   The message string to log.
- * @param timestamp Formatted timestamp string.
  */
 void Logger::_logDebug(const std::string& message) {
 	if (!m_debugEnabled) return;
@@ -154,7 +165,6 @@ void Logger::_logDebug(const std::string& message) {
  * @brief Logs a WARNING message to console (colored yellow) and/or info log file.
  *
  * @param message   The message string to log.
- * @param timestamp Formatted timestamp string.
  */
 void Logger::_logWarning(const std::string& message) {
 	if (m_LogConsoleEnabled) {
@@ -170,7 +180,6 @@ void Logger::_logWarning(const std::string& message) {
  * @brief Logs an ERROR message to console (colored red) and/or error log file.
  *
  * @param message   The message string to log.
- * @param timestamp Formatted timestamp string.
  */
 void Logger::_logError(const std::string& message) {
 	if (m_LogConsoleEnabled) {
@@ -186,7 +195,6 @@ void Logger::_logError(const std::string& message) {
  * @brief Logs a CRITICAL message to console (colored purple) and/or error log file.
  *
  * @param message   The message string to log.
- * @param timestamp Formatted timestamp string.
  */
 void Logger::_logCritical(const std::string& message) {
 	if (m_LogConsoleEnabled) {
@@ -196,6 +204,10 @@ void Logger::_logCritical(const std::string& message) {
 	}
 	if (m_errorStream.is_open())
 		m_errorStream << "[" << _getCurrentTimestamp() << "] [CRT] " << message << '\n';
+}
+
+void Logger::_logTrace(const std::stringstream& oss) {
+	_logTrace(oss.str());
 }
 
 void Logger::_logInfo(const std::stringstream& oss) {
@@ -240,6 +252,7 @@ void Logger::_setConsoleColor(const LogLevel level) {
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	int colorCode = 7; // Default to light gray
 	switch (level) {
+	case LogLevel::TRACE: colorCode = 6; break; // Light yellow
 	case LogLevel::WARNING: colorCode = 14; break; // Yellow
 	case LogLevel::ERROR: colorCode = 12; break;   // Red
 	case LogLevel::CRITICAL: colorCode = 13; break; // Light purple
@@ -250,8 +263,9 @@ void Logger::_setConsoleColor(const LogLevel level) {
 #else
 	// ANSI escape codes for other platforms
 	switch (level) {
-	case LogLevel::WARNING: std::cout << "\033[33m"; break; // Yellow
-	case LogLevel::ERROR: std::cout << "\033[31m"; break;   // Red
+	case LogLevel::TRACE std::cout << "\033[33m"; break; // Light yellow
+	case LogLevel::WARNING: std::cout << "\033[93m"; break; // Yellow
+	case LogLevel::ERROR: std::cout << "\033[91m"; break;   // Red
 	case LogLevel::CRITICAL: std::cout << "\033[35m"; break; // Light purple
 	case LogLevel::DEBUG: std::cout << "\033[36m"; break; // Light cyan
 	case LogLevel::INFO: std::cout << "\033[37m"; break; // Light gray
@@ -289,7 +303,7 @@ std::string Logger::_getCurrentTimestamp(const std::string& format) {
 		now.time_since_epoch()) % 1000;
 
 	std::tm timeInfo;
-	localtime_s(&timeInfo, &time_t);  // Safe version
+	(void)localtime_s(&timeInfo, &time_t);  // Safe version
 
 	std::stringstream ss;
 	ss << std::put_time(&timeInfo, format.c_str());

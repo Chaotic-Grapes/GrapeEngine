@@ -64,7 +64,8 @@ void Overlay::OnUpdate() {
         Window* mainWindow = WindowManager::GetMainWindow();
         if (mainWindow) {
             m_debugUI->Initialize(mainWindow->Handle());
-            if (m_audio) DebugUI::AttachAudio(m_audio);
+            if (m_audioDevice)
+                DebugUI::AttachAudio(m_audioDevice);
             m_initialized = true;
         }
         else return;
@@ -83,8 +84,6 @@ Overlay::~Overlay() {
 
 #else
 // Non-ImGui implementations
-Overlay::Overlay() = default;
-
 void Overlay::OnCreate() {
     // Empty implementation when ImGui is not available
 }

@@ -20,14 +20,14 @@
 #define DEBUGUI_H
 #include <vector>
 #include <string>
-#include "System.h"
-#include "audio/Audio.h"
 #include <unordered_map>
+#include "audio/FmodAudioDevice.h"
 #include "ecs/Entity.h"
 
 // Forward declarations (avoid unnecessary includes)
 struct GLFWwindow;
 class World;
+namespace Audio { class IAudioDevice; }
 
 /**
  * @brief Configuration structure for DebugUI appearance and layout
@@ -173,13 +173,13 @@ public:
 
     /**
      * @brief Attach an audio system for monitoring
-     * @param audio Pointer to the audio system
+     * @param device Pointer to the audio system
      * 
      * Static method to attach an audio system for monitoring and control
      * through the debug interface.
      */
-    static void AttachAudio(Systems::Audio * audio);
-    
+    static void AttachAudio(Audio::FmodAudioDevice* device);
+
     /**
      * @brief Detach the audio system
      * 
@@ -280,7 +280,7 @@ private:
      * Static method that displays audio system status, volume controls,
      * and audio-related debugging information.
      */
-    static void _showAudioWindow(Systems::Audio& audio);
+    static void _showAudioWindow(Audio::FmodAudioDevice* audio);
 
     /**
      * @brief Create a new game entity with basic components

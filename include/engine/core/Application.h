@@ -5,6 +5,7 @@
 #include "Game.h"
 #include "ecs/SceneManager.h"
 #include "serialization/Serialization.h"
+#include "services/AudioService.h"
 
 namespace Engine {
     class Application {
@@ -31,6 +32,9 @@ namespace Engine {
          * @brief Close worlds and release resources.
          */
         void Close();
+
+        Services::AudioService* GetAudioService() { return m_audio; }
+        const Services::AudioService* GetAudioService() const { return m_audio; }
     private:
         // Flag to indicate if application should stop
         static bool m_shouldStop;
@@ -44,6 +48,9 @@ namespace Engine {
 		// Functions to enable/disable console output
         static void _enableConsole();
         static void _disableConsole();
+
+        // Services
+        Services::AudioService* m_audio;
     };
 
     extern Application* CORE;

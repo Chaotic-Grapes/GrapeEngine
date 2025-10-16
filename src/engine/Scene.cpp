@@ -26,14 +26,16 @@ void Scene::LateUpdate() {
 }
 
 void Scene::Load() {
-    m_world->AddSystem<Time>();
-    m_world->AddSystem<Engine::AudioService>();
     m_world->AddSystem<Engine::PhysicsSystem>(m_world.get());
     m_world->AddSystem<Engine::RendererSystem>(m_world.get());
 
 	// This must be added last so it renders on top of everything else
 #ifdef USE_IMGUI
-    m_world->AddSystem<Overlay>(m_world.get());
+    const auto overlay = m_world->AddSystem<Overlay>(m_world.get());
+
+    if (Engine::CORE && Engine::CORE->GetAudioService() && Engine::CORE->GetAudioService()->Device()) {
+        overlay->SetAudio(Engine::CORE->GetAudioService()->Device());
+    }
 #endif
 
     OnLoad();

@@ -12,6 +12,7 @@
         Logger::Get().Log(level, oss.str());   \
     } while(0)
 
+#define LOG_TRACE(msg)    LOG_STREAM(LogLevel::TRACE, msg)
 #define LOG_INFO(msg)     LOG_STREAM(LogLevel::INFO, msg)
 #define LOG_DEBUG(msg)    LOG_STREAM(LogLevel::DEBUG, msg)
 #define LOG_WARNING(msg)  LOG_STREAM(LogLevel::WARNING, msg)
@@ -25,6 +26,7 @@
 #include <mutex>
 
 enum class LogLevel {
+	TRACE,
 	INFO,
 	DEBUG,
 	WARNING,
@@ -79,12 +81,14 @@ public:
 
 private:
 	// void _writeCrashLog(LogLevel level, const std::string& message);
+	void _logTrace(const std::string& message);
 	void _logInfo(const std::string& message);
 	void _logDebug(const std::string& message);
 	void _logWarning(const std::string& message);
 	void _logError(const std::string& message);
 	void _logCritical(const std::string& message);
 
+	void _logTrace(const std::stringstream& oss);
 	void _logInfo(const std::stringstream& oss);
 	void _logDebug(const std::stringstream& oss);
 	void _logWarning(const std::stringstream& oss);

@@ -39,11 +39,11 @@ namespace Engine {
         glm::vec2 ToGlm(const Vector2D& v) { return glm::vec2 {v.X, v.Y}; }
 
         /*!
-        \brief Convert an engine Color (0�255 per channel) to glm::vec4 (0�1).
+        \brief Convert an engine Color (0-255 per channel) to glm::vec4 (0-1).
         \param c The Color to convert.
         \return Normalized glm::vec4 suitable for shaders.
-        \note Color channels in our engine are stored as 8-bit [0�255].
-              GLSL expects floats in the range [0.0�1.0]. Forgetting this
+        \note Color channels in our engine are stored as 8-bit [0-255].
+              GLSL expects floats in the range [0.0-1.0]. Forgetting this
               will cause washed-out or grayscale rendering.
         */
         glm::vec4 ToGlm(const Color& c) {

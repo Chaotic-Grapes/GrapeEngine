@@ -22,9 +22,9 @@
 #define OVERLAY_H
 #include <memory>
 #include "ecs/ISystem.h"
-#include "audio/Audio.h"
 #include "services/DebugUI.h"
 #include "core/Application.h"
+#include "audio/FmodAudioDevice.h"
 
 // Forward declaration
 class World;
@@ -115,17 +115,17 @@ public:
     
     /**
      * @brief Set the audio system for debug monitoring
-     * @param a Pointer to the audio system to monitor
+     * @param device Pointer to the audio system to monitor
      * 
      * Attaches an audio system to the overlay for debug monitoring.
      * The audio system will be accessible through the debug UI for
      * real-time monitoring and control.
      */
-    void SetAudio(Systems::Audio* a) { m_audio = a; }
+    void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
 
 private:
-    Systems::Audio* m_audio = nullptr;  ///< Pointer to audio system for debug monitoring
-    
+    Audio::FmodAudioDevice* m_audioDevice = nullptr;  ///< Pointer to audio system for debug monitoring
+
     /**
      * @brief Set the world reference for entity management
      * @param world Pointer to the World object
