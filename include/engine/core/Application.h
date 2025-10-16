@@ -51,6 +51,8 @@ namespace Engine {
 
         // Services
         Services::AudioService* m_audio;
+
+        double m_lastFrameTime;
     };
 
     extern Application* CORE;

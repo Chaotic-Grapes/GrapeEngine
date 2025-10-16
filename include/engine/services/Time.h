@@ -1,15 +1,10 @@
 ﻿#ifndef TIME_H
 #define TIME_H
 
-#include "ecs/ISystem.h"
-
-// TODO: Possibly detach this from ISystem
-class Time final : public Engine::ISystem {
+namespace Engine { class Application; }
+class Time final {
 public:
-	void OnCreate() override;
-    void OnUpdate() override;
-
-    std::string Name() const override;
+    Time();
 
     static float  DeltaTime();
     static float  UnscaledDeltaTime();
@@ -25,9 +20,12 @@ public:
     static int    FpsCap();
     
 private:
+	friend class Engine::Application;
+
+    static void _update(double dt, double now);
+    static void _initialize();
+
     static double m_startTime;
-    static double m_lastFrameTime;
-    
     static float  m_deltaTime;
     static float  m_fixedDeltaTime;
     static double m_timeElapsed;

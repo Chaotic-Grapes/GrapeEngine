@@ -14,6 +14,8 @@ namespace Engine {
     bool Application::m_shouldStop = false;
 
     void Application::Run(Game& game, const bool consoleFlag) {
+        Time::_initialize();
+
         // Set global pointer to this application instance
         CORE = this;
 
@@ -40,9 +42,13 @@ namespace Engine {
         game.OnStart(m_sceneManager);
         Scene* currentScene = m_sceneManager.GetActiveScene();
 
+        m_lastFrameTime = glfwGetTime();
         while (!m_shouldStop) {
             const double frameStart = glfwGetTime();
+            Time::_update(frameStart - m_lastFrameTime, frameStart);
             Profiler::UpdateTime();
+            m_lastFrameTime = glfwGetTime();
+
             // --- Input & Game Update ---
             Input::_processInput();
             auto* newScene = m_sceneManager.GetActiveScene();
@@ -76,11 +82,9 @@ namespace Engine {
                 glfwSwapBuffers(win->Handle());
             }
 
-            // --- FPS Controller ---
-            const double frameEnd = glfwGetTime();
-            double frameDuration = frameEnd - frameStart;
+            const double frameDuration = m_lastFrameTime - frameStart;
 
-            // Apply FPS cap (if set)
+            // --- FPS Controller ---
             if (Time::FpsCap() > 0) {
                 const double targetFrameTime = 1.0 / Time::FpsCap();
                 if (frameDuration < targetFrameTime) {
