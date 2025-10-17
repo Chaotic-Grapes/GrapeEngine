@@ -2,52 +2,57 @@
 #define ENTITY_H
 
 #include <cstdint>
-#include "ecs/Components.h"
+#include <limits>
+#include <functional>
 
+// Unique, stable ids per component type at runtime.
+using TypeId = uint32_t;
 using EntityId = uint32_t;
 
-class World;
-class Entity {
-public:
-    Entity(EntityId id, World* world, const std::string& name = "GameObject");
-    Entity(const Entity& other) = default;   // just copy the handle
-    ~Entity() = default;
-    Entity& operator=(const Entity& other) = default;
-    Entity(Entity&& other) noexcept = default;
-    Entity& operator=(Entity&& other) noexcept = default;
+namespace ECS {
+    struct Entity {
+        EntityId Index = std::numeric_limits<EntityId>::max();
+        EntityId Generation = 0;
 
-    EntityId GetId() const;
-    void SetName(const std::string& newName);
-	// bool IsActive() const;
-	// void SetActive(bool active);
-    std::string GetName() const;
-    Entity Clone() const;
+        static constexpr EntityId NPOS32 = std::numeric_limits<EntityId>::max();
 
-    Component::Transform& Transform();
+        constexpr bool IsNull() const noexcept { return Index == NPOS32; }
+        friend constexpr bool operator==(Entity a, Entity b) noexcept {
+            return a.Index == b.Index && a.Generation == b.Generation;
+        }
+        friend constexpr bool operator!=(Entity a, Entity b) noexcept {
+            return !(a == b);
+        }
+        friend bool operator<(Entity a, Entity b) noexcept {
+            return a.Index < b.Index || (a.Index == b.Index && a.Generation < b.Generation);
+        }
+        friend bool operator>(Entity a, Entity b) noexcept {
+            return b < a;
+        }
+    };
+
+    static inline constexpr Entity NULL_ENTITY{};
+
+    struct EntityHash {
+        size_t operator()(const Entity& e) const noexcept {
+            return (static_cast<size_t>(e.Index) << 32ull) ^ static_cast<size_t>(e.Generation);
+        }
+    };
+
+    inline TypeId TypeIdNext() {
+        static std::atomic<TypeId> counter{0};
+        return counter++;
+    }
 
     template<typename T>
-    T* GetComponent();
+    inline TypeId TypeIdOf() {
+        static const TypeId id = TypeIdNext();
+        return id;
+    }
 
-    template<typename T, typename... Args>
-    T& AddComponent(Args&&... args);
-
-    template<typename T>
-    void RemoveComponent() const;
-
-    template<typename T>
-    bool HasComponent() const;
-
-    template<typename T, typename... Args>
-    T& AddBehaviour(Args&&... args);
-
-    void RemoveAllComponents() const;
-
-private:
-    EntityId m_id;
-    std::string m_name;
-    World* m_world = nullptr;
-	// bool m_isActive{ true };
-};
+    template<typename... Ts>
+    struct TypeList {};
+}
 
 #include "Entity.inl"
 
