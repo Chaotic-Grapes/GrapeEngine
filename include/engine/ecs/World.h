@@ -173,7 +173,8 @@ namespace ECS {
         public:
             explicit DeferGuard(World& w) : m_world(w), m_active(true) { m_world.BeginDefer(); }
             ~DeferGuard() { if (m_active) m_world.EndDefer(); }
-            DeferGuard(const DeferGuard&) = delete; DeferGuard& operator=(const DeferGuard&) = delete;
+            DeferGuard(const DeferGuard&) = delete;
+            DeferGuard& operator=(const DeferGuard&) = delete;
         private:
             World& m_world;
             bool m_active = false;

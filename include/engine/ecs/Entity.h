@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <limits>
 #include <functional>
+#include <atomic>
 
 // Unique, stable ids per component type at runtime.
 using TypeId = uint32_t;
@@ -35,11 +36,16 @@ namespace ECS {
 
     struct EntityHash {
         size_t operator()(const Entity& e) const noexcept {
+            // Combine index and generation into a single size_t hash
+            // This assumes size_t is at least 64 bits; adjust as needed for other architectures
             return (static_cast<size_t>(e.Index) << 32ull) ^ static_cast<size_t>(e.Generation);
         }
     };
 
     inline TypeId TypeIdNext() {
+        // Thread-safe unique id generation
+        // std::atomic ensures that even in multithreaded contexts,
+        // each call gets a unique value
         static std::atomic<TypeId> counter{0};
         return counter++;
     }
@@ -53,7 +59,5 @@ namespace ECS {
     template<typename... Ts>
     struct TypeList {};
 }
-
-#include "Entity.inl"
 
 #endif

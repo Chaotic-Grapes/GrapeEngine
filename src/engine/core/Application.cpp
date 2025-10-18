@@ -1,12 +1,12 @@
 #include "core/Application.h"
-#include <thread>
 #include "core/CrashDumping.h"
-#include "services/Input.h"
-#include "ecs/systems/PhysicsSystem.h"
 #include "core/Profiler.h"
-#include "services/WindowManager.h"
-#include "Scene.h"
+#include "ecs/systems/PhysicsSystem.h"
+#include "scene/Scene.h"
+#include "services/Input.h"
 #include "services/Time.h"
+#include "services/WindowManager.h"
+#include <thread>
 
 namespace Engine {
     // Global pointer to the core engine
@@ -40,7 +40,6 @@ namespace Engine {
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
-        Scene* currentScene = m_sceneManager.GetActiveScene();
 
         m_lastFrameTime = glfwGetTime();
         while (!m_shouldStop) {
@@ -51,26 +50,23 @@ namespace Engine {
 
             // --- Input & Game Update ---
             Input::_processInput();
-            auto* newScene = m_sceneManager.GetActiveScene();
-            const bool isNewScene = newScene != currentScene;
-            if (isNewScene) {
-                if (currentScene)
-                    currentScene->Unload();
-
-                newScene->Load();
-
-                // This *might* cause a memory access violation
-                delete currentScene;
-                currentScene = newScene;
-            }
 
             // --- Update Services ---
             m_audio->Update();
 
+            // --- Scene Update ---
+            auto* currentScene = m_sceneManager.GetActive();
             if (currentScene) {
-                currentScene->Update();
+                m_sceneManager.Update();
+
+                while (m_accumulator >= Time::FixedDeltaTime()) {
+                    currentScene->OnFixedUpdate();
+                    m_accumulator -= Time::FixedDeltaTime();
+                }
+
+                currentScene->OnUpdate();
                 game.OnUpdate(m_sceneManager);
-                currentScene->LateUpdate();
+                currentScene->OnLateUpdate();
             }
 
             // --- Rendering ---
@@ -95,10 +91,7 @@ namespace Engine {
             }
         }
 
-        if (currentScene) {
-            game.OnShutdown(m_sceneManager);
-            currentScene->Unload();
-        }
+        game.OnShutdown(m_sceneManager);
 
         // Clean up services
         delete m_audio;
