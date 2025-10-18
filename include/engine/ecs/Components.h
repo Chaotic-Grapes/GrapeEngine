@@ -1,20 +1,22 @@
 #ifndef COMPONENTS_H
 #define COMPONENTS_H
 
-#include "math/Vector2D.h"
-#include "ecs/IComponent.h"
-#include "ecs/Entity.h"
-#include <nlohmann/json.hpp>
-#include <string>
 #include "Color.h"
-#include "graphics/texture.hpp"
+#include "ecs/Entity.h"
+#include "ecs/IComponent.h"
 #include "graphics/SpriteMetaData.hpp"
-// #include "graphics/TextureCache.hpp"
+#include "graphics/texture.hpp"
+#include "math/Vector2D.h"
+#include "math/Vector3D.h"
+#include "math/Vector4D.h"
+#include "services/ResourceManager.h"
 #include <filesystem>
 #include <fstream>
-#include <vector>
 #include <iostream>
-#include "services/ResourceManager.h"
+#include <nlohmann/json.hpp>
+#include <string>
+#include <vector>
+// #include "graphics/TextureCache.hpp"
 
 /*
 ================================================================================
@@ -76,6 +78,8 @@ This helps maintain alignment and performance characteristics.
 // However, current implementation is good enough for now.
 namespace ECS {
     namespace Components {
+        // ---------------------------------- Core utility/tag components ----------------------------------
+
         // Lightweight name (fixed-size). Avoids std::string to remain trivially copyable.
         struct Name {
         public:
@@ -108,6 +112,8 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Lifetime>, "Lifetime must be trivially copyable");
 
+        // ---------------------------------- 3D kinematics/physics ----------------------------------
+
         // Kinematics
         struct Velocity {
         public:
@@ -128,43 +134,14 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<AngularVelocity>, "AngularVelocity must be trivially copyable");
 
-        // Camera component but just a sample component for now
-        struct Camera {
-        public:
-            // If true -> use orthographic projection via OrthoHeight. If false -> use FovY.
-            bool IsOrthographic = false;
-            // padding to keep alignment predictable
-            // !!!! These are not meant to be used. !!!!
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
-
-            float FovY = 60.0f;        // degrees
-            float OrthoHeight = 10.0f; // world units (half-height)
-            float Near = 0.1f;
-            float Far = 1000.0f;
-            float Aspect = 16.0f / 9.0f; // width / height
-        };
-        static_assert(std::is_trivially_copyable_v<Camera>, "Camera must be trivially copyable");
-
-        // 2D sprite renderer (for UI/2D layers)
-        struct SpriteRenderer2D {
-        public:
-            uint32_t TextureId = 0;     // engine-specific handle/id
-            uint32_t _Pad = 0;          // keep 8-byte alignment
-            Vector4D Color{1.0f, 1.0f, 1.0f, 1.0f};
-            Vector2D Tiling{1.0f, 1.0f};
-            Vector2D Offset{0.0f, 0.0f};
-        };
-        static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
-
-        // Physics-lite components (engine can expand)
+        // Rigidbody placeholder
         struct Rigidbody {
         public:
-            float Mass = 1.0f;       // Mass <= 0 implies static; be careful with 0
+            float Mass = 1.0f;       // Mass <= 0 implies static
             float InvMass = 1.0f;    // Precompute for speed
             float LinearDrag = 0.0f;
             float AngularDrag = 0.0f;
-            // Flags (bit 0: gravity, bit 1: kinematic, etc.)
-            uint32_t Flags = 0;
+            uint32_t Flags = 0;      // bit 0: UseGravity, bit 1: Kinematic, etc.
             uint32_t _Pad = 0;
         };
         static_assert(std::is_trivially_copyable_v<Rigidbody>, "Rigidbody must be trivially copyable");
@@ -172,7 +149,6 @@ namespace ECS {
         struct BoxCollider {
         public:
             Vector3D HalfExtents{0.5f, 0.5f, 0.5f};
-            // Layer mask for filtering collisions
             uint32_t LayerMask = 0xFFFFFFFFu;
             uint32_t _Pad = 0;
         };
@@ -187,10 +163,139 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<SphereCollider>, "SphereCollider must be trivially copyable");
 
-        // Audio
+        // ---------------------------------- 2D kinematics/physics ----------------------------------
+
+        // 2D velocity for X/Y; systems should update LocalTransform.Position.X/Y
+        struct Velocity2D {
+        public:
+            Vector2D Value{0.0f, 0.0f};
+        };
+        static_assert(std::is_trivially_copyable_v<Velocity2D>, "Velocity2D must be trivially copyable");
+
+        // 2D acceleration for X/Y
+        struct Acceleration2D {
+        public:
+            Vector2D Value{0.0f, 0.0f};
+        };
+        static_assert(std::is_trivially_copyable_v<Acceleration2D>, "Acceleration2D must be trivially copyable");
+
+        // 2D angular velocity around Z axis (radians/sec); systems rotate LocalTransform.Rotation about Z
+        struct AngularVelocity2D {
+        public:
+            float Value = 0.0f;
+            float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f; // keep 16B size/alignment simple
+        };
+        static_assert(std::is_trivially_copyable_v<AngularVelocity2D>, "AngularVelocity2D must be trivially copyable");
+
+        // 2D rigidbody
+        struct Rigidbody2D {
+        public:
+            float Mass = 1.0f;          // Mass <= 0 => static
+            float InvMass = 1.0f;       // Precomputed
+            float LinearDamping = 0.0f; // Damping per second
+            float AngularDamping = 0.0f;
+            float GravityScale = 1.0f;  // Scale world gravity
+            uint32_t Flags = 0;         // bit 0: Kinematic, bit 1: UseGravity, bit 2: FixedRotation
+        };
+        static_assert(std::is_trivially_copyable_v<Rigidbody2D>, "Rigidbody2D must be trivially copyable");
+
+        // Physics material for 2D colliders
+        struct PhysicsMaterial2D {
+        public:
+            float Friction = 0.2f;      // 0..1
+            float Restitution = 0.0f;   // 0..1 (bounciness)
+            float _Pad0 = 0.0f, _Pad1 = 0.0f;
+        };
+        static_assert(std::is_trivially_copyable_v<PhysicsMaterial2D>, "PhysicsMaterial2D must be trivially copyable");
+
+        // Axis-aligned or oriented rectangle collider in 2D
+        struct BoxCollider2D {
+        public:
+            Vector2D HalfExtents{0.5f, 0.5f}; // half-size
+            Vector2D Offset{0.0f, 0.0f};      // local center offset
+            float Rotation = 0.0f;            // local rotation in radians (around Z)
+            uint32_t LayerMask = 0xFFFFFFFFu; // collision layer mask
+            uint32_t Flags = 0;               // bit 0: IsTrigger
+            uint32_t _Pad = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<BoxCollider2D>, "BoxCollider2D must be trivially copyable");
+
+        // Circle collider in 2D
+        struct CircleCollider2D {
+        public:
+            float Radius = 0.5f;
+            Vector2D Offset{0.0f, 0.0f};      // local center offset
+            uint32_t LayerMask = 0xFFFFFFFFu; // collision layer mask
+            uint32_t Flags = 0;               // bit 0: IsTrigger
+        };
+        static_assert(std::is_trivially_copyable_v<CircleCollider2D>, "CircleCollider2D must be trivially copyable");
+
+        // ---------------------------------- Rendering ----------------------------------
+
+        // 2D sprite renderer (for UI/2D layers)
+        struct SpriteRenderer2D {
+        public:
+            uint32_t TextureId = 0;     // engine-specific handle/id
+            uint32_t _Pad = 0;          // keep 8-byte alignment
+            Vector4D Color{1.0f, 1.0f, 1.0f, 1.0f};
+            Vector2D Tiling{1.0f, 1.0f};
+            Vector2D Offset{0.0f, 0.0f};
+        };
+        static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
+
+        // Optional: simple 2D sorting hint for renderer (e.g. painter's algorithm)
+        struct ZIndex2D {
+        public:
+            int16_t ZOrder = 0;  // smaller drawn first
+            int16_t _Pad0 = 0;
+            int32_t _Pad1 = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<ZIndex2D>, "ZIndex2D must be trivially copyable");
+
+        // Optional: sprite flipping flags for atlases
+        struct SpriteFlip2D {
+        public:
+            bool FlipX = false;
+            bool FlipY = false;
+            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<SpriteFlip2D>, "SpriteFlip2D must be trivially copyable");
+
+        // ---------- Cameras ----------
+
+        struct Camera {
+        public:
+            bool IsOrthographic = false;
+            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
+
+            float FovY = 60.0f;         // degrees (used when IsOrthographic == false)
+            float OrthoHeight = 10.0f;  // world units half-height (used when IsOrthographic == true)
+            float Near = 0.1f;
+            float Far = 1000.0f;
+            float Aspect = 16.0f / 9.0f; // width / height
+        };
+        static_assert(std::is_trivially_copyable_v<Camera>, "Camera must be trivially copyable");
+
+        // Optional matrices output for cameras (computed by CameraSystem)
+        struct CameraMatrices {
+        public:
+            Matrix4x4 View{};
+            Matrix4x4 Projection{};
+            Matrix4x4 ViewProjection{};
+        };
+        static_assert(std::is_trivially_copyable_v<CameraMatrices>, "CameraMatrices must be trivially copyable");
+
+        // ---------- Scripting / Audio (kept minimal) ----------
+
+        struct ScriptId {
+        public:
+            uint32_t Id = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<ScriptId>, "ScriptId must be trivially copyable");
+
         struct AudioSource {
         public:
-            uint32_t CueID = 0;
+            uint32_t SoundId = 0;  // engine-specific id/handle
             uint32_t _Pad = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
@@ -198,13 +303,6 @@ namespace ECS {
             uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
-
-        // Scripting hook: binds to a script registry index/handle
-        struct ScriptId {
-        public:
-            uint32_t Id = 0;
-        };
-        static_assert(std::is_trivially_copyable_v<ScriptId>, "ScriptId must be trivially copyable");
     }
 }
 

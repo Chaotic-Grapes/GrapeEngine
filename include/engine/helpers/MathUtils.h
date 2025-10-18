@@ -3,7 +3,7 @@
 
 #include <random>
 
-class MathHelper {
+class MathUtils {
 public:
     // Randomize function template
     template <typename T>
@@ -27,6 +27,13 @@ public:
             return dist(engine);
         }
 		else return 0; // Unsupported type
+    }
+
+    template <typename T>
+    static T Clamp(T value, T minVal, T maxVal) {
+        return value < minVal 
+            ? minVal 
+            : (value > maxVal ? maxVal : value);
     }
 };
 #endif

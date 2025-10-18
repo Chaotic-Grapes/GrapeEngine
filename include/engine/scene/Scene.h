@@ -1,12 +1,13 @@
 #ifndef SCENE_H
 #define SCENE_H
 
-#include <functional>
-#include <vector>
-#include <memory>
-#include "ecs/World.h"
+#include "core/Profiler.h"
 #include "ecs/Hierarchy.h"
+#include "ecs/World.h"
 #include "scene/LayerManager.h"
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace Scenes { class SceneManager; }
 namespace Scenes {
@@ -98,14 +99,18 @@ namespace Scenes {
         const LayerManager& GetLayers() const { return m_layers; }
 
         /**
-         * @brief Creates a new entity in the scene with an optional parent.
+         * @brief Creates an empty entity in the scene with an optional parent.
          * @param parent Optional parent entity to establish hierarchy.
          * @return The created ECS::Entity.
+         * @note Use m_world.Create(arguments...) to create entities with components.
          */
         ECS::Entity CreateEntity(std::optional<ECS::Entity> parent = std::nullopt) {
+            // Will this suppress copy elision?
+            // Consideration: Let user attach after creation to avoid this?
             ECS::Entity e = m_world.Create();
             if (parent.has_value())
-                m_world.Add<ECS::Hierarchy>(e, ECS::Hierarchy{ parent.value() });
+                m_world.Attach(e, parent.value());
+
             return e;
         }
 
@@ -116,10 +121,24 @@ namespace Scenes {
         void DestroyEntity(ECS::Entity entity) { m_world.Destroy(entity); }
 
         /**
-         * @brief Adds a system to the scene's update loop.
+         * @brief Adds system(s) to the scene's update loop.
          * @param sys The system function to add.
          * @param name Optional name for the system (for debugging/diagnostics).
          * @return The stable Id of the added system.
+         * @note To use this function, use a lambda or std::function matching the System signature.
+         * Example:
+         * ```cpp
+         * AddSystem([](Scenes::Scene& s, float dt) {
+         *     ECS::LifetimeSystem::Update(s.GetWorld(), dt);
+         *     ECS::CameraSystem::Update(s.GetWorld());
+         * }, "Multiple Systems");
+         * ```
+         * Alternatively, add single systems:
+         * ```cpp
+         * AddSystem([](Scenes::Scene& s, float dt) {
+         *     ECS::LifetimeSystem::Update(s.GetWorld(), dt);
+         * }, "Lifetime System");
+         * ```
          */
         uint64_t AddSystem(System sys, const char* name = nullptr) {
             SystemEntry entry;
@@ -263,6 +282,7 @@ namespace Scenes {
             // ECS::World::DeferGuard guard(m_world);
             for (auto& s : m_systems) {
                 if (s.Enabled && s.Callback) {
+                    Profiler::Get().BeginScope(s.Name ? s.Name : "Unknown System");
                     s.Callback(*this, dt);
                 }
             }

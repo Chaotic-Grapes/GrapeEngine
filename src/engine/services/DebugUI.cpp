@@ -161,8 +161,8 @@ void DebugUI::AddGameObject(const std::string& name) {
     // Create real ECS entity with components
     auto entity = _createGameEntity(name);
 
-    entity.Transform().Position.X = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
-    entity.Transform().Position.Y = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
+    entity.Transform().Position.X = MathUtils::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
+    entity.Transform().Position.Y = MathUtils::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
 
     // Add to editor list for UI display + clear cached toggle/delete
     // button labels so new objects get proper unique labels

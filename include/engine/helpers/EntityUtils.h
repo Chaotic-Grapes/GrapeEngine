@@ -1,0 +1,38 @@
+#ifndef ENTITYUTILS_H
+#define ENTITYUTILS_H
+
+#include <cstdint>
+#include "ecs/World.h"
+
+namespace ECS {
+    // Utility to pack/unpack/resolve entity ids (Index + Generation)
+    // Trying to keep it separate
+    class EntityUtils {
+    public:
+        // Pack as [63..32]=Generation, [31..0]=Index
+        static uint64_t Pack(Entity e) {
+            return (uint64_t(e.Generation) << 32) | uint64_t(e.Index);
+        }
+
+        static Entity Unpack(uint64_t id) {
+            Entity e;
+            e.Index = static_cast<uint32_t>(id & 0xFFFFFFFFull);
+            e.Generation = static_cast<uint32_t>(id >> 32);
+            return e;
+        }
+
+        // Validate id against world; returns true if alive and sets out
+        static bool TryResolve(const World& world, uint64_t id, Entity& out) {
+            Entity e = Unpack(id);
+            if (world.Alive(e)) {
+                out = e;
+                return true;
+            }
+
+            out = NULL_ENTITY;
+            return false;
+        }
+    };
+}
+
+#endif
