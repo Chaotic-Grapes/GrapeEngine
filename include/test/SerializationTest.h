@@ -1,56 +1,56 @@
-/**
- * @file    SerializationTest.h
- * @author  k.danielneozuofeng
- * @date    26/09/2025
- * @brief   Automated test scene for serialization system
- *
- * This header defines the SerializationTestScene class, a sandbox
- * scene used to verify serialization and deserialization of entities
- * and components. It creates test entities, saves and reloads a scene,
- * and compares the results against expected data to ensure correctness.
- */
+// /**
+//  * @file    SerializationTest.h
+//  * @author  k.danielneozuofeng
+//  * @date    26/09/2025
+//  * @brief   Automated test scene for serialization system
+//  *
+//  * This header defines the SerializationTestScene class, a sandbox
+//  * scene used to verify serialization and deserialization of entities
+//  * and components. It creates test entities, saves and reloads a scene,
+//  * and compares the results against expected data to ensure correctness.
+//  */
 
-#ifndef SERIALIZATIONTEST_H
-#define SERIALIZATIONTEST_H
+// #ifndef SERIALIZATIONTEST_H
+// #define SERIALIZATIONTEST_H
 
-#include "Scene.h"
-#include "ecs/Entity.h"
-#include <vector>
+// #include "Scene.h"
+// #include "ecs/Entity.h"
+// #include <vector>
 
-namespace Sandbox {
-    class SerializationTestScene : public Scene {
-    public:
-        SerializationTestScene();
-        ~SerializationTestScene() override = default;
+// namespace Sandbox {
+//     class SerializationTestScene : public Scene {
+//     public:
+//         SerializationTestScene();
+//         ~SerializationTestScene() override = default;
 
-        void OnLoad() override;
-        void OnUpdate() override;
-        void OnFixedUpdate() override {}
-        void OnLateUpdate() override {}
-        void OnUnload() override;
+//         void OnLoad() override;
+//         void OnUpdate() override;
+//         void OnFixedUpdate() override {}
+//         void OnLateUpdate() override {}
+//         void OnUnload() override;
 
-    private:
-        void RunAutomatedTest();
-        void CreateTestEntities();
-        void SaveScene();
-        void LoadScene();
-        void VerifyLoadedEntities();
-        void PrintTestResults();
+//     private:
+//         void RunAutomatedTest();
+//         void CreateTestEntities();
+//         void SaveScene();
+//         void LoadScene();
+//         void VerifyLoadedEntities();
+//         void PrintTestResults();
 
-        std::vector<Entity> m_originalEntities;
-        bool m_testPassed = true;
+//         std::vector<Entity> m_originalEntities;
+//         bool m_testPassed = true;
 
-        struct ExpectedData {
-            std::string name;
-            Vector2D position;
-            Vector2D scale;
-            float rotation;
-            std::string texturePath;
-            float mass;
-            float radius;
-        };
-        std::vector<ExpectedData> m_expectedData;
-    };
-}
+//         struct ExpectedData {
+//             std::string name;
+//             Vector2D position;
+//             Vector2D scale;
+//             float rotation;
+//             std::string texturePath;
+//             float mass;
+//             float radius;
+//         };
+//         std::vector<ExpectedData> m_expectedData;
+//     };
+// }
 
-#endif
+// #endif

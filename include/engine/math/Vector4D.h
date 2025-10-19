@@ -40,6 +40,9 @@ public:
     bool IsPoint() const;   // If W == 1.0f
     bool IsVector() const;  // If W == 0.0f
     Vector3D XYZ() const;   // Extract 3D components
+
+    // Static members
+    static const Vector4D Zero;
 };
 
 // Binary operators (non-member functions)
@@ -51,3 +54,5 @@ Vector4D operator/(const Vector4D& vector, float scalar);
 bool operator==(const Vector4D& a, const Vector4D& b);
 bool operator!=(const Vector4D& a, const Vector4D& b);
 
+// Static member definitions
+const Vector4D Vector4D::Zero = Vector4D(0.0f, 0.0f, 0.0f, 0.0f);

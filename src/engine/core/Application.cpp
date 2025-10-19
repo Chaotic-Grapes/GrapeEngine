@@ -105,6 +105,7 @@ namespace Engine {
 
     void Application::_enableConsole() {
 #ifdef _WIN32
+#include <windows.h>
         AllocConsole();
 
         FILE* dummy;

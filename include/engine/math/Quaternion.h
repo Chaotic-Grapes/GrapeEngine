@@ -26,6 +26,10 @@ public:
     static Quaternion FromEulerRad(float pitchX, float yawY, float rollZ);
     static Quaternion Slerp(const Quaternion& a, const Quaternion& b, float t);
 
+    // Conversion
+    Vector3D ToEulerRad() const;
+    Vector3D ToEulerDeg() const;
+
     // Rotate a vector
     Vector3D Rotate(const Vector3D& v) const;
 

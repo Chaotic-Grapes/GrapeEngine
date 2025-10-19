@@ -112,6 +112,31 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Lifetime>, "Lifetime must be trivially copyable");
 
+        // ---------------------------------- Layers and Transforms ----------------------------------
+        // Layers: one component holding a small integer id per entity
+        struct Layer { 
+        public:
+            uint16_t Id = 0; 
+        };
+        static_assert(std::is_trivially_copyable_v<Layer>, "Layer must be trivially copyable");
+
+        // Local transform is relative to parent entity (if any)
+        struct LocalTransform { 
+        public:
+            Vector3D Position{0,0,0};
+            Quaternion Rotation{0,0,0,1};
+            Vector3D Scale{1,1,1};
+        };
+        static_assert(std::is_trivially_copyable_v<LocalTransform>, "LocalTransform must be trivially copyable");
+
+        // World transform is relative to world origin
+        struct WorldTransform { 
+        public:
+            Matrix4x4 Matrix{};
+            bool Dirty = true;
+        };
+        static_assert(std::is_trivially_copyable_v<WorldTransform>, "WorldTransform must be trivially copyable");
+
         // ---------------------------------- 3D kinematics/physics ----------------------------------
 
         // Kinematics
@@ -138,13 +163,21 @@ namespace ECS {
         struct Rigidbody {
         public:
             float Mass = 1.0f;       // Mass <= 0 implies static
-            float InvMass = 1.0f;    // Precompute for speed
+            float InverseMass = 1.0f;    // Precompute for speed
             float LinearDrag = 0.0f;
             float AngularDrag = 0.0f;
             uint32_t Flags = 0;      // bit 0: UseGravity, bit 1: Kinematic, etc.
             uint32_t _Pad = 0;
         };
         static_assert(std::is_trivially_copyable_v<Rigidbody>, "Rigidbody must be trivially copyable");
+
+        struct PhysicsMaterial2D {
+        public:
+            float Friction = 0.2f;
+            float Restitution = 0.0f;
+            float _Pad0 = 0.0f, _Pad1 = 0.0f;
+        };
+        static_assert(std::is_trivially_copyable_v<PhysicsMaterial2D>, "PhysicsMaterial2D must be trivially copyable");
 
         struct BoxCollider {
         public:
@@ -165,14 +198,16 @@ namespace ECS {
 
         // ---------------------------------- 2D kinematics/physics ----------------------------------
 
-        // 2D velocity for X/Y; systems should update LocalTransform.Position.X/Y
-        struct Velocity2D {
+        // 2D linear velocity for X/Y; systems should update LocalTransform.Position.X/Y
+        // Velocity is the rate of change of position per second.
+        struct LinearVelocity2D {
         public:
             Vector2D Value{0.0f, 0.0f};
         };
-        static_assert(std::is_trivially_copyable_v<Velocity2D>, "Velocity2D must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<LinearVelocity2D>, "LinearVelocity2D must be trivially copyable");
 
         // 2D acceleration for X/Y
+        // Acceleration is the rate of change of velocity per second.
         struct Acceleration2D {
         public:
             Vector2D Value{0.0f, 0.0f};
@@ -191,7 +226,7 @@ namespace ECS {
         struct Rigidbody2D {
         public:
             float Mass = 1.0f;          // Mass <= 0 => static
-            float InvMass = 1.0f;       // Precomputed
+            float InverseMass = 1.0f;   // Precomputed
             float LinearDamping = 0.0f; // Damping per second
             float AngularDamping = 0.0f;
             float GravityScale = 1.0f;  // Scale world gravity
@@ -235,22 +270,13 @@ namespace ECS {
         // 2D sprite renderer (for UI/2D layers)
         struct SpriteRenderer2D {
         public:
-            uint32_t TextureId = 0;     // engine-specific handle/id
-            uint32_t _Pad = 0;          // keep 8-byte alignment
-            Vector4D Color{1.0f, 1.0f, 1.0f, 1.0f};
+            uint32_t TextureId = 0;
+            Color Color{1.0f, 1.0f, 1.0f, 1.0f};
             Vector2D Tiling{1.0f, 1.0f};
             Vector2D Offset{0.0f, 0.0f};
+            uint32_t _Pad = 0;          // keep 8-byte alignment
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
-
-        // Optional: simple 2D sorting hint for renderer (e.g. painter's algorithm)
-        struct ZIndex2D {
-        public:
-            int16_t ZOrder = 0;  // smaller drawn first
-            int16_t _Pad0 = 0;
-            int32_t _Pad1 = 0;
-        };
-        static_assert(std::is_trivially_copyable_v<ZIndex2D>, "ZIndex2D must be trivially copyable");
 
         // Optional: sprite flipping flags for atlases
         struct SpriteFlip2D {
@@ -260,6 +286,65 @@ namespace ECS {
             uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteFlip2D>, "SpriteFlip2D must be trivially copyable");
+
+        // ---------- Minimal 2D shape data for debug rendering ----------
+        // Keep these POD to be fast and compatible with archetype moves.
+
+        struct ShapeCircle2D {
+        public:
+            float Radius = 0.5f;
+            Vector2D Offset{0.0f, 0.0f}; // local offset
+            Color Color{1.f,1.f,1.f,1.f};
+            float Thickness = 1.0f;      // for wireframe; ignored if Filled
+            bool Filled = false;
+            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<ShapeCircle2D>, "ShapeCircle2D must be trivially copyable");
+
+        struct ShapeBox2D {
+        public:
+            Vector2D HalfExtents{0.5f, 0.5f};
+            Vector2D Offset{0.0f, 0.0f};
+            Color Color{1.f,1.f,1.f,1.f};
+            float Thickness = 1.0f;
+            bool Filled = false;
+            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<ShapeBox2D>, "ShapeBox2D must be trivially copyable");
+
+        struct ShapeLine2D {
+        public:
+            Vector2D A{0.0f, 0.0f};     // local-space endpoints
+            Vector2D B{1.0f, 0.0f};
+            Color Color{1.f,1.f,1.f,1.f};
+            float Thickness = 1.0f;
+            float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f;
+        };
+        static_assert(std::is_trivially_copyable_v<ShapeLine2D>, "ShapeLine2D must be trivially copyable");
+
+        // Fixed-capacity polyline/polygon for debug; avoids heap
+        template<size_t TCapacity = 16>
+        struct ShapePolyline2D {
+        public:
+            Vector2D Points[TCapacity]{};
+            uint8_t Count = 0;          // number of valid points
+            bool Closed = false;        // draw last->first if true
+            uint8_t _Pad0 = 0;
+            uint8_t _Pad1 = 0;
+            Color Color{1,1,1,1};
+            float Thickness = 1.0f;
+            float _Pad2 = 0.0f, _Pad3 = 0.0f, _Pad4 = 0.0f;
+        };
+        static_assert(std::is_trivially_copyable_v<ShapePolyline2D<>>, "ShapePolyline2D must be trivially copyable");
+
+        // Optional: simple 2D sorting hint for renderer (e.g. painter's algorithm)
+        struct ZIndex2D {
+        public:
+            int16_t ZOrder = 0;  // smaller drawn first
+            int16_t _Pad0 = 0;
+            int32_t _Pad1 = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<ZIndex2D>, "ZIndex2D must be trivially copyable");
 
         // ---------- Cameras ----------
 
@@ -295,7 +380,7 @@ namespace ECS {
 
         struct AudioSource {
         public:
-            uint32_t SoundId = 0;  // engine-specific id/handle
+            uint32_t CueId = 0;
             uint32_t _Pad = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
@@ -318,57 +403,57 @@ namespace ECS {
 //         const char* GetTypeName() const override { return "Transform"; }
 //     };
 
-//     struct SpriteRenderer : IComponent {
-//         GLuint TextureId = 0;
-//         int Width = 0;
-//         int Height = 0;
-//         const SpriteMetadata* Meta = nullptr;
-//         Color Color{ 1.f, 1.f, 1.f, 1.f };
-//         bool FlipX = false;
-//         bool FlipY = false;
-//         int SortingOrder = 0;
-//         std::string SortingLayerName = "Default";
-//         std::string TexturePath;
-//         std::string Sprite;
+    struct SpriteRenderer : IComponent {
+        GLuint TextureId = 0;
+        int Width = 0;
+        int Height = 0;
+        const SpriteMetadata* Meta = nullptr;
+        Color Color{ 1.f, 1.f, 1.f, 1.f };
+        bool FlipX = false;
+        bool FlipY = false;
+        int SortingOrder = 0;
+        std::string SortingLayerName = "Default";
+        std::string TexturePath;
+        std::string Sprite;
 
-//         SpriteRenderer(const std::string& spritePath = "") : TexturePath(spritePath), Sprite(spritePath) {
-//             if (!spritePath.empty()) {
-//                 auto tex = RM.Get<Texture>(spritePath);
-//                 TextureId = tex->ID();
-//                 Width = tex->Width();
-//                 Height = tex->Height();
+        SpriteRenderer(const std::string& spritePath = "") : TexturePath(spritePath), Sprite(spritePath) {
+            if (!spritePath.empty()) {
+                auto tex = RM.Get<Texture>(spritePath);
+                TextureId = tex->ID();
+                Width = tex->Width();
+                Height = tex->Height();
 
-//                 auto p = std::filesystem::path(spritePath);
-//                 auto filename = p.stem().string() + ".json";
+                auto p = std::filesystem::path(spritePath);
+                auto filename = p.stem().string() + ".json";
 
-//                 auto parent = p.parent_path().parent_path(); // "assets/textures"
-//                 auto metadataPath = parent / "test-metadata" / filename;
+                auto parent = p.parent_path().parent_path(); // "assets/textures"
+                auto metadataPath = parent / "test-metadata" / filename;
 
-//                 std::ifstream in(metadataPath);
-//                 if (in) {
-//                     nlohmann::json j;
-//                     in >> j;
+                std::ifstream in(metadataPath);
+                if (in) {
+                    nlohmann::json j;
+                    in >> j;
 
-//                     auto key = p.filename().string(); // for example, "fishBoy.png"
-//                     if (j.contains(key)) {
-//                         static std::unordered_map<std::string, SpriteMetadata> cache;
-//                         cache[key] = loadSingleSpriteMetadata(j[key], 0, 0);
-//                         Meta = &cache[key];
-//                     }
-//                     else {
-//                         std::cout << "Metadata file " << metadataPath
-//                             << " missing entry for " << key << "\n";
-//                     }
-//                 }
-//                 else {
-//                     std::cout << "Could not open metadata file: "
-//                         << metadataPath << "\n";
-//                 }
-//             }
-//         }
+                    auto key = p.filename().string(); // for example, "fishBoy.png"
+                    if (j.contains(key)) {
+                        static std::unordered_map<std::string, SpriteMetadata> cache;
+                        cache[key] = loadSingleSpriteMetadata(j[key], 0, 0);
+                        Meta = &cache[key];
+                    }
+                    else {
+                        std::cout << "Metadata file " << metadataPath
+                            << " missing entry for " << key << "\n";
+                    }
+                }
+                else {
+                    std::cout << "Could not open metadata file: "
+                        << metadataPath << "\n";
+                }
+            }
+        }
 
-//         const char* GetTypeName() const override { return "SpriteRenderer"; }
-//     };
+        const char* GetTypeName() const override { return "SpriteRenderer"; }
+    };
 
 // 	// TODO: SpriteShapeRenderer for splining shapes
 

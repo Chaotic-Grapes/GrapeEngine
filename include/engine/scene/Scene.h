@@ -208,7 +208,8 @@ namespace Scenes {
          * @param index The index of the system to retrieve.
          */
         const SystemEntry* GetSystem(size_t index) const {
-            if (index >= m_systems.size()) return nullptr;
+            if (index >= m_systems.size())
+                return nullptr;
             return &m_systems[index];
         }
 

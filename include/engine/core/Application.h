@@ -5,7 +5,6 @@
 #include "scene/SceneManager.h"
 #include "serialization/Serialization.h"
 #include "services/AudioService.h"
-#include <windows.h>
 
 namespace Engine {
     class Application {

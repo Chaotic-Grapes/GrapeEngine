@@ -34,6 +34,15 @@ public:
     static Vector3D Lerp(const Vector3D& a, const Vector3D& b, float t);
     static Vector3D ClampVector(const Vector3D& vector, const Vector3D& min, const Vector3D& max);
     static float ClampValue(float component, float min, float max);
+
+    // Static members
+    static const Vector3D Zero;
+    static const Vector3D Forward;
+    static const Vector3D Up;
+    static const Vector3D Right;
+    static const Vector3D Backward;
+    static const Vector3D Down;
+    static const Vector3D Left;
 };
 
 // Binary operators (non-member functions)
@@ -44,3 +53,12 @@ Vector3D operator*(float scalar, const Vector3D& vector);
 Vector3D operator/(const Vector3D& vector, float scalar);
 bool operator==(const Vector3D& a, const Vector3D& b);
 bool operator!=(const Vector3D& a, const Vector3D& b);
+
+// Static member definitions
+const Vector3D Vector3D::Zero     = Vector3D(0.0f, 0.0f, 0.0f);
+const Vector3D Vector3D::Forward  = Vector3D(0.0f, 0.0f, 1.0f);
+const Vector3D Vector3D::Up       = Vector3D(0.0f, 1.0f, 0.0f);
+const Vector3D Vector3D::Right    = Vector3D(1.0f, 0.0f, 0.0f);
+const Vector3D Vector3D::Backward = Vector3D(0.0f, 0.0f, -1.0f);
+const Vector3D Vector3D::Down     = Vector3D(0.0f, -1.0f, 0.0f);
+const Vector3D Vector3D::Left     = Vector3D(-1.0f, 0.0f, 0.0f);

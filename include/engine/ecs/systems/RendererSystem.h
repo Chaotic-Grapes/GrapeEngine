@@ -13,14 +13,12 @@
 #include "Math/Vector2D.h"
 
 class Entity;
-namespace Engine {
-    class RendererSystem : public ISystem {
+namespace ECS {
+    class RendererSystem {
     public:
-        RendererSystem(World* world);
+        void Initialize();
 
-        void OnCreate() override;
-        void OnUpdate() override;
-        std::string Name() const override { return "Renderer System"; }
+        void Update(World& world, float dt);
 
         int GetFlushCount() const { return m_renderer ? m_renderer->flushCountThisFrame : -1; }
 
@@ -28,9 +26,9 @@ namespace Engine {
         TEMPORARY ACCESSORS for raw renderer + shader (remove later!)
         Used for bypassing ECS in stress tests and direct batch calls.
         ============================================================ */
-        Renderer* GetRenderer() { return m_renderer.get(); }
-        Shader* GetShader() { return m_shader.get(); }
-        Shader* GetTextShader() { return m_textShader.get(); }
+        Renderer* GetRenderer()     { return m_renderer.get(); }
+        Shader*   GetShader()       { return m_shader.get(); }
+        Shader*   GetTextShader()   { return m_textShader.get(); }
 
         const glm::mat4& GetProjection() const { return m_projection; }
 
@@ -55,7 +53,7 @@ namespace Engine {
             };
         }
 
-        World* m_world;
+        bool m_initialized = false;
         std::unique_ptr<Renderer> m_renderer;
 		std::unique_ptr<Shader> m_shader;
         std::unique_ptr<Shader> m_textShader; // for sdf text

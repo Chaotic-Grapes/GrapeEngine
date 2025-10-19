@@ -23,13 +23,6 @@ namespace ECS {
     // Relationship component for hierarchy
     struct Parent { Entity ParentEntity{NULL_ENTITY}; };
 
-    // Layers: one component holding a small integer id per entity
-    struct Layer { uint16_t Id = 0; };
-
-    // Move this?
-    struct LocalTransform { Vector3D Position{0,0,0}; Quaternion Rotation{0,0,0,1}; Vector3D Scale{1,1,1}; };
-    struct WorldTransform { Matrix4x4 Matrix{}; bool Dirty = true; };
-
     // World holds all archetypes and entity allocation, moves entities across archetypes on structural changes.
     class World {
     public:
@@ -58,12 +51,12 @@ namespace ECS {
             return e;
         }
 
-        bool Alive(Entity e) const {
+        bool IsAlive(Entity e) const {
             return e.Index < m_generations.size() && m_generations[e.Index] == e.Generation;
         }
 
         void Destroy(Entity e) {
-            if (!Alive(e))
+            if (!IsAlive(e))
                 return;
 
             auto &loc = m_locations[e.Index];
@@ -78,7 +71,7 @@ namespace ECS {
         // Component API
         template<typename T>
         bool Has(Entity e) const {
-            if (!Alive(e))
+            if (!IsAlive(e))
                 return false;
 
             auto& loc = m_locations[e.Index];
@@ -90,7 +83,7 @@ namespace ECS {
 
         template<typename T>
         T& Get(Entity e) {
-            assert(Alive(e));
+            assert(IsAlive(e));
             auto& loc = m_locations[e.Index];
             assert(loc.ArchetypePtr && loc.ArchetypePtr->Has(TypeIdOf<T>()));
 
@@ -98,7 +91,7 @@ namespace ECS {
         }
         template<typename T>
         const T& Get(Entity e) const {
-            assert(Alive(e));
+            assert(IsAlive(e));
             auto& loc = m_locations[e.Index];
             assert(loc.ArchetypePtr && loc.ArchetypePtr->Has(TypeIdOf<T>()));
 
@@ -107,7 +100,7 @@ namespace ECS {
 
         template<typename T, typename... TArgs>
         T& Add(Entity e, TArgs&&... args) {
-            assert(Alive(e));
+            assert(IsAlive(e));
             auto t = TypeIdOf<T>();
             auto mover = [&, this](Entity, void* dstArchetypeSlot) {
                 new (dstArchetypeSlot) T(std::forward<TArgs>(args)...);
@@ -120,7 +113,7 @@ namespace ECS {
 
         template<typename T>
         void Remove(Entity e) {
-            assert(Alive(e));
+            assert(IsAlive(e));
             if (!Has<T>(e))
                 return;
 
@@ -225,7 +218,7 @@ namespace ECS {
             uint32_t SlotIndex = 0;
         };
         const Location* LocationOf(Entity e) const {
-            if (!Alive(e))
+            if (!IsAlive(e))
                 return nullptr;
             return &m_locations[e.Index];
         }

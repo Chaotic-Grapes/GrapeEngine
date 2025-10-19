@@ -24,7 +24,7 @@ namespace ECS {
         // Validate id against world; returns true if alive and sets out
         static bool TryResolve(const World& world, uint64_t id, Entity& out) {
             Entity e = Unpack(id);
-            if (world.Alive(e)) {
+            if (world.IsAlive(e)) {
                 out = e;
                 return true;
             }
