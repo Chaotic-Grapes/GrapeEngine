@@ -372,3 +372,67 @@ DynCol::SweepHit DynCol::Sweep(const Circle& A, const Vector2D& A_end,
     Vector2D Bend = { (B.min.X + B.max.X) * 0.5f, (B.min.Y + B.max.Y) * 0.5f }; // no movement
     return Sweep(AA, Aend, E, Bend);
 }
+
+//hopefully works for all shapetypes - just using generic mass/velocity and collision data 
+void DynCol::ResolveCollision(Vector2D& posA, Vector2D& velA, float massA, bool staticA,
+    Vector2D& posB, Vector2D& velB, float massB, bool staticB,
+    const Manifold& m, float restitution)
+{
+    //skip if both objects are static types
+    if (staticA && staticB) return;
+
+    //following is to prevent sticking/overlapping of objects
+    if (!staticA && !staticB) {
+
+        //both dynamic objs basically
+        //therefore we need to know the ratios -> heavier objs move less compared to lighter objects
+        
+        //calculate total mass between both objs
+        float totalmass = massA + massB;
+        //if A moves more based on the fact that b is heavier
+        float ratioA = massB / totalmass;
+        //if B moves more based on the fact that a is heavier
+        float ratioB = massA / totalmass;
+
+        //Push of A based on linear interpolation (lerp) with mass-weighted distrobution
+        posA += m.normal * (m.penetration * ratioA);
+        //now same with b
+        posB -= m.normal * (m.penetration * ratioB);
+    }
+    // if only A is dynamic apply force to A dont change pos of B
+    else if (!staticA) {
+        posA += m.normal * m.penetration;
+    }
+    // else for B is the dynamic one not A
+    else {
+        posB -= m.normal * m.penetration;
+    }
+
+    //impulse to give the initial push force plus change in velocity over time
+
+    //calculate relative velocity
+    Vector2D relativeVel = velA - velB;
+
+    //calculates the velocity of how the objects are approaching each other along the collision normal 
+    float velAlongNormal = relativeVel.Dot(m.normal);
+
+    //if objects are already separated we skip them to not apply impulse
+    if (velAlongNormal > 0.0f) return;
+
+    //Calculate impulse magnitude - calculates how much push to apply (j = -(1 + e) * v_rel)
+    float j = -(1.0f + restitution) * velAlongNormal;
+
+    //calculate inverse mass where heavier objs move less
+    //if either objet is static inverse mass is 0, if not divide 1 by its mass to get inverse mass
+    float invMassA = staticA ? 0.0f : 1.0f / massA;
+    float invMassB = staticB ? 0.0f : 1.0f / massB;
+    // adjustment for mass based on (j_final = j_raw / (1/m_A + 1/m_B) physics)
+    j /= (invMassA + invMassB);
+
+    // create impulse vector 
+    Vector2D impulse = m.normal * j;
+
+    // reflection velocities based on whether its static plus or mass * impulse force
+    if (!staticA) velA += impulse * invMassA;
+    if (!staticB) velB -= impulse * invMassB;
+}

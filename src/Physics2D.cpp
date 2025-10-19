@@ -3,6 +3,7 @@
 #include <iostream>
 #include "Collision.h"
 #include "ecs/Entity.h"
+#include "DynamicCollision.h"
 
 namespace Engine {
     Vector2D Physics2D::m_gravity = Vector2D(0.0f, -9.81f);
@@ -53,6 +54,60 @@ namespace Engine {
                     }
                 }
             }
+
+            //circle vs circle collision
+            
+            //check dynamic cirlcles vs other circles 
+            for (size_t i = 0; i < colliderEntities.size(); ++i) {
+
+                // extract rigidbody compo/transform/collider from collider entity
+                auto& [crb, ctransform, collider] = colliderEntities[i];
+
+                //skip for static types
+                if (crb.BodyType == Component::Rigidbody2D::Static) continue;
+
+                //check if entity has circlecollider in it
+                auto* circle = dynamic_cast<Component::CircleCollider2D*>(&collider);
+                if (!circle) continue;
+
+                //check against all other entities after this one eg. -> i+1
+                for (size_t j = i + 1; j < colliderEntities.size(); ++j) {
+
+                    //extractor for other components for other enttititiiesss
+                    auto& [crb2, ctransform2, collider2] = colliderEntities[j];
+
+                    // Check if other entity has a circle collider
+                    const auto* circle2 = dynamic_cast<Component::CircleCollider2D*>(&collider2);
+                    if (!circle2) continue;
+
+                    // Build DynamicCollision circle shapes
+                    DynCol::Circle c1{ ctransform.Position + collider.Offset, circle->Radius };
+                    DynCol::Circle c2{ ctransform2.Position + collider2.Offset, circle2->Radius };
+
+                    // now detect for collision
+                    DynCol::Manifold manifold;
+                    if (DynCol::Overlap(c1, c2, &manifold)) {
+                        // resolve collision response
+                        DynCol::ResolveCollision(
+                            ctransform.Position,                              // entity 1 position
+                            crb.LinearVelocity,                               // entity 1 velocity
+                            crb.Mass,                                         // entity 1 mass
+                            crb.BodyType == Component::Rigidbody2D::Static,  // staticA - is entity 1 static?
+                            ctransform2.Position,                             // entity 2 position
+                            crb2.LinearVelocity,                              // entity 2 velocity
+                            crb2.Mass,                                        // entity 2 mass
+                            crb2.BodyType == Component::Rigidbody2D::Static, // staticis entity 2 static?
+                            manifold,                                         // m - collision data
+                            0.5f                                              // restitution - bounciness (optional)
+                        );
+                    }
+                }
+            }
+            
+            
+
+
+
 
             // TODO: handle other collisions here
 

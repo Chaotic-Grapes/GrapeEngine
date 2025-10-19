@@ -6,13 +6,13 @@
 * @brief   2D collision types and APIs for discrete overlaps and swept (continuous) tests.
 * 
 * @details Declares:
-*   • Shape primitives: AABB, Circle, Segment, ConvexPolygon, Triangle. 
-*   • Utility: MakeEquilateral(center, side, angle) — builds a triangle oriented by angle.
-*   • Contact data:
+*   ï¿½ Shape primitives: AABB, Circle, Segment, ConvexPolygon, Triangle. 
+*   ï¿½ Utility: MakeEquilateral(center, side, angle) ï¿½ builds a triangle oriented by angle.
+*   ï¿½ Contact data:
 *       - Manifold { normal (B->A), penetration, contact, valid } for discrete tests.
 *       - SweepHit { toi[0,1], normal (B->A), contactA/B, hit } for TOI queries. 
-*   • Discrete overlaps: Triangle×AABB, AABB×AABB, Circle×Circle, Circle×AABB, Convex×Convex. 
-*   • Swept tests (continuous): AABB×AABB, Circle×Circle, Circle×AABB (with end positions). 
+*   ï¿½ Discrete overlaps: Triangleï¿½AABB, AABBï¿½AABB, Circleï¿½Circle, Circleï¿½AABB, Convexï¿½Convex. 
+*   ï¿½ Swept tests (continuous): AABBï¿½AABB, Circleï¿½Circle, Circleï¿½AABB (with end positions). 
 *
 * @usage
 *   - Call Overlap(...) for frame-by-frame checks; use Sweep(...) to compute time-of-impact (TOI)
@@ -96,6 +96,11 @@ namespace DynCol {
     SweepHit Sweep(const Circle& A, const Vector2D& A_end,
         const AABB& B, const Vector2D& B_end);
 
+    void ResolveCollision(
+        Vector2D& posA, Vector2D& velA, float massA, bool staticA,
+        Vector2D& posB, Vector2D& velB, float massB, bool staticB,
+        const Manifold& m, float restitution = 0.5f);
+        
 } // namespace DynCol
 
 #endif
