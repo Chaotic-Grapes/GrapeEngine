@@ -9,6 +9,7 @@
 #include "services/WindowManager.h"
 #include <iostream>
 #include <memory>
+#include "ECSTest.hpp"
 
 
 void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
@@ -22,16 +23,13 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     std::cout << "2. Graphics & Art Pipeline Test" << '\n';
     std::cout << "3. Serialization Check Test" << '\n';
     std::cout << "4. Memory Tracking Test" << '\n';
+	std::cout << "5. Entity Component System Test" << '\n';
 
     int choice;
     std::cin >> choice;
 
     // Clear console
     printf("\033[H\033[J");
-
-    // Add scenes
-    size_t graphicsTest = sceneManager.AddScene(new Sandbox::GraphicsTestScene());
-    // size_t serializationTest = sceneManager.AddScene(std::make_unique<Sandbox::SerializationTestScene>());
 
     switch (choice) {
     // case 1: { // PhysicsCollision
@@ -43,6 +41,7 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     // }
     case 2: {
         LOG_INFO("Starting Graphics & Art Pipeline Test...");
+        size_t graphicsTest = sceneManager.AddScene(new Sandbox::GraphicsTestScene());
         sceneManager.SetActive(graphicsTest);
 
         break;
@@ -55,10 +54,17 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     //     break;
     // }
     case 4: {
-        std::cout << "Starting Memory Tracking Test..." << '\n';
+        LOG_INFO("Starting Memory Tracking Test...");
         RunMemoryTests();
         break;
     }
+    case 5: {
+        LOG_INFO("Starting Entity Component System Test...");
+        size_t ecsTest = sceneManager.AddScene(new Sandbox::ECSTestScene());
+        sceneManager.SetActive(ecsTest);
+
+        break;
+	}
     default:
         std::cout << "Invalid choice" << '\n';
         break;

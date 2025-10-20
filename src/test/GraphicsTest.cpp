@@ -91,7 +91,7 @@ void GraphicsTestScene::OnLoad() {
 
     m_rendererSystem = std::make_shared<ECS::RendererSystem>();
     m_rendererSystem->Initialize();
-    AddSystem([this](Scenes::Scene& s, float dt){
+    AddSystem([this](Scenes::Scene& s, const float dt){
         m_rendererSystem->Update(s.GetWorld(), dt);
     }, "Renderer System");
 
@@ -99,7 +99,7 @@ void GraphicsTestScene::OnLoad() {
 }
 
 void GraphicsTestScene::OnUpdate() {
-    ECS::World& world = GetWorld();
+    const ECS::World& world = GetWorld();
 
     // Cycle through test types with G
     if (Input::IsKeyDown(KEY_G)) {
@@ -112,8 +112,8 @@ void GraphicsTestScene::OnUpdate() {
             }
 
             // cleanup old test entities
-            for (uint64_t id : m_testEntities) {
-                ECS::Entity e = EntityUtils::Unpack(id);
+            for (const uint64_t id : m_testEntities) {
+                const ECS::Entity e = EntityUtils::Unpack(id);
                 if (world.IsAlive(e))
                     DestroyEntity(e);
             }
@@ -156,11 +156,11 @@ void GraphicsTestScene::OnUpdate() {
         static int frameCount = 0;
 
         frameCount++;
-        double now = Time::ElapsedTime();
+        const double now = Time::ElapsedTime();
 
         if (now - lastTime >= 1.0) {
-            double elapsed = now - lastTime;
-            double fps = frameCount / elapsed;
+            const double elapsed = now - lastTime;
+            const double fps = frameCount / elapsed;
 
             LOG_DEBUG("FPS: " << fps
                 << " | Flushes: " << m_rendererSystem->GetFlushCount());
@@ -181,9 +181,9 @@ void GraphicsTestScene::OnUnload() {
 // ------------------------------------
 void GraphicsTestScene::runBasicGraphics() { 
     if (m_testEntities.empty()) {
-        ECS::Entity square = CreateOnLayer(
+        const ECS::Entity square = CreateOnLayer(
             m_gameplayLayer,
-            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{100.f,100.f,1} },
+            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{1.f,1.f,1.f} },
             ECS::Components::WorldTransform{ },
             ECS::Components::ShapeBox2D{
                 Vector2D{50.f, 50.f}, // half extents

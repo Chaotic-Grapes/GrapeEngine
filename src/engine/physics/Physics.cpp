@@ -1,17 +1,18 @@
 #include "physics/Physics.h"
 #include <cmath>
 #include <algorithm>
-
 #include "helpers/MathUtils.h"
 
 namespace Engine {
-    Vector2D Physics::m_gravity = Vector2D(0.0f, -9.81f);
+    Vector2D Physics::m_gravity = Vector2D(0.0f, -981.f);
     bool Physics::m_enabled = true;
+    bool Physics::m_worldBoundsEnabled = false;
+    Physics::BoundaryConstraint Physics::m_worldBounds = {0.0f, 1600.0f, 0.0f, 900.0f, false, 0.8f};
 
     Vector2D Physics::CalculateAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::LinearVelocity2D& vel) {
         Vector2D acceleration(0.f, 0.f);
-        acceleration += m_gravity * rb.GravityScale;
-        acceleration += Vector2D(-vel.Value.X * rb.LinearDamping, -vel.Value.Y * rb.LinearDamping) / rb.Mass;
+        //acceleration += m_gravity * rb.GravityScale;
+        acceleration += Vector2D(-vel.Value.X * rb.LinearDamping, -vel.Value.Y * rb.LinearDamping);// / rb.Mass;
         return acceleration;
     }
 
@@ -28,6 +29,16 @@ namespace Engine {
     // ============================================================================
     // Utility Methods
     // ============================================================================
+
+    void Physics::SetWorldBounds(const float minX, const float maxX, const float minY, const float maxY, const bool killVelocity, const float restitution) {
+        m_worldBounds.MinX = minX;
+        m_worldBounds.MaxX = maxX;
+        m_worldBounds.MinY = minY;
+        m_worldBounds.MaxY = maxY;
+        m_worldBounds.KillVelocity = killVelocity;
+        m_worldBounds.Restitution = std::clamp(restitution, 0.0f, 1.0f);
+        m_worldBoundsEnabled = true;
+    }
 
     float Physics::GetInverseMass(const float mass) {
         return (mass > 0.0f) ? 1.0f / mass : 0.0f;
@@ -72,21 +83,31 @@ namespace Engine {
         Vector2D& position,
         Vector2D& velocity,
         const float radius,
-        const BoundaryConstraint& bounds
+        const BoundaryConstraint& bounds,
+        const float entityRestitution
     ) {
         bool collided = false;
+        
+        // Use entity restitution if provided, otherwise use bounds restitution
+        const float restitution = (entityRestitution >= 0.0f) ? entityRestitution : bounds.Restitution;
 
         // X-axis bounds
         if (position.X - radius <= bounds.MinX) {
             position.X = bounds.MinX + radius;
-            if (bounds.KillVelocity && velocity.X < 0.0f) {
+            if (bounds.KillVelocity) {
                 velocity.X = 0.0f;
+            } else if (velocity.X < 0.0f) {
+                // Bounce with restitution
+                velocity.X = -velocity.X * restitution;
             }
             collided = true;
         } else if (position.X + radius >= bounds.MaxX) {
             position.X = bounds.MaxX - radius;
-            if (bounds.KillVelocity && velocity.X > 0.0f) {
+            if (bounds.KillVelocity) {
                 velocity.X = 0.0f;
+            } else if (velocity.X > 0.0f) {
+                // Bounce with restitution
+                velocity.X = -velocity.X * restitution;
             }
             collided = true;
         }
@@ -94,14 +115,20 @@ namespace Engine {
         // Y-axis bounds
         if (position.Y - radius <= bounds.MinY) {
             position.Y = bounds.MinY + radius;
-            if (bounds.KillVelocity && velocity.Y < 0.0f) {
+            if (bounds.KillVelocity) {
                 velocity.Y = 0.0f;
+            } else if (velocity.Y < 0.0f) {
+                // Bounce with restitution
+                velocity.Y = -velocity.Y * restitution;
             }
             collided = true;
         } else if (position.Y + radius >= bounds.MaxY) {
             position.Y = bounds.MaxY - radius;
-            if (bounds.KillVelocity && velocity.Y > 0.0f) {
+            if (bounds.KillVelocity) {
                 velocity.Y = 0.0f;
+            } else if (velocity.Y > 0.0f) {
+                // Bounce with restitution
+                velocity.Y = -velocity.Y * restitution;
             }
             collided = true;
         }
@@ -189,13 +216,19 @@ namespace Engine {
         ECS::Components::LocalTransform& transformB,
         const float radiusA,
         const float radiusB,
+        const Vector2D& offsetA,
+        const Vector2D& offsetB,
         const ECS::Components::PhysicsMaterial2D& physics
     ) {
         CircleCollisionResult result{};
         result.Collided = false;
 
+        // Calculate actual circle centers with offsets
+        const Vector2D centerA = MathUtils::ToVector2D(transformA.Position) + offsetA;
+        const Vector2D centerB = MathUtils::ToVector2D(transformB.Position) + offsetB;
+
         // Calculate collision normal and depth
-        const Vector2D delta = MathUtils::ToVector2D(transformB.Position - transformA.Position);
+        const Vector2D delta = centerB - centerA;
         const float distanceSquared = Dot(delta, delta);
         const float radiusSum = radiusA + radiusB;
 

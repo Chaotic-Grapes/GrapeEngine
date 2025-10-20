@@ -56,9 +56,9 @@ namespace Engine {
             m_audio->Update();
 
             // --- Scene Update ---
+            m_sceneManager.Update();
             auto* currentScene = m_sceneManager.GetActive();
             if (currentScene) {
-                m_sceneManager.Update();
 
                 while (m_accumulator >= Time::FixedDeltaTime()) {
                     currentScene->OnFixedUpdate();

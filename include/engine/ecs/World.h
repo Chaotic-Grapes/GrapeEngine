@@ -618,20 +618,60 @@ namespace ECS {
             (void)e;
             Archetype* arch = loc.ArchetypePtr;
             auto &ci = m_chunkIndices[arch];
-            auto &vec = ci.Entities[loc.ChunkIndex];
-            const uint32_t movedFrom = arch->RemoveSwapBack(loc.ChunkIndex, loc.SlotIndex);
+            const uint32_t chunkIndex = loc.ChunkIndex;
 
-            if (movedFrom != loc.SlotIndex) {
-                const Entity moved = vec[movedFrom];
-                vec[loc.SlotIndex] = moved;
-                vec[movedFrom] = NULL_ENTITY;
-                auto &mloc = m_locations[moved.Index];
-                mloc.SlotIndex = loc.SlotIndex;
-            } 
-            else {
-                vec[loc.SlotIndex] = NULL_ENTITY;
+            // Defensive: ensure mapping vector is large enough
+            if (ci.Entities.size() <= chunkIndex) {
+                ci.Entities.resize(chunkIndex + 1);
             }
 
+            auto &vec = ci.Entities[chunkIndex];
+
+            // Capture chunk count before removal to detect chunk erasure
+            const uint32_t prevChunkCount = arch->GetChunkCount();
+            const uint32_t movedFrom = arch->RemoveSwapBack(chunkIndex, loc.SlotIndex);
+            const uint32_t postChunkCount = arch->GetChunkCount();
+            const bool chunkErased = (postChunkCount + 1u == prevChunkCount);
+
+            if (!chunkErased) {
+                // Regular in-chunk swap/remove
+                if (movedFrom != loc.SlotIndex) {
+                    const Entity moved = vec[movedFrom];
+                    vec[loc.SlotIndex] = moved;
+                    vec[movedFrom] = NULL_ENTITY;
+                    if (!moved.IsNull()) {
+                        auto &mloc = m_locations[moved.Index];
+                        mloc.SlotIndex = loc.SlotIndex;
+                        // ChunkIndex remains the same
+                    }
+                } else {
+                    // Removed last element of the chunk, just clear mapping
+                    if (loc.SlotIndex < vec.size()) {
+                        vec[loc.SlotIndex] = NULL_ENTITY;
+                    }
+                }
+            } else {
+                // The entire chunk at chunkIndex was erased by the archetype.
+                // Keep m_chunkIndices in sync and fix affected entity locations.
+
+                // Remove the vector that mirrored the erased chunk
+                if (chunkIndex < ci.Entities.size()) {
+                    ci.Entities.erase(ci.Entities.begin() + static_cast<std::ptrdiff_t>(chunkIndex));
+                }
+
+                // All chunks that were after the erased one have shifted left by 1.
+                // Update their entities' recorded ChunkIndex to stay consistent.
+                for (uint32_t newChunkIdx = chunkIndex; newChunkIdx < ci.Entities.size(); ++newChunkIdx) {
+                    auto &slotVec = ci.Entities[newChunkIdx];
+                    for (const Entity ent : slotVec) {
+                        if (ent.IsNull()) continue;
+                        auto &mloc = m_locations[ent.Index];
+                        mloc.ChunkIndex = newChunkIdx;
+                    }
+                }
+            }
+
+            // Detach removed entity from any archetype
             loc.ArchetypePtr = nullptr;
         }
 
