@@ -92,13 +92,12 @@ class DebugUI {
 public:
 	/**
 	 * @brief Constructor for DebugUI
-	 * @param scene Pointer to the Scene object for entity management
 	 * @param config Configuration structure for UI layout and appearance
 	 * 
-	 * Initializes the debug UI with a reference to the scene and optional
-	 * configuration settings. The scene pointer is used for entity management.
+	 * Initializes the debug UI with optional configuration settings.
 	 */
-    explicit DebugUI(Scenes::Scene* scene, const DebugUIConfig& config = {});
+    explicit DebugUI(const DebugUIConfig& config = {});
+
 	/**
      * @brief Destructor for DebugUI
      * 
@@ -162,13 +161,32 @@ public:
      * Updates the scene reference used for creating and managing entities
      * through the debug interface.
      */
-    void SetScene(Scenes::Scene* scene) { m_scene = scene; }
+    void AttachScene(Scenes::Scene* scene) { m_scenePtr = scene; }
+
+    /**
+     * @brief Detach the current scene reference
+     * 
+     * Clears the scene pointer, removing the connection to the current
+     * scene for entity management.
+	 */
+	void DetachScene() { m_scenePtr = nullptr; }
     
     /**
      * @brief Check if a valid scene reference exists
      * @return bool True if scene pointer is valid, false otherwise
      */
-    bool HasValidScene() const;
+    bool HasValidScene(const Scenes::Scene* scene = nullptr) const {
+		// Check if member scene pointer is valid first
+    	if (!m_scenePtr)
+            return false;
+
+		// If a specific scene is provided, check for equality
+        if (scene)
+			return m_scenePtr == scene;
+
+		// Otherwise, just confirm member pointer is valid
+	    return m_scenePtr != nullptr;
+    }
 
     /**
      * @brief Attach an audio system for monitoring
@@ -177,14 +195,21 @@ public:
      * Static method to attach an audio system for monitoring and control
      * through the debug interface.
      */
-    static void AttachAudio(Audio::FmodAudioDevice* device);
+	void AttachAudio(Audio::FmodAudioDevice* device) { m_audioPtr = device; }
 
     /**
      * @brief Detach the audio system
      * 
      * Static method to detach the audio system from debug monitoring.
      */
-    static void DetachAudio();
+	void DetachAudio() { m_audioPtr = nullptr; }
+
+	/**
+	 * @brief Check if a valid audio system is attached
+	 * 
+	 * @return bool True if audio pointer is valid, false otherwise
+	 */
+	bool HasValidAudio() const { return m_audioPtr != nullptr; }
 
     /**
      * @brief Add a new game object to the world
@@ -222,14 +247,15 @@ public:
     void ClearAllGameObjects() const;
 
 private:
-    DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
-    Scenes::Scene* m_scene;     ///< Pointer to Scene object for entity management
-    bool m_enabled = false;     ///< Flag indicating if debug UI is currently enabled
-    bool m_initialized = false; ///< Flag indicating if ImGui has been initialized
+    DebugUIConfig m_config;                         ///< Configuration settings for UI layout and appearance
+    Scenes::Scene* m_scenePtr = nullptr;            ///< Pointer to Scene object for entity management
+	Audio::FmodAudioDevice* m_audioPtr = nullptr;   ///< Pointer to audio system for monitoring
+    bool m_enabled = false;                         ///< Flag indicating if debug UI is currently enabled
+    bool m_initialized = false;                     ///< Flag indicating if ImGui has been initialized
 
     // UI state
     bool m_showDemo = false;                    ///< Flag to show/hide ImGui demo window
-    std::string m_newObjectName = "NewObject"; ///< Default name for new game objects
+    std::string m_newObjectName = "NewObject";  ///< Default name for new game objects
 
     // Event counters for input debugging
     int m_spacePressed = 0;   ///< Counter for space key press events

@@ -35,8 +35,8 @@ namespace Engine {
 #else
         (void)consoleFlag;
 #endif
-        m_audio = new Services::AudioService();
-        m_audio->Initialize();
+		// Initialize services
+		_initializeServices();
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
@@ -78,6 +78,9 @@ namespace Engine {
                 glfwSwapBuffers(win->Handle());
             }
 
+			// Update OverlayService (must be after rendering to avoid being drawn over)
+			m_overlay->Update();
+
             const double frameDuration = m_lastFrameTime - frameStart;
 
             // --- FPS Controller ---
@@ -102,6 +105,16 @@ namespace Engine {
     void Application::Close() {
         m_shouldStop = true;
     }
+
+    void Application::_initializeServices() {
+        m_audio = new Services::AudioService();
+        m_audio->Initialize();
+
+		m_overlay = new Services::OverlayService();
+        m_overlay->SetAudio(m_audio->Device());
+		m_overlay->Initialize();
+    }
+
 
     void Application::_enableConsole() {
 #ifdef _WIN32

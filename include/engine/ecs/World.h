@@ -168,7 +168,7 @@ namespace ECS {
 
                         if (ent.IsNull())
                             continue;
-                        fn(ent, *static_cast<std::decay_t<Ts>*>(arch.GetRaw(TypeIdOf<std::decay_t<Ts>>(), ci, i))...);
+                        fn(ent, (*static_cast<std::decay_t<Ts>*>(arch.GetRaw(TypeIdOf<std::decay_t<Ts>>(), ci, i)))...);
                     }
                 }
             }

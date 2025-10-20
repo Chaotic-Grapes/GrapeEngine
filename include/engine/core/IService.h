@@ -19,7 +19,7 @@ namespace Engine {
         bool IsEnabled() const { return m_enabled; }
 
         // Introspection
-        virtual std::string Name() const = 0;
+        virtual std::string Name() const { return m_name; }
 
     protected:
         // Simple log helper available to derived systems

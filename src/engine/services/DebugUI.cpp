@@ -63,20 +63,12 @@
 
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the scene
-DebugUI::DebugUI(Scenes::Scene* scene, const DebugUIConfig& config)
-    : m_config(config), m_scene(scene) {}
+DebugUI::DebugUI(const DebugUIConfig& config) : m_config(config) {}
 
 DebugUI::~DebugUI() {
     // Clean up resources only if UI was initialized
     if (m_initialized) Shutdown();
 }
-
-namespace {
-    Audio::FmodAudioDevice* gAudioPtr = nullptr;
-}
-
-void DebugUI::AttachAudio(Audio::FmodAudioDevice* device) { gAudioPtr = device; }
-void DebugUI::DetachAudio() { gAudioPtr = nullptr; }
 
 void DebugUI::Initialize(GLFWwindow* pWin) {
     // Avoid reinitializing ImGUI
@@ -120,7 +112,7 @@ void DebugUI::Render() {
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
     _showGameObjectEditor();   // Game object editor
-    _showAudioWindow(gAudioPtr);
+    _showAudioWindow(m_audioPtr);
 
     // Show ImGUI's built-in demo window
     if (m_showDemo) {
@@ -145,13 +137,10 @@ void DebugUI::Shutdown() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+	m_scenePtr = nullptr;
+	m_audioPtr = nullptr;
 
     m_initialized = false;
-}
-
-// Check if Scene object exists
-bool DebugUI::HasValidScene() const {
-    return m_scene != nullptr;
 }
 
 // Create a new object
@@ -165,7 +154,7 @@ void DebugUI::AddGameObject(const std::string& name) const {
     // Create real ECS entity with components
     const auto entity = _createGameEntity(name);
 
-    auto& world = m_scene->GetWorld();
+    auto& world = m_scenePtr->GetWorld();
     auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
 
     transform.Position.X = MathUtils::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
@@ -181,7 +170,7 @@ void DebugUI::RemoveGameObject(const PackedEntityId id) const {
     // Safety check
     if (!HasValidScene()) return;
 
-    auto& world = m_scene->GetWorld();
+    auto& world = m_scenePtr->GetWorld();
     const ECS::Entity ent = ECS::EntityUtils::Unpack(id);
     if (!world.IsAlive(ent))
         return;
@@ -194,7 +183,7 @@ void DebugUI::CloneGameObject(const ECS::Entity& entity) const {
     // Safety check
     if (!HasValidScene()) return;
 
-    auto& world = m_scene->GetWorld();
+    auto& world = m_scenePtr->GetWorld();
     const auto cloned = world.Clone(entity, ECS::CloneOptions{
         true
     });
@@ -213,7 +202,7 @@ void DebugUI::ClearAllGameObjects() const {
     // Safety check
     if (!HasValidScene()) return;
 
-    auto& world = m_scene->GetWorld();
+    auto& world = m_scenePtr->GetWorld();
     world.Clear();
 
     _invalidateCache();
@@ -229,7 +218,7 @@ void DebugUI::_showEngineDebugWindow() {
     ImGui::Begin("GrapeEngine Debug Console");
     ImGui::Text("Engine Status: Running");
     ImGui::Text("Debug UI: %s", m_enabled ? "Active" : "Inactive");
-    ImGui::Text("Scene: %s", HasValidScene() ? "Connected" : "Not Set");
+    ImGui::Text("Scene: %s", HasValidScene() ? "Hooked" : "Unhooked");
 
     ImGui::Separator();  // Visual divider line
 
@@ -266,9 +255,6 @@ void DebugUI::_showPerformanceWindow() const {
     // Scope data
     const auto& scopes = Profiler::GetAllScopeData();
     for (const auto& [name, data] : scopes) {
-        if (name == "Time")// || name == "Overlay") 
-            continue; // Skip these special scopes (Time has negligible usage times)
-
         ImGui::Text("%s:", name.c_str());
         ImGui::BulletText("Last: %.3f ms", data.LastTimeMs);
         ImGui::BulletText("Avg:  %.3f ms", data.AverageTimeMs);
@@ -499,6 +485,7 @@ void DebugUI::_showGameObjectEditor() {
 
     ImGui::Separator();
 
+    // TODO: Use Serializer
     static char prefabName[128] = "sample-enemy-prefab";
     ImGui::InputText("Prefab Name", prefabName, sizeof(prefabName));
     if (ImGui::Button("Load Prefab") && strlen(prefabName) > 0) {
@@ -511,7 +498,7 @@ void DebugUI::_showGameObjectEditor() {
                 auto entityJson = nlohmann::json::parse(file);
                 file.close();
 
-                auto& world = m_scene->GetWorld();
+                auto& world = m_scenePtr->GetWorld();
                 // Deserialize creates the entity internally
                 (void)Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
 
@@ -523,96 +510,98 @@ void DebugUI::_showGameObjectEditor() {
         }
     }
 
-    // Display list of current objects
-    auto& world = m_scene->GetWorld();
     // TODO: Find a way to add count
     ImGui::Text("Current Objects:");
 
-    world.Each<>([&](const ECS::Entity entity) {
-        // Explanations for different Id usage in this block:
-		// EntityId is for display only, to show unique entity index
-		// PackedEntityId is for unique ImGui labels (delete/clone buttons, collapsing headers)
-		// EntityId is without the generation bits, so it's easier to read
-		// PackedEntityId is needed to uniquely identify entities in ImGui widgets
+    if (HasValidScene()) {
+        auto& world = m_scenePtr->GetWorld();
 
-        // Active status
-        //ImGui::Text("%s", entity.GetName());
-        std::stringstream oss;
-        oss << "[" << entity.Index << "] ";
-        if (world.Has<ECS::Components::Name>(entity)) {
-            const auto& [name] = world.Get<ECS::Components::Name>(entity);
-            oss << name;
-        }
-        else
-            oss << "Entity";
+        world.Each<>([&](const ECS::Entity entity) {
+            // Explanations for different Id usage in this block:
+            // EntityId is for display only, to show unique entity index
+            // PackedEntityId is for unique ImGui labels (delete/clone buttons, collapsing headers)
+            // EntityId is without the generation bits, so it's easier to read
+            // PackedEntityId is needed to uniquely identify entities in ImGui widgets
 
-        const PackedEntityId packedEntityId = ECS::EntityUtils::Pack(entity);
-
-        if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(packedEntityId))) {
-            // Delete button for each object
-            if (ImGui::SmallButton(_getDeleteLabel(packedEntityId).c_str())) {
-                RemoveGameObject(packedEntityId);
-                return;
+            // Active status
+            //ImGui::Text("%s", entity.GetName());
+            std::stringstream oss;
+            oss << "[" << entity.Index << "] ";
+            if (world.Has<ECS::Components::Name>(entity)) {
+                const auto& [name] = world.Get<ECS::Components::Name>(entity);
+                oss << name;
             }
+            else
+                oss << "Entity";
 
-            // Clone button for each object
-            ImGui::SameLine();
-            if (ImGui::SmallButton(_getCloneLabel(packedEntityId).c_str())) {
-                CloneGameObject(entity);
-                return;
+            const PackedEntityId packedEntityId = ECS::EntityUtils::Pack(entity);
+
+            if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(packedEntityId))) {
+                // Delete button for each object
+                if (ImGui::SmallButton(_getDeleteLabel(packedEntityId).c_str())) {
+                    RemoveGameObject(packedEntityId);
+                    return;
+                }
+
+                // Clone button for each object
+                ImGui::SameLine();
+                if (ImGui::SmallButton(_getCloneLabel(packedEntityId).c_str())) {
+                    CloneGameObject(entity);
+                    return;
+                }
+
+                ImGui::SeparatorText("Transform");
+
+                // TODO: Modify other components too
+                if (world.Has<ECS::Components::LocalTransform>(entity)) {
+                    auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
+
+                    // BEFORE modification
+                    ImGui::Text("DEBUG: Current Scale: (%.2f, %.2f, %.2f)", transform.Scale.X, transform.Scale.Y, transform.Scale.Z);
+
+                    // Position
+                    ImGui::Text("Position");
+                    ImGui::SetNextItemWidth(100.f);
+                    ImGui::InputFloat(std::string("X##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.X);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(100.f);
+                    ImGui::InputFloat(std::string("Y##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.Y);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(100.f);
+                    ImGui::InputFloat(std::string("Z##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.Z);
+
+                    // Rotation
+                    ImGui::Text("Rotation");
+                    ImGui::SetNextItemWidth(100.f);
+                    ImGui::InputFloat(std::string("X##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.X);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(100.f);
+                    ImGui::InputFloat(std::string("Y##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.Y);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(100.f);
+                    ImGui::InputFloat(std::string("Z##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.Z);
+
+                    // Scale
+                    ImGui::Text("Scale");
+                    ImGui::SetNextItemWidth(100.f);
+                    if (ImGui::InputFloat(std::string("X##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.X)) {
+                        // Print when value changes
+                        LOG_DEBUG("Scale.X changed to: " << transform.Scale.X);
+                    }
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(100.f);
+                    if (ImGui::InputFloat(std::string("Y##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.Y)) {
+                        LOG_DEBUG("Scale.Y changed to: " << transform.Scale.Y);
+                    }
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(100.f);
+                    if (ImGui::InputFloat(std::string("Z##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.Z)) {
+                        LOG_DEBUG("Scale.Z changed to: " << transform.Scale.Z);
+                    }
+                }
             }
-
-            ImGui::SeparatorText("Transform");
-
-			// TODO: Modify other components too
-            if (world.Has<ECS::Components::LocalTransform>(entity)) {
-				auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
-
-                // BEFORE modification
-                ImGui::Text("DEBUG: Current Scale: (%.2f, %.2f, %.2f)", transform.Scale.X, transform.Scale.Y, transform.Scale.Z);
-
-                // Position
-                ImGui::Text("Position");
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("X##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.X);
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("Y##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.Y);
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("Z##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.Z);
-
-                // Rotation
-                ImGui::Text("Rotation");
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("X##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.X);
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("Y##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.Y);
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("Z##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.Z);
-
-                // Scale
-                ImGui::Text("Scale");
-                ImGui::SetNextItemWidth(100.f);
-                if (ImGui::InputFloat(std::string("X##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.X)) {
-                    // Print when value changes
-                    LOG_DEBUG("Scale.X changed to: " << transform.Scale.X);
-                }
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(100.f);
-                if (ImGui::InputFloat(std::string("Y##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.Y)) {
-                    LOG_DEBUG("Scale.Y changed to: " << transform.Scale.Y);
-                }
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(100.f);
-                if (ImGui::InputFloat(std::string("Z##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.Z)) {
-                    LOG_DEBUG("Scale.Z changed to: " << transform.Scale.Z);
-                }
-            }
-        }
-    });
+            });
+    }
 
 	//  if (ImGui::Checkbox(oss.str().c_str(), &entity.IsActive)) {
 	//      Component::ShapeRenderer2D* renderer = entity.GetComponent<Component::ShapeRenderer2D>();
@@ -645,7 +634,7 @@ ECS::Entity DebugUI::_createGameEntity(const std::string& name) const {
         color = Color(1.0f, 1.0f, 1.0f, 1.0f);
 
     // Create new entity in ECS
-    auto& world = m_scene->GetWorld();
+    auto& world = m_scenePtr->GetWorld();
 
 	// Copy elision should happen here
     return world.Create(

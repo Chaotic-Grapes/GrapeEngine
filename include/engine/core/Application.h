@@ -5,6 +5,7 @@
 #include "scene/SceneManager.h"
 #include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
+#include "services/OverlayService.h"
 
 namespace Engine {
     class Application {
@@ -48,8 +49,11 @@ namespace Engine {
         static void _enableConsole();
         static void _disableConsole();
 
+        void _initializeServices();
+
         // Services
         Services::AudioService* m_audio = nullptr;
+		Services::OverlayService* m_overlay = nullptr;
 
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
