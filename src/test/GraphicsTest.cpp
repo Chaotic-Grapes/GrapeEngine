@@ -34,6 +34,7 @@ Features:
 #include "services/WindowManager.h"
 #include <glm/glm.hpp>
 #include <iostream>
+#include "core/Logger.h"
 #include "services/ResourceManager.h"
 
 

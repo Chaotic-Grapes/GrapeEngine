@@ -2,6 +2,9 @@
 #define MATHHELPER_H
 
 #include <random>
+#include "math/Vector2D.h"
+#include "math/Vector3D.h"
+#include "math/Vector4D.h"
 
 class MathUtils {
 public:
@@ -34,6 +37,30 @@ public:
         return value < minVal 
             ? minVal 
             : (value > maxVal ? maxVal : value);
+    }
+
+    static Vector3D ToVector3D(const Vector2D& vec2, float z = 0.0f) {
+        return Vector3D(vec2.X, vec2.Y, z);
+    }
+
+    static Vector4D ToVector4D(const Vector2D& vec2, float z = 0.0f, float w = 1.0f) {
+        return Vector4D(vec2.X, vec2.Y, z, w);
+    }
+
+    static Vector2D ToVector2D(const Vector3D& vec3) {
+        return Vector2D(vec3.X, vec3.Y);
+    }
+
+    static Vector2D ToVector2D(const Vector4D& vec4) {
+        return Vector2D(vec4.X, vec4.Y);
+    }
+    
+    static Vector4D ToVector4D(const Vector3D& vec3, float w = 1.0f) {
+        return Vector4D(vec3.X, vec3.Y, vec3.Z, w);
+    }
+
+    static Vector3D ToVector3D(const Vector4D& vec4) {
+        return Vector3D(vec4.X, vec4.Y, vec4.Z);
     }
 };
 #endif
