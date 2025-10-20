@@ -3,7 +3,7 @@
 
 #include "Game.h"
 #include "scene/SceneManager.h"
-#include "serialization/Serialization.h"
+#include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
 
 namespace Engine {
@@ -49,9 +49,9 @@ namespace Engine {
         static void _disableConsole();
 
         // Services
-        Services::AudioService* m_audio;
+        Services::AudioService* m_audio = nullptr;
 
-        double m_lastFrameTime;
+        double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
     };
 
