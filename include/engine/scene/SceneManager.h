@@ -33,16 +33,25 @@ using json = nlohmann::json;
 namespace Scenes {
     class SceneManager {
     public:
-        using ScenePtr = std::unique_ptr<Scene>;
+        // Default constructor
+        SceneManager() = default;
+        
+        // Delete copy constructor and copy assignment operator (non-copyable due to unique_ptr)
+        SceneManager(const SceneManager&) = delete;
+        SceneManager& operator=(const SceneManager&) = delete;
+        
+        // Default move constructor and move assignment operator
+        SceneManager(SceneManager&&) = default;
+        SceneManager& operator=(SceneManager&&) = default;
 
         /**
          * @brief Adds a new scene to the manager and calls its OnLoad() method.
          * @param scene The scene to add.
          * @return The index of the added scene.
          */
-        size_t AddScene(ScenePtr scene) {
+        size_t AddScene(Scene* scene) {
             scene->OnLoad();
-            m_scenes.push_back(std::move(scene));
+            m_scenes.push_back(std::move(std::unique_ptr<Scene>(scene)));
 
             // If there is no active scene, make the first added scene active next frame
             if (m_active == NPOS && m_pendingActive == NPOS) {
@@ -112,18 +121,7 @@ namespace Scenes {
          * @brief Gets the currently active scene.
          * @return Pointer to the active scene, or nullptr if none is active.
          */
-        Scene* GetActive() {
-            if (m_active == NPOS)
-                return nullptr;
-
-            return m_scenes[m_active].get();
-        }
-
-        /**
-         * @brief Gets the currently active scene (const version).
-         * @return Const pointer to the active scene, or nullptr if none is active.
-         */
-        const Scene* GetActive() const {
+        Scene* GetActive() const {
             if (m_active == NPOS)
                 return nullptr;
 
@@ -184,7 +182,7 @@ namespace Scenes {
                 return false;
 
             const Scene& scene = *m_scenes[index];
-            auto world = scene.GetWorld();
+            const auto& world = scene.GetWorld();
 
             try {
                 json sceneJson;
@@ -285,7 +283,7 @@ namespace Scenes {
             m_scenes[m_active]->OnEnter();
         }
 
-        std::vector<ScenePtr> m_scenes;
+        std::vector<std::unique_ptr<Scene>> m_scenes;
         static constexpr size_t NPOS = static_cast<size_t>(-1);
         size_t m_active = NPOS;
         size_t m_pendingActive = NPOS;

@@ -55,4 +55,4 @@ bool operator==(const Vector4D& a, const Vector4D& b);
 bool operator!=(const Vector4D& a, const Vector4D& b);
 
 // Static member definitions
-const Vector4D Vector4D::Zero = Vector4D(0.0f, 0.0f, 0.0f, 0.0f);
+inline const Vector4D Vector4D::Zero = Vector4D(0.0f, 0.0f, 0.0f, 0.0f);

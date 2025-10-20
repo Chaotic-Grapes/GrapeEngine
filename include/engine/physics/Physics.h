@@ -12,9 +12,9 @@ namespace Engine {
         static Vector2D GetGravity() { return m_gravity; }
 
         // Force and impulse application
-        static Vector2D CalculateAcceleration(const ECS::Components::Rigidbody2D& rb);
-        static void ApplyForce(ECS::Components::Rigidbody2D& rb, const Vector2D& force);
-        static void ApplyImpulse(ECS::Components::Rigidbody2D& rb, const Vector2D& impulse);
+        static Vector2D CalculateAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::LinearVelocity2D& vel);
+        static void ApplyForce(const ECS::Components::Rigidbody2D& rb, ECS::Components::LinearVelocity2D& vel, const Vector2D& force);
+        static void ApplyImpulse(const ECS::Components::Rigidbody2D& rb, ECS::Components::LinearVelocity2D& vel, const Vector2D& impulse);
 
         // Physics system control
         static void SetEnabled(bool enabled) { m_enabled = enabled; }
@@ -25,14 +25,14 @@ namespace Engine {
         static float Dot(const Vector2D& a, const Vector2D& b);
 
         // Velocity manipulation
-        static void ApplyVelocityDamping(ECS::Components::Rigidbody2D& rb, float dampingFactor);
-        static void ReflectVelocity(Vector2D& velocity, const Vector2D& normal);
-        static void ZeroVelocityComponent(Vector2D& velocity, bool isXAxis, bool isPositive);
+        static void ApplyVelocityDamping(ECS::Components::LinearVelocity2D& vel, const float dampingFactor);
+        static void ReflectVelocity(ECS::Components::LinearVelocity2D& vel, const Vector2D& normal);
+        static void ZeroVelocityComponent(ECS::Components::LinearVelocity2D& vel, bool isXAxis, bool isPositive);
 
         // Boundary collision
         struct BoundaryConstraint {
-            float minX, maxX, minY, maxY;
-            bool killVelocity;
+            float MinX, MaxX, MinY, MaxY;
+            bool KillVelocity;
         };
         
         static bool ApplyBoundaryConstraint(
@@ -44,42 +44,37 @@ namespace Engine {
 
         // Circle-AABB collision resolution
         struct CircleAABBResult {
-            bool collided;
-            Vector2D penetrationNormal;
-            float penetration;
+            bool Collided;
+            Vector2D PenetrationNormal;
+            float Penetration;
         };
 
         static CircleAABBResult ResolveCircleAABBCollision(
-            Vector2D& circlePosition,
-            Vector2D& circleVelocity,
+            ECS::Components::LocalTransform& circleTransform,
+            ECS::Components::LinearVelocity2D& circleVelocity,
             const Vector2D& boxMin,
             const Vector2D& boxMax,
             float circleRadius,
             float epsilon = 0.001f
         );
 
-        // Circle-Circle collision resolution
-        struct CollisionParams {
-            float restitution;
-            float friction;
-            float positionCorrectionPercent;
-        };
-
         struct CircleCollisionResult {
-            bool collided;
-            Vector2D normal;
-            float depth;
-            float relativeNormalVelocity;
+            bool Collided;
+            Vector2D Normal;
+            float Depth;
+            float RelativeNormalVelocity;
         };
 
         static CircleCollisionResult ResolveCircleCircleCollision(
-            ECS::Components::Rigidbody2D& rbA,
-            ECS::Components::Rigidbody2D& rbB,
-            Vector2D& positionA,
-            Vector2D& positionB,
+            const ECS::Components::Rigidbody2D& rbA,
+            const ECS::Components::Rigidbody2D& rbB,
+            ECS::Components::LinearVelocity2D& velA,
+            ECS::Components::LinearVelocity2D& velB,
+            ECS::Components::LocalTransform& transformA,
+            ECS::Components::LocalTransform& transformB,
             float radiusA,
             float radiusB,
-            const CollisionParams& params
+            const ECS::Components::PhysicsMaterial2D& physics
         );
 
     private:

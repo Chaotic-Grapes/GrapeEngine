@@ -2,32 +2,34 @@
 #include <cmath>
 #include <algorithm>
 
+#include "helpers/MathUtils.h"
+
 namespace Engine {
     Vector2D Physics::m_gravity = Vector2D(0.0f, -9.81f);
     bool Physics::m_enabled = true;
 
-    Vector2D Physics::CalculateAcceleration(const ECS::Components::Rigidbody2D& rb) {
+    Vector2D Physics::CalculateAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::LinearVelocity2D& vel) {
         Vector2D acceleration(0.f, 0.f);
         acceleration += m_gravity * rb.GravityScale;
-        acceleration += Vector2D(-rb.LinearVelocity.X * rb.LinearDamping, -rb.LinearVelocity.Y * rb.LinearDamping) / rb.Mass;
+        acceleration += Vector2D(-vel.Value.X * rb.LinearDamping, -vel.Value.Y * rb.LinearDamping) / rb.Mass;
         return acceleration;
     }
 
-    void Physics::ApplyForce(ECS::Components::Rigidbody2D& rb, const Vector2D& force) {
+    void Physics::ApplyForce(const ECS::Components::Rigidbody2D& rb, ECS::Components::LinearVelocity2D& vel, const Vector2D& force) {
         if (rb.Mass > 0)
-            rb.LinearVelocity += force / rb.Mass;
+            vel.Value += force / rb.Mass;
     }
 
-    void Physics::ApplyImpulse(ECS::Components::Rigidbody2D& rb, const Vector2D& impulse) {
+    void Physics::ApplyImpulse(const ECS::Components::Rigidbody2D& rb, ECS::Components::LinearVelocity2D& vel, const Vector2D& impulse) {
         if (rb.Mass > 0)
-            rb.LinearVelocity += impulse / rb.Mass;
+            vel.Value += impulse / rb.Mass;
     }
 
     // ============================================================================
     // Utility Methods
     // ============================================================================
 
-    float Physics::GetInverseMass(float mass) {
+    float Physics::GetInverseMass(const float mass) {
         return (mass > 0.0f) ? 1.0f / mass : 0.0f;
     }
 
@@ -39,26 +41,25 @@ namespace Engine {
     // Velocity Manipulation
     // ============================================================================
 
-    void Physics::ApplyVelocityDamping(ECS::Components::Rigidbody2D& rb, float dampingFactor) {
-        rb.LinearVelocity.X *= dampingFactor;
-        rb.LinearVelocity.Y *= dampingFactor;
+    void Physics::ApplyVelocityDamping(ECS::Components::LinearVelocity2D& vel, const float dampingFactor) {
+		vel.Value *= dampingFactor;
     }
 
-    void Physics::ReflectVelocity(Vector2D& velocity, const Vector2D& normal) {
-        const float normalVelocity = Dot(velocity, normal);
+    void Physics::ReflectVelocity(ECS::Components::LinearVelocity2D& vel, const Vector2D& normal) {
+        const float normalVelocity = Dot(vel.Value, normal);
         if (normalVelocity < 0.0f) {
-            velocity -= normal * normalVelocity;
+            vel.Value -= normal * normalVelocity;
         }
     }
 
-    void Physics::ZeroVelocityComponent(Vector2D& velocity, bool isXAxis, bool isPositive) {
+    void Physics::ZeroVelocityComponent(ECS::Components::LinearVelocity2D& vel, const bool isXAxis, const bool isPositive) {
         if (isXAxis) {
-            if ((isPositive && velocity.X > 0.0f) || (!isPositive && velocity.X < 0.0f)) {
-                velocity.X = 0.0f;
+            if ((isPositive && vel.Value.X > 0.0f) || (!isPositive && vel.Value.X < 0.0f)) {
+                vel.Value.X = 0.0f;
             }
         } else {
-            if ((isPositive && velocity.Y > 0.0f) || (!isPositive && velocity.Y < 0.0f)) {
-                velocity.Y = 0.0f;
+            if ((isPositive && vel.Value.Y > 0.0f) || (!isPositive && vel.Value.Y < 0.0f)) {
+                vel.Value.Y = 0.0f;
             }
         }
     }
@@ -70,36 +71,36 @@ namespace Engine {
     bool Physics::ApplyBoundaryConstraint(
         Vector2D& position,
         Vector2D& velocity,
-        float radius,
+        const float radius,
         const BoundaryConstraint& bounds
     ) {
         bool collided = false;
 
         // X-axis bounds
-        if (position.X - radius <= bounds.minX) {
-            position.X = bounds.minX + radius;
-            if (bounds.killVelocity && velocity.X < 0.0f) {
+        if (position.X - radius <= bounds.MinX) {
+            position.X = bounds.MinX + radius;
+            if (bounds.KillVelocity && velocity.X < 0.0f) {
                 velocity.X = 0.0f;
             }
             collided = true;
-        } else if (position.X + radius >= bounds.maxX) {
-            position.X = bounds.maxX - radius;
-            if (bounds.killVelocity && velocity.X > 0.0f) {
+        } else if (position.X + radius >= bounds.MaxX) {
+            position.X = bounds.MaxX - radius;
+            if (bounds.KillVelocity && velocity.X > 0.0f) {
                 velocity.X = 0.0f;
             }
             collided = true;
         }
 
         // Y-axis bounds
-        if (position.Y - radius <= bounds.minY) {
-            position.Y = bounds.minY + radius;
-            if (bounds.killVelocity && velocity.Y < 0.0f) {
+        if (position.Y - radius <= bounds.MinY) {
+            position.Y = bounds.MinY + radius;
+            if (bounds.KillVelocity && velocity.Y < 0.0f) {
                 velocity.Y = 0.0f;
             }
             collided = true;
-        } else if (position.Y + radius >= bounds.maxY) {
-            position.Y = bounds.maxY - radius;
-            if (bounds.killVelocity && velocity.Y > 0.0f) {
+        } else if (position.Y + radius >= bounds.MaxY) {
+            position.Y = bounds.MaxY - radius;
+            if (bounds.KillVelocity && velocity.Y > 0.0f) {
                 velocity.Y = 0.0f;
             }
             collided = true;
@@ -113,23 +114,23 @@ namespace Engine {
     // ============================================================================
 
     Physics::CircleAABBResult Physics::ResolveCircleAABBCollision(
-        Vector2D& circlePosition,
-        Vector2D& circleVelocity,
+        ECS::Components::LocalTransform& circleTransform,
+        ECS::Components::LinearVelocity2D& circleVelocity,
         const Vector2D& boxMin,
         const Vector2D& boxMax,
-        float circleRadius,
-        float epsilon
+        const float circleRadius,
+        const float epsilon
     ) {
         CircleAABBResult result{};
-        result.collided = false;
+        result.Collided = false;
 
         const Vector2D closestPoint(
-            std::clamp(circlePosition.X, boxMin.X, boxMax.X),
-            std::clamp(circlePosition.Y, boxMin.Y, boxMax.Y)
+            std::clamp(circleTransform.Position.X, boxMin.X, boxMax.X),
+            std::clamp(circleTransform.Position.Y, boxMin.Y, boxMax.Y)
         );
 
-        Vector2D difference = circlePosition - closestPoint;
-        float distanceSquared = Dot(difference, difference);
+        const Vector2D difference = MathUtils::ToVector2D(circleTransform.Position) - closestPoint;
+        const float distanceSquared = Dot(difference, difference);
 
         if (distanceSquared >= circleRadius * circleRadius) {
             return result;
@@ -139,16 +140,16 @@ namespace Engine {
         float penetration;
 
         if (distanceSquared > MIN_DISTANCE_SQUARED) {
-            float distance = std::sqrt(distanceSquared);
+            const float distance = std::sqrt(distanceSquared);
             normal = difference / distance;
             penetration = circleRadius - distance;
         } else {
             // Circle center inside box - push along smallest axis
             const float distances[] = {
-                circlePosition.X - boxMin.X,  // left
-                boxMax.X - circlePosition.X,  // right
-                circlePosition.Y - boxMin.Y,  // down
-                boxMax.Y - circlePosition.Y   // up
+                circleTransform.Position.X - boxMin.X,  // left
+                boxMax.X - circleTransform.Position.X,  // right
+                circleTransform.Position.Y - boxMin.Y,  // down
+                boxMax.Y - circleTransform.Position.Y   // up
             };
 
             const auto minIt = std::min_element(std::begin(distances), std::end(distances));
@@ -163,14 +164,14 @@ namespace Engine {
         }
 
         // Apply position correction
-        circlePosition += normal * (penetration + epsilon);
+        circleTransform.Position += MathUtils::ToVector3D(normal * (penetration + epsilon));
 
         // Reflect velocity if moving into the collision
         ReflectVelocity(circleVelocity, normal);
 
-        result.collided = true;
-        result.penetrationNormal = normal;
-        result.penetration = penetration;
+        result.Collided = true;
+        result.PenetrationNormal = normal;
+        result.Penetration = penetration;
 
         return result;
     }
@@ -180,43 +181,45 @@ namespace Engine {
     // ============================================================================
 
     Physics::CircleCollisionResult Physics::ResolveCircleCircleCollision(
-        ECS::Components::Rigidbody2D& rbA,
-        ECS::Components::Rigidbody2D& rbB,
-        Vector2D& positionA,
-        Vector2D& positionB,
-        float radiusA,
-        float radiusB,
-        const CollisionParams& params
+        const ECS::Components::Rigidbody2D& rbA,
+        const ECS::Components::Rigidbody2D& rbB,
+        ECS::Components::LinearVelocity2D& velA,
+        ECS::Components::LinearVelocity2D& velB,
+        ECS::Components::LocalTransform& transformA,
+        ECS::Components::LocalTransform& transformB,
+        const float radiusA,
+        const float radiusB,
+        const ECS::Components::PhysicsMaterial2D& physics
     ) {
         CircleCollisionResult result{};
-        result.collided = false;
+        result.Collided = false;
 
         // Calculate collision normal and depth
-        Vector2D delta = positionB - positionA;
-        float distanceSquared = Dot(delta, delta);
-        float radiusSum = radiusA + radiusB;
+        const Vector2D delta = MathUtils::ToVector2D(transformB.Position - transformA.Position);
+        const float distanceSquared = Dot(delta, delta);
+        const float radiusSum = radiusA + radiusB;
 
         if (distanceSquared >= radiusSum * radiusSum || distanceSquared < MIN_DISTANCE_SQUARED) {
             return result;
         }
 
-        float distance = std::sqrt(distanceSquared);
-        Vector2D normal = delta / distance;
-        float depth = radiusSum - distance;
+        const float distance = std::sqrt(distanceSquared);
+        const Vector2D normal = delta / distance;
+        const float depth = radiusSum - distance;
 
         // Calculate relative velocity
-        Vector2D relativeVelocity = rbB.LinearVelocity - rbA.LinearVelocity;
-        float normalVelocity = Dot(relativeVelocity, normal);
+        const Vector2D relativeVelocity = velB.Value - velA.Value;
+        const float normalVelocity = Dot(relativeVelocity, normal);
 
         // Skip if objects are separating
         if (normalVelocity > 0.0f) {
             return result;
         }
 
-        result.collided = true;
-        result.normal = normal;
-        result.depth = depth;
-        result.relativeNormalVelocity = normalVelocity;
+        result.Collided = true;
+        result.Normal = normal;
+        result.Depth = depth;
+        result.RelativeNormalVelocity = normalVelocity;
 
         // Calculate inverse masses
         const float invMassA = GetInverseMass(rbA.Mass);
@@ -228,16 +231,16 @@ namespace Engine {
         }
 
         // Apply restitution impulse
-        const float restitution = std::clamp(params.restitution, 0.0f, 1.0f);
+        const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
         const float j = -(1.0f + restitution) * normalVelocity / invMassSum;
         const Vector2D impulse = normal * j;
 
-        rbA.LinearVelocity -= impulse * invMassA;
-        rbB.LinearVelocity += impulse * invMassB;
+        velA.Value -= impulse * invMassA;
+        velB.Value += impulse * invMassB;
 
         // Apply friction
-        if (params.friction > 0.0f) {
-            const Vector2D newRelativeVelocity = rbB.LinearVelocity - rbA.LinearVelocity;
+        if (physics.Friction > 0.0f) {
+            const Vector2D newRelativeVelocity = velB.Value - velA.Value;
             const float newNormalVelocity = Dot(newRelativeVelocity, normal);
             Vector2D tangent = newRelativeVelocity - normal * newNormalVelocity;
             const float tangentLengthSquared = Dot(tangent, tangent);
@@ -245,20 +248,20 @@ namespace Engine {
             if (tangentLengthSquared > MIN_TANGENT_LENGTH_SQUARED) {
                 tangent = tangent / std::sqrt(tangentLengthSquared);
                 const float jt = -Dot(newRelativeVelocity, tangent) / invMassSum;
-                const float frictionImpulse = std::clamp(jt, -j * params.friction, j * params.friction);
+                const float frictionImpulse = std::clamp(jt, -j * physics.Friction, j * physics.Friction);
                 const Vector2D frictionVector = tangent * frictionImpulse;
 
-                rbA.LinearVelocity -= frictionVector * invMassA;
-                rbB.LinearVelocity += frictionVector * invMassB;
+                velA.Value -= frictionVector * invMassA;
+                velB.Value += frictionVector * invMassB;
             }
         }
 
         // Position correction
-        const Vector2D correction = normal * (depth * params.positionCorrectionPercent / invMassSum);
-        positionA.X -= correction.X * invMassA;
-        positionA.Y -= correction.Y * invMassA;
-        positionB.X += correction.X * invMassB;
-        positionB.Y += correction.Y * invMassB;
+        const Vector2D correction = normal * (depth * physics.PositionCorrectPercent / invMassSum);
+        transformA.Position.X -= correction.X * invMassA;
+        transformA.Position.Y -= correction.Y * invMassA;
+        transformB.Position.X += correction.X * invMassB;
+        transformB.Position.Y += correction.Y * invMassB;
 
         return result;
     }

@@ -30,7 +30,7 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     printf("\033[H\033[J");
 
     // Add scenes
-    size_t graphicsTest = sceneManager.AddScene(std::make_unique<Sandbox::GraphicsTestScene>());
+    size_t graphicsTest = sceneManager.AddScene(new Sandbox::GraphicsTestScene());
     // size_t serializationTest = sceneManager.AddScene(std::make_unique<Sandbox::SerializationTestScene>());
 
     switch (choice) {

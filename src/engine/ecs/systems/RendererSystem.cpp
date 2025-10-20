@@ -33,7 +33,8 @@ namespace ECS {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
-    void RendererSystem::Update(World& world, float dt) {
+    void RendererSystem::Update(World& world, const float dt) {
+        (void)dt;
         if (!m_renderer)
             return;
 

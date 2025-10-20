@@ -1,5 +1,5 @@
 /**
- * @file Overlay.h
+ * @file OverlayService.h
  * @author Foo Rui Qin
  * @date 2024
  * @brief Overlay system for managing debug UI and ImGui integration
@@ -18,16 +18,18 @@
  * the ImGui-based debug interface.
  */
 
-#ifndef OVERLAY_H
-#define OVERLAY_H
+#ifndef OVERLAYSERVICE_H
+#define OVERLAYSERVICE_H
+
+#include "core/IService.h"
 #include <memory>
-#include "services/DebugUI.h"
-#include "core/Application.h"
 #include "audio/FmodAudioDevice.h"
 
-// Forward declaration
-class World;
+// Forward declarations
+namespace Scenes { class SceneManager; }
+
 #ifdef USE_IMGUI
+#include "services/DebugUI.h"
 class DebugUI;
 #endif
 
@@ -63,7 +65,7 @@ namespace Services {
         /**
          * @brief Constructor for Overlay system
          */
-        OverlayService() : IService("Overlay Service") { SetEnabled(false); }
+    OverlayService(Scenes::SceneManager& sceneManager) : IService("Overlay Service"), m_sceneManager(sceneManager) { SetEnabled(false); }
 
 #ifdef USE_IMGUI
         /**
@@ -112,6 +114,7 @@ namespace Services {
 
     private:
         Audio::FmodAudioDevice* m_audioDevice = nullptr;  ///< Pointer to audio system for debug monitoring
+		Scenes::SceneManager& m_sceneManager; 		      ///< Reference to the scene manager for world access
 
 #ifdef USE_IMGUI
         std::unique_ptr<DebugUI> m_debugUI;  ///< Unique pointer to DebugUI instance for memory management

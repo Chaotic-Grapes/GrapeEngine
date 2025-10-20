@@ -35,6 +35,7 @@ Features:
 #include <glm/glm.hpp>
 #include <iostream>
 #include "core/Logger.h"
+#include "graphics/SpriteMetaData.hpp"
 #include "services/ResourceManager.h"
 
 
@@ -204,10 +205,10 @@ void GraphicsTestScene::runDebugDrawing() {
         ECS::World& world = GetWorld();
         const std::string spritePath = "assets/textures/test/player.png";
 
-        auto tex = RM.Get<Texture>(spritePath);
+        const auto tex = RM.Get<Texture>(spritePath);
         uint32_t texId = tex ? tex->ID() : 0;
 
-        ECS::Entity sprite = CreateOnLayer(
+        const ECS::Entity sprite = CreateOnLayer(
             m_gameplayLayer,
             ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{128.f,128.f,1} },
             ECS::Components::WorldTransform{ },
@@ -231,7 +232,7 @@ void GraphicsTestScene::runDebugDrawing() {
 
         auto* meta = _getMetaDataForTexture(spritePath);
 
-        ECS::Entity debug = CreateOnLayer(
+        const ECS::Entity debug = CreateOnLayer(
             m_gameplayLayer,
             ECS::Components::LocalTransform{ 
                 Vector3D{
@@ -309,8 +310,8 @@ void GraphicsTestScene::runBasicSprites() {
     auto fishBoyTexture = RM.Get<Texture>(fishBoySpritePath);
     uint32_t fishBoyTexId = fishBoyTexture ? fishBoyTexture->ID() : 0;
 
-    auto* playerMeta = _getMetaDataForTexture(playerSpritePath);
-    auto* fishBoyMeta = _getMetaDataForTexture(fishBoySpritePath);
+    //auto* playerMeta = _getMetaDataForTexture(playerSpritePath);
+    //auto* fishBoyMeta = _getMetaDataForTexture(fishBoySpritePath);
     
     ECS::Entity sprite1 = CreateOnLayer(
         m_gameplayLayer,
@@ -411,7 +412,7 @@ void GraphicsTestScene::runBackground() {
 }
 
 void GraphicsTestScene::runSpriteScaling() {
-    World& world = GetWorld();
+    ECS::World& world = GetWorld();
 
     if (m_testEntities.empty()) {
         ECS::Entity sprite = CreateOnLayer(
@@ -447,7 +448,7 @@ void GraphicsTestScene::runSpriteScaling() {
 }
 
 void GraphicsTestScene::runSpriteRotation() {
-    World& world = GetWorld();
+    ECS::World& world = GetWorld();
 
     if (m_testEntities.empty()) {
         ECS::Entity sprite = CreateOnLayer(
@@ -481,7 +482,7 @@ void GraphicsTestScene::runSpriteRotation() {
 }
 
 void GraphicsTestScene::runAnimation() {
-    World& world = GetWorld();
+    ECS::World& world = GetWorld();
 
     if (!m_rendererSystem) return;
     auto* renderer = m_rendererSystem->GetRenderer();
@@ -556,7 +557,7 @@ void GraphicsTestScene::runAnimation() {
 }
 
 void GraphicsTestScene::runMultiAnimation() {
-    World& world = GetWorld();
+    ECS::World& world = GetWorld();
 
     if (!m_rendererSystem) return;
     auto* renderer = m_rendererSystem->GetRenderer();
@@ -920,7 +921,7 @@ void GraphicsTestScene::testSingleTexture() {
 }
 
 void GraphicsTestScene::analyzeRenderer() {
-    World& world = GetWorld();
+    ECS::World& world = GetWorld();
 
     if (!m_rendererSystem) {
         LOG_ERROR("RendererSystem system not found!");

@@ -5,7 +5,9 @@
 #include "scene/SceneManager.h"
 #include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
-#include "services/OverlayService.h"
+
+// Forward declaration
+namespace Services { class OverlayService; }
 
 namespace Engine {
     class Application {

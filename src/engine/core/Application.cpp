@@ -6,6 +6,7 @@
 #include "services/Input.h"
 #include "services/Time.h"
 #include "services/WindowManager.h"
+#include "services/OverlayService.h"
 #include <thread>
 
 namespace Engine {
@@ -110,7 +111,7 @@ namespace Engine {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
 
-		m_overlay = new Services::OverlayService();
+		m_overlay = new Services::OverlayService(m_sceneManager);
         m_overlay->SetAudio(m_audio->Device());
 		m_overlay->Initialize();
     }

@@ -34,8 +34,20 @@ namespace ECS {
     class World {
     public:
         World() = default;
+        
+        // Delete copy constructor and copy assignment operator (non-copyable due to unique_ptr)
+        World(const World&) = delete;
+        World& operator=(const World&) = delete;
+        
+        // Default move constructor and move assignment operator
+        World(World&&) noexcept = default;
+        World& operator=(World&&) noexcept = default;
 
         // Entity lifecycle
+        /**
+		 * @brief Create an empty entity in the world.
+		 * @return ECS::Entity The newly created entity
+         */
         Entity Create() {
             EntityId idx;
             // If with identical then and else branches [bugprone-branch-close]
@@ -51,6 +63,12 @@ namespace ECS {
             return Entity{ idx, m_generations[idx] };
         }
 
+        /**
+		 * @brief Create an entity with the specified components in the world.
+		 * @tparam Ts Component types to add to the entity
+		 * @param comps Component instances to add to the entity
+		 * @return ECS::Entity The newly created entity with the specified components
+         */
         template<typename... Ts>
         Entity Create(const Ts&... comps) {
             Entity e = Create();
@@ -59,10 +77,19 @@ namespace ECS {
             return e;
         }
 
+        /**
+		 * @brief Check if the given entity is alive (valid) in the world.
+		 * @param e The entity to check
+		 * @return bool True if the entity is alive; false otherwise
+         */
         bool IsAlive(const Entity e) const {
             return e.Index < m_generations.size() && m_generations[e.Index] == e.Generation;
         }
 
+        /**
+		 * @brief Destroy the specified entity, removing it from the world.
+		 * @param e The entity to destroy
+         */
         void Destroy(const Entity e) {
             if (!IsAlive(e))
                 return;
@@ -77,6 +104,12 @@ namespace ECS {
         }
 
         // Component API
+        /**
+		 * @brief Check if the specified entity has the given component type.
+		 * @tparam T The component type to check for
+		 * @param e The entity to check
+		 * @return bool True if the entity has the component; false otherwise
+         */
         template<typename T>
         bool Has(const Entity e) const {
             if (!IsAlive(e))
@@ -89,6 +122,12 @@ namespace ECS {
             return loc.ArchetypePtr->Has(TypeIdOf<T>());
         }
 
+        /**
+		 * @brief Get a reference to the specified component type for the given entity.
+		 * @tparam T The component type to retrieve
+		 * @param e The entity from which to retrieve the component
+		 * @return T& Reference to the requested component
+         */
         template<typename T>
         T& Get(const Entity e) {
             assert(IsAlive(e));
@@ -97,6 +136,13 @@ namespace ECS {
 
             return *static_cast<T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
         }
+
+        /**
+		 * @brief Get a const reference to the specified component type for the given entity.
+		 * @tparam T The component type to retrieve
+		 * @param e The entity from which to retrieve the component
+		 * @return const T& Const reference to the requested component
+         */
         template<typename T>
         const T& Get(const Entity e) const {
             assert(IsAlive(e));
@@ -106,6 +152,14 @@ namespace ECS {
             return *static_cast<const T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
         }
 
+        /**
+		 * @brief Add a component of the specified type to the given entity, constructing it with the provided arguments.
+		 * @tparam T The component type to add
+		 * @tparam TArgs The types of the constructor arguments for the component
+		 * @param e The entity to which the component will be added
+		 * @param args Constructor arguments for the component
+		 * @return T& Reference to the newly added component
+         */
         template<typename T, typename... TArgs>
         T& Add(Entity e, TArgs&&... args) {
             assert(IsAlive(e));
@@ -119,6 +173,11 @@ namespace ECS {
             return Get<T>(e);
         }
 
+        /**
+		 * @brief Remove the specified component type from the given entity.
+		 * @tparam T The component type to remove
+		 * @param e The entity from which the component will be removed
+         */
         template<typename T>
         void Remove(Entity e) {
             assert(IsAlive(e));
@@ -130,6 +189,13 @@ namespace ECS {
             _structuralRemove<T>(e, t);
         }
 
+        /**
+		 * @brief Set the specified component type for the given entity, adding it if not already present.
+		 * @tparam T The component type to set
+		 * @param e The entity for which the component will be set
+		 * @param value The new value for the component
+		 * @return T& Reference to the set component
+         */
         template<typename T>
         T& Set(Entity e, T value) {
             if (Has<T>(e)) {
@@ -148,7 +214,7 @@ namespace ECS {
          */
         template<typename... Ts, typename TFn>
         void Each(TFn&& fn) {
-            const Signature req({ TypeIdOf<std::decay_t<Ts>>()... });
+            const Signature req(std::vector<TypeId>{ TypeIdOf<std::decay_t<Ts>>()... });
 
             for (auto& kv : m_archetypes) {
                 auto& archPtr = kv.second;
@@ -169,6 +235,40 @@ namespace ECS {
                         if (ent.IsNull())
                             continue;
                         fn(ent, (*static_cast<std::decay_t<Ts>*>(arch.GetRaw(TypeIdOf<std::decay_t<Ts>>(), ci, i)))...);
+                    }
+                }
+            }
+        }
+
+        /**
+		 * @brief Iterate over all entities that have the specified components, invoking the provided function for each (const version).
+		 * @tparam Ts The component types to filter entities by
+		 * @tparam TFn The type of the function to invoke for each matching entity
+		 * @param fn The function to invoke for each matching entity; should accept parameters (Entity, const Ts&...)
+         */
+        template<typename... Ts, typename TFn>
+        void Each(TFn&& fn) const {
+            const Signature req(std::vector<TypeId>{ TypeIdOf<std::decay_t<Ts>>()... });
+
+            for (const auto& kv : m_archetypes) {
+                const auto& archPtr = kv.second;
+
+                if (!archPtr)
+                    continue;
+                if (!archPtr->GetSignature().ContainsAll(req))
+                    continue;
+
+                const auto& arch = *archPtr;
+
+                for (uint32_t ci = 0; ci < arch.GetChunkCount(); ++ci) {
+                    const Chunk* ch = arch.GetChunk(ci);
+
+                    for (uint32_t i = 0; i < ch->Count(); ++i) {
+                        Entity ent = _reverseEntity(arch, ci, i);
+
+                        if (ent.IsNull())
+                            continue;
+                        fn(ent, (*static_cast<const std::decay_t<Ts>*>(arch.GetRaw(TypeIdOf<std::decay_t<Ts>>(), ci, i)))...);
                     }
                 }
             }
@@ -259,10 +359,25 @@ namespace ECS {
         //}
         //bool Deferring() const noexcept { return m_deferDepth > 0; }
 
-        // Relationships
+        /**
+		 * @brief Attach a child entity to a parent entity in the hierarchy.
+		 * @param child The child entity to attach
+		 * @param parent The parent entity to which the child will be attached
+         */
         void Attach(const Entity child, const Entity parent) { Set<Parent>(child, Parent{parent}); }
+
+        /**
+		 * @brief Detach a child entity from its parent in the hierarchy.
+		 * @param child The child entity to detach
+         */
         void Detach(const Entity child)                      { if (Has<Parent>(child)) Remove<Parent>(child); }
 
+        /**
+		 * @brief Iterate over all children of the specified parent entity, invoking the provided function for each child.
+		 * @tparam TFn The type of the function to invoke for each child entity
+		 * @param parent The parent entity whose children will be iterated over
+		 * @param fn The function to invoke for each child entity; should accept a single parameter of type Entity
+         */
         template<typename TFn>
         void ForChildren(const Entity parent, TFn&& fn) const {
             const auto it = m_hierarchy.FirstChild.find(parent);
@@ -277,6 +392,11 @@ namespace ECS {
             }
         }
 
+        /**
+		 * @brief Get the parent entity of the specified child entity.
+		 * @param child The child entity whose parent will be retrieved
+		 * @return ECS::Entity The parent entity, or NULL_ENTITY if the child has no parent
+         */
         Entity ParentOf(const Entity child) const {
             const auto it = m_hierarchy.ParentOf.find(child);
             return it == m_hierarchy.ParentOf.end() ? NULL_ENTITY : it->second;
@@ -345,6 +465,11 @@ namespace ECS {
             uint32_t SlotIndex = 0;
         };
 
+        /**
+		 * @brief Get the location of the specified entity within the world.
+		 * @param e The entity whose location is to be retrieved
+		 * @return const Location* Pointer to the entity's location; nullptr if the entity is not alive
+         */
         const Location* LocationOf(const Entity e) const {
             if (!IsAlive(e))
                 return nullptr;
@@ -405,6 +530,7 @@ namespace ECS {
             (_onComponentAdded(e, TypeIdOf<Ts>()), ...);
         }
 
+		// TODO: Check the mover logic here; seems off
         template<typename T, typename TMover>
         void _structuralAdd(Entity e, TypeId t, TMover&& mover) {
             _ensureComponentInfo<T>();
@@ -422,7 +548,8 @@ namespace ECS {
 
             if (loc.ArchetypePtr->Has(t)) {
                 T* dst = static_cast<T*>(loc.ArchetypePtr->GetRaw(t, loc.ChunkIndex, loc.SlotIndex));
-                *dst = T(std::forward<TMover>(mover), *dst); // not typically reached
+                *dst = T(std::forward<T>(*dst)); // not typically reached
+                // *dst = T(std::forward<TMover>(mover), *dst); // not typically reached
 
                 return;
             }
@@ -487,7 +614,8 @@ namespace ECS {
             vec[slot] = e;
         }
 
-        void _removeFromArchetype(Entity e, Location& loc) {
+        void _removeFromArchetype(const Entity e, Location& loc) {
+            (void)e;
             Archetype* arch = loc.ArchetypePtr;
             auto &ci = m_chunkIndices[arch];
             auto &vec = ci.Entities[loc.ChunkIndex];
@@ -509,6 +637,22 @@ namespace ECS {
 
         Entity _reverseEntity(Archetype& arch, const uint32_t chunkIndex, const uint32_t slot) const {
             const auto it = m_chunkIndices.find(&arch);
+            if (it == m_chunkIndices.end())
+                return NULL_ENTITY;
+
+            const auto &ci = it->second;
+            if (chunkIndex >= ci.Entities.size())
+                return NULL_ENTITY;
+
+            const auto &vec = ci.Entities[chunkIndex];
+            if (slot >= vec.size())
+                return NULL_ENTITY;
+
+            return vec[slot];
+        }
+
+        Entity _reverseEntity(const Archetype& arch, const uint32_t chunkIndex, const uint32_t slot) const {
+            const auto it = m_chunkIndices.find(const_cast<Archetype*>(&arch));
             if (it == m_chunkIndices.end())
                 return NULL_ENTITY;
 

@@ -85,7 +85,7 @@ namespace Services {
 			m_debugUI->AttachAudio(m_audioDevice);
 
         // Attach/detach scene as needed
-        auto* scene = Scenes::SceneManager::GetActive();
+        auto* scene = m_sceneManager.GetActive();
         if (scene && !m_debugUI->HasValidScene(scene))
             m_debugUI->AttachScene(scene);
         else if (m_debugUI->HasValidScene() && !scene)

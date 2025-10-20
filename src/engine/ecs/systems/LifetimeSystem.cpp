@@ -4,7 +4,7 @@ namespace ECS {
     // Decrease Lifetime and destroy expired entities (safe: destroys after iteration)
     void LifetimeSystem::Update(World& world, const float dt) {
         std::vector<Entity> toDestroy;
-        world.Each<Components::Lifetime>([&](const Entity entity, Components::Lifetime& life, const Components::Active active) {
+        world.Each<Components::Lifetime, Components::Active>([&](const Entity entity, Components::Lifetime& life, const Components::Active& active) {
             if (!active.Enabled)
                 return;
 

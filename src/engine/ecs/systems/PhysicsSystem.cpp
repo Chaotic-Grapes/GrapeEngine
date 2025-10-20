@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <vector>
 #include <cmath>
-#include <tuple>
 #include <helpers/MathUtils.h>
 
 // --- Simple 2D grid-based spatial partitioning for broad-phase collision ---
@@ -29,7 +28,7 @@ public:
         // Check neighboring cells (including the cell itself)
         for (int dx = -1; dx <= 1; ++dx) {
             for (int dy = -1; dy <= 1; ++dy) {
-                auto cell = std::make_tuple(std::get<0>(baseCell) + dx, std::get<1>(baseCell) + dy);
+                CellCoord cell{ baseCell.x + dx, baseCell.y + dy };
                 auto it = m_grid.find(cell);
                 if (it != m_grid.end()) {
                     result.insert(result.end(), it->second.begin(), it->second.end());
@@ -41,15 +40,32 @@ public:
     }
 
 private:
+    // Simple struct for grid cell coordinates
+    struct CellCoord {
+        int x, y;
+        
+        bool operator==(const CellCoord& other) const {
+            return x == other.x && y == other.y;
+        }
+    };
+    
+    // Hash functor for CellCoord
+    struct CellHash {
+        size_t operator()(const CellCoord& cell) const noexcept {
+            // Combine hash values using bit shifting
+            return std::hash<int>{}(cell.x) ^ (std::hash<int>{}(cell.y) << 1);
+        }
+    };
+
     // Map from cell coordinates to entities
-    std::unordered_map<std::tuple<int, int>, std::vector<ECS::Entity>> m_grid;
+    std::unordered_map<CellCoord, std::vector<ECS::Entity>, CellHash> m_grid;
 
     // Convert world position to grid cell
-    std::tuple<int, int> _getCell(const Vector3D& position) const {
+    CellCoord _getCell(const Vector3D& position) const {
         int x = static_cast<int>(std::floor(position.X / CELL_SIZE));
         int y = static_cast<int>(std::floor(position.Y / CELL_SIZE));
 
-        return std::make_tuple(x, y);
+        return CellCoord{ x, y };
     }
 };
 
@@ -76,7 +92,7 @@ namespace ECS {
                 const Vector2D intendedPos = Vector2D(transform.Position.X, transform.Position.Y) + linearVel.Value * dt;
 
                 // Apply forces and gravity
-                Vector2D acceleration = Engine::Physics::CalculateAcceleration(rb);
+                Vector2D acceleration = Engine::Physics::CalculateAcceleration(rb, linearVel);
                 if (rb.Flags & (1 << 1)) { // UseGravity is bit 1
                     acceleration += Engine::Physics::GetGravity() * rb.GravityScale;
                 }
