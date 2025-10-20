@@ -3,19 +3,14 @@
 
 #include "Color.h"
 #include "ecs/Entity.h"
-#include "ecs/IComponent.h"
 #include "graphics/SpriteMetaData.hpp"
 #include "graphics/texture.hpp"
 #include "math/Vector2D.h"
 #include "math/Vector3D.h"
 #include "math/Vector4D.h"
-#include "services/ResourceManager.h"
-#include <filesystem>
-#include <fstream>
-#include <iostream>
+#include "math/Quaternion.h"
+#include "math/Matrix4x4.h"
 #include <nlohmann/json.hpp>
-#include <string>
-#include <vector>
 // #include "graphics/TextureCache.hpp"
 
 /*
@@ -124,8 +119,8 @@ namespace ECS {
         struct LocalTransform { 
         public:
             Vector3D Position{0,0,0};
-            Quaternion Rotation{0,0,0,1};
-            Vector3D Scale{1,1,1};
+            Quaternion Rotation{0,0,0,1.f};
+            Vector3D Scale{1.f,1.f,1.f};
         };
         static_assert(std::is_trivially_copyable_v<LocalTransform>, "LocalTransform must be trivially copyable");
 
@@ -173,8 +168,8 @@ namespace ECS {
 
         struct PhysicsMaterial2D {
         public:
-            float Friction = 0.2f;
-            float Restitution = 0.0f;
+            float Friction = 0.2f;      // 0..1
+            float Restitution = 0.0f;   // 0..1 (bounciness)
             float _Pad0 = 0.0f, _Pad1 = 0.0f;
         };
         static_assert(std::is_trivially_copyable_v<PhysicsMaterial2D>, "PhysicsMaterial2D must be trivially copyable");
@@ -233,15 +228,6 @@ namespace ECS {
             uint32_t Flags = 0;         // bit 0: Kinematic, bit 1: UseGravity, bit 2: FixedRotation
         };
         static_assert(std::is_trivially_copyable_v<Rigidbody2D>, "Rigidbody2D must be trivially copyable");
-
-        // Physics material for 2D colliders
-        struct PhysicsMaterial2D {
-        public:
-            float Friction = 0.2f;      // 0..1
-            float Restitution = 0.0f;   // 0..1 (bounciness)
-            float _Pad0 = 0.0f, _Pad1 = 0.0f;
-        };
-        static_assert(std::is_trivially_copyable_v<PhysicsMaterial2D>, "PhysicsMaterial2D must be trivially copyable");
 
         // Axis-aligned or oriented rectangle collider in 2D
         struct BoxCollider2D {
@@ -314,9 +300,9 @@ namespace ECS {
 
         struct ShapeLine2D {
         public:
-            Vector2D A{0.0f, 0.0f};     // local-space endpoints
-            Vector2D B{1.0f, 0.0f};
-            Color Color{1.f,1.f,1.f,1.f};
+            Vector2D A{ 0.0f, 0.0f };     // local-space endpoints
+            Vector2D B{ 1.0f, 0.0f };
+            Color Color{ 1.f,1.f,1.f,1.f };
             float Thickness = 1.0f;
             float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f;
         };
@@ -324,18 +310,16 @@ namespace ECS {
 
         // Fixed-capacity polyline/polygon for debug; avoids heap
         template<size_t TCapacity = 16>
-        struct ShapePolyline2D {
+        struct ShapePolygon2D {
         public:
-            Vector2D Points[TCapacity]{};
+            Vector2D Points[TCapacity]{}; // don't use std::aray<T>
             uint8_t Count = 0;          // number of valid points
-            bool Closed = false;        // draw last->first if true
-            uint8_t _Pad0 = 0;
-            uint8_t _Pad1 = 0;
-            Color Color{1,1,1,1};
-            float Thickness = 1.0f;
-            float _Pad2 = 0.0f, _Pad3 = 0.0f, _Pad4 = 0.0f;
+            Color FillColor{ 1.f, 1.f, 1.f, 1.f };
+            Color OutlineColor{ 1.f, 1.f, 1.f, 1.f };
+            float OutlineThickness = 1.f;
+            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
-        static_assert(std::is_trivially_copyable_v<ShapePolyline2D<>>, "ShapePolyline2D must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<ShapePolygon2D<>>, "ShapePolygon2D must be trivially copyable");
 
         // Optional: simple 2D sorting hint for renderer (e.g. painter's algorithm)
         struct ZIndex2D {
@@ -403,57 +387,57 @@ namespace ECS {
 //         const char* GetTypeName() const override { return "Transform"; }
 //     };
 
-    struct SpriteRenderer : IComponent {
-        GLuint TextureId = 0;
-        int Width = 0;
-        int Height = 0;
-        const SpriteMetadata* Meta = nullptr;
-        Color Color{ 1.f, 1.f, 1.f, 1.f };
-        bool FlipX = false;
-        bool FlipY = false;
-        int SortingOrder = 0;
-        std::string SortingLayerName = "Default";
-        std::string TexturePath;
-        std::string Sprite;
+//     struct SpriteRenderer : IComponent {
+//           GLuint TextureId = 0;
+//           int Width = 0;
+//           int Height = 0;
+//           const SpriteMetadata* Meta = nullptr;
+//           Color Color{ 1.f, 1.f, 1.f, 1.f };
+//           bool FlipX = false;
+//           bool FlipY = false;
+//           int SortingOrder = 0;
+//           std::string SortingLayerName = "Default";
+//           std::string TexturePath;
+//           std::string Sprite;
 
-        SpriteRenderer(const std::string& spritePath = "") : TexturePath(spritePath), Sprite(spritePath) {
-            if (!spritePath.empty()) {
-                auto tex = RM.Get<Texture>(spritePath);
-                TextureId = tex->ID();
-                Width = tex->Width();
-                Height = tex->Height();
+//           SpriteRenderer(const std::string& spritePath = "") : TexturePath(spritePath), Sprite(spritePath) {
+//               if (!spritePath.empty()) {
+//                   auto tex = RM.Get<Texture>(spritePath);
+//                   TextureId = tex->ID();
+//                   Width = tex->Width();
+//                   Height = tex->Height();
 
-                auto p = std::filesystem::path(spritePath);
-                auto filename = p.stem().string() + ".json";
+//                   auto p = std::filesystem::path(spritePath);
+//                   auto filename = p.stem().string() + ".json";
 
-                auto parent = p.parent_path().parent_path(); // "assets/textures"
-                auto metadataPath = parent / "test-metadata" / filename;
+//                   auto parent = p.parent_path().parent_path(); // "assets/textures"
+//                   auto metadataPath = parent / "test-metadata" / filename;
 
-                std::ifstream in(metadataPath);
-                if (in) {
-                    nlohmann::json j;
-                    in >> j;
+//                   std::ifstream in(metadataPath);
+//                   if (in) {
+//                       nlohmann::json j;
+//                       in >> j;
 
-                    auto key = p.filename().string(); // for example, "fishBoy.png"
-                    if (j.contains(key)) {
-                        static std::unordered_map<std::string, SpriteMetadata> cache;
-                        cache[key] = loadSingleSpriteMetadata(j[key], 0, 0);
-                        Meta = &cache[key];
-                    }
-                    else {
-                        std::cout << "Metadata file " << metadataPath
-                            << " missing entry for " << key << "\n";
-                    }
-                }
-                else {
-                    std::cout << "Could not open metadata file: "
-                        << metadataPath << "\n";
-                }
-            }
-        }
+//                       auto key = p.filename().string(); // for example, "fishBoy.png"
+//                       if (j.contains(key)) {
+//                           static std::unordered_map<std::string, SpriteMetadata> cache;
+//                           cache[key] = loadSingleSpriteMetadata(j[key], 0, 0);
+//                           Meta = &cache[key];
+//                       }
+//                       else {
+//                           std::cout << "Metadata file " << metadataPath
+//                               << " missing entry for " << key << "\n";
+//                       }
+//                   }
+//                   else {
+//                       std::cout << "Could not open metadata file: "
+//                                   << metadataPath << "\n";
+//                   }
+//               }
+//           }
 
-        const char* GetTypeName() const override { return "SpriteRenderer"; }
-    };
+//     const char* GetTypeName() const override { return "SpriteRenderer"; }
+// };
 
 // 	// TODO: SpriteShapeRenderer for splining shapes
 

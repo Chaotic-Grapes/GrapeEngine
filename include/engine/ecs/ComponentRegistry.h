@@ -27,16 +27,16 @@ namespace ECS {
           return id;
       }
 
-      static const ComponentMeta& Meta(ComponentTypeId id) {
-          std::lock_guard<std::mutex> lock(_mutex());
+      static const ComponentMeta& Meta(const ComponentTypeId id) {
+          std::lock_guard lock(_mutex());
           return _metas()[id];
       }
 
   private:
       template<typename T>
-      static bool _detailRegister(ComponentTypeId id) {
-          std::lock_guard<std::mutex> lock(mutex());
-          auto& m = metas()[id];
+      static bool _detailRegister(const ComponentTypeId id) {
+          std::lock_guard lock(_mutex());
+          auto& m = _metas()[id];
           if (m.Size == 0) {
               m.Size = sizeof(T);
               m.Align = alignof(T);
@@ -53,14 +53,14 @@ namespace ECS {
                   m.dtor = [](void*) { /* do nothing for trivially destructible */ };
               } 
               else {
-                  m.dtor = [](void* p) { reinterpret_cast<T*>(p)->~T(); };
+                  m.dtor = [](void* p) { static_cast<T*>(p)->~T(); };
               }
           }
           return true;
       }
 
       static ComponentTypeId _nextId() {
-          std::lock_guard<std::mutex> lock(_mutex());
+          std::lock_guard lock(_mutex());
           return ++_counter();
       }
 
@@ -79,9 +79,9 @@ namespace ECS {
   };
 
   template<typename T>
-  inline ComponentTypeId type_id() { return ComponentRegistry::Type<T>(); }
+  inline ComponentTypeId _typeId() { return ComponentRegistry::Type<T>(); }
 
-  inline const ComponentMeta& component_meta(ComponentTypeId id) { return ComponentRegistry::Meta(id); }
+  inline const ComponentMeta& _componentMeta(const ComponentTypeId id) { return ComponentRegistry::Meta(id); }
 }
 
 #endif

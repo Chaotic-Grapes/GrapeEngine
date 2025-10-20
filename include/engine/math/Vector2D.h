@@ -41,6 +41,8 @@ public:
     static const Vector2D Right;
     static const Vector2D Down;
     static const Vector2D Left;
+
+    // To Vector3D conversion
 };
 
 // Binary operators (non-member functions)

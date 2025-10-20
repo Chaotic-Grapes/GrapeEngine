@@ -104,10 +104,10 @@ namespace Scenes {
          * @return The created ECS::Entity.
          * @note Use m_world.Create(arguments...) to create entities with components.
          */
-        ECS::Entity CreateEntity(std::optional<ECS::Entity> parent = std::nullopt) {
+        ECS::Entity CreateEntity(const std::optional<ECS::Entity> parent = std::nullopt) {
             // Will this suppress copy elision?
             // Consideration: Let user attach after creation to avoid this?
-            ECS::Entity e = m_world.Create();
+            const ECS::Entity e = m_world.Create();
             if (parent.has_value())
                 m_world.Attach(e, parent.value());
 
@@ -118,7 +118,7 @@ namespace Scenes {
          * @brief Destroys an entity in the scene.
          * @param entity The entity to destroy.
          */
-        void DestroyEntity(ECS::Entity entity) { m_world.Destroy(entity); }
+        void DestroyEntity(const ECS::Entity entity) { m_world.Destroy(entity); }
 
         /**
          * @brief Adds system(s) to the scene's update loop.
@@ -158,9 +158,9 @@ namespace Scenes {
          * @return The created ECS::Entity.
          */
         template<typename... TCs>
-        ECS::Entity CreateOnLayer(uint16_t layerId, TCs&&... cs) {
-            ECS::Entity e = m_world.Create(std::forward<TCs>(cs)...);
-            m_world.Set<ECS::Layer>(e, ECS::Layer{layerId});
+        ECS::Entity CreateOnLayer(const uint16_t layerId, TCs&&... cs) {
+            const ECS::Entity e = m_world.Create(std::forward<TCs>(cs)...);
+            m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{layerId});
             m_layers.OnLayerSet(e, layerId);
 
             return e;
@@ -171,15 +171,16 @@ namespace Scenes {
          * @param e The entity to modify.
          * @param id The ID of the layer to assign to the entity.
          */
-        void SetLayer(ECS::Entity e, uint16_t id) {
-            if (m_world.Has<ECS::Layer>(e)) {
-                auto prev = m_world.Get<ECS::Layer>(e).Id;
-                if (prev == id) return;
+        void SetLayer(const ECS::Entity e, const uint16_t id) {
+            if (m_world.Has<ECS::Components::Layer>(e)) {
+                const auto prev = m_world.Get<ECS::Components::Layer>(e).Id;
+                if (prev == id)
+                    return;
 
                 m_layers.OnLayerRemoved(e, prev);
             }
 
-            m_world.Set<ECS::Layer>(e, ECS::Layer{id});
+            m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{id});
             m_layers.OnLayerSet(e, id);
         }
 
@@ -187,12 +188,13 @@ namespace Scenes {
          * @brief Removes the layer component from an entity.
          * @param entity The entity to modify.
          */
-        void RemoveFromLayer(ECS::Entity entity) {
-            if (!m_world.Has<ECS::Layer>(entity)) return;
+        void RemoveFromLayer(const ECS::Entity entity) {
+            if (!m_world.Has<ECS::Components::Layer>(entity))
+                return;
 
-            auto prev = m_world.Get<ECS::Layer>(entity).Id;
+            const auto prev = m_world.Get<ECS::Components::Layer>(entity).Id;
             m_layers.OnLayerRemoved(entity, prev);
-            m_world.Remove<ECS::Layer>(entity);
+            m_world.Remove<ECS::Components::Layer>(entity);
         }
 
         // ********************** Read-Only API for Diagnostics ********************** //
@@ -207,7 +209,7 @@ namespace Scenes {
          * @brief Gets a system entry by index.
          * @param index The index of the system to retrieve.
          */
-        const SystemEntry* GetSystem(size_t index) const {
+        const SystemEntry* GetSystem(const size_t index) const {
             if (index >= m_systems.size())
                 return nullptr;
             return &m_systems[index];
@@ -236,7 +238,7 @@ namespace Scenes {
          */
         size_t FindSystemIndexByName(const char* name) const {
             if (!name)
-                return size_t(-1);
+                return static_cast<size_t>(-1);
 
             for (size_t i = 0; i < m_systems.size(); ++i) {
                 if (m_systems[i].Name && std::strcmp(m_systems[i].Name, name) == 0) {
@@ -244,7 +246,7 @@ namespace Scenes {
                 }
             }
 
-            return size_t(-1);
+            return static_cast<size_t>(-1);
         }
 
         /**
@@ -268,18 +270,18 @@ namespace Scenes {
          * @brief Finds the index of a system by its stable Id.
          * @param id The stable Id of the system to find.
          */
-        size_t FindSystemIndexById(uint64_t id) const {
+        size_t FindSystemIndexById(const uint64_t id) const {
             for (size_t i = 0; i < m_systems.size(); ++i) {
                 if (m_systems[i].Id == id)
                     return i;
             }
 
-            return size_t(-1);
+            return static_cast<size_t>(-1);
         }
 
     private:
         // Core update: runs enabled systems (in order), then updates transform hierarchy        
-        void _update(float dt) {
+        void _update(const float dt) {
             // ECS::World::DeferGuard guard(m_world);
             for (auto& s : m_systems) {
                 if (s.Enabled && s.Callback) {

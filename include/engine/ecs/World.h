@@ -5,8 +5,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <string>
-#include <tuple>
 #include <type_traits>
 #include <cassert>
 #include <functional>
@@ -15,13 +13,22 @@
 #include "ecs/Components.h"
 #include "ecs/Signature.h"
 #include "ecs/ComponentRegistry.h"
-#include "math/Vector3D.h"
 #include "math/Matrix4x4.h"
-#include "math/Quaternion.h"
 
 namespace ECS {
     // Relationship component for hierarchy
+    // Move this to Components.h?
     struct Parent { Entity ParentEntity{NULL_ENTITY}; };
+
+    struct CloneOptions {
+    public:
+        // If true, keep Parent as-is; otherwise detach cloned entities from their parents
+        bool KeepParent = false;
+        // Keep Layer component (if present)
+        bool KeepLayer = true;
+        // Keep Name component (if present)
+        bool KeepName = true;
+    };
 
     // World holds all archetypes and entity allocation, moves entities across archetypes on structural changes.
     class World {
@@ -31,6 +38,7 @@ namespace ECS {
         // Entity lifecycle
         Entity Create() {
             EntityId idx;
+            // If with identical then and else branches [bugprone-branch-close]
             if (!m_free.empty()) {
                 idx = m_free.back(); m_free.pop_back();
             }
@@ -51,11 +59,11 @@ namespace ECS {
             return e;
         }
 
-        bool IsAlive(Entity e) const {
+        bool IsAlive(const Entity e) const {
             return e.Index < m_generations.size() && m_generations[e.Index] == e.Generation;
         }
 
-        void Destroy(Entity e) {
+        void Destroy(const Entity e) {
             if (!IsAlive(e))
                 return;
 
@@ -70,7 +78,7 @@ namespace ECS {
 
         // Component API
         template<typename T>
-        bool Has(Entity e) const {
+        bool Has(const Entity e) const {
             if (!IsAlive(e))
                 return false;
 
@@ -82,20 +90,20 @@ namespace ECS {
         }
 
         template<typename T>
-        T& Get(Entity e) {
+        T& Get(const Entity e) {
             assert(IsAlive(e));
             auto& loc = m_locations[e.Index];
             assert(loc.ArchetypePtr && loc.ArchetypePtr->Has(TypeIdOf<T>()));
 
-            return *reinterpret_cast<T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
+            return *static_cast<T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
         }
         template<typename T>
-        const T& Get(Entity e) const {
+        const T& Get(const Entity e) const {
             assert(IsAlive(e));
             auto& loc = m_locations[e.Index];
             assert(loc.ArchetypePtr && loc.ArchetypePtr->Has(TypeIdOf<T>()));
 
-            return *reinterpret_cast<const T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
+            return *static_cast<const T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
         }
 
         template<typename T, typename... TArgs>
@@ -132,10 +140,15 @@ namespace ECS {
             return Add<T>(e, std::move(value));
         }
 
-        // Query iteration: iterate all archetypes that contain Ts...
+        /**
+		 * @brief Iterate over all entities that have the specified components, invoking the provided function for each.
+		 * @tparam Ts The component types to filter entities by
+		 * @tparam TFn The type of the function to invoke for each matching entity
+		 * @param fn The function to invoke for each matching entity; should accept parameters (Entity, Ts&...)
+         */
         template<typename... Ts, typename TFn>
         void Each(TFn&& fn) {
-            Signature req({ TypeIdOf<std::decay_t<Ts>>()... });
+            const Signature req({ TypeIdOf<std::decay_t<Ts>>()... });
 
             for (auto& kv : m_archetypes) {
                 auto& archPtr = kv.second;
@@ -148,52 +161,111 @@ namespace ECS {
                 auto& arch = *archPtr;
 
                 for (uint32_t ci = 0; ci < arch.GetChunkCount(); ++ci) {
-                    Chunk* ch = arch.GetChunk(ci);
+                    const Chunk* ch = arch.GetChunk(ci);
 
                     for (uint32_t i = 0; i < ch->Count(); ++i) {
                         Entity ent = _reverseEntity(arch, ci, i);
 
                         if (ent.IsNull())
                             continue;
-                        fn(ent, *reinterpret_cast<std::decay_t<Ts>*>(arch.GetRaw(TypeIdOf<std::decay_t<Ts>>(), ci, i))...);
+                        fn(ent, *static_cast<std::decay_t<Ts>*>(arch.GetRaw(TypeIdOf<std::decay_t<Ts>>(), ci, i))...);
                     }
                 }
             }
         }
 
-        // Deferred structural changes (for safe modifications during iteration)
-        class DeferGuard {
-        public:
-            explicit DeferGuard(World& w) : m_world(w), m_active(true) { m_world.BeginDefer(); }
-            ~DeferGuard() { if (m_active) m_world.EndDefer(); }
-            DeferGuard(const DeferGuard&) = delete;
-            DeferGuard& operator=(const DeferGuard&) = delete;
-        private:
-            World& m_world;
-            bool m_active = false;
-        };
+        /**
+		 * @brief Destroy all entities in the world safely, invoking per-entity hooks.
+		 * 
+		 * @note This operation may be slower and more expensive than Clear(), which skips hooks.
+		 * @note Consider using Clear() if you simply want to drop all entities quickly.
+         */
+        void DestroyAll() {
+            std::vector<Entity> toDestroy;
+            // Reserve a rough capacity to minimize reallocations
+            toDestroy.reserve(1024);
 
-        void BeginDefer() { ++m_deferDepth; }
-        void EndDefer() {
-            assert(m_deferDepth > 0);
-            if (--m_deferDepth == 0) {
-                for (auto& cmd : m_deferred)
-                    cmd(*this);
-                m_deferred.clear();
+            for (auto& [fst, snd] : m_archetypes) {
+                auto& archPtr = snd;
+
+                if (!archPtr)
+                    continue;
+                Archetype* arch = archPtr.get();
+
+                auto it = m_chunkIndices.find(arch);
+                if (it == m_chunkIndices.end())
+                    continue;
+                auto& ci = it->second;
+
+                for (size_t ciIdx = 0; ciIdx < ci.Entities.size(); ++ciIdx) {
+                    auto& slots = ci.Entities[ciIdx];
+                    for (Entity e : slots) {
+                        if (!e.IsNull()) toDestroy.push_back(e);
+                    }
+                }
+            }
+
+            // Destroy after collection to avoid mutating during traversal
+            for (const Entity e : toDestroy) {
+                Destroy(e);
             }
         }
-        bool Deferring() const noexcept { return m_deferDepth > 0; }
+
+        /**
+		 * @brief Drop all entities and reset the world state quickly, skipping per-entity hooks.
+		 *
+		 * @note This operation is the fastest way to clear all entities from the world.
+		 * @note However, existing Entity handles become invalid after this operation.
+		 * @note Furthermore, no per-entity destruction hooks are invoked; use DestroyAll() if needed.
+         */
+        void Clear() {
+            m_archetypes.clear();
+            m_chunkIndices.clear();
+
+            m_locations.clear();
+            m_generations.clear();
+            m_free.clear();
+
+            // Reset hierarchy indices
+            m_hierarchy = HierarchyIndex{};
+
+			/***** !!!!!! *****/
+            // Note: Intentionally keep m_componentSizes and chunk tunables so subsequent usage
+            // can reuse type size info and capacity heuristics.
+			/***** !!!!!! *****/
+        }
+
+		// TODO: Properly assess whether deferred structural changes are needed
+        // Deferred structural changes (for safe modifications during iteration)
+        //class DeferGuard {
+        //public:
+        //    explicit DeferGuard(World& w) : m_world(w), m_active(true) { m_world.BeginDefer(); }
+        //    ~DeferGuard() { if (m_active) m_world.EndDefer(); }
+        //    DeferGuard(const DeferGuard&) = delete;
+        //    DeferGuard& operator=(const DeferGuard&) = delete;
+        //private:
+        //    World& m_world;
+        //    bool m_active = false;
+        //};
+
+        //void BeginDefer() { ++m_deferDepth; }
+        //void EndDefer() {
+        //    assert(m_deferDepth > 0);
+        //    if (--m_deferDepth == 0) {
+        //        for (auto& cmd : m_deferred)
+        //            cmd(*this);
+        //        m_deferred.clear();
+        //    }
+        //}
+        //bool Deferring() const noexcept { return m_deferDepth > 0; }
 
         // Relationships
-        void Attach(Entity child, Entity parent) {
-            Set<Parent>(child, Parent{parent});
-        }
-        void Detach(Entity child) {
-            if (Has<Parent>(child)) Remove<Parent>(child);
-        }
+        void Attach(const Entity child, const Entity parent) { Set<Parent>(child, Parent{parent}); }
+        void Detach(const Entity child)                      { if (Has<Parent>(child)) Remove<Parent>(child); }
+
         template<typename TFn>
-        void ForChildren(Entity parent, TFn&& fn) const {
-            auto it = m_hierarchy.FirstChild.find(parent);
+        void ForChildren(const Entity parent, TFn&& fn) const {
+            const auto it = m_hierarchy.FirstChild.find(parent);
             if (it == m_hierarchy.FirstChild.end())
                 return;
 
@@ -201,12 +273,67 @@ namespace ECS {
             while (!c.IsNull()) {
                 fn(c);
                 auto itN = m_hierarchy.NextSibling.find(c);
-                c = (itN == m_hierarchy.NextSibling.end()) ? NULL_ENTITY : itN->second;
+                c = itN == m_hierarchy.NextSibling.end() ? NULL_ENTITY : itN->second;
             }
         }
-        Entity ParentOf(Entity child) const {
-            auto it = m_hierarchy.ParentOf.find(child);
+
+        Entity ParentOf(const Entity child) const {
+            const auto it = m_hierarchy.ParentOf.find(child);
             return it == m_hierarchy.ParentOf.end() ? NULL_ENTITY : it->second;
+        }
+
+        /**
+		 * @brief Clone an alive entity, copying all its components.
+		 * @param src Source entity to clone
+		 * @param opts Optionally, adjust how certain components are handled during cloning
+		 * @return ECS::Entity The newly cloned entity
+		 * @exception std::exception Thrown if the source entity is not alive
+         */
+        Entity Clone(const Entity src, const CloneOptions& opts = {}) {
+            if (!IsAlive(src)) 
+				throw std::exception("Cannot clone dead entity");
+
+            const Entity dst = Create();
+
+            const auto& srcLoc = m_locations[src.Index];
+            if (!srcLoc.ArchetypePtr) {
+                // Source has no components; done
+                return dst;
+            }
+
+            Archetype* from = srcLoc.ArchetypePtr;
+            Archetype* to = _getOrCreateArchetype(from->GetSignature());
+            auto [ci, slot] = to->Insert();
+
+            // Copy all components raw
+            for (const auto& info : from->GetComponents()) {
+                void* dstPtr = to->GetRaw(info.Id, ci, slot);
+                const void* srcPtr = from->GetRaw(info.Id, srcLoc.ChunkIndex, srcLoc.SlotIndex);
+                std::memcpy(dstPtr, srcPtr, info.Size);
+            }
+            _placeEntity(dst, to, ci, slot);
+
+            // Adjust Parent/Layer/Name per options
+            if (!opts.KeepParent && Has<Parent>(dst)) {
+                Set<Parent>(dst, Parent{ NULL_ENTITY }); // Detach safely via Set to keep indices consistent
+            }
+
+            if (!opts.KeepLayer && Has<Components::Layer>(dst)) {
+                Remove<Components::Layer>(dst);
+            }
+
+            if (!opts.KeepName && Has<Components::Name>(dst)) {
+                // Clear name cheaply
+                const Components::Name n{};
+                Set<Components::Name>(dst, n);
+            }
+
+            // Mark world transform dirty if present
+            if (Has<Components::WorldTransform>(dst)) {
+                Get<Components::WorldTransform>(dst).Dirty = true;
+            }
+
+            return dst;
         }
 
         const std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash>& Archetypes() const { return m_archetypes; }
@@ -217,7 +344,8 @@ namespace ECS {
             uint32_t ChunkIndex = 0;
             uint32_t SlotIndex = 0;
         };
-        const Location* LocationOf(Entity e) const {
+
+        const Location* LocationOf(const Entity e) const {
             if (!IsAlive(e))
                 return nullptr;
             return &m_locations[e.Index];
@@ -227,6 +355,7 @@ namespace ECS {
         struct ChunkIndex {
             std::vector<std::vector<Entity>> Entities; // [chunkIndex][slotIndex]
         };
+
         struct HierarchyIndex {
             std::unordered_map<Entity, Entity, EntityHash> ParentOf;
             std::unordered_map<Entity, Entity, EntityHash> FirstChild;
@@ -235,14 +364,14 @@ namespace ECS {
         };
 
         Archetype* _getOrCreateArchetype(const Signature& sig) {
-            auto it = m_archetypes.find(sig);
+            const auto it = m_archetypes.find(sig);
             if (it != m_archetypes.end())
                 return it->second.get();
 
             std::vector<ComponentInfo> infos;
             infos.reserve(sig.Types().size());
             for (auto t : sig.Types()) {
-                auto si = m_componentSizes[t];
+                const auto si = m_componentSizes[t];
                 infos.push_back(ComponentInfo{ t, si.first, si.second });
             }
 
@@ -263,10 +392,10 @@ namespace ECS {
         }
 
         template<typename... Ts>
-        void _emplaceComponents(Entity e, const Ts&... comps) {
+        void _emplaceComponents(const Entity e, const Ts&... comps) {
             (_ensureComponentInfo<Ts>(), ...);
 
-            Signature sig({ TypeIdOf<Ts>()... });
+            const Signature sig({ TypeIdOf<Ts>()... });
             Archetype* to = _getOrCreateArchetype(sig);
             auto [ci, slot] = to->Insert();
             
@@ -282,7 +411,7 @@ namespace ECS {
             auto& loc = m_locations[e.Index];
 
             if (!loc.ArchetypePtr) {
-                Signature ns({ t });
+                const Signature ns({ t });
                 Archetype* to = _getOrCreateArchetype(ns);
                 auto [ci, slot] = to->Insert();
                 mover(e, to->GetRaw(t, ci, slot));
@@ -292,19 +421,19 @@ namespace ECS {
             }
 
             if (loc.ArchetypePtr->Has(t)) {
-                T* dst = reinterpret_cast<T*>(loc.ArchetypePtr->GetRaw(t, loc.ChunkIndex, loc.SlotIndex));
+                T* dst = static_cast<T*>(loc.ArchetypePtr->GetRaw(t, loc.ChunkIndex, loc.SlotIndex));
                 *dst = T(std::forward<TMover>(mover), *dst); // not typically reached
 
                 return;
             }
 
-            Signature ns = loc.ArchetypePtr->GetSignature().MergedWith(t);
+            const Signature ns = loc.ArchetypePtr->GetSignature().MergedWith(t);
             Archetype* to = _getOrCreateArchetype(ns);
             auto [ci, slot] = to->Insert();
 
             for (auto& info : loc.ArchetypePtr->GetComponents()) {
                 void* dst = to->GetRaw(info.Id, ci, slot);
-                void* src = loc.ArchetypePtr->GetRaw(info.Id, loc.ChunkIndex, loc.SlotIndex);
+                const void* src = loc.ArchetypePtr->GetRaw(info.Id, loc.ChunkIndex, loc.SlotIndex);
                 std::memcpy(dst, src, info.Size);
             }
 
@@ -314,15 +443,15 @@ namespace ECS {
         }
 
         template<typename T>
-        void _structuralRemove(Entity e, TypeId t) {
+        void _structuralRemove(const Entity e, const TypeId t) {
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr || !loc.ArchetypePtr->Has(t))
                 return;
-            
-            Signature ns = loc.ArchetypePtr->GetSignature().Without(t);
+
+            const Signature ns = loc.ArchetypePtr->GetSignature().Without(t);
             Archetype* to = ns.Types().empty() ? nullptr : _getOrCreateArchetype(ns);
-            uint32_t fromChunk = loc.ChunkIndex;
-            uint32_t fromSlot = loc.SlotIndex;
+            const uint32_t fromChunk = loc.ChunkIndex;
+            const uint32_t fromSlot = loc.SlotIndex;
 
             if (!to) {
                 _removeFromArchetype(e, loc);
@@ -336,7 +465,7 @@ namespace ECS {
                 if (info.Id == t) continue;
 
                 void* dst = to->GetRaw(info.Id, ci, slot);
-                void* src = loc.ArchetypePtr->GetRaw(info.Id, fromChunk, fromSlot);
+                const void* src = loc.ArchetypePtr->GetRaw(info.Id, fromChunk, fromSlot);
                 std::memcpy(dst, src, info.Size);
             }
 
@@ -344,7 +473,7 @@ namespace ECS {
             _placeEntity(e, to, ci, slot);
         }
 
-        void _placeEntity(Entity e, Archetype* arch, uint32_t chunkIndex, uint32_t slot) {
+        void _placeEntity(const Entity e, Archetype* arch, const uint32_t chunkIndex, const uint32_t slot) {
             m_locations[e.Index] = Location{ arch, chunkIndex, slot };
 
             auto &ci = m_chunkIndices[arch];
@@ -362,10 +491,10 @@ namespace ECS {
             Archetype* arch = loc.ArchetypePtr;
             auto &ci = m_chunkIndices[arch];
             auto &vec = ci.Entities[loc.ChunkIndex];
-            uint32_t movedFrom = arch->RemoveSwapBack(loc.ChunkIndex, loc.SlotIndex);
+            const uint32_t movedFrom = arch->RemoveSwapBack(loc.ChunkIndex, loc.SlotIndex);
 
             if (movedFrom != loc.SlotIndex) {
-                Entity moved = vec[movedFrom];
+                const Entity moved = vec[movedFrom];
                 vec[loc.SlotIndex] = moved;
                 vec[movedFrom] = NULL_ENTITY;
                 auto &mloc = m_locations[moved.Index];
@@ -378,8 +507,8 @@ namespace ECS {
             loc.ArchetypePtr = nullptr;
         }
 
-        Entity _reverseEntity(Archetype& arch, uint32_t chunkIndex, uint32_t slot) const {
-            auto it = m_chunkIndices.find(&arch);
+        Entity _reverseEntity(Archetype& arch, const uint32_t chunkIndex, const uint32_t slot) const {
+            const auto it = m_chunkIndices.find(&arch);
             if (it == m_chunkIndices.end())
                 return NULL_ENTITY;
 
@@ -394,10 +523,10 @@ namespace ECS {
             return vec[slot];
         }
 
-        void _onComponentAdded(Entity e, TypeId t) {
+        void _onComponentAdded(const Entity e, const TypeId t) {
             if (t == TypeIdOf<Parent>()) {
                 const auto& p = Get<Parent>(e);
-                auto found = m_hierarchy.ParentOf.find(e);
+                const auto found = m_hierarchy.ParentOf.find(e);
 
                 if (found != m_hierarchy.ParentOf.end()) {
                     if (found->second == p.ParentEntity)
@@ -407,8 +536,8 @@ namespace ECS {
 
                 if (p.ParentEntity.IsNull())
                     return;
-                    
-                Entity oldFirst = m_hierarchy.FirstChild[p.ParentEntity];
+
+                const Entity oldFirst = m_hierarchy.FirstChild[p.ParentEntity];
                 m_hierarchy.FirstChild[p.ParentEntity] = e;
 
                 if (!oldFirst.IsNull()) {
@@ -420,38 +549,38 @@ namespace ECS {
                 m_hierarchy.ParentOf[e] = p.ParentEntity;
             }
         }
-        void _onComponentChanged(Entity e, TypeId t) {
+        void _onComponentChanged(const Entity e, const TypeId t) {
             if (t == TypeIdOf<Parent>()) {
                 _onComponentAdded(e, t);
             }
         }
-        void _onComponentRemoving(Entity e, TypeId t) {
+        void _onComponentRemoving(const Entity e, const TypeId t) {
             if (t == TypeIdOf<Parent>()) {
                 _unlinkChild(e);
                 m_hierarchy.ParentOf.erase(e);
             }
         }
 
-        void _unlinkChild(Entity e) {
+        void _unlinkChild(const Entity e) {
             auto pit = m_hierarchy.ParentOf.find(e);
             if (pit == m_hierarchy.ParentOf.end())
                 return;
 
-            Entity par = pit->second;
+            const Entity parent = pit->second;
             Entity prev = NULL_ENTITY, next = NULL_ENTITY;
 
-            auto itPrev = m_hierarchy.PrevSibling.find(e);
+            const auto itPrev = m_hierarchy.PrevSibling.find(e);
             if (itPrev != m_hierarchy.PrevSibling.end())
                 prev = itPrev->second;
-            
-            auto itNext = m_hierarchy.NextSibling.find(e);
+
+            const auto itNext = m_hierarchy.NextSibling.find(e);
             if (itNext != m_hierarchy.NextSibling.end())
                 next = itNext->second;
             
             if (prev.IsNull()) {
                 if (next.IsNull())
-                    m_hierarchy.FirstChild.erase(par);
-                else m_hierarchy.FirstChild[par] = next;
+                    m_hierarchy.FirstChild.erase(parent);
+                else m_hierarchy.FirstChild[parent] = next;
             }
             else {
                 m_hierarchy.NextSibling[prev] = next;
@@ -466,7 +595,7 @@ namespace ECS {
 
     private:
         uint32_t m_chunkCapacity = 256;
-        size_t m_chunkBytes = 16 * 1024;
+        size_t m_chunkBytes = 16384; // 16 * 1024;
 
         std::vector<uint32_t> m_generations;
         std::vector<uint32_t> m_free;

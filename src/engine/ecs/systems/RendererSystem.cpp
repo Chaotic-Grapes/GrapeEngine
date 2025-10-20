@@ -103,8 +103,8 @@ namespace ECS {
                 ToGlm(sl.Color), 0);
         });
 
-        // Polylines?
-        world.Each<Components::LocalTransform, Components::ShapePolyline2D<32>>([&](ECS::Entity, Components::LocalTransform& lt, Components::ShapePolyline2D<32>& pl){
+        // Polygons?
+        world.Each<Components::LocalTransform, Components::ShapePolygon2D<32>>([&](ECS::Entity, Components::LocalTransform& lt, Components::ShapePolygon2D<32>& pl){
             if (pl.Count < 2)
                 return;
             const auto M = TransformUtils::MakeTRS(lt.Position, lt.Rotation, lt.Scale);
@@ -121,7 +121,7 @@ namespace ECS {
             
             DebugDraw2D::Polygon(*m_renderer,
                 points,
-                ToGlm(pl.Color),
+                ToGlm(pl.FillColor),
                 0);
         });
 

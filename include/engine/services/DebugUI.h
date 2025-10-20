@@ -26,8 +26,8 @@
 
 // Forward declarations (avoid unnecessary includes)
 struct GLFWwindow;
-class World;
 namespace Audio { class IAudioDevice; }
+namespace Scenes { class Scene; }
 
 /**
  * @brief Configuration structure for DebugUI appearance and layout
@@ -80,7 +80,7 @@ struct DebugUIConfig {
  * 
  * Usage example:
  * @code
- * DebugUI debugUI(&world);
+ * DebugUI debugUI(&scene);
  * debugUI.Initialize(window);
  * 
  * // In main loop:
@@ -90,17 +90,16 @@ struct DebugUIConfig {
  */
 class DebugUI {
 public:
-    /**
-     * @brief Constructor for DebugUI
-     * @param world Pointer to the World object for entity management
-     * @param config Configuration structure for UI layout and appearance
-     * 
-     * Initializes the debug UI with a reference to the world and optional
-     * configuration settings. The world pointer is used for entity management.
-     */
-    explicit DebugUI(World* world, const DebugUIConfig& config = {});
-    
-    /**
+	/**
+	 * @brief Constructor for DebugUI
+	 * @param scene Pointer to the Scene object for entity management
+	 * @param config Configuration structure for UI layout and appearance
+	 * 
+	 * Initializes the debug UI with a reference to the scene and optional
+	 * configuration settings. The scene pointer is used for entity management.
+	 */
+    explicit DebugUI(Scenes::Scene* scene, const DebugUIConfig& config = {});
+	/**
      * @brief Destructor for DebugUI
      * 
      * Automatically calls Shutdown() if the UI was initialized to ensure
@@ -148,7 +147,7 @@ public:
      * @brief Enable or disable the entire debug UI
      * @param enabled True to enable UI, false to disable
      */
-    void SetEnabled(bool enabled) { m_enabled = enabled; }
+    void SetEnabled(const bool enabled) { m_enabled = enabled; }
     
     /**
      * @brief Check if the debug UI is currently enabled
@@ -157,19 +156,19 @@ public:
     bool IsEnabled() const { return m_enabled; }
 
     /**
-     * @brief Set the world reference for entity management
-     * @param world Pointer to the World object
+     * @brief Set the scene reference for entity management
+     * @param scene Pointer to the Scene object
      * 
-     * Updates the world reference used for creating and managing entities
+     * Updates the scene reference used for creating and managing entities
      * through the debug interface.
      */
-    void SetWorld(World* world) { m_world = world; }
+    void SetScene(Scenes::Scene* scene) { m_scene = scene; }
     
     /**
-     * @brief Check if a valid world reference exists
-     * @return bool True if world pointer is valid, false otherwise
+     * @brief Check if a valid scene reference exists
+     * @return bool True if scene pointer is valid, false otherwise
      */
-    bool HasValidWorld() const;
+    bool HasValidScene() const;
 
     /**
      * @brief Attach an audio system for monitoring
@@ -194,16 +193,16 @@ public:
      * Creates a new entity with basic components and adds it to the world.
      * The object is positioned randomly within the window bounds.
      */
-    void AddGameObject(const std::string& name);
+    void AddGameObject(const std::string& name) const;
     
     /**
      * @brief Remove a game object by entity ID
-     * @param id Entity ID of the object to remove
+     * @param id Packed Entity ID of the object to remove
      * 
      * Finds and destroys the entity with the specified ID, removing it
      * from the world and updating the UI cache.
      */
-    void RemoveGameObject(EntityId id);
+    void RemoveGameObject(PackedEntityId id) const;
     
     /**
      * @brief Clone an existing game object
@@ -212,7 +211,7 @@ public:
      * Creates a copy of the specified entity with slightly offset position
      * to avoid overlapping with the original.
      */
-    void CloneGameObject(const Entity& entity);
+    void CloneGameObject(const ECS::Entity& entity) const;
     
     /**
      * @brief Clear all game objects from the world
@@ -220,11 +219,11 @@ public:
      * Destroys all entities in the world and updates the UI cache.
      * Use with caution as this removes all game objects.
      */
-    void ClearAllGameObjects();
+    void ClearAllGameObjects() const;
 
 private:
     DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
-    World* m_world;             ///< Pointer to World object for entity management
+    Scenes::Scene* m_scene;     ///< Pointer to Scene object for entity management
     bool m_enabled = false;     ///< Flag indicating if debug UI is currently enabled
     bool m_initialized = false; ///< Flag indicating if ImGui has been initialized
 
@@ -237,14 +236,14 @@ private:
     int m_spaceReleased = 0;  ///< Counter for space key release events
 
     // Cached UI elements to avoid string creation every frame
-    mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;    ///< Cached delete button labels
-    mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;     ///< Cached clone button labels
-    mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;       ///< Cached header collapse states
+    mutable std::unordered_map<PackedEntityId, std::string> m_cachedDeleteLabels;    ///< Cached delete button labels
+    mutable std::unordered_map<PackedEntityId, std::string> m_cachedCloneLabels;     ///< Cached clone button labels
+    mutable std::unordered_map<PackedEntityId, bool> m_cachedCollapsedHeaders;       ///< Cached header collapse states
 
     /**
      * @brief Render the main engine debug window
      * 
-     * Displays engine status, debug UI state, world connection status,
+     * Displays engine status, debug UI state, scene connection status,
      * and provides controls for toggling demo window and UI.
      */
     void _showEngineDebugWindow();
@@ -255,7 +254,7 @@ private:
      * Shows FPS, frame time, memory usage, and other performance metrics
      * for engine optimization and debugging.
      */
-    void _showPerformanceWindow();
+    void _showPerformanceWindow() const;
     
     /**
      * @brief Render the input debugging window
@@ -275,12 +274,12 @@ private:
     
     /**
      * @brief Render the audio monitoring window
-     * @param audio Reference to the audio system
+     * @param device Reference to the audio system
      * 
      * Static method that displays audio system status, volume controls,
      * and audio-related debugging information.
      */
-    static void _showAudioWindow(Audio::FmodAudioDevice* audio);
+    static void _showAudioWindow(Audio::FmodAudioDevice* device);
 
     /**
      * @brief Create a new game entity with basic components
@@ -290,7 +289,7 @@ private:
      * Helper method that creates an entity with transform and other
      * basic components needed for game objects.
      */
-    Entity _createGameEntity(const std::string& name);
+    ECS::Entity _createGameEntity(const std::string& name) const;
     
     /**
      * @brief Invalidate UI caches when entities change
@@ -298,28 +297,28 @@ private:
      * Clears cached button labels and states when entities are added,
      * removed, or modified to ensure UI consistency.
      */
-    void _invalidateCache();
+    void _invalidateCache() const;
     
     /**
      * @brief Get cached delete button label for entity
-     * @param id Entity ID
+     * @param id Packed Entity ID
      * @return const std::string& Cached delete button label
      */
-    const std::string& _getDeleteLabel(EntityId id) const;
+    const std::string& _getDeleteLabel(PackedEntityId id) const;
     
     /**
      * @brief Get cached clone button label for entity
-     * @param id Entity ID
+     * @param id Packed Entity ID
      * @return const std::string& Cached clone button label
      */
-    const std::string& _getCloneLabel(EntityId id) const;
+    const std::string& _getCloneLabel(PackedEntityId id) const;
     
     /**
      * @brief Get cached header collapse state for entity
-     * @param id Entity ID
+     * @param id Packed Entity ID
      * @return const bool& Cached header collapse state
      */
-    const bool& _getCollapsedHeaderBool(EntityId id) const;
+    const bool& _getCollapsedHeaderBool(PackedEntityId id) const;
 };
 
 #endif

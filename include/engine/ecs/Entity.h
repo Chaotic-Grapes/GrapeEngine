@@ -9,6 +9,7 @@
 // Unique, stable ids per component type at runtime.
 using TypeId = uint32_t;
 using EntityId = uint32_t;
+using PackedEntityId = uint64_t;
 
 namespace ECS {
     struct Entity {
@@ -18,16 +19,16 @@ namespace ECS {
         static constexpr EntityId NPOS32 = std::numeric_limits<EntityId>::max();
 
         constexpr bool IsNull() const noexcept { return Index == NPOS32; }
-        friend constexpr bool operator==(Entity a, Entity b) noexcept {
+        friend constexpr bool operator==(const Entity a, const Entity b) noexcept {
             return a.Index == b.Index && a.Generation == b.Generation;
         }
-        friend constexpr bool operator!=(Entity a, Entity b) noexcept {
+        friend constexpr bool operator!=(const Entity a, const Entity b) noexcept {
             return !(a == b);
         }
-        friend bool operator<(Entity a, Entity b) noexcept {
+        friend bool operator<(const Entity a, const Entity b) noexcept {
             return a.Index < b.Index || (a.Index == b.Index && a.Generation < b.Generation);
         }
-        friend bool operator>(Entity a, Entity b) noexcept {
+        friend bool operator>(const Entity a, const Entity b) noexcept {
             return b < a;
         }
     };

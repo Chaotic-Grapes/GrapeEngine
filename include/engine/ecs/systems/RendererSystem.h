@@ -7,12 +7,10 @@
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include "Color.h"
-#include "ecs/ISystem.h"
 #include "ecs/World.h"
 #include "graphics/shader.hpp"
 #include "Math/Vector2D.h"
 
-class Entity;
 namespace ECS {
     class RendererSystem {
     public:

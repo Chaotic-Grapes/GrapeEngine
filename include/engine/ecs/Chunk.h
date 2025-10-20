@@ -7,7 +7,6 @@
 #include <memory>
 #include <cstring>
 #include <cassert>
-#include "ecs/Entity.h"
 
 namespace ECS {
     struct ChunkLayoutEntry {
@@ -20,41 +19,41 @@ namespace ECS {
     class Chunk {
     public:
         Chunk() = default;
-        Chunk(uint32_t capacity, std::vector<ChunkLayoutEntry> layout, size_t totalSize)
-            : m_Capacity(capacity), m_Count(0), m_Buffer(new uint8_t[totalSize]), m_Layout(std::move(layout)) {}
+        Chunk(const uint32_t capacity, std::vector<ChunkLayoutEntry> layout, const size_t totalSize)
+            : m_capacity(capacity), m_count(0), m_buffer(new uint8_t[totalSize]), m_layout(std::move(layout)) {}
 
-        uint32_t Capacity() const noexcept { return m_Capacity; }
-        uint32_t Count() const noexcept { return m_Count; }
-        void SetCount(uint32_t c) noexcept { m_Count = c; }
+        uint32_t Capacity() const noexcept        { return m_capacity; }
+        uint32_t Count() const noexcept           { return m_count; }
+        void SetCount(const uint32_t c) noexcept  { m_count = c; }
 
-        void* ComponentPtr(uint32_t compIndex, uint32_t slot) noexcept {
-            auto &e = m_Layout[compIndex];
-            return m_Buffer.get() + e.Offset + e.Stride * size_t(slot);
+        void* ComponentPtr(const uint32_t compIndex, const uint32_t slot) noexcept {
+            const auto &chunkLayoutEntry = m_layout[compIndex];
+            return m_buffer.get() + chunkLayoutEntry.Offset + chunkLayoutEntry.Stride * static_cast<size_t>(slot);
         }
-        const void* ComponentPtr(uint32_t compIndex, uint32_t slot) const noexcept {
-            auto &e = m_Layout[compIndex];
-            return m_Buffer.get() + e.Offset + e.Stride * size_t(slot);
+        const void* ComponentPtr(const uint32_t compIndex, const uint32_t slot) const noexcept {
+            auto &e = m_layout[compIndex];
+            return m_buffer.get() + e.Offset + e.Stride * static_cast<size_t>(slot);
         }
 
-        uint32_t RemoveSwapBack(uint32_t dst) noexcept {
-            assert(m_Count > 0 && dst < m_Count);
-            uint32_t last = m_Count - 1;
+        uint32_t RemoveSwapBack(const uint32_t dst) noexcept {
+            assert(m_count > 0 && dst < m_count);
+            const uint32_t last = m_count - 1;
             if (dst != last) {
-                for (size_t i = 0; i < m_Layout.size(); ++i) {
-                    std::memmove(ComponentPtr(uint32_t(i), dst),
-                                ComponentPtr(uint32_t(i), last),
-                                m_Layout[i].Stride);
+                for (size_t i = 0; i < m_layout.size(); ++i) {
+                    std::memmove(ComponentPtr(static_cast<uint32_t>(i), dst),
+                                ComponentPtr(static_cast<uint32_t>(i), last),
+                                m_layout[i].Stride);
                 }
             }
-            --m_Count;
+            --m_count;
             return last;
         }
 
     private:
-        uint32_t m_Capacity = 0;
-        uint32_t m_Count = 0;
-        std::unique_ptr<uint8_t[]> m_Buffer;
-        std::vector<ChunkLayoutEntry> m_Layout;
+        uint32_t m_capacity = 0;
+        uint32_t m_count = 0;
+        std::unique_ptr<uint8_t[]> m_buffer;
+        std::vector<ChunkLayoutEntry> m_layout;
     };
 }
 

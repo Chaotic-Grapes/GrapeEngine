@@ -4,7 +4,7 @@
 #include "ecs/World.h"
 #include <type_traits>
 
-namespace Grape::ECS {
+namespace ECS {
     template<typename... TInclude>
     class Query {
     public:
