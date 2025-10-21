@@ -17,6 +17,10 @@ systems, components, and their interactions. This test scene covers:
 
 The scene provides structured test cases that can be cycled through using
 keyboard input, with each test validating specific ECS functionality.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 

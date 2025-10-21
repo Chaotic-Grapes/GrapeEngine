@@ -10,6 +10,10 @@ components based on LocalTransform and parent-child hierarchy relationships.
 
 The system ensures that child entities' world transforms are properly computed
 by combining their local transforms with their parent's world transform.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -25,14 +29,6 @@ namespace ECS {
          * @param dt Delta time (not used but provided for consistency with other systems)
          */
         static void Update(World& world, float dt);
-        
-    private:
-        /**
-         * @brief Recursively update an entity's WorldTransform and all its children
-         * @param world The ECS world
-         * @param entity The entity to update
-         * @param parentMatrix The parent's world transform matrix (identity if no parent)
-         */
-        static void UpdateEntityRecursive(World& world, Entity entity, const Matrix4x4& parentMatrix);
+
     };
 }

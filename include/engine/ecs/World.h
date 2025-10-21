@@ -176,6 +176,106 @@ namespace ECS {
         }
 
         /**
+		 * @brief Try to get a pointer to the specified component type for the given entity.
+		 * @tparam T The component type to retrieve
+		 * @param e The entity from which to retrieve the component
+		 * @return T* Pointer to the component if it exists; nullptr otherwise
+		 * 
+		 * @note This combines Has() and Get() into a single operation, eliminating redundant lookups.
+		 * @note Prefer this over Has() + Get() pattern for better performance.
+         */
+        template<typename T>
+        T* TryGet(const Entity e) {
+            if (!IsAlive(e))
+                return nullptr;
+
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr || !loc.ArchetypePtr->Has(TypeIdOf<T>()))
+                return nullptr;
+
+            return static_cast<T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
+        }
+
+        /**
+		 * @brief Try to get a const pointer to the specified component type for the given entity.
+		 * @tparam T The component type to retrieve
+		 * @param e The entity from which to retrieve the component
+		 * @return const T* Const pointer to the component if it exists; nullptr otherwise
+		 * 
+		 * @note This combines Has() and Get() into a single operation, eliminating redundant lookups.
+		 * @note Prefer this over Has() + Get() pattern for better performance.
+         */
+        template<typename T>
+        const T* TryGet(const Entity e) const {
+            if (!IsAlive(e))
+                return nullptr;
+
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr || !loc.ArchetypePtr->Has(TypeIdOf<T>()))
+                return nullptr;
+
+            return static_cast<const T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
+        }
+
+        /**
+		 * @brief Try to get pointers to multiple components for the given entity.
+		 * @tparam Ts The component types to retrieve
+		 * @param e The entity from which to retrieve the components
+		 * @return std::tuple<Ts*...> Tuple of pointers to the components; any pointer may be nullptr if the component doesn't exist
+		 * 
+		 * @note This retrieves multiple components in a single call with optimized validation.
+		 * @note Check each pointer for nullptr before use.
+         */
+        template<typename... Ts>
+        std::tuple<Ts*...> TryGetComponents(const Entity e) {
+            if (!IsAlive(e))
+                return std::tuple<Ts*...>{ static_cast<Ts*>(nullptr)... };
+
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr)
+                return std::tuple<Ts*...>{ static_cast<Ts*>(nullptr)... };
+
+            // Check if all components exist first
+            const bool hasAll = (loc.ArchetypePtr->Has(TypeIdOf<Ts>()) && ...);
+            if (!hasAll)
+                return std::tuple<Ts*...>{ static_cast<Ts*>(nullptr)... };
+
+            // All exist, retrieve them
+            return std::tuple<Ts*...>{
+                static_cast<Ts*>(loc.ArchetypePtr->GetRaw(TypeIdOf<Ts>(), loc.ChunkIndex, loc.SlotIndex))...
+            };
+        }
+
+        /**
+		 * @brief Try to get const pointers to multiple components for the given entity.
+		 * @tparam Ts The component types to retrieve
+		 * @param e The entity from which to retrieve the components
+		 * @return std::tuple<const Ts*...> Tuple of const pointers to the components; any pointer may be nullptr if the component doesn't exist
+		 * 
+		 * @note This retrieves multiple components in a single call with optimized validation.
+		 * @note Check each pointer for nullptr before use.
+         */
+        template<typename... Ts>
+        std::tuple<const Ts*...> TryGetComponents(const Entity e) const {
+            if (!IsAlive(e))
+                return std::tuple<const Ts*...>{ static_cast<const Ts*>(nullptr)... };
+
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr)
+                return std::tuple<const Ts*...>{ static_cast<const Ts*>(nullptr)... };
+
+            // Check if all components exist first
+            const bool hasAll = (loc.ArchetypePtr->Has(TypeIdOf<Ts>()) && ...);
+            if (!hasAll)
+                return std::tuple<const Ts*...>{ static_cast<const Ts*>(nullptr)... };
+
+            // All exist, retrieve them
+            return std::tuple<const Ts*...>{
+                static_cast<const Ts*>(loc.ArchetypePtr->GetRaw(TypeIdOf<Ts>(), loc.ChunkIndex, loc.SlotIndex))...
+            };
+        }
+
+        /**
 		 * @brief Add a component of the specified type to the given entity, constructing it with the provided arguments.
 		 * @tparam T The component type to add
 		 * @tparam TArgs The types of the constructor arguments for the component
