@@ -9,6 +9,7 @@
 #include <iostream>
 #include <sstream>
 #include "serialization/EntitySerializer.h"
+#include "serialization/Serializer.h"
 #include "core/Profiler.h"
 #include "helpers/MathUtils.h"
 #include <filesystem>
@@ -489,24 +490,13 @@ void DebugUI::_showGameObjectEditor() {
     static char prefabName[128] = "sample-enemy-prefab";
     ImGui::InputText("Prefab Name", prefabName, sizeof(prefabName));
     if (ImGui::Button("Load Prefab") && strlen(prefabName) > 0) {
-        std::ifstream file("assets/samples/" + std::string(prefabName) + ".prefab");
-        if (!file.is_open()) {
-            LOG_ERROR("Cannot open file: " << prefabName);
+        std::string path = "assets/samples/" + std::string(prefabName) + ".prefab";
+        auto& world = m_scenePtr->GetWorld();
+        if (!Serialization::EntitySerializer::LoadPrefab(path, world)) {
+            LOG_ERROR("Failed to load prefab: " << path);
         }
         else {
-            try {
-                auto entityJson = nlohmann::json::parse(file);
-                file.close();
-
-                auto& world = m_scenePtr->GetWorld();
-                // Deserialize creates the entity internally
-                (void)Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
-
-                _invalidateCache();
-            }
-            catch (const std::exception& e) {
-                LOG_ERROR("Failed to parse prefab file: " << e.what());
-            }
+            _invalidateCache();
         }
     }
 
@@ -548,6 +538,24 @@ void DebugUI::_showGameObjectEditor() {
                 if (ImGui::SmallButton(_getCloneLabel(packedEntityId).c_str())) {
                     CloneGameObject(entity);
                     return;
+                }
+
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Save Prefab")) {
+                    // Build a name from the entity name or index
+                    std::string saveName = "entity-" + std::to_string(entity.Index);
+                    if (world.Has<ECS::Components::Name>(entity)) {
+                        const auto& [name] = world.Get<ECS::Components::Name>(entity);
+                        if (std::strlen(name) > 0)
+                            saveName = name;
+                    }
+                    // sanitize simple characters (replace spaces)
+                    for (auto& c : saveName) if (c == ' ') c = '_';
+
+                    std::string path = "assets/samples/" + saveName + ".prefab";
+                    if (!Serialization::EntitySerializer::SavePrefab(path, world, entity)) {
+                        LOG_ERROR("Failed to save prefab: " << path);
+                    }
                 }
 
                 ImGui::SeparatorText("Transform");

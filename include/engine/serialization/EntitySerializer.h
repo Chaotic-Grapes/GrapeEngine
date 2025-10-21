@@ -23,6 +23,7 @@
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include <helpers/EntityUtils.h>
+#include "Serializer.h"
 
 using json = nlohmann::json;
 
@@ -174,6 +175,37 @@ namespace Serialization {
 			}
 			return e;
 		}
+
+		/**
+         * @brief Save an entity as a prefab file (.prefab)
+         * @param filename Path to write (must end with .prefab)
+         * @param world World containing the entity
+         * @param e Entity to serialize
+         * @return true on success
+         */
+        static bool SavePrefab(const std::string& filename, const ECS::World& world, const ECS::Entity e) {
+            json j = SerializeEntity(world, e);
+            return Serializer::SaveJson(filename, "prefab", j);
+        }
+
+        /**
+         * @brief Load a prefab file and instantiate it into the provided world
+         * @param filename Path to read (must end with .prefab)
+         * @param world World to instantiate into
+         * @param outEntity Optional out param to receive created entity
+         * @return true on success
+         */
+        static bool LoadPrefab(const std::string& filename, ECS::World& world, ECS::Entity* outEntity = nullptr) {
+            json j;
+            if (!Serializer::LoadJson(filename, "prefab", j))
+				return false;
+            
+			ECS::Entity e = DeserializeEntity(world, j);
+			if (outEntity)
+				*outEntity = e;
+            
+				return true;
+        }
 	};
 
 	// --- Register all component serializers ---

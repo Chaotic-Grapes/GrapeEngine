@@ -98,6 +98,11 @@ namespace Services {
         void Update() override;
 
         /**
+		 * @brief Render the overlay UI
+		 */
+        void Render() override;
+
+        /**
          * @brief Cleanup and terminate the overlay system
          */
         void Terminate() override;

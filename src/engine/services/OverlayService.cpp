@@ -90,7 +90,9 @@ namespace Services {
             m_debugUI->AttachScene(scene);
         else if (m_debugUI->HasValidScene() && !scene)
             m_debugUI->DetachScene();
+    }
 
+    void OverlayService::Render() {
         // Update UI every frame
         m_debugUI->NewFrame();
         m_debugUI->Render();
