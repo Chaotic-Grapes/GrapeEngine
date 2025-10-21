@@ -206,12 +206,22 @@ namespace Component {
         const char* GetTypeName() const override { return "CircleCollider2D"; }
     };
 
+    struct PolygonCollider2D : Collider2D {
+        //storage for vertices
+        std::vector<Vector2D> Points;
+        //default ctr
+        PolygonCollider2D() = default;
+        //construct polygons from points
+        PolygonCollider2D(const std::vector<Vector2D> points) : Points(points) {};
+
+    };
     // Line renderer for static geometry
     struct LineRenderer : IComponent {
         Vector2D Start{ 0, 0 };
         Vector2D End{ 0, 0 };
         float Thickness = 1.f;
         Color Color{ 1.f, 1.f, 1.f, 1.f };
+
 
         LineRenderer(const Vector2D& start = { 0,0 }, const Vector2D& end = { 0,0 }, const float thickness = 1.f)
             : Start(start), End(end), Thickness(thickness) {}
