@@ -66,11 +66,6 @@ void ECSTestScene::OnLoad() {
     m_physicsLayer = GetLayers().CreateOrGetLayer("physics");
     m_renderLayer = GetLayers().CreateOrGetLayer("render");
 
-    // Initialize transform system (must run before renderer)
-    //AddSystem([](Scenes::Scene& s, const float dt) {
-    //    ECS::TransformSystem::Update(s.GetWorld(), dt);
-    //}, "Transform System");
-
     // Initialize renderer system
     m_rendererSystem = std::make_shared<ECS::RendererSystem>();
     m_rendererSystem->Initialize();
