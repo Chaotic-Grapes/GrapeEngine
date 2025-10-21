@@ -1082,7 +1082,7 @@ void ECSTestScene::_testAllSystems() {
 
 void ECSTestScene::_testStressTestAll() {
     if (m_testEntities.empty()) {
-        const int count = 250;
+        const int count = 1000;
         for (int i = 0; i < count; ++i) {
             const Entity e = CreateOnLayer(m_testLayer,
                 Components::LocalTransform{ 

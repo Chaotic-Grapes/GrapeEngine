@@ -278,7 +278,7 @@ namespace ECS {
         // ---------------------------------- Rendering ----------------------------------
 
         // 2D sprite renderer (for UI/2D layers)
-        struct SpriteRenderer2D {
+        struct SpriteRenderer2D {   
         public:
             uint32_t TextureId = 0;
             Color Color{1.0f, 1.0f, 1.0f, 1.0f};
@@ -287,7 +287,7 @@ namespace ECS {
             uint32_t _Pad = 0;          // keep 8-byte alignment
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
-
+        
         // Optional: sprite flipping flags for atlases
         struct SpriteFlip2D {
         public:

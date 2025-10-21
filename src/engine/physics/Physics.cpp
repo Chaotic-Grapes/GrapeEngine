@@ -232,23 +232,30 @@ namespace Engine {
         const float distanceSquared = Dot(delta, delta);
         const float radiusSum = radiusA + radiusB;
 
-        if (distanceSquared >= radiusSum * radiusSum || distanceSquared < MIN_DISTANCE_SQUARED) {
+        // quick reject: not intersecting
+        if (distanceSquared >= radiusSum * radiusSum) {
             return result;
         }
 
-        const float distance = std::sqrt(distanceSquared);
-        const Vector2D normal = delta / distance;
-        const float depth = radiusSum - distance;
+        // handle near-zero distance (coincident centers) robustly
+        float distance = std::sqrt(std::max(distanceSquared, 0.0f));
+        Vector2D normal;
+        float depth;
 
-        // Calculate relative velocity
+        if (distance <= std::sqrt(MIN_DISTANCE_SQUARED)) {
+            // Centers are essentially coincident — pick an arbitrary normal to separate
+            normal = Vector2D(1.0f, 0.0f);
+            depth = radiusSum; // full penetration, will be corrected proportionally to inverse mass
+        } else {
+            normal = delta / distance;
+            depth = radiusSum - distance;
+        }
+
+        // Relative velocity along normal
         const Vector2D relativeVelocity = velB.Value - velA.Value;
         const float normalVelocity = Dot(relativeVelocity, normal);
 
-        // Skip if objects are separating
-        if (normalVelocity > 0.0f) {
-            return result;
-        }
-
+        // mark collision (we will always perform positional correction when penetrated)
         result.Collided = true;
         result.Normal = normal;
         result.Depth = depth;
@@ -259,42 +266,51 @@ namespace Engine {
         const float invMassB = GetInverseMass(rbB.Mass);
         const float invMassSum = invMassA + invMassB;
 
+        // If both are static, nothing to do
         if (invMassSum == 0.0f) {
             return result;
         }
 
-        // Apply restitution impulse
-        const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
-        const float j = -(1.0f + restitution) * normalVelocity / invMassSum;
-        const Vector2D impulse = normal * j;
+        // Apply impulse only if bodies are moving toward each other (normalVelocity < 0)
+        if (normalVelocity < 0.0f) {
+            const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
+            const float j = -(1.0f + restitution) * normalVelocity / invMassSum;
+            const Vector2D impulse = normal * j;
 
-        velA.Value -= impulse * invMassA;
-        velB.Value += impulse * invMassB;
+            velA.Value -= impulse * invMassA;
+            velB.Value += impulse * invMassB;
 
-        // Apply friction
-        if (physics.Friction > 0.0f) {
-            const Vector2D newRelativeVelocity = velB.Value - velA.Value;
-            const float newNormalVelocity = Dot(newRelativeVelocity, normal);
-            Vector2D tangent = newRelativeVelocity - normal * newNormalVelocity;
-            const float tangentLengthSquared = Dot(tangent, tangent);
+            // Apply friction
+            if (physics.Friction > 0.0f) {
+                const Vector2D newRelativeVelocity = velB.Value - velA.Value;
+                const float newNormalVelocity = Dot(newRelativeVelocity, normal);
+                Vector2D tangent = newRelativeVelocity - normal * newNormalVelocity;
+                const float tangentLengthSquared = Dot(tangent, tangent);
 
-            if (tangentLengthSquared > MIN_TANGENT_LENGTH_SQUARED) {
-                tangent = tangent / std::sqrt(tangentLengthSquared);
-                const float jt = -Dot(newRelativeVelocity, tangent) / invMassSum;
-                const float frictionImpulse = std::clamp(jt, -j * physics.Friction, j * physics.Friction);
-                const Vector2D frictionVector = tangent * frictionImpulse;
+                if (tangentLengthSquared > MIN_TANGENT_LENGTH_SQUARED) {
+                    tangent = tangent / std::sqrt(tangentLengthSquared);
+                    const float jt = -Dot(newRelativeVelocity, tangent) / invMassSum;
+                    const float frictionImpulse = std::clamp(jt, -j * physics.Friction, j * physics.Friction);
+                    const Vector2D frictionVector = tangent * frictionImpulse;
 
-                velA.Value -= frictionVector * invMassA;
-                velB.Value += frictionVector * invMassB;
+                    velA.Value -= frictionVector * invMassA;
+                    velB.Value += frictionVector * invMassB;
+                }
             }
         }
 
-        // Position correction
-        const Vector2D correction = normal * (depth * physics.PositionCorrectPercent / invMassSum);
-        transformA.Position.X -= correction.X * invMassA;
-        transformA.Position.Y -= correction.Y * invMassA;
-        transformB.Position.X += correction.X * invMassB;
-        transformB.Position.Y += correction.Y * invMassB;
+        // Always apply position correction to separate penetrations (even if separating)
+        {
+            const float percent = physics.PositionCorrectPercent; // e.g. 0.2
+            const float slop = 0.01f; // small tolerance to avoid jitter
+            const float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
+            const Vector2D correction = normal * (correctionMagnitude / invMassSum);
+
+            transformA.Position.X -= correction.X * invMassA;
+            transformA.Position.Y -= correction.Y * invMassA;
+            transformB.Position.X += correction.X * invMassB;
+            transformB.Position.Y += correction.Y * invMassB;
+        }
 
         return result;
     }

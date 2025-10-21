@@ -89,7 +89,7 @@ void DebugUI::Initialize(GLFWwindow* pWin) {
     m_initialized = true;  // Mark that DebugUI has been initialized
 }
 
-void DebugUI::NewFrame() {
+void DebugUI::NewFrame() {  
     // Check
     if (!m_initialized) return;
 
