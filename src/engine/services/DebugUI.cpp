@@ -1,3 +1,42 @@
+/**
+ * @file    DebugUI.cpp
+ * @author  Foo Rui Qin
+ * @date    2025
+ * @brief   Implementation of the debug user interface system for engine development
+ *
+ * This file implements the DebugUI class which provides a comprehensive ImGui-based
+ * debug interface for the game engine. The implementation includes:
+ *
+ * Core Features:
+ * - ImGui initialization and integration with GLFW/OpenGL backends
+ * - Real-time engine status monitoring and performance metrics display
+ * - Interactive game object editor with entity creation, deletion, and cloning
+ * - Input debugging with event tracking and state monitoring
+ * - Audio system monitoring and control interface
+ * - Memory usage and profiling information display
+ *
+ * UI Management:
+ * - Configurable window layouts and positioning
+ * - Font scaling and styling customization
+ * - Cached UI elements for performance optimization
+ * - Toggle-able interface with F1 key support
+ *
+ * ECS Integration:
+ * - Entity creation with basic components (Transform, Sprite, etc.)
+ * - Real-time entity management and modification
+ * - Component inspection and editing capabilities
+ * - World state monitoring and debugging
+ *
+ * Performance Optimizations:
+ * - Cached button labels to avoid string creation every frame
+ * - Efficient UI state management
+ * - Minimal memory allocations during rendering
+ * - Optimized ImGui usage patterns
+ *
+ * The debug UI provides essential tools for engine development, debugging,
+ * and performance analysis, making it easier to develop and optimize games.
+ */
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "services/DebugUI.h"
@@ -19,45 +58,6 @@
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
 #endif
-
-/**
- * @file DebugUI.cpp
- * @author Foo Rui Qin
- * @date 2024
- * @brief Implementation of the debug user interface system for engine development
- * 
- * This file implements the DebugUI class which provides a comprehensive ImGui-based
- * debug interface for the game engine. The implementation includes:
- * 
- * Core Features:
- * - ImGui initialization and integration with GLFW/OpenGL backends
- * - Real-time engine status monitoring and performance metrics display
- * - Interactive game object editor with entity creation, deletion, and cloning
- * - Input debugging with event tracking and state monitoring
- * - Audio system monitoring and control interface
- * - Memory usage and profiling information display
- * 
- * UI Management:
- * - Configurable window layouts and positioning
- * - Font scaling and styling customization
- * - Cached UI elements for performance optimization
- * - Toggle-able interface with F1 key support
- * 
- * ECS Integration:
- * - Entity creation with basic components (Transform, Sprite, etc.)
- * - Real-time entity management and modification
- * - Component inspection and editing capabilities
- * - World state monitoring and debugging
- * 
- * Performance Optimizations:
- * - Cached button labels to avoid string creation every frame
- * - Efficient UI state management
- * - Minimal memory allocations during rendering
- * - Optimized ImGui usage patterns
- * 
- * The debug UI provides essential tools for engine development, debugging,
- * and performance analysis, making it easier to develop and optimize games.
- */
 
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the world
@@ -85,6 +85,7 @@ void DebugUI::Initialize(GLFWwindow* window) {
 
     auto& io = ImGui::GetIO();  // Get input/output config
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Allow keyboard navigation
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable docking
     io.FontGlobalScale = m_config.FontScale;    // Scale the entire UI
 
     ImGui::StyleColorsDark(); // Set dark theme colors
@@ -515,7 +516,6 @@ void DebugUI::_showGameObjectEditor() {
         auto entity = m_world->GetEntityManager().GetEntity(entId); // Ensure entity is valid
 
         // Active status
-        //ImGui::Text("%s", entity.GetName());
         std::stringstream oss;
         oss << "[" << entity.GetId() << "] " << entity.GetName();
         if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(entId))) {
@@ -563,13 +563,6 @@ void DebugUI::_showGameObjectEditor() {
                 }
             }
         }
-        //  if (ImGui::Checkbox(oss.str().c_str(), &entity.IsActive)) {
-        //      Component::ShapeRenderer2D* renderer = entity.GetComponent<Component::ShapeRenderer2D>();
-        //      if (renderer) {
-        //          // Hide by setting alpha to 0, show by setting alpha to 1
-        //          renderer->FillColor.A = entity.IsActive ? 255 : 0;
-        //      }
-        //  }
     }
     ImGui::Separator();
 
