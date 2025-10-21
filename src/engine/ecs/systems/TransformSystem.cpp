@@ -18,99 +18,56 @@ and WorldTransform components, taking parent-child relationships into account.
 
 namespace ECS {
     void TransformSystem::Update(World& world, float dt) {
-        (void)dt; // Unused parameter
-        
-        // Strategy: Process all entities with WorldTransform.
-        // For entities without a Parent component (root entities), compute world transform from local.
-        // For entities with a Parent component, compute world transform as parent * local.
-        // Since we iterate in arbitrary order, we may process children before parents.
-        // Solution: Mark WorldTransform as dirty initially, then iterate until all are clean.
-        
-        // First pass: Mark all as dirty and update root entities
+        (void)dt;
+
+        // Depth-first propagation from roots to leaves in one pass.
+        // This avoids repeated passes and reduces lookups on parents.
+
+        // Helper DFS to propagate transforms down the hierarchy
+        auto propagate = [&](auto&& self, Entity parent, const Matrix4x4& parentMatrix) -> void {
+            world.ForChildren(parent, [&](Entity child) {
+                if (!world.IsAlive(child))
+                    return;
+                
+                    if (!world.Has<Components::LocalTransform>(child) || !world.Has<Components::WorldTransform>(child)) {
+                    // Still traverse deeper even if this child doesn't have both components
+                    self(self, child, parentMatrix);
+                    return;
+                }
+
+                const auto& lt = world.Get<Components::LocalTransform>(child);
+                auto& wt = world.Get<Components::WorldTransform>(child);
+                const Matrix4x4 localM = TransformUtils::MakeTRS(lt.Position, lt.Rotation, lt.Scale);
+                wt.Matrix = parentMatrix * localM;
+                wt.Dirty = false;
+
+                self(self, child, wt.Matrix);
+            });
+        };
+
+        // 1) Initialize roots (no Parent or invalid Parent) and propagate
         world.Each<Components::LocalTransform, Components::WorldTransform>(
-            [&](Entity entity, const Components::LocalTransform& localTransform, Components::WorldTransform& worldTransform) {
-                // Check if this entity has a parent
-                if (!world.Has<Parent>(entity)) {
-                    // Root entity - no parent, so world transform = local transform
-                    worldTransform.Matrix = TransformUtils::MakeTRS(
-                        localTransform.Position,
-                        localTransform.Rotation,
-                        localTransform.Scale
-                    );
-                    worldTransform.Dirty = false;
-                } else {
-                    // Has a parent - mark as dirty for next pass
-                    worldTransform.Dirty = true;
+            [&](Entity e, const Components::LocalTransform& lt, Components::WorldTransform& wt) {
+                bool isRoot = true;
+                if (world.Has<Parent>(e)) {
+                    const auto& p = world.Get<Parent>(e);
+                    // Orphan or parent missing required data -> treat as root
+                    if (world.IsAlive(p.ParentEntity) && world.Has<Components::WorldTransform>(p.ParentEntity)) {
+                        isRoot = false;
+                    }
+                }
+
+                if (isRoot) {
+                    wt.Matrix = TransformUtils::MakeTRS(lt.Position, lt.Rotation, lt.Scale);
+                    wt.Dirty = false;
+                    propagate(propagate, e, wt.Matrix);
+                }
+                else {
+                    // Non-root nodes will be handled during parent propagation
+                    wt.Dirty = true;
                 }
             }
         );
-        
-        // Second pass: Iteratively update children until all are clean
-        // This handles hierarchies of any depth
-        const int MAX_ITERATIONS = 100; // Safety limit to prevent infinite loops
-        int iteration = 0;
-        bool anyDirty = true;
-        
-        while (anyDirty && iteration < MAX_ITERATIONS) {
-            anyDirty = false;
-            
-            world.Each<Components::LocalTransform, Components::WorldTransform, Parent>(
-                [&](Entity entity, const Components::LocalTransform& localTransform, 
-                    Components::WorldTransform& worldTransform, const Parent& parent) {
-                    
-                    if (!worldTransform.Dirty) {
-                        return; // Already updated
-                    }
-                    
-                    // Check if parent is alive and has WorldTransform
-                    if (!world.IsAlive(parent.ParentEntity)) {
-                        // Parent is dead, treat as root entity
-                        worldTransform.Matrix = TransformUtils::MakeTRS(
-                            localTransform.Position,
-                            localTransform.Rotation,
-                            localTransform.Scale
-                        );
-                        worldTransform.Dirty = false;
-                        return;
-                    }
-                    
-                    if (!world.Has<Components::WorldTransform>(parent.ParentEntity)) {
-                        // Parent doesn't have WorldTransform, treat as root
-                        worldTransform.Matrix = TransformUtils::MakeTRS(
-                            localTransform.Position,
-                            localTransform.Rotation,
-                            localTransform.Scale
-                        );
-                        worldTransform.Dirty = false;
-                        return;
-                    }
-                    
-                    const auto& parentWorldTransform = world.Get<Components::WorldTransform>(parent.ParentEntity);
-                    
-                    if (parentWorldTransform.Dirty) {
-                        // Parent not yet updated, skip this entity for now
-                        anyDirty = true;
-                        return;
-                    }
-                    
-                    // Parent is clean, we can update this entity
-                    Matrix4x4 localMatrix = TransformUtils::MakeTRS(
-                        localTransform.Position,
-                        localTransform.Rotation,
-                        localTransform.Scale
-                    );
-                    
-                    worldTransform.Matrix = parentWorldTransform.Matrix * localMatrix;
-                    worldTransform.Dirty = false;
-                }
-            );
-            
-            iteration++;
-        }
-        
-        if (iteration >= MAX_ITERATIONS) {
-            LOG_ERROR("TransformSystem: Maximum iteration limit reached. Possible circular parent-child relationship.");
-        }
     }
     
     void TransformSystem::UpdateEntityRecursive(World& world, Entity entity, const Matrix4x4& parentMatrix) {

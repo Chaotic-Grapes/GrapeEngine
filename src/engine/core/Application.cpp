@@ -101,6 +101,7 @@ namespace Engine {
 
         // Clean up services
         delete m_audio;
+        delete m_overlay;
 
         WindowManager::DestroyAll();
     }

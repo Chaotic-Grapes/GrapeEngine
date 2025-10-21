@@ -242,13 +242,10 @@ namespace ECS {
             // Precompute TypeIds into an array for this invocation
             const std::array<TypeId, sizeof...(Ts)> typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
 
-            for (auto& kv : m_archetypes) {
-                auto& archPtr = kv.second;
-
-                if (!archPtr || !archPtr->GetSignature().ContainsAll(req))
-                    continue;
-
-                Archetype* arch = archPtr.get();
+            // Use cached matching archetypes to avoid re-scanning all archetypes
+            const auto& matched = _getMatchingArchetypes(req);
+            for (Archetype* arch : matched) {
+                if (!arch) continue;
 
                 // Precompute component indices for this archetype to avoid map lookups per entity
                 std::array<uint32_t, sizeof...(Ts)> compIdxs{};
@@ -305,13 +302,10 @@ namespace ECS {
             // Precompute TypeIds
             const std::array<TypeId, sizeof...(Ts)> typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
 
-            for (const auto& kv : m_archetypes) {
-                const auto& archPtr = kv.second;
-
-                if (!archPtr || !archPtr->GetSignature().ContainsAll(req))
-                    continue;
-
-                const Archetype* arch = archPtr.get();
+            // Use cached matching archetypes to avoid re-scanning all archetypes
+            const auto& matched = _getMatchingArchetypes(req);
+            for (const Archetype* arch : matched) {
+                if (!arch) continue;
 
                 // Precompute component indices for this archetype
                 std::array<uint32_t, sizeof...(Ts)> compIdxs{};
@@ -592,6 +586,10 @@ namespace ECS {
             m_archetypes.emplace(sig, std::move(arch));
             m_chunkIndices[ptr] = ChunkIndex{};
 
+            // Invalidate query cache when a new archetype is created
+            ++m_archetypeVersion;
+            m_queryCache.clear();
+
             return ptr;
         }
 
@@ -864,6 +862,23 @@ namespace ECS {
             m_hierarchy.NextSibling.erase(e);
         }
 
+        // Returns cached list of archetypes that contain all components in 'req'.
+        // Cached data is invalidated whenever new archetypes are created.
+        const std::vector<Archetype*>& _getMatchingArchetypes(const Signature& req) const {
+            auto it = m_queryCache.find(req);
+            if (it != m_queryCache.end()) return it->second;
+
+            auto& vec = m_queryCache[req];
+            vec.reserve(m_archetypes.size());
+            for (const auto& kv : m_archetypes) {
+                const auto& archPtr = kv.second;
+                if (archPtr && archPtr->GetSignature().ContainsAll(req)) {
+                    vec.push_back(archPtr.get());
+                }
+            }
+            return m_queryCache.at(req);
+        }
+
     private:
         uint32_t m_chunkCapacity = 256;
         size_t m_chunkBytes = 16384; // 16 * 1024;
@@ -877,6 +892,11 @@ namespace ECS {
         std::unordered_map<TypeId, std::pair<size_t,size_t>> m_componentSizes;
 
         HierarchyIndex m_hierarchy;
+
+        // Query cache: maps a required signature to matching archetypes.
+        // Mutable to allow filling cache in const Each.
+        mutable std::unordered_map<Signature, std::vector<Archetype*>, SignatureHash> m_queryCache;
+        uint64_t m_archetypeVersion = 0;
 
         using DeferredCmd = std::function<void(World&)>;
         std::vector<DeferredCmd> m_deferred;
