@@ -1,57 +1,39 @@
 #include "ecs/systems/PhysicsSystem.h"
 #include "services/Time.h"
-#include <iostream>
 #include "physics/Collision.h"
-#include "ecs/Entity.h"
-#include "physics/DynamicCollision.h"
+#include "physics/Physics.h"
+#include "ecs/Components.h"
+#include <unordered_map>
+#include <vector>
+#include <cmath>
+#include <algorithm>
+#include <helpers/MathUtils.h>
 
-namespace Engine {
-    Vector2D PhysicsSystem::m_gravity = Vector2D(0.0f, -9.81f);
-    bool PhysicsSystem::m_enabled = true;
+// --- Simple 2D grid-based spatial partitioning for broad-phase collision ---
+class SpatialPartitioning {
+public:
+    // Cell size determines granularity; tweak as needed
+    // Should be large enough to cover typical entity sizes and their velocities
+    static constexpr float CELL_SIZE = 200.0f;
 
-    void PhysicsSystem::OnCreate() {
-        std::cout << "PhysicsSystem Initialized" << '\n';
+    // Insert an entity into the grid
+    void Insert(const ECS::Entity entity, const Vector3D& position, float radius) {
+        const auto cell = _getCell(position);
+        m_grid[cell].push_back(entity);
     }
 
-    void PhysicsSystem::OnUpdate() {
-        if (!m_enabled) return;
+    // Query for entities near a position (returns possible collision candidates)
+    std::vector<ECS::Entity> Query(const Vector3D& position, float radius) const {
+        std::vector<ECS::Entity> result;
+        const auto baseCell = _getCell(position);
 
-        // Query once
-        const auto entities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform>();
-        const auto colliderEntities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform, Component::Collider2D>();
-        const auto lines = m_world->GetEntityManager().Query<Component::LineRenderer>();
-
-        for (auto& [rb, transform] : entities) {
-            // There's STATIC, KINEMATIC, and DYNAMIC body types
-            // Skip static bodies
-            if (rb.BodyType == Component::Rigidbody2D::Static)
-                continue;
-
-            Vector2D intendedPos = transform.Position + rb.LinearVelocity * Time::FixedDeltaTime();
-
-            // Apply gravity and drag
-            Vector2D acceleration(0.f, 0.f);
-            acceleration += m_gravity * rb.GravityScale;
-            acceleration += Vector2D(-rb.LinearVelocity.X * rb.LinearDamping, -rb.LinearVelocity.Y * rb.LinearDamping) / rb.Mass;
-
-            // TODO: Add a PolygonCollider2D for line segments and complex shapes
-			// DO NOT ADD "LineCollider2D" as it is basically PolygonCollider2D with 2 points
-			// Using "LineRenderer" component for boundary lines for now
-            // Collision: Circle vs boundary lines
-            for (auto& [crb, ctransform, collider] : colliderEntities) {
-                if (const auto* circle = dynamic_cast<Component::CircleCollider2D*>(&collider)) {
-                    for (auto& [lineEntity] : lines) {
-                        Collision::LineSegment seg = Collision::MakeSegment(lineEntity.Start, lineEntity.End);
-                        Vector2D contact, normal;
-                        float tHit;
-
-                        Collision::Circle c{ ctransform.Position, circle->Radius };
-                        if (Collision::CircleVsSegmentSweep(c, intendedPos, seg, contact, normal, tHit)) {
-                            Vector2D reflectedDir;
-                            Collision::CircleSegmentResponse(contact, normal, intendedPos, reflectedDir);
-                            crb.LinearVelocity = reflectedDir * crb.LinearVelocity.Length(); // preserve speed along new direction
-                        }
-                    }
+        // Check neighboring cells (including the cell itself)
+        for (int dx = -1; dx <= 1; ++dx) {
+            for (int dy = -1; dy <= 1; ++dy) {
+                CellCoord cell{ baseCell.x + dx, baseCell.y + dy };
+                auto it = m_grid.find(cell);
+                if (it != m_grid.end()) {
+                    result.insert(result.end(), it->second.begin(), it->second.end());
                 }
             }
 
@@ -118,17 +100,160 @@ namespace Engine {
             if (!rb.FreezeRotation)
                 transform.Rotation += rb.AngularVelocity * Time::FixedDeltaTime();
         }
-    }     
-    
 
-    // Static force/impulse
-    void PhysicsSystem::AddForce(Component::Rigidbody2D& rb, const Vector2D& force) {
-        if (rb.Mass > 0)
-            rb.LinearVelocity += force / rb.Mass;
+        return result;
     }
 
-    void PhysicsSystem::AddImpulse(Component::Rigidbody2D& rb, const Vector2D& impulse) {
-        if (rb.Mass > 0)
-            rb.LinearVelocity += impulse / rb.Mass;
+private:
+    // Simple struct for grid cell coordinates
+    struct CellCoord {
+        int x, y;
+        
+        bool operator==(const CellCoord& other) const {
+            return x == other.x && y == other.y;
+        }
+    };
+    
+    // Hash functor for CellCoord
+    struct CellHash {
+        size_t operator()(const CellCoord& cell) const noexcept {
+            // Combine hash values using bit shifting
+            return std::hash<int>{}(cell.x) ^ (std::hash<int>{}(cell.y) << 1);
+        }
+    };
+
+    // Map from cell coordinates to entities
+    std::unordered_map<CellCoord, std::vector<ECS::Entity>, CellHash> m_grid;
+
+    // Convert world position to grid cell
+    CellCoord _getCell(const Vector3D& position) const {
+        int x = static_cast<int>(std::floor(position.X / CELL_SIZE));
+        int y = static_cast<int>(std::floor(position.Y / CELL_SIZE));
+
+        return CellCoord{ x, y };
+    }
+};
+
+namespace ECS {
+    void PhysicsSystem::Update(World& world, const float dt) {
+        if (!Engine::Physics::IsEnabled()) return;
+
+        // Broad-phase spatial partitioning (e.g., quadtree or grid)
+        // This will optimize collision checks by reducing the number of pairs to test
+        SpatialPartitioning partitioning;
+        world.Each<Components::LocalTransform, Components::CircleCollider2D>(
+            [&](const Entity entity, const Components::LocalTransform& transform, const Components::CircleCollider2D& collider) {
+                // Skip if entity has Active component and is disabled
+                if (world.Has<Components::Active>(entity)) {
+                    const auto& active = world.Get<Components::Active>(entity);
+                    if (!active.Enabled) return;
+                }
+                
+                // Use collider center for partitioning
+                const Vector3D colliderCenter = transform.Position + Vector3D(collider.Offset.X, collider.Offset.Y, 0.0f);
+                partitioning.Insert(entity, colliderCenter, collider.Radius);
+            });
+
+        // Iterate over all entities with Rigidbody2D, LinearVelocity2D, AngularVelocity2D, and LocalTransform
+        world.Each<Components::Rigidbody2D, Components::LinearVelocity2D, Components::AngularVelocity2D, Components::LocalTransform>(
+            [&](const Entity entity, const Components::Rigidbody2D& rb, Components::LinearVelocity2D& linearVel, const Components::AngularVelocity2D& angularVel, Components::LocalTransform& transform) {
+                // Skip if entity has Active component and is disabled
+                if (world.Has<Components::Active>(entity)) {
+                    const auto& active = world.Get<Components::Active>(entity);
+                    if (!active.Enabled) return;
+                }
+                
+                if (rb.Mass <= 0.0f) return; // Skip static bodies
+
+                // Apply forces and gravity
+                Vector2D acceleration = Engine::Physics::CalculateAcceleration(rb, linearVel);
+                if (rb.Flags & (1 << 1)) { // UseGravity is bit 1
+                    acceleration += Engine::Physics::GetGravity() * rb.GravityScale;
+                }
+                linearVel.Value += acceleration * dt;
+
+                // Calculate intended position
+                const Vector2D intendedPos = Vector2D(transform.Position.X, transform.Position.Y) + linearVel.Value * dt;
+
+                // Update position and rotation BEFORE collision detection
+                transform.Position.X = intendedPos.X;
+                transform.Position.Y = intendedPos.Y;
+                if (!(rb.Flags & (1 << 2))) { // FixedRotation is bit 2
+                    transform.Rotation = Quaternion::FromEulerRad(0.0f, 0.0f, angularVel.Value * dt) * transform.Rotation;
+                }
+
+                // Apply world boundary constraints if enabled
+                if (Engine::Physics::IsWorldBoundsEnabled() && world.Has<Components::CircleCollider2D>(entity)) {
+                    const auto& collider = world.Get<Components::CircleCollider2D>(entity);
+                    Vector2D pos2D(transform.Position.X, transform.Position.Y);
+                    Vector2D vel2D = linearVel.Value;
+                    
+                    // Get entity's restitution from PhysicsMaterial2D if it has one
+                    float entityRestitution = -1.0f;  // -1 means use default bounds restitution
+                    if (world.Has<Components::PhysicsMaterial2D>(entity)) {
+                        entityRestitution = world.Get<Components::PhysicsMaterial2D>(entity).Restitution;
+                    }
+                    
+                    if (Engine::Physics::ApplyBoundaryConstraint(pos2D, vel2D, collider.Radius, Engine::Physics::GetWorldBounds(), entityRestitution)) {
+                        transform.Position.X = pos2D.X;
+                        transform.Position.Y = pos2D.Y;
+                        linearVel.Value = vel2D;
+                    }
+                }
+
+                // Process collision if entity has a CircleCollider2D
+                if (world.Has<Components::CircleCollider2D>(entity)) {
+                    // Collider center for broad-phase
+                    const auto& collider = world.Get<Components::CircleCollider2D>(entity);
+                    const Vector3D colliderCenter = transform.Position + Vector3D(collider.Offset.X, collider.Offset.Y, 0.0f);
+
+                    const auto potentialCollisions = partitioning.Query(colliderCenter, collider.Radius);
+
+                    // Narrow-phase collision resolution
+                    for (const auto& otherEntity : potentialCollisions) {
+                        if (entity == otherEntity) continue;
+
+                        if (!world.Has<Components::LocalTransform>(otherEntity) || 
+                            !world.Has<Components::CircleCollider2D>(otherEntity)) continue;
+
+                        // Skip if other entity doesn't have rigidbody or velocity components
+                        if (!world.Has<Components::Rigidbody2D>(otherEntity) ||
+                            !world.Has<Components::LinearVelocity2D>(otherEntity)) continue;
+
+                        auto& otherTransform = world.Get<Components::LocalTransform>(otherEntity);
+                        const auto& otherCollider = world.Get<Components::CircleCollider2D>(otherEntity);
+                        const auto& otherRb = world.Get<Components::Rigidbody2D>(otherEntity);
+                        auto& otherVel = world.Get<Components::LinearVelocity2D>(otherEntity);
+
+                        // Get physics materials from both entities and combine them
+                        Components::PhysicsMaterial2D physicsMat1{0.2f, 0.5f, 0.2f};
+                        Components::PhysicsMaterial2D physicsMat2{0.2f, 0.5f, 0.2f};
+                        
+                        if (world.Has<Components::PhysicsMaterial2D>(entity)) {
+                            physicsMat1 = world.Get<Components::PhysicsMaterial2D>(entity);
+                        }
+                        if (world.Has<Components::PhysicsMaterial2D>(otherEntity)) {
+                            physicsMat2 = world.Get<Components::PhysicsMaterial2D>(otherEntity);
+                        }
+                        
+                        // Combine physics materials: average friction, max restitution, average position correction
+                        Components::PhysicsMaterial2D physicsMat{
+                            (physicsMat1.Friction + physicsMat2.Friction) * 0.5f,
+                            std::max(physicsMat1.Restitution, physicsMat2.Restitution),
+                            (physicsMat1.PositionCorrectPercent + physicsMat2.PositionCorrectPercent) * 0.5f
+                        };
+
+                        // Resolve circle-circle collision with offsets
+                        Engine::Physics::ResolveCircleCircleCollision(
+                            rb, otherRb,
+                            linearVel, otherVel,
+                            transform, otherTransform,
+                            collider.Radius, otherCollider.Radius,
+                            collider.Offset, otherCollider.Offset,
+                            physicsMat
+                        );
+                    }
+                }
+            });
     }
 }

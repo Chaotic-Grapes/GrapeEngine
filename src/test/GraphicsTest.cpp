@@ -21,36 +21,85 @@ Features:
 /* End Header *******************************************************************/
 
 #include "GraphicsTest.hpp"
-#include "services/Input.h"
+#include "core/Application.h"
 #include "ecs/Components.h"
+#include "ecs/systems/RendererSystem.h"
+#include "graphics/font.hpp"
+#include "graphics/renderer.hpp"
+#include "helpers/EntityUtils.h"
+#include "helpers/MathUtils.h"
+#include "services/Input.h"
+#include "services/Time.h"
 #include "services/Window.h"
 #include "services/WindowManager.h"
 #include <glm/glm.hpp>
 #include <iostream>
-#include "services/Time.h"
-#include "graphics/font.hpp"
-#include "graphics/renderer.hpp"
-#include "ecs/systems/RendererSystem.h"
+#include "core/Logger.h"
+#include "graphics/SpriteMetaData.hpp"
+#include "services/ResourceManager.h"
+
 
 using namespace Sandbox;
-using Component::LineRenderer;
-using Component::ShapeRenderer2D;
-using Component::SpriteRenderer;
-using Component::Transform;
+using namespace ECS;
 
-GraphicsTestScene::GraphicsTestScene(int width, int height) : Scene("GraphicsTestScene") {
-    CREATE_WINDOW("Graphics Test", width, height);
-    m_worldWidth  = static_cast<float>(width);
-    m_worldHeight = static_cast<float>(height);
-    m_currentTest = TestType::BasicGraphics;
+extern ResourceManager RM;
+
+namespace {
+    SpriteMetadata* _getMetaDataForTexture(const std::string& texturePath) {
+        // TODO: Maybe shift this somewhere
+        auto p = std::filesystem::path(texturePath);
+        auto filename = p.stem().string() + ".json";
+
+        auto parent = p.parent_path().parent_path(); // "assets/textures"
+        auto metadataPath = parent / "test-metadata" / filename;
+
+        std::ifstream in(metadataPath);
+        SpriteMetadata* meta = nullptr;
+        if (in) {
+            nlohmann::json j;
+            in >> j;
+
+            auto key = p.filename().string(); // for example, "fishBoy.png"
+            if (j.contains(key)) {
+                static std::unordered_map<std::string, SpriteMetadata> cache;
+                cache[key] = loadSingleSpriteMetadata(j[key], 0, 0);
+                meta = &cache[key];
+            }
+            else {
+                LOG_ERROR("Metadata file " << metadataPath << " missing entry for " << key);
+            }
+        }
+        else {
+            LOG_ERROR("Could not open metadata file: " << metadataPath);
+        }
+
+        return meta;
+    }
 }
 
 void GraphicsTestScene::OnLoad() {
-    std::cout << "\nGraphicsTestScene initialized" << '\n';
+    const auto& config = Engine::CORE->GetConfig();
+    const int windowWidth = config.WindowConfig.Width;
+    const int windowHeight = config.WindowConfig.Height;
+
+    CREATE_WINDOW("Graphics Test", windowWidth, windowHeight);
+    m_worldWidth  = static_cast<float>(windowWidth);
+    m_worldHeight = static_cast<float>(windowHeight);
+    m_currentTest = TestType::BasicGraphics;
+
+    m_gameplayLayer = GetLayers().CreateOrGetLayer("gameplay");
+
+    m_rendererSystem = std::make_shared<ECS::RendererSystem>();
+    m_rendererSystem->Initialize();
+    AddSystem([this](Scenes::Scene& s, const float dt){
+        m_rendererSystem->Update(s.GetWorld(), dt);
+    }, "Renderer System");
+
+    LOG_INFO("GraphicsTestScene initialized");
 }
 
 void GraphicsTestScene::OnUpdate() {
-    World& world = GetWorld();
+    const ECS::World& world = GetWorld();
 
     // Cycle through test types with G
     if (Input::IsKeyDown(KEY_G)) {
@@ -63,14 +112,15 @@ void GraphicsTestScene::OnUpdate() {
             }
 
             // cleanup old test entities
-            for (EntityId id : m_TestEntities) {
-                Entity e(id, &world);
-                world.GetEntityManager().DestroyEntity(e);
+            for (const uint64_t id : m_testEntities) {
+                const ECS::Entity e = EntityUtils::Unpack(id);
+                if (world.IsAlive(e))
+                    DestroyEntity(e);
             }
-            m_TestEntities.clear();
+            m_testEntities.clear();
 
             m_currentTest = static_cast<TestType>(current);
-            std::cout << "Switched to test " << current << '\n';
+            LOG_INFO("Switched to test " << current);
 
             m_gHandled = true; // mark handled until key released
         }
@@ -101,20 +151,19 @@ void GraphicsTestScene::OnUpdate() {
     case TestType::SmallBatchTest:    testSmallBatch();     break;
     }
 
-    if (auto* r2d = world.GetSystem<Engine::RendererSystem>()) {
+    if (m_rendererSystem) {
         static double lastTime = Time::ElapsedTime();
         static int frameCount = 0;
 
         frameCount++;
-        double now = Time::ElapsedTime();
+        const double now = Time::ElapsedTime();
 
         if (now - lastTime >= 1.0) {
-            double elapsed = now - lastTime;
-            double fps = frameCount / elapsed;
+            const double elapsed = now - lastTime;
+            const double fps = frameCount / elapsed;
 
-            std::cout << "FPS: " << fps
-                << " | Flushes: " << r2d->GetFlushCount()
-                << '\n';
+            LOG_DEBUG("FPS: " << fps
+                << " | Flushes: " << m_rendererSystem->GetFlushCount());
 
             frameCount = 0;
             lastTime = now; // reset baseline
@@ -123,7 +172,7 @@ void GraphicsTestScene::OnUpdate() {
 }
 
 void GraphicsTestScene::OnUnload() {
-    std::cout << "GraphicsTestScene shutting down" << '\n';
+    LOG_INFO("GraphicsTestScene shutting down");
     m_batchSprites.clear();
 }
 
@@ -131,62 +180,88 @@ void GraphicsTestScene::OnUnload() {
 // Stub functions (to be implemented later)
 // ------------------------------------
 void GraphicsTestScene::runBasicGraphics() { 
-    if (m_TestEntities.empty()) {
-        Entity square = CreateEntity();
-        auto& tr = square.Transform();
-        tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
-        tr.Scale = { 100.0f, 100.0f };
+    if (m_testEntities.empty()) {
+        const ECS::Entity square = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{1.f,1.f,1.f} },
+            ECS::Components::WorldTransform{ },
+            ECS::Components::ShapeBox2D{
+                Vector2D{50.f, 50.f}, // half extents
+                Vector2D{0.f, 0.f},   // offset
+                Color{1.f, 0.f, 0.f, 1.f}, // color
+                0.f,                  // thickness
+                true                  // filled
+            },
+            ECS::Components::Name{ "BasicGraphics_Square" }
+        );
 
-        auto& sr = square.AddComponent<ShapeRenderer2D>();
-        sr.Type = ShapeRenderer2D::ShapeType::Rectangle;
-        sr.FillColor = { 1.0f, 0.0f, 0.0f, 1.0f };
-        sr.OutlineThickness = 0.f;
-        sr.OutlineColor = { 0.f, 0.f, 0.f, 0.f };
-
-        m_TestEntities.push_back(square.GetId());
-        std::cout << "Spawned BasicGraphics entity\n";
+        m_testEntities.push_back(EntityUtils::Pack(square));
+        LOG_DEBUG("Spawned BasicGraphics entity");
     }
 }
 
 void GraphicsTestScene::runDebugDrawing() {
-    if (m_TestEntities.empty()) {
-        Entity sprite = CreateEntity();
-        auto& tr = sprite.Transform();
-        tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
+    if (m_testEntities.empty()) {
+        ECS::World& world = GetWorld();
+        const std::string spritePath = "assets/textures/test/player.png";
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
-        sr.Color = { 1.f, 1.f, 1.f, 1.f };
+        const auto tex = RM.Get<Texture>(spritePath);
+        uint32_t texId = tex ? tex->ID() : 0;
 
-        tr.Scale = {
-            static_cast<float>(sr.Width),
-            static_cast<float>(sr.Height)
+        const ECS::Entity sprite = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{128.f,128.f,1} },
+            ECS::Components::WorldTransform{ },
+            ECS::Components::SpriteRenderer2D{
+                tex ? tex->ID() : 0,
+                Color{1.f,1.f,1.f,1.f},
+                Vector2D{1.f,1.f},
+                Vector2D{0.f,0.f}
+            },
+            ECS::Components::Name{ "DebugDrawing_Sprite" }
+        );
+
+        auto tr = world.Get<ECS::Components::LocalTransform>(sprite);
+        tr.Scale = Vector3D {
+            static_cast<float>(tex->Width()),
+            static_cast<float>(tex->Height()),
+            1.f
         };
 
-        m_TestEntities.push_back(sprite.GetId());
+        m_testEntities.push_back(EntityUtils::Pack(sprite));
 
-        if (sr.Meta && sr.Meta->collider.type == ColliderType::AABB) {
-            Entity debug = CreateEntity();
-            auto& dbgTr = debug.Transform();
+        auto* meta = _getMetaDataForTexture(spritePath);
 
-            dbgTr.Position = {
-                tr.Position.X + sr.Meta->collider.offset.x - sr.Width * 0.5f + sr.Meta->collider.size.x * 0.5f,
-                tr.Position.Y + sr.Meta->collider.offset.y - sr.Height * 0.5f + sr.Meta->collider.size.y * 0.5f
-            };
-            dbgTr.Scale = {
-                static_cast<float>(sr.Meta->collider.size.x),
-                static_cast<float>(sr.Meta->collider.size.y)
-            };
+        const ECS::Entity debug = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{ 
+                Vector3D{
+                    tr.Position.X + meta->collider.offset.x - tr.Scale.X * 0.5f + meta->collider.size.x * 0.5f,
+                    tr.Position.Y + meta->collider.offset.y - tr.Scale.Y * 0.5f + meta->collider.size.y * 0.5f,
+                    0
+                },
+                Quaternion{0,0,0,1},
+                Vector3D{
+                    static_cast<float>(meta->collider.size.x),
+                    static_cast<float>(meta->collider.size.y),
+                    1.f
+                }
+            },
+            ECS::Components::WorldTransform{ },
+            ECS::Components::ShapeBox2D{
+                Vector2D{ static_cast<float>(meta->collider.size.x) * 0.5f, static_cast<float>(meta->collider.size.y) * 0.5f }, // half extents
+                Vector2D{0.f, 0.f},   // offset
+                Color{0.f, 1.f, 0.f, 1.f}, // color
+                2.f,                  // thickness
+                false                 // filled
+            },
+            ECS::Components::Name{ "DebugDrawing_SpriteCollider" }
+        );
 
-            auto& shape = debug.AddComponent<ShapeRenderer2D>();
-            shape.Type = ShapeRenderer2D::ShapeType::Rectangle;
-            shape.FillColor = { 0.f, 0.f, 0.f, 0.f };
-            shape.OutlineColor = { 0.f, 1.f, 0.f, 1.f };
-            shape.OutlineThickness = 2.f;
+        world.Attach(debug, sprite);
+        m_testEntities.push_back(EntityUtils::Pack(debug));
 
-            m_TestEntities.push_back(debug.GetId());
-        }
-
-        std::cout << "Spawned DebugDrawing entities\n";
+        LOG_DEBUG("Spawned DebugDrawing entities");
     }
 }
 
@@ -223,75 +298,144 @@ void GraphicsTestScene::runDebugDrawing() {
 */
 //------------------------------------------------------------------------------
 void GraphicsTestScene::runBasicSprites() {
-    if (m_TestEntities.empty()) {
-        Entity sprite1 = CreateEntity();
-        auto& tr1 = sprite1.Transform();
-        tr1.Position = { m_worldWidth * 0.4f, m_worldHeight * 0.5f };
-        tr1.Scale = { 256.f, 256.f };
 
-        auto& sr1 = sprite1.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
-        sr1.Color = { 1.f, 1.f, 1.f, 1.f };
+    if (!m_testEntities.empty()) return;
 
-        m_TestEntities.push_back(sprite1.GetId());
+    const std::string playerSpritePath = "assets/textures/test/player.png";
+    const std::string fishBoySpritePath = "assets/textures/test/fishBoy.png";
 
-        Entity sprite2 = CreateEntity();
-        auto& tr2 = sprite2.Transform();
-        tr2.Position = { m_worldWidth * 0.6f, m_worldHeight * 0.5f };
-        tr2.Scale = { 512.f, 512.f };
+    auto playerTexture = RM.Get<Texture>(playerSpritePath);
+    uint32_t playerTexId = playerTexture ? playerTexture->ID() : 0;
 
-        auto& sr2 = sprite2.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
-        sr2.Color = { 1.f, 1.f, 1.f, 1.f };
+    auto fishBoyTexture = RM.Get<Texture>(fishBoySpritePath);
+    uint32_t fishBoyTexId = fishBoyTexture ? fishBoyTexture->ID() : 0;
 
-        m_TestEntities.push_back(sprite2.GetId());
+    //auto* playerMeta = _getMetaDataForTexture(playerSpritePath);
+    //auto* fishBoyMeta = _getMetaDataForTexture(fishBoySpritePath);
+    
+    ECS::Entity sprite1 = CreateOnLayer(
+        m_gameplayLayer,
+        ECS::Components::LocalTransform{
+            Vector3D{
+                m_worldWidth * 0.4f,
+                m_worldHeight * 0.5f,
+                0
+            },
+            Quaternion{0, 0, 0, 1},
+            Vector3D{
+                256.f,
+                256.f,
+                1.f
+            }
+        },
+        ECS::Components::WorldTransform{},
+        ECS::Components::ShapeBox2D{
+            Vector2D{128.f, 128.f}, // half extents
+            Vector2D{0.f, 0.f},     // offset
+            Color{1.f, 1.f, 1.f, 1.f}, // color
+            2.f,                    // thickness
+            false                   // filled
+        },
+        ECS::Components::Name{"PlayerSprite"},
+        ECS::Components::SpriteRenderer2D{
+            playerTexId,
+            Color{1.f,1.f,1.f,1.f},
+            Vector2D{1.f,1.f},
+            Vector2D{0.f,0.f}
+        }
+    );
 
-        std::cout << "Spawned BasicSprites entities\n";
-    }
+    m_testEntities.push_back(EntityUtils::Pack(sprite1));
+
+    ECS::Entity sprite2 = CreateOnLayer(
+        m_gameplayLayer,
+        ECS::Components::LocalTransform{
+            Vector3D{
+                m_worldWidth * 0.6f,
+                m_worldHeight * 0.5f,
+                0
+            },
+            Quaternion{0, 0, 0, 1},
+            Vector3D{
+                256.f,
+                256.f,
+                1.f
+            }
+        },
+        ECS::Components::WorldTransform{},
+        ECS::Components::ShapeBox2D{
+            Vector2D{128.f, 128.f}, // half extents
+            Vector2D{0.f, 0.f},     // offset
+            Color{1.f, 1.f, 1.f, 1.f}, // color
+            2.f,                    // thickness
+            false                   // filled
+        },
+        ECS::Components::Name{"FishBoySprite"},
+        ECS::Components::SpriteRenderer2D{
+            fishBoyTexId,
+            Color{1.f,1.f,1.f,1.f},
+            Vector2D{1.f,1.f},
+            Vector2D{0.f,0.f}
+        }
+    );
+
+    m_testEntities.push_back(EntityUtils::Pack(sprite2));
+
+    LOG_DEBUG("Spawned BasicSprites entities");
 }
 
 void GraphicsTestScene::runBackground() {
-    if (m_TestEntities.empty()) {
-        // Create an entity for the background
-        Entity bg = CreateEntity();
-        auto& tr = bg.Transform();
+    if (!m_testEntities.empty()) return;
+    
+    ECS::Entity bg = CreateOnLayer(
+        m_gameplayLayer,
+        ECS::Components::LocalTransform{
+            Vector3D{m_worldWidth * 0.5f, m_worldHeight * 0.5f, 0},
+            Quaternion{0,0,0,1},
+            Vector3D{m_worldWidth, m_worldHeight, 1.f}
+        },
+        ECS::Components::WorldTransform{},
+        ECS::Components::SpriteRenderer2D{
+            RM.Get<Texture>("assets/textures/test/johnPork.png")->ID(),
+            Color{1.f,1.f,1.f,1.f},
+            Vector2D{1.f,1.f},
+            Vector2D{0.f,0.f}
+        },
+        ECS::Components::Name{"Background_JohnPork"}
+    );
 
-        // Center it in the world
-        tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
+    // Store the entity ID so it persists across frames
+    m_testEntities.push_back(EntityUtils::Pack(bg));
 
-        // Scale to cover the entire viewport
-        tr.Scale = { m_worldWidth, m_worldHeight };
-
-        // Add a SpriteRenderer component bound to johnPork.png
-        auto& sr = bg.AddComponent<SpriteRenderer>("../assets/textures/test/johnPork.png");
-        sr.Color = { 1.f, 1.f, 1.f, 1.f }; // no tint
-
-        // Store the entity ID so it persists across frames
-        m_TestEntities.push_back(bg.GetId());
-
-        std::cout << "Background loaded: johnPork.png covering "
-            << m_worldWidth << "x" << m_worldHeight << "\n";
-    }
+    LOG_DEBUG("Background loaded: johnPork.png covering " 
+              << m_worldWidth << "x" << m_worldHeight);
 }
 
 void GraphicsTestScene::runSpriteScaling() {
-    World& world = GetWorld();
+    ECS::World& world = GetWorld();
 
-    if (m_TestEntities.empty()) {
-        Entity sprite = CreateEntity();
-        auto& tr = sprite.Transform();
-        tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
-        tr.Scale = { 256.f, 256.f };
+    if (m_testEntities.empty()) {
+        ECS::Entity sprite = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{256.f,256.f,1.f} },
+            ECS::Components::WorldTransform{ },
+            ECS::Components::SpriteRenderer2D{
+                RM.Get<Texture>("assets/textures/test/player.png")->ID(),
+                Color{1.f,1.f,1.f,1.f},
+                Vector2D{1.f,1.f},
+                Vector2D{0.f,0.f}
+            },
+            ECS::Components::Name{ "SpriteScaling_Player" }
+        );
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/player.png");
-        sr.Color = { 1.f, 1.f, 1.f, 1.f };
-
-        m_TestEntities.push_back(sprite.GetId()); // store ID for later
+        m_testEntities.push_back(EntityUtils::Pack(sprite)); // store ID for later
     }
 
     // Update every frame
     float scaleSpeed = 200.f;
 
-    Entity sprite(m_TestEntities[0], &world); // reconstruct from ID
-    auto& tr = sprite.Transform();
+    ECS::Entity sprite = EntityUtils::Unpack(m_testEntities[0]); // reconstruct from ID
+    auto tr = world.Get<ECS::Components::LocalTransform>(sprite);
 
     if (Input::IsKeyDown(KEY_J)) {
         tr.Scale.X += scaleSpeed * Time::FixedDeltaTime();
@@ -304,39 +448,45 @@ void GraphicsTestScene::runSpriteScaling() {
 }
 
 void GraphicsTestScene::runSpriteRotation() {
-    World& world = GetWorld();
+    ECS::World& world = GetWorld();
 
-    if (m_TestEntities.empty()) {
-        Entity sprite = CreateEntity();
-        auto& tr = sprite.Transform();
-        tr.Position = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
-        tr.Scale = { 512.f, 512.f };
+    if (m_testEntities.empty()) {
+        ECS::Entity sprite = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{512.f,512.f,1.f} },
+            ECS::Components::WorldTransform{ },
+            ECS::Components::SpriteRenderer2D{
+                RM.Get<Texture>("assets/textures/test/fishBoy.png")->ID(),
+                Color{1.f,1.f,1.f,1.f},
+                Vector2D{1.f,1.f},
+                Vector2D{0.f,0.f}
+            },
+            ECS::Components::Name{ "SpriteRotation_FishBoy" }
+        );
 
-        auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
-        sr.Color = { 1.f, 1.f, 1.f, 1.f };
-
-        m_TestEntities.push_back(sprite.GetId());
-        std::cout << "Spawned SpriteRotation entity\n";
+        m_testEntities.push_back(EntityUtils::Pack(sprite));
+        LOG_DEBUG("Spawned SpriteRotation entity");
     }
 
     // Update every frame
     float rotationSpeed = 180.f; // degrees per second
 
-    Entity sprite(m_TestEntities[0], &world); // reconstruct from ID
-    auto& tr = sprite.Transform();
+    ECS::Entity sprite = EntityUtils::Unpack(m_testEntities[0]); // reconstruct from ID
+    auto& tr = world.Get<ECS::Components::LocalTransform>(sprite);
 
     if (Input::IsKeyDown(KEY_R)) {
-        tr.Rotation += rotationSpeed * Time::FixedDeltaTime();
-        if (tr.Rotation >= 360.f) tr.Rotation -= 360.f; // keep it normalized
+        auto deltaRotation = Quaternion::FromAxisAngle(Vector3D::Right, rotationSpeed * Time::FixedDeltaTime());
+        tr.Rotation = deltaRotation * tr.Rotation;
+        tr.Rotation.Normalize();
     }
 }
 
 void GraphicsTestScene::runAnimation() {
-    World& world = GetWorld();
-    auto* r2d = world.GetSystem<Engine::RendererSystem>();
-    if (!r2d) return;
-    auto* renderer = r2d->GetRenderer();
-    auto* shader = r2d->GetShader();
+    ECS::World& world = GetWorld();
+
+    if (!m_rendererSystem) return;
+    auto* renderer = m_rendererSystem->GetRenderer();
+    auto* shader = m_rendererSystem->GetShader();
 
     // Static variables for animation state
     static bool initialized = false;
@@ -346,9 +496,9 @@ void GraphicsTestScene::runAnimation() {
     // Initialize animation once
     if (!initialized) {
         try {
-            animTexture = std::make_unique<Texture>("../assets/textures/test/FishfolkSheet.png");
+            animTexture = std::make_unique<Texture>("assets/textures/test/FishfolkSheet.png");
             GLuint texId = animTexture->ID();
-            if (texId == 0) { std::cout << "ERROR: Failed to load animation texture!\n"; return; }
+            if (texId == 0) { LOG_ERROR("ERROR: Failed to load animation texture!"); return; }
 
             // Use the sheet's real frame size
             int frameWidth = 32;
@@ -366,18 +516,18 @@ void GraphicsTestScene::runAnimation() {
             anim->setRow(0);
 
             initialized = true;
-            std::cout << "Animation initialized - Sheet: "
+            LOG_DEBUG("Animation initialized - Sheet: "
                 << animTexture->Width() << "x" << animTexture->Height()
-                << ", Frame: " << frameWidth << "x" << frameHeight << "\n";
+                << ", Frame: " << frameWidth << "x" << frameHeight);
         }
         catch (const std::exception& e) {
-            std::cout << "ERROR initializing animation: " << e.what() << "\n";
+            LOG_ERROR("ERROR initializing animation: " << e.what());
             return;
         }
     }
 
     if (!anim || !animTexture) {
-        std::cout << "Animation not properly initialized!\n";
+        LOG_ERROR("Animation not properly initialized!");
         return;
     }
 
@@ -392,7 +542,7 @@ void GraphicsTestScene::runAnimation() {
 
     // Submit to renderer
     shader->use();
-    shader->setMat4("uProjection", r2d->GetProjection());
+    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
     renderer->beginFrame();
     renderer->submitSprite(currentSprite);
     renderer->endFrame();
@@ -401,17 +551,17 @@ void GraphicsTestScene::runAnimation() {
     static int frameCount = 0;
     frameCount++;
     if (frameCount % 120 == 0) { // Every 2 seconds at 60fps
-        std::cout << "Animation running - Current frame at: "
-            << currentSprite.pos.x << ", " << currentSprite.pos.y << "\n";
+        LOG_DEBUG("Animation running - Current frame at: "
+            << currentSprite.pos.x << ", " << currentSprite.pos.y);
     }
 }
 
 void GraphicsTestScene::runMultiAnimation() {
-    World& world = GetWorld();
-    auto* r2d = world.GetSystem<Engine::RendererSystem>();
-    if (!r2d) return;
-    auto* renderer = r2d->GetRenderer();
-    auto* shader = r2d->GetShader();
+    ECS::World& world = GetWorld();
+
+    if (!m_rendererSystem) return;
+    auto* renderer = m_rendererSystem->GetRenderer();
+    auto* shader = m_rendererSystem->GetShader();
 
     // Persistent animation state
     static bool initialized = false;
@@ -422,10 +572,10 @@ void GraphicsTestScene::runMultiAnimation() {
 
     if (!initialized) {
         try {
-            animTexture = std::make_unique<Texture>("../assets/textures/test/FishfolkSheet.png");
+            animTexture = std::make_unique<Texture>("assets/textures/test/FishfolkSheet.png");
             GLuint texId = animTexture->ID();
             if (texId == 0) {
-                std::cout << "ERROR: Failed to load animation texture!\n";
+                LOG_ERROR("ERROR: Failed to load animation texture!");
                 return;
             }
 
@@ -450,16 +600,16 @@ void GraphicsTestScene::runMultiAnimation() {
             currentAnim = idleAnim.get();
 
             initialized = true;
-            std::cout << "MultiAnimation initialized: Idle (row 0), Jump (row 1)\n";
+            LOG_DEBUG("MultiAnimation initialized: Idle (row 0), Jump (row 1)");
         }
         catch (const std::exception& e) {
-            std::cout << "ERROR initializing MultiAnimation: " << e.what() << "\n";
+            LOG_ERROR("ERROR initializing MultiAnimation: " << e.what());
             return;
         }
     }
 
     if (!animTexture || !currentAnim) {
-        std::cout << "MultiAnimation not properly initialized!\n";
+        LOG_ERROR("MultiAnimation not properly initialized!");
         return;
     }
 
@@ -482,7 +632,7 @@ void GraphicsTestScene::runMultiAnimation() {
     Sprite currentSprite = currentAnim->play(pos, size, deltaTime);
 
     shader->use();
-    shader->setMat4("uProjection", r2d->GetProjection());
+    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
     renderer->beginFrame();
     renderer->submitSprite(currentSprite);
     renderer->endFrame();
@@ -492,57 +642,63 @@ void GraphicsTestScene::runMultiAnimation() {
 void GraphicsTestScene::runBatchStress() {
     World& world = GetWorld();
 
-    if (m_TestEntities.empty()) {
+    if (m_testEntities.empty()) {
         const int count = 2500; // can increase if performance allows
 
         for (int i = 0; i < count; ++i) {
-            Entity sprite = CreateEntity();
-            auto& tr = sprite.Transform();
+            ECS::Entity sprite = CreateOnLayer(
+                m_gameplayLayer,
+                ECS::Components::LocalTransform{ 
+                    Vector3D{
+                        MathUtils::Randomize(0, static_cast<int>(m_worldWidth)),
+                        MathUtils::Randomize(0, static_cast<int>(m_worldHeight)),
+                        0
+                    }, 
+                    Quaternion::FromAxisAngle(
+                        Vector3D::Right,
+                        MathUtils::Randomize(0, 360)
+                    ),
+                    Vector3D{
+                        MathUtils::Randomize(16.f, 32.f),
+                        MathUtils::Randomize(16.f, 32.f),
+                        1.f
+                    }
+                },
+                ECS::Components::WorldTransform{ },
+                ECS::Components::SpriteRenderer2D{
+                    RM.Get<Texture>("assets/textures/test/fishBoy.png")->ID(),
+                    Color{
+                        MathUtils::Randomize(0.f, 1.f),
+                        MathUtils::Randomize(0.f, 1.f),
+                        MathUtils::Randomize(0.f, 1.f),
+                        1.f
+                    },
+                    Vector2D{1.f,1.f},
+                    Vector2D{0.f,0.f}
+                }
+            );
 
-            // Randomize position inside viewport
-            tr.Position = {
-                static_cast<float>(rand() % static_cast<int>(m_worldWidth)),
-                static_cast<float>(rand() % static_cast<int>(m_worldHeight))
-            };
-
-            // Randomize scale a little bit
-            tr.Scale = {
-                16.f + (rand() % 32),
-                16.f + (rand() % 32)
-            };
-
-            // Randomize rotation (0�359 degrees)
-            tr.Rotation = static_cast<float>(rand() % 360);
-
-            // Add sprite renderer with a test texture
-            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
-
-            // Vary tint color (optional visual variety)
-            sr.Color = {
-                (rand() % 100) / 100.f,
-                (rand() % 100) / 100.f,
-                (rand() % 100) / 100.f,
-                1.f
-            };
-
-            m_TestEntities.push_back(sprite.GetId());
+            m_testEntities.push_back(EntityUtils::Pack(sprite));
         }
 
-        std::cout << "Spawned " << m_TestEntities.size()
+        std::cout << "Spawned " << m_testEntities.size()
             << " sprites for Batch Stress Test\n";
     }
 
     // ------------------------------------
     // Per-frame updates
     // ------------------------------------
-    for (EntityId id : m_TestEntities) {
-        Entity e(id, &world);
-        auto& tr = e.Transform();
+    for (EntityId id : m_testEntities) {
+        ECS::Entity e = EntityUtils::Unpack(id);
+        if (!world.IsAlive(e) || !world.Has<ECS::Components::LocalTransform>(e)) continue;
+        auto& tr = world.Get<ECS::Components::LocalTransform>(e);
 
-        // Rotate continuously (degrees per second)
-        float rotationSpeed = 90.0f; // tweak as needed
-        tr.Rotation += rotationSpeed * Time::DeltaTime();
-        if (tr.Rotation >= 360.0f) tr.Rotation -= 360.0f;
+        auto deltaRotation = Quaternion::FromAxisAngle(
+            Vector3D::Right,
+            90.0f * Time::DeltaTime() // where 90.0f is degrees per second
+        );
+        tr.Rotation = deltaRotation * tr.Rotation;
+        tr.Rotation.Normalize();
     }
 
     // ------------------------------------
@@ -556,7 +712,7 @@ void GraphicsTestScene::runBatchStress() {
 
     if (timeAccum >= 1.0f) {
         float fps = frameCounter / timeAccum;
-        std::cout << "FPS: " << fps << '\n';
+        LOG_DEBUG("FPS: " << fps);
 
         timeAccum = 0.0f;
         frameCounter = 0;
@@ -565,19 +721,18 @@ void GraphicsTestScene::runBatchStress() {
 #endif
 
 #if 1
-void GraphicsTestScene::runBatchStress() {
-    auto* r2d = GetWorld().GetSystem<Engine::RendererSystem>();
-    if (!r2d) {
-        std::cout << "RendererSystem not found!\n";
+    void GraphicsTestScene::runBatchStress() {
+    if (!m_rendererSystem) {
+        LOG_ERROR("RendererSystem not found!");
         return;
     }
 
-    auto* renderer = r2d->GetRenderer();
-    auto* shader = r2d->GetShader();
+    auto* renderer = m_rendererSystem->GetRenderer();
+    auto* shader = m_rendererSystem->GetShader();
 
     // Load texture once
     static bool initialized = false;
-    static Texture texture("../assets/textures/test/fishBoy.png");
+    static Texture texture("assets/textures/test/fishBoy.png");
     static GLuint textureId = 0;
 
     struct SpriteData {
@@ -624,7 +779,7 @@ void GraphicsTestScene::runBatchStress() {
 
     // Prepare frame
     shader->use();
-    shader->setMat4("uProjection", r2d->GetProjection());
+    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
     renderer->beginFrame();
 
     glm::vec4 uv = { 0.f, 0.f, 1.f, 1.f };
@@ -667,10 +822,9 @@ void GraphicsTestScene::runBatchStress() {
 #endif
 
 void GraphicsTestScene::runFontSystem() {
-    auto* r2d = GetWorld().GetSystem<Engine::RendererSystem>();
-    if (!r2d) return;
-    auto* renderer = r2d->GetRenderer();
-    auto* shader = r2d->GetTextShader(); // returns m_shaderText
+    if (!m_rendererSystem) return;
+    auto* renderer = m_rendererSystem->GetRenderer();
+    auto* shader = m_rendererSystem->GetTextShader(); // returns m_shaderText
     if (!shader) return;
 
     static bool initialized = false;
@@ -682,7 +836,7 @@ void GraphicsTestScene::runFontSystem() {
     }
 
     shader->use();
-    shader->setMat4("uProjection", r2d->GetProjection());
+    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
 
     renderer->beginFrame();
     renderer->submitText(*font, "Do not go gentle into that good night,\n Old age should burn and rave at close of day; ", 
@@ -722,31 +876,39 @@ void GraphicsTestScene::debugPerformance() {
 }
 
 void GraphicsTestScene::testSingleTexture() {
-    if (m_TestEntities.empty()) {
+    if (m_testEntities.empty()) {
         const int count = 2500;
         const float spacingX = m_worldWidth / 50.0f;
         const float spacingY = m_worldHeight / 50.0f;
 
         for (int i = 0; i < count; ++i) {
-            Entity sprite = CreateEntity();
-            auto& tr = sprite.Transform();
-
             int col = i % 50;
             int row = i / 50;
-            tr.Position = {
-                col * spacingX + spacingX * 0.5f,
-                row * spacingY + spacingY * 0.5f
-            };
-            tr.Scale = { 32.f, 32.f };
 
-            // All sprites share the same texture
-            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
-            sr.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+            ECS::Entity sprite = CreateOnLayer(
+                m_gameplayLayer,
+                ECS::Components::LocalTransform{
+                    Vector3D{
+                        col * spacingX + spacingX * 0.5f,
+                        row * spacingY + spacingY * 0.5f,
+                        0
+                    },
+                    Quaternion{0,0,0,1},
+                    Vector3D{32.f,32.f,1.f}
+                },
+                ECS::Components::WorldTransform{},
+                ECS::Components::SpriteRenderer2D{
+                    RM.Get<Texture>("assets/textures/test/fishBoy.png")->ID(),
+                    Color{1.f,1.f,1.f,1.f},
+                    Vector2D{1.f,1.f},
+                    Vector2D{0.f,0.f}
+                }
+            );
 
-            m_TestEntities.push_back(sprite.GetId());
+            m_testEntities.push_back(EntityUtils::Pack(sprite));
         }
 
-        std::cout << "Spawned " << count << " identical sprites (same texture & color)" << '\n';
+        LOG_DEBUG("Spawned " << count << " identical sprites (same texture & color)");
         return;
     }
 
@@ -754,53 +916,63 @@ void GraphicsTestScene::testSingleTexture() {
     static int frameCount = 0;
     frameCount++;
     if (frameCount % 60 == 0) {
-        std::cout << "SingleTexture FPS: " << (1.0f / Time::DeltaTime()) << '\n';
+        LOG_DEBUG("SingleTexture FPS: " << (1.0f / Time::DeltaTime()));
     }
 }
 
 void GraphicsTestScene::analyzeRenderer() {
-    World& world = GetWorld();
-    auto* renderer2D = world.GetSystem<Engine::RendererSystem>();
+    ECS::World& world = GetWorld();
 
-    if (!renderer2D) {
-        std::cout << "ERROR: RendererSystem system not found!" << '\n';
+    if (!m_rendererSystem) {
+        LOG_ERROR("RendererSystem system not found!");
         return;
     }
 
     static int frameCount = 0;
     frameCount++;
     if (frameCount % 60 == 0) {
-        int flushes = renderer2D->GetFlushCount();
-        std::cout << "\n=== RENDERER ANALYSIS ===" << '\n';
-        std::cout << "Flushes this frame: " << flushes << '\n';
+        int flushes = m_rendererSystem->GetFlushCount();
+        LOG_DEBUG("=== RENDERER ANALYSIS ===");
+        LOG_DEBUG("Flushes this frame: " << flushes);
         if (flushes > 10) {
-            std::cout << "Too many flushes! Likely texture switches or buffer overflows..." << '\n';
+            LOG_DEBUG("Too many flushes! Likely texture switches or buffer overflows...");
         }
         else if (flushes == 1) {
-            std::cout << "Single batch, bottleneck is CPU-side or GPU fillrate" << '\n';
+            LOG_DEBUG("Single batch, bottleneck is CPU-side or GPU fillrate");
         }
-        std::cout << "FPS: " << (1.0f / Time::DeltaTime()) << '\n';
-        std::cout << "=========================\n" << '\n';
+        LOG_DEBUG("FPS: " << (1.0f / Time::DeltaTime()));
+        LOG_DEBUG("=========================");
     }
 }
 
 void GraphicsTestScene::testSmallBatch() {
-    if (m_TestEntities.empty()) {
+    if (m_testEntities.empty()) {
         const int count = 100;
         for (int i = 0; i < count; ++i) {
-            Entity sprite = CreateEntity();
-            auto& tr = sprite.Transform();
+            ECS::Entity sprite = CreateOnLayer(
+                m_gameplayLayer,
+                ECS::Components::LocalTransform{
+                    Vector3D{
+                        100.0f + (i % 10) * 64.0f,
+                        100.0f + (i / 10) * 64.0f,
+                        0
+                    },
+                    Quaternion{0,0,0,1},
+                    Vector3D{32.f,32.f,1.f}
+                },
+                ECS::Components::WorldTransform{},
+                ECS::Components::SpriteRenderer2D{
+                    RM.Get<Texture>("assets/textures/test/fishBoy.png")->ID(),
+                    Color{1.f,1.f,1.f,1.f},
+                    Vector2D{1.f,1.f},
+                    Vector2D{0.f,0.f}
+                }
+            );
 
-            tr.Position = { 100.0f + (i % 10) * 64.0f, 100.0f + (i / 10) * 64.0f };
-            tr.Scale = { 32.f, 32.f };
-
-            auto& sr = sprite.AddComponent<SpriteRenderer>("../assets/textures/test/fishBoy.png");
-            sr.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-            m_TestEntities.push_back(sprite.GetId());
+            m_testEntities.push_back(EntityUtils::Pack(sprite));
         }
 
-        std::cout << "Spawned small batch: " << count << " sprites" << '\n';
+        LOG_DEBUG("Spawned small batch: " << count << " sprites");
         return;
     }
 
@@ -808,9 +980,9 @@ void GraphicsTestScene::testSmallBatch() {
     frameCount++;
     if (frameCount % 60 == 0) {
         float fps = (1.0f / Time::DeltaTime());
-        std::cout << "100-sprite test FPS: " << fps << '\n';
+        LOG_DEBUG("100-sprite test FPS: " << fps);
         if (fps < 100) {
-            std::cout << "Even 100 sprites are slow, that means the bottleneck is NOT batch size!!!" << '\n';
+            LOG_DEBUG("Even 100 sprites are slow, that means the bottleneck is NOT batch size!!!");
         }
     }
 }
