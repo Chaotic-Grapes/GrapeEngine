@@ -52,6 +52,12 @@ namespace ECS {
             // Component infos are provided in Signature order which is sorted by TypeId.
             // Keep them as-is to enable cache-friendly binary searches without hashing.
             m_componentInfos = std::move(infos);
+            
+            // Build lookup cache for O(1) component index retrieval
+            for (size_t i = 0; i < m_componentInfos.size(); ++i) {
+                m_componentIndexCache[m_componentInfos[i].Id] = static_cast<ComponentIndex>(i);
+            }
+            
             _buildLayout(chunkTargetBytes);
             _newChunk();
         }
@@ -68,12 +74,8 @@ namespace ECS {
 		 * @return True if the component type is present in the archetype, false otherwise.
          */
         bool Has(const TypeId t) const noexcept {
-            // Use lower_bound with (element, value) comparator to avoid reversed comparator calls.
-            auto it = std::lower_bound(
-                m_componentInfos.begin(), m_componentInfos.end(), t,
-                [](const ComponentInfo& ci, const TypeId v) { return ci.Id < v; }
-            );
-            return it != m_componentInfos.end() && it->Id == t;
+            // O(1) hash lookup instead of O(log n) binary search
+            return m_componentIndexCache.find(t) != m_componentIndexCache.end();
         }
 
         /**
@@ -82,12 +84,10 @@ namespace ECS {
 		 * @return The index of the component within the archetype.
          */
         ComponentIndex GetComponentIndex(const TypeId t) const {
-            auto it = std::lower_bound(
-                m_componentInfos.begin(), m_componentInfos.end(), t,
-                [](const ComponentInfo& ci, const TypeId v) { return ci.Id < v; }
-            );
-            assert(it != m_componentInfos.end() && it->Id == t);
-            return static_cast<ComponentIndex>(static_cast<uint32_t>(it - m_componentInfos.begin()));
+            // O(1) hash lookup instead of O(log n) binary search
+            auto it = m_componentIndexCache.find(t);
+            assert(it != m_componentIndexCache.end());
+            return it->second;
         }
 
         /**
@@ -140,13 +140,10 @@ namespace ECS {
         template<typename T>
         T* Get(const uint32_t chunkIndex, const uint32_t slot) {
             const TypeId t = TypeIdOf<T>();
-            auto it = std::lower_bound(
-                m_componentInfos.begin(), m_componentInfos.end(), t,
-                [](const ComponentInfo& ci, const TypeId v) { return ci.Id < v; }
-            );
-            assert(it != m_componentInfos.end() && it->Id == t);
-            const ComponentIndex idx = static_cast<ComponentIndex>(static_cast<uint32_t>(it - m_componentInfos.begin()));
-            return static_cast<T*>(m_chunks[chunkIndex]->ComponentPtr(idx, slot));
+            // O(1) hash lookup
+            auto it = m_componentIndexCache.find(t);
+            assert(it != m_componentIndexCache.end());
+            return static_cast<T*>(m_chunks[chunkIndex]->ComponentPtr(it->second, slot));
         }
 
         /**
@@ -157,13 +154,10 @@ namespace ECS {
          * @return A void pointer to the component data.
          */
         void* GetRaw(const TypeId t, const uint32_t chunkIndex, const uint32_t slot) {
-            auto it = std::lower_bound(
-                m_componentInfos.begin(), m_componentInfos.end(), t,
-                [](const ComponentInfo& ci, const TypeId v) { return ci.Id < v; }
-            );
-            assert(it != m_componentInfos.end() && it->Id == t);
-            const ComponentIndex idx = static_cast<ComponentIndex>(static_cast<uint32_t>(it - m_componentInfos.begin()));
-            return m_chunks[chunkIndex]->ComponentPtr(idx, slot);
+            // O(1) hash lookup
+            auto it = m_componentIndexCache.find(t);
+            assert(it != m_componentIndexCache.end());
+            return m_chunks[chunkIndex]->ComponentPtr(it->second, slot);
         }
 
         /**
@@ -230,6 +224,7 @@ namespace ECS {
     private:
         Signature m_signature;
         std::vector<ComponentInfo> m_componentInfos;
+        std::unordered_map<TypeId, ComponentIndex> m_componentIndexCache; // O(1) component lookup cache
         std::vector<ChunkLayoutEntry> m_layout;
         std::vector<std::unique_ptr<Chunk>> m_chunks;
         uint32_t m_chunkCapacity = 0;

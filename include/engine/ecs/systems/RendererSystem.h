@@ -1,3 +1,19 @@
+/* Start Header *****************************************************************/
+/*!
+\file    RendererSystem.h
+\authors Muhammad Nur Fadzly Bin Zulkifli (85%), Choi Meng Yew (15%)
+\par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
+\date    20th October 2025
+\brief
+Declares the RendererSystem which handles rendering of entities that can be
+rendered, taking into account their transforms and layers.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef RENDERER2D_H
 #define RENDERER2D_H
 

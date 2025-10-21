@@ -1,3 +1,19 @@
+/* Start Header *****************************************************************/
+/*!
+\file    RendererSystem.cpp
+\authors Muhammad Nur Fadzly Bin Zulkifli (85%), Choi Meng Yew (15%)
+\par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
+\date    20th October 2025
+\brief
+Implements the RendererSystem which handles rendering of entities that can be
+rendered, taking into account their transforms and layers.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "ecs/systems/RendererSystem.h"
 #include "core/Application.h"
 #include "graphics/renderer.hpp"
@@ -15,10 +31,9 @@ namespace ECS {
     static void GetRenderTransform(World& world, const Entity entity, 
                                    const Components::LocalTransform& lt,
                                    Vector3D& outPosition, Quaternion& outRotation, Vector3D& outScale) {
-        if (world.Has<Components::WorldTransform>(entity)) {
-            const auto& wt = world.Get<Components::WorldTransform>(entity);
+        if (const auto* wt = world.TryGet<Components::WorldTransform>(entity)) {
             // Decompose world matrix to get position, rotation, scale
-            TransformUtils::DecomposeTRS(wt.Matrix, outPosition, outRotation, outScale);
+            TransformUtils::DecomposeTRS(wt->Matrix, outPosition, outRotation, outScale);
         } else {
             // No WorldTransform, use LocalTransform directly
             outPosition = lt.Position;
@@ -76,8 +91,8 @@ namespace ECS {
         buckets.resize(std::max(1, maxLayerId + 1));
 
         // Collect entities that have LocalTransform + Layer
-        world.Each<Components::LocalTransform, Components::Layer>([&](ECS::Entity entity, Components::LocalTransform& lt, Components::Layer& ly){
-            uint16_t lid = static_cast<uint16_t>(ly.Id);
+        world.Each<Components::LocalTransform, Components::Layer>([&](const ECS::Entity entity, Components::LocalTransform& lt, const Components::Layer& ly){
+            const uint16_t lid = ly.Id;
             if (lid < buckets.size())
                 buckets[lid].push_back(entity);
         });
@@ -89,16 +104,14 @@ namespace ECS {
         m_renderer->beginFrame();
 
         for (int layer = 0; layer <= maxLayerId; ++layer) {
-            if (layer >= (int)buckets.size())
+            if (layer >= static_cast<int>(buckets.size()))
                 continue;
             
             const auto& list = buckets[layer];
             for (ECS::Entity entity : list) {
-                // Skip if entity disabled
-                if (world.Has<Components::Active>(entity)) {
-                    const auto& active = world.Get<Components::Active>(entity);
-                    
-                    if (!active.Enabled)
+                // Skip if entity disabled - use TryGet for optimized access
+                if (const auto* active = world.TryGet<Components::Active>(entity)) {
+                    if (!active->Enabled)
                         continue;
                 }
 
@@ -108,39 +121,37 @@ namespace ECS {
                 Quaternion rotation;
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
-                // Circles
-                if (world.Has<Components::ShapeCircle2D>(entity)) {
-                    const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                // Circles - use TryGet for optimized component access
+                if (const auto* sc = world.TryGet<Components::ShapeCircle2D>(entity)) {
                     DebugDraw2D::Circle(*m_renderer,
-                        ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sc.Offset),
-                        sc.Radius * ((scale.X + scale.Y) * 0.5f),
-                        ToGlm(sc.Color),
+                        ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sc->Offset),
+                        sc->Radius * ((scale.X + scale.Y) * 0.5f),
+                        ToGlm(sc->Color),
                         48, 0);
                 }
 
                 // Boxes
-                if (world.Has<Components::ShapeBox2D>(entity)) {
-                    const auto& sb = world.Get<Components::ShapeBox2D>(entity);
+                if (const auto* sb = world.TryGet<Components::ShapeBox2D>(entity)) {
                     const float rotationAngle = 2.0f * std::acos(rotation.W);
                     const bool hasRotation = std::abs(rotationAngle) > 0.01f;
 
                     if (!hasRotation) {
-                        const glm::vec2 halfExtents = ToGlm(Vector2D{sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y});
-                        const glm::vec2 center = ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sb.Offset);
+                        const glm::vec2 halfExtents = ToGlm(Vector2D{sb->HalfExtents.X * scale.X, sb->HalfExtents.Y * scale.Y});
+                        const glm::vec2 center = ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sb->Offset);
                         const glm::vec2 min = center - halfExtents;
                         const glm::vec2 max = center + halfExtents;
 
-                        if (sb.Filled) {
-                            DebugDraw2D::RectFill(*m_renderer, min, max, ToGlm(sb.Color), 0);
+                        if (sb->Filled) {
+                            DebugDraw2D::RectFill(*m_renderer, min, max, ToGlm(sb->Color), 0);
                         }
                         else {
-                            DebugDraw2D::RectStroke(*m_renderer, min, max, sb.Thickness, ToGlm(sb.Color), 0);
+                            DebugDraw2D::RectStroke(*m_renderer, min, max, sb->Thickness, ToGlm(sb->Color), 0);
                         }
                     } 
                     else {
                         const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
                         transformedCorners.clear(); transformedCorners.reserve(4);
-                        const Vector2D halfExt = sb.HalfExtents;
+                        const Vector2D halfExt = sb->HalfExtents;
                         const Vector3D corners[4] = {
                             Vector3D{-halfExt.X, -halfExt.Y, 0.0f},
                             Vector3D{ halfExt.X, -halfExt.Y, 0.0f},
@@ -150,27 +161,26 @@ namespace ECS {
                         
                         for (auto corner : corners) {
                             const Vector4D corner4D = m * Vector4D{corner.X, corner.Y, corner.Z, 1.0f};
-                            transformedCorners.push_back(ToGlm(Vector2D{corner4D.X, corner4D.Y}) + ToGlm(sb.Offset));
+                            transformedCorners.push_back(ToGlm(Vector2D{corner4D.X, corner4D.Y}) + ToGlm(sb->Offset));
                         }
 
-                        if (sb.Filled)
-                            DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
+                        if (sb->Filled)
+                            DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb->Color), 0);
                         else {
                             for (int i = 0; i < 4; ++i) {
-                                DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i+1)%4], sb.Thickness, ToGlm(sb.Color), 0);
+                                DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i+1)%4], sb->Thickness, ToGlm(sb->Color), 0);
                             }
                         }
                     }
                 }
 
                 // Lines
-                if (world.Has<Components::ShapeLine2D>(entity)) {
-                    const auto& sl = world.Get<Components::ShapeLine2D>(entity);
+                if (const auto* sl = world.TryGet<Components::ShapeLine2D>(entity)) {
                     DebugDraw2D::Line(*m_renderer,
-                        ToGlm(Vector2D{position.X, position.Y} + sl.A),
-                        ToGlm(Vector2D{position.X, position.Y} + sl.B),
-                        sl.Thickness,
-                        ToGlm(sl.Color), 0);
+                        ToGlm(Vector2D{position.X, position.Y} + sl->A),
+                        ToGlm(Vector2D{position.X, position.Y} + sl->B),
+                        sl->Thickness,
+                        ToGlm(sl->Color), 0);
                 }
 
                 // Polygons
@@ -190,15 +200,14 @@ namespace ECS {
                 }
 
                 // SpriteRenderer
-                if (world.Has<Components::SpriteRenderer2D>(entity)) {
-                    const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
+                if (const auto* sr = world.TryGet<Components::SpriteRenderer2D>(entity)) {
                     
                     m_renderer->submitSprite({
                         ToGlm(Vector2D{position.X, position.Y}),
                         ToGlm(Vector2D{scale.X, scale.Y}),
                         {0.f, 0.f, 1.f, 1.f},
-                        ToGlm(sr.Color),
-                        sr.TextureId,
+                        ToGlm(sr->Color),
+                        sr->TextureId,
                         glm::radians(2 * acos(rotation.W)),
                         1.0f
                     });
@@ -208,26 +217,26 @@ namespace ECS {
 
         m_renderer->endFrame();
 
-        if (Time::FrameCount() % 60 == 0)
-        {
-            // Renderer exposes a cumulative flush counter. Compute per-frame
-            // flushes by tracking the previous total and taking the delta.
-            static int previousFlushTotal = 0;
-            int currentTotal = GetFlushCount();
-            int flushes = currentTotal - previousFlushTotal;
-            previousFlushTotal = currentTotal;
-            LOG_DEBUG("=== RENDERER ANALYSIS ===");
-            LOG_DEBUG("Flushes this frame: " << flushes);
-            if (flushes > 10)
-            {
-                LOG_DEBUG("Too many flushes! Likely texture switches or buffer overflows...");
-            }
-            else if (flushes == 1)
-            {
-                LOG_DEBUG("Single batch, bottleneck is CPU-side or GPU fillrate");
-            }
-            LOG_DEBUG("FPS: " << (1.0f / Time::DeltaTime()));
-            LOG_DEBUG("=========================");
-        }
+        //if (Time::FrameCount() % 60 == 0)
+        //{
+        //    // Renderer exposes a cumulative flush counter. Compute per-frame
+        //    // flushes by tracking the previous total and taking the delta.
+        //    static int previousFlushTotal = 0;
+        //    int currentTotal = GetFlushCount();
+        //    int flushes = currentTotal - previousFlushTotal;
+        //    previousFlushTotal = currentTotal;
+        //    LOG_DEBUG("=== RENDERER ANALYSIS ===");
+        //    LOG_DEBUG("Flushes this frame: " << flushes);
+        //    if (flushes > 10)
+        //    {
+        //        LOG_DEBUG("Too many flushes! Likely texture switches or buffer overflows...");
+        //    }
+        //    else if (flushes == 1)
+        //    {
+        //        LOG_DEBUG("Single batch, bottleneck is CPU-side or GPU fillrate");
+        //    }
+        //    LOG_DEBUG("FPS: " << (1.0f / Time::DeltaTime()));
+        //    LOG_DEBUG("=========================");
+        //}
     }
 }
