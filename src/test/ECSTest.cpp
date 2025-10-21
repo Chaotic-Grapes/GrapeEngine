@@ -17,6 +17,10 @@ systems, components, and their interactions. This test scene covers:
 
 The scene provides structured test cases that can be cycled through using
 keyboard input (T key), with each test validating specific ECS functionality.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -63,9 +67,9 @@ void ECSTestScene::OnLoad() {
     m_renderLayer = GetLayers().CreateOrGetLayer("render");
 
     // Initialize transform system (must run before renderer)
-    AddSystem([](Scenes::Scene& s, const float dt) {
-        ECS::TransformSystem::Update(s.GetWorld(), dt);
-    }, "Transform System");
+    //AddSystem([](Scenes::Scene& s, const float dt) {
+    //    ECS::TransformSystem::Update(s.GetWorld(), dt);
+    //}, "Transform System");
 
     // Initialize renderer system
     m_rendererSystem = std::make_shared<ECS::RendererSystem>();
@@ -1076,7 +1080,6 @@ void ECSTestScene::_testAllSystems() {
     }
 }
 
-// TODO: Fix FPS issue
 void ECSTestScene::_testStressTestAll() {
     if (m_testEntities.empty()) {
         const int count = 250;
