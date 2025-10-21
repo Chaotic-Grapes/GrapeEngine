@@ -70,6 +70,11 @@ namespace Engine {
                 currentScene->OnLateUpdate();
             }
 
+            // --- Update Overlay Service ---
+            // This here because it depends on current scene
+			m_overlay->Update();
+            m_overlay->Render();
+
             // --- Rendering ---
             for (const auto* win : WindowManager::GetWindows()) {
                 if (win->ShouldClose()) {
@@ -78,9 +83,6 @@ namespace Engine {
                 }
                 glfwSwapBuffers(win->Handle());
             }
-
-			// Update OverlayService (must be after rendering to avoid being drawn over)
-			m_overlay->Update();
 
             const double frameDuration = m_lastFrameTime - frameStart;
 

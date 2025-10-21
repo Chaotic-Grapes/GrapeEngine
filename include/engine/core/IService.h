@@ -14,6 +14,9 @@ namespace Engine {
         virtual void Update() {}
         virtual void Terminate() {}
 
+        // For services that need rendering last
+        virtual void Render() {}
+
         // Enable/disable the system
         void SetEnabled(const bool e) { m_enabled = e; }
         bool IsEnabled() const { return m_enabled; }
