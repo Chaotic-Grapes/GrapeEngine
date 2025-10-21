@@ -305,6 +305,7 @@ namespace Scenes {
                 if (s.Enabled && s.Callback) {
                     Profiler::Get().BeginScope(s.Name ? s.Name : "Unknown System");
                     s.Callback(*this, dt);
+					Profiler::Get().EndScope(s.Name ? s.Name : "Unknown System");
                 }
             }
             ECS::Hierarchy::UpdateTransforms(m_world);
