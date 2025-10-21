@@ -8,15 +8,14 @@
 
 #include <vector>
 #include "Window.h"
-#include "ecs/ISystem.h"
 
 #ifdef CreateWindow
 #undef CreateWindow
 #endif
 
-class WindowManager final : public Engine::ISystem {
+class WindowManager final {
 public:
-    ~WindowManager() override;
+    ~WindowManager();
 
     // Create a new window, or a child window
     static Window* CreateWindow(const std::string& title, int width, int height, const Window* parent = nullptr);
@@ -29,11 +28,6 @@ public:
 
     static const std::vector<Window*>& GetWindows();
     static Window* GetMainWindow();
-
-    // System interface
-    void OnCreate() override;
-    void OnUpdate() override;
-    std::string Name() const override;
 
 private:
     static std::vector<Window*> m_windows;
