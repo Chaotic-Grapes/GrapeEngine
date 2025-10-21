@@ -115,7 +115,8 @@ void DebugUI::Render() {
     if (!m_initialized || !m_enabled) return;  // Early exit if UI is toggled off
 
     // Render custom debug windows
-    _showEngineDebugWindow(); // Pass demo control to debug window
+    _showPlayStopControls();   // Self-explanatory
+    _showEngineDebugWindow();  // Pass demo control to debug window
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
     _showGameObjectEditor();   // Game object editor
@@ -204,6 +205,49 @@ void DebugUI::ClearAllGameObjects() {
     _invalidateCache();
 }
 
+void DebugUI::_showPlayStopControls() {
+    // Use config values
+    const auto& layout = m_config.Layout;
+    ImGui::SetNextWindowPos(ImVec2(layout.ControlsX, layout.ControlsY), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(layout.ControlsW, layout.ControlsH), ImGuiCond_Once);
+
+    ImGui::Begin("Game Controls");
+
+    // Show current state
+    ImGui::Text("State: %s", m_gameState == GameState::Stopped ? "STOPPED" : "PLAYING");
+    ImGui::Separator();
+
+    // Play button (disabled when playing)
+    bool playDisabled = (m_gameState == GameState::Playing);
+    if (playDisabled) {
+        ImGui::BeginDisabled();
+    }
+    if (ImGui::Button("PLAY", ImVec2(125, 40))) {
+        m_gameState = GameState::Playing;
+        LOG_INFO("Game started");
+    }
+    if (playDisabled) {
+        ImGui::EndDisabled();
+    }
+
+    ImGui::SameLine();
+
+    // Stop button (disabled when stopped)
+    bool stopDisabled = (m_gameState == GameState::Stopped);
+    if (stopDisabled) {
+        ImGui::BeginDisabled();
+    }
+    if (ImGui::Button("STOP", ImVec2(125, 40))) {
+        m_gameState = GameState::Stopped;
+        LOG_INFO("Game stopped");
+    }
+    if (stopDisabled) {
+        ImGui::EndDisabled();
+    }
+
+    ImGui::End();
+}
+
 void DebugUI::_showEngineDebugWindow() {
     // Use config values
     const auto& layout = m_config.Layout;
@@ -272,8 +316,6 @@ void DebugUI::_showPerformanceWindow() {
         }
     }
 
-    ImGui::Separator();
-
     // Reset profiler history
     if (ImGui::Button("Clear Performance History")) {
         Profiler::ClearHistory();
@@ -297,8 +339,9 @@ void DebugUI::_showPerformanceWindow() {
 void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
     if (!device) return;
 
-    ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(320, 240), ImGuiCond_Once);
+    const auto& layout = m_config.Layout;
+    ImGui::SetNextWindowPos(ImVec2(layout.AudioX, layout.AudioY), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(layout.AudioW, layout.AudioH), ImGuiCond_Once);
     ImGui::Begin("Audio Monitor");
 
     // Master volume
@@ -306,6 +349,8 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
     if (ImGui::SliderFloat("Master Volume", &masterVol, 0.0f, 1.0f)) {
         device->SetMasterVolume(masterVol);
     }
+
+    ImGui::Separator();
 
     // Toggle library window
     static bool showLibrary = false;

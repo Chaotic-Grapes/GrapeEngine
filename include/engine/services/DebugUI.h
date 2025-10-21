@@ -1,7 +1,7 @@
 /**
- * @file DebugUI.h
- * @author Foo Rui Qin
- * @date 2024
+ * @file    DebugUI.h
+ * @author  Foo Rui Qin
+ * @date    2025
  * @brief Debug user interface system for engine development and debugging
  * 
  * This file defines the DebugUI class which provides a comprehensive ImGui-based
@@ -46,7 +46,7 @@ struct DebugUIConfig {
      */
     struct WindowLayout {
         float EngineX = 10.0f, EngineY = 10.0f;     ///< Engine debug window position
-        float EngineW = 300.0f, EngineH = 150.0f;   ///< Engine debug window size
+        float EngineW = 300.0f, EngineH = 175.0f;   ///< Engine debug window size
 
         float InputX = 330.0f, InputY = 10.0f;      ///< Input debug window position
         float InputW = 320.0f, InputH = 400.0f;     ///< Input debug window size
@@ -56,6 +56,12 @@ struct DebugUIConfig {
 
         float PerfX = 1065.0f, PerfY = 10.0f;       ///< Performance monitor window position
         float PerfW = 300.0f, PerfH = 400.0f;       ///< Performance monitor window size
+
+        float AudioX = 10.0f, AudioY = 200.0f;
+        float AudioW = 300.0f, AudioH = 207.0f;
+
+        float ControlsX = 10.0f, ControlsY = 422.0f;
+        float ControlsW = 300.0f, ControlsH = 200.0f;
     } Layout;
 
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  ///< Maximum length for game object names
@@ -90,6 +96,14 @@ struct DebugUIConfig {
  */
 class DebugUI {
 public:
+    enum class GameState {
+        Stopped,  // Editor mode
+        Playing,  // Game running
+    };
+
+    GameState GetGameState() const { return m_gameState; }
+    bool IsPlaying() const { return m_gameState == GameState::Playing; }
+
     /**
      * @brief Constructor for DebugUI
      * @param world Pointer to the World object for entity management
@@ -223,6 +237,8 @@ public:
     void ClearAllGameObjects();
 
 private:
+    GameState m_gameState = GameState::Stopped;
+
     DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
     World* m_world;             ///< Pointer to World object for entity management
     bool m_enabled = false;     ///< Flag indicating if debug UI is currently enabled
@@ -240,6 +256,8 @@ private:
     mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;    ///< Cached delete button labels
     mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;     ///< Cached clone button labels
     mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;       ///< Cached header collapse states
+
+    void _showPlayStopControls();
 
     /**
      * @brief Render the main engine debug window
@@ -280,7 +298,7 @@ private:
      * Static method that displays audio system status, volume controls,
      * and audio-related debugging information.
      */
-    static void _showAudioWindow(Audio::FmodAudioDevice* audio);
+    void _showAudioWindow(Audio::FmodAudioDevice* audio);
 
     /**
      * @brief Create a new game entity with basic components
