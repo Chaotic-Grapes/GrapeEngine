@@ -1,3 +1,22 @@
+/* Start Header *****************************************************************/
+/*!
+\file    Archetype.h
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
+\brief
+This file contains the declaration and definition of the Archetype
+class, responsible for managing a group of entities with the same
+component composition. It provides methods for adding, removing, and
+querying entities within the archetype, as well as handling chunk
+allocation and memory management.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #ifndef ARCHETYPE_H
 #define ARCHETYPE_H
 
@@ -65,6 +84,10 @@ namespace ECS {
          */
         uint32_t GetChunkCount() const noexcept                 { return static_cast<uint32_t>(m_chunks.size()); }
 
+        /**
+         * @brief Inserts a new entity into the archetype and returns its location.
+         * @return A pair containing the chunk index and slot index of the newly inserted entity.
+         */
         std::pair<uint32_t,uint32_t> Insert() {
             if (m_chunks.empty() || m_chunks.back()->Count() == m_chunks.back()->Capacity()) {
                 _newChunk();
@@ -77,6 +100,12 @@ namespace ECS {
             return { static_cast<uint32_t>(m_chunks.size() - 1), slot };
         }
 
+        /**
+         * @brief Removes an entity from the archetype using the swap-back method.
+         * @param chunkIndex The index of the chunk containing the entity.
+         * @param slot The slot index of the entity within the chunk.
+         * @return The slot index of the entity that was swapped into the removed entity's position
+         */
         uint32_t RemoveSwapBack(const uint32_t chunkIndex, const uint32_t slot) {
             Chunk* c = m_chunks[chunkIndex].get();
             const uint32_t lastSlot = c->RemoveSwapBack(slot);
@@ -89,6 +118,13 @@ namespace ECS {
             return lastSlot;
         }
 
+        /**
+         * @brief Gets a pointer to the component of type T for the specified chunk and slot.
+         * @tparam T The component type.
+         * @param chunkIndex The index of the chunk.
+         * @param slot The slot index within the chunk.
+         * @return A pointer to the component of type T.
+         */
         template<typename T>
         T* Get(const uint32_t chunkIndex, const uint32_t slot) {
             auto it = m_idToCompIndex.find(TypeIdOf<T>());
@@ -96,6 +132,14 @@ namespace ECS {
 
             return static_cast<T*>(m_chunks[chunkIndex]->ComponentPtr(it->second, slot));
         }
+
+        /**
+         * @brief Gets a raw pointer to the component of the specified type for the given chunk and slot.
+         * @param t The TypeId of the component.
+         * @param chunkIndex The index of the chunk.
+         * @param slot The slot index within the chunk.
+         * @return A void pointer to the component data.
+         */
         void* GetRaw(const TypeId t, const uint32_t chunkIndex, const uint32_t slot) {
             const auto it = m_idToCompIndex.find(t);
             assert(it != m_idToCompIndex.end());
@@ -103,9 +147,30 @@ namespace ECS {
             return m_chunks[chunkIndex]->ComponentPtr(it->second, slot);
         }
 
+        /**
+         * @brief Gets a pointer to the specified chunk.
+         * @param chunkIndex The index of the chunk to retrieve.
+         * @return A pointer to the requested Chunk.
+         */
         Chunk* GetChunk(const uint32_t chunkIndex)                   { return m_chunks[chunkIndex].get(); }
+        
+        /**
+         * @brief Gets a pointer to the specified chunk (const version).
+         * @param chunkIndex The index of the chunk to retrieve.
+         * @return A const pointer to the requested Chunk.
+         */
         const Chunk* GetChunk(const uint32_t chunkIndex) const       { return m_chunks[chunkIndex].get(); }
+        
+        /**
+         * @brief Gets the list of chunks in this archetype.
+         * @return A const reference to the vector of unique pointers to Chunks.
+         */
         const std::vector<std::unique_ptr<Chunk>>& GetChunks() const { return m_chunks; }
+
+        /**
+         * @brief Gets the component information for all components in this archetype.
+         * @return A const reference to the vector of ComponentInfo structures.
+         */
         const std::vector<ComponentInfo>& GetComponents() const      { return m_componentInfos; }
 
     private:

@@ -1,3 +1,23 @@
+/* Start Header *****************************************************************/
+/*!
+\file    Components.h
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
+\brief
+This file contains the declaration of various ECS components used in the engine.
+These components are plain data structures that can be attached to entities
+to define their properties and behaviors. Several components include padding bytes
+to ensure proper alignment and maintain trivially copyable status. Furthermore,
+component serialization is handled centrally in `EntitySerializer.h`. Components
+should be registered there for correct JSON (de)serialization.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #ifndef COMPONENTS_H
 #define COMPONENTS_H
 
@@ -13,31 +33,44 @@
 ================================================================================
 NOTE FOR DEVELOPERS:
 --------------------------------------------------------------------------------
-This project uses **nlohmann::json** for serialisation of all ECS Components.
+Component serialization for the ECS is handled centrally in
+`include/engine/serialization/EntitySerializer.h`.
 
-IMPORTANT CHANGES:
-    - All `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE` macros are now defined in
-      `EntitySerializer.h` instead of the bottom of this file.
-    - If you add a new Component struct, you MUST also add a corresponding macro
-      in `EntitySerializer.h` so that the type can be serialised/deserialised
-      properly.
-    - Nested types (like `Vector2D`, `Color`, etc.) must also have their macros
-      defined in `EntitySerializer.h` if they are used inside Components.
-    - Likewise, if you add/remove a data member/property to a Component, you
-      need to update the macro in `EntitySerializer.h`.
+Key rules you must follow when adding or changing Components:
+    - All `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE` macros for component types and
+        nested POD types (e.g. `Vector2D`, `Color`, `Matrix4x4`) live in
+        `EntitySerializer.h`. Do NOT add those macros to `Components.h`.
+    - After adding a new component struct (or changing its member list), add or
+        update its corresponding `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE` entry in
+        `EntitySerializer.h` so JSON (de)serialisation remains correct.
+    - Register the component with the serializer registry by adding a
+        `REGISTER_COMPONENT_SERIALIZER(<ShortName>, ECS::Components::<Type>)`
+        invocation in `EntitySerializer.h`. The `REGISTER_COMPONENT_SERIALIZER`
+        macro creates a static registration that maps the engine TypeId to the
+        (de)serialisation callbacks used when persisting entities.
+    - Template/component containers (e.g. `ShapePolygon2D<TCapacity>`) cannot
+        be registered directly — provide a concrete typedef or custom handling in
+        `EntitySerializer.h` if you need to serialise them.
 
-Example:
-   struct MyComponent : IComponent {
-       int Value = 0;
-       std::string Name;
-   };
+Minimal example:
+    // In Components.h
+    struct MyComponent {
+            int Value = 0;
+            float Factor = 1.0f;
+    };
 
-   // In EntitySerializer.h:
-   NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Component::MyComponent, Value, Name)
+    // In EntitySerializer.h
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::MyComponent, Value, Factor)
+    REGISTER_COMPONENT_SERIALIZER(MyComponent, ECS::Components::MyComponent)
 
-This ensures that `nlohmann::json` can automatically handle conversions like:
-   json j = myComponent;                 // serialise
-   MyComponent c = j.get<MyComponent>(); // deserialise
+Notes:
+    - Keep nested POD types serialisable by defining their macros in
+        `EntitySerializer.h` as well.
+    - When adding/removing fields, update the matching `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE`
+        macro immediately to avoid silent (de)serialisation bugs.
+
+This centralised approach keeps component headers lightweight and avoids
+duplicate macro definitions across the codebase.
 ================================================================================
 */
 
@@ -61,12 +94,6 @@ This helps maintain alignment and performance characteristics.
 ================================================================================
 */
 
-// TODO: Check if IComponent is really necessary for all components below
-// Considerations: IComponent adds a vtable pointer, which may affect trivial copyability
-// but provides a common interface for all components. Furthermore, it could increase
-// memory usage per component instance as it adds overhead. Evaluate based on usage patterns.
-
-// However, current implementation is good enough for now.
 namespace ECS {
     namespace Components {
         // ---------------------------------- Core utility/tag components ----------------------------------

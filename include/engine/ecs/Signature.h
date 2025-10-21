@@ -1,3 +1,21 @@
+/* Start Header *****************************************************************/
+/*!
+\file    Signature.h
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
+\brief
+This file contains the declaration and definition of the Signature class,
+responsible for managing component signatures in the Entity-Component-System (ECS)
+architecture. It provides methods for checking component presence, merging,
+and removing components from signatures.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #ifndef SIGNATURE_H
 #define SIGNATURE_H
 
@@ -18,9 +36,34 @@ namespace ECS {
             m_types.erase(std::unique(m_types.begin(), m_types.end()), m_types.end());
         }
 
+        /**
+         * @brief Checks if the signature contains the specified component type.
+         * @param t The TypeId of the component to check for.
+         * @return True if the component type is present in the signature, false otherwise.
+         */
         bool Contains(const TypeId t) const {
             return std::binary_search(m_types.begin(), m_types.end(), t);
         }
+
+        /**
+         * @brief Checks if the signature contains any of the component types in the given signature.
+         * @param req The signature containing component types to check for.
+         * @return True if any component type from req is present in this signature, false otherwise.
+         */
+        bool ContainsAny(const Signature& req) const {
+            for (auto rt : req.m_types) {
+                if (Contains(rt)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * @brief Checks if the signature contains all of the component types in the given signature.
+         * @param req The signature containing component types to check for.
+         * @return True if all component types from req are present in this signature, false otherwise.
+         */
         bool ContainsAll(const Signature& req) const {
             auto it = m_types.begin();
 
@@ -35,6 +78,12 @@ namespace ECS {
 
             return true;
         }
+
+        /**
+         * @brief Creates a new signature by merging this signature with the specified component type.
+         * @param t The TypeId of the component to add.
+         * @return A new Signature that includes the specified component type.
+         */
         Signature MergedWith(const TypeId t) const {
             Signature out = *this;
 
@@ -43,6 +92,12 @@ namespace ECS {
 
             return out;
         }
+
+        /**
+         * @brief Creates a new signature by removing the specified component type from this signature.
+         * @param t The TypeId of the component to remove.
+         * @return A new Signature that excludes the specified component type.
+         */
         Signature Without(const TypeId t) const {
             Signature out = *this;
 
@@ -56,6 +111,10 @@ namespace ECS {
         bool operator==(const Signature& o) const { return m_types == o.m_types; }
         bool operator!=(const Signature& o) const { return !(*this == o); }
 
+        /**
+         * @brief Gets the list of component types in this signature.
+         * @return A const reference to the vector of TypeIds.
+         */
         const std::vector<TypeId>& Types() const  { return m_types; }
 
     private:
@@ -63,6 +122,8 @@ namespace ECS {
     };
 
     struct SignatureHash {
+        // Hashes a Signature for use in unordered containers.
+        // Uses FNV1a hash algorithm.
         size_t operator()(const Signature& s) const noexcept {
             // FNV1a 64-bit
             // FNV1a hash algorithm is simple and fast for small data sets

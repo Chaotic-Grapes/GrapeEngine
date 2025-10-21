@@ -1,3 +1,20 @@
+/* Start Header *****************************************************************/
+/*!
+\file    Hierarchy.h
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
+\brief
+This file contains the declaration and definition of the Hierarchy
+class, responsible for updating the world transforms of entities. It provides
+methods for traversing the entity hierarchy and computing world transforms.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #ifndef HIERARCHY_H
 #define HIERARCHY_H
 
@@ -11,6 +28,13 @@
 namespace ECS {
     class Hierarchy {
     public:
+        /**
+         * @brief Update the world transforms of all entities in the hierarchy.
+         * This function traverses the entity hierarchy starting from root entities
+         * (entities without a parent) and updates their world transforms based on
+         * their local transforms and the transforms of their parents.
+         * @param world The ECS world containing the entities and their components.
+         */
         static void UpdateTransforms(World& world) {
             std::vector<Entity> roots;
             world.Each<Components::LocalTransform, Components::WorldTransform>([&](const Entity e, Components::LocalTransform&, Components::WorldTransform&) {

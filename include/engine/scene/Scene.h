@@ -1,3 +1,21 @@
+/* Start Header *****************************************************************/
+/*!
+\file    Scene.h
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
+\brief
+This file contains the declaration and definition of the Scene
+class, responsible for managing a single scene in the application. It provides
+methods for updating the scene, handling events, and managing entities within the
+scene.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #ifndef SCENE_H
 #define SCENE_H
 

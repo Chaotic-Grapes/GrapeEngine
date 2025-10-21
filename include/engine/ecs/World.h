@@ -1,3 +1,22 @@
+/* Start Header *****************************************************************/
+/*!
+\file    World.h
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
+\brief
+This file contains the declaration and definition of the World class, responsible
+for managing the entire Entity-Component-System (ECS) world. It provides methods
+for creating, destroying, and managing entities and their components. The World
+class also handles the updating of entity transforms and the processing of
+systems within the ECS architecture.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #ifndef WORLD_H
 #define WORLD_H
 
@@ -43,7 +62,8 @@ namespace ECS {
         World(World&&) noexcept = default;
         World& operator=(World&&) noexcept = default;
 
-        // Entity lifecycle
+        // ************** Entity Lifecycle ************** //
+
         /**
 		 * @brief Create an empty entity in the world.
 		 * @return ECS::Entity The newly created entity
@@ -103,7 +123,8 @@ namespace ECS {
             m_free.push_back(e.Index);
         }
 
-        // Component API
+        // ************** Component API ************** //
+
         /**
 		 * @brief Check if the specified entity has the given component type.
 		 * @tparam T The component type to check for
@@ -456,8 +477,15 @@ namespace ECS {
             return dst;
         }
 
+        /**
+         * @brief Get the map of archetypes in the world.
+         * @return const std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash>& Reference to the archetypes map
+         */
         const std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash>& Archetypes() const { return m_archetypes; }
 
+        // ************** Entity Location ************** //
+
+        // Location of an entity within the world
         struct Location {
         public:
             Archetype* ArchetypePtr = nullptr;

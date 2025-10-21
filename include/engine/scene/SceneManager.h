@@ -3,10 +3,11 @@
 \file    SceneManager.h
 \authors Muhammad Nur Fadzly Bin Zulkifli (50%), Daniel Neo Zuo Feng Kay (50%)
 \par     muhammadnurfadzly.b@digipen.edu, k.danielneozuofeng@digipen.edu
-\brief   This file contains the declaration and definition of the SceneManager
-		 class, responsible for managing multiple scenes in the application. It
-		 allows adding, removing, and switching between scenes, as well as
-		 serializing and deserializing scenes to and from JSON files.
+\brief   
+This file contains the declaration and definition of the SceneManager
+class, responsible for managing multiple scenes in the application. It
+allows adding, removing, and switching between scenes, as well as
+serializing and deserializing scenes to and from JSON files.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
