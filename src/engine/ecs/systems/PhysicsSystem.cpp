@@ -10,12 +10,13 @@
 #include <algorithm>
 #include "helpers/MathUtils.h"
 #include "helpers/EntityUtils.h"
+#include <iostream>
 
 class SpatialPartitioning {
 public:
     // Smaller cell size improves accuracy at the cost of more cells.
     // Tune this based on typical collider sizes / scene density.
-    static constexpr float CELL_SIZE = 128.0f;
+    static constexpr float CELL_SIZE = 32.0f;
 
     struct CellCoord {
         int x, y;
@@ -56,6 +57,8 @@ namespace ECS {
         if (!Engine::Physics::IsEnabled()) return;
         if (dt <= 0.0f) return;
 
+        const int substeps = 3;  // Run physics 3 times per frame
+        const float subDt = dt / static_cast<float>(substeps);
         // 1) Integrate velocities -> update positions & rotations for all dynamic bodies
         std::vector<Entity> dynamicEntities;
         dynamicEntities.reserve(512);
@@ -65,6 +68,10 @@ namespace ECS {
                 // Skip disabled entities
                 if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) return;
                 if (rb.Mass <= 0.0f) return; // static bodies don't integrate here
+
+                if (linearVel.Value.Length() < 0.05f) {
+                    return;  // Don't integrate, don't add to dynamicEntities
+                }
 
                 // Apply forces & gravity
                 Vector2D acceleration = Engine::Physics::CalculateAcceleration(rb, linearVel);
@@ -138,9 +145,10 @@ namespace ECS {
 
         // 4) Narrow-phase: precise checks + resolve collisions once per unique pair
         // Use a small number of solver iterations for position correction to reduce interpenetration
-        const int positionCorrectionIterations = 2;
+        const int positionCorrectionIterations = 4;
 
         for (int iter = 0; iter < positionCorrectionIterations; ++iter) {
+            int collisionsResolved = 0;
             for (const auto& pr : candidatePairs) {
                 const Entity A = pr.first;
                 const Entity B = pr.second;
@@ -180,7 +188,7 @@ namespace ECS {
                 const float distSq = dx*dx + dy*dy;
                 const float radii = rA + rB;
                 if (distSq >= radii * radii) continue;
-
+                collisionsResolved++;
                 // prepare components for resolution; ensure required components exist when calling resolve
                 // Provide default rigidbodies/materials for static-like objects if missing
                 Components::Rigidbody2D rbA{ 0 }, rbB{ 0 };
@@ -197,7 +205,7 @@ namespace ECS {
                 if (hasVelB) velB = world.Get<Components::LinearVelocity2D>(B);
 
                 // Physics materials - combine
-                Components::PhysicsMaterial2D matA{ 0.2f, 0.5f, 0.2f }, matB{ 0.2f, 0.5f, 0.2f };
+                Components::PhysicsMaterial2D matA{ 0.2f, 0.5f, 0.5f }, matB{ 0.2f, 0.5f, 0.5f };
                 if (world.Has<Components::PhysicsMaterial2D>(A)) matA = world.Get<Components::PhysicsMaterial2D>(A);
                 if (world.Has<Components::PhysicsMaterial2D>(B)) matB = world.Get<Components::PhysicsMaterial2D>(B);
 
@@ -222,9 +230,38 @@ namespace ECS {
                 if (hasVelB) world.Get<Components::LinearVelocity2D>(B) = velB;
                 // transforms are updated in-place (tA, tB)
             } // for candidatePairs
-        } // iterations
+            if (collisionsResolved == 0) break;
 
+
+        } // iterations
+#ifdef _DEBUG
+        static int frameCount = 0;
+        static float totalTime = 0.0f;
+        static int totalPairs = 0;
+        static int totalEntities = 0;
+
+        frameCount++;
+        totalTime += dt;
+        totalPairs += candidatePairs.size();
+        totalEntities += dynamicEntities.size();
+
+        if (frameCount >= 60) {
+            std::cout << "\n=== Physics Stats (60 frames avg) ===\n"
+                << "  Dynamic Entities: " << (totalEntities / 60) << "\n"
+                << "  Grid Cells Used: " << partition.Grid().size() << "\n"
+                << "  Candidate Pairs: " << (totalPairs / 60) << "\n"
+                << "  Avg Frame Time: " << ((totalTime / 60.0f) * 1000.0f) << "ms\n"
+                << "======================================\n";
+
+            frameCount = 0;
+            totalTime = 0.0f;
+            totalPairs = 0;
+            totalEntities = 0;
+        }
+#endif
         // 5) (Optional) Additional collision handling per-entity (e.g., callbacks) can be placed here.
     }
 
+
 } // namespace ECS
+
