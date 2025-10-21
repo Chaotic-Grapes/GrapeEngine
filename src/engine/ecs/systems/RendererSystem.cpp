@@ -64,200 +64,170 @@ namespace ECS {
         m_shader->use();
         m_shader->setMat4("uProjection", m_projection);
 
-        m_renderer->beginFrame();
-
         // Determine max layer id present this frame
         int maxLayerId = -1;
-        world.Each<Components::Layer>([&](ECS::Entity, const Components::Layer& ly) {
-	        maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
+        world.Each<Components::Layer>([&](ECS::Entity, const Components::Layer &ly) {
+            maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
         });
 
         // Render per-layer from back (0) to front (max)
+        // Single-pass collection: bucket entities by layer then process each
+        std::vector<std::vector<ECS::Entity>> buckets;
+        buckets.resize(std::max(1, maxLayerId + 1));
+
+        // Collect entities that have LocalTransform + Layer
+        world.Each<Components::LocalTransform, Components::Layer>([&](ECS::Entity entity, Components::LocalTransform& lt, Components::Layer& ly){
+            uint16_t lid = static_cast<uint16_t>(ly.Id);
+            if (lid < buckets.size())
+                buckets[lid].push_back(entity);
+        });
+
+        // Reusable temporary buffers to avoid per-entity allocations
+        thread_local std::vector<glm::vec2> transformedCorners;
+        thread_local std::vector<glm::vec2> polyPoints;
+
+        m_renderer->beginFrame();
+
         for (int layer = 0; layer <= maxLayerId; ++layer) {
-            // Circles
-            world.Each<Components::LocalTransform, Components::ShapeCircle2D, Components::Layer>([&](ECS::Entity entity, Components::LocalTransform& lt, Components::ShapeCircle2D& sc, Components::Layer& ly){
-                if (ly.Id != static_cast<uint16_t>(layer)) return;
-                // Skip if entity has Active component and is disabled
+            if (layer >= (int)buckets.size())
+                continue;
+            
+            const auto& list = buckets[layer];
+            for (ECS::Entity entity : list) {
+                // Skip if entity disabled
                 if (world.Has<Components::Active>(entity)) {
                     const auto& active = world.Get<Components::Active>(entity);
-                    if (!active.Enabled) return;
+                    
+                    if (!active.Enabled)
+                        continue;
                 }
 
-                // Get the effective transform (world if available, local otherwise)
-                Vector3D position, scale;
+                auto& lt = world.Get<Components::LocalTransform>(entity);
+                Vector3D position;
+                Vector3D scale;
                 Quaternion rotation;
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
-                DebugDraw2D::Circle(*m_renderer,
-                    ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sc.Offset),
-                    sc.Radius * ((scale.X + scale.Y) * 0.5f),
-                    ToGlm(sc.Color),
-                    48, 0);
-            });
-
-            // Boxes
-            world.Each<Components::LocalTransform, Components::ShapeBox2D, Components::Layer>([&](ECS::Entity entity, Components::LocalTransform& lt, Components::ShapeBox2D& sb, Components::Layer& ly){
-                if (ly.Id != static_cast<uint16_t>(layer)) return;
-                // Skip if entity has Active component and is disabled
-                if (world.Has<Components::Active>(entity)) {
-                    const auto& active = world.Get<Components::Active>(entity);
-                    if (!active.Enabled) return;
+                // Circles
+                if (world.Has<Components::ShapeCircle2D>(entity)) {
+                    const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                    DebugDraw2D::Circle(*m_renderer,
+                        ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sc.Offset),
+                        sc.Radius * ((scale.X + scale.Y) * 0.5f),
+                        ToGlm(sc.Color),
+                        48, 0);
                 }
 
-                // Get the effective transform (world if available, local otherwise)
-                Vector3D position, scale;
-                Quaternion rotation;
-                GetRenderTransform(world, entity, lt, position, rotation, scale);
+                // Boxes
+                if (world.Has<Components::ShapeBox2D>(entity)) {
+                    const auto& sb = world.Get<Components::ShapeBox2D>(entity);
+                    const float rotationAngle = 2.0f * std::acos(rotation.W);
+                    const bool hasRotation = std::abs(rotationAngle) > 0.01f;
 
-                // Check if rotation is significant (not identity)
-                const float rotationAngle = 2.0f * std::acos(rotation.W); // angle in radians
-                const bool hasRotation = std::abs(rotationAngle) > 0.01f; // threshold for "no rotation"
+                    if (!hasRotation) {
+                        const glm::vec2 halfExtents = ToGlm(Vector2D{sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y});
+                        const glm::vec2 center = ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sb.Offset);
+                        const glm::vec2 min = center - halfExtents;
+                        const glm::vec2 max = center + halfExtents;
 
-                if (!hasRotation) {
-                    // No rotation, use simple axis-aligned rect
-                    const glm::vec2 halfExtents = ToGlm(Vector2D{sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y});
-                    const glm::vec2 center = ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sb.Offset);
-
-                    const glm::vec2 min = center - halfExtents;
-                    const glm::vec2 max = center + halfExtents;
-
-                    if (sb.Filled) {
-                        DebugDraw2D::RectFill(*m_renderer,
-                            min,
-                            max,
-                            ToGlm(sb.Color),
-                            0);
-                    }
+                        if (sb.Filled) {
+                            DebugDraw2D::RectFill(*m_renderer, min, max, ToGlm(sb.Color), 0);
+                        }
+                        else {
+                            DebugDraw2D::RectStroke(*m_renderer, min, max, sb.Thickness, ToGlm(sb.Color), 0);
+                        }
+                    } 
                     else {
-                        DebugDraw2D::RectStroke(*m_renderer,
-                            min,
-                            max,
-                            sb.Thickness,
-                            ToGlm(sb.Color),
-                            0);
-                    }
-                }
-                else {
-                    // Has rotation, render as a transformed polygon (4 corners)
-                    const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                        const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                        transformedCorners.clear(); transformedCorners.reserve(4);
+                        const Vector2D halfExt = sb.HalfExtents;
+                        const Vector3D corners[4] = {
+                            Vector3D{-halfExt.X, -halfExt.Y, 0.0f},
+                            Vector3D{ halfExt.X, -halfExt.Y, 0.0f},
+                            Vector3D{ halfExt.X,  halfExt.Y, 0.0f},
+                            Vector3D{-halfExt.X,  halfExt.Y, 0.0f}
+                        };
+                        
+                        for (auto corner : corners) {
+                            const Vector4D corner4D = m * Vector4D{corner.X, corner.Y, corner.Z, 1.0f};
+                            transformedCorners.push_back(ToGlm(Vector2D{corner4D.X, corner4D.Y}) + ToGlm(sb.Offset));
+                        }
 
-                    // Define box corners in local space (before offset)
-                    const Vector2D halfExt = sb.HalfExtents;
-                    const Vector3D corners[4] = {
-                        Vector3D{-halfExt.X, -halfExt.Y, 0.0f},
-                        Vector3D{ halfExt.X, -halfExt.Y, 0.0f},
-                        Vector3D{ halfExt.X,  halfExt.Y, 0.0f},
-                        Vector3D{-halfExt.X,  halfExt.Y, 0.0f}
-                    };
-
-                    // Transform corners to world space
-                    std::vector<glm::vec2> transformedCorners;
-                    transformedCorners.reserve(4);
-                    for (auto corner : corners) {
-                        const Vector4D corner4D = m * Vector4D{corner.X, corner.Y, corner.Z, 1.0f};
-                        transformedCorners.push_back(ToGlm(Vector2D{corner4D.X, corner4D.Y}) + ToGlm(sb.Offset));
-                    }
-
-                    // Render as polygon
-                    if (sb.Filled) {
-                        DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
-                    }
-                    else {
-                        // Draw outline as 4 lines
-                        for (int i = 0; i < 4; ++i) {
-                            DebugDraw2D::Line(*m_renderer,
-                                transformedCorners[i],
-                                transformedCorners[(i + 1) % 4],
-                                sb.Thickness,
-                                ToGlm(sb.Color),
-                                0);
+                        if (sb.Filled)
+                            DebugDraw2D::Polygon(*m_renderer, transformedCorners, ToGlm(sb.Color), 0);
+                        else {
+                            for (int i = 0; i < 4; ++i) {
+                                DebugDraw2D::Line(*m_renderer, transformedCorners[i], transformedCorners[(i+1)%4], sb.Thickness, ToGlm(sb.Color), 0);
+                            }
                         }
                     }
                 }
-            });
 
-            // Lines
-            world.Each<Components::LocalTransform, Components::ShapeLine2D, Components::Layer>([&](ECS::Entity entity, Components::LocalTransform& lt, Components::ShapeLine2D& sl, Components::Layer& ly){
-                if (ly.Id != static_cast<uint16_t>(layer)) return;
-                // Skip if entity has Active component and is disabled
-                if (world.Has<Components::Active>(entity)) {
-                    const auto& active = world.Get<Components::Active>(entity);
-                    if (!active.Enabled) return;
+                // Lines
+                if (world.Has<Components::ShapeLine2D>(entity)) {
+                    const auto& sl = world.Get<Components::ShapeLine2D>(entity);
+                    DebugDraw2D::Line(*m_renderer,
+                        ToGlm(Vector2D{position.X, position.Y} + sl.A),
+                        ToGlm(Vector2D{position.X, position.Y} + sl.B),
+                        sl.Thickness,
+                        ToGlm(sl.Color), 0);
                 }
 
-                // Get the effective transform (world if available, local otherwise)
-                Vector3D position, scale;
-                Quaternion rotation;
-                GetRenderTransform(world, entity, lt, position, rotation, scale);
+                // Polygons
+                if (world.Has<Components::ShapePolygon2D<32>>(entity)) {
+                    const auto& pl = world.Get<Components::ShapePolygon2D<32>>(entity);
+                    if (pl.Count >= 2) {
+                        const auto m = TransformUtils::MakeTRS(position, rotation, scale);
+                        polyPoints.clear(); polyPoints.reserve(pl.Count);
 
-                DebugDraw2D::Line(*m_renderer,
-                    ToGlm(Vector2D{position.X, position.Y} + sl.A),
-                    ToGlm(Vector2D{position.X, position.Y} + sl.B),
-                    sl.Thickness,
-                    ToGlm(sl.Color), 0);
-            });
-
-            // Polygons (explicit Layer filter and fix point collection)
-            world.Each<Components::LocalTransform, Components::ShapePolygon2D<32>, Components::Layer>([&](ECS::Entity entity, Components::LocalTransform& lt, Components::ShapePolygon2D<32>& pl, Components::Layer& ly){
-                if (ly.Id != static_cast<uint16_t>(layer)) return;
-                // Skip if entity has Active component and is disabled
-                if (world.Has<Components::Active>(entity)) {
-                    const auto& active = world.Get<Components::Active>(entity);
-                    if (!active.Enabled) return;
+                        for (uint32_t i = 0; i < pl.Count; ++i) {
+                            const Vector3D p3{ pl.Points[i].X, pl.Points[i].Y, 0.0f };
+                            const Vector4D hp = m * Vector4D{ p3.X, p3.Y, p3.Z, 1.0f };
+                            polyPoints.push_back(ToGlm(Vector2D{ hp.X, hp.Y }));
+                        }
+                        DebugDraw2D::Polygon(*m_renderer, polyPoints, ToGlm(pl.FillColor), 0);
+                    }
                 }
 
-                if (pl.Count < 2)
-                    return;
-
-                // Get the effective transform (world if available, local otherwise)
-                Vector3D position, scale;
-                Quaternion rotation;
-                GetRenderTransform(world, entity, lt, position, rotation, scale);
-
-                const auto m = TransformUtils::MakeTRS(position, rotation, scale);
-
-                // Transform to world in a small stack buffer (avoid heap)
-                std::vector<glm::vec2> points;
-                points.reserve(pl.Count);
-                for (uint32_t i = 0; i < pl.Count; ++i) {
-                    // Promote to 3D -> multiply -> project to XY
-                    const Vector3D p3{ pl.Points[i].X, pl.Points[i].Y, 0.0f };
-                    const Vector4D hp = m * Vector4D{ p3.X, p3.Y, p3.Z, 1.0f };
-                    points.push_back(ToGlm(Vector2D{ hp.X, hp.Y }));
+                // SpriteRenderer
+                if (world.Has<Components::SpriteRenderer2D>(entity)) {
+                    const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
+                    
+                    m_renderer->submitSprite({
+                        ToGlm(Vector2D{position.X, position.Y}),
+                        ToGlm(Vector2D{scale.X, scale.Y}),
+                        {0.f, 0.f, 1.f, 1.f},
+                        ToGlm(sr.Color),
+                        sr.TextureId,
+                        glm::radians(2 * acos(rotation.W)),
+                        1.0f
+                    });
                 }
-
-                DebugDraw2D::Polygon(*m_renderer,
-                    points,
-                    ToGlm(pl.FillColor),
-                    0);
-            });
-
-            // SpriteRenderers
-            world.Each<Components::LocalTransform, Components::SpriteRenderer2D, Components::Layer>([&](ECS::Entity entity, Components::LocalTransform& lt, Components::SpriteRenderer2D& sr, Components::Layer& ly) {
-                if (ly.Id != static_cast<uint16_t>(layer)) return;
-                // Skip if entity has Active component and is disabled
-                if (world.Has<Components::Active>(entity)) {
-                    const auto& active = world.Get<Components::Active>(entity);
-                    if (!active.Enabled) return;
-                }
-
-                // Get the effective transform (world if available, local otherwise)
-                Vector3D position, scale;
-                Quaternion rotation;
-                GetRenderTransform(world, entity, lt, position, rotation, scale);
-
-                m_renderer->submitSprite({
-                    ToGlm(Vector2D{position.X, position.Y}),        // pos
-                    ToGlm(Vector2D{scale.X, scale.Y}),              // size
-                    {0.f, 0.f, 1.f, 1.f},               // uv
-                    ToGlm(sr.Color),                                // color
-                    sr.TextureId,                                   // textureId (GLuint)
-                    glm::radians(2 * acos(rotation.W)),      // rotation (radians)
-                    1.0f                                            // uniformScale
-                });
-            });
+            }
         }
 
         m_renderer->endFrame();
+
+        if (Time::FrameCount() % 60 == 0)
+        {
+            // Renderer exposes a cumulative flush counter. Compute per-frame
+            // flushes by tracking the previous total and taking the delta.
+            static int previousFlushTotal = 0;
+            int currentTotal = GetFlushCount();
+            int flushes = currentTotal - previousFlushTotal;
+            previousFlushTotal = currentTotal;
+            LOG_DEBUG("=== RENDERER ANALYSIS ===");
+            LOG_DEBUG("Flushes this frame: " << flushes);
+            if (flushes > 10)
+            {
+                LOG_DEBUG("Too many flushes! Likely texture switches or buffer overflows...");
+            }
+            else if (flushes == 1)
+            {
+                LOG_DEBUG("Single batch, bottleneck is CPU-side or GPU fillrate");
+            }
+            LOG_DEBUG("FPS: " << (1.0f / Time::DeltaTime()));
+            LOG_DEBUG("=========================");
+        }
     }
 }

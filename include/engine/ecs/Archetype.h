@@ -49,10 +49,8 @@ namespace ECS {
 		 */
         Archetype(Signature sig, std::vector<ComponentInfo> infos, const uint32_t chunkCapacity = 256, const size_t chunkTargetBytes = 16384)
             : m_signature(std::move(sig)), m_chunkCapacity(chunkCapacity) {
-            for (uint32_t i = 0; i < infos.size(); ++i) {
-                m_idToCompIndex[infos[i].Id] = i;
-            }
-
+            // Component infos are provided in Signature order which is sorted by TypeId.
+            // Keep them as-is to enable cache-friendly binary searches without hashing.
             m_componentInfos = std::move(infos);
             _buildLayout(chunkTargetBytes);
             _newChunk();
@@ -69,14 +67,28 @@ namespace ECS {
 		 * @param t The TypeId of the component to check for.
 		 * @return True if the component type is present in the archetype, false otherwise.
          */
-        bool Has(const TypeId t) const noexcept                 { return m_idToCompIndex.find(t) != m_idToCompIndex.end(); }
+        bool Has(const TypeId t) const noexcept {
+            // Use lower_bound with (element, value) comparator to avoid reversed comparator calls.
+            auto it = std::lower_bound(
+                m_componentInfos.begin(), m_componentInfos.end(), t,
+                [](const ComponentInfo& ci, const TypeId v) { return ci.Id < v; }
+            );
+            return it != m_componentInfos.end() && it->Id == t;
+        }
 
         /**
 		 * @brief Gets the component index for the given component type.
 		 * @param t The TypeId of the component.
 		 * @return The index of the component within the archetype.
          */
-        ComponentIndex GetComponentIndex(const TypeId t) const  { return m_idToCompIndex.at(t); }
+        ComponentIndex GetComponentIndex(const TypeId t) const {
+            auto it = std::lower_bound(
+                m_componentInfos.begin(), m_componentInfos.end(), t,
+                [](const ComponentInfo& ci, const TypeId v) { return ci.Id < v; }
+            );
+            assert(it != m_componentInfos.end() && it->Id == t);
+            return static_cast<ComponentIndex>(static_cast<uint32_t>(it - m_componentInfos.begin()));
+        }
 
         /**
 		 * @brief Gets the number of chunks in this archetype.
@@ -127,10 +139,14 @@ namespace ECS {
          */
         template<typename T>
         T* Get(const uint32_t chunkIndex, const uint32_t slot) {
-            auto it = m_idToCompIndex.find(TypeIdOf<T>());
-            assert(it != m_idToCompIndex.end());
-
-            return static_cast<T*>(m_chunks[chunkIndex]->ComponentPtr(it->second, slot));
+            const TypeId t = TypeIdOf<T>();
+            auto it = std::lower_bound(
+                m_componentInfos.begin(), m_componentInfos.end(), t,
+                [](const ComponentInfo& ci, const TypeId v) { return ci.Id < v; }
+            );
+            assert(it != m_componentInfos.end() && it->Id == t);
+            const ComponentIndex idx = static_cast<ComponentIndex>(static_cast<uint32_t>(it - m_componentInfos.begin()));
+            return static_cast<T*>(m_chunks[chunkIndex]->ComponentPtr(idx, slot));
         }
 
         /**
@@ -141,10 +157,13 @@ namespace ECS {
          * @return A void pointer to the component data.
          */
         void* GetRaw(const TypeId t, const uint32_t chunkIndex, const uint32_t slot) {
-            const auto it = m_idToCompIndex.find(t);
-            assert(it != m_idToCompIndex.end());
-
-            return m_chunks[chunkIndex]->ComponentPtr(it->second, slot);
+            auto it = std::lower_bound(
+                m_componentInfos.begin(), m_componentInfos.end(), t,
+                [](const ComponentInfo& ci, const TypeId v) { return ci.Id < v; }
+            );
+            assert(it != m_componentInfos.end() && it->Id == t);
+            const ComponentIndex idx = static_cast<ComponentIndex>(static_cast<uint32_t>(it - m_componentInfos.begin()));
+            return m_chunks[chunkIndex]->ComponentPtr(idx, slot);
         }
 
         /**
@@ -210,7 +229,6 @@ namespace ECS {
 
     private:
         Signature m_signature;
-        std::unordered_map<TypeId, ComponentIndex> m_idToCompIndex;
         std::vector<ComponentInfo> m_componentInfos;
         std::vector<ChunkLayoutEntry> m_layout;
         std::vector<std::unique_ptr<Chunk>> m_chunks;

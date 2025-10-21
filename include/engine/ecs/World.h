@@ -25,6 +25,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_set>
 #include <vector>
 #include <type_traits>
+#include <array>
+#include <utility>
 #include <cassert>
 #include <functional>
 #include "ecs/Entity.h"
@@ -237,25 +239,52 @@ namespace ECS {
         void Each(TFn&& fn) {
             const Signature req(std::vector<TypeId>{ TypeIdOf<std::decay_t<Ts>>()... });
 
-            for (auto& kv : m_archetypes) {
-                auto& archPtr = kv.second;
+            // Precompute TypeIds into an array for this invocation
+            const std::array<TypeId, sizeof...(Ts)> typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
 
-                if (!archPtr)
+            // Use cached matching archetypes to avoid re-scanning all archetypes
+            const auto& matched = _getMatchingArchetypes(req);
+            for (Archetype* arch : matched) {
+                if (!arch) continue;
+
+                // Precompute component indices for this archetype to avoid map lookups per entity
+                std::array<uint32_t, sizeof...(Ts)> compIdxs{};
+                for (size_t k = 0; k < compIdxs.size(); ++k) {
+                    compIdxs[k] = static_cast<uint32_t>(arch->GetComponentIndex(typeIds[k]));
+                }
+
+                // Lookup chunk mapping once per archetype
+                const auto it = m_chunkIndices.find(arch);
+                if (it == m_chunkIndices.end())
                     continue;
-                if (!archPtr->GetSignature().ContainsAll(req))
-                    continue;
+                const auto& chunkIndexMapping = it->second.Entities;
 
-                auto& arch = *archPtr;
+                for (uint32_t ci = 0; ci < arch->GetChunkCount(); ++ci) {
+                    const Chunk* ch = arch->GetChunk(ci);
 
-                for (uint32_t ci = 0; ci < arch.GetChunkCount(); ++ci) {
-                    const Chunk* ch = arch.GetChunk(ci);
+                    if (ci >= chunkIndexMapping.size())
+                        continue;
+
+                    const auto& vec = chunkIndexMapping[ci];
 
                     for (uint32_t i = 0; i < ch->Count(); ++i) {
-                        Entity ent = _reverseEntity(arch, ci, i);
+                        if (i >= vec.size())
+                            continue;
 
+                        const Entity ent = vec[i];
                         if (ent.IsNull())
                             continue;
-                        fn(ent, (*static_cast<std::decay_t<Ts>*>(arch.GetRaw(TypeIdOf<std::decay_t<Ts>>(), ci, i)))...);
+
+                        // Gather pointers for each requested component in this slot
+                        std::array<void*, sizeof...(Ts)> ptrs{};
+                        for (size_t pi = 0; pi < ptrs.size(); ++pi) {
+                            ptrs[pi] = const_cast<void*>(ch->ComponentPtr(static_cast<uint32_t>(compIdxs[pi]), i));
+                        }
+
+                        // Call the function with properly casted references
+                        std::apply([&](auto&&... p) {
+                            fn(ent, (*static_cast<std::decay_t<Ts>*>(p))...);
+                        }, ptrs);
                     }
                 }
             }
@@ -270,26 +299,50 @@ namespace ECS {
         template<typename... Ts, typename TFn>
         void Each(TFn&& fn) const {
             const Signature req(std::vector<TypeId>{ TypeIdOf<std::decay_t<Ts>>()... });
+            // Precompute TypeIds
+            const std::array<TypeId, sizeof...(Ts)> typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
 
-            for (const auto& kv : m_archetypes) {
-                const auto& archPtr = kv.second;
+            // Use cached matching archetypes to avoid re-scanning all archetypes
+            const auto& matched = _getMatchingArchetypes(req);
+            for (const Archetype* arch : matched) {
+                if (!arch) continue;
 
-                if (!archPtr)
+                // Precompute component indices for this archetype
+                std::array<uint32_t, sizeof...(Ts)> compIdxs{};
+                for (size_t k = 0; k < compIdxs.size(); ++k) {
+                    compIdxs[k] = static_cast<uint32_t>(arch->GetComponentIndex(typeIds[k]));
+                }
+
+                // Lookup chunk mapping once per archetype
+                const auto it = m_chunkIndices.find(const_cast<Archetype*>(arch));
+                if (it == m_chunkIndices.end())
                     continue;
-                if (!archPtr->GetSignature().ContainsAll(req))
-                    continue;
+                const auto& chunkIndexMapping = it->second.Entities;
 
-                const auto& arch = *archPtr;
+                for (uint32_t ci = 0; ci < arch->GetChunkCount(); ++ci) {
+                    const Chunk* ch = arch->GetChunk(ci);
 
-                for (uint32_t ci = 0; ci < arch.GetChunkCount(); ++ci) {
-                    const Chunk* ch = arch.GetChunk(ci);
+                    if (ci >= chunkIndexMapping.size())
+                        continue;
+
+                    const auto& vec = chunkIndexMapping[ci];
 
                     for (uint32_t i = 0; i < ch->Count(); ++i) {
-                        Entity ent = _reverseEntity(arch, ci, i);
+                        if (i >= vec.size())
+                            continue;
 
+                        const Entity ent = vec[i];
                         if (ent.IsNull())
                             continue;
-                        fn(ent, (*static_cast<const std::decay_t<Ts>*>(arch.GetRaw(TypeIdOf<std::decay_t<Ts>>(), ci, i)))...);
+
+                        std::array<const void*, sizeof...(Ts)> ptrs{};
+                        for (size_t pi = 0; pi < ptrs.size(); ++pi) {
+                            ptrs[pi] = ch->ComponentPtr(static_cast<uint32_t>(compIdxs[pi]), i);
+                        }
+
+                        std::apply([&](auto&&... p) {
+                            fn(ent, (*static_cast<const std::decay_t<Ts>*>(p))...);
+                        }, ptrs);
                     }
                 }
             }
@@ -532,6 +585,10 @@ namespace ECS {
             Archetype* ptr = arch.get();
             m_archetypes.emplace(sig, std::move(arch));
             m_chunkIndices[ptr] = ChunkIndex{};
+
+            // Invalidate query cache when a new archetype is created
+            ++m_archetypeVersion;
+            m_queryCache.clear();
 
             return ptr;
         }
@@ -805,6 +862,23 @@ namespace ECS {
             m_hierarchy.NextSibling.erase(e);
         }
 
+        // Returns cached list of archetypes that contain all components in 'req'.
+        // Cached data is invalidated whenever new archetypes are created.
+        const std::vector<Archetype*>& _getMatchingArchetypes(const Signature& req) const {
+            auto it = m_queryCache.find(req);
+            if (it != m_queryCache.end()) return it->second;
+
+            auto& vec = m_queryCache[req];
+            vec.reserve(m_archetypes.size());
+            for (const auto& kv : m_archetypes) {
+                const auto& archPtr = kv.second;
+                if (archPtr && archPtr->GetSignature().ContainsAll(req)) {
+                    vec.push_back(archPtr.get());
+                }
+            }
+            return m_queryCache.at(req);
+        }
+
     private:
         uint32_t m_chunkCapacity = 256;
         size_t m_chunkBytes = 16384; // 16 * 1024;
@@ -818,6 +892,11 @@ namespace ECS {
         std::unordered_map<TypeId, std::pair<size_t,size_t>> m_componentSizes;
 
         HierarchyIndex m_hierarchy;
+
+        // Query cache: maps a required signature to matching archetypes.
+        // Mutable to allow filling cache in const Each.
+        mutable std::unordered_map<Signature, std::vector<Archetype*>, SignatureHash> m_queryCache;
+        uint64_t m_archetypeVersion = 0;
 
         using DeferredCmd = std::function<void(World&)>;
         std::vector<DeferredCmd> m_deferred;
