@@ -297,6 +297,8 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<SpriteFlip2D>, "SpriteFlip2D must be trivially copyable");
 
+        // TODO: Add Shader components
+
         // ---------- Minimal 2D shape data for debug rendering ----------
         // Keep these POD to be fast and compatible with archetype moves.
 

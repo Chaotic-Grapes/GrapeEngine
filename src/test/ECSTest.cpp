@@ -591,8 +591,9 @@ void ECSTestScene::_testPhysicsBasic() {
         const Entity e = CreateOnLayer(m_physicsLayer,
             Components::LocalTransform{ Vector3D{100, m_worldHeight * 0.5f, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::Rigidbody2D{ 1.f, 1.f, 0.1f, 0.0f, 1.0f, 0 },
-            Components::LinearVelocity2D{ Vector2D{200.f, 0.f} },
+            Components::LinearVelocity2D{ Vector2D{1000.f, 0.f} },
             Components::AngularVelocity2D{ 0.f },
+            Components::PhysicsMaterial2D{},
             Components::CircleCollider2D{ 25.f, Vector2D{0,0}, 0xFFFFFFFF, 0 },
             Components::ShapeCircle2D{ 25.f, Vector2D{0,0}, Color{1.f,1.f,0.f,1.f}, 0.f, true },
             Components::Name{"Physics_Basic"}
@@ -623,7 +624,7 @@ void ECSTestScene::_testPhysicsGravity() {
                     Vector3D{1,1,1} 
                 },
                 Components::Rigidbody2D{ 1.f, 1.f, 0.0f, 0.0f, 1.0f + i * 0.5f, 0x02 }, // UseGravity flag
-                Components::LinearVelocity2D{ Vector2D{0.f, 0.f} },
+                Components::LinearVelocity2D{ Vector2D{500.f, 0.f} },
                 Components::AngularVelocity2D{ 0.f },
                 Components::CircleCollider2D{ 20.f, Vector2D{0,0}, 0xFFFFFFFF, 0 },
                 Components::ShapeCircle2D{ 20.f, Vector2D{0,0}, 

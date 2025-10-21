@@ -16,6 +16,7 @@
 
 #include <nlohmann/json.hpp>
 #include <unordered_map>
+#include <utility>
 #include <functional>
 #include <string>
 #include "ecs/Entity.h"
@@ -24,6 +25,26 @@
 #include <helpers/EntityUtils.h>
 
 using json = nlohmann::json;
+
+#pragma region nlohmann_adl_helpers
+// ADL helpers: call unqualified to_json/from_json with 'using' to enable ADL
+namespace Serialization {
+	template<typename U>
+	inline void to_json_adl(nlohmann::json& j, const U& v) {
+		using nlohmann::to_json;
+		to_json(j, v);
+	}
+
+	template<typename U>
+	inline U from_json_adl(const nlohmann::json& j) {
+		U tmp;
+		using nlohmann::from_json;
+		from_json(j, tmp);
+		return tmp;
+	}
+}
+#pragma endregion
+
 #define REGISTER_COMPONENT_SERIALIZER(VAR, TYPE) \
     namespace { const bool _registered_##VAR = (Serialization::EntitySerializer::RegisterComponent<TYPE>(#TYPE), true); }
 
@@ -37,37 +58,42 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Color, R, G, B, A)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Matrix4x4, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33)
 
 // --- ECS Component Serialization Definitions ---
-
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Name, Value)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::TagMask, Mask)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Active, Enabled)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Lifetime, Time)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Layer, Id)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::LocalTransform, Position, Rotation, Scale)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::WorldTransform, Matrix, Dirty)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Velocity, Value)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Acceleration, Value)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::AngularVelocity, Value)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Rigidbody, Mass, InverseMass, LinearDrag, AngularDrag, Flags)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::PhysicsMaterial2D, Friction, Restitution, PositionCorrectPercent)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::BoxCollider, HalfExtents, LayerMask)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::SphereCollider, Radius, LayerMask)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::LinearVelocity2D, Value)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Acceleration2D, Value)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::AngularVelocity2D, Value)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Rigidbody2D, Mass, InverseMass, LinearDamping, AngularDamping, GravityScale, Flags)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::BoxCollider2D, HalfExtents, Offset, Rotation, LayerMask, Flags)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::CircleCollider2D, Radius, Offset, LayerMask, Flags)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::SpriteRenderer2D, TextureId, Color, Tiling, Offset)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::SpriteFlip2D, FlipX, FlipY)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::ShapeCircle2D, Radius, Offset, Color, Thickness, Filled)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::ShapeBox2D, HalfExtents, Offset, Color, Thickness, Filled)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::ShapeLine2D, A, B, Color, Thickness)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::ZIndex2D, ZOrder)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::Camera, IsOrthographic, FovY, OrthoHeight, Near, Far, Aspect)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::CameraMatrices, View, Projection, ViewProjection)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::ScriptId, Id)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ECS::Components::AudioSource, CueId, Volume, Pitch, Loop)
+namespace ECS { 
+	namespace Components {
+		// Place component-specific NLOHMANN macros inside the component namespace so ADL
+		// can locate the generated to_json/from_json overloads for these types.
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Name, Value)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TagMask, Mask)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Active, Enabled)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Lifetime, Time)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Layer, Id)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(LocalTransform, Position, Rotation, Scale)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WorldTransform, Matrix, Dirty)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Velocity, Value)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Acceleration, Value)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AngularVelocity, Value)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Rigidbody, Mass, InverseMass, LinearDrag, AngularDrag, Flags)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PhysicsMaterial2D, Friction, Restitution, PositionCorrectPercent)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxCollider, HalfExtents, LayerMask)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SphereCollider, Radius, LayerMask)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(LinearVelocity2D, Value)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Acceleration2D, Value)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AngularVelocity2D, Value)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Rigidbody2D, Mass, InverseMass, LinearDamping, AngularDamping, GravityScale, Flags)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxCollider2D, HalfExtents, Offset, Rotation, LayerMask, Flags)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CircleCollider2D, Radius, Offset, LayerMask, Flags)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteRenderer2D, TextureId, Color, Tiling, Offset)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteFlip2D, FlipX, FlipY)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeCircle2D, Radius, Offset, Color, Thickness, Filled)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeBox2D, HalfExtents, Offset, Color, Thickness, Filled)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeLine2D, A, B, Color, Thickness)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ZIndex2D, ZOrder)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera, IsOrthographic, FovY, OrthoHeight, Near, Far, Aspect)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScriptId, Id)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop)
+	} 
+}
 
 namespace Serialization {
 	class EntitySerializer {
@@ -97,16 +123,18 @@ namespace Serialization {
 				[](const ECS::World& world, ECS::Entity e, json& j) {
 					if (world.Has<T>(e)) {
 						const T& component = world.Get<T>(e); // Retrieve the component
-						j = json(component); // Explicitly convert the component to JSON
+						Serialization::to_json_adl<T>(j, component);
+					} else {
+						j = nullptr;
 					}
 				},
 				// Deserialize
 				[](ECS::World& world, ECS::Entity e, const json& j) {
 					if (world.Has<T>(e)) {
-						world.Set<T>(e, j.get<T>());
+						world.template Set<T>(e, Serialization::from_json_adl<T>(j));
 					}
 					else {
-						world.Add<T>(e, j.get<T>());
+						world.template Add<T>(e, Serialization::from_json_adl<T>(j));
 					}
 				}
 			};

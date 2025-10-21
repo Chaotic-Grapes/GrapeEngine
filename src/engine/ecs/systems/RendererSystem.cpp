@@ -1,6 +1,7 @@
 #include "ecs/systems/RendererSystem.h"
 #include "core/Application.h"
 #include "graphics/renderer.hpp"
+#include <algorithm>
 #include <iterator>
 #include "services/WindowManager.h"
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,7 +12,7 @@
 namespace ECS {
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
-    static void GetRenderTransform(World& world, Entity entity, 
+    static void GetRenderTransform(World& world, const Entity entity, 
                                    const Components::LocalTransform& lt,
                                    Vector3D& outPosition, Quaternion& outRotation, Vector3D& outScale) {
         if (world.Has<Components::WorldTransform>(entity)) {
@@ -25,6 +26,7 @@ namespace ECS {
             outScale = lt.Scale;
         }
     }
+
     void RendererSystem::Initialize() {
         if (m_initialized)
             return;
@@ -67,7 +69,7 @@ namespace ECS {
         // Determine max layer id present this frame
         int maxLayerId = -1;
         world.Each<Components::Layer>([&](ECS::Entity, const Components::Layer& ly) {
-            if (static_cast<int>(ly.Id) > maxLayerId) maxLayerId = static_cast<int>(ly.Id);
+	        maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
         });
 
         // Render per-layer from back (0) to front (max)
@@ -113,11 +115,11 @@ namespace ECS {
 
                 if (!hasRotation) {
                     // No rotation, use simple axis-aligned rect
-                    glm::vec2 halfExtents = ToGlm(Vector2D{sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y});
-                    glm::vec2 center = ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sb.Offset);
+                    const glm::vec2 halfExtents = ToGlm(Vector2D{sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y});
+                    const glm::vec2 center = ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sb.Offset);
 
-                    glm::vec2 min = center - halfExtents;
-                    glm::vec2 max = center + halfExtents;
+                    const glm::vec2 min = center - halfExtents;
+                    const glm::vec2 max = center + halfExtents;
 
                     if (sb.Filled) {
                         DebugDraw2D::RectFill(*m_renderer,
@@ -137,11 +139,11 @@ namespace ECS {
                 }
                 else {
                     // Has rotation, render as a transformed polygon (4 corners)
-                    const Matrix4x4 M = TransformUtils::MakeTRS(position, rotation, scale);
+                    const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
 
                     // Define box corners in local space (before offset)
-                    Vector2D halfExt = sb.HalfExtents;
-                    Vector3D corners[4] = {
+                    const Vector2D halfExt = sb.HalfExtents;
+                    const Vector3D corners[4] = {
                         Vector3D{-halfExt.X, -halfExt.Y, 0.0f},
                         Vector3D{ halfExt.X, -halfExt.Y, 0.0f},
                         Vector3D{ halfExt.X,  halfExt.Y, 0.0f},
@@ -151,8 +153,8 @@ namespace ECS {
                     // Transform corners to world space
                     std::vector<glm::vec2> transformedCorners;
                     transformedCorners.reserve(4);
-                    for (int i = 0; i < 4; ++i) {
-                        Vector4D corner4D = M * Vector4D{corners[i].X, corners[i].Y, corners[i].Z, 1.0f};
+                    for (auto corner : corners) {
+                        const Vector4D corner4D = m * Vector4D{corner.X, corner.Y, corner.Z, 1.0f};
                         transformedCorners.push_back(ToGlm(Vector2D{corner4D.X, corner4D.Y}) + ToGlm(sb.Offset));
                     }
 
@@ -212,15 +214,15 @@ namespace ECS {
                 Quaternion rotation;
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
-                const auto M = TransformUtils::MakeTRS(position, rotation, scale);
+                const auto m = TransformUtils::MakeTRS(position, rotation, scale);
 
                 // Transform to world in a small stack buffer (avoid heap)
                 std::vector<glm::vec2> points;
                 points.reserve(pl.Count);
                 for (uint32_t i = 0; i < pl.Count; ++i) {
                     // Promote to 3D -> multiply -> project to XY
-                    Vector3D p3{ pl.Points[i].X, pl.Points[i].Y, 0.0f };
-                    Vector4D hp = M * Vector4D{ p3.X, p3.Y, p3.Z, 1.0f };
+                    const Vector3D p3{ pl.Points[i].X, pl.Points[i].Y, 0.0f };
+                    const Vector4D hp = m * Vector4D{ p3.X, p3.Y, p3.Z, 1.0f };
                     points.push_back(ToGlm(Vector2D{ hp.X, hp.Y }));
                 }
 
@@ -247,10 +249,10 @@ namespace ECS {
                 m_renderer->submitSprite({
                     ToGlm(Vector2D{position.X, position.Y}),        // pos
                     ToGlm(Vector2D{scale.X, scale.Y}),              // size
-                    {0.f, 0.f, 1.f, 1.f},                           // uv
+                    {0.f, 0.f, 1.f, 1.f},               // uv
                     ToGlm(sr.Color),                                // color
                     sr.TextureId,                                   // textureId (GLuint)
-                    glm::radians(2 * acos(rotation.W)),             // rotation (radians)
+                    glm::radians(2 * acos(rotation.W)),      // rotation (radians)
                     1.0f                                            // uniformScale
                 });
             });
