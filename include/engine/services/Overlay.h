@@ -123,6 +123,8 @@ public:
      */
     void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
 
+    bool IsGamePlaying() const { return m_debugUI && m_debugUI->IsPlaying(); }
+
 private:
     Audio::FmodAudioDevice* m_audioDevice = nullptr;  ///< Pointer to audio system for debug monitoring
 

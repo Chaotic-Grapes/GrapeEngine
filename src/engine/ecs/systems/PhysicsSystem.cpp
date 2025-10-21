@@ -3,6 +3,7 @@
 #include <iostream>
 #include "physics/Collision.h"
 #include "ecs/Entity.h"
+#include <services/Overlay.h>
 
 namespace Engine {
     Vector2D PhysicsSystem::m_gravity = Vector2D(0.0f, -9.81f);
@@ -14,6 +15,11 @@ namespace Engine {
 
     void PhysicsSystem::OnUpdate() {
         if (!m_enabled) return;
+
+        auto* overlay = m_world->GetSystem<Overlay>();
+        if (!overlay || !overlay->IsGamePlaying()) {
+            return;  // Don't run physics in editor mode
+        }
 
         // Query once
         const auto entities = m_world->GetEntityManager().Query<Component::Rigidbody2D, Component::Transform>();

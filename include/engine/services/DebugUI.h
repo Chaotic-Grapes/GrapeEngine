@@ -238,6 +238,7 @@ public:
 
 private:
     GameState m_gameState = GameState::Stopped;
+    nlohmann::json m_savedWorldState;
 
     DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
     World* m_world;             ///< Pointer to World object for entity management
@@ -258,6 +259,8 @@ private:
     mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;       ///< Cached header collapse states
 
     void _showPlayStopControls();
+    void _saveWorldState();
+    void _restoreWorldState();
 
     /**
      * @brief Render the main engine debug window

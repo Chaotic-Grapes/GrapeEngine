@@ -1,7 +1,7 @@
 /**
- * @file Overlay.cpp
- * @author Foo Rui Qin
- * @date 2024
+ * @file    Overlay.cpp
+ * @author  Foo Rui Qin
+ * @date    2025
  * @brief Implementation of the Overlay system for debug UI management
  * 
  * This file implements the Overlay class which serves as a system-level wrapper

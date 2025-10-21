@@ -223,6 +223,7 @@ void DebugUI::_showPlayStopControls() {
         ImGui::BeginDisabled();
     }
     if (ImGui::Button("PLAY", ImVec2(125, 40))) {
+        _saveWorldState();
         m_gameState = GameState::Playing;
         LOG_INFO("Game started");
     }
@@ -238,6 +239,7 @@ void DebugUI::_showPlayStopControls() {
         ImGui::BeginDisabled();
     }
     if (ImGui::Button("STOP", ImVec2(125, 40))) {
+        _restoreWorldState();
         m_gameState = GameState::Stopped;
         LOG_INFO("Game stopped");
     }
@@ -246,6 +248,45 @@ void DebugUI::_showPlayStopControls() {
     }
 
     ImGui::End();
+}
+
+void DebugUI::_saveWorldState() {
+    if (!HasValidWorld()) return;
+
+    LOG_INFO("Saving world state...");
+
+    // Get all entities and serialize them
+    auto entities = m_world->GetEntityManager().GetAllEntities();
+    nlohmann::json worldJson = nlohmann::json::array();
+
+    for (const auto& entityId : entities) {
+        auto entity = m_world->GetEntityManager().GetEntity(entityId);
+        auto entityJson = Serialization::EntitySerializer::SerializeEntity(entity);
+        worldJson.push_back(entityJson);
+    }
+
+    m_savedWorldState = worldJson;
+    LOG_INFO("Saved " << entities.size() << " entities");
+}
+
+void DebugUI::_restoreWorldState() {
+    if (!HasValidWorld() || m_savedWorldState.empty()) {
+        LOG_WARNING("No saved state to restore");
+        return;
+    }
+
+    LOG_INFO("Restoring world state...");
+
+    // Delete all current entities
+    m_world->GetEntityManager().DestroyAllEntities();
+
+    // Recreate from saved JSON
+    for (const auto& entityJson : m_savedWorldState) {
+        Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+    }
+
+    _invalidateCache();
+    LOG_INFO("World restored");
 }
 
 void DebugUI::_showEngineDebugWindow() {
