@@ -66,12 +66,14 @@ namespace ECS {
         world.Each<Components::Rigidbody2D, Components::LinearVelocity2D, Components::AngularVelocity2D, Components::LocalTransform>(
             [&](const Entity entity, const Components::Rigidbody2D& rb, Components::LinearVelocity2D& linearVel, const Components::AngularVelocity2D& angularVel, Components::LocalTransform& transform) {
                 // Skip disabled entities
-                if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) return;
-                if (rb.Mass <= 0.0f) return; // static bodies don't integrate here
-
-                if (linearVel.Value.Length() < 0.05f) {
-                    return;  // Don't integrate, don't add to dynamicEntities
+                if (const auto* active = world.TryGet<Components::Active>(entity)) {
+                    if (!active->Enabled) return;
                 }
+                if (rb.Mass <= 0.0f || linearVel.Value.Length() < 0.05f)
+                    return; // static bodies don't integrate here
+
+                if (linearVel.Value.Length() < 0.05f)
+                    return;  // Don't integrate, don't add to dynamicEntities
 
                 // Apply forces & gravity
                 Vector2D acceleration = Engine::Physics::CalculateAcceleration(rb, linearVel);
@@ -87,20 +89,21 @@ namespace ECS {
                 }
 
                 // World bounds constraint (keep integrated pos in sync)
-                if (Engine::Physics::IsWorldBoundsEnabled() && world.Has<Components::CircleCollider2D>(entity)) {
-                    const auto& collider = world.Get<Components::CircleCollider2D>(entity);
-                    Vector2D pos2D(transform.Position.X, transform.Position.Y);
-                    Vector2D vel2D = linearVel.Value;
+                if (Engine::Physics::IsWorldBoundsEnabled()) {
+                    if (const auto* collider = world.TryGet<Components::CircleCollider2D>(entity)) {
+                        Vector2D pos2D(transform.Position.X, transform.Position.Y);
+                        Vector2D vel2D = linearVel.Value;
 
-                    float entityRestitution = -1.0f;
-                    if (world.Has<Components::PhysicsMaterial2D>(entity)) {
-                        entityRestitution = world.Get<Components::PhysicsMaterial2D>(entity).Restitution;
-                    }
+                        float entityRestitution = -1.0f;
+                        if (const auto* mat = world.TryGet<Components::PhysicsMaterial2D>(entity)) {
+                            entityRestitution = mat->Restitution;
+                        }
 
-                    if (Engine::Physics::ApplyBoundaryConstraint(pos2D, vel2D, collider.Radius, Engine::Physics::GetWorldBounds(), entityRestitution)) {
-                        transform.Position.X = pos2D.X;
-                        transform.Position.Y = pos2D.Y;
-                        linearVel.Value = vel2D;
+                        if (Engine::Physics::ApplyBoundaryConstraint(pos2D, vel2D, collider->Radius, Engine::Physics::GetWorldBounds(), entityRestitution)) {
+                            transform.Position.X = pos2D.X;
+                            transform.Position.Y = pos2D.Y;
+                            linearVel.Value = vel2D;
+                        }
                     }
                 }
 
@@ -111,7 +114,9 @@ namespace ECS {
         SpatialPartitioning partition;
         partition.Grid().reserve(1024); // hint (implementation dependent)
         world.Each<Components::LocalTransform, Components::CircleCollider2D>([&](const Entity entity, const Components::LocalTransform& transform, const Components::CircleCollider2D& collider) {
-            if (world.Has<Components::Active>(entity) && !world.Get<Components::Active>(entity).Enabled) return;
+            if (const auto* active = world.TryGet<Components::Active>(entity)) {
+                if (!active->Enabled) return;
+            }
             const Vector3D center = transform.Position + Vector3D(collider.Offset.X, collider.Offset.Y, 0.0f);
             partition.Insert(entity, center, collider.Radius);
         });
@@ -155,23 +160,32 @@ namespace ECS {
 
                 // Validate entities and required components
                 if (!world.IsAlive(A) || !world.IsAlive(B)) continue;
-                if (!world.Has<Components::LocalTransform>(A) || !world.Has<Components::LocalTransform>(B)) continue;
-                if (!world.Has<Components::CircleCollider2D>(A) || !world.Has<Components::CircleCollider2D>(B)) continue;
+                
+                auto [tA_ptr, cA_ptr] = world.TryGetComponents<Components::LocalTransform, Components::CircleCollider2D>(A);
+                auto [tB_ptr, cB_ptr] = world.TryGetComponents<Components::LocalTransform, Components::CircleCollider2D>(B);
+                
+                if (!tA_ptr || !cA_ptr || !tB_ptr || !cB_ptr) continue;
 
                 // Skip disabled actives
-                if (world.Has<Components::Active>(A) && !world.Get<Components::Active>(A).Enabled) continue;
-                if (world.Has<Components::Active>(B) && !world.Get<Components::Active>(B).Enabled) continue;
+                if (const auto* activeA = world.TryGet<Components::Active>(A)) {
+                    if (!activeA->Enabled) continue;
+                }
+                if (const auto* activeB = world.TryGet<Components::Active>(B)) {
+                    if (!activeB->Enabled) continue;
+                }
 
                 // If neither has a rigidbody/velocity, skip (no dynamic response)
-                if ((!world.Has<Components::Rigidbody2D>(A) || !world.Has<Components::LinearVelocity2D>(A)) &&
-                    (!world.Has<Components::Rigidbody2D>(B) || !world.Has<Components::LinearVelocity2D>(B))) {
+                bool hasPhysicsA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
+                bool hasPhysicsB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
+                
+                if (!hasPhysicsA && !hasPhysicsB) {
                     continue;
                 }
 
-                auto& tA = world.Get<Components::LocalTransform>(A);
-                auto& tB = world.Get<Components::LocalTransform>(B);
-                const auto& cA = world.Get<Components::CircleCollider2D>(A);
-                const auto& cB = world.Get<Components::CircleCollider2D>(B);
+                auto& tA = *tA_ptr;
+                auto& tB = *tB_ptr;
+                const auto& cA = *cA_ptr;
+                const auto& cB = *cB_ptr;
 
                 // compute world-space centers
                 const Vector3D centerA3 = tA.Position + Vector3D(cA.Offset.X, cA.Offset.Y, 0.0f);
@@ -194,20 +208,29 @@ namespace ECS {
                 Components::Rigidbody2D rbA{ 0 }, rbB{ 0 };
                 Components::LinearVelocity2D velA{ {0,0} }, velB{ {0,0} };
 
-                bool hasRbA = world.Has<Components::Rigidbody2D>(A);
-                bool hasRbB = world.Has<Components::Rigidbody2D>(B);
-                bool hasVelA = world.Has<Components::LinearVelocity2D>(A);
-                bool hasVelB = world.Has<Components::LinearVelocity2D>(B);
+                const auto* rbA_ptr = world.TryGet<Components::Rigidbody2D>(A);
+                const auto* rbB_ptr = world.TryGet<Components::Rigidbody2D>(B);
+                auto* velA_ptr = world.TryGet<Components::LinearVelocity2D>(A);
+                auto* velB_ptr = world.TryGet<Components::LinearVelocity2D>(B);
 
-                if (hasRbA) rbA = world.Get<Components::Rigidbody2D>(A);
-                if (hasRbB) rbB = world.Get<Components::Rigidbody2D>(B);
-                if (hasVelA) velA = world.Get<Components::LinearVelocity2D>(A);
-                if (hasVelB) velB = world.Get<Components::LinearVelocity2D>(B);
+                bool hasRbA = rbA_ptr != nullptr;
+                bool hasRbB = rbB_ptr != nullptr;
+                bool hasVelA = velA_ptr != nullptr;
+                bool hasVelB = velB_ptr != nullptr;
+
+                if (hasRbA) rbA = *rbA_ptr;
+                if (hasRbB) rbB = *rbB_ptr;
+                if (hasVelA) velA = *velA_ptr;
+                if (hasVelB) velB = *velB_ptr;
 
                 // Physics materials - combine
                 Components::PhysicsMaterial2D matA{ 0.2f, 0.5f, 0.5f }, matB{ 0.2f, 0.5f, 0.5f };
-                if (world.Has<Components::PhysicsMaterial2D>(A)) matA = world.Get<Components::PhysicsMaterial2D>(A);
-                if (world.Has<Components::PhysicsMaterial2D>(B)) matB = world.Get<Components::PhysicsMaterial2D>(B);
+                if (const auto* matA_ptr = world.TryGet<Components::PhysicsMaterial2D>(A)) {
+                    matA = *matA_ptr;
+                }
+                if (const auto* matB_ptr = world.TryGet<Components::PhysicsMaterial2D>(B)) {
+                    matB = *matB_ptr;
+                }
 
                 Components::PhysicsMaterial2D combinedMat{
                     (matA.Friction + matB.Friction) * 0.5f,
@@ -226,8 +249,8 @@ namespace ECS {
                 );
 
                 // write back velocities if they existed
-                if (hasVelA) world.Get<Components::LinearVelocity2D>(A) = velA;
-                if (hasVelB) world.Get<Components::LinearVelocity2D>(B) = velB;
+                if (hasVelA && velA_ptr) *velA_ptr = velA;
+                if (hasVelB && velB_ptr) *velB_ptr = velB;
                 // transforms are updated in-place (tA, tB)
             } // for candidatePairs
             if (collisionsResolved == 0) break;
