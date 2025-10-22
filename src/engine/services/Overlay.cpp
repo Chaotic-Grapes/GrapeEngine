@@ -37,15 +37,21 @@
 
 #ifdef USE_IMGUI
 #include "services/DebugUI.h"
+#include "../editor/LevelEditor.h"
 #include "services/Input.h"
 #include "services/Window.h"
 #include "services/WindowManager.h"
+#include "services/UICommon.h"
 #include <iostream>
 #include "ecs/World.h"
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
 
 void Overlay::OnCreate() {
     if (m_world) {
         m_debugUI = std::make_unique<DebugUI>(m_world);
+        m_levelEditor = std::make_unique<LevelEditor>(m_world);
+        UICommon::InitializeDefaultLayouts();
     }
 }
 
@@ -55,8 +61,12 @@ void Overlay::OnUpdate() {
         m_debugUI = std::make_unique<DebugUI>(m_world);  // Just pass the raw pointer directly
     }
 
+    if (!m_levelEditor && m_world) {
+        m_levelEditor = std::make_unique<LevelEditor>(m_world);
+    }
+
     // If still no instance, then return
-    if (!m_debugUI) return;
+    if (!m_debugUI || !m_levelEditor) return;
 
     // Try to initialize ImGui if not done yet
     if (!m_initialized) {
@@ -73,7 +83,19 @@ void Overlay::OnUpdate() {
 
     // Update UI every frame
     m_debugUI->NewFrame();
+    m_levelEditor->ProcessInput();
+
+    // Draw debugUI and level editor
     m_debugUI->Render();
+    m_levelEditor->Render();
+
+    // Finalize and draw everything at once
+    ImGui::Render();
+    auto* drawData = ImGui::GetDrawData();
+    if (drawData) {
+        // Submit to OpenGL for GPU execution
+        ImGui_ImplOpenGL3_RenderDrawData(drawData);
+    }
 }
 
 // Prevent memory leaks

@@ -42,6 +42,7 @@
 #include "services/DebugUI.h"
 #include "services/Input.h"
 #include <imgui.h>
+#include "services/UICommon.h"
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <algorithm>
@@ -70,11 +71,11 @@ DebugUI::~DebugUI() {
 }
 
 namespace {
-    Audio::FmodAudioDevice* gAudioPtr = nullptr;
+    Audio::FmodAudioDevice* audioPtr = nullptr;
 }
 
-void DebugUI::AttachAudio(Audio::FmodAudioDevice* device) { gAudioPtr = device; }
-void DebugUI::DetachAudio() { gAudioPtr = nullptr; }
+void DebugUI::AttachAudio(Audio::FmodAudioDevice* device) { audioPtr = device; }
+void DebugUI::DetachAudio() { audioPtr = nullptr; }
 
 void DebugUI::Initialize(GLFWwindow* window) {
     // Avoid reinitializing ImGUI
@@ -85,7 +86,7 @@ void DebugUI::Initialize(GLFWwindow* window) {
 
     auto& io = ImGui::GetIO();  // Get input/output config
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Allow keyboard navigation
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable docking
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable docking functionality
     io.FontGlobalScale = m_config.FontScale;    // Scale the entire UI
 
     ImGui::StyleColorsDark(); // Set dark theme colors
@@ -96,86 +97,33 @@ void DebugUI::Initialize(GLFWwindow* window) {
 }
 
 void DebugUI::NewFrame() {
-    // Check
     if (!m_initialized) return;
 
-    // Interact with debug UI (start of every frame so it keeps getting checked)
+    // Toggle only affects which panels are drawn, not frame lifecycle
     if (Input::IsKeyPressed(GLFW_KEY_F1)) {
         SetEnabled(!IsEnabled());
     }
 
-    // Play/Stop: Ctrl + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
-        !Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT) && !Input::IsKeyDown(GLFW_KEY_LEFT_ALT)) 
-    {
-        if (m_gameState == GameState::Stopped) {
-            // Simulate play button
-            _saveWorldState();
-            m_gameState = GameState::Playing;
-            LOG_INFO("Game started (Ctrl+P)");
-        }
-        else {
-            // Simulate stop button
-            _restoreWorldState();
-            m_gameState = GameState::Stopped;
-            LOG_INFO("Game stopped (Ctrl+P)");
-        }
-    }
-
-    // Pause/Resume: Ctrl + Shift + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) && 
-        Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT)) 
-    {
-        if (m_gameState == GameState::Playing) {
-            m_gameState = GameState::Paused;
-            LOG_INFO("Game paused (Ctrl+Shift+P)");
-        }
-        else if (m_gameState == GameState::Paused) {
-            m_gameState = GameState::Playing;
-            LOG_INFO("Game resumed (Ctrl+Shift+P)");
-        }
-    }
-
-    // Step: Alt + P
-    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_ALT)) {
-        if (m_gameState == GameState::Paused) {
-            m_stepRequested = true;
-            LOG_INFO("Stepping 1 physics frame (Alt+P)");
-        }
-    }
-
-    // Early exit if UI is toggled off
-    if (!m_enabled) return;
-
-    ImGui_ImplOpenGL3_NewFrame(); // Prepare OpenGL rendering
-    ImGui_ImplGlfw_NewFrame();    // Process window/input events
-    ImGui::NewFrame();            // Start ImGUI's internal frame
+    // Always begin a new ImGui frame so other modules (e.g. LevelEditor) can draw
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 }
 
 void DebugUI::Render() {
-    if (!m_initialized || !m_enabled) return;  // Early exit if UI is toggled off
+    if (!m_initialized) return;
 
-    // Render custom debug windows
-    _showPlaybackControls();   // Play/Stop, Pause/Resume, Step
-    _showEngineDebugWindow();  // Pass demo control to debug window
-    _showPerformanceWindow();  // Show FPS and performance stats
-    _showInputDebugWindow();   // Input debugging
-    _showGameObjectEditor();   // Game object editor
-    _showAudioWindow(gAudioPtr);
+    // Draw debug panels only when enabled
+    if (m_enabled) {
+        _showEngineDebugWindow();
+        _showPerformanceWindow();
+        _showInputDebugWindow();
+        _showGameObjectEditor();
+        _showAudioWindow(audioPtr);
 
-    // Show ImGUI's built-in demo window
-    if (m_showDemo) {
-        // Toggle functionality shown later in engine debug window func
-        ImGui::ShowDemoWindow(&m_showDemo);
-    }
-
-    // Finalize the frame and send to GPU
-    ImGui::Render();  // Generate draw commands from UI
-    auto* drawData = ImGui::GetDrawData();  // Get rendering data structure
-
-    if (drawData) {
-        // Submit to OpenGL for GPU execution
-        ImGui_ImplOpenGL3_RenderDrawData(drawData);
+        if (m_showDemo) {
+            ImGui::ShowDemoWindow(&m_showDemo);
+        }
     }
 }
 
@@ -246,129 +194,11 @@ void DebugUI::ClearAllGameObjects() {
     _invalidateCache();
 }
 
-void DebugUI::_showPlaybackControls() {
-    // Use config values
-    const auto& layout = m_config.Layout;
-    ImGui::SetNextWindowPos(ImVec2(layout.ControlsX, layout.ControlsY), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(layout.ControlsW, layout.ControlsH), ImGuiCond_Once);
-
-    ImGui::Begin("Game Controls");
-
-    // If mouse is over window then show tooltips (with keyboard shortcuts)
-    if (ImGui::IsWindowHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::Text("Play/Stop - Ctrl+P");
-        ImGui::Text("Pause/Resume - Ctrl+Shift+P");
-        ImGui::Text("Step - Alt+P");
-        ImGui::EndTooltip();
-    }
-
-    // Show current state (resume is essentially == playing)
-    ImGui::Text("State: %s",
-        m_gameState == GameState::Stopped ? "STOPPED" :
-        m_gameState == GameState::Paused ? "PAUSED" :
-        "PLAYING"
-    );
-
-    ImGui::Separator();
-
-    // Buttons 
-    // If the buttons have been clicked, they get grayed out
-    auto button = [&](const char* label, bool shouldBeEnabled, GameState newState, const char* logMsg, 
-        bool isStepButton = false, ImVec2 size = ImVec2(250, 40))
-    {
-        if (!shouldBeEnabled) ImGui::BeginDisabled();
-        bool clicked = ImGui::Button(label, size);
-        if (!shouldBeEnabled) ImGui::EndDisabled();
-
-        if (clicked) {
-            if (isStepButton) {
-                // Special case: STEP just sets flag
-                m_stepRequested = true;
-            }
-            else {
-                // Normal case: change state
-                if (newState == GameState::Playing && m_gameState == GameState::Stopped) {
-                    _saveWorldState();
-                }
-                if (newState == GameState::Stopped) {
-                    _restoreWorldState();
-                }
-                m_gameState = newState;
-            }
-            LOG_INFO(logMsg);
-        }
-     };
-
-    // Play and stop buttons
-    // PLAY: stopped > playing; STOP: playing/paused > stopped
-    button("PLAY", m_gameState == GameState::Stopped, GameState::Playing, "Game started");
-    ImGui::SameLine();
-    button("STOP", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
-
-    ImGui::Separator();
-
-    // Pause and resume buttons
-    // PAUSE: playing > paused; RESUME: paused > playing
-    button("PAUSE", m_gameState == GameState::Playing, GameState::Paused, "Game paused");
-    ImGui::SameLine();
-    button("RESUME", m_gameState == GameState::Paused, GameState::Playing, "Game resumed");
-
-    ImGui::Separator();
-    
-    // Step button (for step-by-step physics)
-    // Scenario where step button gets grayed out: when playing/resumed/stopped
-    button("STEP", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true);
-    ImGui::End();
-}
-
-void DebugUI::_saveWorldState() {
-    if (!HasValidWorld()) return;
-
-    LOG_INFO("Saving world state...");
-
-    // Get all entities and serialize them
-    auto entities = m_world->GetEntityManager().GetAllEntities();
-    nlohmann::json worldJson = nlohmann::json::array();
-
-    for (const auto& entityId : entities) {
-        auto entity = m_world->GetEntityManager().GetEntity(entityId);
-        auto entityJson = Serialization::EntitySerializer::SerializeEntity(entity);
-        worldJson.push_back(entityJson);
-    }
-
-    m_savedWorldState = worldJson;
-    LOG_INFO("Saved " << entities.size() << " entities");
-}
-
-void DebugUI::_restoreWorldState() {
-    if (!HasValidWorld() || m_savedWorldState.empty()) {
-        LOG_WARNING("No saved state to restore");
-        return;
-    }
-
-    LOG_INFO("Restoring world state...");
-
-    // Delete all current entities
-    m_world->GetEntityManager().DestroyAllEntities();
-
-    // Recreate from saved JSON
-    for (const auto& entityJson : m_savedWorldState) {
-        Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
-    }
-
-    _invalidateCache();
-    LOG_INFO("World restored");
-}
-
 void DebugUI::_showEngineDebugWindow() {
     // Use config values
-    const auto& layout = m_config.Layout;
-    ImGui::SetNextWindowPos(ImVec2(layout.EngineX, layout.EngineY), ImGuiCond_Once);   // Position window (only on first appearance)
-    ImGui::SetNextWindowSize(ImVec2(layout.EngineW, layout.EngineH), ImGuiCond_Once);  // Size
-
-    // Display current engine state info
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_ENGINE);
     ImGui::Begin("GrapeEngine Debug Console");
+
     ImGui::Text("Engine Status: Running");
     ImGui::Text("Debug UI: %s", m_enabled ? "Active" : "Inactive");
     ImGui::Text("World: %s", HasValidWorld() ? "Connected" : "Not Set");
@@ -386,9 +216,7 @@ void DebugUI::_showEngineDebugWindow() {
 
 void DebugUI::_showPerformanceWindow() {
     // Use config values
-    const auto& layout = m_config.Layout;
-    ImGui::SetNextWindowPos(ImVec2(layout.PerfX, layout.PerfY), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(layout.PerfW, layout.PerfH), ImGuiCond_Once);
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_PERF);
 
     ImGui::Begin("Performance Monitor");
 
@@ -452,9 +280,7 @@ void DebugUI::_showPerformanceWindow() {
 void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
     if (!device) return;
 
-    const auto& layout = m_config.Layout;
-    ImGui::SetNextWindowPos(ImVec2(layout.AudioX, layout.AudioY), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(layout.AudioW, layout.AudioH), ImGuiCond_Once);
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_AUDIO);
     ImGui::Begin("Audio Monitor");
 
     // Master volume
@@ -557,10 +383,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
 
 void DebugUI::_showInputDebugWindow() {
     // Use config values
-    const auto& layout = m_config.Layout;
-    // Same stuff as before
-    ImGui::SetNextWindowPos(ImVec2(layout.InputX, layout.InputY), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(layout.InputW, layout.InputH), ImGuiCond_Once);
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_INPUT);
 
     ImGui::Begin("Input Debug");
 
@@ -604,11 +427,8 @@ void DebugUI::_showInputDebugWindow() {
 }
 
 void DebugUI::_showGameObjectEditor() {
-    // Same same
-    const auto& layout = m_config.Layout;
-    // Position the window to the right of existing windows
-    ImGui::SetNextWindowPos(ImVec2(layout.EditorX, layout.EditorY), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(layout.EditorW, layout.EditorH), ImGuiCond_Once);
+    // Use config values
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_EDITOR);
 
     ImGui::Begin("Game Object Editor");
 

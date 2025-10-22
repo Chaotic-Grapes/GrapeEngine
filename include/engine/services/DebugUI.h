@@ -44,25 +44,6 @@ struct DebugUIConfig {
      * Defines positions and sizes for all debug windows including engine status,
      * input debugging, game object editor, and performance monitor.
      */
-    struct WindowLayout {
-        float EngineX = 10.0f, EngineY = 10.0f;     ///< Engine debug window position
-        float EngineW = 300.0f, EngineH = 175.0f;   ///< Engine debug window size
-
-        float InputX = 330.0f, InputY = 10.0f;      ///< Input debug window position
-        float InputW = 320.0f, InputH = 400.0f;     ///< Input debug window size
-
-        float EditorX = 670.0f, EditorY = 10.0f;    ///< Game object editor window position
-        float EditorW = 375.0f, EditorH = 400.0f;   ///< Game object editor window size
-
-        float PerfX = 1065.0f, PerfY = 10.0f;       ///< Performance monitor window position
-        float PerfW = 300.0f, PerfH = 400.0f;       ///< Performance monitor window size
-
-        float AudioX = 10.0f, AudioY = 200.0f;
-        float AudioW = 300.0f, AudioH = 207.0f;
-
-        float ControlsX = 10.0f, ControlsY = 422.0f;
-        float ControlsW = 527.0f, ControlsH = 202.0f;
-    } Layout;
 
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  ///< Maximum length for game object names
 };
@@ -96,17 +77,6 @@ struct DebugUIConfig {
  */
 class DebugUI {
 public:
-    enum class GameState {
-        Stopped,  // Editor mode
-        Playing,  // Game running
-        Paused    // Freeze
-    };
-
-    GameState GetGameState() const { return m_gameState; }
-    bool IsPlaying() const { return m_gameState == GameState::Playing; }
-    bool IsStepRequested() const { return m_stepRequested; }
-    void ClearStepRequest() { m_stepRequested = false; }
-
     /**
      * @brief Constructor for DebugUI
      * @param world Pointer to the World object for entity management
@@ -133,7 +103,7 @@ public:
      * applies styling, and prepares the UI for rendering. Must be called
      * after OpenGL context creation.
      */
-    void Initialize(GLFWwindow* pWin);
+    void Initialize(GLFWwindow* window);
     
     /**
      * @brief Start a new ImGui frame
@@ -240,10 +210,6 @@ public:
     void ClearAllGameObjects();
 
 private:
-    GameState m_gameState = GameState::Stopped;
-    nlohmann::json m_savedWorldState;
-    bool m_stepRequested = false;
-
     DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
     World* m_world;             ///< Pointer to World object for entity management
     bool m_enabled = false;     ///< Flag indicating if debug UI is currently enabled
@@ -261,10 +227,6 @@ private:
     mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;    ///< Cached delete button labels
     mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;     ///< Cached clone button labels
     mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;       ///< Cached header collapse states
-
-    void _showPlaybackControls();
-    void _saveWorldState();
-    void _restoreWorldState();
 
     /**
      * @brief Render the main engine debug window

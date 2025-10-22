@@ -25,11 +25,13 @@
 #include "services/DebugUI.h"
 #include "core/Application.h"
 #include "audio/FmodAudioDevice.h"
+#include "../editor/LevelEditor.h"
 
 // Forward declaration
 class World;
 #ifdef USE_IMGUI
 class DebugUI;
+class LevelEditor;
 #endif
 
 /**
@@ -123,9 +125,9 @@ public:
      */
     void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
 
-    bool IsGamePlaying() const { return m_debugUI && m_debugUI->IsPlaying(); }
-    bool IsStepRequested() const { return m_debugUI && m_debugUI->IsStepRequested(); }
-    void ClearStepRequest() const { if (m_debugUI) m_debugUI->ClearStepRequest(); }
+    bool IsGamePlaying() const { return m_levelEditor && m_levelEditor->IsPlaying(); }
+    bool IsStepRequested() const { return m_levelEditor && m_levelEditor->IsStepRequested(); }
+    void ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
 
 private:
     Audio::FmodAudioDevice* m_audioDevice = nullptr;  ///< Pointer to audio system for debug monitoring
@@ -143,6 +145,7 @@ private:
 
 #ifdef USE_IMGUI
     std::unique_ptr<DebugUI> m_debugUI;  ///< Unique pointer to DebugUI instance for memory management
+    std::unique_ptr<LevelEditor> m_levelEditor;
     bool m_initialized = false;          ///< Flag indicating if ImGui has been initialized
 #endif
 };
