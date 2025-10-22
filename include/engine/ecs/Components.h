@@ -388,6 +388,17 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<ScriptId>, "ScriptId must be trivially copyable");
 
+        // C# Script instance component for CoreCLR hosting
+        struct ScriptInstance {
+        public:
+            uint64_t ManagedHandle = 0;   // Handle to C# object instance
+            uint32_t TypeHash = 0;        // Hash of script type name
+            bool Initialized = false;     // Whether OnStart() has been called
+            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
+            char TypeName[128] = {0};     // Script class name (e.g., "MyGame.PlayerController")
+        };
+        static_assert(std::is_trivially_copyable_v<ScriptInstance>, "ScriptInstance must be trivially copyable");
+
         struct AudioSource {
         public:
             uint32_t CueId = 0;
