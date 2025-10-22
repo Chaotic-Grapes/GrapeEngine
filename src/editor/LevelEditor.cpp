@@ -144,23 +144,25 @@ void LevelEditor::_showPlaybackControls() {
             }
         };
 
-    // Play and stop buttons
-    // PLAY: stopped > playing; STOP: playing/paused > stopped
-    button("\xEE\x80\xB7##play", m_gameState == GameState::Stopped, GameState::Playing, "Game started");
-    ImGui::SameLine();
-    button("\xEE\x81\x87##stop", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
+    // Single play/pause toggle button
+    // Shows play when stopped/paused
+    if (m_gameState == GameState::Stopped || m_gameState == GameState::Paused) {
+        button("\xEE\x80\xB7", true, GameState::Playing,
+            m_gameState == GameState::Stopped ? "Game started" : "Game resumed");
+    }
+    // Shows pause when playing
+    else {
+        button("\xEE\x80\xB4", true, GameState::Paused, "Game paused");
+    }
     ImGui::SameLine();
 
-    // Pause and resume buttons
-    // PAUSE: playing > paused; RESUME: paused > playing
-    button("\xEE\x80\xB4##pause", m_gameState == GameState::Playing, GameState::Paused, "Game paused");
-    ImGui::SameLine();
-    button("\xEE\x80\xB7##resume", m_gameState == GameState::Paused, GameState::Playing, "Game resumed");
+    // STOP: playing/paused > stopped
+    button("\xEE\x81\x87", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
     ImGui::SameLine();
 
     // Step button (for step-by-step physics)
-    // Scenario where step button gets grayed out: when playing/resumed/stopped
-    button("\xEE\x81\x84##step", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true);
+    // Only enabled when paused
+    button("\xEE\x81\x84", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true);
 
     ImGui::End();
 }
