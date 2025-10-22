@@ -69,11 +69,10 @@ namespace ECS {
                 if (const auto* active = world.TryGet<Components::Active>(entity)) {
                     if (!active->Enabled) return;
                 }
-                if (rb.Mass <= 0.0f || linearVel.Value.Length() < 0.05f)
-                    return; // static bodies don't integrate here
 
-                if (linearVel.Value.Length() < 0.05f)
-                    return;  // Don't integrate, don't add to dynamicEntities
+                // Skip static bodies (zero or negative mass)
+                if (rb.Mass <= 0.0f)
+                    return;
 
                 // Apply forces & gravity
                 Vector2D acceleration = Engine::Physics::CalculateAcceleration(rb, linearVel);
