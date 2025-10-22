@@ -1,8 +1,9 @@
-#include "../editor/LevelEditor.h"
+﻿#include "../editor/LevelEditor.h"
 #include "services/Input.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include "services/UICommon.h"
  
@@ -13,13 +14,39 @@ LevelEditor::~LevelEditor() {}
 
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
-
-    // Load the Material Symbols font
     auto& io = ImGui::GetIO();
-    /* m_symbolsFont = io.Fonts->AddFontFromFileTTF(
+
+    // Add default font first (required for merge mode to work)
+    io.Fonts->AddFontDefault();
+
+    // Define the range for Material Symbols (Private Use Area E000-F8FF where icons live)
+    static const ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
+
+    // Configure font loading settings for Material Symbols
+    ImFontConfig iconsConfig;
+    iconsConfig.MergeMode = true;            // Merge icons into default font so we don't need to switch fonts
+    iconsConfig.PixelSnapH = true;           // Align icon pixels to grid for sharper rendering
+    iconsConfig.GlyphMinAdvanceX = 24.0f;    // Minimum horizontal spacing for each icon
+    iconsConfig.GlyphOffset = ImVec2(0, 6);  // Shift icons down 6 pixels to center them vertically in buttons
+
+    // Load Material Symbols font and merge it with the default font
+    m_symbolsFont = io.Fonts->AddFontFromFileTTF(
         "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
-        m_config.FontSize * m_config.FontScale
-    ); */
+        m_config.FontSize * m_config.FontScale,
+        &iconsConfig,
+        iconRanges
+    );
+
+    // Checks
+    if (m_symbolsFont == nullptr) {
+        LOG_ERROR("Failed to load Material Symbols font");
+    }
+    else {
+        LOG_INFO("Material Symbols font merged successfully");
+    }
+
+    // Build the font atlas (combines default font + Material Symbols)
+    io.Fonts->Build();
 }
 
 void LevelEditor::ProcessInput() {
@@ -72,7 +99,6 @@ void LevelEditor::Render() {
 void LevelEditor::_showPlaybackControls() {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::EDITOR_PLAYBACK);
-
     ImGui::Begin("Game Controls", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
     // If mouse is over window then show tooltips (with keyboard shortcuts)
@@ -81,7 +107,6 @@ void LevelEditor::_showPlaybackControls() {
         ImGui::Text("Play/Stop - Ctrl+P");
         ImGui::Text("Pause/Resume - Ctrl+Shift+P");
         ImGui::Text("Step - Alt+P");
-
         ImGui::Dummy(ImVec2(0, 20));
 
         // Show current state (resume is essentially == playing)
@@ -92,16 +117,14 @@ void LevelEditor::_showPlaybackControls() {
         );
         ImGui::EndTooltip();
     }
-
     // Buttons 
     // If the buttons have been clicked, they get grayed out
-    auto button = [&](const char* label, bool shouldBeEnabled, GameState newState, const char* logMsg,
+    auto button = [&](const char* icon, bool shouldBeEnabled, GameState newState, const char* logMsg,
         bool isStepButton = false, ImVec2 size = ImVec2(100, 40))
         {
             if (!shouldBeEnabled) ImGui::BeginDisabled();
-            bool clicked = ImGui::Button(label, size);
+            bool clicked = ImGui::Button(icon, size);
             if (!shouldBeEnabled) ImGui::EndDisabled();
-
             if (clicked) {
                 if (isStepButton) {
                     // Special case: STEP just sets flag
@@ -123,23 +146,22 @@ void LevelEditor::_showPlaybackControls() {
 
     // Play and stop buttons
     // PLAY: stopped > playing; STOP: playing/paused > stopped
-    button("PLAY", m_gameState == GameState::Stopped, GameState::Playing, "Game started");
+    button("\xEE\x80\xB7##play", m_gameState == GameState::Stopped, GameState::Playing, "Game started");
     ImGui::SameLine();
-    button("STOP", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
-
+    button("\xEE\x81\x87##stop", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
     ImGui::SameLine();
 
     // Pause and resume buttons
     // PAUSE: playing > paused; RESUME: paused > playing
-    button("PAUSE", m_gameState == GameState::Playing, GameState::Paused, "Game paused");
+    button("\xEE\x80\xB4##pause", m_gameState == GameState::Playing, GameState::Paused, "Game paused");
     ImGui::SameLine();
-    button("RESUME", m_gameState == GameState::Paused, GameState::Playing, "Game resumed");
-
+    button("\xEE\x80\xB7##resume", m_gameState == GameState::Paused, GameState::Playing, "Game resumed");
     ImGui::SameLine();
 
     // Step button (for step-by-step physics)
     // Scenario where step button gets grayed out: when playing/resumed/stopped
-    button("STEP", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true);
+    button("\xEE\x81\x84##step", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true);
+
     ImGui::End();
 }
 
