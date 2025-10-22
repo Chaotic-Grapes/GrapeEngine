@@ -74,6 +74,7 @@ void Overlay::OnUpdate() {
         Window* mainWindow = WindowManager::GetMainWindow();
         if (mainWindow) {
             m_debugUI->Initialize(mainWindow->Handle());
+            m_levelEditor->Initialize(mainWindow->Handle());
             if (m_audioDevice)
                 DebugUI::AttachAudio(m_audioDevice);
             m_initialized = true;

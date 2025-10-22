@@ -11,6 +11,17 @@ LevelEditor::LevelEditor(World* world, const LevelEditorConfig& config)
 
 LevelEditor::~LevelEditor() {}
 
+void LevelEditor::Initialize(GLFWwindow* pWin) {
+    if (!pWin) return;
+
+    // Load the Material Symbols font
+    auto& io = ImGui::GetIO();
+    /* m_symbolsFont = io.Fonts->AddFontFromFileTTF(
+        "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
+        m_config.FontSize * m_config.FontScale
+    ); */
+}
+
 void LevelEditor::ProcessInput() {
     // Play/Stop: Ctrl + P
     if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
@@ -26,7 +37,7 @@ void LevelEditor::ProcessInput() {
             // Simulate stop button
             _restoreWorldState();
             m_gameState = GameState::Stopped;
-            LOG_INFO("Game stopped (Ctrl+P)");
+            LOG_INFO("Game stopped (Ctrl+P)"); 
         }
     }
 
@@ -62,7 +73,7 @@ void LevelEditor::_showPlaybackControls() {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::EDITOR_PLAYBACK);
 
-    ImGui::Begin("Game Controls");
+    ImGui::Begin("Game Controls", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
     // If mouse is over window then show tooltips (with keyboard shortcuts)
     if (ImGui::IsWindowHovered()) {
@@ -70,22 +81,22 @@ void LevelEditor::_showPlaybackControls() {
         ImGui::Text("Play/Stop - Ctrl+P");
         ImGui::Text("Pause/Resume - Ctrl+Shift+P");
         ImGui::Text("Step - Alt+P");
+
+        ImGui::Dummy(ImVec2(0, 20));
+
+        // Show current state (resume is essentially == playing)
+        ImGui::Text("State: %s",
+            m_gameState == GameState::Stopped ? "STOPPED" :
+            m_gameState == GameState::Paused ? "PAUSED" :
+            "PLAYING"
+        );
         ImGui::EndTooltip();
     }
-
-    // Show current state (resume is essentially == playing)
-    ImGui::Text("State: %s",
-        m_gameState == GameState::Stopped ? "STOPPED" :
-        m_gameState == GameState::Paused ? "PAUSED" :
-        "PLAYING"
-    );
-
-    ImGui::Separator();
 
     // Buttons 
     // If the buttons have been clicked, they get grayed out
     auto button = [&](const char* label, bool shouldBeEnabled, GameState newState, const char* logMsg,
-        bool isStepButton = false, ImVec2 size = ImVec2(250, 40))
+        bool isStepButton = false, ImVec2 size = ImVec2(100, 40))
         {
             if (!shouldBeEnabled) ImGui::BeginDisabled();
             bool clicked = ImGui::Button(label, size);
@@ -116,7 +127,7 @@ void LevelEditor::_showPlaybackControls() {
     ImGui::SameLine();
     button("STOP", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
 
-    ImGui::Separator();
+    ImGui::SameLine();
 
     // Pause and resume buttons
     // PAUSE: playing > paused; RESUME: paused > playing
@@ -124,7 +135,7 @@ void LevelEditor::_showPlaybackControls() {
     ImGui::SameLine();
     button("RESUME", m_gameState == GameState::Paused, GameState::Playing, "Game resumed");
 
-    ImGui::Separator();
+    ImGui::SameLine();
 
     // Step button (for step-by-step physics)
     // Scenario where step button gets grayed out: when playing/resumed/stopped

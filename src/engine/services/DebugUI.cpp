@@ -87,7 +87,7 @@ void DebugUI::Initialize(GLFWwindow* window) {
     auto& io = ImGui::GetIO();  // Get input/output config
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Allow keyboard navigation
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable docking functionality
-    io.FontGlobalScale = m_config.FontScale;    // Scale the entire UI
+    io.FontGlobalScale = m_config.FontScale;              // Scale the entire UI
 
     ImGui::StyleColorsDark(); // Set dark theme colors
     ImGui_ImplGlfw_InitForOpenGL(window, true); // GLFW backend (window/input handling)

@@ -6,12 +6,12 @@
 // Forward declarations
 struct GLFWwindow;
 class World;
+struct ImFont;
 
 // Structure copied from DebugUI
 struct LevelEditorConfig {
-    float FontScale = 1.35f;  // Global font scaling factor for the entire UI
-
-
+    float FontScale = 1.0f;  // Global font scaling factor for the entire UI
+    float FontSize = 12.0f;
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  // Maximum length for game object names
 };
 
@@ -26,7 +26,7 @@ public:
     explicit LevelEditor(World* world, const LevelEditorConfig& config = {});
     ~LevelEditor();
 
-    void Initialize(GLFWwindow* window);
+    void Initialize(GLFWwindow* pWin);
     void ProcessInput();
     void Render();
 
@@ -43,6 +43,9 @@ private:
     GameState m_gameState = GameState::Stopped;
     bool m_stepRequested = false;
     nlohmann::json m_savedWorldState;
+
+    // Font for symbols
+    ImFont* m_symbolsFont = nullptr;
 
     void _showPlaybackControls();
     void _saveWorldState();
