@@ -214,38 +214,39 @@ void DebugUI::_showPlayStopControls() {
     ImGui::Begin("Game Controls");
 
     // Show current state
-    ImGui::Text("State: %s", m_gameState == GameState::Stopped ? "STOPPED" : "PLAYING");
+    ImGui::Text("State: %s",
+        m_gameState == GameState::Stopped ? "STOPPED" :
+        m_gameState == GameState::Paused ? "PAUSED" :
+        "PLAYING"
+    );
+
     ImGui::Separator();
 
-    // Play button (disabled when playing)
-    bool playDisabled = (m_gameState == GameState::Playing);
-    if (playDisabled) {
-        ImGui::BeginDisabled();
-    }
-    if (ImGui::Button("PLAY", ImVec2(125, 40))) {
-        _saveWorldState();
-        m_gameState = GameState::Playing;
-        LOG_INFO("Game started");
-    }
-    if (playDisabled) {
-        ImGui::EndDisabled();
-    }
+    // Buttons 
+    auto button = [&](const char* label, bool shouldBeEnabled, GameState newState, const char* logMsg, ImVec2 size = ImVec2(125, 40)) {
+        if (!shouldBeEnabled) ImGui::BeginDisabled();
+        bool clicked = ImGui::Button(label, size);
+        if (!shouldBeEnabled) ImGui::EndDisabled();
 
+        if (clicked) {
+            if (newState == GameState::Playing && m_gameState == GameState::Stopped) _saveWorldState();
+            if (newState == GameState::Stopped) _restoreWorldState();
+            m_gameState = newState;
+            LOG_INFO(logMsg);
+        }
+     };
+
+    // Play and stop buttons
+    button("PLAY", m_gameState == GameState::Stopped, GameState::Playing, "Game started");
     ImGui::SameLine();
+    button("STOP", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
 
-    // Stop button (disabled when stopped)
-    bool stopDisabled = (m_gameState == GameState::Stopped);
-    if (stopDisabled) {
-        ImGui::BeginDisabled();
-    }
-    if (ImGui::Button("STOP", ImVec2(125, 40))) {
-        _restoreWorldState();
-        m_gameState = GameState::Stopped;
-        LOG_INFO("Game stopped");
-    }
-    if (stopDisabled) {
-        ImGui::EndDisabled();
-    }
+    ImGui::Separator();
+
+    // Pause and resume buttons
+    button("PAUSE", m_gameState == GameState::Playing, GameState::Paused, "Game paused");
+    ImGui::SameLine();
+    button("RESUME", m_gameState == GameState::Paused, GameState::Playing, "Game resumed");
 
     ImGui::End();
 }

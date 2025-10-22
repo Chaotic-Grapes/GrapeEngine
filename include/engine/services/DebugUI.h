@@ -99,6 +99,7 @@ public:
     enum class GameState {
         Stopped,  // Editor mode
         Playing,  // Game running
+        Paused    // Freeze
     };
 
     GameState GetGameState() const { return m_gameState; }
