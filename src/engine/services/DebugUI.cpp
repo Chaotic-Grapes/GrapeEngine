@@ -104,6 +104,10 @@ void DebugUI::NewFrame() {
         SetEnabled(!IsEnabled());
     }
 
+    // Play/Stop: Ctrl + P
+    // Pause: Ctrl + Shift + P
+    // Step: Alt + P
+
     if (!m_enabled) return;  // Early exit if UI is toggled off
 
     ImGui_ImplOpenGL3_NewFrame(); // Prepare OpenGL rendering
@@ -213,7 +217,7 @@ void DebugUI::_showPlayStopControls() {
 
     ImGui::Begin("Game Controls");
 
-    // Show current state
+    // Show current state (resume is essentially == playing)
     ImGui::Text("State: %s",
         m_gameState == GameState::Stopped ? "STOPPED" :
         m_gameState == GameState::Paused ? "PAUSED" :
@@ -223,20 +227,35 @@ void DebugUI::_showPlayStopControls() {
     ImGui::Separator();
 
     // Buttons 
-    auto button = [&](const char* label, bool shouldBeEnabled, GameState newState, const char* logMsg, ImVec2 size = ImVec2(125, 40)) {
+    // If the buttons have been clicked, they get grayed out
+    auto button = [&](const char* label, bool shouldBeEnabled, GameState newState, const char* logMsg, 
+        bool isStepButton = false, ImVec2 size = ImVec2(250, 40))
+    {
         if (!shouldBeEnabled) ImGui::BeginDisabled();
         bool clicked = ImGui::Button(label, size);
         if (!shouldBeEnabled) ImGui::EndDisabled();
 
         if (clicked) {
-            if (newState == GameState::Playing && m_gameState == GameState::Stopped) _saveWorldState();
-            if (newState == GameState::Stopped) _restoreWorldState();
-            m_gameState = newState;
+            if (isStepButton) {
+                // Special case: STEP just sets flag
+                m_stepRequested = true;
+            }
+            else {
+                // Normal case: change state
+                if (newState == GameState::Playing && m_gameState == GameState::Stopped) {
+                    _saveWorldState();
+                }
+                if (newState == GameState::Stopped) {
+                    _restoreWorldState();
+                }
+                m_gameState = newState;
+            }
             LOG_INFO(logMsg);
         }
      };
 
     // Play and stop buttons
+    // PLAY: stopped > playing; STOP: playing/paused > stopped
     button("PLAY", m_gameState == GameState::Stopped, GameState::Playing, "Game started");
     ImGui::SameLine();
     button("STOP", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
@@ -244,10 +263,16 @@ void DebugUI::_showPlayStopControls() {
     ImGui::Separator();
 
     // Pause and resume buttons
+    // PAUSE: playing > paused; RESUME: paused > playing
     button("PAUSE", m_gameState == GameState::Playing, GameState::Paused, "Game paused");
     ImGui::SameLine();
     button("RESUME", m_gameState == GameState::Paused, GameState::Playing, "Game resumed");
 
+    ImGui::Separator();
+    
+    // Step button (for step-by-step physics)
+    // Scenario where step button gets grayed out: when playing/resumed/stopped
+    button("STEP", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true);
     ImGui::End();
 }
 

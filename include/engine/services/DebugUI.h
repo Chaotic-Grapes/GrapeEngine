@@ -104,6 +104,8 @@ public:
 
     GameState GetGameState() const { return m_gameState; }
     bool IsPlaying() const { return m_gameState == GameState::Playing; }
+    bool IsStepRequested() const { return m_stepRequested; }
+    void ClearStepRequest() { m_stepRequested = false; }
 
     /**
      * @brief Constructor for DebugUI
@@ -240,6 +242,7 @@ public:
 private:
     GameState m_gameState = GameState::Stopped;
     nlohmann::json m_savedWorldState;
+    bool m_stepRequested = false;
 
     DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
     World* m_world;             ///< Pointer to World object for entity management

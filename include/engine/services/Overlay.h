@@ -124,6 +124,8 @@ public:
     void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
 
     bool IsGamePlaying() const { return m_debugUI && m_debugUI->IsPlaying(); }
+    bool IsStepRequested() const { return m_debugUI && m_debugUI->IsStepRequested(); }
+    void ClearStepRequest() const { if (m_debugUI) m_debugUI->ClearStepRequest(); }
 
 private:
     Audio::FmodAudioDevice* m_audioDevice = nullptr;  ///< Pointer to audio system for debug monitoring

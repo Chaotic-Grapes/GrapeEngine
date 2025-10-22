@@ -16,9 +16,24 @@ namespace Engine {
     void PhysicsSystem::OnUpdate() {
         if (!m_enabled) return;
 
+        // 2 instances when physics should run:
+        // 1) Playing (IsGamePlaying() == true, IsStepRequested() == false) 
+        // 2) Paused + STEP (IsGamePlaying() == false, IsStepRequested() == true)
         auto* overlay = m_world->GetSystem<Overlay>();
-        if (!overlay || !overlay->IsGamePlaying()) {
-            return;  // Don't run physics in editor mode
+        if (!overlay) {
+            return; 
+        }
+
+        // 1) Physics runs when m_gameState == Playing
+        // So if m_gameState == Paused for e.g. it just freezes the frame (somehow it all works out)
+        if (!overlay->IsGamePlaying() && !overlay->IsStepRequested()) {
+            return;
+        }
+
+        // 2) Physics runs when m_gameState == Paused + STEP (step-by-step physics mode)
+        // Clear step flag if set (1 frame)
+        if (overlay->IsStepRequested()) {
+            overlay->ClearStepRequest();
         }
 
         // Query once
