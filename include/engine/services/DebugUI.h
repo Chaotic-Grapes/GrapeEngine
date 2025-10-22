@@ -61,7 +61,7 @@ struct DebugUIConfig {
         float AudioW = 300.0f, AudioH = 207.0f;
 
         float ControlsX = 10.0f, ControlsY = 422.0f;
-        float ControlsW = 300.0f, ControlsH = 200.0f;
+        float ControlsW = 527.0f, ControlsH = 202.0f;
     } Layout;
 
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  ///< Maximum length for game object names
@@ -262,7 +262,7 @@ private:
     mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;     ///< Cached clone button labels
     mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;       ///< Cached header collapse states
 
-    void _showPlayStopControls();
+    void _showPlaybackControls();
     void _saveWorldState();
     void _restoreWorldState();
 

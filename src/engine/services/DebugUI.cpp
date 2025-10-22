@@ -105,10 +105,47 @@ void DebugUI::NewFrame() {
     }
 
     // Play/Stop: Ctrl + P
-    // Pause: Ctrl + Shift + P
-    // Step: Alt + P
+    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
+        !Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT) && !Input::IsKeyDown(GLFW_KEY_LEFT_ALT)) 
+    {
+        if (m_gameState == GameState::Stopped) {
+            // Simulate play button
+            _saveWorldState();
+            m_gameState = GameState::Playing;
+            LOG_INFO("Game started (Ctrl+P)");
+        }
+        else {
+            // Simulate stop button
+            _restoreWorldState();
+            m_gameState = GameState::Stopped;
+            LOG_INFO("Game stopped (Ctrl+P)");
+        }
+    }
 
-    if (!m_enabled) return;  // Early exit if UI is toggled off
+    // Pause/Resume: Ctrl + Shift + P
+    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) && 
+        Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT)) 
+    {
+        if (m_gameState == GameState::Playing) {
+            m_gameState = GameState::Paused;
+            LOG_INFO("Game paused (Ctrl+Shift+P)");
+        }
+        else if (m_gameState == GameState::Paused) {
+            m_gameState = GameState::Playing;
+            LOG_INFO("Game resumed (Ctrl+Shift+P)");
+        }
+    }
+
+    // Step: Alt + P
+    if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_ALT)) {
+        if (m_gameState == GameState::Paused) {
+            m_stepRequested = true;
+            LOG_INFO("Stepping 1 physics frame (Alt+P)");
+        }
+    }
+
+    // Early exit if UI is toggled off
+    if (!m_enabled) return;
 
     ImGui_ImplOpenGL3_NewFrame(); // Prepare OpenGL rendering
     ImGui_ImplGlfw_NewFrame();    // Process window/input events
@@ -119,7 +156,7 @@ void DebugUI::Render() {
     if (!m_initialized || !m_enabled) return;  // Early exit if UI is toggled off
 
     // Render custom debug windows
-    _showPlayStopControls();   // Self-explanatory
+    _showPlaybackControls();   // Play/Stop, Pause/Resume, Step
     _showEngineDebugWindow();  // Pass demo control to debug window
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
@@ -209,13 +246,22 @@ void DebugUI::ClearAllGameObjects() {
     _invalidateCache();
 }
 
-void DebugUI::_showPlayStopControls() {
+void DebugUI::_showPlaybackControls() {
     // Use config values
     const auto& layout = m_config.Layout;
     ImGui::SetNextWindowPos(ImVec2(layout.ControlsX, layout.ControlsY), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(layout.ControlsW, layout.ControlsH), ImGuiCond_Once);
 
     ImGui::Begin("Game Controls");
+
+    // If mouse is over window then show tooltips (with keyboard shortcuts)
+    if (ImGui::IsWindowHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::Text("Play/Stop - Ctrl+P");
+        ImGui::Text("Pause/Resume - Ctrl+Shift+P");
+        ImGui::Text("Step - Alt+P");
+        ImGui::EndTooltip();
+    }
 
     // Show current state (resume is essentially == playing)
     ImGui::Text("State: %s",
