@@ -90,6 +90,7 @@ namespace Sandbox {
         TestType m_currentTest{ TestType::BasicEntityCreation };
         
         // Layers
+        uint16_t m_boundaryLayer = 0;
         uint16_t m_testLayer = 0;
         uint16_t m_physicsLayer = 0;
         uint16_t m_renderLayer = 0;
