@@ -113,8 +113,7 @@ namespace ECS {
 		 * @param e The entity to destroy
          */
         void Destroy(const Entity e) {
-            if (!IsAlive(e))
-                return;
+			// Assume entity is alive
 
             auto &loc = m_locations[e.Index];
             if (loc.ArchetypePtr) {
@@ -135,8 +134,7 @@ namespace ECS {
          */
         template<typename T>
         bool Has(const Entity e) const {
-            if (!IsAlive(e))
-                return false;
+            // Assume entity is alive
 
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr)
@@ -152,11 +150,8 @@ namespace ECS {
 		 * @return T& Reference to the requested component
          */
         template<typename T>
-        T& Get(const Entity e) {
-            assert(IsAlive(e));
+        inline T& Get(const Entity e) {
             auto& loc = m_locations[e.Index];
-            assert(loc.ArchetypePtr && loc.ArchetypePtr->Has(TypeIdOf<T>()));
-
             return *static_cast<T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
         }
 
@@ -167,11 +162,8 @@ namespace ECS {
 		 * @return const T& Const reference to the requested component
          */
         template<typename T>
-        const T& Get(const Entity e) const {
-            assert(IsAlive(e));
+        inline const T& Get(const Entity e) const {
             auto& loc = m_locations[e.Index];
-            assert(loc.ArchetypePtr && loc.ArchetypePtr->Has(TypeIdOf<T>()));
-
             return *static_cast<const T*>(loc.ArchetypePtr->GetRaw(TypeIdOf<T>(), loc.ChunkIndex, loc.SlotIndex));
         }
 
@@ -186,8 +178,7 @@ namespace ECS {
          */
         template<typename T>
         T* TryGet(const Entity e) {
-            if (!IsAlive(e))
-                return nullptr;
+            // Assume entity is alive
 
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr || !loc.ArchetypePtr->Has(TypeIdOf<T>()))
@@ -207,8 +198,7 @@ namespace ECS {
          */
         template<typename T>
         const T* TryGet(const Entity e) const {
-            if (!IsAlive(e))
-                return nullptr;
+            // Assume entity is alive
 
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr || !loc.ArchetypePtr->Has(TypeIdOf<T>()))
@@ -228,8 +218,7 @@ namespace ECS {
          */
         template<typename... Ts>
         std::tuple<Ts*...> TryGetComponents(const Entity e) {
-            if (!IsAlive(e))
-                return std::tuple<Ts*...>{ static_cast<Ts*>(nullptr)... };
+            // Assume entity is alive
 
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr)
@@ -257,8 +246,7 @@ namespace ECS {
          */
         template<typename... Ts>
         std::tuple<const Ts*...> TryGetComponents(const Entity e) const {
-            if (!IsAlive(e))
-                return std::tuple<const Ts*...>{ static_cast<const Ts*>(nullptr)... };
+			// Assume entity is alive
 
             auto& loc = m_locations[e.Index];
             if (!loc.ArchetypePtr)
@@ -284,8 +272,7 @@ namespace ECS {
 		 * @return T& Reference to the newly added component
          */
         template<typename T, typename... TArgs>
-        T& Add(Entity e, TArgs&&... args) {
-            assert(IsAlive(e));
+        inline T& Add(Entity e, TArgs&&... args) {
             auto t = TypeIdOf<T>();
             auto mover = [&, this](Entity, void* dstArchetypeSlot) {
                 new (dstArchetypeSlot) T(std::forward<TArgs>(args)...);
@@ -302,10 +289,8 @@ namespace ECS {
 		 * @param e The entity from which the component will be removed
          */
         template<typename T>
-        void Remove(Entity e) {
-            assert(IsAlive(e));
-            if (!Has<T>(e))
-                return;
+        inline void Remove(Entity e) {
+			// Assume entity has the component
 
             auto t = TypeIdOf<T>();
             _onComponentRemoving(e, t);
@@ -337,54 +322,56 @@ namespace ECS {
          */
         template<typename... Ts, typename TFn>
         void Each(TFn&& fn) {
-            const Signature req(std::vector<TypeId>{ TypeIdOf<std::decay_t<Ts>>()... });
+            constexpr size_t numComponents = sizeof...(Ts);
+            if constexpr (numComponents == 0) return;
 
-            // Precompute TypeIds into an array for this invocation
-            const std::array<TypeId, sizeof...(Ts)> typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
+            // Use compile-time query ID to cache archetype list pointer
+            using QueryTag = std::tuple<std::decay_t<Ts>...>;
+            static const std::vector<Archetype*>* cached = nullptr;
+            static uint64_t cacheVersion = 0;
+            static std::array<TypeId, numComponents> typeIds = { 0 };
+            
+            if (cached == nullptr || cacheVersion != m_archetypeVersion) {
+                typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
+                const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
+                cached = &_getMatchingArchetypes(req);
+                cacheVersion = m_archetypeVersion;
+            }
+            const auto& matched = *cached;
+            
+            for (Archetype* __restrict arch : matched) {
+                if (!arch) [[unlikely]] continue;
 
-            // Use cached matching archetypes to avoid re-scanning all archetypes
-            const auto& matched = _getMatchingArchetypes(req);
-            for (Archetype* arch : matched) {
-                if (!arch) continue;
-
-                // Precompute component indices for this archetype to avoid map lookups per entity
-                std::array<uint32_t, sizeof...(Ts)> compIdxs{};
-                for (size_t k = 0; k < compIdxs.size(); ++k) {
-                    compIdxs[k] = static_cast<uint32_t>(arch->GetComponentIndex(typeIds[k]));
+                // Precompute component indices for this archetype
+                std::array<uint32_t, numComponents> compIdxs;
+                for (size_t k = 0; k < numComponents; ++k) {
+                    compIdxs[k] = arch->GetComponentIndex(typeIds[k]);
                 }
 
-                // Lookup chunk mapping once per archetype
-                const auto it = m_chunkIndices.find(arch);
-                if (it == m_chunkIndices.end())
-                    continue;
-                const auto& chunkIndexMapping = it->second.Entities;
+                const uint32_t chunkCount = arch->GetChunkCount();
+                
+                // Iterate through all chunks in this archetype
+                for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                    Chunk* __restrict ch = arch->GetChunk(ci);
+                    const uint32_t count = ch->Count();
+                    
+                    if (count == 0) [[unlikely]] continue;
+                    
+                    // Get base pointers to component arrays (stack-allocated)
+                    std::array<uint8_t*, numComponents> componentBases;
+                    std::array<size_t, numComponents> strides;
+                    
+                    for (size_t pi = 0; pi < numComponents; ++pi) {
+                        componentBases[pi] = static_cast<uint8_t*>(ch->ComponentBase(compIdxs[pi]));
+                        strides[pi] = ch->ComponentStride(compIdxs[pi]);
+                    }
+                    
+                    // Get entity array pointer for direct access
+                    const Entity* __restrict entities = ch->Entities().data();
 
-                for (uint32_t ci = 0; ci < arch->GetChunkCount(); ++ci) {
-                    const Chunk* ch = arch->GetChunk(ci);
-
-                    if (ci >= chunkIndexMapping.size())
-                        continue;
-
-                    const auto& vec = chunkIndexMapping[ci];
-
-                    for (uint32_t i = 0; i < ch->Count(); ++i) {
-                        if (i >= vec.size())
-                            continue;
-
-                        const Entity ent = vec[i];
-                        if (ent.IsNull())
-                            continue;
-
-                        // Gather pointers for each requested component in this slot
-                        std::array<void*, sizeof...(Ts)> ptrs{};
-                        for (size_t pi = 0; pi < ptrs.size(); ++pi) {
-                            ptrs[pi] = const_cast<void*>(ch->ComponentPtr(static_cast<uint32_t>(compIdxs[pi]), i));
-                        }
-
-                        // Call the function with properly casted references
-                        std::apply([&](auto&&... p) {
-                            fn(ent, (*static_cast<std::decay_t<Ts>*>(p))...);
-                        }, ptrs);
+                    // Tight inner loop - fully optimized
+                    for (uint32_t i = 0; i < count; ++i) {
+                        _invokeWithComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
                     }
                 }
             }
@@ -398,51 +385,56 @@ namespace ECS {
          */
         template<typename... Ts, typename TFn>
         void Each(TFn&& fn) const {
-            const Signature req(std::vector<TypeId>{ TypeIdOf<std::decay_t<Ts>>()... });
-            // Precompute TypeIds
-            const std::array<TypeId, sizeof...(Ts)> typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
+            constexpr size_t numComponents = sizeof...(Ts);
+            if constexpr (numComponents == 0) return;
 
-            // Use cached matching archetypes to avoid re-scanning all archetypes
-            const auto& matched = _getMatchingArchetypes(req);
-            for (const Archetype* arch : matched) {
-                if (!arch) continue;
+            // Use compile-time query ID to cache archetype list pointer
+            using QueryTag = std::tuple<std::decay_t<Ts>...>;
+            static const std::vector<Archetype*>* cached = nullptr;
+            static uint64_t cacheVersion = 0;
+            static std::array<TypeId, numComponents> typeIds = { 0 };
+            
+            if (cached == nullptr || cacheVersion != m_archetypeVersion) {
+                typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
+                const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
+                cached = &_getMatchingArchetypes(req);
+                cacheVersion = m_archetypeVersion;
+            }
+            const auto& matched = *cached;
+            
+            for (const Archetype* __restrict arch : matched) {
+                if (!arch) [[unlikely]] continue;
 
                 // Precompute component indices for this archetype
-                std::array<uint32_t, sizeof...(Ts)> compIdxs{};
-                for (size_t k = 0; k < compIdxs.size(); ++k) {
-                    compIdxs[k] = static_cast<uint32_t>(arch->GetComponentIndex(typeIds[k]));
+                std::array<uint32_t, numComponents> compIdxs;
+                for (size_t k = 0; k < numComponents; ++k) {
+                    compIdxs[k] = arch->GetComponentIndex(typeIds[k]);
                 }
 
-                // Lookup chunk mapping once per archetype
-                const auto it = m_chunkIndices.find(const_cast<Archetype*>(arch));
-                if (it == m_chunkIndices.end())
-                    continue;
-                const auto& chunkIndexMapping = it->second.Entities;
+                const uint32_t chunkCount = arch->GetChunkCount();
+                
+                // Iterate through all chunks in this archetype
+                for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                    const Chunk* __restrict ch = arch->GetChunk(ci);
+                    const uint32_t count = ch->Count();
+                    
+                    if (count == 0) [[unlikely]] continue;
+                    
+                    // Get base pointers to component arrays (stack-allocated)
+                    std::array<const uint8_t*, numComponents> componentBases;
+                    std::array<size_t, numComponents> strides;
+                    
+                    for (size_t pi = 0; pi < numComponents; ++pi) {
+                        componentBases[pi] = static_cast<const uint8_t*>(ch->ComponentBase(compIdxs[pi]));
+                        strides[pi] = ch->ComponentStride(compIdxs[pi]);
+                    }
+                    
+                    // Get entity array pointer for direct access
+                    const Entity* __restrict entities = ch->Entities().data();
 
-                for (uint32_t ci = 0; ci < arch->GetChunkCount(); ++ci) {
-                    const Chunk* ch = arch->GetChunk(ci);
-
-                    if (ci >= chunkIndexMapping.size())
-                        continue;
-
-                    const auto& vec = chunkIndexMapping[ci];
-
-                    for (uint32_t i = 0; i < ch->Count(); ++i) {
-                        if (i >= vec.size())
-                            continue;
-
-                        const Entity ent = vec[i];
-                        if (ent.IsNull())
-                            continue;
-
-                        std::array<const void*, sizeof...(Ts)> ptrs{};
-                        for (size_t pi = 0; pi < ptrs.size(); ++pi) {
-                            ptrs[pi] = ch->ComponentPtr(static_cast<uint32_t>(compIdxs[pi]), i);
-                        }
-
-                        std::apply([&](auto&&... p) {
-                            fn(ent, (*static_cast<const std::decay_t<Ts>*>(p))...);
-                        }, ptrs);
+                    // Tight inner loop
+                    for (uint32_t i = 0; i < count; ++i) {
+                        _invokeWithConstComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
                     }
                 }
             }
@@ -459,22 +451,20 @@ namespace ECS {
             // Reserve a rough capacity to minimize reallocations
             toDestroy.reserve(1024);
 
-            for (auto& [fst, snd] : m_archetypes) {
-                auto& archPtr = snd;
-
+            for (auto& [sig, archPtr] : m_archetypes) {
                 if (!archPtr)
                     continue;
+                
                 Archetype* arch = archPtr.get();
-
-                auto it = m_chunkIndices.find(arch);
-                if (it == m_chunkIndices.end())
-                    continue;
-                auto& ci = it->second;
-
-                for (size_t ciIdx = 0; ciIdx < ci.Entities.size(); ++ciIdx) {
-                    auto& slots = ci.Entities[ciIdx];
-                    for (Entity e : slots) {
-                        if (!e.IsNull()) toDestroy.push_back(e);
+                for (uint32_t ci = 0; ci < arch->GetChunkCount(); ++ci) {
+                    const Chunk* chunk = arch->GetChunk(ci);
+                    const uint32_t count = chunk->Count();
+                    
+                    for (uint32_t slot = 0; slot < count; ++slot) {
+                        const Entity e = chunk->GetEntity(slot);
+                        if (!e.IsNull()) {
+                            toDestroy.push_back(e);
+                        }
                     }
                 }
             }
@@ -494,7 +484,6 @@ namespace ECS {
          */
         void Clear() {
             m_archetypes.clear();
-            m_chunkIndices.clear();
 
             m_locations.clear();
             m_generations.clear();
@@ -658,10 +647,6 @@ namespace ECS {
         }
 
     private:
-        struct ChunkIndex {
-            std::vector<std::vector<Entity>> Entities; // [chunkIndex][slotIndex]
-        };
-
         struct HierarchyIndex {
             std::unordered_map<Entity, Entity, EntityHash> ParentOf;
             std::unordered_map<Entity, Entity, EntityHash> FirstChild;
@@ -684,7 +669,6 @@ namespace ECS {
             auto arch = std::make_unique<Archetype>(sig, std::move(infos), m_chunkCapacity, m_chunkBytes);
             Archetype* ptr = arch.get();
             m_archetypes.emplace(sig, std::move(arch));
-            m_chunkIndices[ptr] = ChunkIndex{};
 
             // Invalidate query cache when a new archetype is created
             ++m_archetypeVersion;
@@ -787,109 +771,54 @@ namespace ECS {
 
         void _placeEntity(const Entity e, Archetype* arch, const uint32_t chunkIndex, const uint32_t slot) {
             m_locations[e.Index] = Location{ arch, chunkIndex, slot };
-
-            auto &ci = m_chunkIndices[arch];
-            if (ci.Entities.size() <= chunkIndex)
-                ci.Entities.resize(chunkIndex + 1);
-
-            auto &vec = ci.Entities[chunkIndex];
-            if (vec.size() <= slot)
-                vec.resize(arch->GetChunk(chunkIndex)->Capacity(), NULL_ENTITY);
-                
-            vec[slot] = e;
+            
+            // Store entity ID directly in the chunk
+            arch->GetChunk(chunkIndex)->SetEntity(slot, e);
         }
 
         void _removeFromArchetype(const Entity e, Location& loc) {
-            (void)e;
             Archetype* arch = loc.ArchetypePtr;
-            auto &ci = m_chunkIndices[arch];
             const uint32_t chunkIndex = loc.ChunkIndex;
-
-            // Defensive: ensure mapping vector is large enough
-            if (ci.Entities.size() <= chunkIndex) {
-                ci.Entities.resize(chunkIndex + 1);
-            }
-
-            auto &vec = ci.Entities[chunkIndex];
-
-            // Capture chunk count before removal to detect chunk erasure
-            const uint32_t prevChunkCount = arch->GetChunkCount();
-            const uint32_t movedFrom = arch->RemoveSwapBack(chunkIndex, loc.SlotIndex);
-            const uint32_t postChunkCount = arch->GetChunkCount();
-            const bool chunkErased = (postChunkCount + 1u == prevChunkCount);
-
-            if (!chunkErased) {
-                // Regular in-chunk swap/remove
-                if (movedFrom != loc.SlotIndex) {
-                    const Entity moved = vec[movedFrom];
-                    vec[loc.SlotIndex] = moved;
-                    vec[movedFrom] = NULL_ENTITY;
-                    if (!moved.IsNull()) {
-                        auto &mloc = m_locations[moved.Index];
-                        mloc.SlotIndex = loc.SlotIndex;
-                        // ChunkIndex remains the same
-                    }
-                } else {
-                    // Removed last element of the chunk, just clear mapping
-                    if (loc.SlotIndex < vec.size()) {
-                        vec[loc.SlotIndex] = NULL_ENTITY;
-                    }
-                }
-            } else {
-                // The entire chunk at chunkIndex was erased by the archetype.
-                // Keep m_chunkIndices in sync and fix affected entity locations.
-
-                // Remove the vector that mirrored the erased chunk
-                if (chunkIndex < ci.Entities.size()) {
-                    ci.Entities.erase(ci.Entities.begin() + static_cast<std::ptrdiff_t>(chunkIndex));
-                }
-
-                // All chunks that were after the erased one have shifted left by 1.
-                // Update their entities' recorded ChunkIndex to stay consistent.
-                for (uint32_t newChunkIdx = chunkIndex; newChunkIdx < ci.Entities.size(); ++newChunkIdx) {
-                    auto &slotVec = ci.Entities[newChunkIdx];
-                    for (const Entity ent : slotVec) {
-                        if (ent.IsNull()) continue;
-                        auto &mloc = m_locations[ent.Index];
-                        mloc.ChunkIndex = newChunkIdx;
-                    }
+            const uint32_t slotIndex = loc.SlotIndex;
+            
+            Chunk* chunk = arch->GetChunk(chunkIndex);
+            
+            // RemoveSwapBack handles both component data and entity ID swapping
+            const uint32_t movedSlot = chunk->RemoveSwapBack(slotIndex);
+            
+            // If an entity was swapped, update its location
+            if (movedSlot != slotIndex) {
+                const Entity movedEntity = chunk->GetEntity(slotIndex);
+                if (!movedEntity.IsNull()) {
+                    auto& movedLoc = m_locations[movedEntity.Index];
+                    movedLoc.SlotIndex = slotIndex;
                 }
             }
-
-            // Detach removed entity from any archetype
+            
+            // Detach removed entity from archetype
             loc.ArchetypePtr = nullptr;
         }
 
         Entity _reverseEntity(Archetype& arch, const uint32_t chunkIndex, const uint32_t slot) const {
-            const auto it = m_chunkIndices.find(&arch);
-            if (it == m_chunkIndices.end())
+            if (chunkIndex >= arch.GetChunkCount())
                 return NULL_ENTITY;
-
-            const auto &ci = it->second;
-            if (chunkIndex >= ci.Entities.size())
+            
+            const Chunk* ch = arch.GetChunk(chunkIndex);
+            if (slot >= ch->Count())
                 return NULL_ENTITY;
-
-            const auto &vec = ci.Entities[chunkIndex];
-            if (slot >= vec.size())
-                return NULL_ENTITY;
-
-            return vec[slot];
+            
+            return ch->GetEntity(slot);
         }
 
         Entity _reverseEntity(const Archetype& arch, const uint32_t chunkIndex, const uint32_t slot) const {
-            const auto it = m_chunkIndices.find(const_cast<Archetype*>(&arch));
-            if (it == m_chunkIndices.end())
+            if (chunkIndex >= arch.GetChunkCount())
                 return NULL_ENTITY;
-
-            const auto &ci = it->second;
-            if (chunkIndex >= ci.Entities.size())
+            
+            const Chunk* ch = arch.GetChunk(chunkIndex);
+            if (slot >= ch->Count())
                 return NULL_ENTITY;
-
-            const auto &vec = ci.Entities[chunkIndex];
-            if (slot >= vec.size())
-                return NULL_ENTITY;
-
-            return vec[slot];
+            
+            return ch->GetEntity(slot);
         }
 
         void _onComponentAdded(const Entity e, const TypeId t) {
@@ -979,6 +908,26 @@ namespace ECS {
             return m_queryCache.at(req);
         }
 
+        // Helper to invoke function with component references using base pointers + offsets
+        template<typename... Ts, typename TFn, size_t... Is>
+        inline void _invokeWithComponents(TFn&& fn, const Entity ent, 
+                                   const std::array<uint8_t*, sizeof...(Ts)>& bases,
+                                   const std::array<size_t, sizeof...(Ts)>& strides,
+                                   const uint32_t index,
+                                   std::index_sequence<Is...>) {
+            fn(ent, (*reinterpret_cast<std::decay_t<Ts>*>(bases[Is] + strides[Is] * index))...);
+        }
+
+        // Helper for const version
+        template<typename... Ts, typename TFn, size_t... Is>
+        inline void _invokeWithConstComponents(TFn&& fn, const Entity ent,
+                                       const std::array<const uint8_t*, sizeof...(Ts)>& bases,
+                                       const std::array<size_t, sizeof...(Ts)>& strides,
+                                       const uint32_t index,
+                                       std::index_sequence<Is...>) const {
+            fn(ent, (*reinterpret_cast<const std::decay_t<Ts>*>(bases[Is] + strides[Is] * index))...);
+        }
+
     private:
         uint32_t m_chunkCapacity = 256;
         size_t m_chunkBytes = 16384; // 16 * 1024;
@@ -988,7 +937,6 @@ namespace ECS {
         std::vector<Location> m_locations;
 
         std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash> m_archetypes;
-        std::unordered_map<Archetype*, ChunkIndex> m_chunkIndices;
         std::unordered_map<TypeId, std::pair<size_t,size_t>> m_componentSizes;
 
         HierarchyIndex m_hierarchy;

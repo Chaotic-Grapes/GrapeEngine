@@ -256,31 +256,31 @@ namespace ECS {
 
 
         } // iterations
-#ifdef _DEBUG
-        static int frameCount = 0;
-        static float totalTime = 0.0f;
-        static int totalPairs = 0;
-        static int totalEntities = 0;
-
-        frameCount++;
-        totalTime += dt;
-        totalPairs += candidatePairs.size();
-        totalEntities += dynamicEntities.size();
-
-        if (frameCount >= 60) {
-            std::cout << "\n=== Physics Stats (60 frames avg) ===\n"
-                << "  Dynamic Entities: " << (totalEntities / 60) << "\n"
-                << "  Grid Cells Used: " << partition.Grid().size() << "\n"
-                << "  Candidate Pairs: " << (totalPairs / 60) << "\n"
-                << "  Avg Frame Time: " << ((totalTime / 60.0f) * 1000.0f) << "ms\n"
-                << "======================================\n";
-
-            frameCount = 0;
-            totalTime = 0.0f;
-            totalPairs = 0;
-            totalEntities = 0;
-        }
-#endif
+//#ifdef _DEBUG
+//        static int frameCount = 0;
+//        static float totalTime = 0.0f;
+//        static int totalPairs = 0;
+//        static int totalEntities = 0;
+//
+//        frameCount++;
+//        totalTime += dt;
+//        totalPairs += candidatePairs.size();
+//        totalEntities += dynamicEntities.size();
+//
+//        if (frameCount >= 60) {
+//            std::cout << "\n=== Physics Stats (60 frames avg) ===\n"
+//                << "  Dynamic Entities: " << (totalEntities / 60) << "\n"
+//                << "  Grid Cells Used: " << partition.Grid().size() << "\n"
+//                << "  Candidate Pairs: " << (totalPairs / 60) << "\n"
+//                << "  Avg Frame Time: " << ((totalTime / 60.0f) * 1000.0f) << "ms\n"
+//                << "======================================\n";
+//
+//            frameCount = 0;
+//            totalTime = 0.0f;
+//            totalPairs = 0;
+//            totalEntities = 0;
+//        }
+//#endif
         // 5) (Optional) Additional collision handling per-entity (e.g., callbacks) can be placed here.
     }
 

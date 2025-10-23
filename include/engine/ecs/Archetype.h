@@ -73,7 +73,7 @@ namespace ECS {
 		 * @param t The TypeId of the component to check for.
 		 * @return True if the component type is present in the archetype, false otherwise.
          */
-        bool Has(const TypeId t) const noexcept {
+        inline bool Has(const TypeId t) const noexcept {
             // O(1) hash lookup instead of O(log n) binary search
             return m_componentIndexCache.find(t) != m_componentIndexCache.end();
         }
@@ -83,10 +83,9 @@ namespace ECS {
 		 * @param t The TypeId of the component.
 		 * @return The index of the component within the archetype.
          */
-        ComponentIndex GetComponentIndex(const TypeId t) const {
+        inline ComponentIndex GetComponentIndex(const TypeId t) const {
             // O(1) hash lookup instead of O(log n) binary search
             auto it = m_componentIndexCache.find(t);
-            assert(it != m_componentIndexCache.end());
             return it->second;
         }
 

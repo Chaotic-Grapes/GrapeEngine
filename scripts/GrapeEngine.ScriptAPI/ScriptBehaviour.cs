@@ -20,11 +20,31 @@ namespace GrapeEngine.Scripting
         /// </summary>
         public virtual void OnStart() { }
 
+        // TODO: Remove delta time
         /// <summary>
         /// Called every frame while the entity is active.
         /// </summary>
-        /// <param name="deltaTime">Time elapsed since last frame in seconds</param>
-        public virtual void OnUpdate(float deltaTime) { }
+        public virtual void OnUpdate(float dt) { }
+
+        /// <summary>
+        /// Called at fixed time intervals for physics updates.
+        /// </summary>
+        public virtual void OnFixedUpdate() { }
+
+        /// <summary>
+        /// Called every frame after all OnUpdate calls.
+        /// </summary>
+        public virtual void OnLateUpdate() { }
+
+        /// <summary>
+        /// Called when the script is enabled.
+        /// </summary>
+        public virtual void OnEnable() { }
+
+        /// <summary>
+        /// Called when the script is disabled.
+        /// </summary>
+        public virtual void OnDisable() { }
 
         /// <summary>
         /// Called when the script or entity is being destroyed.
@@ -34,21 +54,30 @@ namespace GrapeEngine.Scripting
 
         // ------------ Entity API ------------ //
 
-        /// <summary>
-        /// Get the transform component of this entity.
-        /// </summary>
-        public Transform GetTransform()
-        {
-            return EntityAPI.GetTransform(EntityId);
-        }
+        // /// <summary>
+        // /// Get the transform component of this entity.
+        // /// </summary>
+        // public Transform GetTransform()
+        // {
+        //     return EntityAPI.GetTransform(EntityId);
+        // }
 
+        // /// <summary>
+        // /// Set the position of this entity.
+        // /// </summary>
+        // public void SetPosition(Vector3 position)
+        // {
+        //     EntityAPI.SetPosition(EntityId, position);
+        // }
+
+        // TODO: Create a struct wrapper for entities?
         /// <summary>
-        /// Set the position of this entity.
+        /// Creates a new entity in the scene.
         /// </summary>
-        public void SetPosition(Vector3 position)
-        {
-            EntityAPI.SetPosition(EntityId, position);
-        }
+        // public void Create()
+        // {
+        //     EntityAPI.CreateEntity(EntityId);
+        // }
 
         /// <summary>
         /// Destroy this entity.
@@ -187,6 +216,25 @@ namespace GrapeEngine.Scripting
 
         [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern void SetPosition(ulong entityId, Vector3 position);
+
+        // [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl)]
+        // public static extern bool HasComponent<T>(ulong entityId) where T : struct;
+
+        // [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl)]
+        // public static extern T? GetComponent<T>(ulong entityId) where T : struct;
+
+        // [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl)]
+        // public static extern void AddComponent<T>(ulong entityId, T component) where T : struct;
+
+        // [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl)]
+        // public static extern void RemoveComponent<T>(ulong entityId) where T : struct;
+
+        // TODO: Fix this.
+        // Possibly need to create an entity struct wrapper
+        // Need to figure out how to pass complex types via P/Invoke
+        // Probably need Marshal
+        // [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl)]
+        // public static extern Entity CreateEntity(ulong entityId);
 
         [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl)]
         public static extern void DestroyEntity(ulong entityId);

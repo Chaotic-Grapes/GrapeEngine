@@ -30,10 +30,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace ECS {
     class Signature {
     public:
-        Signature() = default;
+        Signature() { m_types.reserve(8); }  // Reserve space for common case
         explicit Signature(std::vector<TypeId> types) : m_types(std::move(types)) {
             std::sort(m_types.begin(), m_types.end());
             m_types.erase(std::unique(m_types.begin(), m_types.end()), m_types.end());
+            m_types.shrink_to_fit();  // Free unused memory after deduplication
         }
 
         /**
