@@ -1,3 +1,26 @@
+/* Start Header *****************************************************************/
+/*!
+\file    ComponentRegistry.h
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
+\brief
+This file contains the ComponentRegistry class, which manages component type
+registration and metadata storage for the ECS. Uses lock-free registration with
+std::call_once for thread-safe initialization without mutex contention in hot
+paths. Component metadata (size, alignment, constructor/destructor) is cached
+and accessed lock-free during iteration for maximum performance.
+
+This class is critical for enabling efficient memory layout calculations
+and component management in the ECS architecture. Not to be directly used by
+game code; instead, use the provided ECS component management APIs.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header
+********************************************************************************/
+
 #ifndef COMPONENTREGISTRY_H
 #define COMPONENTREGISTRY_H
 

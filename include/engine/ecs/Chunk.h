@@ -5,9 +5,15 @@
 \par     muhammadnurfadzly.b@digipen.edu
 \brief
 This file contains the declaration and definition of the Chunk class,
-responsible for managing a chunk of entities and their components. It provides
-methods for adding, removing, and accessing components within the chunk, as well
-as handling memory allocation and deallocation.
+responsible for managing a contiguous block of entities and their components
+in Structure of Arrays (SoA) layout. Features version tracking for incremental
+processing, allowing queries to skip unchanged chunks. Provides efficient
+component access via base pointers and stride calculations for cache-friendly
+iteration.
+
+This class is necessary for enabling efficient memory layout and component
+management in the ECS architecture. Not to be directly used by game code; instead,
+use the provided ECS component management APIs.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the

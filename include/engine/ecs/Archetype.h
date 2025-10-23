@@ -4,11 +4,15 @@
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \brief
-This file contains the declaration and definition of the Archetype
-class, responsible for managing a group of entities with the same
-component composition. It provides methods for adding, removing, and
-querying entities within the archetype, as well as handling chunk
-allocation and memory management.
+This file contains the declaration and definition of the Archetype class,
+responsible for managing entities with identical component compositions.
+Features archetype graph edges for O(1) component add/remove transitions,
+pre-computed component stride cache for fast iteration, and chunk defragmentation
+to maintain memory locality. Handles chunk allocation, entity management, and
+efficient component access patterns for high-performance ECS queries.
+
+This class is not to be directly used by game code; instead,
+use the provided ECS component management APIs.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the

@@ -4,11 +4,16 @@
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \brief
-This file contains the declaration and definition of the World class, responsible
-for managing the entire Entity-Component-System (ECS) world. It provides methods
-for creating, destroying, and managing entities and their components. The World
-class also handles the updating of entity transforms and the processing of
-systems within the ECS architecture.
+This file contains the declaration and definition of the World class, the central
+manager for the ECS architecture. Features persistent query caching that survives
+archetype creation, archetype graph edges for O(1) component transitions, and
+optimized iteration with pre-computed component indices and strides.
+
+Provides entity lifecycle management, hierarchical relationships, and efficient
+Each() queries with template-based static caching for maximum performance.
+
+This class is mostly used by developers and would be considered the most
+important part of the ECS architecture.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
