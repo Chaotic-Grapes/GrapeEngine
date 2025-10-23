@@ -28,6 +28,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/ComponentRegistry.h"
 
 namespace ECS {
+    // Signature represents a set of component types using their TypeIds.
     class Signature {
     public:
         Signature() { m_types.reserve(8); }  // Reserve space for common case

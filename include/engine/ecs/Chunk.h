@@ -27,13 +27,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Entity.h"
 
 namespace ECS {
+    // Layout entry for each component type in the chunk
     struct ChunkLayoutEntry {
     public:
-        size_t Offset = 0;
-        size_t Stride = 0;
-        size_t Align = 1;
+        size_t Offset = 0; // Offset of the component data within the chunk
+        size_t Stride = 0; // Stride (size) of the component type
+        size_t Align = 1;  // Alignment requirement of the component type
     };
 
+    // Chunk represents a contiguous block of memory for storing entities and their components.
     class Chunk {
     public:
         Chunk() = default;
@@ -45,7 +47,8 @@ namespace ECS {
          * @param totalSize The total size of the chunk's buffer.
          */
         Chunk(const uint32_t capacity, std::vector<ChunkLayoutEntry> layout, const size_t totalSize)
-            : m_capacity(capacity), m_count(0), m_buffer(new uint8_t[totalSize]), m_layout(std::move(layout)) {
+            : m_capacity(capacity), m_count(0), m_version(0), m_buffer(new uint8_t[totalSize]), m_layout(std::move(layout)) {
+            // Preallocate slots for all potential entities in this chunk
             m_entities.resize(capacity, NULL_ENTITY);
         }
 
@@ -53,19 +56,37 @@ namespace ECS {
          * @brief Gets the capacity of the chunk.
          * @return The maximum number of entities this chunk can hold.
          */
-        uint32_t Capacity() const noexcept        { return m_capacity; }
+        uint32_t Capacity() const noexcept { return m_capacity; }
 
         /**
          * @brief Gets the current count of entities in the chunk.
          * @return The number of entities currently stored in the chunk.
          */
-        uint32_t Count() const noexcept           { return m_count; }
+        uint32_t Count() const noexcept { return m_count; }
         
         /**
          * @brief Sets the current count of entities in the chunk.
          * @param c The new count of entities.
          */
-        void SetCount(const uint32_t c) noexcept  { m_count = c; }
+        void SetCount(const uint32_t c) noexcept  { 
+            m_count = c; 
+            // Increment version when count changes to signal structural modifications
+            // to allow queries to skip this chunk if they have already processed this version
+            MarkDirty();
+        }
+        
+        /**
+         * @brief Gets the current version of the chunk.
+         * @return The version number, incremented each time chunk data is modified.
+         */
+        uint64_t Version() const noexcept { return m_version; }
+        
+        /**
+         * @brief Marks the chunk as modified by incrementing its version.
+         * Called whenever component data changes to enable incremental query processing.
+         * Queries can track the last processed version to skip unchanged chunks.
+         */
+        void MarkDirty() noexcept { ++m_version; }
 
         /**
          * @brief Gets the entity at the specified slot index.
@@ -83,6 +104,9 @@ namespace ECS {
          */
         inline void SetEntity(const uint32_t slot, const Entity entity) noexcept {
             m_entities[slot] = entity;
+            
+            // Mark chunk as dirty since entity assignment modifies chunk data
+            MarkDirty();
         }
 
         /**
@@ -148,7 +172,7 @@ namespace ECS {
         uint32_t RemoveSwapBack(const uint32_t dst) noexcept {
             const uint32_t last = m_count - 1;
             if (dst != last) {
-                // Swap component data
+                // Swap component data from last entity into the removed entity's slot
                 for (size_t i = 0; i < m_layout.size(); ++i) {
                     std::memmove(ComponentPtr(static_cast<uint32_t>(i), dst),
                                 ComponentPtr(static_cast<uint32_t>(i), last),
@@ -157,18 +181,26 @@ namespace ECS {
                 // Swap entity IDs
                 m_entities[dst] = m_entities[last];
             }
-            // Clear the last slot
+
+            // Clear the last slot to prevent dangling entity references
             m_entities[last] = NULL_ENTITY;
             --m_count;
+            
+            // Mark chunk dirty after removal so queries can detect structural changes
+            // Critical for incremental processing - ensures queries reprocess affected chunks
+            MarkDirty();
+            
             return last;
         }
 
     private:
-        uint32_t m_capacity = 0;
-        uint32_t m_count = 0;
-        std::unique_ptr<uint8_t[]> m_buffer;
-        std::vector<ChunkLayoutEntry> m_layout;
-        std::vector<Entity> m_entities;  // Entity IDs stored directly in chunk
+        uint32_t m_capacity = 0;  // Maximum entities this chunk can hold (determines memory allocation)
+        uint32_t m_count = 0;     // Current number of entities in this chunk (0 to m_capacity)
+        uint64_t m_version = 0;   // Incremented on any modification - enables incremental query processing
+                                  // Queries track last seen version to skip unchanged chunks (massive speedup)
+        std::unique_ptr<uint8_t[]> m_buffer;        // Raw memory buffer storing all component data
+        std::vector<ChunkLayoutEntry> m_layout;     // Describes where each component type lives in the buffer
+        std::vector<Entity> m_entities;             // Entity IDs stored directly in chunk for quick entity -> slot lookup
     };
 }
 

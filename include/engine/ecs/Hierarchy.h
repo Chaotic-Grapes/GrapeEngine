@@ -26,6 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <optional>
 
 namespace ECS {
+    // Hierarchy class for managing entity transforms in a parent-child hierarchy
     class Hierarchy {
     public:
         /**
@@ -49,7 +50,7 @@ namespace ECS {
         }
 
     private:
-        static void _updateSubtree(World& world, const Entity e, const std::optional<Matrix4x4>& parentWorld) {
+            static void _updateSubtree(World& world, const Entity e, const std::optional<Matrix4x4>& parentWorld) {
             const auto &lt = world.Get<Components::LocalTransform>(e);
             auto &wt = world.Get<Components::WorldTransform>(e);
 
