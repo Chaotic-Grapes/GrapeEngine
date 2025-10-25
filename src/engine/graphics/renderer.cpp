@@ -97,7 +97,7 @@ Renderer::Renderer(size_t maxQuads) {
 
     // attributes
     glEnableVertexArrayAttrib(vao, 0);
-    glVertexArrayAttribFormat(vao, 0, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, position));
+    glVertexArrayAttribFormat(vao, 0, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, position));
     glVertexArrayAttribBinding(vao, 0, 0);
 
     glEnableVertexArrayAttrib(vao, 1);
@@ -192,7 +192,10 @@ void Renderer::submitQuad(const glm::vec2& pos,
 
     size_t base = cpuBuffer.size();
     for (int i = 0; i < 4; ++i)
-        cpuBuffer.push_back({ positions[i], uvs[i], color, texIndex });
+    {
+        glm::vec3 pos3(positions[i], 0.0f); // promote 2D => 3D
+        cpuBuffer.push_back({ pos3, uvs[i], color, texIndex });
+    }
 
     cpuIndices.insert(cpuIndices.end(), {
         (uint32_t)base, (uint32_t)base + 1, (uint32_t)base + 2,
@@ -297,4 +300,38 @@ void Renderer::submitText(const Font& font,
         // Always advance cursor (even for space)
         x += g.advance * scale * tracking;
     }
+}
+
+void Renderer::drawFullscreenQuad() const
+{
+    static GLuint fsVAO = 0, fsVBO = 0;
+    if (fsVAO == 0)
+    {
+        // positions + texcoords (NDC)
+        float quadVertices[] = {
+            // pos      // uv
+            -1.0f, -1.0f,  0.0f, 0.0f,
+             1.0f, -1.0f,  1.0f, 0.0f,
+            -1.0f,  1.0f,  0.0f, 1.0f,
+             1.0f,  1.0f,  1.0f, 1.0f
+        };
+
+        glGenVertexArrays(1, &fsVAO);
+        glGenBuffers(1, &fsVBO);
+        glBindVertexArray(fsVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, fsVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+        glBindVertexArray(0);
+    }
+
+    glBindVertexArray(fsVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
 }
