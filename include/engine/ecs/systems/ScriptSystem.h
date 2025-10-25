@@ -14,8 +14,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#ifndef SCRIPT_SYSTEM_H
-#define SCRIPT_SYSTEM_H
+#ifndef SCRIPTSYSTEM_H
+#define SCRIPTSYSTEM_H
 
 #include "ecs/World.h"
 #include "scene/Scene.h"
@@ -24,7 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_map>
 
 // Forward declarations for CoreCLR types to avoid polluting headers
-typedef void* hostfxr_handle;
+using hostfxr_handle = void*;
 
 namespace ECS {
 
@@ -93,9 +93,29 @@ namespace ECS {
         /**
          * @brief System update - calls OnUpdate on all active scripts.
          * @param world The ECS world
-         * @param dt Delta time in seconds
          */
-        static void Update(World& world, float dt);
+        static void Update(World& world);
+
+        /**
+         * @brief System update - calls OnFixedUpdate on all active scripts.
+         * Should be called at fixed time intervals for physics.
+         * @param world The ECS world
+         */
+        static void FixedUpdate(World& world);
+
+        /**
+         * @brief System update - calls OnLateUpdate on all active scripts.
+         * Should be called after all Update calls.
+         * @param world The ECS world
+         */
+        static void LateUpdate(World& world);
+
+        /**
+         * @brief System update - handles enable/disable state changes.
+         * Call this when Active component changes.
+         * @param world The ECS world
+         */
+        static void UpdateActiveState(World& world);
 
         /**
          * @brief System update - cleanup destroyed entities' scripts.
@@ -123,13 +143,21 @@ namespace ECS {
         using CreateScriptInstanceFn = uint64_t(*)(const char* typeName, uint64_t entityId);
         using DestroyScriptInstanceFn = void(*)(uint64_t handle);
         using CallStartFn = void(*)(uint64_t handle);
-        using CallUpdateFn = void(*)(uint64_t handle, float dt);
+        using CallUpdateFn = void(*)(uint64_t handle);
+        using CallFixedUpdateFn = void(*)(uint64_t handle);
+        using CallLateUpdateFn = void(*)(uint64_t handle);
+        using CallEnableFn = void(*)(uint64_t handle);
+        using CallDisableFn = void(*)(uint64_t handle);
 
         // Managed function delegates
         CreateScriptInstanceFn m_createInstance = nullptr;
         DestroyScriptInstanceFn m_destroyInstance = nullptr;
         CallStartFn m_callStart = nullptr;
         CallUpdateFn m_callUpdate = nullptr;
+        CallFixedUpdateFn m_callFixedUpdate = nullptr;
+        CallLateUpdateFn m_callLateUpdate = nullptr;
+        CallEnableFn m_callEnable = nullptr;
+        CallDisableFn m_callDisable = nullptr;
 
         bool m_initialized = false;
 
@@ -143,8 +171,78 @@ namespace ECS {
 
         // Internal cleanup
         void CleanupScript(Components::ScriptInstance& script);
+
+        // ============================================================================
+        // C++ Callbacks for C# Scripts (Generic Component API)
+        // ============================================================================
+        // These functions are exported and callable from C# via P/Invoke.
+        // They provide safe, type-agnostic component access.
+        
+        friend bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
+        friend void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
+        friend bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
+        friend void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
+        friend void ScriptAPI_DestroyEntity(uint64_t entityId);
     };
 
 }
+
+// ============================================================================
+// Exported C Functions for C# P/Invoke
+// ============================================================================
+
+#ifndef SCRIPT_API
+#ifdef _WIN32
+    #define SCRIPT_API extern "C" __declspec(dllexport)
+#else
+    #define SCRIPT_API extern "C" __attribute__((visibility("default")))
+#endif
+#endif
+
+/**
+ * @brief Get a component from an entity by type hash.
+ * @param entityId Entity to query
+ * @param typeHash FNV-1a hash of component type name
+ * @param outBuffer Buffer to write component data to
+ * @param bufferSize Size of the buffer
+ * @return true if component exists and was copied, false otherwise
+ */
+SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
+
+/**
+ * @brief Set a component on an entity by type hash.
+ * @param entityId Entity to modify
+ * @param typeHash FNV-1a hash of component type name
+ * @param componentData Pointer to component data to copy
+ * @param dataSize Size of the component data
+ */
+SCRIPT_API void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
+
+/**
+ * @brief Check if an entity has a component.
+ * @param entityId Entity to query
+ * @param typeHash FNV-1a hash of component type name
+ * @return true if the component exists
+ */
+SCRIPT_API bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
+
+/**
+ * @brief Remove a component from an entity.
+ * @param entityId Entity to modify
+ * @param typeHash FNV-1a hash of component type name
+ */
+SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
+
+/**
+ * @brief Destroy an entity.
+ * @param entityId Entity to destroy
+ */
+SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId);
+
+/**
+ * @brief Set the world instance for script API access.
+ * @param world Pointer to the ECS world
+ */
+SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world);
 
 #endif

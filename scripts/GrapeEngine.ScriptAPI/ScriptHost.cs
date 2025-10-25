@@ -2,20 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 // Has hot reloading... theoretically?
 // But it isn't tested yet.
+
+// ************** !!!!!!!! IMPORTANT !!!!!!!! ************** //
+//                                                           //
+// Please consult me before making ANY changes to this file. //
+// Unless it's just logging changes or documentation updates //
+//                                                           //
+// ************** !!!!!!!! IMPORTANT !!!!!!!! ************** //
+
 namespace GrapeEngine.Scripting
 {
     /// <summary>
-    /// Entry point for C++ to interact with the managed scripting system.
+    /// The entry point for C++ to interact with the managed scripting system.
     /// This class manages script instance lifecycle and dispatches calls.
     /// </summary>
     public static class ScriptHost
     {
         // Store all active script instances
-        private static readonly Dictionary<ulong, ScriptBehaviour> s_instances = new();
-        private static ulong s_nextHandle = 1;
+        private static readonly Dictionary<ulong, ScriptBehaviour> m_instances = new();
+        private static ulong m_nextHandle = 1;
 
         /// <summary>
         /// Create a new script instance.
@@ -24,26 +33,30 @@ namespace GrapeEngine.Scripting
         /// <param name="typeNamePtr">Pointer to C-string containing fully qualified type name</param>
         /// <param name="entityId">The entity ID this script is attached to</param>
         /// <returns>Handle to the created instance, or 0 on failure</returns>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+
+        // CallConvs specifies the calling convention for this method.
+        // In this case, we use Cdecl to match the C++ side. (matching is very important)
+        // This ensures that the stack is cleaned up correctly after the function call.
+        // Also take note: I encapsulated the typeof(...) in square brackets because it is an array.
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])] // CallConvCdecl is in System.Runtime.CompilerServices
         public static ulong CreateScriptInstance(IntPtr typeNamePtr, ulong entityId)
         {
             try
             {
                 // Marshal type name from C++
-                // My first time using Marshal class
-                string? typeName = Marshal.PtrToStringAnsi(typeNamePtr);
+                var typeName = Marshal.PtrToStringAnsi(typeNamePtr);
 
                 // I normally use string.IsNullOrWhiteSpace but I am going with IsNullOrEmpty just to be safe
                 if (string.IsNullOrEmpty(typeName))
                 {
-                    Console.WriteLine("[ScriptHost] ERROR: Null or empty type name");
+                    Logging.Log("ERROR: Null or empty type name", LogLevel.Error);
                     return 0;
                 }
 
-                Console.WriteLine($"[ScriptHost] Creating script instance: {typeName} for entity {entityId}");
+                Logging.Log($"Creating script instance: {typeName} for entity {entityId}", LogLevel.Info);
 
                 // Find the type
-                Type? scriptType = Type.GetType(typeName);
+                var scriptType = Type.GetType(typeName);
                 if (scriptType == null)
                 {
                     // Try searching all loaded assemblies
@@ -57,15 +70,15 @@ namespace GrapeEngine.Scripting
 
                 if (scriptType == null)
                 {
-                  Console.WriteLine($"[ScriptHost] ERROR: Type not found: {typeName}");
-                  return 0;
+                    Logging.Log($"ERROR: Type not found: {typeName}", LogLevel.Error);
+                    return 0;
                 }
 
                 // Verify it's a ScriptBehaviour
                 if (!scriptType.IsSubclassOf(typeof(ScriptBehaviour)))
                 {
-                  Console.WriteLine($"[ScriptHost] ERROR: Type {typeName} does not inherit from ScriptBehaviour");
-                  return 0;
+                    Logging.Log($"ERROR: Type {typeName} does not inherit from ScriptBehaviour", LogLevel.Error);
+                    return 0;
                 }
 
                 // Create instance
@@ -73,17 +86,21 @@ namespace GrapeEngine.Scripting
                 instance.EntityId = entityId;
 
                 // Assign handle and store
-                ulong handle = s_nextHandle++;
-                s_instances[handle] = instance;
+                var handle = m_nextHandle++;
+                m_instances[handle] = instance;
 
-                Console.WriteLine($"[ScriptHost] Script instance created successfully. Handle: {handle}");
+                Logging.Log($"Script instance created successfully. Handle: {handle}", LogLevel.Info);
+
                 return handle;
             }
             catch (Exception ex)
             {
                 // Honestly could just log ex.ToString() but whatever
-                Console.WriteLine($"[ScriptHost] ERROR creating script instance: {ex.Message}");
-                Console.WriteLine($"[ScriptHost] Stack trace: {ex.StackTrace}");
+                Logging.Log($"Error creating script instance: {ex.Message}", LogLevel.Error);
+                Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+
+                Marshal.FreeHGlobal(typeNamePtr); // nearly forgot to free the unmanaged string
+
                 return 0;
             }
         }
@@ -92,25 +109,26 @@ namespace GrapeEngine.Scripting
         /// Destroy a script instance.
         /// Called from C++ when detaching a script from an entity.
         /// </summary>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+        /// <param name="handle">The script instance handle.</param>
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
         public static void DestroyScriptInstance(ulong handle)
         {
             try
             {
-                if (s_instances.TryGetValue(handle, out var instance))
+                if (m_instances.TryGetValue(handle, out var instance))
                 {
-                    Console.WriteLine($"[ScriptHost] Destroying script instance. Handle: {handle}");
+                    Logging.Log($"Destroying script instance. Handle: {handle}", LogLevel.Info);
                     instance.OnDestroy();
-                    s_instances.Remove(handle);
+                    m_instances.Remove(handle);
                 }
                 else
                 {
-                    Console.WriteLine($"[ScriptHost] WARNING: Tried to destroy non-existent handle: {handle}");
+                    Logging.Log($"WARNING: Tried to destroy non-existent handle: {handle}", LogLevel.Warning);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ScriptHost] ERROR destroying script: {ex.Message}");
+                Logging.Log($"Error destroying script: {ex.Message}", LogLevel.Error);
             }
         }
 
@@ -118,24 +136,25 @@ namespace GrapeEngine.Scripting
         /// Call OnStart on a script instance.
         /// Called from C++ during script initialization.
         /// </summary>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+        /// <param name="handle">The script instance handle.</param>
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
         public static void CallStart(ulong handle)
         {
             try
             {
-                if (s_instances.TryGetValue(handle, out var instance))
+                if (m_instances.TryGetValue(handle, out var instance))
                 {
                     instance.OnStart();
                 }
                 else
                 {
-                    Console.WriteLine($"[ScriptHost] WARNING: CallStart on invalid handle: {handle}");
+                    Logging.Log($"WARNING: CallStart on invalid handle: {handle}", LogLevel.Warning);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ScriptHost] ERROR in OnStart: {ex.Message}");
-                Console.WriteLine($"[ScriptHost] Stack trace: {ex.StackTrace}");
+                Logging.Log($"ERROR in OnStart: {ex.Message}", LogLevel.Error);
+                Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
             }
         }
 
@@ -143,29 +162,117 @@ namespace GrapeEngine.Scripting
         /// Call OnUpdate on a script instance.
         /// Called from C++ every frame.
         /// </summary>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-        public static void CallUpdate(ulong handle, float deltaTime)
+        /// <param name="handle">The script instance handle.</param>
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        public static void CallUpdate(ulong handle)
         {
             try
             {
-                if (s_instances.TryGetValue(handle, out var instance))
+                if (m_instances.TryGetValue(handle, out var instance))
                 {
-                    instance.OnUpdate(deltaTime);
+                    instance.OnUpdate();
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ScriptHost] ERROR in OnUpdate: {ex.Message}");
+                Logging.Log($"ERROR in OnUpdate: {ex.Message}", LogLevel.Error);
+                Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            }
+        }
+
+        /// <summary>
+        /// Call OnFixedUpdate on a script instance.
+        /// Called from C++ at fixed time intervals for physics updates.
+        /// </summary>
+        /// <param name="handle">The script instance handle.</param>
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        public static void CallFixedUpdate(ulong handle)
+        {
+            try
+            {
+                if (m_instances.TryGetValue(handle, out var instance))
+                {
+                    instance.OnFixedUpdate();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"ERROR in OnFixedUpdate: {ex.Message}", LogLevel.Error);
+                Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            }
+        }
+
+        /// <summary>
+        /// Call OnLateUpdate on a script instance.
+        /// Called from C++ every frame after all OnUpdate calls.
+        /// </summary>
+        /// <param name="handle">The script instance handle.</param>
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        public static void CallLateUpdate(ulong handle)
+        {
+            try
+            {
+                if (m_instances.TryGetValue(handle, out var instance))
+                {
+                    instance.OnLateUpdate();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"ERROR in OnLateUpdate: {ex.Message}", LogLevel.Error);
+                Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            }
+        }
+
+        /// <summary>
+        /// Call OnEnable on a script instance.
+        /// </summary>
+        /// <param name="handle">The script instance handle.</param>
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        public static void CallEnable(ulong handle)
+        {
+            try
+            {
+                if (m_instances.TryGetValue(handle, out var instance))
+                {
+                    instance.OnEnable();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"ERROR in OnEnable: {ex.Message}", LogLevel.Error);
+                Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            }
+        }
+
+        /// <summary>
+        /// Call OnDisable on a script instance.
+        /// </summary>
+        /// <param name="handle">The script instance handle.</param>
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        public static void CallDisable(ulong handle)
+        {
+            try
+            {
+                if (m_instances.TryGetValue(handle, out var instance))
+                {
+                    instance.OnDisable();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"ERROR in OnDisable: {ex.Message}", LogLevel.Error);
+                Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
             }
         }
 
         /// <summary>
         /// Get the number of active script instances (for debugging).
         /// </summary>
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
         public static int GetInstanceCount()
         {
-            return s_instances.Count;
+            return m_instances.Count;
         }
     }
 }
