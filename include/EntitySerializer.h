@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include <functional>
 #include <iostream>
-#include "core/Logger.h"
+#include "systems/Logger.h"
 
 using json = nlohmann::json;
 
@@ -225,6 +225,7 @@ namespace Serialization {
 		// initializes the component registry with all supported component types.
 		static void InitializeRegistry() {
 			if (s_registryInitialized) return;
+			s_registryInitialized = true;
 
 			LOG_DEBUG("Initializing component registry...");
 
@@ -238,7 +239,7 @@ namespace Serialization {
 			RegisterComponentWithConstructor<Component::SpriteRenderer>("SpriteRenderer", [](Entity& entity, const json& data) {
 				std::string path = data.value("TexturePath", "");
 				entity.AddComponent<Component::SpriteRenderer>(path);
-				};
+				}
 			);
 
 			LOG_DEBUG("Registered components:");
@@ -248,8 +249,6 @@ namespace Serialization {
 
 			LOG_DEBUG("EntitySerializer::InitializeRegistry() called");
 			LOG_DEBUG("Initializing component registry...");
-
-			s_registryInitialized = true;
 		}
 	};
 }
