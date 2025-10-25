@@ -28,6 +28,11 @@ Features:
 #include "graphics/vertex.hpp"
 #include "graphics/sprite.hpp"
 
+inline constexpr float kPixelsPerUnit = 100.0f; // 1 world unit == 100 pixels
+
+inline float PixelsToUnits(float px) { return px / kPixelsPerUnit; }
+inline float UnitsToPixels(float wu) { return wu * kPixelsPerUnit; }
+
 class Renderer {
 public:
     Renderer(size_t maxQuads = 3000);
@@ -59,6 +64,8 @@ public:
         glm::vec2 pos,
         glm::vec4 color,
         float pixelSize);
+
+    void Renderer::drawFullscreenQuad() const;
 
     int flushCountThisFrame = 0;
 
