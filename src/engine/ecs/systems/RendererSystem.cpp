@@ -121,7 +121,7 @@ namespace ECS {
                 Quaternion rotation;
                 GetRenderTransform(world, entity, lt, position, rotation, scale);
 
-                // Circles - use TryGet for optimized component access
+                // Circles
                 if (const auto* sc = world.TryGet<Components::ShapeCircle2D>(entity)) {
                     DebugDraw2D::Circle(*m_renderer,
                         ToGlm(Vector2D{position.X, position.Y}) + ToGlm(sc->Offset),

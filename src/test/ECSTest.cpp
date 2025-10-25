@@ -153,6 +153,12 @@ void ECSTestScene::OnUpdate() {
         case TestType::ComponentIteration:      _testComponentIteration(); break;
         case TestType::ArchetypeChanges:        _testArchetypeChanges(); break;
     }
+
+    if (Time::FrameCount() % 120 == 0) {
+        // Log renderer flush count every 120 frames and FPS
+        LOG_INFO("Renderer flushes this frame: " << m_rendererSystem->GetFlushCount()
+                 << " | FPS: " << static_cast<int>(1.0f / Time::DeltaTime()));
+    }
 }
 
 void ECSTestScene::OnUnload() {
