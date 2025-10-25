@@ -1,3 +1,16 @@
+/**
+ * @file    EntitySerializer.h
+ * @author  k.danielneozuofeng
+ * @date    26/09/2025
+ * @brief   Entity serialization and deserialization to JSON
+ *
+ * This header defines the EntitySerializer class, which manages
+ * the conversion of individual entities (and their components)
+ * to and from JSON format. It maintains a registry of supported
+ * component types and their serialization/deserialization logic,
+ * allowing entities to be reconstructed within a World.
+ */
+
 #ifndef ENTITYSERIALIZER_H
 #define ENTITYSERIALIZER_H
 
@@ -8,7 +21,7 @@
 #include <unordered_map>
 #include <functional>
 #include <iostream>
-#include "systems/Logger.h"
+#include "core/Logger.h"
 
 using json = nlohmann::json;
 
@@ -62,48 +75,34 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Component::LineRenderer,
 	Start, End, Thickness, Color
 )
 
+/**
+	 * @brief Handles serialization and deserialization of entities to/from JSON format
+	 *
+	 * Features:
+	 * - Component registration system for extensibility
+	 * - Support for custom component constructors
+	 * - Game code can register custom components without modifying engine
+*/
 namespace Serialization {
 
-	// this class handles serialization and deserialziation of entities to/from JSON format.
+	/**
+	* @brief Handles serialization and deserialization of entities to/from JSON format
+	*/
 	class EntitySerializer {
-	private:
-
+	public:
+		// Function signatures for component serialization
 		using SerializationFunction = std::function<json(Entity&)>;
 		using DeserializationFunction = std::function<void(Entity&, const json&)>;
+		using ComponentConstructor = std::function<void(Entity&, const json&)>;
 
-		// registry maps component types names to their serialization functions
-		inline static std::unordered_map<std::string, SerializationFunction> s_serializationRegistry;
-		inline static std::unordered_map<std::string, DeserializationFunction> s_deserializationRegistry;
-		inline static bool s_registryInitialized = false;
-
-		// initializes the component registry with all supported component types.
-		static void InitializeRegistry() {
-			if (s_registryInitialized) return;
-
-			LOG_DEBUG("Initializing component registry...");
-
-			RegisterComponent<Component::Transform>("Transform");
-			RegisterComponent<Component::SpriteRenderer>("SpriteRenderer");
-			RegisterComponent<Component::Rigidbody2D>("Rigidbody2D");
-			RegisterComponent<Component::CircleCollider2D>("CircleCollider2D");
-			RegisterComponent<Component::BoxCollider2D>("BoxCollider2D");
-			RegisterComponent<Component::ShapeRenderer2D>("ShapeRenderer2D");
-			RegisterComponent<Component::LineRenderer>("LineRenderer");
-
-			LOG_DEBUG("Registered components:");
-			for (const auto& [name, _] : s_deserializationRegistry) {
-				LOG_DEBUG("  - " << name);
-			}
-
-			LOG_DEBUG("EntitySerializer::InitializeRegistry() called");
-			LOG_DEBUG("Initializing component registry...");
-
-			s_registryInitialized = true;
-		}
-
-		// registers a component type for serialization/deserialization
+		/**
+		 * @brief Register a component type for serialization/deserialization
+		 */
 		template<typename T>
 		static void RegisterComponent(const std::string& typeName) {
+			InitializeRegistry();
+			// LOG_DEBUG ("Registering Component: " << TypeName);	// debug
+
 			// register serialization function
 			s_serializationRegistry[typeName] = [](Entity& entity) -> json {
 				if (auto* component = entity.GetComponent<T>()) {
@@ -112,7 +111,7 @@ namespace Serialization {
 					return j;
 				}
 				return json{}; // returns empty JSON
-			};
+				};
 
 			// register deserialization function
 			s_deserializationRegistry[typeName] = [typeName](Entity& entity, const json& data) {
@@ -123,10 +122,42 @@ namespace Serialization {
 				if (auto* component = entity.GetComponent<T>()) {
 					from_json(data, *component);
 				}
-			};
+				};
 		}
-	public:
-		// serializes an entity to JSON format including all its components.
+
+		/**
+		 * @brief Register a component with a custom constructor
+		 */
+		template <typename T>
+		static void RegisterComponentWithConstructor(const std::string& typeName, ComponentConstructor constructor) {
+			InitializeRegistry();
+			// LOG_DEBUG ("Registering Component with custom constructor: " << TypeName);	// debug
+
+			// register serialization function
+			s_serializationRegistry[typeName] = [](Entity& entity) -> json {
+				if (auto* component = entity.GetComponent<T>()) {
+					json j;
+					to_json(j, *component);
+					return j;
+				}
+				return json{}; // returns empty JSON
+				};
+
+			// register deserialization function
+			s_deserializationRegistry[typeName] = [typeName, constructor](Entity& entity, const json& data) {
+				if (!entity.HasComponent<T>()) {
+					LOG_DEBUG("Adding " << typeName << " with custom constructor for entity ID " << entity.GetId());
+					constructor(entity, data);
+				}
+				if (auto* component = entity.GetComponent<T>()) {
+					from_json(data, *component);
+				}
+				};
+		}
+
+		/**
+		 * @brief Serializes an entity to JSON format including all its components
+		 */
 		static json SerializeEntity(Entity entity) {
 			InitializeRegistry();
 
@@ -142,13 +173,15 @@ namespace Serialization {
 					entityJson["Components"].push_back({
 						{"Type", typeName},
 						{"Data", componentData}
-					});
+						});
 				}
 			}
 			return entityJson;
 		}
 
-		// deserializes an entity from JSON and adds it to the world
+		/**
+		 * @brief Deserializes an entity from JSON and adds it to the world
+		 */
 		static Entity DeserializeEntity(World& world, const json& entityJson) {
 			InitializeRegistry();
 
@@ -171,18 +204,7 @@ namespace Serialization {
 						// SpriteRenderer has a custom constructor that takes a texture path
 						// and is needed to initialize the component properly.
 						if (it != s_deserializationRegistry.end()) {
-							if (typeName == "SpriteRenderer") {
-								const auto& data = componentEntry["Data"];
-								if (!entity.HasComponent<Component::SpriteRenderer>()) {
-									std::string path = data.value("TexturePath", "");
-									entity.AddComponent<Component::SpriteRenderer>(path);
-								}
-								if (auto* component = entity.GetComponent<Component::SpriteRenderer>()) {
-									from_json(data, *component);
-								}
-							} else {
-								it->second(entity, componentEntry["Data"]);
-							}
+							it->second(entity, componentEntry["Data"]);
 						}
 						else {
 							LOG_WARNING("Unknown component type: " << typeName);
@@ -193,6 +215,41 @@ namespace Serialization {
 
 			LOG_DEBUG("=== Finished Deserializing Entity ===");
 			return entity;
+		}
+	private:
+		// registry maps component types names to their serialization functions
+		inline static std::unordered_map<std::string, SerializationFunction> s_serializationRegistry;
+		inline static std::unordered_map<std::string, DeserializationFunction> s_deserializationRegistry;
+		inline static bool s_registryInitialized = false;
+
+		// initializes the component registry with all supported component types.
+		static void InitializeRegistry() {
+			if (s_registryInitialized) return;
+
+			LOG_DEBUG("Initializing component registry...");
+
+			RegisterComponent<Component::Transform>("Transform");
+			RegisterComponent<Component::Rigidbody2D>("Rigidbody2D");
+			RegisterComponent<Component::CircleCollider2D>("CircleCollider2D");
+			RegisterComponent<Component::BoxCollider2D>("BoxCollider2D");
+			RegisterComponent<Component::ShapeRenderer2D>("ShapeRenderer2D");
+			RegisterComponent<Component::LineRenderer>("LineRenderer");
+
+			RegisterComponentWithConstructor<Component::SpriteRenderer>("SpriteRenderer", [](Entity& entity, const json& data) {
+				std::string path = data.value("TexturePath", "");
+				entity.AddComponent<Component::SpriteRenderer>(path);
+				};
+			);
+
+			LOG_DEBUG("Registered components:");
+			for (const auto& [name, _] : s_deserializationRegistry) {
+				LOG_DEBUG("  - " << name);
+			}
+
+			LOG_DEBUG("EntitySerializer::InitializeRegistry() called");
+			LOG_DEBUG("Initializing component registry...");
+
+			s_registryInitialized = true;
 		}
 	};
 }
