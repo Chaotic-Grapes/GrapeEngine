@@ -33,7 +33,7 @@ Functions:
 namespace {
     inline Vertex V(const glm::vec2& p, const glm::vec4& c) {
         Vertex v;
-        v.position = p;
+        v.position = glm::vec3(p, 0.0f); // promote 2D to 3D
         v.texCoord = { 0.f, 0.f }; // sample white
         v.color = c;
         v.texIndex = 0.f;        // Renderer overwrites with actual slot
