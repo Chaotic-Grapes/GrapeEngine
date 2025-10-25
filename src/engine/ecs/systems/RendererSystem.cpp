@@ -6,27 +6,39 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "ecs/Components.h"
 #include "graphics/texture.hpp"
+#include "services/Time.h"
 
 namespace Engine {
     RendererSystem::RendererSystem(World* world) : m_world(world) {}
 
     void RendererSystem::OnCreate() {
-        m_shader = std::make_unique<Shader>("assets/shaders/batch.vert",
-                                            "assets/shaders/batch.frag");
-        m_textShader = std::make_unique<Shader>("assets/shaders/sdf_text.vert",
-                                                "assets/shaders/sdf_text.frag");
+        // Window and dimensions
+        const auto& mainWindow = WindowManager::GetMainWindow();
+        const int width = mainWindow->Width();
+        const int height = mainWindow->Height();
+
+        // Shaders
+        m_shader = std::make_unique<Shader>("assets/shaders/batch.vert", "assets/shaders/batch.frag");
+        m_textShader = std::make_unique<Shader>("assets/shaders/sdf_text.vert", "assets/shaders/sdf_text.frag");
+
+        // Renderer
         m_renderer = std::make_unique<Renderer>(3000);
 
-        const auto& mainWindow = WindowManager::GetMainWindow();
+        // --- Editor Camera ---
+        m_editorCamera = std::make_unique<EditorCamera>(*m_world);
 
-        m_projection = glm::ortho(0.f,
-            static_cast<float>(mainWindow->Width()),
-            0.f,
-            static_cast<float>(mainWindow->Height()),
-            -1.f,
-            1.f
+        // Framebuffers
+        m_fbos["hdr"] = std::make_unique<Framebuffer>();
+        m_fbos["hdr"]->Create(width, height, true);
+
+        // Projection matrix
+        m_projection = glm::ortho(
+            0.f, static_cast<float>(width),
+            0.f, static_cast<float>(height),
+            -1.f, 1.f
         );
 
+        // OpenGL state
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
@@ -39,8 +51,79 @@ namespace Engine {
         glClearColor(0.1f, 0.1f, 0.1f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT);
 
+        glm::mat4 view = glm::mat4(1.0f);
+        glm::mat4 projection = glm::mat4(1.0f);
+        bool foundActive = false;
+
+        // ============================================================
+        // 1. Toggle or cycle camera
+        // ============================================================
+        if (Input::IsKeyPressed(KEY_C)) {
+            m_useEditorCamera = !m_useEditorCamera;
+            std::cout << "[RendererSystem] "
+                << (m_useEditorCamera ? "Using Editor Camera" : "Using Scene Camera")
+                << std::endl;
+
+            if (m_editorCamera) {
+                m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
+            }
+        }
+
+        // ============================================================
+        // 2. Use EditorCamera if active, otherwise ECS camera
+        // ============================================================
+        if (m_useEditorCamera && m_editorCamera) {
+            m_editorCamera->Update(Time::DeltaTime());
+            view = m_editorCamera->GetViewMatrix();
+            projection = m_editorCamera->GetProjectionMatrix();
+            foundActive = true;
+        }
+        else {
+            for (auto& [transform, camera] :
+                m_world->GetEntityManager().Query<Component::Transform, Component::Camera3D>())
+            {
+                if (!camera.Active) continue; // skip inactive cameras
+
+                // Build View
+                view = glm::lookAt(
+                    glm::vec3(transform.Position.X, transform.Position.Y, camera.Z),
+                    glm::vec3(transform.Position.X, transform.Position.Y, camera.Z - 1.0f),
+                    glm::vec3(0, 1, 0)
+                );
+
+                // Build Projection
+                if (camera.UsePerspective)
+                    projection = glm::perspective(camera.FOV, camera.AspectRatio, camera.NearPlane, camera.FarPlane);
+                else
+                    projection = glm::ortho(
+                        -camera.OrthoSize * camera.AspectRatio * 0.5f,
+                        camera.OrthoSize * camera.AspectRatio * 0.5f,
+                        -camera.OrthoSize * 0.5f,
+                        camera.OrthoSize * 0.5f,
+                        camera.NearPlane, camera.FarPlane
+                    );
+
+                foundActive = true;
+                break;
+            }
+        }
+
+        // fallback (if no active camera found)
+        if (!foundActive) {
+            const auto& mainWindow = WindowManager::GetMainWindow();
+            projection = glm::ortho(0.f, float(mainWindow->Width()),
+                0.f, float(mainWindow->Height()),
+                -1.f, 1.f);
+        }
+
+        // We only send (Projection * View) here instead of the full (Projection * View * Model)
+        // because each sprite/shape's model transform (position, rotation, scale) is already
+        // baked into its vertex positions on the CPU during batching. By the time vertices
+        // reach the GPU, they are in world space, so the shader only needs to transform them
+        // into camera (view) space and then into clip space.
+        // I will remind myself to change this in the future
         m_shader->use();
-        m_shader->setMat4("uProjection", m_projection);
+        m_shader->setMat4("uViewProj", projection * view);
 
         m_renderer->beginFrame();
 
