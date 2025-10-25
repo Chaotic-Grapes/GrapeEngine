@@ -30,6 +30,7 @@ Features:
 #include "services/Time.h"
 #include "graphics/font.hpp"
 #include "graphics/renderer.hpp"
+#include "graphics/graphicsConfig.hpp"
 #include "ecs/systems/RendererSystem.h"
 
 using namespace Sandbox;
@@ -38,11 +39,14 @@ using Component::ShapeRenderer2D;
 using Component::SpriteRenderer;
 using Component::Transform;
 
+constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::ViewportCamera;
+constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::ObjectPicking;
+
 GraphicsTestScene::GraphicsTestScene(int width, int height) : Scene("GraphicsTestScene") {
     CREATE_WINDOW("Graphics Test", width, height);
     m_worldWidth  = static_cast<float>(width);
     m_worldHeight = static_cast<float>(height);
-    m_currentTest = TestType::BasicGraphics;
+    m_currentTest = DEFAULT_TEST;
 }
 
 void GraphicsTestScene::OnLoad() {
@@ -58,8 +62,8 @@ void GraphicsTestScene::OnUpdate() {
             int current = static_cast<int>(m_currentTest);
             current++;
 
-            if (current > static_cast<int>(TestType::FontSystem)) {
-                current = static_cast<int>(TestType::BasicGraphics);
+            if (current > static_cast<int>(LAST_TEST)) {
+                current = static_cast<int>(DEFAULT_TEST);
             }
 
             // cleanup old test entities
@@ -79,7 +83,9 @@ void GraphicsTestScene::OnUpdate() {
         m_gHandled = false; // reset when key is released
     }
 
-    // Run the current test
+    // ============================================================
+    // M1 RUBRIC TESTS
+    // ============================================================
     switch (m_currentTest) {
     case TestType::BasicGraphics:     runBasicGraphics();  break;
     case TestType::DebugDrawing:      runDebugDrawing();   break;
@@ -91,6 +97,19 @@ void GraphicsTestScene::OnUpdate() {
     case TestType::MultiAnimation:    runMultiAnimation(); break;
     case TestType::PerformanceTest:   runBatchStress();    break;
     case TestType::FontSystem:        runFontSystem();     break;
+
+    // ============================================================
+    // M2 RUBRIC TESTS
+    // ============================================================
+    case TestType::GameGUI:           runGameGUI();          break;
+    case TestType::FontSys:           runFontSys();          break;
+    case TestType::ViewportCamera:    runViewportCamera();   break;
+    case TestType::TransformationSys: runTransformationSys(); break;
+    case TestType::SpriteAnim:        runSpriteAnim();       break;
+    case TestType::MultipleShaders:   runMultipleShaders();  break;
+    case TestType::Batching:          runBatching();         break;
+    case TestType::EditorCamera:      runEditorCamera();     break;
+    case TestType::ObjectPicking:     runObjectPicking();    break;
 
     // ============================================================
     // PERFORMANCE / PROFILING DEBUG TESTS
@@ -392,7 +411,7 @@ void GraphicsTestScene::runAnimation() {
 
     // Submit to renderer
     shader->use();
-    shader->setMat4("uProjection", r2d->GetProjection());
+    shader->setMat4("uViewProj", r2d->GetProjection());
     renderer->beginFrame();
     renderer->submitSprite(currentSprite);
     renderer->endFrame();
@@ -693,7 +712,6 @@ void GraphicsTestScene::runFontSystem() {
     // - Ascender/descender overlaps (if, fl, yj, yp)
     // - Baseline/bearing alignment (mmm, iii, lll, HHO)
     // - Mixed-case spacing (UI, Il, Ty, Fo)
-    // - Punctuation placement (.,?!;:���� -- �)
     // Render this to visually inspect spacing, kerning, and glyph metrics accuracy
     renderer->submitText(*font,
         "AV AW To Yo Wa Fo\n"
@@ -706,6 +724,128 @@ void GraphicsTestScene::runFontSystem() {
                         { 100.f, 800.f }, { 1.f, 1.f, 1.f, 0.8f }, 24.f);
 
     renderer->endFrame();
+}
+
+// ============================================================
+// M2 TEST RUNNERS
+// ============================================================
+
+void Sandbox::GraphicsTestScene::runGameGUI() {
+    // TODO: Implement M2 Game GUI test
+}
+
+void Sandbox::GraphicsTestScene::runFontSys() {
+    runFontSystem();
+}
+
+void GraphicsTestScene::runViewportCamera() {
+    // ------------------------------------------------------------
+    // INITIALIZATION (runs once)
+    // ------------------------------------------------------------
+    if (m_TestEntities.empty()) {
+        // -------------------------------
+        // Player (cyan circle)
+        // -------------------------------
+        Entity player = CreateEntity();
+        auto& playerTr = player.Transform();
+        playerTr.Position = { 0.f, 0.f };
+        playerTr.Scale = { 1.f, 1.f };
+
+        auto& playerShape = player.AddComponent<Component::ShapeRenderer2D>();
+        playerShape.Type = Component::ShapeRenderer2D::ShapeType::Circle;
+        playerShape.FillColor = { 0.f, 1.f, 1.f, 1.f }; // cyan
+        playerShape.OutlineThickness = 0.f;
+        playerShape.Radius = 0.55f; // world units
+
+        // -------------------------------
+        // Camera (follows player)
+        // -------------------------------
+        Entity cam = CreateEntity();
+        auto& camTr = cam.Transform();
+        camTr.Position = playerTr.Position; // start centered on player
+        camTr.Scale = { 1.f, 1.f };
+
+        auto& camera = cam.AddComponent<Component::Camera3D>();
+        camera.Active = true;
+        camera.UsePerspective = false;
+        camera.Z = 10.f; // orthographic distance from plane
+
+        camera.AspectRatio = m_worldWidth / m_worldHeight;
+        camera.OrthoSize = 16.f;
+        camera.NearPlane = 0.1f;
+        camera.FarPlane = 100.f;
+
+        // -------------------------------
+        // Static box object
+        // -------------------------------
+        Entity box = CreateEntity();
+        auto& boxTr = box.Transform();
+        boxTr.Position = { 0.f, 0.f };
+        boxTr.Scale = { 2.f, 2.f };
+
+        auto& boxShape = box.AddComponent<Component::ShapeRenderer2D>();
+        boxShape.Type = Component::ShapeRenderer2D::ShapeType::Rectangle;
+        boxShape.FillColor = { 1.f, 0.f, 0.5f, 1.f }; // pink
+        boxShape.OutlineThickness = 0.f;
+
+        // Track created entities
+        m_TestEntities.push_back(player.GetId());
+        m_TestEntities.push_back(cam.GetId());
+        m_TestEntities.push_back(box.GetId());
+
+        std::cout << "Viewport camera test initialized\n";
+    }
+
+    // ------------------------------------------------------------
+    // UPDATE LOOP (runs every frame)
+    // ------------------------------------------------------------
+    World& world = GetWorld();
+
+    // Retrieve player & camera
+    Entity playerEntity(m_TestEntities[0], &world);
+    Entity camEntity(m_TestEntities[1], &world);
+
+    auto& playerTr = playerEntity.Transform();
+    auto& camTr = camEntity.Transform();
+
+    // Movement input
+    float moveSpeed = (500.f * graphicsConfig::PIXEL_TO_WORLD) * Time::DeltaTime();
+
+    if (Input::IsKeyDown(KEY_A)) playerTr.Position.X -= moveSpeed;
+    if (Input::IsKeyDown(KEY_D)) playerTr.Position.X += moveSpeed;
+    if (Input::IsKeyDown(KEY_W)) playerTr.Position.Y += moveSpeed;
+    if (Input::IsKeyDown(KEY_S)) playerTr.Position.Y -= moveSpeed;
+
+    // Smooth camera follow
+    static Vector2D targetPos = playerTr.Position;
+    targetPos = playerTr.Position;
+
+    float smoothFactor = 10.f * Time::DeltaTime();
+    camTr.Position = Vector2D::Lerp(camTr.Position, targetPos, smoothFactor);
+}
+
+void Sandbox::GraphicsTestScene::runTransformationSys() {
+    // TODO: Implement M2 Transformation System test
+}
+
+void Sandbox::GraphicsTestScene::runSpriteAnim() {
+    runAnimation();
+}
+
+void Sandbox::GraphicsTestScene::runMultipleShaders() {
+    // TODO: Implement M2 Multiple Shader pipelines test
+}
+
+void Sandbox::GraphicsTestScene::runBatching() {
+    // TODO: Implement M2 Batching / draw-call reduction test
+}
+
+void Sandbox::GraphicsTestScene::runEditorCamera() {
+    // TODO: Implement M2 Editor Camera test
+}
+
+void Sandbox::GraphicsTestScene::runObjectPicking() {
+    // TODO: Implement M2 Object Picking test
 }
 
 // ============================================================
@@ -750,7 +890,7 @@ void GraphicsTestScene::testSingleTexture() {
         return;
     }
 
-    // No updates � measure raw rendering cost
+    // No updates => measure raw rendering cost
     static int frameCount = 0;
     frameCount++;
     if (frameCount % 60 == 0) {
