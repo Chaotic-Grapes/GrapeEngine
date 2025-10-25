@@ -72,6 +72,7 @@ namespace Component {
         std::string SortingLayerName = "Default";
         std::string TexturePath;
         std::string Sprite;
+        bool Bloom = false;
 
         SpriteRenderer(const std::string& spritePath = "") : TexturePath(spritePath), Sprite(spritePath) {
             if (!spritePath.empty()) {
@@ -218,6 +219,33 @@ namespace Component {
 
         const char* GetTypeName() const override { return "LineRenderer"; }
     };
-}
+
+    struct Camera3D : IComponent {
+        Vector2D Position{ 0.f, 0.f };
+        float Z = 10.f;
+
+        bool UsePerspective = false;
+        float FOV           = glm::radians(45.f);
+        float NearPlane     = 0.1f;
+        float FarPlane      = 100.f;
+        float OrthoSize     = 10.f;
+        float AspectRatio   = 16.f / 9.f;
+
+        bool Active = true; // Which camera is active?
+
+        const char* GetTypeName() const override { return "Camera3D"; }
+    };
+
+    struct RenderLayer : IComponent {
+        int LayerIndex = 0; // which render layer this entity belongs to
+
+        RenderLayer(int index = 0)
+            : LayerIndex(index) {
+        }
+
+        const char* GetTypeName() const override { return "RenderLayer"; }
+    };
+
+} // namespace Component
 
 #endif
