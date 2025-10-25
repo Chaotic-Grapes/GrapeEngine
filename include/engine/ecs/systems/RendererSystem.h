@@ -3,6 +3,7 @@
 
 #include "graphics/renderer.hpp"
 #include "graphics/debugDraw2D.hpp"
+#include "graphics/FrameBuffer.hpp"
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -11,6 +12,7 @@
 #include "ecs/World.h"
 #include "graphics/shader.hpp"
 #include "Math/Vector2D.h"
+#include "graphics/EditorCamera.hpp"
 
 class Entity;
 namespace Engine {
@@ -57,9 +59,20 @@ namespace Engine {
 
         World* m_world;
         std::unique_ptr<Renderer> m_renderer;
+
 		std::unique_ptr<Shader> m_shader;
         std::unique_ptr<Shader> m_textShader; // for sdf text
+        // Bloom post-process shaders
+        std::unique_ptr<Shader> m_bloomBlurShader;
+        std::unique_ptr<Shader> m_bloomCombineShader;
+
+        std::unique_ptr<EditorCamera> m_editorCamera;
+        bool m_useEditorCamera = true;   // editor camera is default
+        int m_activeCameraIndex = 0;     // used later to cycle ECS cameras
+
         glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();
+
+        std::unordered_map<std::string, std::unique_ptr<Framebuffer>> m_fbos;
     };
 }
 
