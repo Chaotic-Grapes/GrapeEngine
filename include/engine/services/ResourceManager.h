@@ -1,19 +1,29 @@
-/**
- * @file    ResourceManager.h
- * @author  Foo Rui Qin
- * @date    2025
- * @brief   Resource management system for caching and loading game assets
- *
- * This file defines the ResourceManager class which provides a centralized system
- * for loading, caching, and managing game assets including textures and audio files.
- * Features include:
- * - Template-based asset retrieval with automatic caching
- * - Support for multiple asset types (Texture, AudioData)
- * - Cache management utilities (clear, unload, size tracking)
- * - File existence validation and error handling
- * - Memory-efficient shared pointer usage
- * - Global singleton instance for engine-wide access
- */
+/* Start Header *****************************************************************/
+/*!
+\file   ResourceManager.h
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   26th October 2025
+\brief
+Defines the ResourceManager class for loading, caching, and managing game
+assets (textures and audio files).
+
+Features:
+- Template-based asset retrieval with automatic caching
+- Support for Texture and AudioData asset types
+- Cache management utilities (clear, unload, size tracking)
+- File validation and error handling with logging
+- Global singleton instance (RM) for engine-wide access
+
+Usage:
+  auto texture = RM.Get<Texture>("assets/player.png");
+  auto audio = RM.Get<AudioData>("assets/music.wav");
+
+  RM.PrintCacheInfo();
+  RM.UnloadAsset("assets/player.png");
+  RM.ClearCache();
+*/
+/* End Header *******************************************************************/
 
 #ifndef RESOURCE_MANAGER_H
 #define RESOURCE_MANAGER_H
@@ -25,7 +35,7 @@
 #include <glad/glad.h>
 #include "graphics/Texture.hpp"
 
- // A struct is created for audio data since there's no audio class
+// A struct is created for audio data since there's no audio class
 struct AudioData {
     std::vector<uint8_t> Data;  // Raw audio file data in bytes
     std::string Path;           // Original file path of the audio asset
@@ -34,7 +44,7 @@ struct AudioData {
 };
 
 // Centralized resource management system for game assets
-// Texture and audio
+// Supports texture and audio
 class ResourceManager {
 public:
     // Default constructor
@@ -43,7 +53,7 @@ public:
     // Default destructor
     ~ResourceManager() = default;
 
-    // Template specializations for supported asset types
+    // Template function to retrieve assets with automatic caching
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
 
@@ -63,11 +73,11 @@ public:
     bool IsAssetCached(const std::string& name) const;
 
 private:
-    // Single generic cache map
+    // Returns reference to the appropriate cache map for type T
     template <typename T>
     std::unordered_map<std::string, std::shared_ptr<T>>& GetCacheMap();
 
-    // Loaders (texture, audio)
+    // Loads an asset from disk with validation and error handling
     template <typename T>
     std::shared_ptr<T> Load(const std::string& filePath);
 
