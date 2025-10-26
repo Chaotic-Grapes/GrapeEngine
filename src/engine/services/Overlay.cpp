@@ -84,7 +84,7 @@ void Overlay::OnUpdate() {
 
     // Update UI every frame
     m_debugUI->NewFrame();
-    m_levelEditor->ProcessInput();
+    m_levelEditor->Update();
 
     // Draw debugUI and level editor
     m_debugUI->Render();

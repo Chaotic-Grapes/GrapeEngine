@@ -1,14 +1,13 @@
 #ifndef LEVELEDITOR_H
 #define LEVELEDITOR_H
 
-#include "nlohmann/json.hpp"
+#include "../editor/PlaybackControls.h"
 
 // Forward declarations
 struct GLFWwindow;
 class World;
-struct ImFont;
 
-// Structure copied from DebugUI
+// Structure for LevelEditor config
 struct LevelEditorConfig {
     float FontScale = 1.0f;  // Global font scaling factor for the entire UI
     float FontSize = 24.0f;
@@ -17,41 +16,24 @@ struct LevelEditorConfig {
 
 class LevelEditor {
 public:
-    enum class GameState {
-        Stopped,   // Editor mode
-        Playing,   // Game running
-        Paused     // Freeze
-    }; 
-
     explicit LevelEditor(World* world, const LevelEditorConfig& config = {});
     ~LevelEditor();
 
     void Initialize(GLFWwindow* pWin);
-    void ProcessInput();
+    void Update();
     void Render();
 
     // Expose game state for physics
-    GameState GetGameState() const { return m_gameState; }
-    bool IsPlaying() const;
-    bool IsStepRequested() const;
-    void ClearStepRequest();
+    Playback::GameState GetGameState() const { return m_playback.GetGameState(); }
+    bool IsPlaying() const { return m_playback.IsPlaying(); }
+    bool IsStepRequested() const { return m_playback.IsStepRequested(); }
+    void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
     World* m_world;
     LevelEditorConfig m_config;
-
-    GameState m_gameState = GameState::Stopped;
-    bool m_stepRequested = false;
-    nlohmann::json m_savedWorldState;
-
-    // Font for symbols
+    Playback m_playback;
     ImFont* m_symbolsFont = nullptr;
-
-    void _showPlaybackControls();
-    void _saveWorldState();
-    void _restoreWorldState();
-
-    bool HasValidWorld() const { return m_world != nullptr; }
 };
 
 #endif
