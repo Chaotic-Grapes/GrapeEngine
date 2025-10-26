@@ -1,4 +1,4 @@
-﻿namespace GrapeEngine.Scripting
+﻿namespace GrapeEngine
 {
     public enum LogLevel
     {

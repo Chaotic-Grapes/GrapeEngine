@@ -65,8 +65,8 @@ namespace GrapeEngine
         /// </remarks>
         public static float MaximumDeltaTime
         {
-              get => GetMaximumDeltaTime();
-              set => SetMaximumDeltaTime(value);
+            get => GetMaximumDeltaTime();
+            set => SetMaximumDeltaTime(value);
         }
         
         // ============================================================================

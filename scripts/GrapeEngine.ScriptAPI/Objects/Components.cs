@@ -1,4 +1,4 @@
-using System;
+using GrapeEngine.Numerics;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting
@@ -97,7 +97,6 @@ namespace GrapeEngine.Scripting
     public struct AngularVelocity2D
     {
         public float Value;
-        private float _Pad0, _Pad1, _Pad2;
 
         public AngularVelocity2D(float value) => Value = value;
     }
@@ -379,5 +378,39 @@ namespace GrapeEngine.Scripting
         public float M21, M22, M23, M24;
         public float M31, M32, M33, M34;
         public float M41, M42, M43, M44;
+    }
+
+    /// <summary>
+    /// Component type registry using compile-time hash matching.
+    /// Type hashes MUST match the C++ side component type IDs.
+    /// </summary>
+    internal static class ComponentTypeRegistry
+    {
+        // FNV-1a hash function - matches C++ ComponentType::Hash()
+        private static uint FNV1aHash(string str)
+        {
+            // FNV-1a prime and offset
+            const uint fnvPrime = 0x01000193;
+            const uint fnvOffset = 0x811C9DC5;
+
+            var hash = fnvOffset;
+            foreach (var c in str)
+            {
+                hash ^= c;
+                hash *= fnvPrime;
+            }
+
+            return hash;
+        }
+
+        /// <summary>
+        /// Get the type hash for a component type.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public static uint GetTypeHash<T>() where T : unmanaged
+        {
+            return FNV1aHash(typeof(T).Name);
+        }
     }
 }
