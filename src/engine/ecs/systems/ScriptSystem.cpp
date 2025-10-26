@@ -12,7 +12,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-// ************************ HEADERS ************************ //
+// ********************************** HEADERS ********************************** //
 // Engine headers
 #include "ecs/systems/ScriptSystem.h"
 #include "ecs/Components.h"
@@ -28,9 +28,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <iostream>
 #include <filesystem>
 #include <cstring>
+// **************************************************************************** //
 
-// ******************************************************** //
-
+// ******************************* EXPORT MACRO ******************************* //
 // Export macro
 #ifdef _WIN32
     #ifdef ECS_EXPORTS
@@ -47,6 +47,28 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define STRING_T std::wstring // std::wstring handles wide characters (UTF-16) natively on Windows.
 // If we are targeting other platforms, we may need to adjust this.
 #endif
+// *************************************************************************** //
+
+// ******************************************* NOTE ******************************************* //
+// Anything to do with char/string must be handled carefully due to platform differences.       //
+// Windows uses UTF-16 wide chars. Therefore, use the following helpers:                        //
+// StringToNativeString(const char* str) - converts UTF-8 C string to native string             //
+// MultiByteToWideChar - Windows API function to convert UTF-8 to UTF-16 wide chars             //
+// STR(s) - macro to convert string literals to native string literals                          //
+// CHAR_T - platform-specific char type (wchar_t on Windows)                                    //
+// STRING_T - platform-specific string type (std::wstring on Windows)                           //
+//                                                                                              //
+// -------------------------------------------------------------------------------------------- //
+//                                                                                              //
+// TODO: Add support for non-Windows platforms if needed.                                       //
+// Other notes: Linux typically uses UTF-8 with char/std::string. MacOS is similar.             //
+// Linux uses .so files instead of .dll. Adjust loading code accordingly.                       //
+// What about macOS? Need to check.                                                             //
+//                                                                                              //
+// Windows: Uses UTF-16 wide chars (wchar_t/std::wstring).                                      //
+// Linux: Uses UTF-8 with char/std::string.                                                     //
+// MacOS: Similar to Linux, uses UTF-8 with char/std::string.                                   //
+// ******************************************************************************************** //
 
 namespace ECS {
     // Static instance for singleton access
@@ -74,17 +96,16 @@ namespace ECS {
     }
 
     ScriptSystem::ScriptSystem() {
-        if (s_instance == nullptr) {
+        if (s_instance == nullptr)
             s_instance = this;
-        }
     }
 
     ScriptSystem::~ScriptSystem() {
         // Cleanup on destruction
         Shutdown();
-        if (s_instance == this) {
+
+        if (s_instance == this)
             s_instance = nullptr;
-        }
     }
 
     bool ScriptSystem::Initialize(const char* runtimeConfigPath) {
@@ -112,15 +133,12 @@ namespace ECS {
     }
 
     void ScriptSystem::Shutdown() {
-        if (!m_initialized) {
-            return;
-        }
+        if (!m_initialized)
+            return; // why shutdown when not initialized?
 
         std::cout << "[ScriptSystem] Shutting down CoreCLR..." << '\n';
 
-        // TODO: Cleanup all active script instances
-        // TODO: Close hostfxr context
-
+        // Cleanup all function pointers
         m_createInstance = nullptr;
         m_destroyInstance = nullptr;
         m_callStart = nullptr;
@@ -130,19 +148,31 @@ namespace ECS {
         m_callEnable = nullptr;
         m_callDisable = nullptr;
         m_loadAssemblyAndGetFunctionPtr = nullptr;
-        m_hostfxrContext = nullptr;
 
+        // Close hostfxr context
+        if (m_hostfxrContext != nullptr && m_closeFxr != nullptr) {
+            std::cout << "[ScriptSystem] Closing hostfxr context..." << '\n';
+            m_closeFxr(m_hostfxrContext);
+            m_hostfxrContext = nullptr;
+        }
+
+        // Clear hostfxr function pointers
+        m_initFxr = nullptr;
+        m_getRuntimeDelegate = nullptr;
+        m_closeFxr = nullptr;
+
+        // Mark as uninitialized
         m_initialized = false;
 
-        std::cout << "[ScriptSystem] Shutdown complete" << '\n';
+        std::cout << "[ScriptSystem] Shutdown successful" << '\n';
     }
 
     bool ScriptSystem::InitializeHostFxr() {
         // Get path to hostfxr library
         CHAR_T buffer[1024];
-        size_t buffer_size = sizeof(buffer) / sizeof(CHAR_T);
+        size_t bufferSize = sizeof(buffer) / sizeof(CHAR_T);
         
-        int rc = get_hostfxr_path(buffer, &buffer_size, nullptr);
+        int rc = get_hostfxr_path(buffer, &bufferSize, nullptr);
         if (rc != 0) {
             std::cerr << "[ScriptSystem] Failed to get hostfxr path. Error code: " << rc << '\n';
             std::cerr << "[ScriptSystem] Make sure .NET SDK/Runtime is installed" << '\n'; 
@@ -151,41 +181,100 @@ namespace ECS {
             return false;
         }
 
-        // For now, just verify we can find it
-        // In a full implementation, we'd load it and get function pointers
+        // Here begins the platform-specific loading of hostfxr
+        // Windows is .dll and Linux is .so
+        // ...and macOS is .so? (need to check if we are targeting other platforms)
+#ifdef _WIN32        
+        // Load hostfxr.dll
+        HMODULE hostfxrLib = LoadLibraryW(buffer);
+        if (!hostfxrLib) {
+            std::cerr << "[ScriptSystem] Failed to load hostfxr.dll. Error: " << GetLastError() << '\n';
+            return false;
+        }
+
+        // Get function pointers
+        m_initFxr            = (hostfxr_initialize_for_runtime_config_fn)GetProcAddress(hostfxrLib, "hostfxr_initialize_for_runtime_config");
+        m_getRuntimeDelegate = (hostfxr_get_runtime_delegate_fn)GetProcAddress(hostfxrLib, "hostfxr_get_runtime_delegate");
+        m_closeFxr           = (hostfxr_close_fn)GetProcAddress(hostfxrLib, "hostfxr_close");
+
+        if (!m_initFxr || !m_getRuntimeDelegate || !m_closeFxr) {
+            std::cerr << "[ScriptSystem] Failed to get hostfxr function pointers" << '\n';
+            FreeLibrary(hostfxrLib);
+            return false;
+        }
+        // if adding other platforms, add #elif directives here
+        // Read note above about other platforms thank you
+#endif
+
+        std::cout << "[ScriptSystem] hostfxr loaded successfully" << '\n';
         return true;
     }
 
     bool ScriptSystem::LoadRuntime(const char* runtimeConfigPath) {
-        if (!runtimeConfigPath || strlen(runtimeConfigPath) == 0) {
+        if (!runtimeConfigPath || std::strlen(runtimeConfigPath) == 0) {
             std::cerr << "[ScriptSystem] Invalid runtime config path" << '\n';
+            return false;
+        }
+
+        if (!m_initFxr || !m_getRuntimeDelegate) {
+            std::cerr << "[ScriptSystem] hostfxr not initialized" << '\n';
             return false;
         }
 
         std::cout << "[ScriptSystem] Loading .NET runtime from: " << runtimeConfigPath << '\n';
 
-        // TODO: Full implementation will:
-        // 1. Call hostfxr_initialize_for_runtime_config
-        // 2. Get runtime delegate for load_assembly_and_get_function_pointer
-        // 3. Store the function pointer
-
-        // For now, just verify the file exists
+        // Verify the file exists
         if (!std::filesystem::exists(runtimeConfigPath)) {
             std::cerr << "[ScriptSystem] Runtime config file not found: " << runtimeConfigPath << '\n';
             return false;
         }
 
-        std::cout << "[ScriptSystem] Runtime config verified" << '\n';
+        // Convert to native string
+        STRING_T configPath = StringToNativeString(runtimeConfigPath);
+
+        // Initialize the .NET runtime
+        hostfxr_initialize_parameters params = {};
+        params.size = sizeof(hostfxr_initialize_parameters); // Must set size correctly
+
+        // Call hostfxr_initialize_for_runtime_config
+        int rc = m_initFxr(configPath.c_str(), &params, &m_hostfxrContext);
+        if (rc != 0 || m_hostfxrContext == nullptr) {
+            std::cerr << "[ScriptSystem] Failed to initialize runtime. Error code: "
+                      << std::hex << rc << std::dec << '\n'; // std::hex for error codes apparently
+                      // Don't forget to switch back to decimal after 
+
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Runtime initialized successfully" << '\n';
+
+        // Get the load_assembly_and_get_function_pointer delegate
+        rc = m_getRuntimeDelegate(
+            m_hostfxrContext,
+            hdt_load_assembly_and_get_function_pointer,
+            &m_loadAssemblyAndGetFunctionPtr
+        );
+
+        if (rc != 0 || m_loadAssemblyAndGetFunctionPtr == nullptr) {
+            std::cerr << "[ScriptSystem] Failed to get runtime delegate. Error code: "
+                      << std::hex << rc << std::dec << '\n';
+
+            m_closeFxr(m_hostfxrContext);
+            m_hostfxrContext = nullptr;
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Runtime delegate acquired" << '\n';
         return true;
     }
 
     bool ScriptSystem::LoadAssembly(const char* assemblyPath) {
         if (!m_initialized) {
-            std::cerr << "[ScriptSystem] Cannot load assembly - system not initialized" << '\n';
+            std::cerr << "[ScriptSystem] Cannot load assembly" << '\n';
             return false;
         }
 
-        if (!assemblyPath || strlen(assemblyPath) == 0) {
+        if (!assemblyPath || std::strlen(assemblyPath) == 0) {
             std::cerr << "[ScriptSystem] Invalid assembly path" << '\n';
             return false;
         }
@@ -211,63 +300,105 @@ namespace ECS {
     bool ScriptSystem::LoadManagedDelegates(const char* assemblyPath) {
         std::cout << "[ScriptSystem] Loading managed delegates from assembly..." << '\n';
 
-        // TODO: Full implementation using load_assembly_and_get_function_pointer
-        // 
-        // This function will:
-        // 1. Convert paths to native strings
-        // 2. Call load_assembly_and_get_function_pointer for each ScriptHost method
-        // 3. Store the function pointers
-        //
-        // Example (once CoreCLR hosting is complete):
-        /*
-        load_assembly_and_get_function_pointer_fn load_assembly_and_get_function_pointer = nullptr;
-        load_assembly_and_get_function_pointer = (load_assembly_and_get_function_pointer_fn)m_loadAssemblyAndGetFunctionPtr;
-
-        STRING_T assemblyPathNative = StringToNativeString(assemblyPath);
-        STRING_T typeName = STR("GrapeEngine.Scripting.ScriptHost, GrapeEngine.ScriptAPI");
-
-        // Load CreateScriptInstance
-        STRING_T methodName = STR("CreateScriptInstance");
-        STRING_T delegateType = STR("GrapeEngine.Scripting.ScriptHost+CreateScriptInstanceDelegate, GrapeEngine.ScriptAPI");
-        
-        int rc = load_assembly_and_get_function_pointer(
-            assemblyPathNative.c_str(),
-            typeName.c_str(),
-            methodName.c_str(),
-            delegateType.c_str(),
-            nullptr,
-            (void**)&m_createInstance
-        );
-        
-        if (rc != 0 || m_createInstance == nullptr) {
-            std::cerr << "[ScriptSystem] Failed to load CreateScriptInstance. Error: " << rc << '\n';
+        if (!m_loadAssemblyAndGetFunctionPtr) {
+            std::cerr << "[ScriptSystem] Runtime not loaded" << '\n';
             return false;
         }
 
-        // Similarly for DestroyScriptInstance, CallStart, CallUpdate...
-        */
+        // Cast to the correct function pointer type
+        load_assembly_and_get_function_pointer_fn loadAssemblyAndGetFunctionPointer =
+            (load_assembly_and_get_function_pointer_fn)m_loadAssemblyAndGetFunctionPtr;
 
-        // For now, just log that we're in placeholder mode
-        std::cout << "[ScriptSystem] LoadManagedDelegates placeholder - TODO: Implement CoreCLR function pointer loading" << '\n';
-        std::cout << "[ScriptSystem] Assembly path: " << assemblyPath << '\n';
-        std::cout << "[ScriptSystem] Expected delegates:" << '\n';
-        std::cout << "[ScriptSystem]   - CreateScriptInstance" << '\n';
-        std::cout << "[ScriptSystem]   - DestroyScriptInstance" << '\n';
-        std::cout << "[ScriptSystem]   - CallStart" << '\n';
-        std::cout << "[ScriptSystem]   - CallUpdate" << '\n';
-        std::cout << "[ScriptSystem]   - CallFixedUpdate" << '\n';
-        std::cout << "[ScriptSystem]   - CallLateUpdate" << '\n';
-        std::cout << "[ScriptSystem]   - CallEnable" << '\n';
-        std::cout << "[ScriptSystem]   - CallDisable" << '\n';
+        STRING_T assemblyPathNative = StringToNativeString(assemblyPath);
+        STRING_T typeName = STR("GrapeEngine.Scripting.ScriptHost, GrapeEngine.ScriptAPI"); // Important: namespaces MUST match
 
-        // Return true for now so the system can be tested
-        // Once CoreCLR is implemented, this should return false if any delegate fails to load
+        // Helper lambda to load a single delegate
+        auto loadDelegate = [&](const CHAR_T* methodName, void** outDelegate) -> bool {
+            int rc = loadAssemblyAndGetFunctionPointer(
+                assemblyPathNative.c_str(),
+                typeName.c_str(),
+                methodName,
+                UNMANAGEDCALLERSONLY_METHOD,  // Using UnmanagedCallersOnly delegates
+                nullptr,
+                outDelegate
+            );
+
+            if (rc != 0 || *outDelegate == nullptr) {
+#ifdef _WIN32
+                std::wcerr << L"[ScriptSystem] Failed to load delegate: " << methodName 
+                           << L". Error: " << std::hex << rc << std::dec << '\n';
+#endif
+                return false;
+            }
+            return true;
+        };
+
+        // Load all delegates necessary for scripting
+        // Note: If more delegates are added in the future, add them here
+        // Don't forget to add logging for each delegate load failure
+        // so we know which one failed
+
+		// First argument is the method name in C#, second is the out delegate pointer
+		// Use STR macro for method names to convert to native string literals
+		// The out delegates are void** so we need to cast them appropriately
+
+        // ******************* LOAD ALL DELEGATES HERE ******************* //
+        std::cout << "[ScriptSystem] Loading CreateScriptInstance..." << '\n';
+        if (!loadDelegate(STR("CreateScriptInstance"), reinterpret_cast<void**>(&m_createInstance))) {
+            std::cerr << "[ScriptSystem] Failed to load CreateScriptInstance delegate" << '\n';
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Loading DestroyScriptInstance..." << '\n';
+        if (!loadDelegate(STR("DestroyScriptInstance"), reinterpret_cast<void**>(&m_destroyInstance))) {
+            std::cerr << "[ScriptSystem] Failed to load DestroyScriptInstance delegate" << '\n';
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Loading CallStart..." << '\n';
+        if (!loadDelegate(STR("CallStart"), reinterpret_cast<void**>(&m_callStart))) {
+            std::cerr << "[ScriptSystem] Failed to load CallStart delegate" << '\n';
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Loading CallUpdate..." << '\n';
+        if (!loadDelegate(STR("CallUpdate"), reinterpret_cast<void**>(&m_callUpdate))) {
+            std::cerr << "[ScriptSystem] Failed to load CallUpdate delegate" << '\n';
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Loading CallFixedUpdate..." << '\n';
+        if (!loadDelegate(STR("CallFixedUpdate"), reinterpret_cast<void**>(&m_callFixedUpdate))) {
+            std::cerr << "[ScriptSystem] Failed to load CallFixedUpdate delegate" << '\n';
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Loading CallLateUpdate..." << '\n';
+        if (!loadDelegate(STR("CallLateUpdate"), reinterpret_cast<void**>(&m_callLateUpdate))) {
+            std::cerr << "[ScriptSystem] Failed to load CallLateUpdate delegate" << '\n';
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Loading CallEnable..." << '\n';
+        if (!loadDelegate(STR("CallEnable"), reinterpret_cast<void**>(&m_callEnable))) {
+            std::cerr << "[ScriptSystem] Failed to load CallEnable delegate" << '\n';
+            return false;
+        }
+
+        std::cout << "[ScriptSystem] Loading CallDisable..." << '\n';
+        if (!loadDelegate(STR("CallDisable"), reinterpret_cast<void**>(&m_callDisable))) {
+            std::cerr << "[ScriptSystem] Failed to load CallDisable delegate" << '\n';
+            return false;
+        }
+        // **************************************************************** //
+
+        std::cout << "[ScriptSystem] All managed delegates loaded successfully!" << '\n';
         return true;
     }
 
     bool ScriptSystem::AttachScript(World& world, Entity entity, const char* scriptTypeName) {
         if (!m_initialized) {
-            std::cerr << "[ScriptSystem] Cannot attach script - system not initialized" << '\n';
+            std::cerr << "[ScriptSystem] Cannot attach script (system not initialized)" << '\n';
             return false;
         }
 
@@ -287,26 +418,30 @@ namespace ECS {
 
         // Create script component
         Components::ScriptInstance script;
-        script.ManagedHandle = 0; // Will be set when we call C#
-        script.TypeHash = std::hash<std::string>{}(scriptTypeName);
+        script.ManagedHandle = 0; // Will be set when we call C#. This is just initialization.
+        script.TypeHash = static_cast<uint32_t>(std::hash<std::string>{}(scriptTypeName));
         script.Initialized = false;
         
         // Copy type name (safely)
-        size_t nameLen = strlen(scriptTypeName);
-        if (nameLen >= sizeof(script.TypeName)) {
+        size_t nameLen = std::strlen(scriptTypeName);
+        if (nameLen >= sizeof(script.TypeName))
             nameLen = sizeof(script.TypeName) - 1;
-        }
-        memcpy(script.TypeName, scriptTypeName, nameLen);
+        std::memcpy(script.TypeName, scriptTypeName, nameLen);
         script.TypeName[nameLen] = '\0';
 
-        // TODO: Call C# CreateScriptInstance
-        // uint64_t entityPacked = EntityUtils::Pack(entity);
-        // script.ManagedHandle = m_createInstance(scriptTypeName, entityPacked);
+        // Call C# CreateScriptInstance
+        if (!m_createInstance) {
+            std::cerr << "[ScriptSystem] CreateInstance delegate not loaded" << '\n';
+            return false;
+        }
+
+        uint64_t entityPacked = EntityUtils::Pack(entity);
+        script.ManagedHandle = m_createInstance(scriptTypeName, entityPacked);
         
-        // For now, just use a placeholder
-        // Yes, despite the name, this is just a dummy value for placeholder
-        // Whoever invented this is an actual genius
-        script.ManagedHandle = 0xDEADBEEF; 
+        if (script.ManagedHandle == 0) {
+            std::cerr << "[ScriptSystem] Failed to create script instance" << '\n';
+            return false;
+        }
 
         // Add component to entity
         world.Add<Components::ScriptInstance>(entity, script);
@@ -316,14 +451,12 @@ namespace ECS {
     }
 
     void ScriptSystem::DetachScript(World& world, Entity entity) {
-        if (!world.IsAlive(entity)) {
+        if (!world.IsAlive(entity))
             return;
-        }
 
         auto* script = world.TryGet<Components::ScriptInstance>(entity);
-        if (!script) {
+        if (!script)
             return;
-        }
 
         std::cout << "[ScriptSystem] Detaching script from entity " << entity.Index << '\n';
 
@@ -332,12 +465,12 @@ namespace ECS {
     }
 
     void ScriptSystem::CleanupScript(Components::ScriptInstance& script) {
-        if (script.ManagedHandle == 0) {
+        if (script.ManagedHandle == 0)
             return;
-        }
 
-        // TODO: Call C# DestroyScriptInstance
-        // m_destroyInstance(script.ManagedHandle);
+        // Call C# DestroyScriptInstance
+        if (m_destroyInstance)
+            m_destroyInstance(script.ManagedHandle);
 
         script.ManagedHandle = 0;
         script.Initialized = false;
@@ -354,8 +487,9 @@ namespace ECS {
                     std::cout << "[ScriptSystem] Calling OnStart for script on entity " 
                               << entity.Index << '\n';
 
-                    // TODO: Call C# CallStart
-                    // s_instance->m_callStart(script.ManagedHandle);
+                    // Call C# CallStart
+                    if (s_instance && s_instance->m_callStart)
+                        s_instance->m_callStart(script.ManagedHandle);
 
                     script.Initialized = true;
                 }
@@ -371,8 +505,9 @@ namespace ECS {
                     return;
 
                 if (script.ManagedHandle != 0) {
-                    // TODO: Call C# CallUpdate
-                    // s_instance->m_callUpdate(script.ManagedHandle);
+                    // Call C# CallUpdate
+                    if (s_instance && s_instance->m_callUpdate)
+                        s_instance->m_callUpdate(script.ManagedHandle);
                 }
             }
         );
@@ -386,8 +521,9 @@ namespace ECS {
                     return;
 
                 if (script.ManagedHandle != 0) {
-                    // TODO: Call C# CallFixedUpdate
-                    // s_instance->m_callFixedUpdate(script.ManagedHandle);
+                    // Call C# CallFixedUpdate
+                    if (s_instance && s_instance->m_callFixedUpdate)
+                        s_instance->m_callFixedUpdate(script.ManagedHandle);
                 }
             }
         );
@@ -401,8 +537,9 @@ namespace ECS {
                     return;
 
                 if (script.ManagedHandle != 0) {
-                    // TODO: Call C# CallLateUpdate
-                    // s_instance->m_callLateUpdate(script.ManagedHandle);
+                    // Call C# CallLateUpdate
+                    if (s_instance && s_instance->m_callLateUpdate)
+                        s_instance->m_callLateUpdate(script.ManagedHandle);
                 }
             }
         );
@@ -514,7 +651,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(ShapeBox2D,           "ShapeBox2D")
         HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
         HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
-        HANDLE_COMPONENT_TYPE(Camera,               "Camera")
+        HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
         HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
         HANDLE_COMPONENT_TYPE(Active,               "Active")
         HANDLE_COMPONENT_TYPE(Name,                 "Name")
@@ -576,7 +713,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(ShapeBox2D,           "ShapeBox2D")
         HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
         HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
-        HANDLE_COMPONENT_TYPE(Camera,               "Camera")
+        HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
         HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
         HANDLE_COMPONENT_TYPE(Active,               "Active")
         HANDLE_COMPONENT_TYPE(Name,                 "Name")
@@ -624,7 +761,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(ShapeBox2D,           "ShapeBox2D")
         HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
         HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
-        HANDLE_COMPONENT_TYPE(Camera,               "Camera")
+        HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
         HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
         HANDLE_COMPONENT_TYPE(Active,               "Active")
         HANDLE_COMPONENT_TYPE(Name,                 "Name")
@@ -671,7 +808,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(ShapeBox2D,           "ShapeBox2D")
         HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
         HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
-        HANDLE_COMPONENT_TYPE(Camera,               "Camera")
+        HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
         HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
         HANDLE_COMPONENT_TYPE(Active,               "Active")
         HANDLE_COMPONENT_TYPE(Name,                 "Name")
@@ -688,7 +825,8 @@ namespace {
 
 #ifndef SCRIPT_API
 #ifdef _WIN32
-    // __declspec(dllexport) means the function is exported from the DLL
+    // __declspec(dllexport) means the function is exported from DLL
+	// This is necessary for P/Invoke in C# to find the functions
     #define SCRIPT_API extern "C" __declspec(dllexport)
 #endif
 #endif

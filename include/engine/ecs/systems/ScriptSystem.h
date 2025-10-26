@@ -136,28 +136,33 @@ namespace ECS {
 
     private:
         // CoreCLR runtime handles
-        hostfxr_handle* m_hostfxrContext = nullptr;
-        void* m_loadAssemblyAndGetFunctionPtr = nullptr;
+        hostfxr_handle  m_hostfxrContext                = nullptr;
+        void*           m_loadAssemblyAndGetFunctionPtr = nullptr;
+
+        // hostfxr function pointers (loaded dynamically)
+        hostfxr_initialize_for_runtime_config_fn    m_initFxr               = nullptr;
+        hostfxr_get_runtime_delegate_fn             m_getRuntimeDelegate    = nullptr;
+        hostfxr_close_fn                            m_closeFxr              = nullptr;
 
         // Function pointer types for C# delegates
-        using CreateScriptInstanceFn = uint64_t(*)(const char* typeName, uint64_t entityId);
-        using DestroyScriptInstanceFn = void(*)(uint64_t handle);
-        using CallStartFn = void(*)(uint64_t handle);
-        using CallUpdateFn = void(*)(uint64_t handle);
-        using CallFixedUpdateFn = void(*)(uint64_t handle);
-        using CallLateUpdateFn = void(*)(uint64_t handle);
-        using CallEnableFn = void(*)(uint64_t handle);
-        using CallDisableFn = void(*)(uint64_t handle);
+        using CreateScriptInstanceFn    = uint64_t(*)   (const char* typeName, uint64_t entityId);
+        using DestroyScriptInstanceFn   = void(*)       (uint64_t handle);
+        using CallStartFn               = void(*)       (uint64_t handle);
+        using CallUpdateFn              = void(*)       (uint64_t handle);
+        using CallFixedUpdateFn         = void(*)       (uint64_t handle);
+        using CallLateUpdateFn          = void(*)       (uint64_t handle);
+        using CallEnableFn              = void(*)       (uint64_t handle);
+        using CallDisableFn             = void(*)       (uint64_t handle);
 
         // Managed function delegates
-        CreateScriptInstanceFn m_createInstance = nullptr;
-        DestroyScriptInstanceFn m_destroyInstance = nullptr;
-        CallStartFn m_callStart = nullptr;
-        CallUpdateFn m_callUpdate = nullptr;
-        CallFixedUpdateFn m_callFixedUpdate = nullptr;
-        CallLateUpdateFn m_callLateUpdate = nullptr;
-        CallEnableFn m_callEnable = nullptr;
-        CallDisableFn m_callDisable = nullptr;
+        CreateScriptInstanceFn      m_createInstance    = nullptr;
+        DestroyScriptInstanceFn     m_destroyInstance   = nullptr;
+        CallStartFn                 m_callStart         = nullptr;
+        CallUpdateFn                m_callUpdate        = nullptr;
+        CallFixedUpdateFn           m_callFixedUpdate   = nullptr;
+        CallLateUpdateFn            m_callLateUpdate    = nullptr;
+        CallEnableFn                m_callEnable        = nullptr;
+        CallDisableFn               m_callDisable       = nullptr;
 
         bool m_initialized = false;
 
@@ -194,8 +199,6 @@ namespace ECS {
 #ifndef SCRIPT_API
 #ifdef _WIN32
     #define SCRIPT_API extern "C" __declspec(dllexport)
-#else
-    #define SCRIPT_API extern "C" __attribute__((visibility("default")))
 #endif
 #endif
 

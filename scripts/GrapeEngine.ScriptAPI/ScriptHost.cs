@@ -38,6 +38,8 @@ namespace GrapeEngine.Scripting
         // In this case, we use Cdecl to match the C++ side. (matching is very important)
         // This ensures that the stack is cleaned up correctly after the function call.
         // Also take note: I encapsulated the typeof(...) in square brackets because it is an array.
+        // Also PSA: I did not read much on interoperability with C++ so there are gonna be some bugs
+        // All I know is that Cdecl is mostly used from my experience :)
         [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])] // CallConvCdecl is in System.Runtime.CompilerServices
         public static ulong CreateScriptInstance(IntPtr typeNamePtr, ulong entityId)
         {
