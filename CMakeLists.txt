@@ -164,28 +164,74 @@ if(EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
 endif()
 
 # ======================= C# Scripting API Build ===========================
-# NOTE: Only build the ENGINE's scripting API here.
-# Game projects (user scripts) are built separately by the user.
+# Build the engine's scripting API AND any game scripts in scripts/ folder
+# This allows game scripts to be separate C# projects while being built automatically
 if(DOTNET_EXECUTABLE)
-    message(STATUS "Configuring C# Scripting API...")
+    message(STATUS "Configuring C# Scripting Projects...")
     
-    # Build only the engine's scripting API (not game scripts!)
+    # Build GrapeEngine.ScriptAPI (engine's API)
     add_custom_target(
         BuildScriptAPI ALL
         COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj" 
             --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
+            --output "${CMAKE_BINARY_DIR}/$<CONFIG>/scripts"
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
         COMMENT "Building GrapeEngine Scripting API..."
         VERBATIM
     )
     
-    # Make GrapeEngine depend on API build
-    add_dependencies(GrapeEngine BuildScriptAPI)
+    # Find all .csproj files in scripts/ folder (excluding the API itself)
+    file(GLOB GAME_SCRIPT_PROJECTS 
+        "${CMAKE_CURRENT_LIST_DIR}/scripts/*/*.csproj"
+    )
     
-    message(STATUS "Scripting API will be built to: build/scripts/")
-    message(STATUS "NOTE: Game scripts are built separately in game projects")
+    # Build each game script project found
+    set(GAME_SCRIPT_TARGETS "")
+    foreach(CSPROJ_FILE ${GAME_SCRIPT_PROJECTS})
+        # Skip the ScriptAPI project (already built above)
+        get_filename_component(PROJ_NAME ${CSPROJ_FILE} NAME_WE)
+        if(NOT PROJ_NAME STREQUAL "GrapeEngine.ScriptAPI")
+            message(STATUS "  Found game script project: ${PROJ_NAME}")
+            
+            # Create a build target for this project
+            add_custom_target(
+                Build_${PROJ_NAME} ALL
+                COMMAND ${DOTNET_EXECUTABLE} build "${CSPROJ_FILE}"
+                    --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
+                    --output "${CMAKE_BINARY_DIR}/$<CONFIG>/scripts"
+                WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
+                COMMENT "Building ${PROJ_NAME}..."
+                DEPENDS BuildScriptAPI
+                VERBATIM
+            )
+            
+            list(APPEND GAME_SCRIPT_TARGETS Build_${PROJ_NAME})
+        endif()
+    endforeach()
+    
+    # Make GrapeEngine depend on all script builds
+    add_dependencies(GrapeEngine BuildScriptAPI ${GAME_SCRIPT_TARGETS})
+    
+    # Copy all compiled DLLs to the executable directory
+    add_custom_command(TARGET GrapeEngine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_BINARY_DIR}/$<CONFIG>/scripts"
+            "$<TARGET_FILE_DIR:GrapeEngine>/scripts"
+        COMMENT "Copying C# assemblies to executable directory..."
+    )
+    
+    # Generate runtimeconfig.json for .NET hosting
+    set(RUNTIME_CONFIG_PATH "$<TARGET_FILE_DIR:GrapeEngine>/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")
+    add_custom_command(TARGET GrapeEngine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E echo "{\"runtimeOptions\":{\"tfm\":\"net9.0\",\"framework\":{\"name\":\"Microsoft.NETCore.App\",\"version\":\"9.0.0\"}}}" > "${RUNTIME_CONFIG_PATH}"
+        COMMENT "Generating runtimeconfig.json..."
+    )
+    
+    message(STATUS "C# build output: ${CMAKE_BINARY_DIR}/$<CONFIG>/scripts")
+    message(STATUS "DLLs will be copied to: $<TARGET_FILE_DIR:GrapeEngine>/scripts")
+    message(STATUS "Game scripts can be added as separate .csproj files in scripts/ folder")
 else()
-    message(WARNING ".NET SDK not found - Scripting API will not be built automatically")
+    message(WARNING ".NET SDK not found - Scripting will not be available")
 endif()
 
 message(STATUS "GrapeEngine configured successfully!")
