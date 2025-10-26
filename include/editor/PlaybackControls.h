@@ -34,8 +34,8 @@ public:
         Paused     // Freeze
     };
 
-    explicit Playback(World* world);
-    ~Playback();
+    explicit Playback(World* world);  
+    ~Playback();                  
 
     // Initialize with symbols font for icons
     void Initialize(ImFont* symbolsFont);

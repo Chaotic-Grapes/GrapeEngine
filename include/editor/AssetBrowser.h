@@ -10,8 +10,8 @@ level editor.
 
 Features:
 - File browser UI showing assets folder structure
-- Folder navigation
-- File selection
+- Breadcrumb navigation
+- File selection with info display
 - Asset import, replacement and hot reload
 */
 /* End Header *******************************************************************/
@@ -27,9 +27,6 @@ struct ImFont;
 
 class AssetBrowser {
 public:
-    AssetBrowser();
-    ~AssetBrowser();
-
     // Initialize with symbols font for icons
     void Initialize(ImFont* symbolsFont);
 
@@ -37,11 +34,17 @@ public:
     void Render();
 
 private:
+    // Display clickable breadcrumb navigation trail
+    void _displayBreadcrumbs();
+
     // Display folder contents
     void _displayFolder(const std::filesystem::path& folderPath);
 
     // Display a single file entry
     void _displayFile(const std::filesystem::path& filePath);
+
+    // Display info about selected file
+    void _displaySelectedFileInfo();
 
     ImFont* m_symbolsFont = nullptr;
     std::string m_assetsRootPath = "assets/";

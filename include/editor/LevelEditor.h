@@ -1,3 +1,21 @@
+/* Start Header *****************************************************************/
+/*!
+\file   LevelEditor.h
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   26th October 2025
+\brief
+Declares the LevelEditor class which orchestrates all editor panels including
+playback controls and asset browser.
+
+Features:
+- Manages playback controls for game state (play/pause/stop)
+- Manages asset browser for file management
+- Font loading and configuration for editor UI
+- Exposes game state for physics system integration
+*/
+/* End Header *******************************************************************/
+
 #ifndef LEVELEDITOR_H
 #define LEVELEDITOR_H
 
@@ -7,35 +25,42 @@
 // Forward declarations
 struct GLFWwindow;
 class World;
+struct ImFont;
 
-// Structure for LevelEditor config
+// Configuration structure for level editor UI settings
 struct LevelEditorConfig {
     float FontScale = 1.0f;  // Global font scaling factor for the entire UI
-    float FontSize = 24.0f;
+    float FontSize = 24.0f;   // Base font size in pixels
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  // Maximum length for game object names
 };
 
+// Level editor orchestrates all editor panels and manages editor state
 class LevelEditor {
 public:
     explicit LevelEditor(World* world, const LevelEditorConfig& config = {});
     ~LevelEditor();
 
+    // Initialize ImGui fonts and editor panels
     void Initialize(GLFWwindow* pWin);
+
+    // Process input for all editor panels
     void Update();
+
+    // Render all editor panels
     void Render();
 
-    // Expose game state for physics
+    // Expose game state for physics system
     Playback::GameState GetGameState() const { return m_playback.GetGameState(); }
     bool IsPlaying() const { return m_playback.IsPlaying(); }
     bool IsStepRequested() const { return m_playback.IsStepRequested(); }
     void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
-    World* m_world;
-    LevelEditorConfig m_config;
-    Playback m_playback;
-    AssetBrowser m_assetBrowser;
-    ImFont* m_symbolsFont = nullptr;
+    World* m_world;                   // Reference to game world
+    LevelEditorConfig m_config;       // Editor configuration settings
+    Playback m_playback;              // Playback controls panel
+    AssetBrowser m_assetBrowser;      // Asset browser panel
+    ImFont* m_symbolsFont = nullptr;  // Material Symbols icon font
 };
 
 #endif

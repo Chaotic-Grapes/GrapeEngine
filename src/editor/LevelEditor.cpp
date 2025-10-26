@@ -1,13 +1,33 @@
-﻿#include "../editor/LevelEditor.h"
+﻿/* Start Header *****************************************************************/
+/*!
+\file   LevelEditor.cpp
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   26th October 2025
+\brief
+Implements the LevelEditor class which orchestrates all editor panels including
+playback controls and asset browser.
+
+Features:
+- Material Symbols font loading for icon support
+- Playback controls panel initialization and management
+- Asset browser panel initialization and management
+- Editor input processing and rendering coordination
+*/
+/* End Header *******************************************************************/
+
+#include "../editor/LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
 
+// Constructor: initialize level editor with world and config
 LevelEditor::LevelEditor(World* world, const LevelEditorConfig& config)
-    : m_world(world), m_config(config), m_playback(world) {
+    : m_world(world), m_config(config), m_playback(world), m_assetBrowser() {
 }
 
 LevelEditor::~LevelEditor() {}
 
+// Initialize ImGui fonts and editor panels
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
     auto& io = ImGui::GetIO();
@@ -49,10 +69,12 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     m_assetBrowser.Initialize(m_symbolsFont);
 }
 
+// Process input for all editor panels
 void LevelEditor::Update() {
     m_playback.ProcessInput();
 }
 
+// Render all editor panels
 void LevelEditor::Render() {
     if (!m_world) return;
     m_playback.Render();
