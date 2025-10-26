@@ -273,6 +273,7 @@ constexpr int KEY_J     = GLFW_KEY_J;     ///< J key
 constexpr int KEY_K     = GLFW_KEY_K;     ///< K key
 constexpr int KEY_R     = GLFW_KEY_R;     ///< R key
 constexpr int KEY_O     = GLFW_KEY_O;     ///< R key
+constexpr int KEY_T     = GLFW_KEY_T;     ///< T key
 //! @}
 
 //! \name Mouse Button Constants

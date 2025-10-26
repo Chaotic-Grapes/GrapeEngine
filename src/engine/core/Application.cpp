@@ -1,12 +1,13 @@
 #include "core/Application.h"
-#include <thread>
 #include "core/CrashDumping.h"
-#include "services/Input.h"
-#include "ecs/systems/PhysicsSystem.h"
 #include "core/Profiler.h"
-#include "services/WindowManager.h"
-#include "Scene.h"
+#include "ecs/systems/PhysicsSystem.h"
+#include "scene/Scene.h"
+#include "services/Input.h"
 #include "services/Time.h"
+#include "services/WindowManager.h"
+#include "services/OverlayService.h"
+#include <thread>
 
 namespace Engine {
     // Global pointer to the core engine
@@ -25,7 +26,7 @@ namespace Engine {
         Grape_Engine::CrashDumping::SetDumpCreateState(true);
 
         // Load configuration first
-        Serialization::ConfigLoader::LoadConfig("../config.json", m_config);
+        Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_config);
 
 #if !_DEBUG
         if (consoleFlag)
@@ -35,12 +36,11 @@ namespace Engine {
 #else
         (void)consoleFlag;
 #endif
-        m_audio = new Services::AudioService();
-        m_audio->Initialize();
+		// Initialize services
+		_initializeServices();
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
-        Scene* currentScene = m_sceneManager.GetActiveScene();
 
         m_lastFrameTime = glfwGetTime();
         while (!m_shouldStop) {
@@ -51,27 +51,29 @@ namespace Engine {
 
             // --- Input & Game Update ---
             Input::_processInput();
-            auto* newScene = m_sceneManager.GetActiveScene();
-            const bool isNewScene = newScene != currentScene;
-            if (isNewScene) {
-                if (currentScene)
-                    currentScene->Unload();
-
-                newScene->Load();
-
-                // This *might* cause a memory access violation
-                delete currentScene;
-                currentScene = newScene;
-            }
 
             // --- Update Services ---
             m_audio->Update();
 
+            // --- Scene Update ---
+            m_sceneManager.Update();
+            auto* currentScene = m_sceneManager.GetActive();
             if (currentScene) {
-                currentScene->Update();
+
+                while (m_accumulator >= Time::FixedDeltaTime()) {
+                    currentScene->OnFixedUpdate();
+                    m_accumulator -= Time::FixedDeltaTime();
+                }
+
+                currentScene->OnUpdate();
                 game.OnUpdate(m_sceneManager);
-                currentScene->LateUpdate();
+                currentScene->OnLateUpdate();
             }
+
+            // --- Update Overlay Service ---
+            // This here because it depends on current scene
+			m_overlay->Update();
+            m_overlay->Render();
 
             // --- Rendering ---
             for (const auto* win : WindowManager::GetWindows()) {
@@ -95,13 +97,11 @@ namespace Engine {
             }
         }
 
-        if (currentScene) {
-            game.OnShutdown(m_sceneManager);
-            currentScene->Unload();
-        }
+        game.OnShutdown(m_sceneManager);
 
         // Clean up services
         delete m_audio;
+        delete m_overlay;
 
         WindowManager::DestroyAll();
     }
@@ -110,8 +110,19 @@ namespace Engine {
         m_shouldStop = true;
     }
 
+    void Application::_initializeServices() {
+        m_audio = new Services::AudioService();
+        m_audio->Initialize();
+
+		m_overlay = new Services::OverlayService(m_sceneManager);
+        m_overlay->SetAudio(m_audio->Device());
+		m_overlay->Initialize();
+    }
+
+
     void Application::_enableConsole() {
 #ifdef _WIN32
+#include <windows.h>
         AllocConsole();
 
         FILE* dummy;

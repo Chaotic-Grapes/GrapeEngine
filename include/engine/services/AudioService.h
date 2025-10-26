@@ -8,8 +8,8 @@
 namespace Services {
     class AudioService : public Engine::IService {
     public:
-        AudioService();
-        ~AudioService() override;
+        AudioService() : IService("Audio Service") {}
+        ~AudioService() override { Terminate(); }
 
         void Initialize() override;
         void Update() override;
@@ -22,12 +22,11 @@ namespace Services {
         bool LoadCue(const std::string& cueId, const std::string& path, const Audio::SoundParams& p) const {
             return m_device->LoadCue(cueId, path, p);
         }
+
         Audio::PlaybackHandle Play(const std::string& cueId, const Audio::PlaySettings& s) const {
             return m_device->Play(cueId, s);
         }
         void Stop(const Audio::PlaybackHandle handle, Audio::StopMode mode) const { m_device->Stop(handle, mode); }
-
-		std::string Name() const override { return "Audio Service"; }
 
     private:
         std::unique_ptr<Audio::FmodAudioDevice> m_device;

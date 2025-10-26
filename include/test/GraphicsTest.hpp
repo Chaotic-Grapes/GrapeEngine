@@ -20,15 +20,15 @@ requirements while also experimenting with advanced rendering features.
 #pragma once
 
 #include "Game.h"
-#include <vector>
-#include "ecs/World.h"
 #include "ecs/Entity.h"
+#include "ecs/World.h"
+#include <vector>
+#include <memory>
+#include "ecs/systems/RendererSystem.h"
 
 namespace Sandbox {
-    class GraphicsTestScene : public Scene {
+    class GraphicsTestScene : public Scenes::Scene {
     public:
-        GraphicsTestScene(int width, int height);
-
         void OnLoad() override;
         void OnUpdate() override;
         void OnUnload() override;
@@ -79,12 +79,14 @@ namespace Sandbox {
 
     private:
         bool m_gHandled = false;
+        uint16_t m_gameplayLayer = 0;
+        std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
 
         // Background, sprites, debugObjects
-        std::vector<EntityId> m_TestEntities;
+        std::vector<uint64_t> m_testEntities;
 
         // Stress test
-        std::vector<Entity> m_batchSprites;
+        std::vector<ECS::Entity> m_batchSprites;
 
         // World dimensions
         float m_worldWidth = 1600.f;
