@@ -5,12 +5,12 @@
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
 \brief
-Defines the ResourceManager class for loading, caching, and managing game
-assets (textures and audio files).
+Defines the ResourceManager class for loading, caching and managing game
+assets (textures, audio files and fonts).
 
 Features:
 - Template-based asset retrieval with automatic caching
-- Support for Texture and AudioData asset types
+- Support for Texture, AudioData, and Font asset types
 - Cache management utilities (clear, unload, size tracking)
 - File validation and error handling with logging
 - Global singleton instance (RM) for engine-wide access
@@ -18,6 +18,9 @@ Features:
 Usage:
   auto texture = RM.Get<Texture>("assets/player.png");
   auto audio = RM.Get<AudioData>("assets/music.wav");
+
+  auto font = RM.Get<Font>("assets/arial.ttf");           // Default 48px
+  auto bigFont = RM.GetFont("assets/arial.ttf", 72);      // Custom size
 
   RM.PrintCacheInfo();
   RM.UnloadAsset("assets/player.png");
@@ -34,6 +37,7 @@ Usage:
 #include <filesystem>
 #include <glad/glad.h>
 #include "graphics/Texture.hpp"
+#include "graphics/Font.hpp"
 
 // A struct is created for audio data since there's no audio class
 struct AudioData {
@@ -44,7 +48,7 @@ struct AudioData {
 };
 
 // Centralized resource management system for game assets
-// Supports texture and audio
+// Supports textures, audio and fonts
 class ResourceManager {
 public:
     // Default constructor
@@ -56,6 +60,9 @@ public:
     // Template function to retrieve assets with automatic caching
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
+
+    // Load font with specified size (allows same font at different sizes)
+    std::shared_ptr<Font> GetFont(const std::string& name, int pixelSize = 48);
 
     // Clear all cached assets from memory
     void ClearCache();
@@ -84,6 +91,7 @@ private:
     // Asset caches (store loaded assets)
     std::unordered_map<std::string, std::shared_ptr<Texture>> m_textures;
     std::unordered_map<std::string, std::shared_ptr<AudioData>> m_audioFiles;
+    std::unordered_map<std::string, std::shared_ptr<Font>> m_fonts;
 };
 
 // Global ResourceManager instance
