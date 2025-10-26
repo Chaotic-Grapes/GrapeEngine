@@ -89,7 +89,7 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeBox2D, HalfExtents, Offset, Color, Thickness, Filled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeLine2D, A, B, Color, Thickness)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ZIndex2D, ZOrder)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera, IsOrthographic, FovY, OrthoHeight, Near, Far, Aspect)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScriptId, Id)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop)
@@ -238,7 +238,7 @@ namespace Serialization {
 	// ShapePolygon2D is a template, therefore it needs to be rewritten
 	// REGISTER_COMPONENT_SERIALIZER(ShapePolygon2D, ECS::Components::ShapePolygon2D)
 	REGISTER_COMPONENT_SERIALIZER(ZIndex2D, ECS::Components::ZIndex2D)
-	REGISTER_COMPONENT_SERIALIZER(Camera, ECS::Components::Camera)
+	REGISTER_COMPONENT_SERIALIZER(Camera, ECS::Components::Camera3D)
 	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices)
 	REGISTER_COMPONENT_SERIALIZER(ScriptId, ECS::Components::ScriptId)
 	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource)

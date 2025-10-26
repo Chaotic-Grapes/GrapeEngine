@@ -117,9 +117,6 @@ namespace ECS {
         struct Active {
         public:
             bool Enabled = true;
-            // padding explicit to keep trivially copyable and predictable size
-            // !!!! These are not meant to be used. !!!!
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
 
@@ -185,7 +182,6 @@ namespace ECS {
             float LinearDrag = 0.0f;
             float AngularDrag = 0.0f;
             uint32_t Flags = 0;      // bit 0: UseGravity, bit 1: Kinematic, etc.
-            uint32_t _Pad = 0;
         };
         static_assert(std::is_trivially_copyable_v<Rigidbody>, "Rigidbody must be trivially copyable");
 
@@ -194,7 +190,6 @@ namespace ECS {
             float Friction = 0.2f;               // 0..1
             float Restitution = 0.0f;            // 0..1 (bounciness)
 			float PositionCorrectPercent = 0.2f; // 0..1
-            float _Pad0 = 0.0f;
         };
         static_assert(std::is_trivially_copyable_v<PhysicsMaterial2D>, "PhysicsMaterial2D must be trivially copyable");
 
@@ -202,16 +197,13 @@ namespace ECS {
         public:
             Vector3D HalfExtents{0.5f, 0.5f, 0.5f};
             uint32_t LayerMask = 0xFFFFFFFFu;
-            uint32_t _Pad = 0;
         };
         static_assert(std::is_trivially_copyable_v<BoxCollider>, "BoxCollider must be trivially copyable");
 
         struct SphereCollider {
         public:
             float Radius = 0.5f;
-            float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f;
             uint32_t LayerMask = 0xFFFFFFFFu;
-            uint32_t _Pad3 = 0;
         };
         static_assert(std::is_trivially_copyable_v<SphereCollider>, "SphereCollider must be trivially copyable");
 
@@ -237,7 +229,6 @@ namespace ECS {
         struct AngularVelocity2D {
         public:
             float Value = 0.0f;
-            float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f; // keep 16B size/alignment simple
         };
         static_assert(std::is_trivially_copyable_v<AngularVelocity2D>, "AngularVelocity2D must be trivially copyable");
 
@@ -261,7 +252,6 @@ namespace ECS {
             float Rotation = 0.0f;            // local rotation in radians (around Z)
             uint32_t LayerMask = 0xFFFFFFFFu; // collision layer mask
             uint32_t Flags = 0;               // bit 0: IsTrigger
-            uint32_t _Pad = 0;
         };
         static_assert(std::is_trivially_copyable_v<BoxCollider2D>, "BoxCollider2D must be trivially copyable");
 
@@ -284,7 +274,6 @@ namespace ECS {
             Color Color{1.0f, 1.0f, 1.0f, 1.0f};
             Vector2D Tiling{1.0f, 1.0f};
             Vector2D Offset{0.0f, 0.0f};
-            uint32_t _Pad = 0;          // keep 8-byte alignment
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -293,7 +282,6 @@ namespace ECS {
         public:
             bool FlipX = false;
             bool FlipY = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteFlip2D>, "SpriteFlip2D must be trivially copyable");
 
@@ -309,7 +297,6 @@ namespace ECS {
             Color Color{1.f,1.f,1.f,1.f};
             float Thickness = 1.0f;      // for wireframe; ignored if Filled
             bool Filled = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<ShapeCircle2D>, "ShapeCircle2D must be trivially copyable");
 
@@ -320,7 +307,6 @@ namespace ECS {
             Color Color{1.f,1.f,1.f,1.f};
             float Thickness = 1.0f;
             bool Filled = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<ShapeBox2D>, "ShapeBox2D must be trivially copyable");
 
@@ -330,7 +316,6 @@ namespace ECS {
             Vector2D B{ 1.0f, 0.0f };
             Color Color{ 1.f,1.f,1.f,1.f };
             float Thickness = 1.0f;
-            float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f;
         };
         static_assert(std::is_trivially_copyable_v<ShapeLine2D>, "ShapeLine2D must be trivially copyable");
 
@@ -343,7 +328,6 @@ namespace ECS {
             Color FillColor{ 1.f, 1.f, 1.f, 1.f };
             Color OutlineColor{ 1.f, 1.f, 1.f, 1.f };
             float OutlineThickness = 1.f;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<ShapePolygon2D<>>, "ShapePolygon2D must be trivially copyable");
 
@@ -351,25 +335,21 @@ namespace ECS {
         struct ZIndex2D {
         public:
             int16_t ZOrder = 0;  // smaller drawn first
-            int16_t _Pad0 = 0;
-            int32_t _Pad1 = 0;
         };
         static_assert(std::is_trivially_copyable_v<ZIndex2D>, "ZIndex2D must be trivially copyable");
 
         // ---------- Cameras ----------
 
-        struct Camera {
-        public:
-            bool IsOrthographic = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
-
-            float FovY = 60.0f;         // degrees (used when IsOrthographic == false)
-            float OrthoHeight = 10.0f;  // world units half-height (used when IsOrthographic == true)
-            float Near = 0.1f;
-            float Far = 1000.0f;
-            float Aspect = 16.0f / 9.0f; // width / height
+        struct Camera3D {
+        public: 
+            bool UsePerspective = false;
+            float FOV           = 45.f; // Don't use glm functions outside of graphics
+            float NearPlane     = 0.1f;
+            float FarPlane      = 100.f;
+            float OrthoSize     = 10.f;
+            float AspectRatio   = 16.f / 9.f; // width / height
         };
-        static_assert(std::is_trivially_copyable_v<Camera>, "Camera must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<Camera3D>, "Camera3D must be trivially copyable");
 
         // Optional matrices output for cameras (computed by CameraSystem)
         struct CameraMatrices {
@@ -394,7 +374,6 @@ namespace ECS {
             uint64_t ManagedHandle = 0;   // Handle to C# object instance
             uint32_t TypeHash = 0;        // Hash of script type name
             bool Initialized = false;     // Whether OnStart() has been called
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
             char TypeName[128] = {0};     // Script class name (e.g., "MyGame.PlayerController")
         };
         static_assert(std::is_trivially_copyable_v<ScriptInstance>, "ScriptInstance must be trivially copyable");
@@ -402,11 +381,9 @@ namespace ECS {
         struct AudioSource {
         public:
             uint32_t CueId = 0;
-            uint32_t _Pad = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
     }
