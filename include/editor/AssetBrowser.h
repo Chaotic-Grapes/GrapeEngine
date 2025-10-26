@@ -1,57 +1,52 @@
-#ifndef LEVELEDITOR_H
-#define LEVELEDITOR_H
+/* Start Header *****************************************************************/
+/*!
+\file   AssetBrowser.h
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   26th October 2025
+\brief
+Declares the AssetBrowser class for browsing and managing game assets in the
+level editor.
 
-#include "nlohmann/json.hpp"
+Features:
+- File browser UI showing assets folder structure
+- Folder navigation
+- File selection
+- Asset import, replacement and hot reload
+*/
+/* End Header *******************************************************************/
 
-// Forward declarations
-struct GLFWwindow;
-class World;
+#ifndef ASSETBROWSER_H
+#define ASSETBROWSER_H
+
+#include <string>
+#include <filesystem>
+
+// Forward declaration
 struct ImFont;
 
-// Structure copied from DebugUI
-struct LevelEditorConfig {
-    float FontScale = 1.0f;  // Global font scaling factor for the entire UI
-    float FontSize = 24.0f;
-    static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  // Maximum length for game object names
-};
-
-class LevelEditor {
+class AssetBrowser {
 public:
-    enum class GameState {
-        Stopped,   // Editor mode
-        Playing,   // Game running
-        Paused     // Freeze
-    }; 
+    AssetBrowser();
+    ~AssetBrowser();
 
-    explicit LevelEditor(World* world, const LevelEditorConfig& config = {});
-    ~LevelEditor();
+    // Initialize with symbols font for icons
+    void Initialize(ImFont* symbolsFont);
 
-    void Initialize(GLFWwindow* pWin);
-    void ProcessInput();
+    // Render the asset browser UI
     void Render();
 
-    // Expose game state for physics
-    GameState GetGameState() const { return m_gameState; }
-    bool IsPlaying() const;
-    bool IsStepRequested() const;
-    void ClearStepRequest();
-
 private:
-    World* m_world;
-    LevelEditorConfig m_config;
+    // Display folder contents
+    void _displayFolder(const std::filesystem::path& folderPath);
 
-    GameState m_gameState = GameState::Stopped;
-    bool m_stepRequested = false;
-    nlohmann::json m_savedWorldState;
+    // Display a single file entry
+    void _displayFile(const std::filesystem::path& filePath);
 
-    // Font for symbols
     ImFont* m_symbolsFont = nullptr;
-
-    void _showPlaybackControls();
-    void _saveWorldState();
-    void _restoreWorldState();
-
-    bool HasValidWorld() const { return m_world != nullptr; }
+    std::string m_assetsRootPath = "assets/";
+    std::string m_currentPath = "assets/";
+    std::string m_selectedAsset;
 };
 
 #endif

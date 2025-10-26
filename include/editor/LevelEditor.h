@@ -2,6 +2,7 @@
 #define LEVELEDITOR_H
 
 #include "../editor/PlaybackControls.h"
+#include "../editor/AssetBrowser.h"
 
 // Forward declarations
 struct GLFWwindow;
@@ -33,6 +34,7 @@ private:
     World* m_world;
     LevelEditorConfig m_config;
     Playback m_playback;
+    AssetBrowser m_assetBrowser;
     ImFont* m_symbolsFont = nullptr;
 };
 

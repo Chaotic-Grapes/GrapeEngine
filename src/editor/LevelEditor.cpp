@@ -44,8 +44,9 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     // Build the font atlas (combines default font + Material Symbols)
     io.Fonts->Build();
 
-    // Initialize playback controls with symbols font
+    // Initialize playback controls & asset browser with symbols font
     m_playback.Initialize(m_symbolsFont);
+    m_assetBrowser.Initialize(m_symbolsFont);
 }
 
 void LevelEditor::Update() {
@@ -55,4 +56,5 @@ void LevelEditor::Update() {
 void LevelEditor::Render() {
     if (!m_world) return;
     m_playback.Render();
+    m_assetBrowser.Render();
 }
