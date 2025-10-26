@@ -46,6 +46,9 @@ private:
     // Display info about selected file
     void _displaySelectedFileInfo();
 
+    // Import new texture file into current folder
+    void _importTexture();
+
     ImFont* m_symbolsFont = nullptr;
     std::string m_assetsRootPath = "assets/";
     std::string m_currentPath = "assets/";
