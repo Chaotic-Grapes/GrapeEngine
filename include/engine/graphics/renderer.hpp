@@ -1,0 +1,89 @@
+/* Start Header *****************************************************************/
+/*!
+\file   renderer.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   24th September 2025
+\brief
+Declares the Renderer class, a low-level batching system responsible for
+efficiently sending geometry to the GPU. It manages vertex/index buffers,
+texture slots, and batched draw calls, automatically flushing when capacity
+is exceeded.
+
+Features:
+- Batches quads, sprites, text, and generic triangles.
+- Manages OpenGL buffer objects (VAO, VBO, EBO).
+- Provides a texture slot cache for array-based texture binding.
+- Designed to be called between beginFrame() and endFrame().
+*/
+/* End Header *******************************************************************/
+
+#pragma once
+#include <glm/glm.hpp>
+#include <vector>
+#include <cstdint>
+#include <glad/glad.h>
+
+#include "font.hpp"
+#include "graphics/vertex.hpp"
+#include "graphics/sprite.hpp"
+
+class Renderer {
+public:
+    Renderer(size_t maxQuads = 3000);
+    ~Renderer();
+
+    void beginFrame();
+    void endFrame();
+
+    // Submit textured quad (sprite) to the batcher
+    void submitQuad(const glm::vec2& pos,
+        const glm::vec2& size,
+        GLuint textureId,
+        const glm::vec4& uvRect,   // (u0,v0,u1,v1)
+        const glm::vec4& color,
+        float rotation = 0.0f,
+        float scale = 1.0f,
+        int layer = 0);
+
+    // Generic triangles for helpers (polygons/circles/etc.)
+    void submitTriangles(const Vertex* verts, size_t vCount,
+        const uint32_t* indices, size_t iCount,
+        GLuint textureId,
+        int layer = 0);
+
+    void submitSprite(const Sprite& sprite);
+
+    void submitText(const Font& font,
+        std::string_view text,
+        glm::vec2 pos,
+        glm::vec4 color,
+        float pixelSize);
+
+    int flushCountThisFrame = 0;
+
+private:
+    // GL objects
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    GLuint ebo = 0;
+
+    // CPU-side batching
+    std::vector<Vertex>   cpuBuffer;    // vertices
+    std::vector<uint32_t> cpuIndices;   // indices
+
+    // Current GPU buffer capacities (in elements)
+    size_t vboCapacity = 0;
+    size_t eboCapacity = 0;
+
+    // Texture slot cache (for uTextures[N] shader array)
+    static constexpr int MaxTextureSlots = 32;
+    std::vector<GLuint> textureSlots;   // GL texture ids in slots 0..N-1
+
+    // Helpers
+    void ensureCapacity(size_t vNeeded, size_t iNeeded);
+    void flush();
+    void clearTextureSlots();
+    int  getOrAssignTextureSlot(GLuint textureId, bool& flushed); // returns 0..N-1
+    void bindTextureSlots() const;
+};

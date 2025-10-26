@@ -49,7 +49,9 @@ target_compile_definitions(GrapeEngine PRIVATE USE_IMGUI)
 
 # Include directories
 target_include_directories(GrapeEngine PRIVATE 
-    ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/include/engine
+    ${CMAKE_CURRENT_LIST_DIR}/include/test
+    ${CMAKE_CURRENT_LIST_DIR}/include/externals
 )
 
 # Link libraries
