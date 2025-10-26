@@ -24,8 +24,6 @@ Features:
 #include "services/ResourceManager.h"
 #include <iostream>
 
-ResourceManager RM;
-
 // Private Helpers
 void Texture::loadFromFile(const std::string& path) {
     m_path = path; // keep for deep copies
