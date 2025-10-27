@@ -47,7 +47,7 @@ Features:
 using namespace Sandbox;
 using namespace ECS;
 
-constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::ViewportCamera;
+constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::BasicGraphics;
 constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::ObjectPicking;
 
 extern ResourceManager RM;
@@ -98,7 +98,7 @@ void GraphicsTestScene::OnLoad() {
     m_gameplayLayer = GetLayers().CreateOrGetLayer("gameplay");
 
     m_rendererSystem = std::make_shared<ECS::RendererSystem>();
-    m_rendererSystem->Initialize();
+    m_rendererSystem->Initialize(GetWorld());
     AddSystem([this](Scenes::Scene& s, const float dt){
         m_rendererSystem->Update(s.GetWorld(), dt);
     }, "Renderer System");
@@ -202,24 +202,96 @@ void GraphicsTestScene::OnUnload() {
 // ------------------------------------
 // Stub functions (to be implemented later)
 // ------------------------------------
-void GraphicsTestScene::runBasicGraphics() { 
+void GraphicsTestScene::runBasicGraphics() {
     if (m_testEntities.empty()) {
+        // ------------------------------------------------------------
+        // Red filled square (center)
+        // ------------------------------------------------------------
         const ECS::Entity square = CreateOnLayer(
             m_gameplayLayer,
-            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{1.f,1.f,1.f} },
-            ECS::Components::WorldTransform{ },
+            ECS::Components::LocalTransform{
+                Vector3D{m_worldWidth * 0.5f, m_worldHeight * 0.5f, 0},
+                Quaternion{0, 0, 0, 1},
+                Vector3D{1.f, 1.f, 1.f}
+            },
+            ECS::Components::WorldTransform{},
             ECS::Components::ShapeBox2D{
-                Vector2D{50.f, 50.f}, // half extents
-                Vector2D{0.f, 0.f},   // offset
-                Color{1.f, 0.f, 0.f, 1.f}, // color
-                0.f,                  // thickness
-                true                  // filled
+                Vector2D{50.f, 50.f},
+                Vector2D{0.f, 0.f},
+                Color{1.f, 0.f, 0.f, 1.f}, // red
+                0.f,                       // thickness (ignored for filled)
+                true                       // filled
             },
             ECS::Components::Name{ "BasicGraphics_Square" }
         );
 
+        // ------------------------------------------------------------
+        // Filled blue circle (left)
+        // ------------------------------------------------------------
+        const ECS::Entity filledCircle = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{m_worldWidth * 0.3f, m_worldHeight * 0.5f, 0},
+                Quaternion{0, 0, 0, 1},
+                Vector3D{1.f, 1.f, 1.f}
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                50.f,                          // radius
+                Vector2D{0.f, 0.f},            // offset
+                Color{0.f, 0.4f, 1.f, 1.f},    // blue fill
+                0.f                            // strokePx (0 = filled)
+            },
+            ECS::Components::Name{ "Filled_Circle" }
+        );
+
+        // ------------------------------------------------------------
+        // Outlined green circle (center-right)
+        // ------------------------------------------------------------
+        const ECS::Entity outlinedCircle = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{m_worldWidth * 0.7f, m_worldHeight * 0.5f, 0},
+                Quaternion{0, 0, 0, 1},
+                Vector3D{1.f, 1.f, 1.f}
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                50.f,                          // radius
+                Vector2D{0.f, 0.f},            // offset
+                Color{0.f, 1.f, 0.f, 1.f},     // green outline
+                2.0f                           // strokePx > 0 = outline
+            },
+            ECS::Components::Name{ "Outlined_Circle" }
+        );
+
+        // ------------------------------------------------------------
+        // Hollow magenta collider circle (semi-transparent outline)
+        // ------------------------------------------------------------
+        const ECS::Entity colliderCircle = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{m_worldWidth * 0.5f, m_worldHeight * 0.75f, 0},
+                Quaternion{0, 0, 0, 1},
+                Vector3D{1.f, 1.f, 1.f}
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                60.f,                          // radius
+                Vector2D{0.f, 0.f},            // offset
+                Color{1.f, 0.f, 1.f, 0.6f},    // magenta, semi-transparent
+                3.0f                           // strokePx (outline only)
+            },
+            ECS::Components::Name{ "Collider_Circle" }
+        );
+
+        // Track created entities
         m_testEntities.push_back(EntityUtils::Pack(square));
-        LOG_DEBUG("Spawned BasicGraphics entity");
+        m_testEntities.push_back(EntityUtils::Pack(filledCircle));
+        m_testEntities.push_back(EntityUtils::Pack(outlinedCircle));
+        m_testEntities.push_back(EntityUtils::Pack(colliderCircle));
+
+        LOG_DEBUG("Spawned BasicGraphics test entities");
     }
 }
 
@@ -458,15 +530,15 @@ void GraphicsTestScene::runSpriteScaling() {
     float scaleSpeed = 200.f;
 
     ECS::Entity sprite = EntityUtils::Unpack(m_testEntities[0]); // reconstruct from ID
-    auto tr = world.Get<ECS::Components::LocalTransform>(sprite);
+    auto& tr = world.Get<ECS::Components::LocalTransform>(sprite);
 
     if (Input::IsKeyDown(KEY_J)) {
-        tr.Scale.X += scaleSpeed * Time::FixedDeltaTime();
-        tr.Scale.Y += scaleSpeed * Time::FixedDeltaTime();
+        tr.Scale.X += scaleSpeed * Time::DeltaTime();
+        tr.Scale.Y += scaleSpeed * Time::DeltaTime();
     }
     if (Input::IsKeyDown(KEY_K)) {
-        tr.Scale.X = std::max(10.f, tr.Scale.X - scaleSpeed * Time::FixedDeltaTime());
-        tr.Scale.Y = std::max(10.f, tr.Scale.Y - scaleSpeed * Time::FixedDeltaTime());
+        tr.Scale.X = std::max(10.f, tr.Scale.X - scaleSpeed * Time::DeltaTime());
+        tr.Scale.Y = std::max(10.f, tr.Scale.Y - scaleSpeed * Time::DeltaTime());
     }
 }
 
@@ -498,8 +570,13 @@ void GraphicsTestScene::runSpriteRotation() {
     auto& tr = world.Get<ECS::Components::LocalTransform>(sprite);
 
     if (Input::IsKeyDown(KEY_R)) {
-        auto deltaRotation = Quaternion::FromAxisAngle(Vector3D::Right, rotationSpeed * Time::FixedDeltaTime());
-        tr.Rotation = deltaRotation * tr.Rotation;
+        // rotationSpeed is in DEGREES/second; convert to RADIANS/second
+        const float angleRad = glm::radians(rotationSpeed) * Time::DeltaTime();
+
+        // rotate about Z for 2D sprites
+        const auto deltaRotation = Quaternion::FromAxisAngle(Vector3D{ 0.f, 0.f, 1.f }, angleRad);
+
+        tr.Rotation = deltaRotation * tr.Rotation; // apply incremental rotation
         tr.Rotation.Normalize();
     }
 }
@@ -555,7 +632,7 @@ void GraphicsTestScene::runAnimation() {
     }
 
     // Use the Time system's delta time directly
-    float deltaTime = Time::FixedDeltaTime();
+    float deltaTime = Time::DeltaTime();
 
     // Update animation and get current frame
     glm::vec2 pos = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
@@ -645,7 +722,7 @@ void GraphicsTestScene::runMultiAnimation() {
     }
 
     // Use delta time
-    float deltaTime = Time::FixedDeltaTime();
+    float deltaTime = Time::DeltaTime();
 
     // Position & size for the "main character"
     glm::vec2 pos = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
@@ -655,7 +732,7 @@ void GraphicsTestScene::runMultiAnimation() {
     Sprite currentSprite = currentAnim->play(pos, size, deltaTime);
 
     shader->use();
-    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
+    shader->setMat4("uViewProj", m_rendererSystem->GetProjection());
     renderer->beginFrame();
     renderer->submitSprite(currentSprite);
     renderer->endFrame();
@@ -802,7 +879,7 @@ void GraphicsTestScene::runBatchStress() {
 
     // Prepare frame
     shader->use();
-    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
+    shader->setMat4("uViewProj", m_rendererSystem->GetProjection());
     renderer->beginFrame();
 
     glm::vec4 uv = { 0.f, 0.f, 1.f, 1.f };
@@ -900,57 +977,73 @@ void GraphicsTestScene::runViewportCamera() {
     // ------------------------------------------------------------
     // INITIALIZATION (runs once)
     // ------------------------------------------------------------
-	const World& world = GetWorld();
+    ECS::World& world = GetWorld();
+
     if (m_testEntities.empty()) {
         // -------------------------------
         // Player (cyan circle)
         // -------------------------------
-        Entity player = CreateEntity();
-        auto& playerTr = player.Transform();
-        playerTr.Position = { 0.f, 0.f };
-        playerTr.Scale = { 1.f, 1.f };
+        ECS::Entity player = world.Create();
 
-        auto& playerShape = player.AddComponent<Component::ShapeRenderer2D>();
-        playerShape.Type = Component::ShapeRenderer2D::ShapeType::Circle;
-        playerShape.FillColor = { 0.f, 1.f, 1.f, 1.f }; // cyan
-        playerShape.OutlineThickness = 0.f;
-        playerShape.Radius = 0.55f; // world units
+        auto& playerTr = world.Add<ECS::Components::LocalTransform>(player);
+        playerTr.Position = { 0.f, 0.f, 0.f };
+        playerTr.Scale = { 1.f, 1.f, 1.f };
+        playerTr.Rotation = Quaternion::Identity();
+
+        auto& playerCircle = world.Add<ECS::Components::ShapeCircle2D>(player);
+        playerCircle.Radius = 0.55f;                 // world units
+        playerCircle.Color = { 0.f, 1.f, 1.f, 1.f };// cyan
+        playerCircle.Thickness = 1.0f;                  // used if not Filled
+        playerCircle.Filled = true;
+
+        auto& playerLayer = world.Add<ECS::Components::Layer>(player);
+        playerLayer.Id = m_gameplayLayer;
 
         // -------------------------------
         // Camera (follows player)
         // -------------------------------
-        Entity cam = CreateEntity();
-        auto& camTr = cam.Transform();
-        camTr.Position = playerTr.Position; // start centered on player
-        camTr.Scale = { 1.f, 1.f };
+        ECS::Entity cam = world.Create();
 
-        auto& camera = cam.AddComponent<Component::Camera3D>();
+        auto& camTr = world.Add<ECS::Components::LocalTransform>(cam);
+        camTr.Position = { playerTr.Position.X, playerTr.Position.Y, 10.f }; // Z = camera height
+        camTr.Scale = { 1.f, 1.f, 1.f };
+        camTr.Rotation = Quaternion::Identity();
+
+        auto& camera = world.Add<ECS::Components::Camera3D>(cam);
         camera.Active = true;
         camera.UsePerspective = false;
-        camera.Z = 10.f; // orthographic distance from plane
-
-        camera.AspectRatio = m_worldWidth / m_worldHeight;
         camera.OrthoSize = 16.f;
         camera.NearPlane = 0.1f;
         camera.FarPlane = 100.f;
 
+        // Aspect from current window
+        const auto window = WindowManager::GetMainWindow();
+        camera.AspectRatio = static_cast<float>(window->Width())
+            / static_cast<float>(window->Height());
+
         // -------------------------------
         // Static box object
         // -------------------------------
-        Entity box = CreateEntity();
-        auto& boxTr = box.Transform();
-        boxTr.Position = { 0.f, 0.f };
-        boxTr.Scale = { 2.f, 2.f };
+        ECS::Entity box = world.Create();
 
-        auto& boxShape = box.AddComponent<Component::ShapeRenderer2D>();
-        boxShape.Type = Component::ShapeRenderer2D::ShapeType::Rectangle;
-        boxShape.FillColor = { 1.f, 0.f, 0.5f, 1.f }; // pink
-        boxShape.OutlineThickness = 0.f;
+        auto& boxTr = world.Add<ECS::Components::LocalTransform>(box);
+        boxTr.Position = { 0.f, 0.f, 0.f };
+        boxTr.Scale = { 2.f, 2.f, 1.f };
+        boxTr.Rotation = Quaternion::Identity();
 
-        // Track created entities
-        m_testEntities.push_back(player.GetId());
-        m_testEntities.push_back(cam.GetId());
-        m_testEntities.push_back(box.GetId());
+        auto& boxShape = world.Add<ECS::Components::ShapeBox2D>(box);
+        boxShape.HalfExtents = { 1.f, 1.f };            // half of 2x2
+        boxShape.Color = { 1.f, 0.f, 0.5f, 1.f }; // pink
+        boxShape.Thickness = 1.0f;
+        boxShape.Filled = true;
+
+        auto& boxLayer = world.Add<ECS::Components::Layer>(box);
+        boxLayer.Id = m_gameplayLayer;
+
+        // Track created entities (store ECS::Entity directly)
+        m_testEntities.push_back(EntityUtils::Pack(player));
+        m_testEntities.push_back(EntityUtils::Pack(cam));
+        m_testEntities.push_back(EntityUtils::Pack(box));
 
         std::cout << "Viewport camera test initialized\n";
     }
@@ -958,30 +1051,33 @@ void GraphicsTestScene::runViewportCamera() {
     // ------------------------------------------------------------
     // UPDATE LOOP (runs every frame)
     // ------------------------------------------------------------
-    World& world = GetWorld();
+    ECS::Entity playerEntity = EntityUtils::Unpack(m_testEntities[0]);
+    ECS::Entity camEntity = EntityUtils::Unpack(m_testEntities[1]);
 
-    // Retrieve player & camera
-    Entity playerEntity(m_testEntities[0], &world);
-    Entity camEntity(m_testEntities[1], &world);
+    auto& playerTr = world.Get<ECS::Components::LocalTransform>(playerEntity);
+    auto& camTr = world.Get<ECS::Components::LocalTransform>(camEntity);
+    auto& camComp = world.Get<ECS::Components::Camera3D>(camEntity); // if you need params
 
-    auto& playerTr = playerEntity.Transform();
-    auto& camTr = camEntity.Transform();
-
-    // Movement input
-    float moveSpeed = (500.f * graphicsConfig::PIXEL_TO_WORLD) * Time::DeltaTime();
+    // Movement input (keep your units the same)
+    const float dt = Time::DeltaTime();
+    const float moveSpeed = (500.f * graphicsConfig::PIXEL_TO_WORLD) * dt;
 
     if (Input::IsKeyDown(KEY_A)) playerTr.Position.X -= moveSpeed;
     if (Input::IsKeyDown(KEY_D)) playerTr.Position.X += moveSpeed;
     if (Input::IsKeyDown(KEY_W)) playerTr.Position.Y += moveSpeed;
     if (Input::IsKeyDown(KEY_S)) playerTr.Position.Y -= moveSpeed;
 
-    // Smooth camera follow
-    static Vector2D targetPos = playerTr.Position;
-    targetPos = playerTr.Position;
+    // Smooth camera follow (XY only; keep Z = camera height)
+    // Controls how quickly the camera catches up (seconds)
+    const float tau = 0.3f;          // increase for more lag
+    const float alpha = 1.0f - expf(-dt / tau);
 
-    float smoothFactor = 10.f * Time::DeltaTime();
-    camTr.Position = Vector2D::Lerp(camTr.Position, targetPos, smoothFactor);
+    camTr.Position.X += alpha * (playerTr.Position.X - camTr.Position.X);
+    camTr.Position.Y += alpha * (playerTr.Position.Y - camTr.Position.Y);
+
+    // camTr.Position.Z stays as is (e.g., 10.f)
 }
+
 
 void Sandbox::GraphicsTestScene::runTransformationSys() {
     // TODO: Implement M2 Transformation System test

@@ -83,7 +83,7 @@ namespace Sandbox {
         std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
 
         // Background, sprites, debugObjects
-        std::vector<uint64_t> m_testEntities;
+        std::vector<PackedEntityId> m_testEntities;
 
         // Stress test
         std::vector<ECS::Entity> m_batchSprites;
