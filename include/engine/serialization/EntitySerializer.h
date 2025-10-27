@@ -91,7 +91,7 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ZIndex2D, ZOrder)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScriptId, Id)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScriptInstance, ManagedHandle, TypeHash, Initialized, TypeName)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop)
 	} 
 }
@@ -240,7 +240,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(ZIndex2D, ECS::Components::ZIndex2D)
 	REGISTER_COMPONENT_SERIALIZER(Camera, ECS::Components::Camera3D)
 	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices)
-	REGISTER_COMPONENT_SERIALIZER(ScriptId, ECS::Components::ScriptId)
+	REGISTER_COMPONENT_SERIALIZER(ScriptInstance, ECS::Components::ScriptInstance)
 	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource)
 }
 

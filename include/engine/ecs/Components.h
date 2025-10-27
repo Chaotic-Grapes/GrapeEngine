@@ -362,12 +362,6 @@ namespace ECS {
 
         // ---------- Scripting / Audio (kept minimal) ----------
 
-        struct ScriptId {
-        public:
-            uint32_t Id = 0;
-        };
-        static_assert(std::is_trivially_copyable_v<ScriptId>, "ScriptId must be trivially copyable");
-
         // C# Script instance component for CoreCLR hosting
         struct ScriptInstance {
         public:
