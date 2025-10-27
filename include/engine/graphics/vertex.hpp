@@ -6,4 +6,5 @@ struct Vertex {
     glm::vec2 texCoord;
     glm::vec4 color;
     float     texIndex; // filled by renderer when you pass a textureId
+    float     strokePx; // stroke width in pixels (0 = filled)
 };
