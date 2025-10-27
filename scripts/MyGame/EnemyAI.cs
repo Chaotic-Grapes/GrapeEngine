@@ -5,18 +5,15 @@ using GrapeEngine.Numerics;
 namespace MyGame;
 
 /// <summary>
-/// Simple enemy AI - demonstrates autonomous behavior.
-/// This is another unique behavior that's different from PlayerController.
-/// 
-/// RUBRIC: This is a second unique script behavior for the demo.
+/// Simple enemy AI to demonstrate autonomous behavior.
 /// </summary>
 public class EnemyAI : ScriptBehaviour
 {
-    private float m_patrolSpeed = 80.0f;
+    private readonly float m_patrolSpeed = 80f;
     private Vector3 m_patrolPointA;
     private Vector3 m_patrolPointB;
     private bool m_movingToB = true;
-    private float m_detectionRadius = 150.0f;
+    private float m_detectionRadius = 150f;
 
     // Visual entity
     private Entity m_visualEntity;
@@ -29,7 +26,7 @@ public class EnemyAI : ScriptBehaviour
         m_visualEntity = CreateEntity();
 
         // Set up initial position (use Entity position if provided, otherwise default)
-        var initialPos = new Vector3(100.0f, 100.0f, 0.0f);
+        var initialPos = new Vector3(100f, 100f, 0f);
         
         var transform = new LocalTransform
         {
@@ -43,7 +40,7 @@ public class EnemyAI : ScriptBehaviour
         var circle = new ShapeCircle2D
         {
             Radius = 15.0f,
-            Color = new Color { R = 1.0f, G = 0.0f, B = 0.0f, A = 1.0f },
+            Color = new Color { R = 1f, G = 0f, B = 0f, A = 1f },
             Filled = true
         };
         m_visualEntity.SetComponent(circle);
@@ -51,7 +48,8 @@ public class EnemyAI : ScriptBehaviour
         // Add Layer component so renderer can see it
         m_visualEntity.SetComponent(new Layer { Id = 0 });
 
-        // Make sure it's active
+        // Active component to toggle its active state
+        // But we don't really need it as it's always active even without the component
         m_visualEntity.SetComponent(new Active { Enabled = true });
 
         // Set patrol points
