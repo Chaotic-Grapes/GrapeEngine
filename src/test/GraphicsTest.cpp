@@ -47,7 +47,7 @@ Features:
 using namespace Sandbox;
 using namespace ECS;
 
-constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::BasicGraphics;
+constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::ViewportCamera;
 constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::ObjectPicking;
 
 extern ResourceManager RM;
@@ -1087,8 +1087,91 @@ void Sandbox::GraphicsTestScene::runSpriteAnim() {
     runAnimation();
 }
 
-void Sandbox::GraphicsTestScene::runMultipleShaders() {
-    // TODO: Implement M2 Multiple Shader pipelines test
+void GraphicsTestScene::runMultipleShaders() {
+    if (m_testEntities.empty()) {
+        const float midX = m_worldWidth * 0.5f;
+        const float midY = m_worldHeight * 0.5f;
+
+        // ---------------------------------------------
+        // Player: controllable yellow circle (filled)
+        // ---------------------------------------------
+        ECS::Entity player = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ midX, midY, 0.f },
+                Quaternion::Identity(),
+                Vector3D{ 1.f, 1.f, 1.f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                60.f,
+                Vector2D{ 0.f, 0.f },
+                Color{ 1.f, 1.f, 0.f, 1.f }, // bright yellow
+                0.f                          // filled
+            },
+            ECS::Components::Name{ "Player" }
+        );
+
+        // ---------------------------------------------
+        // Static red circle (left side)
+        // ---------------------------------------------
+        ECS::Entity redCircle = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ midX - 250.f, midY, 0.f },
+                Quaternion::Identity(),
+                Vector3D{ 1.f, 1.f, 1.f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                50.f,
+                Vector2D{ 0.f, 0.f },
+                Color{ 1.f, 0.f, 0.f, 1.f },
+                0.f
+            },
+            ECS::Components::Name{ "RedCircle" }
+        );
+
+        // ---------------------------------------------
+        // Static green outlined circle (right side)
+        // ---------------------------------------------
+        ECS::Entity greenOutline = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ midX + 250.f, midY, 0.f },
+                Quaternion::Identity(),
+                Vector3D{ 1.f, 1.f, 1.f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                60.f,
+                Vector2D{ 0.f, 0.f },
+                Color{ 0.f, 1.f, 0.f, 1.f },
+                3.f // outline stroke
+            },
+            ECS::Components::Name{ "GreenOutlinedCircle" }
+        );
+
+        // Track entities
+        m_testEntities.push_back(EntityUtils::Pack(player));
+        m_testEntities.push_back(EntityUtils::Pack(redCircle));
+        m_testEntities.push_back(EntityUtils::Pack(greenOutline));
+
+        LOG_DEBUG("Spawned player and test circles for MultipleShaders test");
+    }
+
+    // ---------------------------------------------
+    // Simple player movement logic
+    // ---------------------------------------------
+    ECS::World& world = GetWorld();
+    ECS::Entity playerEntity = EntityUtils::Unpack(m_testEntities[0]);
+    auto& playerTr = world.Get<ECS::Components::LocalTransform>(playerEntity);
+
+    const float moveSpeed = 400.f * Time::DeltaTime();
+    if (Input::IsKeyDown(KEY_A)) playerTr.Position.X -= moveSpeed;
+    if (Input::IsKeyDown(KEY_D)) playerTr.Position.X += moveSpeed;
+    if (Input::IsKeyDown(KEY_W)) playerTr.Position.Y += moveSpeed;
+    if (Input::IsKeyDown(KEY_S)) playerTr.Position.Y -= moveSpeed;
 }
 
 void Sandbox::GraphicsTestScene::runBatching() {
