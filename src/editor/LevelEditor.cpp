@@ -13,6 +13,12 @@ Features:
 - Playback controls panel initialization and management
 - Asset browser panel initialization and management
 - Editor input processing and rendering coordination
+
+References:
+- Font configuration based on ImGui documentation (docs/FONTS.md)
+- MergeMode technique from imgui.cpp ImFontConfig examples
+- Font atlas building pattern from ImGui source (imgui_draw.cpp)
+- Icon font integration adapted from community examples in ImGui discussions
 */
 /* End Header *******************************************************************/
 
@@ -32,10 +38,18 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
     auto& io = ImGui::GetIO();
 
-    // Add default font first (required for merge mode to work)
-    io.Fonts->AddFontDefault();
+    /// Load default font at custom size for text
+    float textFontSize = 15.0f; 
+    io.Fonts->AddFontDefault(); 
+    io.Fonts->Clear();  // Clear auto-added default font to override size
 
-    // Define the range for Material Symbols (Private Use Area E000-F8FF where icons live)
+    // Load default font at custom size
+    ImFontConfig textConfig;
+    textConfig.SizePixels = textFontSize;
+    io.Fonts->AddFontDefault(&textConfig);
+
+    // Define the range for Material Symbols
+    // Reference: https://fonts.google.com/icons
     static const ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
 
     // Configure font loading settings for Material Symbols
@@ -43,12 +57,15 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     iconsConfig.MergeMode = true;            // Merge icons into default font so we don't need to switch fonts
     iconsConfig.PixelSnapH = true;           // Align icon pixels to grid for sharper rendering
     iconsConfig.GlyphMinAdvanceX = 24.0f;    // Minimum horizontal spacing for each icon
-    iconsConfig.GlyphOffset = ImVec2(0, 6);  // Shift icons down 6 pixels to center them vertically in buttons
+    iconsConfig.GlyphOffset = ImVec2(0, 5);  // Shift icons down 5 pixels to center them vertically in buttons
+
+    // Load Material Symbols at smaller size
+    float iconFontSize = 19.0f;  
 
     // Load Material Symbols font and merge it with the default font
     m_symbolsFont = io.Fonts->AddFontFromFileTTF(
         "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
-        m_config.FontSize * m_config.FontScale,
+        iconFontSize,
         &iconsConfig,
         iconRanges
     );

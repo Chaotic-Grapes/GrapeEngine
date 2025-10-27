@@ -29,8 +29,7 @@ struct ImFont;
 
 // Configuration structure for level editor UI settings
 struct LevelEditorConfig {
-    float FontScale = 1.0f;  // Global font scaling factor for the entire UI
-    float FontSize = 24.0f;   // Base font size in pixels
+    float FontSize = 19.6f;   // Base font size in pixels
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  // Maximum length for game object names
 };
 

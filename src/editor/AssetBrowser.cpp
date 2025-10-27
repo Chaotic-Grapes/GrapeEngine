@@ -11,6 +11,11 @@ Features:
 - File browser with breadcrumb navigation
 - File selection with info display
 - Display of assets folder structure
+
+References:
+- Windows file dialog using Win32 API (commdlg.h)
+- ImGui styling and layout functions (imgui.h)
+- Breadcrumb navigation pattern & button customization adapted from ImGui examples
 */
 /* End Header *******************************************************************/
 

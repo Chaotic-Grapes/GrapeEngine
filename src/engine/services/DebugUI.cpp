@@ -1,41 +1,26 @@
-/**
- * @file    DebugUI.cpp
- * @author  Foo Rui Qin
- * @date    2025
- * @brief   Implementation of the debug user interface system for engine development
- *
- * This file implements the DebugUI class which provides a comprehensive ImGui-based
- * debug interface for the game engine. The implementation includes:
- *
- * Core Features:
- * - ImGui initialization and integration with GLFW/OpenGL backends
- * - Real-time engine status monitoring and performance metrics display
- * - Interactive game object editor with entity creation, deletion, and cloning
- * - Input debugging with event tracking and state monitoring
- * - Audio system monitoring and control interface
- * - Memory usage and profiling information display
- *
- * UI Management:
- * - Configurable window layouts and positioning
- * - Font scaling and styling customization
- * - Cached UI elements for performance optimization
- * - Toggle-able interface with F1 key support
- *
- * ECS Integration:
- * - Entity creation with basic components (Transform, Sprite, etc.)
- * - Real-time entity management and modification
- * - Component inspection and editing capabilities
- * - World state monitoring and debugging
- *
- * Performance Optimizations:
- * - Cached button labels to avoid string creation every frame
- * - Efficient UI state management
- * - Minimal memory allocations during rendering
- * - Optimized ImGui usage patterns
- *
- * The debug UI provides essential tools for engine development, debugging,
- * and performance analysis, making it easier to develop and optimize games.
- */
+/* Start Header *****************************************************************/
+/*!
+\file   DebugUI.cpp
+\author Foo Rui Qin (70%)
+        Muhammad Nur Fadzly Bin Zulkifli (30%)
+\par    ruiqin.foo@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
+\date   26th October 2025
+\brief
+Implements the DebugUI class which provides a comprehensive ImGui-based debug
+interface for the game engine.
+
+Features:
+- ImGui initialization and integration with GLFW/OpenGL backends
+- Real-time engine status monitoring and performance metrics display
+- Interactive game object editor with entity creation, deletion, and cloning
+- Input debugging with event tracking and state monitoring
+- Audio system monitoring and control interface
+- Configurable window layouts and font scaling
+- Cached UI elements for performance optimization
+- Toggle-able interface with F1 key support
+*/
+/* End Header *******************************************************************/
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -74,9 +59,13 @@ namespace {
     Audio::FmodAudioDevice* audioPtr = nullptr;
 }
 
+// Attach audio device for monitoring
 void DebugUI::AttachAudio(Audio::FmodAudioDevice* device) { audioPtr = device; }
+
+// Detach audio device
 void DebugUI::DetachAudio() { audioPtr = nullptr; }
 
+// Initialize ImGui context and backends
 void DebugUI::Initialize(GLFWwindow* window) {
     // Avoid reinitializing ImGUI
     if (!window || m_initialized) return;
@@ -96,6 +85,7 @@ void DebugUI::Initialize(GLFWwindow* window) {
     m_initialized = true;  // Mark that DebugUI has been initialized
 }
 
+// Begin new ImGui frame and handle F1 toggle
 void DebugUI::NewFrame() {
     if (!m_initialized) return;
 
@@ -110,6 +100,7 @@ void DebugUI::NewFrame() {
     ImGui::NewFrame();
 }
 
+// Render all debug windows
 void DebugUI::Render() {
     if (!m_initialized) return;
 
@@ -127,6 +118,7 @@ void DebugUI::Render() {
     }
 }
 
+// Shutdown ImGui and cleanup resources
 void DebugUI::Shutdown() {
     if (!m_initialized) return;
 
@@ -171,6 +163,7 @@ void DebugUI::RemoveGameObject(const EntityId id) {
     _invalidateCache();
 }
 
+// Clone entity with position offset
 void DebugUI::CloneGameObject(const Entity& entity) {
     // Safety check
     if (!HasValidWorld()) return;
@@ -185,6 +178,7 @@ void DebugUI::CloneGameObject(const Entity& entity) {
     _invalidateCache();
 }
 
+// Destroy all entities in the world
 void DebugUI::ClearAllGameObjects() {
     // Safety check
     if (!HasValidWorld()) return;
@@ -194,6 +188,7 @@ void DebugUI::ClearAllGameObjects() {
     _invalidateCache();
 }
 
+// Display engine status and demo window toggle
 void DebugUI::_showEngineDebugWindow() {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_ENGINE);
@@ -214,6 +209,7 @@ void DebugUI::_showEngineDebugWindow() {
     ImGui::End();  // Complete window definition
 }
 
+// Display FPS, frame times and profiler scope data
 void DebugUI::_showPerformanceWindow() {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_PERF);
@@ -277,6 +273,7 @@ void DebugUI::_showPerformanceWindow() {
     ImGui::End();
 }
 
+// Display audio system controls and library window
 void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
     if (!device) return;
 
@@ -381,6 +378,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
     ImGui::End();
 }
 
+// Display mouse, keyboard and window input state
 void DebugUI::_showInputDebugWindow() {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_INPUT);
@@ -426,6 +424,7 @@ void DebugUI::_showInputDebugWindow() {
     ImGui::End();
 }
 
+// Display entity list with creation, deletion, cloning and component editing
 void DebugUI::_showGameObjectEditor() {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_EDITOR);
@@ -583,6 +582,7 @@ void DebugUI::_invalidateCache() {
     m_cachedCloneLabels.clear();
 }
 
+// Get or create cached delete button label for entity
 const std::string& DebugUI::_getDeleteLabel(const EntityId id) const {
     // Same thing
     auto it = m_cachedDeleteLabels.find(id);
@@ -594,6 +594,7 @@ const std::string& DebugUI::_getDeleteLabel(const EntityId id) const {
     return it->second;
 }
 
+// Get or create cached clone button label for entity
 const std::string& DebugUI::_getCloneLabel(const EntityId id) const {
     // Same thing
     auto it = m_cachedCloneLabels.find(id);
@@ -605,6 +606,7 @@ const std::string& DebugUI::_getCloneLabel(const EntityId id) const {
     return it->second;
 }
 
+// Get or create collapsed header state for entity
 const bool& DebugUI::_getCollapsedHeaderBool(const EntityId id) const {
     auto it = m_cachedCollapsedHeaders.find(id);
     if (it == m_cachedCollapsedHeaders.end()) {

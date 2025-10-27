@@ -14,6 +14,9 @@ Features:
 - World state serialization and restoration for play/stop
 - ImGui UI with tooltips and Material Symbols icons
 - Step-by-step physics frame execution for debugging
+
+Reference:
+- ImGui UI layout and button styling (imgui.h)
 */
 /* End Header *******************************************************************/
 
