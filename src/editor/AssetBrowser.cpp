@@ -85,6 +85,20 @@ void AssetBrowser::Render() {
 
     if (!isPrefab) ImGui::EndDisabled();
 
+    ImGui::SameLine();
+
+    // Edit Prefab button (only enabled if a .prefab file is selected)
+    if (!isPrefab) ImGui::BeginDisabled();
+
+    if (ImGui::Button("\xEE\x8F\x89 Edit Prefab")) {
+        _editPrefab();
+    }
+    if (ImGui::IsItemHovered() && isPrefab) {
+        ImGui::SetTooltip("Edit prefab properties");
+    }
+
+    if (!isPrefab) ImGui::EndDisabled();
+
     // Two-column layout (.x is width): file list on left, info panel on right
     float windowWidth = ImGui::GetContentRegionAvail().x;
 
@@ -416,22 +430,26 @@ void AssetBrowser::_replaceTexture() {
 // Load and instantiate selected prefab into the level
 // COPIED DIRECTLY FROM DEBUGUI.H
 void AssetBrowser::_loadPrefab() {
+    // Ensure prefab is selected
     if (m_selectedAsset.empty()) {
         LOG_WARNING("No prefab selected");
         return;
     }
 
+    // Ensure valid world reference exists
     if (!m_world) {
         LOG_ERROR("Cannot load prefab: No world reference");
         return;
     }
 
+    // Try to open the selected prefab file
     std::ifstream file(m_selectedAsset);
     if (!file.is_open()) {
         LOG_ERROR("Cannot open file: " << m_selectedAsset);
     }
     else {
         try {
+            // Parse prefab JSON
             auto entityJson = nlohmann::json::parse(file);
             file.close();
 
@@ -446,9 +464,45 @@ void AssetBrowser::_loadPrefab() {
             m_statusTimer = 3.0f;
         }
         catch (const std::exception& e) {
+            // Handle JSON parsing or deserialization errors
             LOG_ERROR("Failed to parse prefab file: " << e.what());
             m_statusMessage = "Failed to load prefab";
             m_statusTimer = 3.0f;
         }
+    }
+}
+
+// Open prefab for editing
+void AssetBrowser::_editPrefab() {
+    // Ensure prefab is selected
+    if (m_selectedAsset.empty()) {
+        LOG_WARNING("No prefab selected to edit");
+        return;
+    }
+
+    // Try to open the prefab file
+    std::ifstream file(m_selectedAsset);
+    if (!file.is_open()) {
+        LOG_ERROR("Cannot open prefab file: " << m_selectedAsset);
+        m_statusMessage = "Failed to open prefab";
+        m_statusTimer = 3.0f;
+        return;
+    }
+
+    try {
+        // Parse prefab JSON into memory
+        m_prefabData = nlohmann::json::parse(file);
+        m_editingPrefabPath = m_selectedAsset;
+        m_editingPrefab = true;
+        file.close();
+
+        LOG_INFO("Opened prefab for editing: " << std::filesystem::path(m_selectedAsset).filename().string());
+    }
+    catch (const std::exception& e) {
+        // Handle parsing errors
+        LOG_ERROR("Failed to parse prefab: " << e.what());
+        m_statusMessage = "Failed to parse prefab";
+        m_statusTimer = 3.0f;
+        m_editingPrefab = false;
     }
 }

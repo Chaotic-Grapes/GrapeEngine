@@ -21,6 +21,7 @@ Features:
 
 #include <string>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 // Forward declaration
 struct ImFont;
@@ -57,13 +58,27 @@ private:
     // Replace the currently selected texture file
     void _replaceTexture();
 
+    // Loads a prefab file from disk and instantiates it into the world
     void _loadPrefab();
 
+    // Opens the selected prefab in an editor for modification
+    void _editPrefab();
+
+    // Updates all entities that were instantiated from prefabs to match
+    // their latest prefab definitions (used for synchronization)
+    void _updatePrefabInstances();
+
+    // References and state for managing assets, prefabs and editor navigation
     ImFont* m_symbolsFont = nullptr;
     World* m_world = nullptr;
     std::string m_assetsRootPath = "assets\\";
     std::string m_currentPath = "assets\\";
     std::string m_selectedAsset;
+
+    // Prefab editing state
+    bool m_editingPrefab = false;            
+    nlohmann::json m_prefabData;              
+    std::string m_editingPrefabPath;
 };
 
 #endif
