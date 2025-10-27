@@ -358,6 +358,7 @@ namespace ECS {
             float FarPlane      = 100.f;
             float OrthoSize     = 10.f;
             float AspectRatio   = 16.f / 9.f; // width / height
+            bool  Active        = false;
         };
         static_assert(std::is_trivially_copyable_v<Camera3D>, "Camera3D must be trivially copyable");
 
