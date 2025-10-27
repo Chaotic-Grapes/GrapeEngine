@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef SCRIPTSYSTEM_H
 #define SCRIPTSYSTEM_H
 
+#include "hostfxr.h"
 #include "ecs/World.h"
 #include "scene/Scene.h"
 #include <string>
@@ -27,7 +28,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using hostfxr_handle = void*;
 
 namespace ECS {
-
     /**
      * @brief Manages C# script execution through CoreCLR hosting.
      * 
@@ -53,7 +53,7 @@ namespace ECS {
          * @param runtimeConfigPath Path to .NET runtime config (runtimeconfig.json)
          * @return true if initialization succeeded, false otherwise
          */
-        bool Initialize(const char* runtimeConfigPath);
+        bool Initialize(const char* runtimeConfigPath = "GrapeEngine.ScriptAPI.runtimeconfig.json");
 
         /**
          * @brief Shutdown the CoreCLR runtime and cleanup resources.

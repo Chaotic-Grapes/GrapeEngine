@@ -109,7 +109,8 @@ namespace ECS {
     }
 
     bool ScriptSystem::Initialize(const char* runtimeConfigPath) {
-        if (m_initialized) return true;
+        if (m_initialized)
+            return true;
 
         // Use std::cout for logging rather than engine logging to avoid any dependency issues
         // If that is possible
@@ -313,6 +314,7 @@ namespace ECS {
         STRING_T typeName = STR("GrapeEngine.Scripting.ScriptHost, GrapeEngine.ScriptAPI"); // Important: namespaces MUST match
 
         // Helper lambda to load a single delegate
+        // Using this helps to avoid tedious repetitive code into one single line
         auto loadDelegate = [&](const CHAR_T* methodName, void** outDelegate) -> bool {
             int rc = loadAssemblyAndGetFunctionPointer(
                 assemblyPathNative.c_str(),

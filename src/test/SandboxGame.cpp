@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include "ECSTest.hpp"
+#include "ScriptingTest.hpp"
 
 
 void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
@@ -24,6 +25,7 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     std::cout << "3. Serialization Check Test" << '\n';
     std::cout << "4. Memory Tracking Test" << '\n';
 	std::cout << "5. Entity Component System Test" << '\n';
+	std::cout << "6. C# Scripting System Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -65,6 +67,13 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
 
         break;
 	}
+    case 6: {
+        LOG_INFO("Starting C# Scripting System Test...");
+        size_t scriptingTest = sceneManager.AddScene(new Sandbox::ScriptingTestScene());
+        sceneManager.SetActive(scriptingTest);
+
+        break;
+    }
     default:
         std::cout << "Invalid choice" << '\n';
         break;

@@ -149,7 +149,7 @@ endif()
 add_custom_command(TARGET GrapeEngine POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_LIST_DIR}/lib/fmod/fmod.dll"
-        $<TARGET_FILE_DIR:GrapeEngine>
+        "$<TARGET_FILE_DIR:GrapeEngine>"
     COMMENT "Copying FMOD DLL to output directory"
 )
 
@@ -158,7 +158,7 @@ if(EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
     add_custom_command(TARGET GrapeEngine POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CORECLR_LIB_DIR}/nethost.dll"
-            $<TARGET_FILE_DIR:GrapeEngine>
+            "$<TARGET_FILE_DIR:GrapeEngine>"
         COMMENT "Copying nethost.dll to output directory"
     )
 endif()
@@ -174,7 +174,7 @@ if(DOTNET_EXECUTABLE)
         BuildScriptAPI ALL
         COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj" 
             --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
-            --output "${CMAKE_BINARY_DIR}/$<CONFIG>/scripts"
+            --output "${CMAKE_BINARY_DIR}/$<CONFIG>" # Output to same directory as .exe file
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
         COMMENT "Building GrapeEngine Scripting API..."
         VERBATIM
@@ -198,7 +198,7 @@ if(DOTNET_EXECUTABLE)
                 Build_${PROJ_NAME} ALL
                 COMMAND ${DOTNET_EXECUTABLE} build "${CSPROJ_FILE}"
                     --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
-                    --output "${CMAKE_BINARY_DIR}/$<CONFIG>/scripts"
+                    --output "${CMAKE_BINARY_DIR}/$<CONFIG>" # Output to same directory as .exe file
                 WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
                 COMMENT "Building ${PROJ_NAME}..."
                 DEPENDS BuildScriptAPI
@@ -212,24 +212,22 @@ if(DOTNET_EXECUTABLE)
     # Make GrapeEngine depend on all script builds
     add_dependencies(GrapeEngine BuildScriptAPI ${GAME_SCRIPT_TARGETS})
     
-    # Copy all compiled DLLs to the executable directory
-    add_custom_command(TARGET GrapeEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_BINARY_DIR}/$<CONFIG>/scripts"
-            "$<TARGET_FILE_DIR:GrapeEngine>/scripts"
-        COMMENT "Copying C# assemblies to executable directory..."
-    )
+    # Note: C# DLLs are already built directly to ${CMAKE_BINARY_DIR}/$<CONFIG>
+    # which is the same directory as the executable, so no copying is needed.
+
+    # Copy runtimeconfig.json for .NET hosting
+    if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")
+        add_custom_command(TARGET GrapeEngine POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json"
+                "$<TARGET_FILE_DIR:GrapeEngine>"
+            COMMENT "Copying runtimeconfig.json to output directory"
+        )
+    endif()
     
-    # Generate runtimeconfig.json for .NET hosting
-    set(RUNTIME_CONFIG_PATH "$<TARGET_FILE_DIR:GrapeEngine>/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")
-    add_custom_command(TARGET GrapeEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E echo "{\"runtimeOptions\":{\"tfm\":\"net9.0\",\"framework\":{\"name\":\"Microsoft.NETCore.App\",\"version\":\"9.0.0\"}}}" > "${RUNTIME_CONFIG_PATH}"
-        COMMENT "Generating runtimeconfig.json..."
-    )
-    
-    message(STATUS "C# build output: ${CMAKE_BINARY_DIR}/$<CONFIG>/scripts")
-    message(STATUS "DLLs will be copied to: $<TARGET_FILE_DIR:GrapeEngine>/scripts")
-    message(STATUS "Game scripts can be added as separate .csproj files in scripts/ folder")
+    message(STATUS "C# build output: ${CMAKE_BINARY_DIR}/$<CONFIG>")
+    message(STATUS "DLLs will be copied to: $<TARGET_FILE_DIR:GrapeEngine>")
+    #message(STATUS "Game scripts can be added as separate .csproj files in scripts/ folder")
 else()
     message(WARNING ".NET SDK not found - Scripting will not be available")
 endif()

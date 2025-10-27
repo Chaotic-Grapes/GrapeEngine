@@ -6,13 +6,14 @@ using System.Runtime.CompilerServices;
 
 // Has hot reloading... theoretically?
 // But it isn't tested yet.
+// TODO: Test hot reloading and make sure ScriptHost works correctly after assemblies are reloaded.
 
-// ************** !!!!!!!! IMPORTANT !!!!!!!! ************** //
-//                                                           //
-// Please consult me before making ANY changes to this file. //
-// Unless it's just logging changes or documentation updates //
-//                                                           //
-// ************** !!!!!!!! IMPORTANT !!!!!!!! ************** //
+// *************** !!!!!!!! IMPORTANT !!!!!!!! *************** //
+//                                                             //
+// Please consult me before making ANY changes to this file.   //
+// Unless it's just logging changes or documentation updates.  //
+//                                                             //
+// *************** !!!!!!!! IMPORTANT !!!!!!!! *************** //
 
 namespace GrapeEngine.Scripting
 {
@@ -40,16 +41,19 @@ namespace GrapeEngine.Scripting
         // Also take note: I encapsulated the typeof(...) in square brackets because it is an array.
         // Also PSA: I did not read much on interoperability with C++ so there are gonna be some bugs
         // All I know is that Cdecl is mostly used from my experience :)
+        // UnmanagedCallersOnly attribute indicates that this method can be called from unmanaged code (C++ in this case).
+        // It also prevents this method from being called from managed code directly.
         [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])] // CallConvCdecl is in System.Runtime.CompilerServices
         public static ulong CreateScriptInstance(IntPtr typeNamePtr, ulong entityId)
         {
             try
             {
                 // Marshal type name from C++
+                // PtrToStringAnsi converts a pointer to an ANSI string (C-style null-terminated string)
                 var typeName = Marshal.PtrToStringAnsi(typeNamePtr);
 
-                // I normally use string.IsNullOrWhiteSpace but I am going with IsNullOrEmpty just to be safe
-                if (string.IsNullOrEmpty(typeName))
+                // string.IsNullOrWhiteSpace is better than IsNullOrEmpty in most cases
+                if (string.IsNullOrWhiteSpace(typeName))
                 {
                     Logging.Log("ERROR: Null or empty type name", LogLevel.Error);
                     return 0;
