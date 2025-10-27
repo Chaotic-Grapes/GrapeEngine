@@ -32,8 +32,8 @@ Usage Example:
 
 #pragma once
 
-#include "ecs/Entity.h"
 #include "ecs/World.h"
+#include "ecs/Entity.h"
 #include "ecs/Components.h"
 #include "services/Input.h"
 #include "services/WindowManager.h"
@@ -43,7 +43,7 @@ namespace Engine {
 
     class EditorCamera {
     public:
-        explicit EditorCamera(World& world);
+        explicit EditorCamera(ECS::World& world);
         ~EditorCamera();
 
         /// Updates camera position and projection based on user input.
@@ -62,28 +62,28 @@ namespace Engine {
         void Focus(const glm::vec3& target);
 
         /// Accessor for the internal Camera3D component.
-        Component::Camera3D* GetCameraComponent() const { return m_camera; }
+        ECS::Components::Camera3D* GetCameraComponent() const { return m_camera; }
 
         /// Accessor for the internal Transform component.
-        Component::Transform* GetTransform() const { return m_transform; }
+        ECS::Components::LocalTransform* GetTransform() const { return m_transform; }
 
     private:
         // --------------------------------------------------------------------
         // Internal state
         // --------------------------------------------------------------------
-        Entity m_cameraEntity;                      //!< Wrapped ECS entity
-        Component::Transform* m_transform{};        //!< Pointer to Transform component
-        Component::Camera3D* m_camera{};            //!< Pointer to Camera3D component
+        ECS::Entity m_cameraEntity;                         //!< Wrapped ECS entity
+        ECS::Components::LocalTransform* m_transform{};     //!< Pointer to Transform component
+        ECS::Components::Camera3D* m_camera{};              //!< Pointer to Camera3D component
 
-        glm::vec3 m_target = { 0.f, 0.f, 0.f }; //!< Orbit center
-        glm::vec3 m_cameraPosition = { 0.f, 0.f, 10.f }; //!< Cached position
+        glm::vec3 m_target = { 0.f, 0.f, 0.f };             //!< Orbit center
+        glm::vec3 m_cameraPosition = { 0.f, 0.f, 10.f };    //!< Cached position
 
-        float m_distance = 10.f;            //!< Distance from orbit center
-        float m_yaw = 0.f;                  //!< Horizontal rotation angle
-        float m_pitch = 0.f;                //!< Vertical rotation angle
-        float m_targetOrthoSize = 20.0f;    //!< Target orthographic size
-        float m_perspectiveBlend = 0.0f;    //!< 0=ortho, 1=perspective
-        bool  m_returningToOrtho = false;   //!< Whether camera is transitioning to ortho mode
+        float m_distance = 10.f;                            //!< Distance from orbit center
+        float m_yaw = 0.f;                                  //!< Horizontal rotation angle
+        float m_pitch = 0.f;                                //!< Vertical rotation angle
+        float m_targetOrthoSize = 1000.0f;                    //!< Target orthographic size
+        float m_perspectiveBlend = 0.0f;                    //!< 0=ortho, 1=perspective
+        bool  m_returningToOrtho = false;                   //!< Whether camera is transitioning to ortho mode
 
         // --------------------------------------------------------------------
         // Mouse state and interaction flags
