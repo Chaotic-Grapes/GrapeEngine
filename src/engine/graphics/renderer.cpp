@@ -41,6 +41,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <iostream>
 
 // No need to grow since there is batch flushing when capacity is exceeded
 void Renderer::ensureCapacity(size_t vNeeded, size_t iNeeded) {
@@ -52,6 +53,15 @@ void Renderer::clearTextureSlots() { textureSlots.clear(); }
 
 void Renderer::flush() {
     flushCountThisFrame++;
+
+#if 0
+    std::cout << "FLUSH: verts=" << cpuBuffer.size()
+              << "/" << vboCapacity
+              << " indices=" << cpuIndices.size()
+              << "/" << eboCapacity
+              << " texSlots=" << textureSlots.size() << std::endl;
+#endif
+
     endFrame();
     beginFrame();
 }
@@ -111,6 +121,11 @@ Renderer::Renderer(size_t maxQuads) {
     glEnableVertexArrayAttrib(vao, 3);
     glVertexArrayAttribFormat(vao, 3, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, texIndex));
     glVertexArrayAttribBinding(vao, 3, 0);
+
+    // stroke thickness per vertex
+    glEnableVertexArrayAttrib(vao, 4);
+    glVertexArrayAttribFormat(vao, 4, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, strokePx));
+    glVertexArrayAttribBinding(vao, 4, 0);
 }
 
 Renderer::~Renderer() {
@@ -132,6 +147,14 @@ void Renderer::endFrame() {
     glNamedBufferSubData(ebo, 0, cpuIndices.size() * sizeof(uint32_t), cpuIndices.data());
 
     bindTextureSlots();
+
+#if 0
+    std::cout   << "[PROFILING]: verts=" << cpuBuffer.size()
+                << "/" << vboCapacity
+                << " indices=" << cpuIndices.size()
+                << "/" << eboCapacity
+                << " texSlots=" << textureSlots.size() << std::endl;
+#endif
 
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, (GLsizei)cpuIndices.size(), GL_UNSIGNED_INT, nullptr);
