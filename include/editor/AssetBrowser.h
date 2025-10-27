@@ -26,6 +26,7 @@ Features:
 // Forward declaration
 struct ImFont;
 class World;
+class Entity;
 
 class AssetBrowser {
 public:
@@ -67,6 +68,9 @@ private:
     // Updates all entities that were instantiated from prefabs to match
     // their latest prefab definitions (used for synchronization)
     void _updatePrefabInstances();
+
+    // Helper for updating single entity
+    bool _updateEntityFromPrefab(Entity& entity); 
 
     // References and state for managing assets, prefabs and editor navigation
     ImFont* m_symbolsFont = nullptr;

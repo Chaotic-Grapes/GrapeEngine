@@ -35,6 +35,7 @@ References:
 #include <services/ResourceManager.h>
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
+#include "ecs/Entity.h"
 
 void AssetBrowser::Initialize(ImFont* symbolsFont, World* world) {
     m_symbolsFont = symbolsFont;
@@ -504,5 +505,57 @@ void AssetBrowser::_editPrefab() {
         m_statusMessage = "Failed to parse prefab";
         m_statusTimer = 3.0f;
         m_editingPrefab = false;
+    }
+}
+
+// Find all entities using this prefab and update them
+void AssetBrowser::_updatePrefabInstances() {
+    // Safety checks
+    if (!m_world || m_editingPrefabPath.empty()) return;
+    if (!m_prefabData.contains("Components")) return;
+
+    int updatedCount = 0;  // Track successful updates
+    auto allEntities = m_world->GetEntityManager().GetAllEntities();
+
+    // Check each entity to see if it uses this prefab
+    for (auto entityId : allEntities) {
+        auto entity = m_world->GetEntityManager().GetEntity(entityId);
+
+        // Check if entity is linked to this prefab
+        auto* prefabLink = entity.GetComponent<Component::PrefabLink>();
+        if (!prefabLink || prefabLink->prefabPath != m_editingPrefabPath) {
+            continue;  // Skip if not linked to this prefab
+        }
+
+        // Update this prefab instance
+        if (_updateEntityFromPrefab(entity)) {
+            updatedCount++;
+        }
+    }
+
+    LOG_INFO("Updated " << updatedCount << " prefab instances");
+}
+
+// Update single entity's components from prefab data
+bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
+    try {
+        // Apply each component from prefab to entity
+        for (const auto& componentEntry : m_prefabData["Components"]) {
+            std::string typeName = componentEntry["Type"];
+
+            // Update Transform component
+            if (typeName == "Transform") {
+                auto* transform = entity.GetComponent<Component::Transform>();
+                if (transform) from_json(componentEntry["Data"], *transform);
+            }
+            // Adding more component types later
+        }
+
+        LOG_INFO("Updated entity " << entity.GetId());
+        return true;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Failed to update entity: " << e.what());
+        return false;
     }
 }
