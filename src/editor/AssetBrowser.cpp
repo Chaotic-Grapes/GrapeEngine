@@ -104,33 +104,51 @@ void AssetBrowser::_displayBreadcrumbs() {
     std::filesystem::path currentPath(m_currentPath);
     std::vector<std::filesystem::path> pathParts;
 
-    // Build path parts from root to current
+    // Build path parts from root to current (filter out empty/special directory entries)
     for (const auto& part : currentPath) {
         std::string partStr = part.string();
-        // Only add non-empty parts (skip empty strings, ".", etc.)
         if (!partStr.empty() && partStr != "." && partStr != ".." && partStr != "/" && partStr != "\\") {
             pathParts.push_back(partStr);
         }
     }
 
-    // Display each part as clickable button
+    // Display each part as clickable button with separators
     std::string accumulatedPath;
-    for (size_t i{}; i < pathParts.size(); i++) {
-        // Add separator between parts
+    for (size_t i = 0; i < pathParts.size(); i++) {
+        // Build accumulated path up to this part (e.g., "assets", "assets\Audio", etc.)
+        if (i > 0) accumulatedPath += "\\";
+        accumulatedPath += pathParts[i].string();
+
+        // Add ">" separator between breadcrumb parts (but not before first one)
         if (i > 0) {
             ImGui::SameLine();
             ImGui::TextDisabled(">");
             ImGui::SameLine();
         }
 
-        // Build accumulated path up to this part
-        if (i > 0) accumulatedPath += "/";
-        accumulatedPath += pathParts[i].string();
+        // Display breadcrumb part
+        if (i == pathParts.size() - 1) {
+            // Last part (current directory): display as plain text, not clickable
+            ImGui::Text("%s", pathParts[i].string().c_str());
+        }
+        else {
+            // Previous parts: display as clickable blue buttons
+            ImGui::PushID(static_cast<int>(i));  // Unique ID so ImGui can distinguish buttons
 
-        // Clickable breadcrumb button
-        if (ImGui::SmallButton(pathParts[i].string().c_str())) {
-            m_currentPath = accumulatedPath;
-            m_selectedAsset.clear();  // Clear selection when navigating folders
+            // Style buttons to look like clickable links (blue text, transparent background)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));           // Blue text
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));                     // Transparent
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.4f, 0.8f, 0.3f));  // Subtle hover
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.4f, 0.8f, 0.5f));   // Subtle click
+
+            // When clicked, navigate to that folder level
+            if (ImGui::SmallButton(pathParts[i].string().c_str())) {
+                m_currentPath = accumulatedPath;
+                m_selectedAsset.clear();  // Clear file selection when changing folders
+            }
+
+            ImGui::PopStyleColor(4);  // Pop all 4 color style overrides (Text, Button, ButtonHovered, ButtonActive)
+            ImGui::PopID();           // Pop the unique ID for this button
         }
     }
 }
@@ -350,7 +368,7 @@ void AssetBrowser::_replaceTexture() {
                 }
 
                 // Hot reload: force ResourceManager to reload the texture
-                extern ResourceManager RM;
+                // Basically update assets while the program is running without restarting it
                 RM.UnloadAsset(m_selectedAsset);   // Remove old cached version
                 RM.Get<Texture>(m_selectedAsset);  // Load new version into cache
 
