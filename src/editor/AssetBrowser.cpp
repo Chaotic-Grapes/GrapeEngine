@@ -436,8 +436,11 @@ void AssetBrowser::_loadPrefab() {
             file.close();
 
             // Deserialize creates the entity internally
-            (void)Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+            auto entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
 
+            // Tag entity with prefab link
+            entity.AddComponent<Component::PrefabLink>(m_selectedAsset);
+            
             LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
             m_statusMessage = "Prefab loaded successfully";
             m_statusTimer = 3.0f;
