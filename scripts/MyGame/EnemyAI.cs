@@ -48,6 +48,9 @@ public class EnemyAI : ScriptBehaviour
         };
         m_visualEntity.SetComponent(circle);
 
+        // Add Layer component so renderer can see it
+        m_visualEntity.SetComponent(new Layer { Id = 0 });
+
         // Make sure it's active
         m_visualEntity.SetComponent(new Active { Enabled = true });
 

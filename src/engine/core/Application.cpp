@@ -26,7 +26,7 @@ namespace Engine {
         Grape_Engine::CrashDumping::SetDumpCreateState(true);
 
         // Load configuration first
-        Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_config);
+        Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
 
 #if !_DEBUG
         if (consoleFlag)

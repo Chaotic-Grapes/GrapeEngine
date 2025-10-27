@@ -310,14 +310,14 @@ namespace GrapeEngine.Scripting
     // ---------------------------------- Camera Components ----------------------------------
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct Camera
+    public struct Camera3D
     {
-        public bool IsOrthographic;
-        public float FovY;
-        public float OrthoHeight;
-        public float Near;
-        public float Far;
-        public float Aspect;
+        public bool UsePerspective;
+        public float FOV;
+        public float NearPlane;
+        public float FarPlane;
+        public float OrthoSize;
+        public float AspectRatio;
     }
 
     [StructLayout(LayoutKind.Sequential)]

@@ -14,11 +14,6 @@ public class PlayerController : ScriptBehaviour
     private readonly float m_moveSpeed = 200.0f;
     private float m_rotationSpeed = 180.0f;
 
-    // World bounds
-    private const float WorldWidth = 1280.0f;
-    private const float WorldHeight = 720.0f;
-    private const float BoundaryMargin = 30.0f;
-
     // Visual entity that represents the player
     private Entity m_visualEntity;
 
@@ -30,10 +25,10 @@ public class PlayerController : ScriptBehaviour
         // Create the visual entity for the player
         m_visualEntity = CreateEntity();
         
-        // Set up initial position at center of screen
+        // Set initial position at center of screen
         var transform = new LocalTransform
         {
-            Position = new Vector3(WorldWidth * 0.5f, WorldHeight * 0.5f, 0.0f),
+            Position = new Vector3(World.Width * 0.5f, World.Height * 0.5f, 0.0f),
             Rotation = Quaternion.Identity,
             Scale = new Vector3(1, 1, 1)
         };
@@ -47,6 +42,9 @@ public class PlayerController : ScriptBehaviour
             Filled = true
         };
         m_visualEntity.SetComponent(circle);
+
+        // Add Layer component so renderer can see it
+        m_visualEntity.SetComponent(new Layer { Id = 0 });
 
         // Make sure it's active
         m_visualEntity.SetComponent(new Active { Enabled = true });
@@ -62,32 +60,49 @@ public class PlayerController : ScriptBehaviour
             return;
         }
 
-        // Calculate movement based on input
-        var movement = Vector3.Zero;
+        // WASD movement with keyboard input
+        var movement = Vector2.Zero;
 
-        // WASD movement (for now we'll use Time-based auto-movement as placeholder)
-        // When Input API is available, replace this with actual input
-        
-        // Demo movement pattern - move in a figure-8
-        var t = (float)Time.ElapsedTime * 0.5f;
-        var targetX = WorldWidth * 0.5f + MathF.Cos(t) * 300.0f;
-        var targetY = WorldHeight * 0.5f + MathF.Sin(t * 2.0f) * 150.0f;
-        
-        // Smooth movement towards target
-        var target = new Vector3(targetX, targetY, 0.0f);
-        var direction = target - transform.Position;
-        
-        if (direction.Magnitude > 5.0f)
+        if (Input.IsKeyDown(KeyCode.W))
+            movement.Y += 1.0f; // Up
+        if (Input.IsKeyDown(KeyCode.S))
+            movement.Y -= 1.0f; // Down
+        if (Input.IsKeyDown(KeyCode.A))
+            movement.X -= 1.0f; // Left
+        if (Input.IsKeyDown(KeyCode.D))
+            movement.X += 1.0f; // Right
+
+        // Normalize diagonal movement so we don't move faster diagonally
+        if (movement.Magnitude > 0.0f)
         {
-            movement = direction.Normalized * m_moveSpeed * Time.DeltaTime;
+            movement = movement.Normalized;
+            transform.Position.X += movement.X * m_moveSpeed * Time.DeltaTime;
+            transform.Position.Y += movement.Y * m_moveSpeed * Time.DeltaTime;
         }
 
-        // Apply movement
-        transform.Position += movement;
+        // Rotation with Q/E keys
+        if (Input.IsKeyDown(KeyCode.Q))
+        {
+            // Rotate counter-clockwise (increase Z rotation)
+            var angle = m_rotationSpeed * Time.DeltaTime * (MathF.PI / 180.0f);
+            var currentAngle = 2.0f * MathF.Acos(transform.Rotation.W);
+            var newAngle = currentAngle + angle;
+            transform.Rotation.W = MathF.Cos(newAngle / 2.0f);
+            transform.Rotation.Z = MathF.Sin(newAngle / 2.0f);
+        }
+        if (Input.IsKeyDown(KeyCode.E))
+        {
+            // Rotate clockwise (decrease Z rotation)
+            var angle = m_rotationSpeed * Time.DeltaTime * (MathF.PI / 180.0f);
+            var currentAngle = 2.0f * MathF.Acos(transform.Rotation.W);
+            var newAngle = currentAngle - angle;
+            transform.Rotation.W = MathF.Cos(newAngle / 2.0f);
+            transform.Rotation.Z = MathF.Sin(newAngle / 2.0f);
+        }
 
         // Clamp to world bounds
-        transform.Position.X = Math.Clamp(transform.Position.X, BoundaryMargin, WorldWidth - BoundaryMargin);
-        transform.Position.Y = Math.Clamp(transform.Position.Y, BoundaryMargin, WorldHeight - BoundaryMargin);
+        transform.Position.X = Math.Clamp(transform.Position.X, World.WallThickness, World.Width - World.WallThickness);
+        transform.Position.Y = Math.Clamp(transform.Position.Y, World.WallThickness, World.Height - World.WallThickness);
 
         // Update component
         m_visualEntity.SetComponent(transform);
@@ -105,7 +120,7 @@ public class PlayerController : ScriptBehaviour
         var pulse = 0.9f + 0.1f * MathF.Sin((float)Time.ElapsedTime * 5.0f);
         circle.Radius = 20.0f * pulse;
             
-        // Keep green color but vary brightness
+        // Keep green color but change brightness
         circle.Color.R = 0.0f;
         circle.Color.G = pulse;
         circle.Color.B = 0.0f;
@@ -116,6 +131,6 @@ public class PlayerController : ScriptBehaviour
 
     public override void OnFixedUpdate()
     {
-        // Physics-based updates would go here if needed
+        // Physics-based updates would go here if needed but not used in this demo
     }
 }

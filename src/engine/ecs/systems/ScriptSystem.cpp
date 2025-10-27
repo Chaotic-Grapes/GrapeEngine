@@ -18,6 +18,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "ecs/ComponentRegistry.h"
 #include "helpers/EntityUtils.h"
+#include "services/Input.h"
 
 // CoreCLR hosting headers
 #include <nethost.h>
@@ -684,6 +685,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(ShapeBox2D,           "ShapeBox2D")
         HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
         HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
+        HANDLE_COMPONENT_TYPE(Layer,                "Layer")
         HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
         HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
         HANDLE_COMPONENT_TYPE(Active,               "Active")
@@ -746,6 +748,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(ShapeBox2D,           "ShapeBox2D")
         HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
         HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
+        HANDLE_COMPONENT_TYPE(Layer,                "Layer")
         HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
         HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
         HANDLE_COMPONENT_TYPE(Active,               "Active")
@@ -794,6 +797,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(ShapeBox2D,           "ShapeBox2D")
         HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
         HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
+        HANDLE_COMPONENT_TYPE(Layer,                "Layer")
         HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
         HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
         HANDLE_COMPONENT_TYPE(Active,               "Active")
@@ -842,6 +846,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
         HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
         HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
+        HANDLE_COMPONENT_TYPE(Layer,                "Layer")
         HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
         HANDLE_COMPONENT_TYPE(Active,               "Active")
         HANDLE_COMPONENT_TYPE(Name,                 "Name")
@@ -907,4 +912,56 @@ SCRIPT_API uint64_t ScriptAPI_CreateEntity() {
 // World management - must be called before using script API
 SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world) {
     SetScriptWorld(world);
+}
+
+// ============================================================================
+// Input API - Keyboard
+// ============================================================================
+
+SCRIPT_API bool ScriptAPI_IsKeyPressed(int key) {
+    return Input::IsKeyPressed(key);
+}
+
+SCRIPT_API bool ScriptAPI_IsKeyDown(int key) {
+    return Input::IsKeyDown(key);
+}
+
+SCRIPT_API bool ScriptAPI_IsKeyUp(int key) {
+    return Input::IsKeyUp(key);
+}
+
+// ============================================================================
+// Input API - Mouse
+// ============================================================================
+
+SCRIPT_API bool ScriptAPI_IsMousePressed(int button) {
+    return Input::IsMousePressed(button);
+}
+
+SCRIPT_API double ScriptAPI_GetMouseX() {
+    return Input::GetMouseX();
+}
+
+SCRIPT_API double ScriptAPI_GetMouseY() {
+    return Input::GetMouseY();
+}
+
+SCRIPT_API double ScriptAPI_GetScrollX() {
+    return Input::GetScrollX();
+}
+
+SCRIPT_API double ScriptAPI_GetScrollY() {
+    return Input::GetScrollY();
+}
+
+// ============================================================================
+// Input API - Window
+// ============================================================================
+
+SCRIPT_API int ScriptAPI_GetWindowWidth() {
+    return Input::GetWindowWidth();
+}
+
+SCRIPT_API int ScriptAPI_GetWindowHeight() {
+    return Input::GetWindowHeight();
 }

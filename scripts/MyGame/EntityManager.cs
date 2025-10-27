@@ -11,11 +11,6 @@ namespace MyGame;
 /// </summary>
 public class EntityManager : ScriptBehaviour
 {
-    // World configuration
-    private const float WorldWidth = 1280.0f;
-    private const float WorldHeight = 720.0f;
-    private const float WallThickness = 20.0f;
-
     // Entity references for spawned objects
     private Entity m_player;
     private Entity m_enemy1;
@@ -68,68 +63,72 @@ public class EntityManager : ScriptBehaviour
         m_boundaryTop = CreateEntity();
         m_boundaryTop.SetComponent(new LocalTransform
         {
-            Position = new Vector3(WorldWidth / 2, WallThickness / 2, 0),
+            Position = new Vector3(World.Width / 2, World.WallThickness / 2, 0),
             Rotation = Quaternion.Identity,
             Scale = new Vector3(1, 1, 1)
         });
         m_boundaryTop.SetComponent(new ShapeBox2D
         {
-            HalfExtents = new Vector2(WorldWidth / 2, WallThickness / 2),
+            HalfExtents = new Vector2(World.Width / 2, World.WallThickness / 2),
             Offset = Vector2.Zero,
             Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
             Filled = true
         });
+        m_boundaryTop.SetComponent(new Layer { Id = 0 }); // Default layer
         m_boundaryTop.SetComponent(new Active { Enabled = true });
 
         // Bottom wall
         m_boundaryBottom = CreateEntity();
         m_boundaryBottom.SetComponent(new LocalTransform
         {
-            Position = new Vector3(WorldWidth / 2, WorldHeight - WallThickness / 2, 0),
+            Position = new Vector3(World.Width / 2, World.Height - World.WallThickness / 2, 0),
             Rotation = Quaternion.Identity,
             Scale = new Vector3(1, 1, 1)
         });
         m_boundaryBottom.SetComponent(new ShapeBox2D
         {
-            HalfExtents = new Vector2(WorldWidth / 2, WallThickness / 2),
+            HalfExtents = new Vector2(World.Width / 2, World.WallThickness / 2),
             Offset = Vector2.Zero,
             Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
             Filled = true
         });
+        m_boundaryBottom.SetComponent(new Layer { Id = 0 });
         m_boundaryBottom.SetComponent(new Active { Enabled = true });
 
         // Left wall
         m_boundaryLeft = CreateEntity();
         m_boundaryLeft.SetComponent(new LocalTransform
         {
-            Position = new Vector3(WallThickness / 2, WorldHeight / 2, 0),
+            Position = new Vector3(World.WallThickness / 2, World.Height / 2, 0),
             Rotation = Quaternion.Identity,
             Scale = new Vector3(1, 1, 1)
         });
         m_boundaryLeft.SetComponent(new ShapeBox2D
         {
-            HalfExtents = new Vector2(WallThickness / 2, WorldHeight / 2),
+            HalfExtents = new Vector2(World.WallThickness / 2, World.Height / 2),
             Offset = Vector2.Zero,
             Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
             Filled = true
         });
+        m_boundaryLeft.SetComponent(new Layer { Id = 0 });
         m_boundaryLeft.SetComponent(new Active { Enabled = true });
 
         // Right wall
         m_boundaryRight = CreateEntity();
         m_boundaryRight.SetComponent(new LocalTransform
         {
-            Position = new Vector3(WorldWidth - WallThickness / 2, WorldHeight / 2, 0),
+            Position = new Vector3(World.Width - World.WallThickness / 2, World.Height / 2, 0),
             Rotation = Quaternion.Identity,
             Scale = new Vector3(1, 1, 1)
         });
         m_boundaryRight.SetComponent(new ShapeBox2D
         {
-            HalfExtents = new Vector2(WallThickness / 2, WorldHeight / 2),
+            HalfExtents = new Vector2(World.WallThickness / 2, World.Height / 2),
             Offset = Vector2.Zero,
             Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
             Filled = true
         });
+        m_boundaryRight.SetComponent(new Layer { Id = 0 });
         m_boundaryRight.SetComponent(new Active { Enabled = true });
 
         Log("World boundaries created (4 walls)", LogLevel.Info);
