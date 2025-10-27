@@ -38,7 +38,6 @@ namespace GrapeEngine.Scripting
     public struct Active
     {
         public bool Enabled;
-        private byte _Pad0, _Pad1, _Pad2;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -167,7 +166,6 @@ namespace GrapeEngine.Scripting
         public float Friction;
         public float Restitution;
         public float PositionCorrectPercent;
-        private float _Pad0;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -178,7 +176,6 @@ namespace GrapeEngine.Scripting
         public float Rotation;
         public uint LayerMask;
         public uint Flags;
-        private uint _Pad;
 
         public const uint FLAG_IS_TRIGGER = 1 << 0;
 
@@ -248,7 +245,6 @@ namespace GrapeEngine.Scripting
         public float LinearDrag;
         public float AngularDrag;
         public uint Flags;
-        private uint _Pad;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -256,16 +252,13 @@ namespace GrapeEngine.Scripting
     {
         public Vector3 HalfExtents;
         public uint LayerMask;
-        private uint _Pad;
     }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct SphereCollider
     {
         public float Radius;
-        private float _Pad0, _Pad1, _Pad2;
         public uint LayerMask;
-        private uint _Pad3;
     }
 
     // ---------------------------------- Rendering Components ----------------------------------
@@ -277,7 +270,6 @@ namespace GrapeEngine.Scripting
         public Color Color;
         public Vector2 Tiling;
         public Vector2 Offset;
-        private uint _Pad;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -288,7 +280,6 @@ namespace GrapeEngine.Scripting
         public Color Color;
         public float Thickness;
         public bool Filled;
-        private byte _Pad0, _Pad1, _Pad2;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -299,7 +290,6 @@ namespace GrapeEngine.Scripting
         public Color Color;
         public float Thickness;
         public bool Filled;
-        private byte _Pad0, _Pad1, _Pad2;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -309,15 +299,12 @@ namespace GrapeEngine.Scripting
         public Vector2 B;
         public Color Color;
         public float Thickness;
-        private float _Pad0, _Pad1, _Pad2;
     }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct ZIndex2D
     {
         public short ZOrder;
-        private short _Pad0;
-        private int _Pad1;
     }
 
     // ---------------------------------- Camera Components ----------------------------------
@@ -326,7 +313,6 @@ namespace GrapeEngine.Scripting
     public struct Camera
     {
         public bool IsOrthographic;
-        private byte _Pad0, _Pad1, _Pad2;
         public float FovY;
         public float OrthoHeight;
         public float Near;
