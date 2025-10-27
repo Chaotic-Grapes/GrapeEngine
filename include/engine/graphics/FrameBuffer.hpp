@@ -99,4 +99,24 @@ public:
             ? colorAttachments[index]
             : 0;
     }
+
+    GLuint GetID() const { return fbo; }           // if you haven't already
+    int     Width() const { return width; }
+    int     Height() const { return height; }
+
+    // CONVENIENCE HELPERS
+
+    /** @brief Binds and clears the framebuffer in one call. */
+    void BindAndClear(float r = 0.f, float g = 0.f, float b = 0.f, float a = 1.f);
+
+    /** @brief Binds the default framebuffer (screen). */
+    static void BindDefault() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
+
+    /**
+     * @brief Blits this framebuffer to the default (screen) framebuffer.
+     * @param mask  Bitmask of buffers to copy (e.g. GL_COLOR_BUFFER_BIT).
+     * @param filter  Filtering mode (GL_NEAREST or GL_LINEAR).
+     */
+    void BlitToDefault(GLbitfield mask = GL_COLOR_BUFFER_BIT,
+        GLenum filter = GL_NEAREST) const;
 };

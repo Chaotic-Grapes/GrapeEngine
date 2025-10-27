@@ -96,3 +96,21 @@ void Framebuffer::Destroy()
         fbo = 0;
     }
 }
+
+void Framebuffer::BindAndClear(float r, float g, float b, float a)
+{
+    Bind();
+    glViewport(0, 0, width, height);
+    glClearColor(r, g, b, a);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void Framebuffer::BlitToDefault(GLbitfield mask, GLenum filter) const
+{
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBlitFramebuffer(0, 0, width, height,
+        0, 0, width, height,
+        mask, filter);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+}
