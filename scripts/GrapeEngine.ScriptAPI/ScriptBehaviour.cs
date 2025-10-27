@@ -135,9 +135,8 @@ namespace GrapeEngine.Scripting
 
         /// <summary>
         /// Destroy this entity.
-        /// After calling this, the entity will no longer be valid.
         /// </summary>
-        protected void Destroy()
+        protected void DestroyEntity()
         {
             Entity.Destroy();
         }
@@ -146,7 +145,7 @@ namespace GrapeEngine.Scripting
         /// Destroy another entity by its ID.
         /// </summary>
         /// <param name="entityId">The entity ID to destroy</param>
-        protected void Destroy(ulong entityId)
+        protected void DestroyEntity(ulong entityId)
         {
             EntityAPI.DestroyEntity(entityId);
         }
@@ -155,7 +154,7 @@ namespace GrapeEngine.Scripting
         /// Destroy another entity.
         /// </summary>
         /// <param name="entity">The entity to destroy</param>
-        protected void Destroy(Entity entity)
+        protected void DestroyEntity(Entity entity)
         {
             entity.Destroy();
         }
@@ -167,6 +166,18 @@ namespace GrapeEngine.Scripting
         protected Entity CreateEntity()
         {
             ulong entityId = EntityAPI.CreateEntity();
+            return new Entity(entityId);
+        }
+
+        /// <summary>
+        /// Create a new entity on a specific layer.
+        /// This is more efficient than CreateEntity() + SetComponent&lt;Layer&gt;().
+        /// </summary>
+        /// <param name="layerId">The layer ID to assign to the entity</param>
+        /// <returns>The newly created entity with the layer already set</returns>
+        protected Entity CreateEntityOnLayer(ushort layerId)
+        {
+            ulong entityId = EntityAPI.CreateEntityOnLayer(layerId);
             return new Entity(entityId);
         }
 
