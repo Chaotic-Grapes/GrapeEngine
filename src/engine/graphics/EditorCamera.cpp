@@ -25,22 +25,36 @@ namespace Engine {
     // Lifecycle
     // ============================================================================
 
-    EditorCamera::EditorCamera(World& world)
-        : m_cameraEntity(world.CreateEntity())
+    EditorCamera::EditorCamera(ECS::World& world)
+        : m_cameraEntity(world.Create())    // Create an empty entity
     {
         // Attach components
-        m_transform = &m_cameraEntity.AddComponent<Component::Transform>();
-        m_camera = &m_cameraEntity.AddComponent<Component::Camera3D>();
+        m_transform = &world.Add<ECS::Components::LocalTransform>(m_cameraEntity);
+        m_camera = &world.Add<ECS::Components::Camera3D>(m_cameraEntity);
 
-        // Default orthographic setup
+        // --- Default orthographic camera setup (pixel-space) ---
         m_camera->UsePerspective = false;
-        m_camera->OrthoSize = 20.0f;
 
-        const auto window = WindowManager::GetMainWindow();
-        m_camera->AspectRatio = static_cast<float>(window->Width()) / static_cast<float>(window->Height());
+        auto* window = WindowManager::GetMainWindow();
+        float width = static_cast<float>(window->Width());
+        float height = static_cast<float>(window->Height());
+
+        // Make 1 world unit = 1 pixel vertically
+        m_camera->OrthoSize = height;
+        m_camera->AspectRatio = width / height;
+        // keep target in sync so we don't lerp toward 20 on startup
+        m_targetOrthoSize = m_camera->OrthoSize;
+
+        // Keep near/far wide enough for both 2D and 3D
         m_camera->NearPlane = 0.1f;
         m_camera->FarPlane = 1000.0f;
+
         m_camera->Active = true;
+
+        // --- Position the camera slightly off the XY plane ---
+        m_cameraPosition = glm::vec3(width * 0.5f, height * 0.5f, 10.0f);
+        m_target = glm::vec3(width * 0.5f, height * 0.5f, 0.0f);
+        m_distance = 10.0f; // Match initial Z offset
 
         std::cout << "[EditorCamera] Initialized\n";
     }
@@ -57,10 +71,7 @@ namespace Engine {
     // Input Handling
     // ============================================================================
 
-
     void EditorCamera::HandleInput(float dt) {
-        (void)dt;
-
         // ------------------------------
         // BLOCK INPUT DURING RETURN-TO-ORTHO
         // ------------------------------
@@ -123,10 +134,12 @@ namespace Engine {
         }
 
         // ------------------------------
-        // ZOOM (mouse wheel)
+        // ZOOM (mouse wheel - when not orbiting)
         // ------------------------------
         const double scrollY = Input::GetScrollY();
-        if (scrollY != 0.0) {
+
+        // Only zoom ortho size if we're not orbiting
+        if (scrollY != 0.0 && !m_orbiting) {
             constexpr float zoomFactor = 1.1f;
 
             if (scrollY > 0.0)
@@ -134,7 +147,7 @@ namespace Engine {
             else
                 m_targetOrthoSize *= zoomFactor;
 
-            m_targetOrthoSize = glm::clamp(m_targetOrthoSize, 0.2f, 400.0f);
+            m_targetOrthoSize = glm::clamp(m_targetOrthoSize, 0.2f, 5000.0f);
         }
 
         constexpr float zoomLerpSpeed = 10.0f;
@@ -181,7 +194,7 @@ namespace Engine {
         // ------------------------------
         // DOLLY (distance via scroll during orbit)
         // ------------------------------
-        if (scrollY != 0.0) {
+        if (scrollY != 0.0 && m_orbiting) {
             m_distance -= static_cast<float>(scrollY) * 0.8f;
             m_distance = glm::max(m_distance, 1.0f);
         }
@@ -194,13 +207,15 @@ namespace Engine {
         }
 
         // ------------------------------
-        // SMOOTH BLEND: Interpolate between ortho/perspective based on pitch
+        // SMOOTH BLEND: Interpolate between ortho/perspective based on rotation from flat view
         // ------------------------------
-        const float absPitch = glm::abs(m_pitch);
+        // Calculate angular distance from default flat view (yaw=0, pitch=0)
+        const float rotationMagnitude = glm::sqrt(m_pitch * m_pitch + m_yaw * m_yaw);
+
         constexpr float blendStart = glm::radians(0.5f);
         constexpr float blendEnd = glm::radians(5.0f);
 
-        float targetBlend = glm::smoothstep(blendStart, blendEnd, absPitch);
+        float targetBlend = glm::smoothstep(blendStart, blendEnd, rotationMagnitude);
 
         // Smooth interpolation of blend factor
         constexpr float blendSpeed = 8.0f;
@@ -237,8 +252,8 @@ namespace Engine {
         m_transform->Position.Y = cameraPos.y;
 
         // 2D rotation angle (around Z) for editor gizmos, etc.
-        const float angle = atan2f(-dir.x, -dir.z); // negative because camera faces toward target
-        m_transform->Rotation = angle;
+        const float angle = atan2f(-dir.x, -dir.z);
+        m_transform->Rotation = Quaternion::FromAxisAngle(Vector3D(0.f, 0.f, 1.f), angle);
 
         // Store eye for view matrix
         m_cameraPosition = cameraPos;
@@ -292,7 +307,7 @@ namespace Engine {
         return {
             m_transform->Position.X,
             m_transform->Position.Y,
-            m_camera->Z
+            m_transform->Position.Z
         };
     }
 
