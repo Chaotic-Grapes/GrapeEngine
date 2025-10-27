@@ -153,6 +153,7 @@ namespace ECS {
         using CallLateUpdateFn          = void(*)       (uint64_t handle);
         using CallEnableFn              = void(*)       (uint64_t handle);
         using CallDisableFn             = void(*)       (uint64_t handle);
+        using LoadGameAssemblyFn        = int(*)        (const char* assemblyPath);
 
         // Managed function delegates
         CreateScriptInstanceFn      m_createInstance    = nullptr;
@@ -163,6 +164,7 @@ namespace ECS {
         CallLateUpdateFn            m_callLateUpdate    = nullptr;
         CallEnableFn                m_callEnable        = nullptr;
         CallDisableFn               m_callDisable       = nullptr;
+        LoadGameAssemblyFn          m_loadGameAssembly  = nullptr;
 
         bool m_initialized = false;
 

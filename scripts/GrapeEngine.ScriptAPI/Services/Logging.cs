@@ -22,12 +22,12 @@
                     break;
                 case LogLevel.Warning:
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[ScriptHost] WARNING: {message}");
+                    Console.WriteLine($"[ScriptHost] {message}");
                     Console.ResetColor();
                     break;
                 case LogLevel.Error:
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[ScriptHost] ERROR: {message}");
+                    Console.WriteLine($"[ScriptHost] {message}");
                     Console.ResetColor();
                     break;
             }

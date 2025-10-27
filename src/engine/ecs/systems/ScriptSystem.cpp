@@ -294,6 +294,29 @@ namespace ECS {
             return false;
         }
 
+        // Load the game assembly into the AppDomain so that scripts can be instantiated
+        if (m_loadGameAssembly) {
+            std::cout << "[ScriptSystem] Loading game assembly into AppDomain..." << '\n';
+            
+            // Derive the game assembly path from the script API assembly path
+            std::filesystem::path apiPath(assemblyPath);
+            std::filesystem::path gameAssemblyPath = apiPath.parent_path() / "MyGame.dll"; // TODO: Change "MyGame.dll" to actual game assembly name
+            
+            if (!std::filesystem::exists(gameAssemblyPath)) {
+                std::cerr << "[ScriptSystem] Game assembly not found: " << gameAssemblyPath << '\n';
+                return false;
+            }
+            
+            int result = m_loadGameAssembly(gameAssemblyPath.string().c_str());
+
+            if (result == 0) {
+                std::cerr << "[ScriptSystem] Failed to load game assembly into AppDomain" << '\n';
+                return false;
+            }
+
+            std::cout << "[ScriptSystem] Game assembly loaded into AppDomain successfully" << '\n';
+        }
+
         std::cout << "[ScriptSystem] Assembly loaded successfully" << '\n';
         return true;
     }
@@ -390,6 +413,14 @@ namespace ECS {
         std::cout << "[ScriptSystem] Loading CallDisable..." << '\n';
         if (!loadDelegate(STR("CallDisable"), reinterpret_cast<void**>(&m_callDisable))) {
             std::cerr << "[ScriptSystem] Failed to load CallDisable delegate" << '\n';
+            return false;
+        }
+
+        // The most important part of CoreCLR hosting: loading the game assembly
+        // Without this, nothing works!
+        std::cout << "[ScriptSystem] Loading LoadGameAssembly..." << '\n';
+        if (!loadDelegate(STR("LoadGameAssembly"), reinterpret_cast<void**>(&m_loadGameAssembly))) {
+            std::cerr << "[ScriptSystem] Failed to load LoadGameAssembly delegate" << '\n';
             return false;
         }
         // **************************************************************** //

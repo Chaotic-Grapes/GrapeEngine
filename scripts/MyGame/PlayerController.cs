@@ -2,7 +2,7 @@ using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
 
-namespace TestGame;
+namespace MyGame;
 
 /// <summary>
 /// Player controller script - demonstrates keyboard input and movement.

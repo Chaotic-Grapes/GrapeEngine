@@ -143,8 +143,6 @@ void ScriptingTestScene::_initializeScriptSystem() {
     // Create script system
     m_scriptSystem = std::make_shared<ScriptSystem>();
 
-    LOG_INFO(std::filesystem::current_path());
-
     // Initialize CoreCLR runtime    
     if (!m_scriptSystem->Initialize()) {
         LOG_ERROR("FATAL: Failed to initialize ScriptSystem!");
@@ -242,7 +240,7 @@ void ScriptingTestScene::_createPlayer() {
 
     // ATTACH C# SCRIPT
     // This script handles player movement
-    if (!m_scriptSystem->AttachScript(GetWorld(), m_playerEntity, "TestGame.PlayerController"))
+    if (!m_scriptSystem->AttachScript(GetWorld(), m_playerEntity, "MyGame.PlayerController"))
         LOG_ERROR("Failed to attach PlayerController script!");
     else
         LOG_INFO("PlayerController script attached successfully");
@@ -275,7 +273,7 @@ void ScriptingTestScene::_createEnemy(float x, float y, int enemyNumber) {
     // ATTACH DIFFERENT C# SCRIPT
     // This demonstrates that different objects can have different scripts
     // Using EnemyAI script - patrol behavior
-    if (!m_scriptSystem->AttachScript(GetWorld(), enemyEntity, "TestGame.EnemyAI"))
+    if (!m_scriptSystem->AttachScript(GetWorld(), enemyEntity, "MyGame.EnemyAI"))
         LOG_ERROR("Failed to attach EnemyAI script to Enemy " << enemyNumber);
     else
         LOG_INFO("EnemyAI script attached to Enemy " << enemyNumber);
@@ -312,7 +310,7 @@ void ScriptingTestScene::_createRotatingObject() {
     GetWorld().Add<Components::ZIndex2D>(m_rotatingEntity, Components::ZIndex2D{ 3 });
 
     // ATTACH COLLECTIBLE C# SCRIPT (bobbing + rainbow colors)
-    if (!m_scriptSystem->AttachScript(GetWorld(), m_rotatingEntity, "TestGame.CollectibleItem"))
+    if (!m_scriptSystem->AttachScript(GetWorld(), m_rotatingEntity, "MyGame.CollectibleItem"))
         LOG_ERROR("Failed to attach CollectibleItem script!");
     else
         LOG_INFO("CollectibleItem script attached successfully");
@@ -343,7 +341,7 @@ void ScriptingTestScene::_createOscillatingObject() {
     GetWorld().Add<Components::ZIndex2D>(m_oscillatingEntity, Components::ZIndex2D{ 3 });
 
     // ATTACH COLLECTIBLE C# SCRIPT (another instance, different position)
-    if (!m_scriptSystem->AttachScript(GetWorld(), m_oscillatingEntity, "TestGame.CollectibleItem"))
+    if (!m_scriptSystem->AttachScript(GetWorld(), m_oscillatingEntity, "MyGame.CollectibleItem"))
         LOG_ERROR("Failed to attach CollectibleItem script!");
     else
         LOG_INFO("CollectibleItem script attached successfully (instance 2)");

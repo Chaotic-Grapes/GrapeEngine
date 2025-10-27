@@ -2,7 +2,7 @@ using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
 
-namespace TestGame;
+namespace MyGame;
 
 /// <summary>
 /// Collectible item - demonstrates another unique behavior.

@@ -97,6 +97,14 @@ target_link_libraries(GrapeEngine
         ${NETHOST_LIB}
 )
 
+# Export functions from executable for C# P/Invoke
+# Note: This is temporary until we refactor to a DLL!
+if(MSVC)
+    set_target_properties(GrapeEngine PROPERTIES
+        LINK_FLAGS "/EXPORT:ScriptAPI_GetComponent /EXPORT:ScriptAPI_SetComponent /EXPORT:ScriptAPI_HasComponent /EXPORT:ScriptAPI_RemoveComponent /EXPORT:ScriptAPI_DestroyEntity /EXPORT:ScriptAPI_SetWorld"
+    )
+endif()
+
 # Preserve folder structure in Visual Studio
 foreach(source IN LISTS ENGINE_SOURCES)
     get_filename_component(source_path "${source}" PATH)

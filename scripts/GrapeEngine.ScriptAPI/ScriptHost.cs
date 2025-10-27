@@ -80,10 +80,27 @@ namespace GrapeEngine.Scripting
                     return 0;
                 }
 
+                Logging.Log($"Found type: {scriptType.FullName}", LogLevel.Info);
+                Logging.Log($"Base type: {scriptType.BaseType?.FullName ?? "null"}", LogLevel.Info);
+
                 // Verify it's a ScriptBehaviour
-                if (!scriptType.IsSubclassOf(typeof(ScriptBehaviour)))
+                // Use name-based check to avoid assembly context issues
+                bool isScriptBehaviour = false;
+                var baseType = scriptType.BaseType;
+                while (baseType != null)
+                {
+                    if (baseType.Name == "ScriptBehaviour" || baseType.Name == nameof(ScriptBehaviour))
+                    {
+                        isScriptBehaviour = true;
+                        break;
+                    }
+                    baseType = baseType.BaseType;
+                }
+
+                if (!isScriptBehaviour)
                 {
                     Logging.Log($"ERROR: Type {typeName} does not inherit from ScriptBehaviour", LogLevel.Error);
+                    Logging.Log($"  Type's base: {scriptType.BaseType?.FullName ?? "none"}", LogLevel.Error);
                     return 0;
                 }
 
@@ -279,6 +296,71 @@ namespace GrapeEngine.Scripting
         public static int GetInstanceCount()
         {
             return m_instances.Count;
+        }
+
+        /// <summary>
+        /// Load an additional assembly into the AppDomain.
+        /// This is needed to make custom script types discoverable.
+        /// </summary>
+        /// <param name="assemblyPathPtr">Pointer to C-string containing assembly path</param>
+        /// <returns>1 if successful, 0 if failed</returns>
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        public static int LoadGameAssembly(IntPtr assemblyPathPtr)
+        {
+            try
+            {
+                var assemblyPath = Marshal.PtrToStringAnsi(assemblyPathPtr);
+                if (string.IsNullOrWhiteSpace(assemblyPath))
+                {
+                    Logging.Log("ERROR: Null or empty assembly path", LogLevel.Error);
+                    return 0;
+                }
+
+                Logging.Log($"Loading game assembly: {assemblyPath}", LogLevel.Info);
+
+                // Load the assembly using AssemblyLoadContext to avoid type identity issues
+                // First try to load by name if it's already in the same directory
+                var assemblyName = AssemblyName.GetAssemblyName(assemblyPath);
+                Assembly? assembly = null;
+                
+                try
+                {
+                    // Try loading by name first (better for resolving dependencies)
+                    assembly = Assembly.Load(assemblyName);
+                }
+                catch
+                {
+                    // If that fails, use LoadFrom
+                    assembly = Assembly.LoadFrom(assemblyPath);
+                }
+                
+                if (assembly == null)
+                {
+                    Logging.Log($"ERROR: Failed to load assembly from {assemblyPath}", LogLevel.Error);
+                    return 0;
+                }
+
+                Logging.Log($"Successfully loaded assembly: {assembly.FullName}", LogLevel.Info);
+                
+                // Log all types found (for debugging)
+                var types = assembly.GetTypes();
+                Logging.Log($"Found {types.Length} types in assembly", LogLevel.Info);
+                foreach (var type in types)
+                {
+                    if (type.IsSubclassOf(typeof(ScriptBehaviour)))
+                    {
+                        Logging.Log($"  - Script type found: {type.FullName}", LogLevel.Info);
+                    }
+                }
+
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Logging.Log($"Error loading game assembly: {ex.Message}", LogLevel.Error);
+                Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+                return 0;
+            }
         }
     }
 }

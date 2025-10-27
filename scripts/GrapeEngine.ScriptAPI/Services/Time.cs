@@ -7,7 +7,7 @@ namespace GrapeEngine
     /// </summary>
     public static class Time
     {
-        private const string NativeLib = "__Internal";
+        private const string NativeLib = "GrapeEngine.exe";
 
         // ============================================================================
         // Read-Only Properties

@@ -2,7 +2,7 @@ using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
 
-namespace TestGame;
+namespace MyGame;
 
 /// <summary>
 /// Simple enemy AI - demonstrates autonomous behavior.
