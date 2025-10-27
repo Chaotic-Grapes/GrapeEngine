@@ -18,21 +18,49 @@ public class EnemyAI : ScriptBehaviour
     private bool m_movingToB = true;
     private float m_detectionRadius = 150.0f;
 
+    // Visual entity
+    private Entity m_visualEntity;
+
     public override void OnStart()
     {
         Log("EnemyAI initialized!", LogLevel.Info);
 
-        // Set patrol points based on initial position
-        if (TryGetComponent<LocalTransform>(out var transform))
+        // Create the visual entity for this enemy
+        m_visualEntity = CreateEntity();
+
+        // Set up initial position (use Entity position if provided, otherwise default)
+        var initialPos = new Vector3(100.0f, 100.0f, 0.0f);
+        
+        var transform = new LocalTransform
         {
-            m_patrolPointA = transform.Position;
-            m_patrolPointB = transform.Position + new Vector3(200.0f, 0.0f, 0.0f);
-        }
+            Position = initialPos,
+            Rotation = Quaternion.Identity,
+            Scale = new Vector3(1, 1, 1)
+        };
+        m_visualEntity.SetComponent(transform);
+
+        // Add red circle visual
+        var circle = new ShapeCircle2D
+        {
+            Radius = 15.0f,
+            Color = new Color { R = 1.0f, G = 0.0f, B = 0.0f, A = 1.0f },
+            Filled = true
+        };
+        m_visualEntity.SetComponent(circle);
+
+        // Make sure it's active
+        m_visualEntity.SetComponent(new Active { Enabled = true });
+
+        // Set patrol points
+        m_patrolPointA = initialPos;
+        m_patrolPointB = initialPos + new Vector3(200.0f, 0.0f, 0.0f);
+
+        Log($"Enemy visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
     }
 
     public override void OnUpdate()
     {
-        if (!TryGetComponent<LocalTransform>(out var transform))
+        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
             return;
 
         // Simple patrol behavior
@@ -52,7 +80,7 @@ public class EnemyAI : ScriptBehaviour
             m_movingToB = !m_movingToB;
         }
 
-        SetComponent(transform);
+        m_visualEntity.SetComponent(transform);
 
         // Update visual
         UpdateEnemyVisual();
@@ -61,18 +89,18 @@ public class EnemyAI : ScriptBehaviour
     private void UpdateEnemyVisual()
     {
         // Make enemy throb to show it's active
-        if (!TryGetComponent<ShapeCircle2D>(out var circle))
+        if (!m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle))
             return;
 
         var throb = 0.85f + 0.15f * MathF.Sin((float)Time.ElapsedTime * 3.0f);
         circle.Radius = 15.0f * throb;
 
         // Red color with varying intensity
-        circle.Color.R = (byte)(255 * throb);
-        circle.Color.G = 0;
-        circle.Color.B = 0;
-        circle.Color.A = 255;
+        circle.Color.R = throb;
+        circle.Color.G = 0.0f;
+        circle.Color.B = 0.0f;
+        circle.Color.A = 1.0f;
 
-        SetComponent(circle);
+        m_visualEntity.SetComponent(circle);
     }
 }

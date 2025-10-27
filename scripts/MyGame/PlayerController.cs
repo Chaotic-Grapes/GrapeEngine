@@ -19,17 +19,46 @@ public class PlayerController : ScriptBehaviour
     private const float WorldHeight = 720.0f;
     private const float BoundaryMargin = 30.0f;
 
+    // Visual entity that represents the player
+    private Entity m_visualEntity;
+
     public override void OnStart()
     {
         Log("PlayerController initialized!", LogLevel.Info);
         Log("Use WASD to move, Q/E to rotate", LogLevel.Info);
+
+        // Create the visual entity for the player
+        m_visualEntity = CreateEntity();
+        
+        // Set up initial position at center of screen
+        var transform = new LocalTransform
+        {
+            Position = new Vector3(WorldWidth * 0.5f, WorldHeight * 0.5f, 0.0f),
+            Rotation = Quaternion.Identity,
+            Scale = new Vector3(1, 1, 1)
+        };
+        m_visualEntity.SetComponent(transform);
+
+        // Add green circle visual
+        var circle = new ShapeCircle2D
+        {
+            Radius = 20.0f,
+            Color = new Color { R = 0.0f, G = 1.0f, B = 0.0f, A = 1.0f },
+            Filled = true
+        };
+        m_visualEntity.SetComponent(circle);
+
+        // Make sure it's active
+        m_visualEntity.SetComponent(new Active { Enabled = true });
+
+        Log($"Player visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
     }
 
     public override void OnUpdate()
     {
-        if (!TryGetComponent<LocalTransform>(out var transform))
+        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
         {
-            Log("PlayerController: No LocalTransform component!", LogLevel.Warning);
+            Log("PlayerController: No LocalTransform component on visual entity!", LogLevel.Warning);
             return;
         }
 
@@ -61,7 +90,7 @@ public class PlayerController : ScriptBehaviour
         transform.Position.Y = Math.Clamp(transform.Position.Y, BoundaryMargin, WorldHeight - BoundaryMargin);
 
         // Update component
-        SetComponent(transform);
+        m_visualEntity.SetComponent(transform);
 
         // Update visual feedback
         UpdateVisual();
@@ -70,19 +99,19 @@ public class PlayerController : ScriptBehaviour
     private void UpdateVisual()
     {
         // Make the player pulse to show it's active
-        if (!TryGetComponent<ShapeCircle2D>(out var circle))
+        if (!m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle))
             return;
 
         var pulse = 0.9f + 0.1f * MathF.Sin((float)Time.ElapsedTime * 5.0f);
         circle.Radius = 20.0f * pulse;
             
         // Keep green color but vary brightness
-        circle.Color.R = 0;
-        circle.Color.G = (byte)(255 * pulse);
-        circle.Color.B = 0;
-        circle.Color.A = 255;
+        circle.Color.R = 0.0f;
+        circle.Color.G = pulse;
+        circle.Color.B = 0.0f;
+        circle.Color.A = 1.0f;
             
-        SetComponent(circle);
+        m_visualEntity.SetComponent(circle);
     }
 
     public override void OnFixedUpdate()

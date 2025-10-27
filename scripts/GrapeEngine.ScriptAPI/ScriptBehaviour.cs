@@ -160,6 +160,16 @@ namespace GrapeEngine.Scripting
             entity.Destroy();
         }
 
+        /// <summary>
+        /// Create a new entity in the world.
+        /// </summary>
+        /// <returns>The newly created entity</returns>
+        protected Entity CreateEntity()
+        {
+            ulong entityId = EntityAPI.CreateEntity();
+            return new Entity(entityId);
+        }
+
         // ============================================================================
         // Utility Methods
         // ============================================================================

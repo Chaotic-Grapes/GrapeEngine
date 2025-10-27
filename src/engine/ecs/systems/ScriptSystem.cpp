@@ -893,6 +893,17 @@ SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId) {
     }
 }
 
+SCRIPT_API uint64_t ScriptAPI_CreateEntity() {
+    ECS::World* world = GetScriptWorld();
+    if (!world) {
+        std::cerr << "[ScriptAPI] No world set for script access" << '\n';
+        return 0;
+    }
+
+    ECS::Entity entity = world->Create();
+    return ECS::EntityUtils::Pack(entity);
+}
+
 // World management - must be called before using script API
 SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world) {
     SetScriptWorld(world);

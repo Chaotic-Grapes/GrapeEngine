@@ -54,13 +54,6 @@ void ScriptingTestScene::OnLoad() {
     const int windowHeight = config.WindowConfig.Height;
 
     CREATE_WINDOW("C# Scripting Test Scene", windowWidth, windowHeight);
-    m_worldWidth = static_cast<float>(windowWidth);
-    m_worldHeight = static_cast<float>(windowHeight);
-
-    // Create layers for organization
-    m_playerLayer = GetLayers().CreateOrGetLayer("player");
-    m_enemyLayer = GetLayers().CreateOrGetLayer("enemy");
-    m_propsLayer = GetLayers().CreateOrGetLayer("props");
 
     // Initialize renderer system
     m_rendererSystem = std::make_shared<RendererSystem>();
@@ -69,37 +62,24 @@ void ScriptingTestScene::OnLoad() {
         m_rendererSystem->Update(s.GetWorld(), dt);
     }, "Renderer System");
 
-    // Initialize physics system (for movement)
-    AddSystem([](Scenes::Scene& s, const float dt) {
-        PhysicsSystem::Update(s.GetWorld(), dt);
-    }, "Physics System");
-
     // Initialize ScriptSystem
     _initializeScriptSystem();
 
-    // Configure world boundaries
-    const float wallThickness = 20.0f;
-    Engine::Physics::SetWorldBounds(
-        wallThickness, 
-        m_worldWidth - wallThickness, 
-        wallThickness, 
-        m_worldHeight - wallThickness, 
-        false, 
-        0.8f
-    );
-    Engine::Physics::EnableWorldBounds(true);
+    // Create a single manager entity that will orchestrate everything from C#
+    Entity managerEntity = GetWorld().Create();
+    GetWorld().Add<Components::Active>(managerEntity, Components::Active{ true });
+    
+    // Attach EntityManager script - it will create all entities, boundaries, and logic
+    if (!m_scriptSystem->AttachScript(GetWorld(), managerEntity, "MyGame.EntityManager")) {
+        LOG_ERROR("FATAL: Failed to attach EntityManager script!");
+        return;
+    }
 
-    // Create visual boundaries
-    _createWorldBoundaries();
-
-    // ========== Create all scripted entities ==========
+    // Also create controller entities for each test script
+    // The EntityManager creates visual entities, but we need separate entities for script controllers
     _createScriptedEntities();
 
-    LOG_INFO("ScriptingTestScene initialized with " << GetSystemCount() << " systems");
-    LOG_INFO("Created 5 entities with unique C# scripts:");
-    LOG_INFO("  - PlayerController (green circle, figure-8 movement)");
-    LOG_INFO("  - 2x EnemyAI (red circles, patrol behavior)");
-    LOG_INFO("  - 2x CollectibleItem (rainbow circles, bobbing)");
+    LOG_INFO("ScriptingTestScene initialized");
     LOG_INFO("Press ESC to exit");
 }
 
@@ -158,7 +138,7 @@ void ScriptingTestScene::_initializeScriptSystem() {
         return;
     }
 
-    // CRITICAL: Set world pointer for C# API
+    // Set world pointer for C# API
     ScriptAPI_SetWorld(&GetWorld());
 
     // ========== Register script system update methods ==========
@@ -196,22 +176,18 @@ void ScriptingTestScene::_initializeScriptSystem() {
 // ============================================================================
 
 void ScriptingTestScene::_createScriptedEntities() {
-    LOG_INFO("Creating scripted entities...");
+    LOG_INFO("Creating scripted controller entities...");
 
-    // Create player (center of screen)
+    // All visual creation is now handled by the scripts themselves!
+    // We just create minimal controller entities and attach scripts.
+
     _createPlayer();
+    _createEnemy(1);
+    _createEnemy(2);
+    _createCollectible(1);
+    _createCollectible(2);
 
-    // Create two enemies at different positions
-    _createEnemy(200.0f, 200.0f, 1);
-    _createEnemy(1080.0f, 520.0f, 2);
-
-    // Create rotating object
-    _createRotatingObject();
-
-    // Create oscillating object
-    _createOscillatingObject();
-
-    LOG_INFO("All scripted entities created!");
+    LOG_INFO("All scripted controller entities created");
 }
 
 void ScriptingTestScene::_createPlayer() {
@@ -219,59 +195,27 @@ void ScriptingTestScene::_createPlayer() {
 
     m_playerEntity = GetWorld().Create();
 
-    // Add transform component
-    GetWorld().Add<Components::LocalTransform>(m_playerEntity, Components::LocalTransform{
-        Vector3D{ m_worldWidth * 0.5f, m_worldHeight * 0.5f, 0.0f },
-        Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f },
-        Vector3D{ 1.0f, 1.0f, 1.0f }
-    });
-
     // Add active component (required for scripts to run)
     GetWorld().Add<Components::Active>(m_playerEntity, Components::Active{ true });
 
-    // Add visual representation (green circle)
-    GetWorld().Add<Components::ShapeCircle2D>(m_playerEntity, Components::ShapeCircle2D{
-        20.0f,
-        Vector2D{},
-        Color{ 0.0f, 1.0f, 0.0f, 1.0f }  // Green
-    });
-
-    GetWorld().Add<Components::ZIndex2D>(m_playerEntity, Components::ZIndex2D{ 10 });
-
     // ATTACH C# SCRIPT
-    // This script handles player movement
+    // The script will create its own visual entity and components
     if (!m_scriptSystem->AttachScript(GetWorld(), m_playerEntity, "MyGame.PlayerController"))
         LOG_ERROR("Failed to attach PlayerController script!");
     else
         LOG_INFO("PlayerController script attached successfully");
 }
 
-void ScriptingTestScene::_createEnemy(float x, float y, int enemyNumber) {
+void ScriptingTestScene::_createEnemy(int enemyNumber) {
     LOG_INFO("Creating Enemy " << enemyNumber << " entity with C# script...");
 
     Entity enemyEntity = GetWorld().Create();
 
-    // Add transform component
-    GetWorld().Add<Components::LocalTransform>(enemyEntity, Components::LocalTransform{
-        Vector3D{ x, y, 0.0f },
-        Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f },
-        Vector3D{ 1.0f, 1.0f, 1.0f }
-    });
-
     // Add active component
     GetWorld().Add<Components::Active>(enemyEntity, Components::Active{ true });
 
-    // Add visual representation (red circle)
-    GetWorld().Add<Components::ShapeCircle2D>(enemyEntity, Components::ShapeCircle2D{
-        15.0f,
-        Vector2D{},
-        Color{ 1.0f, 0.0f, 0.0f, 1.0f }  // Red
-    });
-
-    GetWorld().Add<Components::ZIndex2D>(enemyEntity, Components::ZIndex2D{ 5 });
-
     // ATTACH DIFFERENT C# SCRIPT
-    // This demonstrates that different objects can have different scripts
+    // The script will create its own visual entity and components
     // Using EnemyAI script - patrol behavior
     if (!m_scriptSystem->AttachScript(GetWorld(), enemyEntity, "MyGame.EnemyAI"))
         LOG_ERROR("Failed to attach EnemyAI script to Enemy " << enemyNumber);
@@ -285,129 +229,24 @@ void ScriptingTestScene::_createEnemy(float x, float y, int enemyNumber) {
         m_enemy2Entity = enemyEntity;
 }
 
-void ScriptingTestScene::_createRotatingObject() {
-    LOG_INFO("Creating First Collectible entity with C# script...");
+void ScriptingTestScene::_createCollectible(int collectibleNumber) {
+    LOG_INFO("Creating Collectible " << collectibleNumber << " entity with C# script...");
 
-    m_rotatingEntity = GetWorld().Create();
-
-    // Add transform component
-    GetWorld().Add<Components::LocalTransform>(m_rotatingEntity, Components::LocalTransform{
-        Vector3D{ 640.0f, 200.0f, 0.0f },
-        Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f },
-        Vector3D{ 1.0f, 1.0f, 1.0f }
-    });
+    Entity collectibleEntity = GetWorld().Create();
 
     // Add active component
-    GetWorld().Add<Components::Active>(m_rotatingEntity, Components::Active{ true });
-
-    // Add visual representation (blue box)
-    GetWorld().Add<Components::ShapeBox2D>(m_rotatingEntity, Components::ShapeBox2D{
-        Vector2D{40.0f, 40.0f},
-        Vector2D{},
-        Color{ 0.0f, 0.0f, 1.0f, 1.0f }  // Blue
-    });
-
-    GetWorld().Add<Components::ZIndex2D>(m_rotatingEntity, Components::ZIndex2D{ 3 });
+    GetWorld().Add<Components::Active>(collectibleEntity, Components::Active{ true });
 
     // ATTACH COLLECTIBLE C# SCRIPT (bobbing + rainbow colors)
-    if (!m_scriptSystem->AttachScript(GetWorld(), m_rotatingEntity, "MyGame.CollectibleItem"))
-        LOG_ERROR("Failed to attach CollectibleItem script!");
+    // The script will create its own visual entity
+    if (!m_scriptSystem->AttachScript(GetWorld(), collectibleEntity, "MyGame.CollectibleItem"))
+        LOG_ERROR("Failed to attach CollectibleItem script " << collectibleNumber);
     else
-        LOG_INFO("CollectibleItem script attached successfully");
-}
+        LOG_INFO("CollectibleItem script " << collectibleNumber << " attached successfully");
 
-void ScriptingTestScene::_createOscillatingObject() {
-    LOG_INFO("Creating Third Collectible entity with C# script...");
-
-    m_oscillatingEntity = GetWorld().Create();
-
-    // Add transform component
-    GetWorld().Add<Components::LocalTransform>(m_oscillatingEntity, Components::LocalTransform{
-        Vector3D{ 640.0f, 520.0f, 0.0f },
-        Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f },
-        Vector3D{ 1.0f, 1.0f, 1.0f }
-    });
-
-    // Add active component
-    GetWorld().Add<Components::Active>(m_oscillatingEntity, Components::Active{ true });
-
-    // Add visual representation (magenta circle)
-    GetWorld().Add<Components::ShapeCircle2D>(m_oscillatingEntity, Components::ShapeCircle2D{
-        18.0f,
-        Vector2D{},
-        Color{ 1.0f, 0.0f, 1.0f, 1.0f }  // Magenta
-    });
-
-    GetWorld().Add<Components::ZIndex2D>(m_oscillatingEntity, Components::ZIndex2D{ 3 });
-
-    // ATTACH COLLECTIBLE C# SCRIPT (another instance, different position)
-    if (!m_scriptSystem->AttachScript(GetWorld(), m_oscillatingEntity, "MyGame.CollectibleItem"))
-        LOG_ERROR("Failed to attach CollectibleItem script!");
+    // Store references
+    if (collectibleNumber == 1)
+        m_rotatingEntity = collectibleEntity;
     else
-        LOG_INFO("CollectibleItem script attached successfully (instance 2)");
-}
-
-// ============================================================================
-// WORLD BOUNDARIES
-// ============================================================================
-
-void ScriptingTestScene::_createWorldBoundaries() {
-    const float wallThickness = 20.0f;
-    const Color wallColor = { 0.5f, 0.5f, 0.5f, 1.0f };  // Gray
-
-    // Top wall
-    Entity topWall = GetWorld().Create();
-    GetWorld().Add<Components::LocalTransform>(topWall, Components::LocalTransform{
-        Vector3D{ m_worldWidth * 0.5f, wallThickness * 0.5f, 0.0f },
-        Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f },
-        Vector3D{ 1.0f, 1.0f, 1.0f }
-    });
-    GetWorld().Add<Components::ShapeBox2D>(topWall, Components::ShapeBox2D{
-        Vector2D{ m_worldWidth, wallThickness },
-        Vector2D{},
-        wallColor
-    });
-    GetWorld().Add<Components::ZIndex2D>(topWall, Components::ZIndex2D{ 0 });
-
-    // Bottom wall
-    Entity bottomWall = GetWorld().Create();
-    GetWorld().Add<Components::LocalTransform>(bottomWall, Components::LocalTransform{
-        Vector3D{ m_worldWidth * 0.5f, m_worldHeight - wallThickness * 0.5f, 0.0f },
-        Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f },
-        Vector3D{ 1.0f, 1.0f, 1.0f }
-    });
-    GetWorld().Add<Components::ShapeBox2D>(bottomWall, Components::ShapeBox2D{
-        Vector2D{ m_worldWidth, wallThickness },
-        Vector2D{},
-        wallColor
-    });
-    GetWorld().Add<Components::ZIndex2D>(bottomWall, Components::ZIndex2D{ 0 });
-
-    // Left wall
-    Entity leftWall = GetWorld().Create();
-    GetWorld().Add<Components::LocalTransform>(leftWall, Components::LocalTransform{
-        Vector3D{ wallThickness * 0.5f, m_worldHeight * 0.5f, 0.0f },
-        Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f },
-        Vector3D{ 1.0f, 1.0f, 1.0f }
-    });
-    GetWorld().Add<Components::ShapeBox2D>(leftWall, Components::ShapeBox2D{
-        Vector2D{ wallThickness, m_worldHeight },
-        Vector2D{},
-        wallColor
-    });
-    GetWorld().Add<Components::ZIndex2D>(leftWall, Components::ZIndex2D{ 0 });
-
-    // Right wall
-    Entity rightWall = GetWorld().Create();
-    GetWorld().Add<Components::LocalTransform>(rightWall, Components::LocalTransform{
-        Vector3D{ m_worldWidth - wallThickness * 0.5f, m_worldHeight * 0.5f, 0.0f },
-        Quaternion{ 0.0f, 0.0f, 0.0f, 1.0f },
-        Vector3D{ 1.0f, 1.0f, 1.0f }
-    });
-    GetWorld().Add<Components::ShapeBox2D>(rightWall, Components::ShapeBox2D{
-        Vector2D{ wallThickness, m_worldHeight },
-        Vector2D{},
-        wallColor
-    });
-    GetWorld().Add<Components::ZIndex2D>(rightWall, Components::ZIndex2D{ 0 });
+        m_oscillatingEntity = collectibleEntity;
 }

@@ -81,10 +81,8 @@ namespace Sandbox {
         void _initializeScriptSystem();
         void _createScriptedEntities();
         void _createPlayer();
-        void _createEnemy(float x, float y, int enemyNumber);
-        void _createRotatingObject();
-        void _createOscillatingObject();
-        void _createWorldBoundaries();
+        void _createEnemy(int enemyNumber);
+        void _createCollectible(int collectibleNumber);
     };
 }
 

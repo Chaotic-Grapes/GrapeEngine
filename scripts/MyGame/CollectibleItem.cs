@@ -15,19 +15,45 @@ public class CollectibleItem : ScriptBehaviour
     private readonly float m_bobHeight = 10.0f;
     private Vector3 m_originalPosition;
 
+    // Visual entity
+    private Entity m_visualEntity;
+
     public override void OnStart()
     {
         Log("Collectible item spawned!", LogLevel.Info);
 
-        if (TryGetComponent<LocalTransform>(out var transform))
+        // Create the visual entity
+        m_visualEntity = CreateEntity();
+
+        // Set up initial position (use a default or pass in via script parameters in future)
+        m_originalPosition = new Vector3(400.0f, 360.0f, 0.0f);
+
+        var transform = new LocalTransform
         {
-            m_originalPosition = transform.Position;
-        }
+            Position = m_originalPosition,
+            Rotation = Quaternion.Identity,
+            Scale = new Vector3(1, 1, 1)
+        };
+        m_visualEntity.SetComponent(transform);
+
+        // Add yellow/gold circle visual
+        var circle = new ShapeCircle2D
+        {
+            Radius = 12.0f,
+            Color = new Color { R = 1.0f, G = 0.84f, B = 0.0f, A = 1.0f }, // Gold
+            Filled = true
+        };
+        m_visualEntity.SetComponent(circle);
+
+        // Make sure it's active
+        m_visualEntity.SetComponent(new Active { Enabled = true });
+
+        Log($"Collectible visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
     }
 
     public override void OnUpdate()
     {
-        if (!TryGetComponent<LocalTransform>(out var transform))
+        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
             return;
 
         // Bob up and down
@@ -37,7 +63,7 @@ public class CollectibleItem : ScriptBehaviour
         // Rotate
         // Note: Simplified rotation - would use quaternions properly in full implementation
 
-        SetComponent(transform);
+        m_visualEntity.SetComponent(transform);
 
         // Update visual
         UpdateCollectibleVisual();
@@ -45,7 +71,7 @@ public class CollectibleItem : ScriptBehaviour
 
     private void UpdateCollectibleVisual()
     {
-        if (!TryGetComponent<ShapeCircle2D>(out var circle))
+        if (!m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle))
             return;
 
         // Rainbow color cycle
@@ -55,12 +81,12 @@ public class CollectibleItem : ScriptBehaviour
         circle.Color.R = r;
         circle.Color.G = g;
         circle.Color.B = b;
-        circle.Color.A = 255;
+        circle.Color.A = 1.0f;
 
-        SetComponent(circle);
+        m_visualEntity.SetComponent(circle);
     }
 
-    private (byte r, byte g, byte b) HSVToRGB(float h, float s, float v)
+    private (float r, float g, float b) HSVToRGB(float h, float s, float v)
     {
         var hi = (int)(h * 6.0f) % 6;
         var f = h * 6.0f - hi;
@@ -79,6 +105,6 @@ public class CollectibleItem : ScriptBehaviour
             default: r = v; g = p; b = q; break;
         }
 
-        return ((byte)(r * 255), (byte)(g * 255), (byte)(b * 255));
+        return (r, g, b);
     }
 }

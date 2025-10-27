@@ -25,6 +25,9 @@ namespace GrapeEngine.ScriptAPI.Unsafe
         [DllImport(NativeLib, EntryPoint = "ScriptAPI_DestroyEntity", CallingConvention = CallingConvention.Cdecl)]
         public static extern void DestroyEntity(ulong entityId);
 
+        [DllImport(NativeLib, EntryPoint = "ScriptAPI_CreateEntity", CallingConvention = CallingConvention.Cdecl)]
+        public static extern ulong CreateEntity();
+
         [DllImport(NativeLib, EntryPoint = "ScriptAPI_SetWorld", CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe void SetWorld(void* world);
     }
