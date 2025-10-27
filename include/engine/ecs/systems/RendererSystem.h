@@ -16,7 +16,7 @@
 namespace ECS {
     class RendererSystem {
     public:
-        void Initialize();
+        void Initialize(World& world);
 
         void Update(World& world, float dt);
 
@@ -58,11 +58,13 @@ namespace ECS {
 
 		std::unique_ptr<Shader> m_shader;
         std::unique_ptr<Shader> m_textShader; // for sdf text
+        std::unique_ptr<Shader> m_sdfCircleShader;
+
         // Bloom post-process shaders
         std::unique_ptr<Shader> m_bloomBlurShader;
         std::unique_ptr<Shader> m_bloomCombineShader;
 
-        std::unique_ptr<EditorCamera> m_editorCamera;
+        std::unique_ptr<Engine::EditorCamera> m_editorCamera;
         bool m_useEditorCamera = true;   // editor camera is default
         int m_activeCameraIndex = 0;     // used later to cycle ECS cameras
 
