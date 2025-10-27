@@ -27,6 +27,7 @@ Features:
 #include "core/Logger.h" 
 #include <imgui.h>
 #include <vector>
+#include <services/ResourceManager.h>
 
 void AssetBrowser::Initialize(ImFont* symbolsFont) {
     m_symbolsFont = symbolsFont;
@@ -347,6 +348,11 @@ void AssetBrowser::_replaceTexture() {
                 if (std::filesystem::exists(destPathSource.parent_path())) {
                     std::filesystem::copy_file(sourcePath, destPathSource, std::filesystem::copy_options::overwrite_existing);
                 }
+
+                // Hot reload: force ResourceManager to reload the texture
+                extern ResourceManager RM;
+                RM.UnloadAsset(m_selectedAsset);   // Remove old cached version
+                RM.Get<Texture>(m_selectedAsset);  // Load new version into cache
 
                 LOG_INFO("Successfully replaced texture in both locations: " << destPathBuild.filename().string());
                 m_statusMessage = "Texture replaced successfully";
