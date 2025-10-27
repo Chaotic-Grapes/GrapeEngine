@@ -33,9 +33,12 @@ References:
 #include <imgui.h>
 #include <vector>
 #include <services/ResourceManager.h>
+#include "serialization/EntitySerializer.h"
+#include "ecs/World.h"
 
-void AssetBrowser::Initialize(ImFont* symbolsFont) {
+void AssetBrowser::Initialize(ImFont* symbolsFont, World* world) {
     m_symbolsFont = symbolsFont;
+    m_world = world;
 }
 
 // Render the asset browser UI window
@@ -68,6 +71,19 @@ void AssetBrowser::Render() {
     }
 
     if (!hasSelection) ImGui::EndDisabled();
+
+    // Load Prefab button (only enabled if a .prefab file is selected)
+    bool isPrefab = !m_selectedAsset.empty() && std::filesystem::path(m_selectedAsset).extension() == ".prefab";
+    if (!isPrefab) ImGui::BeginDisabled();
+
+    if (ImGui::Button("\xEE\xA1\xB3 Load Prefab")) {
+        _loadPrefab();
+    }
+    if (ImGui::IsItemHovered() && isPrefab) {
+        ImGui::SetTooltip("Load prefab into the level");
+    }
+
+    if (!isPrefab) ImGui::EndDisabled();
 
     // Two-column layout (.x is width): file list on left, info panel on right
     float windowWidth = ImGui::GetContentRegionAvail().x;
@@ -395,4 +411,41 @@ void AssetBrowser::_replaceTexture() {
 #else
     LOG_WARNING("File dialog not implemented for this platform");
 #endif
+}
+
+// Load and instantiate selected prefab into the level
+// COPIED DIRECTLY FROM DEBUGUI.H
+void AssetBrowser::_loadPrefab() {
+    if (m_selectedAsset.empty()) {
+        LOG_WARNING("No prefab selected");
+        return;
+    }
+
+    if (!m_world) {
+        LOG_ERROR("Cannot load prefab: No world reference");
+        return;
+    }
+
+    std::ifstream file(m_selectedAsset);
+    if (!file.is_open()) {
+        LOG_ERROR("Cannot open file: " << m_selectedAsset);
+    }
+    else {
+        try {
+            auto entityJson = nlohmann::json::parse(file);
+            file.close();
+
+            // Deserialize creates the entity internally
+            (void)Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+
+            LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
+            m_statusMessage = "Prefab loaded successfully";
+            m_statusTimer = 3.0f;
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to parse prefab file: " << e.what());
+            m_statusMessage = "Failed to load prefab";
+            m_statusTimer = 3.0f;
+        }
+    }
 }

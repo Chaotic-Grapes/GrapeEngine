@@ -459,31 +459,6 @@ void DebugUI::_showGameObjectEditor() {
     ImGui::SameLine();
     if (ImGui::Button("Collectible")) AddGameObject("Collectible");
 
-    ImGui::Separator();
-
-    static char prefabName[128] = "sample-enemy-prefab";
-    ImGui::InputText("Prefab Name", prefabName, sizeof(prefabName));
-    if (ImGui::Button("Load Prefab") && strlen(prefabName) > 0) {
-        std::ifstream file("assets/samples/" + std::string(prefabName) + ".prefab");
-        if (!file.is_open()) {
-            LOG_ERROR("Cannot open file: " << prefabName);
-        }
-        else {
-            try {
-                auto entityJson = nlohmann::json::parse(file);
-                file.close();
-
-                // Deserialize creates the entity internally
-                (void)Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
-
-                _invalidateCache();
-            }
-            catch (const std::exception& e) {
-                LOG_ERROR("Failed to parse prefab file: " << e.what());
-            }
-        }
-    }
-
     // Display list of current objects
     const auto entities = m_world->GetEntityManager().GetAllEntities();
     ImGui::Text("Current Objects (%zu):", entities.size());

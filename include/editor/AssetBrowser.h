@@ -24,11 +24,12 @@ Features:
 
 // Forward declaration
 struct ImFont;
+class World;
 
 class AssetBrowser {
 public:
-    // Initialize with symbols font for icons
-    void Initialize(ImFont* symbolsFont);
+    // Initialize with symbols font for icons and world reference
+    void Initialize(ImFont* symbolsFont, World* world);
 
     // Render the asset browser UI
     void Render();
@@ -56,7 +57,10 @@ private:
     // Replace the currently selected texture file
     void _replaceTexture();
 
+    void _loadPrefab();
+
     ImFont* m_symbolsFont = nullptr;
+    World* m_world = nullptr;
     std::string m_assetsRootPath = "assets\\";
     std::string m_currentPath = "assets\\";
     std::string m_selectedAsset;

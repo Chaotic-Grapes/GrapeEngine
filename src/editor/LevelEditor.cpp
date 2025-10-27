@@ -83,7 +83,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     // Initialize playback controls & asset browser with symbols font
     m_playback.Initialize(m_symbolsFont);
-    m_assetBrowser.Initialize(m_symbolsFont);
+    m_assetBrowser.Initialize(m_symbolsFont, m_world);
 }
 
 // Process input for all editor panels
