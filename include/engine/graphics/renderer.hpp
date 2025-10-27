@@ -35,7 +35,7 @@ inline float UnitsToPixels(float wu) { return wu * kPixelsPerUnit; }
 
 class Renderer {
 public:
-    Renderer(size_t maxQuads = 3000);
+    Renderer(size_t maxQuads = 20000);
     ~Renderer();
 
     void beginFrame();
