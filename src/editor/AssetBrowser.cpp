@@ -40,15 +40,28 @@ void AssetBrowser::Render() {
     // Display clickable breadcrumb navigation
     _displayBreadcrumbs();
 
-    ImGui::SameLine();
-
     // Import button
-    if (ImGui::Button("\xEF\x82\x9B")) {
+    if (ImGui::Button("\xEF\x82\x9B Import")) {
         _importTexture();
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Import PNG texture into current folder");
     }
+
+    ImGui::SameLine();
+
+    // Replace button (only enabled if a file is selected)
+    bool hasSelection = !m_selectedAsset.empty();
+    if (!hasSelection) ImGui::BeginDisabled();
+
+    if (ImGui::Button("\xEE\xA3\x94 Replace")) { 
+        _replaceTexture();
+    }
+    if (ImGui::IsItemHovered() && hasSelection) {
+        ImGui::SetTooltip("Replace selected texture with a new file");
+    }
+
+    if (!hasSelection) ImGui::EndDisabled();
 
     // Two-column layout (.x is width): file list on left, info panel on right
     float windowWidth = ImGui::GetContentRegionAvail().x;
@@ -66,6 +79,21 @@ void AssetBrowser::Render() {
     ImGui::BeginChild("FileInfo", ImVec2(0, 0), true);
     _displaySelectedFileInfo();
     ImGui::EndChild();
+
+    // Success popup (if texture replacement is ok)
+    if (m_statusTimer > 0.0f) {
+        // Position at bottom of the window
+        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 30);
+        ImGui::SetCursorPosX(20);
+
+        // Green text for success, red for errors
+        ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
+            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f) 
+            : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+
+        ImGui::TextColored(color, "%s", m_statusMessage.c_str());
+        m_statusTimer -= ImGui::GetIO().DeltaTime;
+    }
 
     ImGui::End();
 }
@@ -202,6 +230,7 @@ void AssetBrowser::_displaySelectedFileInfo() {
     }
     catch (const std::exception& e) {
         ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "Could not get file size");
+        LOG_ERROR("Failed to get file size: " << e.what());
     }
     
     // Stop indenting text
@@ -235,15 +264,18 @@ void AssetBrowser::_importTexture() {
     if (GetOpenFileNameA(&ofn)) {
         // User selected a file; the path is now in 'filename' buffer
         std::filesystem::path sourcePath(filename);
+
         // Where to copy it: current folder + just the filename (e.g. "assets/player.png")
         std::filesystem::path destPathBuild = std::filesystem::path(m_currentPath) / sourcePath.filename();
 
         // Also copy to source assets folder (relative to build/)
         std::string sourceAssetsPath = m_currentPath;
+
         // Check if path contains "assets"
         if (sourceAssetsPath.find("assets") != std::string::npos) {
             // Replace build/assets with ../assets
             std::filesystem::path destPathSource = std::filesystem::path("..") / m_currentPath / sourcePath.filename();
+
             try {
                 // Copy to build/assets (runtime)
                 // If file exists, overwrite it
@@ -269,6 +301,69 @@ void AssetBrowser::_importTexture() {
     }
 
 #else  // Not Windows (Linux, Mac, etc.)
+    LOG_WARNING("File dialog not implemented for this platform");
+#endif
+}
+
+// Replace the currently selected texture file with a new one
+void AssetBrowser::_replaceTexture() {
+    if (m_selectedAsset.empty()) {
+        LOG_WARNING("No file selected to replace");
+        return;
+    }
+
+#ifdef _WIN32
+    // Same as above (import textures)
+    char filename[512] = "";
+
+    OPENFILENAMEA ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = sizeof(filename);
+    ofn.lpstrFilter = "PNG Files\0*.png\0All Files\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrTitle = "Select PNG to Replace With";
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+    // Show file dialog
+    if (GetOpenFileNameA(&ofn)) {
+        std::filesystem::path sourcePath(filename);
+        std::filesystem::path destPathBuild(m_selectedAsset);  // Use selected file's path
+
+        // Also replace in source assets folder
+        std::string sourceAssetsPath = m_selectedAsset;
+
+        if (sourceAssetsPath.find("assets") != std::string::npos) {
+            // Construct path to source assets (replace build/assets with ../assets)
+            std::filesystem::path relativePath = std::filesystem::relative(destPathBuild, "assets");
+            std::filesystem::path destPathSource = std::filesystem::path("..") / "assets" / relativePath;
+
+            try {
+                // Replace file in build/assets (runtime)
+                std::filesystem::copy_file(sourcePath, destPathBuild, std::filesystem::copy_options::overwrite_existing);
+
+                // Replace file in ../assets (source)
+                if (std::filesystem::exists(destPathSource.parent_path())) {
+                    std::filesystem::copy_file(sourcePath, destPathSource, std::filesystem::copy_options::overwrite_existing);
+                }
+
+                LOG_INFO("Successfully replaced texture in both locations: " << destPathBuild.filename().string());
+                m_statusMessage = "Texture replaced successfully";
+                m_statusTimer = 3.0f; // Show for 3 seconds
+            }
+            catch (const std::exception& e) {
+                LOG_ERROR("Failed to replace texture: " << e.what());
+                m_statusMessage = "Failed to replace texture";
+                m_statusTimer = 3.0f;
+            }
+        }
+    }
+    else {
+        LOG_INFO("Replace cancelled by user");
+    }
+
+#else
     LOG_WARNING("File dialog not implemented for this platform");
 #endif
 }

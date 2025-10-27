@@ -34,6 +34,10 @@ public:
     void Render();
 
 private:
+    // Success notification
+    std::string m_statusMessage = "";
+    float m_statusTimer = 0.0f;
+
     // Display clickable breadcrumb navigation trail
     void _displayBreadcrumbs();
 
@@ -49,9 +53,12 @@ private:
     // Import new texture file into current folder
     void _importTexture();
 
+    // Replace the currently selected texture file
+    void _replaceTexture();
+
     ImFont* m_symbolsFont = nullptr;
-    std::string m_assetsRootPath = "assets/";
-    std::string m_currentPath = "assets/";
+    std::string m_assetsRootPath = "assets\\";
+    std::string m_currentPath = "assets\\";
     std::string m_selectedAsset;
 };
 
