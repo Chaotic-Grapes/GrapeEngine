@@ -1,47 +1,120 @@
+/* Start Header *****************************************************************/
+/*!
+\file   RendererSystem.h
+\author Your Name
+\date   27th October 2025
+\brief
+High-level rendering system for the ECS. Manages shaders, camera, and
+orchestrates the render graph for multi-pass rendering.
+
+Responsibilities:
+- Initialize and manage rendering resources (shaders, camera, render graph)
+- Process ECS entities with renderable components
+- Execute the render graph each frame
+- Provide temporary accessors for stress testing
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef RENDERER2D_H
 #define RENDERER2D_H
 
-#include "graphics/renderer.hpp"
-#include "graphics/debugDraw2D.hpp"
-#include "graphics/FrameBuffer.hpp"
+// ============================================================================
+// Third-Party Includes
+// ============================================================================
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
+
+// ============================================================================
+// Engine Includes
+// ============================================================================
 #include "Color.h"
 #include "ecs/World.h"
-#include "graphics/shader.hpp"
 #include "Math/Vector2D.h"
+
+// ============================================================================
+// Graphics Includes
+// ============================================================================
+#include "graphics/shader.hpp"
+#include "graphics/renderer.hpp"
+#include "graphics/debugDraw2D.hpp"
 #include "graphics/EditorCamera.hpp"
+#include "graphics/RenderGraph.hpp"
 
 namespace ECS {
+
+    // ========================================================================
+    // RendererSystem
+    // ========================================================================
+    /*!
+    \class RendererSystem
+    \brief Manages all 2D rendering through a modern render graph architecture.
+
+    This system owns the render graph, which in turn owns all framebuffers.
+    It processes ECS entities with renderable components and executes multi-pass
+    rendering each frame.
+    */
     class RendererSystem {
     public:
+        // ====================================================================
+        // Public Interface
+        // ====================================================================
+
+        /*!
+        \brief Initialize the rendering system with all required resources.
+        \param world The ECS world to render.
+        */
         void Initialize(World& world);
 
+        /*!
+        \brief Update and render all entities in the world.
+        \param world The ECS world to render.
+        \param dt Delta time (currently unused).
+        */
         void Update(World& world, float dt);
 
-        int GetFlushCount() const { return m_renderer ? m_renderer->flushCountThisFrame : -1; }
+        /*!
+        \brief Get the number of batch flushes this frame (for profiling).
+        \return Flush count, or -1 if renderer not initialized.
+        */
+        int GetFlushCount() const {
+            return m_renderer ? m_renderer->flushCountThisFrame : -1;
+        }
 
-        /* ============================================================
-        TEMPORARY ACCESSORS for raw renderer + shader (remove later!)
-        Used for bypassing ECS in stress tests and direct batch calls.
-        ============================================================ */
-        Renderer* GetRenderer()     { return m_renderer.get(); }
-        Shader*   GetShader()       { return m_shader.get(); }
-        Shader*   GetTextShader()   { return m_textShader.get(); }
+        // ====================================================================
+        // Temporary Accessors (For Stress Testing - Remove Later)
+        // ====================================================================
+        /*! \brief Direct access to low-level renderer for bypass testing. */
+        Renderer* GetRenderer() { return m_renderer.get(); }
 
+        /*! \brief Direct access to main shader for bypass testing. */
+        Shader* GetShader() { return m_shader.get(); }
+
+        /*! \brief Direct access to text shader for bypass testing. */
+        Shader* GetTextShader() { return m_textShader.get(); }
+
+        /*! \brief Get the current projection matrix. */
         const glm::mat4& GetProjection() const { return m_projection; }
 
     private:
-        // Conversion helpers (keep glm isolated to graphics)
-        glm::vec2 ToGlm(const Vector2D& v) { return glm::vec2 {v.X, v.Y}; }
+        // ====================================================================
+        // Conversion Helpers
+        // ====================================================================
+
+        /*! \brief Convert engine Vector2D to GLM vec2. */
+        glm::vec2 ToGlm(const Vector2D& v) {
+            return glm::vec2{ v.X, v.Y };
+        }
 
         /*!
-        \brief Convert an engine Color (0-255 per channel) to glm::vec4 (0-1).
+        \brief Convert engine Color (0-255) to GLM vec4 (0.0-1.0).
         \param c The Color to convert.
         \return Normalized glm::vec4 suitable for shaders.
-        \note Color channels in our engine are stored as 8-bit [0-255].
-              GLSL expects floats in the range [0.0-1.0]. Forgetting this
+        \note GLSL expects floats in [0.0-1.0]. Forgetting normalization
               will cause washed-out or grayscale rendering.
         */
         glm::vec4 ToGlm(const Color& c) {
@@ -53,25 +126,36 @@ namespace ECS {
             };
         }
 
-        bool m_initialized = false;
-        std::unique_ptr<Renderer> m_renderer;
+        // ====================================================================
+        // Member Variables - State
+        // ====================================================================
 
-		std::unique_ptr<Shader> m_shader;
-        std::unique_ptr<Shader> m_textShader; // for sdf text
-        std::unique_ptr<Shader> m_sdfCircleShader;
+        bool m_initialized = false;                ///< Has Initialize() been called?
+        bool m_useEditorCamera = true;             ///< Use editor vs ECS cameras
+        int m_activeCameraIndex = 0;               ///< Active ECS camera (future use)
+        glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();  ///< Projection matrix
 
-        // Bloom post-process shaders
-        std::unique_ptr<Shader> m_bloomBlurShader;
-        std::unique_ptr<Shader> m_bloomCombineShader;
+        // ====================================================================
+        // Member Variables - Core Systems
+        // ====================================================================
 
-        std::unique_ptr<Engine::EditorCamera> m_editorCamera;
-        bool m_useEditorCamera = true;   // editor camera is default
-        int m_activeCameraIndex = 0;     // used later to cycle ECS cameras
+        std::unique_ptr<Renderer> m_renderer;      ///< Low-level batch renderer
+        std::unique_ptr<RenderGraph> m_renderGraph;///< Render graph (owns framebuffers)
+        std::unique_ptr<Engine::EditorCamera> m_editorCamera;  ///< Editor camera
 
-        glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();
+        // ====================================================================
+        // Member Variables - Shaders
+        // ====================================================================
 
-        std::unordered_map<std::string, std::unique_ptr<Framebuffer>> m_fbos;
+        std::unique_ptr<Shader> m_shader;          ///< Main batched geometry shader
+        std::unique_ptr<Shader> m_textShader;      ///< SDF text rendering shader
+        std::unique_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
+
+        // Post-process shaders (future use)
+        std::unique_ptr<Shader> m_bloomBlurShader;     ///< Bloom blur pass
+        std::unique_ptr<Shader> m_bloomCombineShader;  ///< Bloom composite pass
     };
-}
 
-#endif
+} // namespace ECS
+
+#endif // RENDERER2D_H
