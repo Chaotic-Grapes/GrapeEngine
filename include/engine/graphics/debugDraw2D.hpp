@@ -29,14 +29,13 @@ Functions:
 class Renderer;
 
 namespace DebugDraw2D {
-
-    // Filled circle
+    // Renders a filled circle when strokePx <= 0, or an outlined circle (of strokePx thickness in pixels) otherwise.
     void Circle(Renderer& r,
         const glm::vec2& center,
         float radius,
         const glm::vec4& color,
-        int segments,
-        GLuint textureId);
+        float strokePx,
+        GLuint textureId = 0);
 
     // Thick line as a quad
     void Line(Renderer& r,

@@ -31,12 +31,24 @@ Functions:
 #include <cstdint>
 
 namespace {
-    inline Vertex V(const glm::vec2& p, const glm::vec4& c) {
+    inline Vertex V(const glm::vec2& p, const glm::vec4& c, float strokePx = 0.0f) {
         Vertex v;
         v.position = glm::vec3(p, 0.0f); // promote 2D to 3D
         v.texCoord = { 0.f, 0.f }; // sample white
         v.color = c;
         v.texIndex = 0.f;        // Renderer overwrites with actual slot
+        v.strokePx = strokePx;
+        return v;
+    }
+
+    inline Vertex V(const glm::vec2& p, const glm::vec4& c, const glm::vec2& uv, float strokePx = 0.0f)
+    {
+        Vertex v;
+        v.position = glm::vec3(p, 0.0f);
+        v.texCoord = uv;            // allow explicit UVs
+        v.color = c;
+        v.texIndex = 0.f;
+        v.strokePx = strokePx;
         return v;
     }
 
@@ -60,33 +72,26 @@ namespace DebugDraw2D {
         const glm::vec2& center,
         float radius,
         const glm::vec4& color,
-        int segments,
+        float strokePx,
         GLuint textureId)
     {
-        if (segments < 3) segments = 3;
+        // Slightly enlarge both geometry and UVs so the circle's edge (|vUV| = 1)
+        // stays comfortably inside the quad (prevents clipping during anti-aliasing)
+        const float pad = 1.10f; // 10% margin
+        const glm::vec2 half{ radius * pad, radius * pad };
 
-        std::vector<Vertex> verts;
-        std::vector<uint32_t> idx;
-        verts.reserve(static_cast<size_t>(segments) + 1);
-        idx.reserve(static_cast<size_t>(segments) * 3);
+        // Define quad corners (positions + matching UVs)
+        Vertex v0 = { glm::vec3(center + glm::vec2(-half.x, -half.y), 0.0f), {-pad, -pad}, color, 0.0f, strokePx };
+        Vertex v1 = { glm::vec3(center + glm::vec2(half.x, -half.y), 0.0f),  { pad, -pad}, color, 0.0f, strokePx };
+        Vertex v2 = { glm::vec3(center + glm::vec2(half.x,  half.y), 0.0f),  { pad,  pad}, color, 0.0f, strokePx };
+        Vertex v3 = { glm::vec3(center + glm::vec2(-half.x,  half.y), 0.0f), {-pad,  pad}, color, 0.0f, strokePx };
 
-        verts.push_back(V(center, color)); // center
-        const uint32_t cIdx = 0;
+        // 2 triangles forming the quad
+        const uint32_t idx[] = { 0, 1, 2, 2, 3, 0 };
+        const Vertex   vb[] = { v0, v1, v2, v3 };
 
-        float step = glm::two_pi<float>() / segments;
-        for (int i = 0; i < segments; ++i) {
-            float a = i * step;
-            glm::vec2 p = { center.x + std::cos(a) * radius,
-                            center.y + std::sin(a) * radius };
-            verts.push_back(V(p, color));
-        }
-        for (int i = 0; i < segments; ++i) {
-            uint32_t i1 = 1 + i;
-            uint32_t i2 = 1 + (i + 1) % segments;
-            idx.push_back(cIdx); idx.push_back(i1); idx.push_back(i2);
-        }
-
-        r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
+        // Send to renderer - the fragment shader will compute the actual circular mask
+        r.submitTriangles(vb, 4, idx, 6, textureId);
     }
 
     void Line(Renderer& r,
@@ -96,10 +101,10 @@ namespace DebugDraw2D {
         const glm::vec4& color,
         GLuint textureId)
     {
-        glm::vec2 dir = p2 - p1;
+        glm::vec2 dir = p2 - p1; // edge vector
         float len = std::max(std::sqrt(dir.x * dir.x + dir.y * dir.y), 1e-6f);
         dir /= len;
-        glm::vec2 n = { -dir.y, dir.x }; // left normal
+        glm::vec2 n = { -dir.y, dir.x }; // outward normal
         glm::vec2 off = n * (thickness * 0.5f);
 
         glm::vec2 v0 = p1 - off; // BL
