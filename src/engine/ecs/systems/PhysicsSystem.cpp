@@ -122,7 +122,7 @@ namespace ECS {
                 }
 
                 // Skip static bodies (zero or negative mass)
-                if (rb. <= 0.0f)
+                if (rb.Mass <= 0.0f)
                     return;
 
                 // Apply forces & gravity (f = ma in a = f/m)
@@ -377,7 +377,7 @@ namespace ECS {
 
                 // resolved using our resolve collision
                 // takes rigidbodies, velocity, transforms, offsets and combined materials
-                Engine::Physics::ResolveCollision(
+              Engine::Physics::ResolveCollision(
                     rbA, rbB,
                     velA, velB,
                     tA, tB,

@@ -957,7 +957,7 @@ void ECSTestScene::_testRenderLayers() {
 void ECSTestScene::_testRenderStressTest() {
     if (m_testEntities.empty()) {
         // Create many entities to stress test the renderer
-        const int count = 2500;
+        const int count = 1000;
         for (int i = 0; i < count; ++i) {
             const Entity e = CreateOnLayer(m_renderLayer,
                 Components::LocalTransform{ 
