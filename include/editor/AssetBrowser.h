@@ -53,8 +53,8 @@ private:
     // Display info about selected file
     void _displaySelectedFileInfo();
 
-    // Import new texture file into current folder
-    void _importTexture();
+    // Import new asset file into current folder
+    void _importAsset();
 
     // Replace the currently selected texture file
     void _replaceTexture();

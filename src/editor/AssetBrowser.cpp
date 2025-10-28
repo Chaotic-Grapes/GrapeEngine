@@ -52,7 +52,7 @@ void AssetBrowser::Render() {
 
     // Import button
     if (ImGui::Button("\xEF\x82\x9B")) {
-        _importTexture();
+        _importAsset();
     }
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Import new assets into current folder");
@@ -308,8 +308,8 @@ void AssetBrowser::_displaySelectedFileInfo() {
     ImGui::Unindent();
 }
 
-// Import a new texture file into the current folder
-void AssetBrowser::_importTexture() {
+// Import a new asset file into the current folder
+void AssetBrowser::_importAsset() {
 #ifdef _WIN32  // Only compile this code on Windows
     char filename[512] = ""; 
 
@@ -320,11 +320,10 @@ void AssetBrowser::_importTexture() {
     ofn.lpstrFile = filename;                                // Point to buffer where Windows will write the selected path
     ofn.nMaxFile = sizeof(filename);                         // Tell Windows max size of buffer (512 bytes)
 
-    ofn.lpstrFilter = "PNG Files\0*.png\0All Files\0*.*\0";  // File type filters in the dropdown
-    // Format: "Display Name\0*.extension\0" (null-separated strings)
-
-    ofn.nFilterIndex = 1;                                    // Start with first filter selected (PNG Files)
-    ofn.lpstrTitle = "Select PNG Texture to Import";         // Dialog window title
+    // Support multiple file types
+    ofn.lpstrFilter = "All Files\0*.*\0PNG Files\0*.png\0WAV Files\0*.wav\0JSON Files\0*.json\0Prefab Files\0*.prefab\0";
+    ofn.nFilterIndex = 1;                                    // Default to "All Files"
+    ofn.lpstrTitle = "Select Asset to Import";               // Dialog window title
 
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
     // OFN_PATHMUSTEXIST: Folder must exist
