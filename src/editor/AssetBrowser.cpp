@@ -51,11 +51,11 @@ void AssetBrowser::Render() {
     _displayBreadcrumbs();
 
     // Import button
-    if (ImGui::Button("\xEF\x82\x9B Import")) {
+    if (ImGui::Button("\xEF\x82\x9B")) {
         _importTexture();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Import PNG texture into current folder");
+        ImGui::SetTooltip("Import new assets into current folder");
     }
 
     ImGui::SameLine();
@@ -64,54 +64,70 @@ void AssetBrowser::Render() {
     bool hasSelection = !m_selectedAsset.empty();
     if (!hasSelection) ImGui::BeginDisabled();
 
-    if (ImGui::Button("\xEE\xA3\x94 Replace")) { 
+    if (ImGui::Button("\xEE\xA3\x94")) { 
         _replaceTexture();
-    }
-    if (ImGui::IsItemHovered() && hasSelection) {
-        ImGui::SetTooltip("Replace selected texture with a new file");
     }
 
     if (!hasSelection) ImGui::EndDisabled();
 
-    // Load Prefab button (only enabled if a .prefab file is selected)
-    bool isPrefab = !m_selectedAsset.empty() && std::filesystem::path(m_selectedAsset).extension() == ".prefab";
-    if (!isPrefab) ImGui::BeginDisabled();
-
-    if (ImGui::Button("\xEE\xA1\xB3 Load Prefab")) {
-        _loadPrefab();
+    // Show tooltip even when disabled
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        if (hasSelection) {
+            ImGui::SetTooltip("Replace selected texture with a new file");
+        }
+        else {
+            ImGui::SetTooltip("Replace selected texture with a new file (disabled)");
+        }
     }
-    if (ImGui::IsItemHovered() && isPrefab) {
-        ImGui::SetTooltip("Load prefab into the level");
-    }
-
-    if (!isPrefab) ImGui::EndDisabled();
 
     ImGui::SameLine();
 
-    // Edit Prefab button (only enabled if a .prefab file is selected)
+    // + button (only enabled if a prefab is selected)
+    bool isPrefab = !m_selectedAsset.empty() && std::filesystem::path(m_selectedAsset).extension() == ".prefab";
     if (!isPrefab) ImGui::BeginDisabled();
 
-    if (ImGui::Button("\xEE\x8F\x89 Edit Prefab")) {
-        _editPrefab();
-    }
-    if (ImGui::IsItemHovered() && isPrefab) {
-        ImGui::SetTooltip("Edit prefab properties");
+    // + button containing load and edit prefab buttons
+    if (ImGui::Button("\xEE\x85\x85\xEE\x8C\x93")) {
+        ImGui::OpenPopup("Prefabs");
     }
 
     if (!isPrefab) ImGui::EndDisabled();
+
+    // Tooltip
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        if (isPrefab) {
+            ImGui::SetTooltip("Prefab management (load/edit)");
+        }
+        else {
+            ImGui::SetTooltip("Prefab management (disabled)");
+        }
+    }
+
+    // Popup window
+    if (ImGui::BeginPopup("Prefabs")) {
+        // Content of dropdown menu
+        if (ImGui::Selectable("Load Prefab")) {
+            _loadPrefab();
+        }
+        if (ImGui::Selectable("Edit Prefab")) {
+            _editPrefab();
+        }
+
+        ImGui::EndPopup();
+    }
 
     // Two-column layout (.x is width): file list on left, info panel on right
     float windowWidth = ImGui::GetContentRegionAvail().x;
 
-    // Left side: File/folder list (70% width)
+    // Left side: File/folder list (65% width)
     // Child window = scrollable region within parent window
-    ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.7f, 0), true);
+    ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
     _displayFolder(m_currentPath);
     ImGui::EndChild();
 
     ImGui::SameLine();
 
-    // Right side: File info panel (30% width)
+    // Right side: File info panel (35% width)
     // ImVec2(0, 0) = take up remaining horizontal + vertical space
     ImGui::BeginChild("FileInfo", ImVec2(0, 0), true);
     _displaySelectedFileInfo();
