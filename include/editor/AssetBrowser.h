@@ -73,9 +73,16 @@ private:
     // Helper for updating single entity
     bool _updateEntityFromPrefab(Entity& entity); 
 
-    // Helper for editing a single component's properties
-    void _renderComponentEditor(nlohmann::json& componentEntry);
+    // Render a single property row
+    void _renderVector2DRow(const std::string& label, nlohmann::json& data, 
+        const std::string& xKey, const std::string& yKey, float dragSpeed = 1.0f, 
+        float labelOffset = 20.0f);
 
+    // Render a single float row
+    void _renderFloatRow(const std::string& label, const std::string& fieldLabel, 
+        nlohmann::json& data, const std::string& key, float dragSpeed = 1.0f,
+        float labelOffset = 20.0f);
+    
     // Display prefab editor window with property editing
     void _showPrefabEditor();
 
