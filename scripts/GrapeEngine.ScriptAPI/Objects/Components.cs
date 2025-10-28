@@ -3,6 +3,19 @@ using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting
 {
+    public interface IComponentData
+    {
+        void AddToEntity(Entity entity);
+    }
+
+    public readonly struct ComponentData<T>(T component) : IComponentData where T : unmanaged
+    {
+        private readonly T _component = component;
+
+        public void AddToEntity(Entity entity)
+            => entity.AddComponent(_component);
+    }
+
     // ============================================================================
     // Component Mirrors - Must match C++ Components.h layout EXACTLY
     // ============================================================================

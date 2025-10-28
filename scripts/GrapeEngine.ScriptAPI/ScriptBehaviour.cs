@@ -73,7 +73,7 @@ namespace GrapeEngine.Scripting
         public virtual void OnDestroy() { }
 
         // ============================================================================
-        // Component Access (Convenience methods - delegate to Entity)
+        // Component Access
         // ============================================================================
 
         /// <summary>
@@ -82,9 +82,31 @@ namespace GrapeEngine.Scripting
         /// </summary>
         /// <typeparam name="T">The component type</typeparam>
         /// <returns>The component data</returns>
+        /// <exception cref="InvalidOperationException">Thrown when the entity doesn't have the component</exception>
         protected T GetComponent<T>() where T : unmanaged
         {
             return Entity.GetComponent<T>();
+        }
+
+        /// <summary>
+        /// Add a component to this entity and return it.
+        /// </summary>
+        /// <typeparam name="T">The component type</typeparam>
+        /// <param name="component">The component data to add</param>
+        /// <returns>The added component, if successful</returns>
+        protected T AddComponent<T>(T component) where T : unmanaged
+        {
+            return Entity.AddComponent(component);
+        }
+
+        /// <summary>
+        /// Check if this entity has the specified component.
+        /// </summary>
+        /// <typeparam name="T">The component type</typeparam>
+        /// <returns>True if entity has the component, false otherwise</returns>
+        protected bool HasComponent<T>() where T : unmanaged
+        {
+            return Entity.HasComponent<T>();
         }
 
         /// <summary>
@@ -107,16 +129,6 @@ namespace GrapeEngine.Scripting
         protected void SetComponent<T>(T component) where T : unmanaged
         {
             Entity.SetComponent(component);
-        }
-
-        /// <summary>
-        /// Check if this entity has a component.
-        /// </summary>
-        /// <typeparam name="T">The component type</typeparam>
-        /// <returns>True if the entity has the component, false otherwise</returns>
-        protected bool HasComponent<T>() where T : unmanaged
-        {
-            return Entity.HasComponent<T>();
         }
 
         /// <summary>
@@ -169,16 +181,26 @@ namespace GrapeEngine.Scripting
             return new Entity(entityId);
         }
 
+        // Note: params T[] will not work as this means all the components are of the same type.
+        // Note2: object[] is not ideal for performance and ECS is really concerned with performance.
+        // Therefore, see IComponentData and ComponentData<T>!
+        // IComponentData is a wrapper interface to add components of different types.
         /// <summary>
-        /// Create a new entity on a specific layer.
-        /// This is more efficient than CreateEntity() + SetComponent&lt;Layer&gt;().
+        /// Create a new entity in the world with the specified components.
         /// </summary>
-        /// <param name="layerId">The layer ID to assign to the entity</param>
-        /// <returns>The newly created entity with the layer already set</returns>
-        protected Entity CreateEntityOnLayer(ushort layerId)
+        /// <param name="components">The components to add to the new entity</param>
+        /// <returns>The newly created entity</returns>
+        protected Entity CreateEntity(params IComponentData[] components)
         {
-            ulong entityId = EntityAPI.CreateEntityOnLayer(layerId);
-            return new Entity(entityId);
+            ulong entityId = EntityAPI.CreateEntity();
+            Entity entity = new(entityId); // Instantiate Entity with the new ID
+
+            foreach (var component in components)
+                // Unsafe not needed
+                component.AddToEntity(entity);
+
+            return entity;
+            // IComponentData array is cleaned up by GC automatically
         }
 
         // ============================================================================

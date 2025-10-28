@@ -50,6 +50,40 @@ namespace GrapeEngine.Scripting
         }
 
         /// <summary>
+        /// Add a component to this entity and return it.
+        /// Throws an exception if adding the component fails.
+        /// </summary>
+        /// <typeparam name="T">The component type</typeparam>
+        /// <param name="component">The component data to add</param>
+        /// <returns>The added component, if successful</returns>
+        /// <exception cref="InvalidOperationException">Thrown when adding the component fails</exception>
+        public T AddComponent<T>(T component) where T : unmanaged
+        {
+            unsafe
+            {
+                var size = sizeof(T);
+                var buffer = stackalloc byte[size]; // allocate buffer for the result
+
+                if (EntityAPI.AddComponent(EntityId, ComponentTypeRegistry.GetTypeHash<T>(), &component, sizeof(T), buffer))
+                    return *(T*)buffer;
+                
+                throw new InvalidOperationException($"Failed to add component of type {typeof(T).Name} to entity {EntityId}");
+            }
+        }
+
+        /// <summary>
+        /// Check if this entity has the specified component.
+        /// </summary>
+        /// <typeparam name="T">The component type</typeparam>
+        /// <returns>True if entity has the component, false otherwise</returns>
+        public bool HasComponent<T>() where T : unmanaged
+        {
+            // This does not need the unsafe context as no pointers are used
+            // Check the other methods above. It uses pointers. (&component)
+            return EntityAPI.HasComponent(EntityId, ComponentTypeRegistry.GetTypeHash<T>());
+        }
+
+        /// <summary>
         /// Try to get a component from this entity.
         /// Returns false if the component doesn't exist.
         /// </summary>
@@ -88,18 +122,6 @@ namespace GrapeEngine.Scripting
             {
                 EntityAPI.SetComponent(EntityId, ComponentTypeRegistry.GetTypeHash<T>(), &component, sizeof(T));
             }
-        }
-
-        /// <summary>
-        /// Check if this entity has a component.
-        /// </summary>
-        /// <typeparam name="T">The component type</typeparam>
-        /// <returns>True if the entity has the component, false otherwise</returns>
-        public bool HasComponent<T>() where T : unmanaged
-        {
-            // This does not need the unsafe context as no pointers are used
-            // Check the other methods above. It uses pointers. (&component)
-            return EntityAPI.HasComponent(EntityId, ComponentTypeRegistry.GetTypeHash<T>());
         }
 
         /// <summary>

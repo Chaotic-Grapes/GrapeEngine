@@ -23,38 +23,29 @@ public class EnemyAI : ScriptBehaviour
         Log("EnemyAI initialized!", LogLevel.Info);
 
         // Create the visual entity for this enemy
-        m_visualEntity = CreateEntity();
+        m_visualEntity = CreateEntity(
+            new ComponentData<LocalTransform>(new()
+            {
+                Position = new Vector3(100f, 100f, 0f),
+                Rotation = Quaternion.Identity,
+                Scale = new Vector3(1, 1, 1)
+            }),
+            // Add red circle visual
+            new ComponentData<ShapeCircle2D>(new()
+            {
+                Radius = 15.0f,
+                Color = new Color { R = 1f, G = 0f, B = 0f, A = 1f },
+                Filled = true
+            }),
+            new ComponentData<Layer>(new() { Id = 0 }),
+            new ComponentData<Active>(new() { Enabled = true })
+        );
 
-        // Set up initial position (use Entity position if provided, otherwise default)
-        var initialPos = new Vector3(100f, 100f, 0f);
-        
-        var transform = new LocalTransform
-        {
-            Position = initialPos,
-            Rotation = Quaternion.Identity,
-            Scale = new Vector3(1, 1, 1)
-        };
-        m_visualEntity.SetComponent(transform);
-
-        // Add red circle visual
-        var circle = new ShapeCircle2D
-        {
-            Radius = 15.0f,
-            Color = new Color { R = 1f, G = 0f, B = 0f, A = 1f },
-            Filled = true
-        };
-        m_visualEntity.SetComponent(circle);
-
-        // Add Layer component so renderer can see it
-        m_visualEntity.SetComponent(new Layer { Id = 0 });
-
-        // Active component to toggle its active state
-        // But we don't really need it as it's always active even without the component
-        m_visualEntity.SetComponent(new Active { Enabled = true });
+        var transform = m_visualEntity.GetComponent<LocalTransform>();
 
         // Set patrol points
-        m_patrolPointA = initialPos;
-        m_patrolPointB = initialPos + new Vector3(200.0f, 0.0f, 0.0f);
+        m_patrolPointA = transform.Position;
+        m_patrolPointB = transform.Position + new Vector3(200.0f, 0.0f, 0.0f);
 
         Log($"Enemy visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
     }
