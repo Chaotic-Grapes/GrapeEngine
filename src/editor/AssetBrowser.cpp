@@ -149,6 +149,11 @@ void AssetBrowser::Render() {
     }
 
     ImGui::End();
+
+    // Show prefab editor if editing
+    if (m_editingPrefab) {
+        _showPrefabEditor();
+    }
 }
 
 // Display clickable breadcrumb trail
@@ -554,23 +559,72 @@ void AssetBrowser::_updatePrefabInstances() {
 // Update single entity's components from prefab data
 bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
     try {
-        // Apply each component from prefab to entity
+        // Iterate through each component defined in the prefab JSON
+        // The prefab JSON structure is: { "Components": [ { "Type": "Transform", "Data": {...} }, ... ] }
         for (const auto& componentEntry : m_prefabData["Components"]) {
-            std::string typeName = componentEntry["Type"];
+            std::string typeName = componentEntry["Type"];  // Get component type name (e.g. "Transform")
 
-            // Update Transform component
+            // Update Transform component if present
             if (typeName == "Transform") {
                 auto* transform = entity.GetComponent<Component::Transform>();
-                if (transform) from_json(componentEntry["Data"], *transform);
+                if (transform) {
+                    // Deserialize JSON data into the component (updates Position, Rotation, Scale)
+                    from_json(componentEntry["Data"], *transform);
+                }
             }
-            // Adding more component types later
+            // Update SpriteRenderer component
+            else if (typeName == "SpriteRenderer") {
+                auto* sprite = entity.GetComponent<Component::SpriteRenderer>();
+                if (sprite) {
+                    // Deserialize JSON data into sprite component (updates TexturePath, Color, FlipX, etc.)
+                    from_json(componentEntry["Data"], *sprite);
+                }
+            }
+            // Update Rigidbody2D component
+            else if (typeName == "Rigidbody2D") {
+                auto* rb = entity.GetComponent<Component::Rigidbody2D>();
+                if (rb) {
+                    // Deserialize JSON data into rigidbody (updates Mass, Velocity, BodyType, etc.)
+                    from_json(componentEntry["Data"], *rb);
+                }
+            }
+            // Update ShapeRenderer2D component
+            else if (typeName == "ShapeRenderer2D") {
+                auto* shape = entity.GetComponent<Component::ShapeRenderer2D>();
+                if (shape) {
+                    // Deserialize JSON data into shape renderer (updates Type, FillColor, Radius, etc.)
+                    from_json(componentEntry["Data"], *shape);
+                }
+            }
+            // Update CircleCollider2D component
+            else if (typeName == "CircleCollider2D") {
+                auto* collider = entity.GetComponent<Component::CircleCollider2D>();
+                if (collider) {
+                    // Deserialize JSON data into circle collider (updates Radius, Offset, IsTrigger, etc.)
+                    from_json(componentEntry["Data"], *collider);
+                }
+            }
+            // Update BoxCollider2D component
+            else if (typeName == "BoxCollider2D") {
+                auto* collider = entity.GetComponent<Component::BoxCollider2D>();
+                if (collider) {
+                    // Deserialize JSON data into box collider (updates Size, Offset, IsTrigger, etc.)
+                    from_json(componentEntry["Data"], *collider);
+                }
+            }
         }
 
-        LOG_INFO("Updated entity " << entity.GetId());
-        return true;
+        LOG_INFO("Updated entity " << entity.GetId() << " from prefab");
+        return true;  // Success
     }
     catch (const std::exception& e) {
-        LOG_ERROR("Failed to update entity: " << e.what());
-        return false;
+        // JSON parsing or component update failed
+        LOG_ERROR("Failed to update entity " << entity.GetId() << ": " << e.what());
+        return false; 
     }
+}
+
+// Prefab editor window (when inspector panel is complete, this will be moved)
+void AssetBrowser::_showPrefabEditor() {
+
 }

@@ -62,7 +62,8 @@ private:
     // Loads a prefab file from disk and instantiates it into the world
     void _loadPrefab();
 
-    // Opens the selected prefab in an editor for modification
+    // Loads prefab data, sets m_editingPrefab = true; basically it's the trigger that 
+    // opens the editor (code will probs be moved into inspector code after it's done)
     void _editPrefab();
 
     // Updates all entities that were instantiated from prefabs to match
@@ -71,6 +72,9 @@ private:
 
     // Helper for updating single entity
     bool _updateEntityFromPrefab(Entity& entity); 
+
+    // Display prefab editor window with property editing
+    void _showPrefabEditor();
 
     // References and state for managing assets, prefabs and editor navigation
     ImFont* m_symbolsFont = nullptr;
