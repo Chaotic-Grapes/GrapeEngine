@@ -24,8 +24,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <memory>
 #include <unordered_map>
 
-// Forward declarations for CoreCLR types to avoid polluting headers
+// CoreCLR handle
 using hostfxr_handle = void*;
+
+// TODO:
+// 1. Build this as a separate DLL.
+// 2. Load/unload the DLL dynamically in the engine.
+// 3. Refine this further.
+// 4. Make GetComponent similar to how Unity handles it.
+// 5. Exception handling.
 
 namespace ECS {
     /**
@@ -84,42 +91,37 @@ namespace ECS {
         void DetachScript(World& world, Entity entity);
 
         /**
-         * @brief System update - calls OnStart for new scripts.
-         * Should be called before Update system.
+         * @brief Callback for when the system starts.
          * @param world The ECS world
          */
         static void OnStart(World& world);
 
         /**
-         * @brief System update - calls OnUpdate on all active scripts.
+         * @brief Callback for per-frame updates.
          * @param world The ECS world
          */
         static void Update(World& world);
 
         /**
-         * @brief System update - calls OnFixedUpdate on all active scripts.
-         * Should be called at fixed time intervals for physics.
+         * @brief Callback for fixed-timestep updates.
          * @param world The ECS world
          */
         static void FixedUpdate(World& world);
 
         /**
-         * @brief System update - calls OnLateUpdate on all active scripts.
-         * Should be called after all Update calls.
+         * @brief Calls late update on scripts.
          * @param world The ECS world
          */
         static void LateUpdate(World& world);
 
         /**
-         * @brief System update - handles enable/disable state changes.
-         * Call this when Active component changes.
+         * @brief Calls OnEnable/OnDisable on scripts based on Active component.
          * @param world The ECS world
          */
         static void UpdateActiveState(World& world);
 
         /**
-         * @brief System update - cleanup destroyed entities' scripts.
-         * Should be called in cleanup phase.
+         * @brief Callback when an entity with a script is destroyed.
          * @param world The ECS world
          */
         static void OnDestroy(World& world);
@@ -186,6 +188,7 @@ namespace ECS {
         // They provide safe, type-agnostic component access.
         
         friend bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
+		friend bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer);
         friend void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
         friend bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
         friend void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
@@ -213,6 +216,17 @@ namespace ECS {
  * @return true if component exists and was copied, false otherwise
  */
 SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
+
+/**
+ * @brief Get a component from an entity by type hash.
+ * @param entityId Entity to modify
+ * @param typeHash FNV-1a hash of component type name
+ * @param componentData Pointer to component data to add
+ * @param dataSize Size of the component data
+ * @param outBuffer Buffer to write the added component data to
+ * @return true if component was added successfully, false otherwise
+ */
+SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer);
 
 /**
  * @brief Set a component on an entity by type hash.

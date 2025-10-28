@@ -13,6 +13,9 @@ namespace GrapeEngine.ScriptAPI.Unsafe
         [DllImport(NativeLib, EntryPoint = "ScriptAPI_GetComponent", CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe bool GetComponent(ulong entityId, uint typeHash, byte* outBuffer, int bufferSize);
 
+        [DllImport(NativeLib, EntryPoint = "ScriptAPI_AddComponent", CallingConvention = CallingConvention.Cdecl)]
+        public static extern unsafe bool AddComponent(ulong entityId, uint typeHash, void* componentData, int dataSize, void* outBuffer);
+
         [DllImport(NativeLib, EntryPoint = "ScriptAPI_SetComponent", CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe void SetComponent(ulong entityId, uint typeHash, void* componentData, int dataSize);
 

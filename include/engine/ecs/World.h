@@ -995,6 +995,7 @@ namespace ECS {
         }
 
         void _removeFromArchetype(const Entity e, Location& loc) {
+            (void)e;
             // Remove entity from its current archetype
             Archetype* arch = loc.ArchetypePtr;
             const uint32_t chunkIndex = loc.ChunkIndex;
