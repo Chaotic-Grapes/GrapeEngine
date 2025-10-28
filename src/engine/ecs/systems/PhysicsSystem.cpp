@@ -359,14 +359,30 @@ namespace ECS {
                     (matA.PositionCorrectPercent + matB.PositionCorrectPercent) * 0.5f
                 };
 
+                float dist = std::sqrt(distSq);
+                float depth = radii - dist;
+
+                // Collision normal points from A to B
+                Vector2D normal;
+                if (dist > 0.0001f) {
+                    normal.X = dx / dist;
+                    normal.Y = dy / dist;
+                }
+                // Circles are perfectly overlapping, use arbitrary normal
+                else {
+                  
+                    normal.X = 1.0f;
+                    normal.Y = 0.0f;
+                }
+
                 // resolved using our resolve collision
                 // takes rigidbodies, velocity, transforms, offsets and combined materials
-                Engine::Physics::ResolveCircleCircleCollision(
+                Engine::Physics::ResolveCollision(
                     rbA, rbB,
                     velA, velB,
                     tA, tB,
-                    rA, rB,
-                    cA.Offset, cB.Offset,
+                    normal,
+                    depth,
                     combinedMat
                 );
 
