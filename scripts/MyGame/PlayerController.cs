@@ -22,31 +22,22 @@ public class PlayerController : ScriptBehaviour
         Log("Use WASD to move, Q/E to rotate", LogLevel.Info);
 
         // Create the visual entity for the player
-        m_visualEntity = CreateEntity();
-        
-        // Set initial position at center of screen
-        var transform = new LocalTransform
-        {
-            Position = new Vector3(World.Width * 0.5f, World.Height * 0.5f, 0.0f),
-            Rotation = Quaternion.Identity,
-            Scale = new Vector3(1, 1, 1)
-        };
-        m_visualEntity.SetComponent(transform);
-
-        // Add green circle visual
-        var circle = new ShapeCircle2D
-        {
-            Radius = 20.0f,
-            Color = new Color { R = 0.0f, G = 1.0f, B = 0.0f, A = 1.0f },
-            Filled = true
-        };
-        m_visualEntity.SetComponent(circle);
-
-        // Add Layer component so renderer can see it
-        m_visualEntity.SetComponent(new Layer { Id = 0 });
-
-        // Make sure it's active
-        m_visualEntity.SetComponent(new Active { Enabled = true });
+        m_visualEntity = CreateEntity(
+            new ComponentData<LocalTransform>(new()
+            {
+                Position = new Vector3(World.Width * 0.5f, World.Height * 0.5f, 0.0f),
+                Rotation = Quaternion.Identity,
+                Scale = new Vector3(1, 1, 1)
+            }),
+            new ComponentData<ShapeCircle2D>(new()
+            {
+                Radius = 20.0f,
+                Color = new Color { R = 0.0f, G = 1.0f, B = 0.0f, A = 1.0f }, // Green color
+                Filled = true
+            }),
+            new ComponentData<Layer>(new() { Id = 0 }),
+            new ComponentData<Active>(new() { Enabled = true })
+        );
 
         Log($"Player visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
     }
@@ -118,13 +109,13 @@ public class PlayerController : ScriptBehaviour
 
         var pulse = 0.9f + 0.1f * MathF.Sin((float)Time.ElapsedTime * 5.0f);
         circle.Radius = 20.0f * pulse;
-            
+
         // Keep green color but change brightness
         circle.Color.R = 0.0f;
         circle.Color.G = pulse;
         circle.Color.B = 0.0f;
         circle.Color.A = 1.0f;
-            
+
         m_visualEntity.SetComponent(circle);
     }
 

@@ -699,6 +699,68 @@ namespace {
         return false;
     }
 
+    // Make it return bool to indicate success/failure
+    // The actual output is written into outBuffer
+    bool AddComponentGeneric(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
+        ECS::World* world = GetScriptWorld();
+        if (!world) {
+            std::cerr << "[ScriptAPI] No world set for script access" << '\n';
+            return false;
+        }
+
+        ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
+        if (!world->IsAlive(entity))
+            return false;
+
+        #define HANDLE_COMPONENT_TYPE(ComponentType, HashName) \
+            if (typeHash == FNV1aHash(HashName)) { \
+                if (dataSize != sizeof(ECS::Components::ComponentType)) { \
+                    std::cerr << "[ScriptAPI] Component size mismatch" << '\n'; \
+                    return false; \
+                } \
+                ECS::Components::ComponentType comp; \
+                std::memcpy(&comp, componentData, sizeof(ECS::Components::ComponentType)); \
+				world->Add<ECS::Components::ComponentType>(entity, comp); \
+                if (outBuffer) { \
+                    std::memcpy(outBuffer, &comp, sizeof(ECS::Components::ComponentType)); \
+                } \
+                return true; \
+            }
+
+        HANDLE_COMPONENT_TYPE(LocalTransform,       "LocalTransform")
+        HANDLE_COMPONENT_TYPE(WorldTransform,       "WorldTransform")
+        HANDLE_COMPONENT_TYPE(LinearVelocity2D,     "LinearVelocity2D")
+        HANDLE_COMPONENT_TYPE(Acceleration2D,       "Acceleration2D")
+        HANDLE_COMPONENT_TYPE(AngularVelocity2D,    "AngularVelocity2D")
+        HANDLE_COMPONENT_TYPE(Rigidbody2D,          "Rigidbody2D")
+        HANDLE_COMPONENT_TYPE(PhysicsMaterial2D,    "PhysicsMaterial2D")
+        HANDLE_COMPONENT_TYPE(BoxCollider2D,        "BoxCollider2D")
+        HANDLE_COMPONENT_TYPE(CircleCollider2D,     "CircleCollider2D")
+        HANDLE_COMPONENT_TYPE(Velocity,             "Velocity")
+        HANDLE_COMPONENT_TYPE(Acceleration,         "Acceleration")
+        HANDLE_COMPONENT_TYPE(AngularVelocity,      "AngularVelocity")
+        HANDLE_COMPONENT_TYPE(Rigidbody,            "Rigidbody")
+        HANDLE_COMPONENT_TYPE(BoxCollider,          "BoxCollider")
+        HANDLE_COMPONENT_TYPE(SphereCollider,       "SphereCollider")
+        HANDLE_COMPONENT_TYPE(SpriteRenderer2D,     "SpriteRenderer2D")
+        HANDLE_COMPONENT_TYPE(ShapeCircle2D,        "ShapeCircle2D")
+        HANDLE_COMPONENT_TYPE(ShapeBox2D,           "ShapeBox2D")
+        HANDLE_COMPONENT_TYPE(ShapeLine2D,          "ShapeLine2D")
+        HANDLE_COMPONENT_TYPE(ZIndex2D,             "ZIndex2D")
+        HANDLE_COMPONENT_TYPE(Layer,                "Layer")
+        HANDLE_COMPONENT_TYPE(Camera3D,             "Camera3D")
+        HANDLE_COMPONENT_TYPE(CameraMatrices,       "CameraMatrices")
+        HANDLE_COMPONENT_TYPE(Active,               "Active")
+        HANDLE_COMPONENT_TYPE(Name,                 "Name")
+        HANDLE_COMPONENT_TYPE(TagMask,              "TagMask")
+        HANDLE_COMPONENT_TYPE(Lifetime,             "Lifetime")
+
+        #undef HANDLE_COMPONENT_TYPE // Don't want to pollute global namespace
+
+        std::cerr << "[ScriptAPI] Unknown component type hash: " << typeHash << '\n';
+        return false;
+    }
+
     void SetComponentGeneric(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize) {
         ECS::World* world = GetScriptWorld();
         if (!world) {
@@ -871,6 +933,10 @@ namespace {
 
 SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize) {
     return GetComponentGeneric(entityId, typeHash, outBuffer, bufferSize);
+}
+
+SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
+    return AddComponentGeneric(entityId, typeHash, componentData, dataSize, outBuffer);
 }
 
 SCRIPT_API void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize) {

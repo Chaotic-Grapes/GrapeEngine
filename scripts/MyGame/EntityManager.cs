@@ -67,76 +67,80 @@ public class EntityManager : ScriptBehaviour
         Log("Creating world boundaries...", LogLevel.Info);
 
         // Top wall
-        m_boundaryTop = CreateEntity();
-        m_boundaryTop.SetComponent(new LocalTransform
-        {
-            Position = new Vector3(World.Width / 2, World.WallThickness / 2, 0),
-            Rotation = Quaternion.Identity,
-            Scale = new Vector3(1, 1, 1)
-        });
-        m_boundaryTop.SetComponent(new ShapeBox2D
-        {
-            HalfExtents = new Vector2(World.Width / 2, World.WallThickness / 2),
-            Offset = Vector2.Zero,
-            Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
-            Filled = true
-        });
-        m_boundaryTop.SetComponent(new Layer { Id = 0 }); // Default layer
-        m_boundaryTop.SetComponent(new Active { Enabled = true });
+        m_boundaryTop = CreateEntity(
+            new ComponentData<LocalTransform>(new()
+            {
+                Position = new Vector3(World.Width / 2, World.WallThickness / 2, 0),
+                Rotation = Quaternion.Identity,
+                Scale = new Vector3(1, 1, 1)
+            }),
+            new ComponentData<ShapeBox2D>(new()
+            {
+                HalfExtents = new Vector2(World.Width / 2, World.WallThickness / 2),
+                Offset = Vector2.Zero,
+                Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
+                Filled = true
+            }),
+            new ComponentData<Layer>(new() { Id = 0 }), // Default layer
+            new ComponentData<Active>(new() { Enabled = true })
+        );
 
         // Bottom wall
-        m_boundaryBottom = CreateEntity();
-        m_boundaryBottom.SetComponent(new LocalTransform
-        {
-            Position = new Vector3(World.Width / 2, World.Height - World.WallThickness / 2, 0),
-            Rotation = Quaternion.Identity,
-            Scale = new Vector3(1, 1, 1)
-        });
-        m_boundaryBottom.SetComponent(new ShapeBox2D
-        {
-            HalfExtents = new Vector2(World.Width / 2, World.WallThickness / 2),
-            Offset = Vector2.Zero,
-            Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
-            Filled = true
-        });
-        m_boundaryBottom.SetComponent(new Layer { Id = 0 });
-        m_boundaryBottom.SetComponent(new Active { Enabled = true });
+        m_boundaryBottom = CreateEntity(
+            new ComponentData<LocalTransform>(new()
+            {
+                Position = new Vector3(World.Width / 2, World.Height - World.WallThickness / 2, 0),
+                Rotation = Quaternion.Identity,
+                Scale = new Vector3(1, 1, 1)
+            }),
+            new ComponentData<ShapeBox2D>(new()
+            {
+                HalfExtents = new Vector2(World.Width / 2, World.WallThickness / 2),
+                Offset = Vector2.Zero,
+                Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
+                Filled = true
+            }),
+            new ComponentData<Layer>(new() { Id = 0 }), // Default layer
+            new ComponentData<Active>(new() { Enabled = true })
+        );
 
         // Left wall
-        m_boundaryLeft = CreateEntity();
-        m_boundaryLeft.SetComponent(new LocalTransform
-        {
-            Position = new Vector3(World.WallThickness / 2, World.Height / 2, 0),
-            Rotation = Quaternion.Identity,
-            Scale = new Vector3(1, 1, 1)
-        });
-        m_boundaryLeft.SetComponent(new ShapeBox2D
-        {
-            HalfExtents = new Vector2(World.WallThickness / 2, World.Height / 2),
-            Offset = Vector2.Zero,
-            Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
-            Filled = true
-        });
-        m_boundaryLeft.SetComponent(new Layer { Id = 0 });
-        m_boundaryLeft.SetComponent(new Active { Enabled = true });
+        m_boundaryLeft = CreateEntity(
+            new ComponentData<LocalTransform>(new()
+            {
+                Position = new Vector3(World.WallThickness / 2, World.Height / 2, 0),
+                Rotation = Quaternion.Identity,
+                Scale = new Vector3(1, 1, 1)
+            }),
+            new ComponentData<ShapeBox2D>(new()
+            {
+                HalfExtents = new Vector2(World.WallThickness / 2, World.Height / 2),
+                Offset = Vector2.Zero,
+                Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
+                Filled = true
+            }),
+            new ComponentData<Layer>(new() { Id = 0 }), // Default layer
+            new ComponentData<Active>(new() { Enabled = true })
+        );
 
         // Right wall
-        m_boundaryRight = CreateEntity();
-        m_boundaryRight.SetComponent(new LocalTransform
-        {
-            Position = new Vector3(World.Width - World.WallThickness / 2, World.Height / 2, 0),
-            Rotation = Quaternion.Identity,
-            Scale = new Vector3(1, 1, 1)
-        });
-        m_boundaryRight.SetComponent(new ShapeBox2D
-        {
-            HalfExtents = new Vector2(World.WallThickness / 2, World.Height / 2),
-            Offset = Vector2.Zero,
-            Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
-            Filled = true
-        });
-        m_boundaryRight.SetComponent(new Layer { Id = 0 });
-        m_boundaryRight.SetComponent(new Active { Enabled = true });
+        m_boundaryRight = CreateEntity(
+            new ComponentData<LocalTransform>(new()
+            {
+                Position = new Vector3(World.Width - World.WallThickness / 2, World.Height / 2, 0),
+                Rotation = Quaternion.Identity,
+                Scale = new Vector3(1, 1, 1)
+            }),
+            new ComponentData<ShapeBox2D>(new()
+            {
+                HalfExtents = new Vector2(World.WallThickness / 2, World.Height / 2),
+                Offset = Vector2.Zero,
+                Color = new Color { R = 0.3f, G = 0.3f, B = 0.3f, A = 1.0f },
+                Filled = true
+            }),
+            new ComponentData<Layer>(new() { Id = 0 }), // Default layer
+            new ComponentData<Active>(new() { Enabled = true })
+        );
 
         Log("World boundaries created (4 walls)", LogLevel.Info);
     }
@@ -146,8 +150,9 @@ public class EntityManager : ScriptBehaviour
         Log("Spawning Player...", LogLevel.Info);
 
         // Create a controller entity for the PlayerController script
-        m_playerController = CreateEntity();
-        m_playerController.SetComponent(new Active { Enabled = true });
+        m_playerController = CreateEntity(
+            new ComponentData<Active>(new() { Enabled = true }
+        ));
         
         // The PlayerController script will create its own visual entity
         // We just need to attach the script component
@@ -160,11 +165,14 @@ public class EntityManager : ScriptBehaviour
         Log("Spawning Enemies...", LogLevel.Info);
 
         // Enemy 1 - left side
-        m_enemy1Controller = CreateEntity();
-        m_enemy1Controller.SetComponent(new Active { Enabled = true });
+        m_enemy1Controller = CreateEntity(
+            new ComponentData<Active>(new() { Enabled = true }
+        ));
         
         // Enemy 2 - right side  
-        m_enemy2Controller = CreateEntity();
+        m_enemy2Controller = CreateEntity(
+            new ComponentData<Active>(new() { Enabled = true }
+        );
         m_enemy2Controller.SetComponent(new Active { Enabled = true });
     }
 
