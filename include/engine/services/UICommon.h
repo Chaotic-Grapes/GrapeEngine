@@ -13,7 +13,8 @@ enum class WindowId {
     DEBUG_INPUT,
     DEBUG_EDITOR,
     EDITOR_PLAYBACK,
-    EDITOR_ASSET_BROWSER
+    EDITOR_ASSET_BROWSER,
+    EDITOR_PREFAB_EDITOR
 };
 
 // Centralized registry APIs

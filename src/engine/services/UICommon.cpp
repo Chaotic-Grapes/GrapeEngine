@@ -37,5 +37,6 @@ void InitializeDefaultLayouts() {
     // LevelEditor defaults
     RegisterLayout(WindowId::EDITOR_PLAYBACK, 650.0f, 0.0f, 334.0f, 57.0f);
     RegisterLayout(WindowId::EDITOR_ASSET_BROWSER, 0.0f, 600.0f, 1000.0f, 300.0f);
+    RegisterLayout(WindowId::EDITOR_PREFAB_EDITOR, 350.0f, 200.0f, 460.0f, 300.0f);
 }
 } // namespace UICommon
