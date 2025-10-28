@@ -142,7 +142,7 @@ namespace ECS {
                 //part where rotation is integrated
 
                 // skip if rotation is locked 
-                if (!(rb.Flags & (1 << 2))) { 
+                if (!(rb.Flags & (1 << 2))) {
                     // convert angular velocity to quaternion rotation
                     transform.Rotation = Quaternion::FromEulerRad(0.0f, 0.0f, angularVel.Value * dt) * transform.Rotation;
                 }
@@ -177,7 +177,7 @@ namespace ECS {
         // phase 2 of broadphase to build spatial grid where we actively 
         // insert all static and dynamitc entities into grid
         SpatialPartitioning partition;
-        partition.Grid().reserve(1024); 
+        partition.Grid().reserve(1024);
 
         // insert all entities with circle colliders into grid 
         world.Each<Components::LocalTransform, Components::CircleCollider2D>([&](const Entity entity, const Components::LocalTransform& transform, const Components::CircleCollider2D& collider) {
@@ -186,13 +186,13 @@ namespace ECS {
             if (const auto* active = world.TryGet<Components::Active>(entity)) {
                 if (!active->Enabled) return;
             }
-            
+
             //calculate world-space center (position + collider offset)
             const Vector3D center = transform.Position + Vector3D(collider.Offset.X, collider.Offset.Y, 0.0f);
 
             // insert into spatial grid using bounding radius
             partition.Insert(entity, center, collider.Radius);
-        });
+            });
 
         // generate candidate pairs in this part to check entities within same cells
         // to find potential collisions only entities in same/nearby cells are considered
@@ -212,7 +212,7 @@ namespace ECS {
             if (a > b) std::swap(a, b);
             // combines into a 64 bit key
             return (a << 32) | (b & 0xFFFFFFFFull);
-        };
+            };
 
         //iterate through all grid cells
         for (const auto& cellEntry : partition.Grid()) {
@@ -224,7 +224,7 @@ namespace ECS {
             // possibilities -> (A,C)(B,C)(A,B)
             for (size_t i = 0; i < n; ++i) {
                 for (size_t j = i + 1; j < n; ++j) {
-                    
+
                     // packs entities into 64-bit IDs
                     const uint64_t a = ECS::EntityUtils::Pack(entities[i]);
                     const uint64_t b = ECS::EntityUtils::Pack(entities[j]);
@@ -243,7 +243,7 @@ namespace ECS {
         // for each candidate pair 
         // 1) collision test based on distance
         // 2) resolve collision with impulse and position correction in mind
-    
+
         //using this as a iteration counter the higher the more accurate since it loops more
         const int positionCorrectionIterations = 4;
 
@@ -259,15 +259,15 @@ namespace ECS {
 
                 // check if either A or B are alive objs
                 if (!world.IsAlive(A) || !world.IsAlive(B)) continue;
-                
+
                 // get transform and collider for both entities
                 auto [tA_ptr, cA_ptr] = world.TryGetComponents
-                    <Components::LocalTransform, 
+                    <Components::LocalTransform,
                     Components::CircleCollider2D>(A);
                 auto [tB_ptr, cB_ptr] = world.TryGetComponents
-                    <Components::LocalTransform, 
+                    <Components::LocalTransform,
                     Components::CircleCollider2D>(B);
-                
+
                 //skip if transformation or collider components are missing from objs
                 if (!tA_ptr || !cA_ptr || !tB_ptr || !cB_ptr) continue;
 
@@ -282,7 +282,7 @@ namespace ECS {
                 // If neither has a rigidbody/velocity, skip since no possible dyanmic response
                 bool hasPhysicsA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
                 bool hasPhysicsB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
-                
+
                 // static objs for both skip
                 if (!hasPhysicsA && !hasPhysicsB) {
                     continue;
@@ -309,7 +309,7 @@ namespace ECS {
                 // if circles overlap: distance^2 < (radiusA + radiusB)^2 -> means collision!
                 const float dx = centerB.X - centerA.X;
                 const float dy = centerB.Y - centerA.Y;
-                const float distSq = dx*dx + dy*dy;
+                const float distSq = dx * dx + dy * dy;
                 const float radii = rA + rB;
 
                 // reject if not collision
@@ -370,14 +370,14 @@ namespace ECS {
                 }
                 // Circles are perfectly overlapping, use arbitrary normal
                 else {
-                  
+
                     normal.X = 1.0f;
                     normal.Y = 0.0f;
                 }
 
                 // resolved using our resolve collision
                 // takes rigidbodies, velocity, transforms, offsets and combined materials
-              Engine::Physics::ResolveCollision(
+                Engine::Physics::ResolveCollision(
                     rbA, rbB,
                     velA, velB,
                     tA, tB,
@@ -395,5 +395,6 @@ namespace ECS {
             if (collisionsResolved == 0) break;
         } // iterations
 
-} // namespace ECS
+    } // namespace ECS
 
+}

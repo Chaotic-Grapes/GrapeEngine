@@ -59,7 +59,19 @@ void PhysicsTestScene::OnUnload() {
 }
 
 //helper function during unloading
-void DestroyEntities() {
-	const ECS::World& world = GetWorld();
+void PhysicsTestScene::DestroyEntities() {
+//	const ECS::World& world = GetWorld();
 }
 
+void PhysicsTestScene::PhysicsCollisionResponse() {
+
+}
+
+void PhysicsTestScene::PhysicsForces() {
+
+		}
+
+	
+void PhysicsTestScene::BroadNarrowPhaseCollision() {
+
+		}
