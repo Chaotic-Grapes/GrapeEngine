@@ -624,6 +624,88 @@ bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
     }
 }
 
+// Render UI for editing a single component's properties
+// Reduce repetitive code
+void AssetBrowser::_renderComponentEditor(nlohmann::json& componentEntry) {
+    std::string componentType = componentEntry["Type"];
+    // Transform component editor
+    if (componentType == "Transform") {
+        // Get reference to Transform data for editing (FOR NOW)
+        auto& data = componentEntry["Data"];
+
+        // Transform header with collapsing arrow
+        if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+            // Rotation row
+            ImGui::Text("Local Rotation");
+
+            // Extract current value from JSON
+            float rotation = data["Rotation"];
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);  // Small gappity
+            ImGui::Text("θ");
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::DragFloat("##Rotation", &rotation, 1.0f)) {
+                data["Rotation"] = rotation;
+            }
+
+            // Position row
+            ImGui::Text("Local Position");
+
+            // Extract current values from JSON
+            float posX = data["Position"]["X"];
+            float posY = data["Position"]["Y"];
+
+            // This is an attempt to make it look ok
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
+
+            ImGui::Text("X");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::DragFloat("##PosX", &posX, 1.0f)) {
+                data["Position"]["X"] = posX;
+            }
+
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
+            ImGui::Text("Y");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::DragFloat("##PosY", &posY, 1.0f)) {
+                data["Position"]["Y"] = posY;
+            }
+
+            // Scale row
+            ImGui::Text("Local Scale");
+
+            // Extract current values from JSON
+            float scaleX = data["Scale"]["X"];
+            float scaleY = data["Scale"]["Y"];
+
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 52);
+
+            ImGui::Text("X");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::DragFloat("##ScaleX", &scaleX, 1.0f)) {
+                data["Scale"]["X"] = scaleX;
+            }
+
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
+            ImGui::Text("Y");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::DragFloat("##ScaleY", &scaleY, 1.0f)) {
+                data["Scale"]["Y"] = scaleY;
+            }
+        }
+    }
+}
+
 // Prefab editor window (when inspector panel is complete, this will be moved)
 void AssetBrowser::_showPrefabEditor() {
     // Set initial window size
@@ -639,81 +721,8 @@ void AssetBrowser::_showPrefabEditor() {
         if (m_prefabData.contains("Components")) {
             // Loop through all components to find Transform (default, can add components)
             for (auto& componentEntry : m_prefabData["Components"]) {
-                if (componentEntry["Type"] == "Transform") {
-                    // Get reference to Transform data for editing (FOR NOW)
-                    auto& data = componentEntry["Data"];
-
-                    // Transform header with collapsing arrow
-                    if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-                        // Rotation row
-                        ImGui::Text("Local Rotation");
-
-                        // Extract current value from JSON
-                        float rotation = data["Rotation"];
-                        ImGui::SameLine();
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);  // Small gappity
-                        ImGui::Text("θ");
-
-                        ImGui::SameLine();
-                        ImGui::SetNextItemWidth(100);
-                        if (ImGui::DragFloat("##Rotation", &rotation, 1.0f)) {
-                            data["Rotation"] = rotation;
-                        }
-
-                        // Position row
-                        ImGui::Text("Local Position");
-
-                        // Extract current values from JSON
-                        float posX = data["Position"]["X"];
-                        float posY = data["Position"]["Y"];
-
-                        // This is an attempt to make it look ok
-                        ImGui::SameLine();
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
-
-                        ImGui::Text("X");
-                        ImGui::SameLine();
-                        ImGui::SetNextItemWidth(100);
-                        if (ImGui::DragFloat("##PosX", &posX, 1.0f)) {
-                            data["Position"]["X"] = posX;
-                        }
-
-                        ImGui::SameLine();
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20); 
-                        ImGui::Text("Y");
-                        ImGui::SameLine();
-                        ImGui::SetNextItemWidth(100);
-                        if (ImGui::DragFloat("##PosY", &posY, 1.0f)) {
-                            data["Position"]["Y"] = posY;
-                        }
-
-                        // Scale row
-                        ImGui::Text("Local Scale");
-
-                        // Extract current values from JSON
-                        float scaleX = data["Scale"]["X"];
-                        float scaleY = data["Scale"]["Y"];
-
-                        ImGui::SameLine();
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 52);
-
-                        ImGui::Text("X");
-                        ImGui::SameLine();
-                        ImGui::SetNextItemWidth(100);
-                        if (ImGui::DragFloat("##ScaleX", &scaleX, 1.0f)) {
-                            data["Scale"]["X"] = scaleX;
-                        }
-
-                        ImGui::SameLine();
-                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
-                        ImGui::Text("Y");
-                        ImGui::SameLine();
-                        ImGui::SetNextItemWidth(100);
-                        if (ImGui::DragFloat("##ScaleY", &scaleY, 1.0f)) {
-                            data["Scale"]["Y"] = scaleY;
-                        }
-                    }
-                }
+                // Render editor UI for each component
+                _renderComponentEditor(componentEntry);
             }
         }
 
@@ -738,7 +747,7 @@ void AssetBrowser::_showPrefabEditor() {
 
         ImGui::SameLine();
 
-        // Cancel button - discard changes and close window
+        // Cancel button: discard changes and close window
         if (ImGui::Button("Cancel")) {
             m_editingPrefab = false;
         }

@@ -73,6 +73,9 @@ private:
     // Helper for updating single entity
     bool _updateEntityFromPrefab(Entity& entity); 
 
+    // Helper for editing a single component's properties
+    void _renderComponentEditor(nlohmann::json& componentEntry);
+
     // Display prefab editor window with property editing
     void _showPrefabEditor();
 
