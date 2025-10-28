@@ -5,9 +5,7 @@ using GrapeEngine.Numerics;
 namespace MyGame;
 
 /// <summary>
-/// Collectible item - demonstrates another unique behavior.
-/// 
-/// RUBRIC: This is a third unique script behavior.
+/// Collectible item to demonstrate another unique behavior.
 /// </summary>
 public class CollectibleItem : ScriptBehaviour
 {
@@ -25,7 +23,7 @@ public class CollectibleItem : ScriptBehaviour
         // Create the visual entity
         m_visualEntity = CreateEntity();
 
-        // Set up initial position (use a default or pass in via script parameters in future)
+        // Set up initial position
         m_originalPosition = new Vector3(400.0f, 360.0f, 0.0f);
 
         var transform = new LocalTransform
@@ -44,11 +42,7 @@ public class CollectibleItem : ScriptBehaviour
             Filled = true
         };
         m_visualEntity.SetComponent(circle);
-
-        // Add Layer component so renderer can see it
         m_visualEntity.SetComponent(new Layer { Id = 0 });
-
-        // Make sure it's active
         m_visualEntity.SetComponent(new Active { Enabled = true });
 
         Log($"Collectible visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
@@ -80,6 +74,8 @@ public class CollectibleItem : ScriptBehaviour
         // Rainbow color cycle
         var hue = ((float)Time.ElapsedTime * 0.5f) % 1.0f;
         var (r, g, b) = HSVToRGB(hue, 1.0f, 1.0f);
+        // Since hue is being used, we need to convert HSV to RGB
+        // More details below in HSVToRGB method
 
         circle.Color.R = r;
         circle.Color.G = g;
@@ -89,6 +85,8 @@ public class CollectibleItem : ScriptBehaviour
         m_visualEntity.SetComponent(circle);
     }
 
+    // Note: This is only a sample method for the sake of the demo.
+    // Method adapted from https://gist.github.com/mjackson/5311256
     private (float r, float g, float b) HSVToRGB(float h, float s, float v)
     {
         var hi = (int)(h * 6.0f) % 6;

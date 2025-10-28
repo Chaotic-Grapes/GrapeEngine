@@ -5,11 +5,13 @@ using GrapeEngine.Numerics;
 namespace MyGame;
 
 /// <summary>
-/// EntityManager - Orchestrates the entire scripting test scene from C#.
-/// Handles spawning all entities, world boundaries, and test logic.
-/// This demonstrates that complex scene setup can be entirely script-driven.
+/// The class that manages the entities in the test scene.
+/// Handles spawning all entities, world boundaries and test logic.
+/// Should demonstrate that scene setups can be entirely script-driven.
 /// </summary>
-public class EntityManager : ScriptBehaviour
+public class EntityManager : ScriptBehaviour 
+// Public opinion states that some people are put off by the "Behaviour" spelling. (Talking about Unity)
+// Could consider changing to something more standard and not specific to American/British English.
 {
     // Entity references for spawned objects
     private Entity m_player;
@@ -31,6 +33,11 @@ public class EntityManager : ScriptBehaviour
     private Entity m_boundaryLeft;
     private Entity m_boundaryRight;
 
+    // Note: The multiple declaration of entities above is for clarity in this example.
+
+    // Note: In Unity, the methods such as Update(), FixedUpdate() etc do not have to be overridden.
+    // In GrapeEngine, we override OnStart() and OnUpdate() and it is a must to do so.
+    // Could try to implement like Unity but it isn't a priority.
     public override void OnStart()
     {
         Log("=== EntityManager ===", LogLevel.Info);
@@ -43,7 +50,7 @@ public class EntityManager : ScriptBehaviour
         SpawnEnemies();
         SpawnCollectibles();
 
-        Log($"Created {5} controller entities + {5} visual entities + {4} boundary entities", LogLevel.Info);
+        Log($"Created 5 controller entities + 5 visual entities + 4 boundary entities", LogLevel.Info);
         Log("Player: Green circle with figure-8 movement", LogLevel.Info);
         Log("Enemies: 2 red circles with patrol behavior", LogLevel.Info);
         Log("Collectibles: 2 rainbow circles with bobbing motion", LogLevel.Info);
@@ -177,8 +184,9 @@ public class EntityManager : ScriptBehaviour
     public override void OnDestroy()
     {
         Log("EntityManager: Cleaning up scene...", LogLevel.Info);
-        
+
         // Cleanup is automatic when entities are destroyed
+        // since C# scripts are attached to entities and cleaned up with them
         // but we could manually clean up here if needed
     }
 }

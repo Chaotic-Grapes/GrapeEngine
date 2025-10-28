@@ -5,8 +5,7 @@ using GrapeEngine.Numerics;
 namespace MyGame;
 
 /// <summary>
-/// Player controller script - demonstrates keyboard input and movement.
-/// This is a unique behavior that controls the player entity.
+/// Player controller script to demonstrate keyboard input and movement.
 /// </summary>
 public class PlayerController : ScriptBehaviour
 {
