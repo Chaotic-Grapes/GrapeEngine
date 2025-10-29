@@ -29,7 +29,7 @@ struct ImFont;
 
 // Configuration structure for level editor UI settings
 struct LevelEditorConfig {
-    float FontSize = 19.6f;   // Base font size in pixels
+    float FontSize = 16.0f;                                // Base font size in pixels
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  // Maximum length for game object names
 };
 
@@ -60,6 +60,7 @@ private:
     Playback m_playback;              // Playback controls panel
     AssetBrowser m_assetBrowser;      // Asset browser panel
     ImFont* m_symbolsFont = nullptr;  // Material Symbols icon font
+    ImFont* m_mainFont = nullptr;     // Inter font for text
 };
 
 #endif

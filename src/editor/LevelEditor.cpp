@@ -33,36 +33,34 @@ LevelEditor::LevelEditor(World* world, const LevelEditorConfig& config)
 
 LevelEditor::~LevelEditor() {}
 
-// Initialize ImGui fonts and editor panels
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
     auto& io = ImGui::GetIO();
 
-    /// Load default font at custom size for text
-    float textFontSize = 15.0f; 
-    io.Fonts->AddFontDefault(); 
-    io.Fonts->Clear();  // Clear auto-added default font to override size
+    io.Fonts->Clear();
 
-    // Load default font at custom size
-    ImFontConfig textConfig;
-    textConfig.SizePixels = textFontSize;
-    io.Fonts->AddFontDefault(&textConfig);
+    // 1. Load Inter as main font for text
+    float textFontSize = m_config.FontSize;
+    m_mainFont = io.Fonts->AddFontFromFileTTF(
+        "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
+        textFontSize
+    );
 
-    // Define the range for Material Symbols
-    // Reference: https://fonts.google.com/icons
+    if (!m_mainFont) {
+        LOG_ERROR("Failed to load Inter font, using default");
+        m_mainFont = io.Fonts->AddFontDefault();
+    }
+
+    // 2. Load Material Symbols as SEPARATE font
     static const ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
 
-    // Configure font loading settings for Material Symbols
     ImFontConfig iconsConfig;
-    iconsConfig.MergeMode = true;            // Merge icons into default font so we don't need to switch fonts
-    iconsConfig.PixelSnapH = true;           // Align icon pixels to grid for sharper rendering
-    iconsConfig.GlyphMinAdvanceX = 24.0f;    // Minimum horizontal spacing for each icon
-    iconsConfig.GlyphOffset = ImVec2(0, 5);  // Shift icons down 5 pixels to center them vertically in buttons
+    iconsConfig.MergeMode = false;           // Keep them separate
+    iconsConfig.PixelSnapH = true;
+    iconsConfig.GlyphMinAdvanceX = 24.0f;
+    iconsConfig.GlyphOffset = ImVec2(0, 0);  // No vertical offset
 
-    // Load Material Symbols at smaller size
-    float iconFontSize = 19.0f;  
-
-    // Load Material Symbols font and merge it with the default font
+    float iconFontSize = 18.0f;
     m_symbolsFont = io.Fonts->AddFontFromFileTTF(
         "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
         iconFontSize,
@@ -70,20 +68,11 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         iconRanges
     );
 
-    // Checks
-    if (m_symbolsFont == nullptr) {
-        LOG_ERROR("Failed to load Material Symbols font");
-    }
-    else {
-        LOG_INFO("Material Symbols font merged successfully");
-    }
-
-    // Build the font atlas (combines default font + Material Symbols)
     io.Fonts->Build();
 
-    // Initialize playback controls & asset browser with symbols font
-    m_playback.Initialize(m_symbolsFont);
-    m_assetBrowser.Initialize(m_symbolsFont, m_world);
+    // Pass both fonts to components
+    m_playback.Initialize(m_mainFont, m_symbolsFont);  // Update to take both fonts
+    m_assetBrowser.Initialize(m_mainFont, m_symbolsFont, m_world);
 }
 
 // Process input for all editor panels

@@ -38,7 +38,8 @@ References:
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 
-void AssetBrowser::Initialize(ImFont* symbolsFont, World* world) {
+void AssetBrowser::Initialize(ImFont* mainFont, ImFont* symbolsFont, World* world) {
+    m_mainFont = mainFont;
     m_symbolsFont = symbolsFont;
     m_world = world;
 }
@@ -46,15 +47,19 @@ void AssetBrowser::Initialize(ImFont* symbolsFont, World* world) {
 // Render the asset browser UI window
 void AssetBrowser::Render() {
     UICommon::ApplyLayout(UICommon::WindowId::EDITOR_ASSET_BROWSER);
+    ImGui::PushFont(m_mainFont);
     ImGui::Begin("Asset Browser");
 
     // Display clickable breadcrumb navigation
     _displayBreadcrumbs();
 
     // Import button (upload icon)
+    ImGui::PushFont(m_symbolsFont);
     if (ImGui::Button("\xEF\x82\x9B")) {
         _importAsset();
     }
+    ImGui::PopFont();
+
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Import new assets into current folder");
     }
@@ -65,10 +70,12 @@ void AssetBrowser::Render() {
     bool hasSelection = !m_selectedAsset.empty();
     if (!hasSelection) ImGui::BeginDisabled();
 
+    ImGui::PushFont(m_symbolsFont);
     if (ImGui::Button("\xEE\xA3\x94")) {
         _replaceTexture();
     }
 
+    ImGui::PopFont();
     if (!hasSelection) ImGui::EndDisabled();
 
     // Show tooltip even when disabled
@@ -88,10 +95,12 @@ void AssetBrowser::Render() {
     if (!isPrefab) ImGui::BeginDisabled();
 
     // + button containing load and edit prefab buttons
+    ImGui::PushFont(m_symbolsFont);
     if (ImGui::Button("\xEE\x85\x85\xEE\x8C\x93")) {
         ImGui::OpenPopup("Prefabs");
     }
 
+    ImGui::PopFont();
     if (!isPrefab) ImGui::EndDisabled();
 
     // Tooltip for prefab button
@@ -151,6 +160,7 @@ void AssetBrowser::Render() {
     }
 
     ImGui::End();
+    ImGui::PopFont();
 
     // Show prefab editor window if user clicked "Edit Prefab"
     if (m_editingPrefab) {
@@ -214,9 +224,12 @@ void AssetBrowser::_displayBreadcrumbs() {
 
 // Display all files and folders in the given directory
 void AssetBrowser::_displayFolder(const std::filesystem::path& folderPath) {
+    ImGui::PushFont(m_mainFont);
+
     // Check if path exists or if path exists but it's a file, not a folder
     if (!std::filesystem::exists(folderPath) || !std::filesystem::is_directory(folderPath)) {
         ImGui::TextColored(ImVec4(1, 0, 0, 1), "Folder not found");
+        ImGui::PopFont();
         return;
     }
 
@@ -224,10 +237,15 @@ void AssetBrowser::_displayFolder(const std::filesystem::path& folderPath) {
     for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
         // If item is folder
         if (entry.is_directory()) {
-            // Folder icon + name
-            std::string folderName = "\xEE\x8B\x87 " + entry.path().filename().string();
+            // Render folder icon with symbols font
+            ImGui::PushFont(m_symbolsFont);
+            ImGui::Text("\xEE\x8B\x87");
+            ImGui::PopFont();
 
-            // Clickable folder entry
+            ImGui::SameLine();
+
+            // Render folder name with main font
+            std::string folderName = entry.path().filename().string();
             if (ImGui::Selectable(folderName.c_str())) {
                 // If clicked, navigate into it by changing current path
                 m_currentPath = entry.path().string();
@@ -240,6 +258,7 @@ void AssetBrowser::_displayFolder(const std::filesystem::path& folderPath) {
             _displayFile(entry.path());
         }
     }
+    ImGui::PopFont();
 }
 
 // Display a single file as a selectable entry
@@ -248,11 +267,14 @@ void AssetBrowser::_displayFile(const std::filesystem::path& filePath) {
     std::string filename = filePath.filename().string();
     bool isSelected = (m_selectedAsset == filePath.string());
 
-    // File icon + filename
-    std::string displayName = "\xEE\xA1\xB3 " + filename;
+    // Render icon with symbols font
+    ImGui::PushFont(m_symbolsFont);
+    ImGui::Text("\xEE\xA1\xB3");
+    ImGui::PopFont();
 
+    ImGui::SameLine();
     // Selectable file entry
-    if (ImGui::Selectable(displayName.c_str(), isSelected)) {
+    if (ImGui::Selectable(filename.c_str(), isSelected)) {
         // If clicked, remember it as selected
         m_selectedAsset = filePath.string();
     }
@@ -625,9 +647,6 @@ bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
     }
 }
 
-// ============================= GENERALIZED UI HELPERS =============================
-// These helpers are reusable for ANY component type - they handle common UI patterns
-
 // Render a property with X and Y fields (works for Position, Scale, Velocity, Size, etc.)
 void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& data, const std::string& xKey,
     const std::string& yKey, float dragSpeed, float labelOffset)
@@ -818,7 +837,7 @@ void AssetBrowser::_showPrefabEditor() {
                     // Without it, these function calls wouldn't compile because the lambda wouldn't
                     // have access to the current class instance
                     _renderComponentSection("Transform", data, [this](nlohmann::json& d) {
-                        _renderFloatRow("Local Rotation", "θ", d, "Rotation", 1.0f);
+                        _renderFloatRow("Local Rotation", "R", d, "Rotation", 1.0f);
                         _renderVector2DRow("Local Position", d["Position"], "X", "Y", 1.0f);
                         _renderVector2DRow("Local Scale", d["Scale"], "X", "Y", 0.01f, 52.0f);
                         });
