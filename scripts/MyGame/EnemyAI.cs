@@ -9,6 +9,10 @@ namespace MyGame;
 /// </summary>
 public class EnemyAI : ScriptBehaviour
 {
+    //AI state machine
+    private HFSM m_fsm;
+
+    // stats
     private readonly float m_patrolSpeed = 80f;
     private Vector3 m_patrolPointA;
     private Vector3 m_patrolPointB;
