@@ -47,8 +47,8 @@ Features:
 using namespace Sandbox;
 using namespace ECS;
 
-constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::ViewportCamera;
-constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::ObjectPicking;
+constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::BasicGraphics;
+constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::FontSystem;
 
 extern ResourceManager RM;
 
@@ -218,7 +218,7 @@ void GraphicsTestScene::runBasicGraphics() {
             ECS::Components::ShapeBox2D{
                 Vector2D{50.f, 50.f},
                 Vector2D{0.f, 0.f},
-                Color{1.f, 0.f, 0.f, 1.f}, // red
+                Color{3.f, 0.f, 0.5f, 1.f}, // Magenta
                 0.f,                       // thickness (ignored for filled)
                 true                       // filled
             },
@@ -239,7 +239,7 @@ void GraphicsTestScene::runBasicGraphics() {
             ECS::Components::ShapeCircle2D{
                 50.f,                          // radius
                 Vector2D{0.f, 0.f},            // offset
-                Color{0.f, 0.4f, 1.f, 1.f},    // blue fill
+                Color{2.f, 1.4f, 7.4f, 1.f},    // blue fill
                 0.f                            // strokePx (0 = filled)
             },
             ECS::Components::Name{ "Filled_Circle" }
@@ -259,7 +259,7 @@ void GraphicsTestScene::runBasicGraphics() {
             ECS::Components::ShapeCircle2D{
                 50.f,                          // radius
                 Vector2D{0.f, 0.f},            // offset
-                Color{0.f, 1.f, 0.f, 1.f},     // green outline
+                Color{0.f, 3.f, 0.f, 1.f},     // green outline
                 2.0f                           // strokePx > 0 = outline
             },
             ECS::Components::Name{ "Outlined_Circle" }
@@ -279,8 +279,8 @@ void GraphicsTestScene::runBasicGraphics() {
             ECS::Components::ShapeCircle2D{
                 60.f,                          // radius
                 Vector2D{0.f, 0.f},            // offset
-                Color{1.f, 0.f, 1.f, 0.6f},    // magenta, semi-transparent
-                3.0f                           // strokePx (outline only)
+                Color{2.f, 2.f, 0.f, 1.f},
+                0.f                           
             },
             ECS::Components::Name{ "Collider_Circle" }
         );
@@ -992,7 +992,7 @@ void GraphicsTestScene::runViewportCamera() {
 
         auto& playerCircle = world.Add<ECS::Components::ShapeCircle2D>(player);
         playerCircle.Radius = 0.55f;                 // world units
-        playerCircle.Color = { 0.f, 1.f, 1.f, 1.f };// cyan
+        playerCircle.Color = { 0.f, 2.f, 2.f, 1.f };// cyan
         playerCircle.Thickness = 1.0f;                  // used if not Filled
         playerCircle.Filled = true;
 
@@ -1106,7 +1106,7 @@ void GraphicsTestScene::runMultipleShaders() {
             ECS::Components::ShapeCircle2D{
                 60.f,
                 Vector2D{ 0.f, 0.f },
-                Color{ 1.f, 1.f, 0.f, 1.f }, // bright yellow
+                Color{ 9.f, 3.f, 0.f, 1.f }, // brighter yellow
                 0.f                          // filled
             },
             ECS::Components::Name{ "Player" }
