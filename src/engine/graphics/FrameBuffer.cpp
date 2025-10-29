@@ -1,7 +1,36 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Framebuffer.cpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   29th October 2025
+\brief
+Implements the Framebuffer class, which encapsulates the creation, management,
+and usage of OpenGL framebuffer objects (FBOs). A framebuffer serves as an
+off-screen render target that allows rendering to textures instead of directly
+to the default window backbuffer.
+
+This file provides functions for:
+- Creating framebuffers with configurable color and depth attachments
+- Binding/unbinding framebuffers for off-screen rendering
+- Resizing and destroying framebuffer resources
+- Clearing and blitting contents between framebuffers
+- Binding framebuffer textures for post-processing passes
+
+The Framebuffer class is a key component of the engine’s rendering pipeline,
+used for effects such as HDR rendering, bloom, tone mapping, and deferred passes.
+*/
+/* End Header *******************************************************************/
+
 #include "graphics/Framebuffer.hpp"
 #include <iostream>
 #include <vector>
 
+// ============================================================================
+// Creates a framebuffer with color and optional depth attachments.
+// This sets up texture targets for rendering into (instead of the default window).
+// Parameters allow choosing size, HDR (floating point) mode, and number of color attachments.
+// ============================================================================
 void Framebuffer::Create(int w, int h,
     bool floatingPoint,
     bool withDepth,
@@ -65,9 +94,20 @@ void Framebuffer::Create(int w, int h,
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+// ============================================================================
+// Binds this framebuffer so subsequent draw calls render into it.
+// ============================================================================
 void Framebuffer::Bind() { glBindFramebuffer(GL_FRAMEBUFFER, fbo); }
+
+// ============================================================================
+// Unbinds the framebuffer, restoring rendering to the default backbuffer.
+// ============================================================================
 void Framebuffer::Unbind() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
 
+// ============================================================================
+// Resizes the framebuffer by destroying and recreating all attachments
+// with the new width and height.
+// ============================================================================
 void Framebuffer::Resize(int w, int h,
     bool floatingPoint,
     bool withDepth)
@@ -76,6 +116,10 @@ void Framebuffer::Resize(int w, int h,
     Create(w, h, floatingPoint, withDepth);
 }
 
+// ============================================================================
+// Frees all GPU resources associated with this framebuffer —
+// deletes color textures, depth buffers, and the FBO itself.
+// ============================================================================
 void Framebuffer::Destroy()
 {
     if (depth)
@@ -97,6 +141,10 @@ void Framebuffer::Destroy()
     }
 }
 
+// ============================================================================
+// Binds the framebuffer, sets viewport to its size, and clears its color
+// and depth buffers to a given RGBA color.
+// ============================================================================
 void Framebuffer::BindAndClear(float r, float g, float b, float a)
 {
     Bind();
@@ -105,6 +153,10 @@ void Framebuffer::BindAndClear(float r, float g, float b, float a)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
+// ============================================================================
+// Copies (blits) the framebuffer’s contents to the default backbuffer.
+// Usually used to display post-processed results to the screen.
+// ============================================================================
 void Framebuffer::BlitToDefault(GLbitfield mask, GLenum filter) const
 {
     glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
@@ -113,4 +165,17 @@ void Framebuffer::BlitToDefault(GLbitfield mask, GLenum filter) const
         0, 0, width, height,
         mask, filter);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+}
+
+// ============================================================================
+// Binds one of the framebuffer’s color textures to a given texture unit,
+// so it can be sampled in a shader (e.g., for post-processing).
+// ============================================================================
+void Framebuffer::BindColorTexture(int index, int unit) const
+{
+    if (index < 0 || index >= static_cast<int>(colorAttachments.size()))
+        return;
+
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(GL_TEXTURE_2D, colorAttachments[index]);
 }

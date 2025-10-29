@@ -119,4 +119,7 @@ public:
      */
     void BlitToDefault(GLbitfield mask = GL_COLOR_BUFFER_BIT,
         GLenum filter = GL_NEAREST) const;
+
+    /** @brief Binds a specific color attachment texture to a given texture unit. */
+    void BindColorTexture(int index = 0, int unit = 0) const;
 };
