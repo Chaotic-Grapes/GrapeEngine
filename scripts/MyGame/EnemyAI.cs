@@ -10,9 +10,10 @@ public class EnemyAI : ScriptBehaviour
     private HFSM m_fsm;
 
     // stats
-    public float BaseSpeed = 80f;
-    public float Speed = 80f;
-    private float m_detectionRadius = 150f;
+    public float BaseSpeed = 80.0f;
+    public float Speed = 80.0f;
+    public float AttackDamage = 10.0f;
+    private float m_detectionRadius = 150.0f;
 
     // incase we need it for specific game scenes
     public float Health = 100f;
@@ -144,13 +145,14 @@ public class EnemyAI : ScriptBehaviour
     public bool CanSeePlayer()
     {
         //might wanna use this for monsters that require LOS
+        return m_playerEntity.EntityId != 0; 
     }
 
     public float GetDistanceToPlayer()
     {
         //early exit if player doesnt exist
         // if player entity doesnt exist set to max so the check distance will fail = no change state
-        if(m_playerEntity.EntityId == null)
+        if(m_playerEntity.EntityId == 0)
         {
             return float.MaxValue;
         }
@@ -167,7 +169,7 @@ public class EnemyAI : ScriptBehaviour
         //diff gets the difference vector of values
         var diff = playerTransform.Position - myTransform.Position;
         // .magnitude converts it into distance
-        var distance = diff.magnitude;
+        var distance = diff.Magnitude;
 
         return distance;
     }
@@ -175,12 +177,16 @@ public class EnemyAI : ScriptBehaviour
     public void MoveInDirection(Vector3 direction, float deltaTime)
     {
         // for static enemies (example like grabber kinds) because they dont need to move
-        if (!m_visualEntity.TryGetComponent<LocalTransform>())
+        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
             return;
 
-            /*
-           * a-star to be set here
-           */
+        
+        var normalizedDir = direction.Normalized;
+        transform.Position += normalizedDir * Speed * deltaTime;
+        m_visualEntity.SetComponent(transform);
+       /*
+       * a-star to be set here
+       */
 
     }
 
@@ -191,7 +197,7 @@ public class EnemyAI : ScriptBehaviour
             return;
         
         // if player doesnt have transform set
-        if (!m_playerEntity.TryGetComponent<LocalTransform>(out var myTransform))
+        if (!m_playerEntity.TryGetComponent<LocalTransform>(out var playerTransform))
             return;
 
         //early exit for non moving enemies
@@ -216,13 +222,11 @@ public class EnemyAI : ScriptBehaviour
     public void DealDamageToPlayer(float damage)
     {
         // todo hp system or maybe elsewhere. whereever the damage can apply quicker.
-        Log($"Attacking player for {damage} damage!", LogLevel.Info);
     }
 
     private void OnDeath()
     {
         // maybe for bosses or if this AI has to die for the player to progress
-        Log("Enemy defeated!", LogLevel.Info);
         m_visualEntity.Destroy();
         DestroyEntity();
     }
@@ -247,6 +251,9 @@ public class EnemyPatrolState : State
     // flag to help set patrollings
     private bool m_movingToB = true;
     private float m_detectionR = 150.0f;
+
+    //minimum distance 
+    private float m_minD = 5.0f;
 
     //linkage from patrol -> chase
     public EnemyChaseState ChaseState;
@@ -289,7 +296,7 @@ public class EnemyPatrolState : State
         var distance = direction.Magnitude;
 
         // Move towards patrol point
-        if (distance > 5.0f)
+        if (distance > m_minD)
         {
             m_enemy.MoveInDirection(direction, deltaTime);
         }
@@ -328,6 +335,10 @@ public class EnemyChaseState : State
     public EnemyPatrolState PatrolState;
     public EnemyAttackState AttackState;
 
+    //ranges
+    private float AttackRange = 5.f; //placeholder
+    private float DetectionRange = 150.0f;             
+
     //constructor to create state
     public EnemyChaseState(EnemyAI enemy)
     {
@@ -359,13 +370,13 @@ public class EnemyChaseState : State
         float distance = m_enemy.GetDistanceToPlayer();
 
         // Close enough to attack
-        if (distance <= m_enemy.AttackRange)
+        if (distance <= AttackRange)
         {
             return AttackState;
         }
 
         // Lost player (too far away)
-        if (distance > m_enemy.DetectionRange * 1.5f)
+        if (distance > DetectionRange)
         {
             return PatrolState;
         }
@@ -382,6 +393,9 @@ public class EnemyAttackState : State
 
     // buffer
     private float m_attackCooldown = 0f;
+
+    //detection radius
+    private float m_detectionRadius = 150.0f;
 
     //resetter
     private const float ATTACK_COOLDOWN_TIME = 1.5f;
