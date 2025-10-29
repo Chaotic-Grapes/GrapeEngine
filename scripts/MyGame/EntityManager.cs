@@ -151,8 +151,8 @@ public class EntityManager : ScriptBehaviour
 
         // Create a controller entity for the PlayerController script
         m_playerController = CreateEntity(
-            new ComponentData<Active>(new() { Enabled = true }
-        ));
+            new ComponentData<Active>(new() { Enabled = true })
+        );
         
         // The PlayerController script will create its own visual entity
         // We just need to attach the script component
@@ -166,12 +166,12 @@ public class EntityManager : ScriptBehaviour
 
         // Enemy 1 - left side
         m_enemy1Controller = CreateEntity(
-            new ComponentData<Active>(new() { Enabled = true }
-        ));
+            new ComponentData<Active>(new() { Enabled = true })
+        );
         
         // Enemy 2 - right side  
         m_enemy2Controller = CreateEntity(
-            new ComponentData<Active>(new() { Enabled = true }
+            new ComponentData<Active>(new() { Enabled = true })
         );
         m_enemy2Controller.SetComponent(new Active { Enabled = true });
     }
