@@ -1,294 +1,254 @@
-﻿// /**
-//  * @file    SerializationTest.cpp
-//  * @author  k.danielneozuofeng
-//  * @date    26/09/2025
-//  * @brief   Implementation of automated serialization test scene
-//  *
-//  * This source file implements the SerializationTestScene class,
-//  * which performs a multi-phase integrity test of the serialization
-//  * system. It creates sample entities, saves them to a JSON scene file,
-//  * reloads them, and verifies that entity data (such as transform,
-//  * components, and names) are preserved correctly across the process.
-//  *
-//  * Test phases include:
-//  *  - Creating controlled test entities
-//  *  - Saving the current world to disk
-//  *  - Loading the saved world back into memory
-//  *  - Verifying loaded entities against expected values
-//  *  - Printing final pass/fail test results
-//  */
+/**
+ * @file    SerializationTest.cpp
+ * @author  k.danielneozuofeng
+ * @date    26/09/2025
+ * @brief   Implementation of automated serialization test scene
+ *
+ * This source file implements the SerializationTestScene class,
+ * which performs a multi-phase integrity test of the serialization
+ * system. It creates sample entities, saves them to a JSON scene file,
+ * reloads them, and verifies that entity data (such as transform,
+ * components, and names) are preserved correctly across the process.
+ *
+ * Test phases include:
+ *  - Creating controlled test entities
+ *  - Saving the current world to disk
+ *  - Loading the saved world back into memory
+ *  - Verifying loaded entities against expected values
+ *  - Printing final pass/fail test results
+ */
 
-// #include "SerializationTest.h"
-// #include "serialization/Serialization.h"
-// #include "ecs/Components.h"
-// #include "services/WindowManager.h"
-// #include <iostream>
-// #include <filesystem>
+#include "SerializationTest.h"
+#include "serialization/EntitySerializer.h"
+#include "serialization/Serializer.h"
+#include "ecs/Components.h"
+#include "core/Logger.h"
+#include <filesystem>
+#include <cmath>
+#include <cstring>
 
-// using namespace Sandbox;
+using namespace Sandbox;
 
-// SerializationTestScene::SerializationTestScene()
-//     : Scene("SerializationTestScene") {
-//     CREATE_WINDOW("Serialization Test", 1600, 900);
-// }
+void SerializationTestScene::OnLoad() {
+    LOG_INFO("========================================");
+    LOG_INFO("SERIALIZATION INTEGRITY TEST");
+    LOG_INFO("========================================");
+    RunAutomatedTest();
+}
 
-// void SerializationTestScene::OnLoad() {
-//     std::cout << "\nSERIALIZATION INTEGRITY TEST" << '\n';
-//     std::cout << "Running automated serialization test..." << '\n';
+void SerializationTestScene::RunAutomatedTest() {
+    LOG_DEBUG("PHASE 1: Creating Test Entities");
+    CreateTestEntities();
+    
+    LOG_DEBUG("PHASE 2: Saving Scene");
+    SaveScene();
+    if (!m_testPassed) {
+        LOG_ERROR("TEST STOPPED: Scene save failed"); 
+        return;
+    }
 
-//     RunAutomatedTest();
-// }
+    LOG_DEBUG("PHASE 3: Loading Scene");
+    LoadScene();
+    if (!m_testPassed) {
+        LOG_ERROR("TEST STOPPED: Scene load failed"); 
+        return;
+    }
 
-// void SerializationTestScene::RunAutomatedTest() {
-//     std::cout << "\nPHASE 1: Creating Test Entities" << '\n';
-//     CreateTestEntities();
+    LOG_DEBUG("PHASE 4: Verifying Loaded Data");
+    VerifyLoadedEntities();
+    PrintTestResults();
 
-//     std::cout << "\nPHASE 2: Saving Scene" << '\n';
-//     SaveScene();
+    LOG_DEBUG("Test complete. Check above for any failures.");
+}
 
-//     if (!m_testPassed) {
-//         std::cout << "TEST STOPPED: Save failed" << '\n';
-//         return;
-//     }
+void SerializationTestScene::CreateTestEntities() {
+    ECS::World& world = GetWorld();
+    
+    // Test 1: Entity with LocalTransform + SpriteRenderer2D + Name
+    ECS::Entity sprite = world.Create();
+    world.Add<ECS::Components::Name>(sprite);
+    auto& spriteName = world.Get<ECS::Components::Name>(sprite); // This assumes entity has Name component
+    std::strncpy(spriteName.Value, "TestSprite", sizeof(spriteName.Value) - 1);
+    
+    world.Add<ECS::Components::LocalTransform>(sprite);
+    auto& spriteTransform = world.Get<ECS::Components::LocalTransform>(sprite);
+    spriteTransform.Position = Vector3D{400.0f, 450.0f, 0.0f};
+    spriteTransform.Scale = Vector3D{128.0f, 128.0f, 1.0f};
+    spriteTransform.Rotation = Quaternion{0.0f, 0.0f, 0.382683f, 0.923880f};
+    
+    world.Add<ECS::Components::SpriteRenderer2D>(sprite);
+    auto& spriteRenderer = world.Get<ECS::Components::SpriteRenderer2D>(sprite);
+    spriteRenderer.TextureId = 1;
+    spriteRenderer.Color = Color{1.0f, 0.5f, 0.5f, 1.0f};
+    
+    m_originalEntities.push_back(sprite);
+    m_expectedData.push_back({"TestSprite", Vector3D{400.0f, 450.0f, 0.0f},  
+        Vector3D{128.0f, 128.0f, 1.0f}, Quaternion{0.0f, 0.0f, 0.382683f, 0.923880f}, 1, 0.0f, 0.0f});
+    
+    // Test 2: Entity with LocalTransform + LinearVelocity2D
+    ECS::Entity movingEntity = world.Create();
+    world.Add<ECS::Components::Name>(movingEntity);
+    auto& movingName = world.Get<ECS::Components::Name>(movingEntity);
+    std::strncpy(movingName.Value, "MovingEntity", sizeof(movingName.Value) - 1);
+    
+    world.Add<ECS::Components::LocalTransform>(movingEntity);
+    auto& movingTransform = world.Get<ECS::Components::LocalTransform>(movingEntity);
+    movingTransform.Position = Vector3D{100.0f, 100.0f, 0.0f};
+    movingTransform.Scale = Vector3D{50.0f, 50.0f, 1.0f};
+    
+    world.Add<ECS::Components::LinearVelocity2D>(movingEntity);
+    auto& velocity = world.Get<ECS::Components::LinearVelocity2D>(movingEntity);
+    velocity.Value = Vector2D{10.0f, 5.0f};
+    
+    m_originalEntities.push_back(movingEntity);
+    m_expectedData.push_back({"MovingEntity", Vector3D{100.0f, 100.0f, 0.0f},
+        Vector3D{50.0f, 50.0f, 1.0f}, Quaternion{0.0f, 0.0f, 0.0f, 1.0f}, 0, 10.0f, 5.0f});
+    
+    LOG_DEBUG("Created " << m_originalEntities.size() << " test entities");
+}
 
-//     std::cout << "\nPHASE 3: Loading Scene" << '\n';
-//     LoadScene();
+void SerializationTestScene::SaveScene() {
+    ECS::World& world = GetWorld();
+    std::filesystem::create_directories("assets/samples");
+    
+    try {
+        json sceneJson;
+        sceneJson["Version"] = "1.0";
+        sceneJson["SceneName"] = "SerializationTest";
+        sceneJson["EntityCount"] = m_originalEntities.size();
+        
+        json entities = json::array();
+        for (const auto& entity : m_originalEntities) {
+            entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
+        }
+        sceneJson["Entities"] = std::move(entities);
+        
+        if (!Serialization::Serializer::SaveJson("assets/samples/sample-scene.scn", "scn", sceneJson)) {
+            LOG_ERROR("[FAIL] Scene save failed");
+            m_testPassed = false;
+            return;
+        }
+        LOG_INFO("[PASS] Scene saved successfully");
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("[FAIL] Error during save: " << e.what());
+        m_testPassed = false;
+    }
+}
 
-//     if (!m_testPassed) {
-//         std::cout << "TEST STOPPED: Load failed" << '\n';
-//         return;
-//     }
+void SerializationTestScene::LoadScene() {
+    ECS::World& world = GetWorld();
+    
+    for (auto& entity : m_originalEntities) {
+        if (world.IsAlive(entity)) {
+            world.Destroy(entity);
+        }
+    }
+    m_originalEntities.clear();
+    
+    try {
+        json sceneJson;
+        if (!Serialization::Serializer::LoadJson("assets/samples/sample-scene.scn", "scn", sceneJson)) {
+            LOG_ERROR("[FAIL] Cannot load scene JSON");
+            m_testPassed = false;
+            return;
+        }
+        
+        int loadedCount = 0;
+        if (sceneJson.contains("Entities")) {
+            for (const auto& entityJson : sceneJson["Entities"]) {
+                ECS::Entity newEntity = Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
+                m_originalEntities.push_back(newEntity);
+                loadedCount++;
+            }
+        }
+        
+        if (loadedCount == 0) {
+            LOG_ERROR("[FAIL] No entities were loaded");
+            m_testPassed = false;
+            return;
+        }
+        LOG_INFO("[PASS] Loaded " << loadedCount << " entities");
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("[FAIL] Error during load: " << e.what());
+        m_testPassed = false;
+    }
+}
 
-//     std::cout << "\nPHASE 4: Verifying Loaded Data" << '\n';
-//     VerifyLoadedEntities();
+void SerializationTestScene::VerifyLoadedEntities() {
+    ECS::World& world = GetWorld();
+    bool allTestsPassed = true;
+    
+    for (const auto& entity : m_originalEntities) {
+        if (!world.IsAlive(entity)) {
+            LOG_ERROR("[FAIL] Entity is not alive");
+            allTestsPassed = false;
+            continue;
+        }
+        
+        std::string name = "Unknown";
+        if (world.Has<ECS::Components::Name>(entity)) {
+            const auto& nameComp = world.Get<ECS::Components::Name>(entity);
+            name = nameComp.Value;
+        }
+        
+        const ExpectedData* expected = nullptr;
+        for (auto& exp : m_expectedData) {
+            if (exp.name == name) {
+                expected = &exp;
+                break;
+            }
+        }
+        
+        if (!expected) continue;
+        
+        if (world.Has<ECS::Components::LocalTransform>(entity)) {
+            const auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
+            bool posMatch = (std::abs(transform.Position.X - expected->position.X) < 0.01f &&
+                           std::abs(transform.Position.Y - expected->position.Y) < 0.01f &&
+                           std::abs(transform.Position.Z - expected->position.Z) < 0.01f);
+            bool scaleMatch = (std::abs(transform.Scale.X - expected->scale.X) < 0.01f &&
+                             std::abs(transform.Scale.Y - expected->scale.Y) < 0.01f &&
+                             std::abs(transform.Scale.Z - expected->scale.Z) < 0.01f);
+            
+            LOG_DEBUG("  " << name << " - Position: " << (posMatch ? "[PASS]" : "[FAIL]"));
+            LOG_DEBUG("  " << name << " - Scale: " << (scaleMatch ? "[PASS]" : "[FAIL]"));
+            
+            if (!posMatch || !scaleMatch) allTestsPassed = false;
+        }
+        
+        if (name == "TestSprite" && world.Has<ECS::Components::SpriteRenderer2D>(entity)) {
+            const auto& sprite = world.Get<ECS::Components::SpriteRenderer2D>(entity);
+            bool texMatch = sprite.TextureId == expected->textureId;
+            LOG_DEBUG("  " << name << " - TextureId: " << (texMatch ? "[PASS]" : "[FAIL]"));
+            if (!texMatch) allTestsPassed = false;
+        }
+        
+        if (name == "MovingEntity" && world.Has<ECS::Components::LinearVelocity2D>(entity)) {
+            const auto& vel = world.Get<ECS::Components::LinearVelocity2D>(entity);
+            bool velMatch = (std::abs(vel.Value.X - expected->linearVelocityX) < 0.01f &&
+                           std::abs(vel.Value.Y - expected->linearVelocityY) < 0.01f);
+            LOG_DEBUG("  " << name << " - Velocity: " << (velMatch ? "[PASS]" : "[FAIL]"));
+            if (!velMatch) allTestsPassed = false;
+        }
+    }
+    
+    m_testPassed = allTestsPassed;
+}
 
-//     PrintTestResults();
+void SerializationTestScene::PrintTestResults() {
+    LOG_INFO("========================================");
+    if (m_testPassed)
+        LOG_INFO("[PASS] ALL TESTS PASSED");
+    else
+        LOG_ERROR("[FAIL] SOME TESTS FAILED");
+    
+    LOG_INFO("========================================");
+}
 
-//     std::cout << "\nTest complete. Check above for any failures." << '\n';
-// }
-
-// void SerializationTestScene::CreateTestEntities() {
-//     std::cout << "CreateTestEntities() started" << '\n';
-
-//     World& world = GetWorld();
-//     std::cout << "Got world reference" << '\n';
-
-//     // test 1: Basic Transform + SpriteRenderer
-//     std::cout << "Creating TestSprite entity..." << '\n';
-//     Entity sprite = world.CreateEntity("TestSprite");
-//     std::cout << "Entity created with ID: " << sprite.GetId() << '\n';
-
-//     auto& spriteTransform = sprite.Transform();
-//     spriteTransform.Position = { 400.0f, 450.0f };
-//     spriteTransform.Scale = { 128.0f, 128.0f };
-//     spriteTransform.Rotation = 45.0f;
-//     std::cout << "Transform set" << '\n';
-
-//     auto& spriteRenderer = sprite.AddComponent<Component::SpriteRenderer>(
-//         "assets/textures/test/player.png"
-//     );
-//     std::cout << "SpriteRenderer component added" << '\n';
-//     spriteRenderer.Color = { 1.0f, 0.5f, 0.5f, 1.0f };
-
-//     m_originalEntities.push_back(sprite);
-//     m_expectedData.push_back({
-//         "TestSprite",
-//         { 400.0f, 450.0f },
-//         { 128.0f, 128.0f },
-//            45.0f, "assets/textures/test/player.png",
-//             0.0f, 0.0f
-//         });
-
-//     std::cout << "Created Sprite entity: " << sprite.GetName() << '\n';
-
-//     // test 2: Simple entity with only transform
-//     std::cout << "Creating simple entity without complex components..." << '\n';
-//     Entity simpleEntity = world.CreateEntity("SimpleEntity");
-//     auto& simpleTransform = simpleEntity.Transform();
-//     simpleTransform.Position = { 100.0f, 100.0f };
-//     simpleTransform.Scale = { 50.0f, 50.0f };
-
-//     m_originalEntities.push_back(simpleEntity);
-//     m_expectedData.push_back({
-//         "SimpleEntity",
-//         { 100.0f, 100.0f },
-//         { 50.0f, 50.0f },
-//         0.0f,
-//         "",
-//         0.0f,
-//         0.0f
-//         });
-
-//     std::cout << "Created Simple entity: " << simpleEntity.GetName() << '\n';
-//     std::cout << "Total entities created: " << m_originalEntities.size() << '\n';
-//     std::cout << "CreateTestEntities() completed successfully" << '\n';
-// }
-
-// void SerializationTestScene::SaveScene() {
-//     std::cout << "SaveScene() started" << '\n';
-
-//     World& world = GetWorld();
-//     std::cout << "Got world reference for saving" << '\n';
-
-//     std::cout << "Creating save directory..." << '\n';
-//     std::filesystem::create_directories("assets/saves");
-//     std::cout << "Save directory ready" << '\n';
-
-//     std::cout << "Calling SceneSerializer::SaveScene..." << '\n';
-//     const bool success = Serialization::SceneSerializer::SaveScene(
-//         world,
-//         "assets/samples/sample-scene.json"
-//     );
-//     std::cout << "SceneSerializer::SaveScene returned: " << success << '\n';
-
-//     if (success) {
-//         std::cout << "Scene save operation reported success" << '\n';
-
-//         if (std::filesystem::exists("assets/samples/sample-scene.json")) {
-//             const auto fileSize = std::filesystem::file_size("assets/samples/sample-scene.json");
-//             std::cout << "File created with size: " << fileSize << " bytes" << '\n';
-
-//             std::ifstream testFile("assets/samples/sample-scene.json");
-//             std::string firstLine;
-//             std::getline(testFile, firstLine);
-//             std::cout << "First line of file: " << firstLine.substr(0, 50) << "..." << '\n';
-//             testFile.close();
-//         }
-//         else {
-//             std::cout << "ERROR: File was not created!" << '\n';
-//             m_testPassed = false;
-//             return;
-//         }
-//     }
-//     else {
-//         std::cout << "Scene save failed!" << '\n';
-//         m_testPassed = false;
-//         return;
-//     }
-
-//     std::cout << "SaveScene() completed successfully" << '\n';
-// }
-
-// void SerializationTestScene::LoadScene() {
-//     std::cout << "LoadScene() started" << '\n';
-
-//     World& world = GetWorld();
-//     std::cout << "Got world reference for loading" << '\n';
-
-//     if (!std::filesystem::exists("assets/samples/sample-scene.json")) {
-//         std::cout << "ERROR: Save file doesn't exist for loading!" << '\n';
-//         m_testPassed = false;
-//         return;
-//     }
-
-//     std::cout << "Clearing original entities..." << '\n';
-//     for (auto& entity : m_originalEntities) {
-//         world.GetEntityManager().DestroyEntity(entity);
-//     }
-//     m_originalEntities.clear();
-//     std::cout << "Original entities cleared" << '\n';
-
-//     std::cout << "Calling SceneSerializer::LoadScene..." << '\n';
-//     const bool success = Serialization::SceneSerializer::LoadScene(
-//         world,
-//         "assets/samples/sample-scene.json"
-//     );
-//     std::cout << "SceneSerializer::LoadScene returned: " << success << '\n';
-
-//     if (success) {
-//         std::cout << "Scene load operation reported success" << '\n';
-
-//         const auto entityIds = world.GetEntityManager().GetAllEntities();
-//         std::cout << "Found " << entityIds.size() << " entities after load" << '\n';
-
-//         for (const EntityId id : entityIds) {
-//             Entity newEntity = world.GetEntityManager().GetEntity(id);
-//             std::cout << "Loaded entity: [" << id << "] " << newEntity.GetName() << '\n';
-//             m_originalEntities.push_back(newEntity);
-//         }
-//         std::cout << "Loaded entities: " << m_originalEntities.size() << '\n';
-//     }
-//     else {
-//         std::cout << "Scene load failed!" << '\n';
-//         m_testPassed = false;
-//         return;
-//     }
-
-//     std::cout << "LoadScene() completed successfully" << '\n';
-// }
-
-// void SerializationTestScene::VerifyLoadedEntities() {
-//     std::cout << "VerifyLoadedEntities() started" << '\n';
-
-//     World& world = GetWorld();
-//     const auto entityIds = world.GetEntityManager().GetAllEntities();
-
-//     std::cout << "Verifying " << entityIds.size() << " loaded entities..." << '\n';
-
-//     bool allTestsPassed = true;
-
-//     for (const EntityId id : entityIds) {
-//         Entity entity = world.GetEntityManager().GetEntity(id);
-//         std::string name = entity.GetName();
-
-//         std::cout << "\nChecking entity: [" << id << "] " << name << '\n';
-
-//         const ExpectedData* expected = nullptr;
-//         for (auto& exp : m_expectedData) {
-//             if (exp.name == name) {
-//                 expected = &exp;
-//                 break;
-//             }
-//         }
-
-//         if (!expected) {
-//             std::cout << "No expected data for entity" << name << "'" << '\n';
-//             continue;
-//         }
-
-//         const auto& transform = entity.Transform();
-//         const bool posMatch = (std::abs(transform.Position.X - expected->position.X) < 0.01f &&
-//             std::abs(transform.Position.Y - expected->position.Y) < 0.01f);
-//         const bool scaleMatch = (std::abs(transform.Scale.X - expected->scale.X) < 0.01f &&
-//             std::abs(transform.Scale.Y - expected->scale.Y) < 0.01f);
-//         const bool rotMatch = std::abs(transform.Rotation - expected->rotation) < 0.01f;
-
-//         std::cout << "  Position: " << (posMatch ? "Success" : "Fail")
-//             << " (" << transform.Position.X << ", " << transform.Position.Y << ")" << '\n';
-//         std::cout << "  Scale: " << (scaleMatch ? "Success" : "Fail")
-//             << " (" << transform.Scale.X << ", " << transform.Scale.Y << ")" << '\n';
-//         std::cout << "  Rotation: " << (rotMatch ? "Success" : "Fail")
-//             << " (" << transform.Rotation << " deg)" << '\n';
-
-//         if (!posMatch || !scaleMatch || !rotMatch) {
-//             allTestsPassed = false;
-//         }
-
-//         if (name == "TestSprite") {
-//             const bool hasSprite = entity.HasComponent<Component::SpriteRenderer>();
-//             std::cout << "  SpriteRenderer: " << (hasSprite ? "Success" : "Fail") << '\n';
-//             if (!hasSprite) allTestsPassed = false;
-//         }
-//     }
-
-//     m_testPassed = allTestsPassed;
-//     std::cout << "VerifyLoadedEntities() completed" << '\n';
-// }
-
-// void SerializationTestScene::PrintTestResults() {
-//     std::cout << "\nFINAL TEST RESULTS" << '\n';
-//     if (m_testPassed) {
-//         std::cout << "ALL TESTS PASSED - Serialization system is working correctly!" << '\n';
-//     }
-//     else {
-//         std::cout << "SOME TESTS FAILED - Serialization system has issues!" << '\n';
-//     }
-//     std::cout << "==========================" << '\n';
-// }
-
-// void SerializationTestScene::OnUpdate() {}
-
-// void SerializationTestScene::OnUnload() {
-//     m_originalEntities.clear();
-//     m_expectedData.clear();
-// }
+void SerializationTestScene::OnUpdate() {}
+void SerializationTestScene::OnUnload() {
+    m_originalEntities.clear();
+    m_expectedData.clear();
+}
