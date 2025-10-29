@@ -3,23 +3,29 @@ layout (location = 0) out vec4 FragColor;
 
 in vec2 vTexCoord;
 
-uniform sampler2D uScene;      // HDR color texture
-uniform sampler2D uBloomBlur;  // blurred bright areas
-uniform float uExposure = 1.0; // tweak as desired
+uniform sampler2D uScene;           // HDR scene color
+uniform sampler2D uBloomBlur;       // blurred bright regions (bloom texture)
+uniform float uExposure = 1.0;      // overall brightness scaling
+uniform float uBloomStrength = 0.2; // how intense the bloom glow is
+uniform float uGamma = 2.2;         // gamma correction value
 
 void main() {
-    const float gamma = 2.2;
+    // Sample HDR scene and bloom textures
     vec3 hdrColor = texture(uScene, vTexCoord).rgb;
     vec3 bloomColor = texture(uBloomBlur, vTexCoord).rgb;
 
-    // Additively blend bloom before tone mapping
-    vec3 color = hdrColor + bloomColor;
+    // Combine bloom with controllable intensity
+    vec3 color = hdrColor + bloomColor * uBloomStrength;
 
-    // Tone map (exponential)
-    vec3 mapped = vec3(1.0) - exp(-color * uExposure);
+    // Apply exposure adjustment (simulate camera exposure)
+    color *= uExposure;
 
-    // Gamma correction
-    mapped = pow(mapped, vec3(1.0 / gamma));
+    // Reinhard tone mapping to compress HDR range into [0,1]
+    vec3 mapped = color / (color + vec3(1.0));
 
+    // Gamma correction to convert linear color to sRGB space
+    mapped = pow(mapped, vec3(1.0 / uGamma));
+
+    // Output final LDR color
     FragColor = vec4(mapped, 1.0);
 }
