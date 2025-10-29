@@ -400,85 +400,89 @@ namespace ECS {
             constexpr size_t numComponents = sizeof...(Ts);
 
             // If no components specified, returning nothing
+            // use constexpr as if numComponents is 0, then the rest of the code is not needed
+            // This is for optimization to avoid unnecessary work at runtime
+            // (Unsure if it helps too, but worth trying)
             if constexpr (numComponents == 0)
                 return;
-
-            // Some optimization efforts:
-            // Use compile-time query ID to cache archetype list pointer per unique component set
-            // Should be faster than unordered_map because template instantiation happens at compile-time
-            using QueryTag = std::tuple<std::decay_t<Ts>...>; // std::decay_t removes references and cv-qualifiers from types
-            static const std::vector<Archetype*>* cached = nullptr;
-            static uint64_t cacheVersion = 0;  // Track which archetype version we last processed
-            static std::array<TypeId, numComponents> typeIds = { 0 };
-            
-            // Check only archetypes added since last version
-            if (cached == nullptr || cacheVersion != m_archetypeVersion) {
-                // First time initialization - get component type IDs at runtime
-                if (cached == nullptr) {
-                    typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
-                }
-
-                // Build signature for the requested components
-                const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
-
-                // Get matching archetypes and update cache
-                cached = &_getMatchingArchetypes(req);
+            else { // Need to add `else` to suppress "unreachable code" warning (https://stackoverflow.com/questions/52244640/if-constexpr-and-c4702-and-c4100-and-c4715)
+                // Some optimization efforts:
+                // Use compile-time query ID to cache archetype list pointer per unique component set
+                // Should be faster than unordered_map because template instantiation happens at compile-time
+                using QueryTag = std::tuple<std::decay_t<Ts>...>; // std::decay_t removes references and cv-qualifiers from types
+                static const std::vector<Archetype*>* cached = nullptr;
+                static uint64_t cacheVersion = 0;  // Track which archetype version we last processed
+                static std::array<TypeId, numComponents> typeIds = { 0 };
                 
-                // Update version to current
-                cacheVersion = m_archetypeVersion;
-            }
-            const auto& matched = *cached; // Get cached archetype list (shouldn't be null here either way)
-            
-            // Iterate through all matched archetypes
-            for (Archetype* arch : matched) {
-                if (!arch) continue;
-
-                // Precompute component indices for this archetype to avoid repeated lookups
-                // This avoids repeated lookups during iteration
-                std::array<uint32_t, numComponents> compIdxs;
-                for (size_t k = 0; k < numComponents; ++k) {
-                    // Get the component index for this type in the archetype
-                    // Store it in the precomputed array
-                    compIdxs[k] = arch->GetComponentIndex(typeIds[k]);
-                }
-
-                // Get number of chunks in the archetype
-                const uint32_t chunkCount = arch->GetChunkCount();
-                
-                // Iterate through all chunks in this archetype
-                for (uint32_t ci = 0; ci < chunkCount; ++ci) {
-                    // Get the chunk pointer then its entity count
-                    Chunk* ch = arch->GetChunk(ci);
-                    const uint32_t count = ch->Count();
-                    
-                    // Skip empty chunks
-                    if (count == 0)
-                        continue;
-                    
-                    // Get base pointers to component arrays and their strides
-                    std::array<uint8_t*, numComponents> componentBases;
-                    std::array<size_t, numComponents> strides;
-                    
-                    // Populate them with data from chunk
-                    for (size_t pi = 0; pi < numComponents; ++pi) {
-                        // ComponentBase() gets start of component array in chunk's memory buffer
-                        componentBases[pi] = static_cast<uint8_t*>(ch->ComponentBase(compIdxs[pi]));
-                        
-                        // Get stride from archetype instead of chunk to avoid indirect lookup
-                        // Also note: all chunks in an archetype have identical layout,
-                        // so cache at archetype level
-                        strides[pi] = arch->GetComponentStride(compIdxs[pi]);
+                // Check only archetypes added since last version
+                if (cached == nullptr || cacheVersion != m_archetypeVersion) {
+                    // First time initialization - get component type IDs at runtime
+                    if (cached == nullptr) {
+                        typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
                     }
-                    
-                    // Get entity array pointer for direct access
-                    const Entity* entities = ch->Entities().data();
 
-                    // Now iterate through all entities in the chunk
-                    for (uint32_t i = 0; i < count; ++i) {
-                        // Invoke the lambda expression with the entity and its components
-                        // This uses a helper function to unpack the component pointers
-                        // std::index_sequence_for is used to generate index sequences for parameter packs
-                        _invokeWithComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
+                    // Build signature for the requested components
+                    const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
+
+                    // Get matching archetypes and update cache
+                    cached = &_getMatchingArchetypes(req);
+                    
+                    // Update version to current
+                    cacheVersion = m_archetypeVersion;
+                }
+                const auto& matched = *cached; // Get cached archetype list (shouldn't be null here either way)
+                
+                // Iterate through all matched archetypes
+                for (Archetype* arch : matched) {
+                    if (!arch) continue;
+
+                    // Precompute component indices for this archetype to avoid repeated lookups
+                    // This avoids repeated lookups during iteration
+                    std::array<uint32_t, numComponents> compIdxs;
+                    for (size_t k = 0; k < numComponents; ++k) {
+                        // Get the component index for this type in the archetype
+                        // Store it in the precomputed array
+                        compIdxs[k] = arch->GetComponentIndex(typeIds[k]);
+                    }
+
+                    // Get number of chunks in the archetype
+                    const uint32_t chunkCount = arch->GetChunkCount();
+                    
+                    // Iterate through all chunks in this archetype
+                    for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                        // Get the chunk pointer then its entity count
+                        Chunk* ch = arch->GetChunk(ci);
+                        const uint32_t count = ch->Count();
+                        
+                        // Skip empty chunks
+                        if (count == 0)
+                            continue;
+                        
+                        // Get base pointers to component arrays and their strides
+                        std::array<uint8_t*, numComponents> componentBases;
+                        std::array<size_t, numComponents> strides;
+                        
+                        // Populate them with data from chunk
+                        for (size_t pi = 0; pi < numComponents; ++pi) {
+                            // ComponentBase() gets start of component array in chunk's memory buffer
+                            componentBases[pi] = static_cast<uint8_t*>(ch->ComponentBase(compIdxs[pi]));
+                            
+                            // Get stride from archetype instead of chunk to avoid indirect lookup
+                            // Also note: all chunks in an archetype have identical layout,
+                            // so cache at archetype level
+                            strides[pi] = arch->GetComponentStride(compIdxs[pi]);
+                        }
+                        
+                        // Get entity array pointer for direct access
+                        const Entity* entities = ch->Entities().data();
+
+                        // Now iterate through all entities in the chunk
+                        for (uint32_t i = 0; i < count; ++i) {
+                            // Invoke the lambda expression with the entity and its components
+                            // This uses a helper function to unpack the component pointers
+                            // std::index_sequence_for is used to generate index sequences for parameter packs
+                            _invokeWithComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
+                        }
                     }
                 }
             }
@@ -496,53 +500,54 @@ namespace ECS {
 
             constexpr size_t numComponents = sizeof...(Ts);
             if constexpr (numComponents == 0) return;
-
-            using QueryTag = std::tuple<std::decay_t<Ts>...>;
-            static const std::vector<Archetype*>* cached = nullptr;
-            static uint64_t cacheVersion = 0;
-            static std::array<TypeId, numComponents> typeIds = { 0 };
-            
-            if (cached == nullptr || cacheVersion != m_archetypeVersion) {
-
-                if (cached == nullptr) {
-                    typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
-                }
+            else {
+                using QueryTag = std::tuple<std::decay_t<Ts>...>;
+                static const std::vector<Archetype*>* cached = nullptr;
+                static uint64_t cacheVersion = 0;
+                static std::array<TypeId, numComponents> typeIds = { 0 };
                 
-                const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
-                cached = &_getMatchingArchetypes(req);
-                cacheVersion = m_archetypeVersion;
-            }
-            const auto& matched = *cached;
-            
-            for (const Archetype* arch : matched) {
-                if (!arch) continue;
+                if (cached == nullptr || cacheVersion != m_archetypeVersion) {
 
-                std::array<uint32_t, numComponents> compIdxs;
-                for (size_t k = 0; k < numComponents; ++k) {
-                    compIdxs[k] = arch->GetComponentIndex(typeIds[k]);
-                }
-
-                const uint32_t chunkCount = arch->GetChunkCount();
-                
-                for (uint32_t ci = 0; ci < chunkCount; ++ci) {
-                    const Chunk* ch = arch->GetChunk(ci);
-                    const uint32_t count = ch->Count();
-                    
-                    // Skip empty chunks
-                    if (count == 0) continue;
-                    
-                    std::array<const uint8_t*, numComponents> componentBases;
-                    std::array<size_t, numComponents> strides;
-                    
-                    for (size_t pi = 0; pi < numComponents; ++pi) {
-                        componentBases[pi] = static_cast<const uint8_t*>(ch->ComponentBase(compIdxs[pi]));
-                        strides[pi] = arch->GetComponentStride(compIdxs[pi]);
+                    if (cached == nullptr) {
+                        typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
                     }
                     
-                    const Entity* entities = ch->Entities().data();
+                    const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
+                    cached = &_getMatchingArchetypes(req);
+                    cacheVersion = m_archetypeVersion;
+                }
+                const auto& matched = *cached;
+                
+                for (const Archetype* arch : matched) {
+                    if (!arch) continue;
 
-                    for (uint32_t i = 0; i < count; ++i) {
-                        _invokeWithConstComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
+                    std::array<uint32_t, numComponents> compIdxs;
+                    for (size_t k = 0; k < numComponents; ++k) {
+                        compIdxs[k] = arch->GetComponentIndex(typeIds[k]);
+                    }
+
+                    const uint32_t chunkCount = arch->GetChunkCount();
+                    
+                    for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                        const Chunk* ch = arch->GetChunk(ci);
+                        const uint32_t count = ch->Count();
+                        
+                        // Skip empty chunks
+                        if (count == 0) continue;
+                        
+                        std::array<const uint8_t*, numComponents> componentBases;
+                        std::array<size_t, numComponents> strides;
+                        
+                        for (size_t pi = 0; pi < numComponents; ++pi) {
+                            componentBases[pi] = static_cast<const uint8_t*>(ch->ComponentBase(compIdxs[pi]));
+                            strides[pi] = arch->GetComponentStride(compIdxs[pi]);
+                        }
+                        
+                        const Entity* entities = ch->Entities().data();
+
+                        for (uint32_t i = 0; i < count; ++i) {
+                            _invokeWithConstComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
+                        }
                     }
                 }
             }

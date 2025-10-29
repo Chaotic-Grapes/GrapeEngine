@@ -20,12 +20,11 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     // const int windowHeight = config.WindowConfig.Height;
 
     std::cout << "Select test scene: \n";
-    //std::cout << "1. Physics & Collision 2D Test" << '\n';
-    std::cout << "2. Graphics & Art Pipeline Test" << '\n';
-    std::cout << "3. Serialization Check Test" << '\n';
-    std::cout << "4. Memory Tracking Test" << '\n';
-	std::cout << "5. Entity Component System Test" << '\n';
-	std::cout << "6. C# Scripting System Test" << '\n';
+    std::cout << "1. Graphics & Art Pipeline Test" << '\n';
+    std::cout << "2. Serialization Check Test" << '\n';
+    std::cout << "3. Memory Tracking Test" << '\n';
+	std::cout << "4. Entity Component System Test" << '\n';
+	std::cout << "5. C# Scripting System Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -34,49 +33,42 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     printf("\033[H\033[J");
 
     switch (choice) {
-    // case 1: { // PhysicsCollision
-    //     std::cout << "Starting Physics & Collision 2D Test..." << '\n';
+        case 1: {
+            LOG_INFO("Starting Graphics & Art Pipeline Test...");
+            size_t graphicsTest = sceneManager.AddScene(new Sandbox::GraphicsTestScene());
+            sceneManager.SetActive(graphicsTest);
 
-    //     sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(windowWidth, windowHeight, 7.0f));
-    //     sceneManager.LoadScene("PhysicsCollision2DTestScene");
-    //     break;
-    // }
-    case 2: {
-        LOG_INFO("Starting Graphics & Art Pipeline Test...");
-        size_t graphicsTest = sceneManager.AddScene(new Sandbox::GraphicsTestScene());
-        sceneManager.SetActive(graphicsTest);
+            break;
+        }
+        case 2: {
+            LOG_INFO("Starting Serialization Integrity Test...");
+            size_t serializationTest = sceneManager.AddScene(new Sandbox::SerializationTestScene());
+            sceneManager.SetActive(serializationTest);
+            break;
+        }
+        case 3: {
+            LOG_INFO("Starting Memory Tracking Test...");
+            RunMemoryTests();
+            break;
+        }
+        case 4: {
+            LOG_INFO("Starting Entity Component System Test...");
+            size_t ecsTest = sceneManager.AddScene(new Sandbox::ECSTestScene());
+            sceneManager.SetActive(ecsTest);
 
-        break;
-    }
-    // case 3: {
-    //     std::cout << "Starting Serialization Integrity Test..." << '\n';
+            break;
+        }
+        case 5: {
+            LOG_INFO("Starting C# Scripting System Test...");
+            size_t scriptingTest = sceneManager.AddScene(new Sandbox::ScriptingTestScene());
+            sceneManager.SetActive(scriptingTest);
 
-    //     sceneManager.AddScene(new Sandbox::SerializationTestScene());
-    //     sceneManager.LoadScene("SerializationTestScene");
-    //     break;
-    // }
-    case 4: {
-        LOG_INFO("Starting Memory Tracking Test...");
-        RunMemoryTests();
-        break;
-    }
-    case 5: {
-        LOG_INFO("Starting Entity Component System Test...");
-        size_t ecsTest = sceneManager.AddScene(new Sandbox::ECSTestScene());
-        sceneManager.SetActive(ecsTest);
-
-        break;
-	}
-    case 6: {
-        LOG_INFO("Starting C# Scripting System Test...");
-        size_t scriptingTest = sceneManager.AddScene(new Sandbox::ScriptingTestScene());
-        sceneManager.SetActive(scriptingTest);
-
-        break;
-    }
-    default:
-        std::cout << "Invalid choice" << '\n';
-        break;
+            break;
+        }
+        default: {
+            std::cout << "Invalid choice" << '\n';
+            break;
+        }
     }
 }
 
