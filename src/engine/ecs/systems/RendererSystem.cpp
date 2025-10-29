@@ -56,6 +56,18 @@ namespace ECS {
             "assets/shaders/sdf_circle.frag"
         );
 
+        m_bloomExtractShader = std::make_unique<Shader>(
+            "assets/shaders/bloom_extract.vert",
+            "assets/shaders/bloom_extract.frag");
+
+        m_bloomBlurShader = std::make_unique<Shader>(
+            "assets/shaders/bloom_extract.vert",
+            "assets/shaders/bloom_blur.frag");
+
+        m_bloomCombineShader = std::make_unique<Shader>(
+            "assets/shaders/bloom_extract.vert",
+            "assets/shaders/bloom_combine.frag");
+
         // Renderer
         m_renderer = std::make_unique<Renderer>(15000);
 
@@ -71,6 +83,13 @@ namespace ECS {
         m_renderGraph->CreateTexture("Backbuffer",
             { width, height, GL_RGBA8, true });
 
+        m_renderGraph->CreateTexture("BloomExtract"
+            , { width / 2, height / 2, GL_RGBA16F, false });
+
+        m_renderGraph->CreateTexture("BloomBlur"
+            , { width / 2, height / 2, GL_RGBA16F, false });
+
+
         // Resize HDR when window resizes
         Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
             [this](const Messaging::WindowResized& msg)
@@ -78,10 +97,11 @@ namespace ECS {
                 // TODO: Add RenderGraph::ResizeTexture() method to handle this
                 // For now, recreate the graph on resize
                 m_renderGraph = std::make_unique<RenderGraph>();
-                m_renderGraph->CreateTexture("HDR",
-                    { msg.Width, msg.Height, GL_RGBA16F, false });
-                m_renderGraph->CreateTexture("Backbuffer",
-                    { msg.Width, msg.Height, GL_RGBA8, true });
+
+                m_renderGraph->CreateTexture("HDR",          { msg.Width,      msg.Height,      GL_RGBA16F, false });
+                m_renderGraph->CreateTexture("Backbuffer",   { msg.Width,      msg.Height,      GL_RGBA8,   true });
+                m_renderGraph->CreateTexture("BloomExtract", { msg.Width / 2,  msg.Height / 2,  GL_RGBA16F, false });
+                m_renderGraph->CreateTexture("BloomBlur",    { msg.Width / 2,  msg.Height / 2,  GL_RGBA16F, false });
 
                 // Update fallback projection
                 m_projection = glm::ortho(
@@ -116,6 +136,9 @@ namespace ECS {
         glm::mat4 projection = glm::mat4(1.0f);
         bool foundActive = false;
 
+        // Track current camera zoom for bloom scaling
+        m_cameraOrthoSize = kReferenceOrthoSize; // default fallback (world-space 1080p)
+
         // ============================================================
         // 1. Toggle or cycle camera
         // ============================================================
@@ -138,6 +161,7 @@ namespace ECS {
             view = m_editorCamera->GetViewMatrix();
             projection = m_editorCamera->GetProjectionMatrix();
             foundActive = true;
+            m_cameraOrthoSize = m_editorCamera->GetCameraComponent()->OrthoSize;
         }
         else {
             world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
@@ -177,6 +201,7 @@ namespace ECS {
                     }
 
                     foundActive = true; // take the first active camera
+                    m_cameraOrthoSize = camera.OrthoSize;
                 }
             );
         }
@@ -188,6 +213,20 @@ namespace ECS {
                 0.f, float(mainWindow->Height()),
                 -1.f, 1.f);
         }
+
+        // ============================================================
+        // BLOOM RADIUS CALCULATION (world-space consistent)
+        // ============================================================
+        const auto& win = WindowManager::GetMainWindow();
+        const float bloomBufferHeight = static_cast<float>(win->Height()) / 2.0f;
+
+        // How zoomed in we are relative to the default ortho size
+        const float zoomScale = kReferenceOrthoSize / m_cameraOrthoSize;
+
+        // Convert desired world-space bloom spread to texel space
+        const float bloomRadiusTexels =
+            (kDesiredBloomWorldSpread / kReferenceOrthoSize) *
+            bloomBufferHeight * zoomScale;
 
         // We only send (Projection * View) here instead of the full (Projection * View * Model)
         // because each sprite/shape's model transform (position, rotation, scale) is already
@@ -235,7 +274,9 @@ namespace ECS {
                     return;
                 }
 
-                hdrFbo->BindAndClear(0.1f, 0.1f, 0.1f, 1.f);
+                // Bceause of tone-mapping, the background will appear slightly lighter.
+                // tone mapping remaps linear HDR gray (0.1) into gamma-corrected space (looks brighter)
+                hdrFbo->BindAndClear(0.018f, 0.018f, 0.019f, 1.0f);
 
                 // ---------------------------------------
                 // Layered rendering: SDF first, then batch
@@ -379,21 +420,82 @@ namespace ECS {
                 Framebuffer::Unbind();
             });
 
+        m_renderGraph->AddPass("BloomExtract", { "HDR" }, { "BloomExtract" },
+                [this](ResourceAccessor& res)
+                {
+                    auto* hdrFbo = res.GetFramebuffer("HDR");
+                    auto* extractFbo = res.GetFramebuffer("BloomExtract");
+                    if (!hdrFbo || !extractFbo) return;
+
+                    extractFbo->BindAndClear(0, 0, 0, 1);
+                    m_bloomExtractShader->use();
+                    m_bloomExtractShader->setUniform("uThreshold", 1.1f); // brightness threshold
+                    m_bloomExtractShader->setUniform("uScene", 0);
+                    hdrFbo->BindColorTexture(0); // texture unit 0 in shader
+                    m_renderer->drawFullscreenQuad();
+                    Framebuffer::Unbind();
+                });
+
+        m_renderGraph->AddPass("BloomBlurH", { "BloomExtract" }, { "BloomBlur" },
+            [this, &bloomRadiusTexels](ResourceAccessor& res)
+            {
+                auto* src = res.GetFramebuffer("BloomExtract");
+                auto* dst = res.GetFramebuffer("BloomBlur");
+                if (!src || !dst) return;
+
+                dst->BindAndClear(0, 0, 0, 1);
+                m_bloomBlurShader->use();
+                m_bloomBlurShader->setUniform("uHorizontal", 1);
+                m_bloomBlurShader->setUniform("uImage", 0);
+                m_bloomBlurShader->setUniform("uRadius", bloomRadiusTexels);
+                m_bloomBlurShader->setUniform("uSamples", std::max(12, int(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
+                m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
+                src->BindColorTexture(0);
+                m_renderer->drawFullscreenQuad();
+                Framebuffer::Unbind();
+            });
+
+        m_renderGraph->AddPass("BloomBlurV", { "BloomBlur" }, { "BloomExtract" },
+            [this, &bloomRadiusTexels](ResourceAccessor& res)
+            {
+                auto* src = res.GetFramebuffer("BloomBlur");
+                auto* dst = res.GetFramebuffer("BloomExtract");
+                if (!src || !dst) return;
+
+                dst->BindAndClear(0, 0, 0, 1);
+                m_bloomBlurShader->use();
+                m_bloomBlurShader->setUniform("uHorizontal", 0);
+                m_bloomBlurShader->setUniform("uImage", 0);
+                m_bloomBlurShader->setUniform("uRadius", bloomRadiusTexels);
+                m_bloomBlurShader->setUniform("uSamples", std::max(12, int(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
+                m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
+
+                src->BindColorTexture(0);
+                m_renderer->drawFullscreenQuad();
+                Framebuffer::Unbind();
+            });
+
         // Pass 2: Blit HDR to backbuffer
-        m_renderGraph->AddPass("Composite", { "HDR" }, { "Backbuffer" },
+        m_renderGraph->AddPass("Composite", { "HDR", "BloomExtract" }, { "Backbuffer" },
             [this](ResourceAccessor& res)
             {
-                auto* hdrFbo = res.GetFramebuffer("HDR");
-                if (!hdrFbo) {
-                    std::cerr << "ERROR: HDR framebuffer not found in Composite pass!\n";
-                    return;
-                }
+                auto* hdr = res.GetFramebuffer("HDR");
+                auto* bloom = res.GetFramebuffer("BloomExtract");
+                if (!hdr || !bloom) return;
 
                 const auto& win = WindowManager::GetMainWindow();
                 Framebuffer::BindDefault();
                 glViewport(0, 0, win->Width(), win->Height());
 
-                hdrFbo->BlitToDefault();
+                m_bloomCombineShader->use();
+                m_bloomCombineShader->setUniform("uScene", 0);
+                m_bloomCombineShader->setUniform("uBloomBlur", 1);
+                m_bloomCombineShader->setUniform("uExposure", 1.3f);      // Or 0.8f if still too bright
+                m_bloomCombineShader->setUniform("uBloomStrength", 5.2f); // Control bloom intensity
+                m_bloomCombineShader->setUniform("uGamma", 1.5f);
+                hdr->BindColorTexture(0, 0);
+                bloom->BindColorTexture(0, 1);
+                m_renderer->drawFullscreenQuad();
             });
 
         // ============================================================
