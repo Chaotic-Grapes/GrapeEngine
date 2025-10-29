@@ -11,6 +11,7 @@ Features:
 - File browser with breadcrumb navigation
 - File selection with info display
 - Display of assets folder structure
+- Prefab editing and instance synchronization
 
 References:
 - Windows file dialog using Win32 API (commdlg.h)
@@ -50,7 +51,7 @@ void AssetBrowser::Render() {
     // Display clickable breadcrumb navigation
     _displayBreadcrumbs();
 
-    // Import button
+    // Import button (upload icon)
     if (ImGui::Button("\xEF\x82\x9B")) {
         _importAsset();
     }
@@ -64,7 +65,7 @@ void AssetBrowser::Render() {
     bool hasSelection = !m_selectedAsset.empty();
     if (!hasSelection) ImGui::BeginDisabled();
 
-    if (ImGui::Button("\xEE\xA3\x94")) { 
+    if (ImGui::Button("\xEE\xA3\x94")) {
         _replaceTexture();
     }
 
@@ -93,7 +94,7 @@ void AssetBrowser::Render() {
 
     if (!isPrefab) ImGui::EndDisabled();
 
-    // Tooltip
+    // Tooltip for prefab button
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         if (isPrefab) {
             ImGui::SetTooltip("Prefab management (load/edit)");
@@ -103,12 +104,13 @@ void AssetBrowser::Render() {
         }
     }
 
-    // Popup window
+    // Popup window with prefab options
     if (ImGui::BeginPopup("Prefabs")) {
-        // Content of dropdown menu
+        // Load prefab option: instantiate into world
         if (ImGui::Selectable("Load Prefab")) {
             _loadPrefab();
         }
+        // Edit prefab option: open prefab editor
         if (ImGui::Selectable("Edit Prefab")) {
             _editPrefab();
         }
@@ -133,7 +135,7 @@ void AssetBrowser::Render() {
     _displaySelectedFileInfo();
     ImGui::EndChild();
 
-    // Success popup (if texture replacement is ok)
+    // Status message popup (shows success/error messages for 3 seconds)
     if (m_statusTimer > 0.0f) {
         // Position at bottom of the window
         ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 30);
@@ -141,22 +143,22 @@ void AssetBrowser::Render() {
 
         // Green text for success, red for errors
         ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f) 
-            : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)  // Red
+            : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);  // Green
 
         ImGui::TextColored(color, "%s", m_statusMessage.c_str());
-        m_statusTimer -= ImGui::GetIO().DeltaTime;
+        m_statusTimer -= ImGui::GetIO().DeltaTime;  // Countdown timer
     }
 
     ImGui::End();
 
-    // Show prefab editor if editing
+    // Show prefab editor window if user clicked "Edit Prefab"
     if (m_editingPrefab) {
         _showPrefabEditor();
     }
 }
 
-// Display clickable breadcrumb trail
+// Display clickable breadcrumb trail (e.g., assets > Audio > Music)
 void AssetBrowser::_displayBreadcrumbs() {
     std::filesystem::path currentPath(m_currentPath);
     std::vector<std::filesystem::path> pathParts;
@@ -223,7 +225,7 @@ void AssetBrowser::_displayFolder(const std::filesystem::path& folderPath) {
         // If item is folder
         if (entry.is_directory()) {
             // Folder icon + name
-            std::string folderName = "\xEE\x8B\x87 " + entry.path().filename().string(); 
+            std::string folderName = "\xEE\x8B\x87 " + entry.path().filename().string();
 
             // Clickable folder entry
             if (ImGui::Selectable(folderName.c_str())) {
@@ -256,7 +258,7 @@ void AssetBrowser::_displayFile(const std::filesystem::path& filePath) {
     }
 }
 
-// Display information about the currently selected file
+// Display information about the currently selected file in the right panel
 void AssetBrowser::_displaySelectedFileInfo() {
     if (m_selectedAsset.empty()) {
         ImGui::TextDisabled("No file selected");
@@ -308,15 +310,15 @@ void AssetBrowser::_displaySelectedFileInfo() {
         ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "Could not get file size");
         LOG_ERROR("Failed to get file size: " << e.what());
     }
-    
+
     // Stop indenting text
     ImGui::Unindent();
 }
 
-// Import a new asset file into the current folder
+// Import a new asset file into the current folder using Windows file dialog
 void AssetBrowser::_importAsset() {
 #ifdef _WIN32  // Only compile this code on Windows
-    char filename[512] = ""; 
+    char filename[512] = "";
 
     // OPENFILENAMEA is a Windows struct that configures the file dialog
     OPENFILENAMEA ofn = {};                                  // Initialize all fields to 0/null
@@ -334,7 +336,7 @@ void AssetBrowser::_importAsset() {
     // OFN_PATHMUSTEXIST: Folder must exist
     // OFN_FILEMUSTEXIST: File must exist (can't type fake name)
     // OFN_NOCHANGEDIR: Don't change working directory after dialog closes
-        
+
     // Show file dialog: returns true if user selected a file, false if cancelled
     if (GetOpenFileNameA(&ofn)) {
         // User selected a file; the path is now in 'filename' buffer
@@ -380,7 +382,7 @@ void AssetBrowser::_importAsset() {
 #endif
 }
 
-// Replace the currently selected texture file with a new one
+// Replace the currently selected texture file with a new one (hot reload support)
 void AssetBrowser::_replaceTexture() {
     if (m_selectedAsset.empty()) {
         LOG_WARNING("No file selected to replace");
@@ -449,7 +451,6 @@ void AssetBrowser::_replaceTexture() {
 }
 
 // Load and instantiate selected prefab into the level
-// COPIED DIRECTLY FROM DEBUGUI.H
 void AssetBrowser::_loadPrefab() {
     // Ensure prefab is selected
     if (m_selectedAsset.empty()) {
@@ -477,9 +478,9 @@ void AssetBrowser::_loadPrefab() {
             // Deserialize creates the entity internally
             auto entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
 
-            // Tag entity with prefab link
+            // Tag entity with prefab link so we can update it later when prefab changes
             entity.AddComponent<Component::PrefabLink>(m_selectedAsset);
-            
+
             LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
             m_statusMessage = "Prefab loaded successfully";
             m_statusTimer = 3.0f;
@@ -493,7 +494,7 @@ void AssetBrowser::_loadPrefab() {
     }
 }
 
-// Open prefab for editing
+// Open prefab for editing (loads JSON into memory and sets flag to show editor window)
 void AssetBrowser::_editPrefab() {
     // Ensure prefab is selected
     if (m_selectedAsset.empty()) {
@@ -514,7 +515,7 @@ void AssetBrowser::_editPrefab() {
         // Parse prefab JSON into memory
         m_prefabData = nlohmann::json::parse(file);
         m_editingPrefabPath = m_selectedAsset;
-        m_editingPrefab = true;
+        m_editingPrefab = true;  // This flag triggers _showPrefabEditor() to render
         file.close();
 
         LOG_INFO("Opened prefab for editing: " << std::filesystem::path(m_selectedAsset).filename().string());
@@ -528,7 +529,7 @@ void AssetBrowser::_editPrefab() {
     }
 }
 
-// Find all entities using this prefab and update them
+// Find all entities using this prefab and update them with new prefab data
 void AssetBrowser::_updatePrefabInstances() {
     // Safety checks
     if (!m_world || m_editingPrefabPath.empty()) return;
@@ -547,7 +548,7 @@ void AssetBrowser::_updatePrefabInstances() {
             continue;  // Skip if not linked to this prefab
         }
 
-        // Update this prefab instance
+        // Update this prefab instance with new data
         if (_updateEntityFromPrefab(entity)) {
             updatedCount++;
         }
@@ -556,7 +557,7 @@ void AssetBrowser::_updatePrefabInstances() {
     LOG_INFO("Updated " << updatedCount << " prefab instances");
 }
 
-// Update single entity's components from prefab data
+// Update single entity's components from prefab data (synchronizes instance with prefab)
 bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
     try {
         // Iterate through each component defined in the prefab JSON
@@ -620,13 +621,16 @@ bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
     catch (const std::exception& e) {
         // JSON parsing or component update failed
         LOG_ERROR("Failed to update entity " << entity.GetId() << ": " << e.what());
-        return false; 
+        return false;
     }
 }
 
-// Helper: Render a single property row (label + X/Y fields)
-void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& data, const std::string& xKey, 
-    const std::string& yKey, float dragSpeed, float labelOffset) 
+// ============================= GENERALIZED UI HELPERS =============================
+// These helpers are reusable for ANY component type - they handle common UI patterns
+
+// Render a property with X and Y fields (works for Position, Scale, Velocity, Size, etc.)
+void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& data, const std::string& xKey,
+    const std::string& yKey, float dragSpeed, float labelOffset)
 {
     ImGui::Text(label.c_str());
 
@@ -634,103 +638,242 @@ void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& 
     float x = data[xKey];
     float y = data[yKey];
 
-    // Looks ok
+    // X field
     ImGui::SameLine();
-    // Offset cause "Local Scale" is too short, making pos of X and Y misaligned 
-    // (with "Local Position" and "Local Rotation")
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);  // Align with other fields
     ImGui::Text("X");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
-    // Hold to drag, double click to type (X-values)
+    // Hold to drag, double click to type
     if (ImGui::DragFloat(("##" + label + "X").c_str(), &x, dragSpeed)) {
-        data[xKey] = x;
+        data[xKey] = x;  // Write back to JSON
     }
 
+    // Y field
     ImGui::SameLine();
-    // But this pos should be ok as long as X is aligned
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
     ImGui::Text("Y");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
-    // Y-values
     if (ImGui::DragFloat(("##" + label + "Y").c_str(), &y, dragSpeed)) {
-        data[yKey] = y;
+        data[yKey] = y;  // Write back to JSON
     }
 }
 
-// Helper: Render a single float row (label + one field)
-void AssetBrowser::_renderFloatRow(const std::string& label, const std::string& fieldLabel, nlohmann::json& data, 
-    const std::string& key, float dragSpeed, float labelOffset) 
+// Render a single float property with custom field label (works for Mass, Rotation, Volume, etc.)
+void AssetBrowser::_renderFloatRow(const std::string& label, const std::string& fieldLabel, nlohmann::json& data,
+    const std::string& key, float dragSpeed, float labelOffset)
 {
     ImGui::Text(label.c_str());
 
-    // Same thing
     float value = data[key];
 
     ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
-    ImGui::Text(fieldLabel.c_str());
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);  // Align with other fields
+    ImGui::Text(fieldLabel.c_str());  // Field label like "kg", "°", "m", etc.
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
     if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed)) {
-        data[key] = value;
+        data[key] = value;  // Write back to JSON
     }
 }
 
-// Prefab editor window (when inspector panel is complete, this will be moved)
+// Render a text input property (works for TexturePath, Name, Tag, etc.)
+void AssetBrowser::_renderTextProperty(const std::string& label, nlohmann::json& data, const std::string& key,
+    float labelOffset)
+{
+    std::string value = data[key];
+    char buf[128];
+    strncpy_s(buf, value.c_str(), sizeof(buf) - 1);
+
+    ImGui::Text(label.c_str());
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
+    ImGui::SetNextItemWidth(100);
+
+    // Text input field
+    if (ImGui::InputText(("##" + key).c_str(), buf, sizeof(buf))) {
+        data[key] = std::string(buf);  // Write back to JSON
+    }
+}
+
+// Render an integer drag property (works for SortingOrder, MaxParticles, FontSize, etc.)
+void AssetBrowser::_renderIntProperty(const std::string& label, nlohmann::json& data, const std::string& key,
+    float labelOffset)
+{
+    int value = data[key];
+
+    ImGui::Text(label.c_str());
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
+    ImGui::SetNextItemWidth(100);
+
+    // Integer drag field
+    if (ImGui::DragInt(("##" + key).c_str(), &value)) {
+        data[key] = value;  // Write back to JSON
+    }
+}
+
+// Render a color picker property (works for any RGBA color in JSON)
+void AssetBrowser::_renderColorProperty(const std::string& label, nlohmann::json& colorData, float labelOffset) {
+    ImGui::Text(label.c_str());
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
+
+    // Convert JSON RGBA (0-255) to ImGui color (0-1)
+    // Normalize it first
+    ImVec4 color(
+        colorData["R"].get<float>() / 255.0f,
+        colorData["G"].get<float>() / 255.0f,
+        colorData["B"].get<float>() / 255.0f,
+        colorData["A"].get<float>() / 255.0f
+    );
+
+    // IMGUI HAS BUILT-IN COLOR EDITORS AND PICKERS
+    // ColorEdit4 = RGBA editor with sliders + color square
+    // NoInputs cause we don't want to show the RGBA values before clicking into the color picker
+    // NoDragDrop = can't drag and drop color between widgets 
+    // AlphaBar = Show alpha (like Unity)
+    if (ImGui::ColorEdit4(("##" + label).c_str(), &color.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop | 
+        ImGuiColorEditFlags_AlphaBar)) 
+    {
+        // When user edits color, ImGui gives a float (0-1 range) back
+        // Write back to JSON (convert 0-1 back to 0-255 for saving)
+        colorData["R"] = color.x * 255.0f;
+        colorData["G"] = color.y * 255.0f;
+        colorData["B"] = color.z * 255.0f;
+        colorData["A"] = color.w * 255.0f;
+    }
+}
+
+// Render read-only text with label (for displaying non-editable info like file paths)
+void AssetBrowser::_renderReadOnlyText(const std::string& label, const std::string& value, float labelOffset) {
+    ImGui::Text(label.c_str());
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
+    ImGui::TextDisabled("%s", value.c_str());  // Gray text = read-only
+}
+
+// Render two checkboxes on same row (works for FlipX/FlipY, Loop/PlayOnAwake, etc.)
+void AssetBrowser::_renderCheckboxRow(const std::string& label, nlohmann::json& data, const std::string& key1,
+    const std::string& label1, const std::string& key2, const std::string& label2, float labelOffset)
+{
+    ImGui::Text(label.c_str());
+    ImGui::SameLine();
+
+    bool value1 = data[key1];
+    bool value2 = data[key2];
+
+    // First checkbox
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
+    ImGui::SetNextItemWidth(20);
+    if (ImGui::Checkbox(("##" + key1).c_str(), &value1)) data[key1] = value1;
+    ImGui::SameLine();
+    ImGui::Text(label1.c_str());
+
+    // Second checkbox
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(20);
+    if (ImGui::Checkbox(("##" + key2).c_str(), &value2)) data[key2] = value2;
+    ImGui::SameLine();
+    ImGui::Text(label2.c_str());
+}
+
+// Generic component section renderer: wraps content in a collapsing header
+// Lambda function allows flexible rendering of any component's properties
+template<typename T>
+void AssetBrowser::_renderComponentSection(const std::string& headerName, nlohmann::json& data, T renderContent) {
+    // Collapsing header (click triangle to expand/collapse)
+    if (ImGui::CollapsingHeader(headerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+        renderContent(data);  // Call the lambda to render component-specific properties
+    }
+}
+
+// Prefab editor window: displays editable properties for the selected prefab
+// (This will eventually move to Inspector when it's implemented)
 void AssetBrowser::_showPrefabEditor() {
-    // Set initial window size
     UICommon::ApplyLayout(UICommon::WindowId::EDITOR_PREFAB_EDITOR);
 
-    // Create window with close button (X) that sets m_editingPrefab to false
+    // Window with close button (X) that sets m_editingPrefab to false
     if (ImGui::Begin("Prefab Editor", &m_editingPrefab)) {
-        // Display which prefab we're editing
-        ImGui::Text("Editing: %s", std::filesystem::path(m_editingPrefabPath).filename().string().c_str());
+        // Header: Display which prefab we're editing
+        ImGui::Text("Prefab");
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10.0f);
+        ImGui::TextDisabled("%s", m_editingPrefabPath.empty() ? "None" :
+            std::filesystem::path(m_editingPrefabPath).filename().string().c_str());
+
         ImGui::Separator();
 
-        // Look for components in the prefab JSON
+        // Render all components in the prefab
         if (m_prefabData.contains("Components")) {
-            // Loop through all components to find Transform (default, can add components)
             for (auto& componentEntry : m_prefabData["Components"]) {
                 std::string componentType = componentEntry["Type"];
-                // Render editor UI for each component
-                // TRANSFORM
-                if (componentType == "Transform") {
-                    auto& data = componentEntry["Data"];
+                auto& data = componentEntry["Data"];
 
-                    if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-                        _renderFloatRow("Local Rotation", "θ", data, "Rotation", 1.0f);
-                        _renderVector2DRow("Local Position", data["Position"], "X", "Y", 1.0f);
-                        _renderVector2DRow("Local Scale", data["Scale"], "X", "Y", 0.01f, 52.0f);
-                    }
+                // TRANSFORM
+                // Position, rotation, scale
+                if (componentType == "Transform") {
+                    // [this] lets the lambda call member functions of this class (e.g. _renderFloatRow)
+                    // Without it, these function calls wouldn't compile because the lambda wouldn't
+                    // have access to the current class instance
+                    _renderComponentSection("Transform", data, [this](nlohmann::json& d) {
+                        _renderFloatRow("Local Rotation", "θ", d, "Rotation", 1.0f);
+                        _renderVector2DRow("Local Position", d["Position"], "X", "Y", 1.0f);
+                        _renderVector2DRow("Local Scale", d["Scale"], "X", "Y", 0.01f, 52.0f);
+                        });
                 }
-                // 
+                // SPRITE RENDERER
+                // Texture, color tint, flip options, sorting
+                else if (componentType == "SpriteRenderer") {
+                    _renderComponentSection("Sprite Renderer", data, [this](nlohmann::json& d) {
+                        // Sprite texture path (read-only for now)
+                        std::string texPath = d.value("TexturePath", "");
+                        _renderReadOnlyText("Sprite", texPath.empty() ? "None"
+                            : std::filesystem::path(texPath).filename().string());
+
+                        // Color tint picker
+                        _renderColorProperty("Color", d["Color"]);
+
+                        // Flip X/Y checkboxes
+                        _renderCheckboxRow("Flip", d, "FlipX", "X", "FlipY", "Y");
+
+                        ImGui::Separator();
+                        ImGui::Text("Additional Settings");
+
+                        // Sorting layer name (for render order grouping)
+                        _renderTextProperty("Sorting Layer", d, "SortingLayerName", 48.0f);
+
+                        // Order in layer (fine-grained sorting within a layer)
+                        _renderIntProperty("Order in Layer", d, "SortingOrder", 38.0f);
+                        });
+                }
+                // I'll do more in the future
             }
         }
 
         ImGui::Separator();
-        // Apply button: saves to file and updates all instances
+
+        // Apply button: saves modified JSON to file and updates all prefab instances in the world
         if (ImGui::Button("Apply to All Instances")) {
-            // Write modified JSON back to prefab file
             std::ofstream file(m_editingPrefabPath);
             if (file.is_open()) {
                 file << m_prefabData.dump(2);  // Pretty print with 2-space indent
                 file.close();
 
-                // Update all entities using this prefab
+                // Synchronize all entities that were instantiated from this prefab
                 _updatePrefabInstances();
 
                 LOG_INFO("Saved prefab and updated instances");
                 m_statusMessage = "Prefab updated successfully";
                 m_statusTimer = 3.0f;
-                m_editingPrefab = false;  // Close editor window
+                m_editingPrefab = false;  // Close editor window after successful save
             }
         }
 
         ImGui::SameLine();
 
-        // Cancel button: discard changes and close window
+        // Cancel button: discard changes and close window without saving
         if (ImGui::Button("Cancel")) {
             m_editingPrefab = false;
         }

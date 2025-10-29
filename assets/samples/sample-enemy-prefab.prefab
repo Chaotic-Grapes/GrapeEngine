@@ -2,6 +2,20 @@
   "Name": "PrefabSample",
   "Components": [
     {
+      "Type": "Transform",
+      "Data": {
+        "Position": {
+          "X": 650,
+          "Y": 750
+        },
+        "Rotation": 0,
+        "Scale": {
+          "X": 1,
+          "Y": 1
+        }
+      }
+    },
+    {
       "Type": "SpriteRenderer",
       "Data": {
         "Color": {
@@ -19,20 +33,6 @@
         "TextureId": 1,
         "TexturePath": "assets/textures/test/player.png",
         "Width": 224
-      }
-    },
-    {
-      "Type": "Transform",
-      "Data": {
-        "Position": {
-          "X": 650,
-          "Y": 750
-        },
-        "Rotation": 0,
-        "Scale": {
-          "X": 256,
-          "Y": 256
-        }
       }
     }
   ]
