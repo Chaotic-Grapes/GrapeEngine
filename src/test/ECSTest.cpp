@@ -886,9 +886,9 @@ void ECSTestScene::_testRenderStressTest() {
                     MathUtils::Randomize(5.f, 20.f), 
                     Vector2D{0,0}, 
                     Color{
-                        MathUtils::Randomize(0.f, 1.f),
-                        MathUtils::Randomize(0.f, 1.f),
-                        MathUtils::Randomize(0.f, 1.f),
+                        MathUtils::Randomize(0.f, 2.f),
+                        MathUtils::Randomize(0.f, 2.f),
+                        MathUtils::Randomize(0.f, 2.f),
                         1.f
                     }, 
                     0.f, true 
