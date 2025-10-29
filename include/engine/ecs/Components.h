@@ -371,6 +371,23 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<CameraMatrices>, "CameraMatrices must be trivially copyable");
 
+        struct Light2D {
+        public:
+            enum class Type : uint8_t {
+                Directional = 0,
+                Point = 1
+            };
+
+            Type      LightType = Type::Directional; // defaults to directional
+            Vector3D  Position{ 0.f, 0.f, 0.f };       // used if Point
+            Vector3D  Direction{ 0.f, -1.f, 0.f };     // used if Directional
+            Color     Color{ 1.f, 1.f, 1.f, 1.f };     // RGB intensity
+            float     Intensity = 1.0f;              // brightness scalar
+            float     Range = 10.0f;                 // used if Point
+            bool      CastsShadows = false;          // for later extensions
+        };
+        static_assert(std::is_trivially_copyable_v<Light2D>, "Light2D must be trivially copyable");
+
         // ---------- Scripting / Audio (kept minimal) ----------
 
         struct ScriptId {
