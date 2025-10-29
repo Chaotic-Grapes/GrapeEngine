@@ -44,6 +44,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/debugDraw2D.hpp"
 #include "graphics/EditorCamera.hpp"
 #include "graphics/RenderGraph.hpp"
+#include "graphics/graphicsConfig.hpp"
 
 namespace ECS {
 
@@ -118,30 +119,43 @@ namespace ECS {
               will cause washed-out or grayscale rendering.
         */
         glm::vec4 ToGlm(const Color& c) {
-            return glm::vec4{
-                static_cast<float>(c.R) / 255.0f,
-                static_cast<float>(c.G) / 255.0f,
-                static_cast<float>(c.B) / 255.0f,
-                static_cast<float>(c.A) / 255.0f
-            };
+            return glm::vec4{ c.R, c.G, c.B, c.A };
         }
 
         // ====================================================================
         // Member Variables - State
         // ====================================================================
 
-        bool m_initialized = false;                ///< Has Initialize() been called?
-        bool m_useEditorCamera = true;             ///< Use editor vs ECS cameras
-        int m_activeCameraIndex = 0;               ///< Active ECS camera (future use)
-        glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();  ///< Projection matrix
+        bool m_initialized = false;                                 ///< Has Initialize() been called?
+        bool m_useEditorCamera = true;                              ///< Use editor vs ECS cameras
+        int m_activeCameraIndex = 0;                                ///< Active ECS camera (future use)
+        glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();    ///< Projection matrix
+
+        /*!
+        \brief Cached current camera orthographic size (world units).
+        Updated every frame by RendererSystem::Update().
+        */
+        float m_cameraOrthoSize = 1080.0f;
+
+        /*!
+        \brief Reference ortho size considered "default zoom" for bloom scaling.
+        */
+        static constexpr float kReferenceOrthoSize = 1080.0f;
+
+        /*!
+        \brief Desired bloom spread (in world-space units) at reference zoom.
+        E.g., 48 corresponds roughly to 48 pixels at 1080p.
+        */
+        static constexpr float kDesiredBloomWorldSpread = 40.0f;
+
 
         // ====================================================================
         // Member Variables - Core Systems
         // ====================================================================
 
-        std::unique_ptr<Renderer> m_renderer;      ///< Low-level batch renderer
-        std::unique_ptr<RenderGraph> m_renderGraph;///< Render graph (owns framebuffers)
-        std::unique_ptr<Engine::EditorCamera> m_editorCamera;  ///< Editor camera
+        std::unique_ptr<Renderer> m_renderer;                   ///< Low-level batch renderer
+        std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
+        std::unique_ptr<Engine::EditorCamera> m_editorCamera;   ///< Editor camera
 
         // ====================================================================
         // Member Variables - Shaders
@@ -151,9 +165,10 @@ namespace ECS {
         std::unique_ptr<Shader> m_textShader;      ///< SDF text rendering shader
         std::unique_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
 
-        // Post-process shaders (future use)
-        std::unique_ptr<Shader> m_bloomBlurShader;     ///< Bloom blur pass
-        std::unique_ptr<Shader> m_bloomCombineShader;  ///< Bloom composite pass
+        // Post-process shaders
+        std::unique_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
+        std::unique_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
+        std::unique_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
     };
 
 } // namespace ECS
