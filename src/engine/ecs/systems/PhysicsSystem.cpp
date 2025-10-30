@@ -255,7 +255,13 @@ namespace ECS {
                         transform.Position.Y += linearVel.Value.Y * dt;
 
                         if (!(rb.Flags & (1 << 2))) {
-                            Engine::Physics::ApplyAngularDamping(angularVel, rb.AngularDamping);
+                            float angularAcceleration = Engine::Physics::CalculateAngularAcceleration(rb, angularVel);
+                            if (std::abs(angularAcceleration * dt) > std::abs(angularVel.Value)) {
+                                angularVel.Value = 0.0f;
+                            }
+                            else {
+                                angularVel.Value += angularAcceleration * dt;
+                            }
                             transform.Rotation = Quaternion::FromEulerRad(0.0f, 0.0f, angularVel.Value * dt) * transform.Rotation;
                         }
 

@@ -80,8 +80,8 @@ namespace Engine {
     // Angular Damping
     // ============================================================================
 
-    void Physics::ApplyAngularDamping(ECS::Components::AngularVelocity2D& angularVel, float dampingFactor) {
-        angularVel.Value *= dampingFactor;
+    float Physics::CalculateAngularAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::AngularVelocity2D& angVel) {
+        return -angVel.Value * rb.AngularDamping;
     }
     
     // ============================================================================
