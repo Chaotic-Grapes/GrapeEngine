@@ -73,28 +73,6 @@ public class EnemyAI : ScriptBehaviour
 
     public override void OnUpdate()
     {
-        //if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
-        //    return;
-
-        //// Simple patrol behavior
-        //var targetPoint = m_movingToB ? m_patrolPointB : m_patrolPointA;
-        //var direction = targetPoint - transform.Position;
-        //var distance = direction.Magnitude;
-
-        //// Move towards patrol point
-        //if (distance > 5.0f)
-        //{
-        //    var movement = direction.Normalized * m_patrolSpeed * Time.DeltaTime;
-        //    transform.Position += movement;
-        //}
-        //else
-        //{
-        //    // Reached patrol point, switch direction
-        //    m_movingToB = !m_movingToB;
-        //}
-
-        //m_visualEntity.SetComponent(transform);
-
 
         // Try to link to player if not already linked
         if (!m_linkedToPlayer)
@@ -123,11 +101,46 @@ public class EnemyAI : ScriptBehaviour
         var throb = 0.85f + 0.15f * MathF.Sin((float)Time.ElapsedTime * 3.0f);
         circle.Radius = 15.0f * throb;
 
-        // Red color with varying intensity
-        circle.Color.R = throb;
-        circle.Color.G = 0.0f;
-        circle.Color.B = 0.0f;
-        circle.Color.A = 1.0f;
+
+        // Change color based on current state
+
+        if (m_fsm.CurrentState is EnemyAttackState)
+        {
+            // Check cooldown status
+            if (m_attackState.m_attackCooldown > 0.0f)
+            {
+                //  BLACK when on cooldown (can't attack yet)
+                circle.Color.R = 0.0f;
+                circle.Color.G = 0.0f;
+                circle.Color.B = 0.0f;
+                circle.Color.A = 1.0f;
+            }
+            else
+            {
+                // WHITE when ready to attack (cooldown finished)
+                circle.Color.R = 1.0f;
+                circle.Color.G = 1.0f;
+                circle.Color.B = 1.0f;
+                circle.Color.A = 1.0f;
+            }
+        }
+
+        else if (m_fsm.CurrentState is EnemyChaseState)
+        {
+            // Orange when chasing
+            circle.Color.R = 1.0f;
+            circle.Color.G = 0.5f;
+            circle.Color.B = 0.0f;
+            circle.Color.A = 1.0f;
+        }
+        else
+        {
+            // Red color when patrolling (default)
+            circle.Color.R = throb;
+            circle.Color.G = 0.0f;
+            circle.Color.B = 0.0f;
+            circle.Color.A = 1.0f;
+        }
 
         m_visualEntity.SetComponent(circle);
     }
@@ -155,6 +168,7 @@ public class EnemyAI : ScriptBehaviour
         m_chaseState.PatrolState = m_patrolState;
         m_chaseState.AttackState = m_attackState;
         m_attackState.ChaseState = m_chaseState;
+        m_attackState.PatrolState = m_patrolState;
 
         //init state machine with it starting at patrolState
         m_fsm = new HFSM();
@@ -420,16 +434,20 @@ public class EnemyAttackState : State
     private EnemyAI m_enemy;
 
     // buffer
-    private float m_attackCooldown = 0f;
+    public float m_attackCooldown = 0f;
 
     //detection radius
-    private float m_detectionRadius = 150.0f;
+    private float AttackRange = 5.0f; 
+    private float DetectionRange = 150.0f;     
+    
+
 
     //resetter
     private const float ATTACK_COOLDOWN_TIME = 1.5f;
 
     //needed for state linkage
     public EnemyChaseState ChaseState;
+    public EnemyPatrolState PatrolState;
 
     // constructor to create state
     public EnemyAttackState(EnemyAI enemy)
@@ -469,10 +487,15 @@ public class EnemyAttackState : State
     {
         float distance = m_enemy.GetDistanceToPlayer();
 
-        // Player escaped attack range
-        if (distance > m_detectionRadius)
+        if(distance <= AttackRange)
         {
-            return ChaseState;
+            return null;
+        }
+        else if (distance <= DetectionRange && distance >=AttackRange) {
+             return ChaseState;
+        }
+        else {
+            return PatrolState;
         }
 
         return null;
