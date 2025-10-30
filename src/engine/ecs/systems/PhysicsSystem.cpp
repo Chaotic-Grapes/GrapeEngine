@@ -235,7 +235,7 @@ namespace ECS {
             Components::AngularVelocity2D, Components::LocalTransform>(
                 [&](const Entity entity, const Components::Rigidbody2D& rb,
                     Components::LinearVelocity2D& linearVel,
-                    const Components::AngularVelocity2D& angularVel,
+                    Components::AngularVelocity2D& angularVel,
                     Components::LocalTransform& transform) {
 
                         if (const auto* active = world.TryGet<Components::Active>(entity)) {
@@ -255,6 +255,13 @@ namespace ECS {
                         transform.Position.Y += linearVel.Value.Y * dt;
 
                         if (!(rb.Flags & (1 << 2))) {
+                            float angularAcceleration = Engine::Physics::CalculateAngularAcceleration(rb, angularVel);
+                            if (std::abs(angularAcceleration * dt) > std::abs(angularVel.Value)) {
+                                angularVel.Value = 0.0f;
+                            }
+                            else {
+                                angularVel.Value += angularAcceleration * dt;
+                            }
                             transform.Rotation = Quaternion::FromEulerRad(0.0f, 0.0f, angularVel.Value * dt) * transform.Rotation;
                         }
 

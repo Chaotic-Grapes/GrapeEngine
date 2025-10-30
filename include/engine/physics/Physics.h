@@ -50,6 +50,9 @@ namespace Engine {
         static void ReflectVelocity(ECS::Components::LinearVelocity2D& vel, const Vector2D& normal);
         static void ZeroVelocityComponent(ECS::Components::LinearVelocity2D& vel, bool isXAxis, bool isPositive);
 
+        // Angular Damping
+        static float CalculateAngularAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::AngularVelocity2D& angVel);
+
         static bool ApplyBoundaryConstraint(
             Vector2D& position, 
             Vector2D& velocity, 

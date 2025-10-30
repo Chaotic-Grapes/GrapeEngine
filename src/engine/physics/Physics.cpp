@@ -75,7 +75,15 @@ namespace Engine {
             }
         }
     }
+    
+    // ============================================================================
+    // Angular Damping
+    // ============================================================================
 
+    float Physics::CalculateAngularAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::AngularVelocity2D& angVel) {
+        return -angVel.Value * rb.AngularDamping;
+    }
+    
     // ============================================================================
     // Boundary Collision
     // ============================================================================
