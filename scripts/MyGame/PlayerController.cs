@@ -9,6 +9,9 @@ namespace MyGame;
 /// </summary>
 public class PlayerController : ScriptBehaviour
 {
+    //create static instance container to be get by other class 
+    public static PlayerController Instance { get; private set; }
+
     // Movement settings
     private readonly float m_moveSpeed = 200.0f;
     private float m_rotationSpeed = 180.0f;
@@ -18,6 +21,10 @@ public class PlayerController : ScriptBehaviour
 
     public override void OnStart()
     {
+        // Set the static Instance property to point to this specific PlayerController object
+        // This allows other classes to access this PlayerController via PlayerController.Instance
+        Instance = this;
+        
         Log("PlayerController initialized!", LogLevel.Info);
         Log("Use WASD to move, Q/E to rotate", LogLevel.Info);
 
@@ -119,8 +126,24 @@ public class PlayerController : ScriptBehaviour
         m_visualEntity.SetComponent(circle);
     }
 
+    //getter for visual entity (so EnemyAI can access it)
+    public Entity GetVisualEntity()
+    {
+        return m_visualEntity;
+    }
+
     public override void OnFixedUpdate()
     {
         // Physics-based updates would go here if needed but not used in this demo
+    }
+
+    //kill character
+    public override void OnDestroy()
+    {
+        // Clear static instance when destroyed
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 }
