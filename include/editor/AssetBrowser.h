@@ -28,6 +28,7 @@ References:
 #include <string>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <imgui.h>
 
 // Forward declarations
 struct ImFont;
@@ -106,7 +107,7 @@ private:
 
     // Generic component section renderer: wraps content in collapsing header
     // Uses lambda function for flexible component-specific rendering
-    template<typename T>
+    template <typename T>
     void _renderComponentSection(const std::string& headerName, nlohmann::json& data,
         T renderContent);
 
@@ -115,6 +116,7 @@ private:
     void _showPrefabEditor();
 
     // References to external systems
+    float m_fontScale = 1.0f;
     ImFont* m_mainFont = nullptr;
     ImFont* m_symbolsFont = nullptr;   // Material Symbols font for icons
     World* m_world = nullptr;          // Game world reference for entity management

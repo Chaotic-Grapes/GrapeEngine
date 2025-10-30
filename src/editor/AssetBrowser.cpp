@@ -31,7 +31,6 @@ References:
 #include "../editor/AssetBrowser.h"
 #include "services/UICommon.h"
 #include "core/Logger.h" 
-#include <imgui.h>
 #include <vector>
 #include <services/ResourceManager.h>
 #include "serialization/EntitySerializer.h"
@@ -127,12 +126,31 @@ void AssetBrowser::Render() {
         ImGui::EndPopup();
     }
 
+    // Font scale controls
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 193);
+
+    ImGui::SetNextItemWidth(120);
+    if (ImGui::SliderFloat("##Scale", &m_fontScale, 0.5f, 2.0f, "%.1fx")) {
+        m_fontScale = std::clamp(m_fontScale, 0.5f, 2.0f);
+    }
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("UI Scale");
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Reset##Scale")) {
+        m_fontScale = 1.0f;
+    }
+
     // Two-column layout (.x is width): file list on left, info panel on right
     float windowWidth = ImGui::GetContentRegionAvail().x;
 
     // Left side: File/folder list (65% width)
     // Child window = scrollable region within parent window
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
+    ImGui::SetWindowFontScale(m_fontScale);
     _displayFolder(m_currentPath);
     ImGui::EndChild();
 
@@ -141,14 +159,15 @@ void AssetBrowser::Render() {
     // Right side: File info panel (35% width)
     // ImVec2(0, 0) = take up remaining horizontal + vertical space
     ImGui::BeginChild("FileInfo", ImVec2(0, 0), true);
+    ImGui::SetWindowFontScale(m_fontScale);
     _displaySelectedFileInfo();
     ImGui::EndChild();
 
     // Status message popup (shows success/error messages for 3 seconds)
     if (m_statusTimer > 0.0f) {
         // Position at bottom of the window
-        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 30);
         ImGui::SetCursorPosX(20);
+        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 30);
 
         // Green text for success, red for errors
         ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
@@ -159,8 +178,13 @@ void AssetBrowser::Render() {
         m_statusTimer -= ImGui::GetIO().DeltaTime;  // Countdown timer
     }
 
+    ImGui::SameLine();
+
     ImGui::End();
     ImGui::PopFont();
+
+    // Reset scaling for other windows
+    ImGui::SetWindowFontScale(1.0f);
 
     // Show prefab editor window if user clicked "Edit Prefab"
     if (m_editingPrefab) {
@@ -587,54 +611,32 @@ bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
         for (const auto& componentEntry : m_prefabData["Components"]) {
             std::string typeName = componentEntry["Type"];  // Get component type name (e.g. "Transform")
 
-            // Update Transform component if present
-            if (typeName == "Transform") {
-                auto* transform = entity.GetComponent<Component::Transform>();
-                if (transform) {
-                    // Deserialize JSON data into the component (updates Position, Rotation, Scale)
-                    from_json(componentEntry["Data"], *transform);
+            // Helper lambda that handles the repetitive pattern ([&] captures everything by reference)
+            // Checks if component matches type name; if so, tries to get the actual component via GetComponent<T>()
+            // Also calls from_json which reads JSON data and updates component's fields
+            auto updateComponent = [&]<typename T>(const std::string& name) {
+                if (typeName == name) {
+                    if (auto* component = entity.GetComponent<T>()) {
+                        from_json(componentEntry["Data"], *component);
+                    }
+                    return true;
                 }
-            }
-            // Update SpriteRenderer component
-            else if (typeName == "SpriteRenderer") {
-                auto* sprite = entity.GetComponent<Component::SpriteRenderer>();
-                if (sprite) {
-                    // Deserialize JSON data into sprite component (updates TexturePath, Color, FlipX, etc.)
-                    from_json(componentEntry["Data"], *sprite);
-                }
-            }
-            // Update Rigidbody2D component
-            else if (typeName == "Rigidbody2D") {
-                auto* rb = entity.GetComponent<Component::Rigidbody2D>();
-                if (rb) {
-                    // Deserialize JSON data into rigidbody (updates Mass, Velocity, BodyType, etc.)
-                    from_json(componentEntry["Data"], *rb);
-                }
-            }
-            // Update ShapeRenderer2D component
-            else if (typeName == "ShapeRenderer2D") {
-                auto* shape = entity.GetComponent<Component::ShapeRenderer2D>();
-                if (shape) {
-                    // Deserialize JSON data into shape renderer (updates Type, FillColor, Radius, etc.)
-                    from_json(componentEntry["Data"], *shape);
-                }
-            }
-            // Update CircleCollider2D component
-            else if (typeName == "CircleCollider2D") {
-                auto* collider = entity.GetComponent<Component::CircleCollider2D>();
-                if (collider) {
-                    // Deserialize JSON data into circle collider (updates Radius, Offset, IsTrigger, etc.)
-                    from_json(componentEntry["Data"], *collider);
-                }
-            }
-            // Update BoxCollider2D component
-            else if (typeName == "BoxCollider2D") {
-                auto* collider = entity.GetComponent<Component::BoxCollider2D>();
-                if (collider) {
-                    // Deserialize JSON data into box collider (updates Size, Offset, IsTrigger, etc.)
-                    from_json(componentEntry["Data"], *collider);
-                }
-            }
+                return false;
+            };
+
+            // For each component type, call the lambda with the type + JSON type name
+            // Updates Position, Rotation, Scale
+            if (updateComponent.operator()<Component::Transform>("Transform")) continue;
+            // Updates TexturePath, Color, FlipX, etc.
+            if (updateComponent.operator()<Component::SpriteRenderer>("SpriteRenderer")) continue;
+            // Updates Mass, Velocity, BodyType, etc.
+            if (updateComponent.operator()<Component::Rigidbody2D>("Rigidbody2D")) continue;
+            // Updates Type, FillColor, Radius, etc.
+            if (updateComponent.operator()<Component::ShapeRenderer2D>("ShapeRenderer2D")) continue;
+            // Updates Radius, Offset, IsTrigger, etc.
+            if (updateComponent.operator()<Component::CircleCollider2D>("CircleCollider2D")) continue;
+            // Updates Radius, Offset, IsTrigger, etc.
+            if (updateComponent.operator()<Component::BoxCollider2D>("BoxCollider2D")) continue;
         }
 
         LOG_INFO("Updated entity " << entity.GetId() << " from prefab");
@@ -689,7 +691,7 @@ void AssetBrowser::_renderFloatRow(const std::string& label, const std::string& 
 
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);  // Align with other fields
-    ImGui::Text(fieldLabel.c_str());  // Field label like "kg", "°", "m", etc.
+    ImGui::Text(fieldLabel.c_str());  // Field label like "kg", "m", etc.
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
     if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed)) {
@@ -752,9 +754,12 @@ void AssetBrowser::_renderColorProperty(const std::string& label, nlohmann::json
     // ColorEdit4 = RGBA editor with sliders + color square
     // NoInputs cause we don't want to show the RGBA values before clicking into the color picker
     // NoDragDrop = can't drag and drop color between widgets 
-    // AlphaBar = Show alpha (like Unity)
-    if (ImGui::ColorEdit4(("##" + label).c_str(), &color.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoDragDrop | 
-        ImGuiColorEditFlags_AlphaBar)) 
+    // AlphaBar = show alpha (like Unity)
+    // NoLabel = removes the title next to the freaking box thing
+    // PickerHueWheel = color picker wheel (not default vertical hue bar)
+    if (ImGui::ColorEdit4("Color", &color.x, ImGuiColorEditFlags_NoInputs |
+        ImGuiColorEditFlags_NoDragDrop |
+        ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel))
     {
         // When user edits color, ImGui gives a float (0-1 range) back
         // Write back to JSON (convert 0-1 back to 0-255 for saving)
@@ -800,7 +805,7 @@ void AssetBrowser::_renderCheckboxRow(const std::string& label, nlohmann::json& 
 
 // Generic component section renderer: wraps content in a collapsing header
 // Lambda function allows flexible rendering of any component's properties
-template<typename T>
+template <typename T>
 void AssetBrowser::_renderComponentSection(const std::string& headerName, nlohmann::json& data, T renderContent) {
     // Collapsing header (click triangle to expand/collapse)
     if (ImGui::CollapsingHeader(headerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -815,6 +820,7 @@ void AssetBrowser::_showPrefabEditor() {
 
     // Window with close button (X) that sets m_editingPrefab to false
     if (ImGui::Begin("Prefab Editor", &m_editingPrefab)) {
+        ImGui::SetWindowFontScale(m_fontScale);
         // Header: Display which prefab we're editing
         ImGui::Text("Prefab");
         ImGui::SameLine();
@@ -837,9 +843,9 @@ void AssetBrowser::_showPrefabEditor() {
                     // Without it, these function calls wouldn't compile because the lambda wouldn't
                     // have access to the current class instance
                     _renderComponentSection("Transform", data, [this](nlohmann::json& d) {
-                        _renderFloatRow("Local Rotation", "R", d, "Rotation", 1.0f);
+                        _renderFloatRow("Local Rotation", "R", d, "Rotation", 1.0f, 19.0f);
                         _renderVector2DRow("Local Position", d["Position"], "X", "Y", 1.0f);
-                        _renderVector2DRow("Local Scale", d["Scale"], "X", "Y", 0.01f, 52.0f);
+                        _renderVector2DRow("Local Scale", d["Scale"], "X", "Y", 0.01f, 41.0f);
                         });
                 }
                 // SPRITE RENDERER
@@ -852,7 +858,7 @@ void AssetBrowser::_showPrefabEditor() {
                             : std::filesystem::path(texPath).filename().string());
 
                         // Color tint picker
-                        _renderColorProperty("Color", d["Color"]);
+                        _renderColorProperty("Color", d["Color"], 14.0f);
 
                         // Flip X/Y checkboxes
                         _renderCheckboxRow("Flip", d, "FlipX", "X", "FlipY", "Y");
@@ -861,10 +867,10 @@ void AssetBrowser::_showPrefabEditor() {
                         ImGui::Text("Additional Settings");
 
                         // Sorting layer name (for render order grouping)
-                        _renderTextProperty("Sorting Layer", d, "SortingLayerName", 48.0f);
+                        _renderTextProperty("Sorting Layer", d, "SortingLayerName", 44.0f);
 
                         // Order in layer (fine-grained sorting within a layer)
-                        _renderIntProperty("Order in Layer", d, "SortingOrder", 38.0f);
+                        _renderIntProperty("Order in Layer", d, "SortingOrder", 37.0f);
                         });
                 }
                 // I'll do more in the future
@@ -886,7 +892,7 @@ void AssetBrowser::_showPrefabEditor() {
                 LOG_INFO("Saved prefab and updated instances");
                 m_statusMessage = "Prefab updated successfully";
                 m_statusTimer = 3.0f;
-                m_editingPrefab = false;  // Close editor window after successful save
+                m_editingPrefab = false;      // Close editor window after successful save
             }
         }
 
