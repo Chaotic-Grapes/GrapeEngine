@@ -27,12 +27,37 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // CoreCLR handle
 using hostfxr_handle = void*;
 
+// Platform-specific macros
+#ifdef _WIN32
+    // ****************************************** //
+    // Unused for now but will be used later for path handling (see TODO 9)
+    // Will probably be moved to a different header for project path management
+    // We don't have to define these for C# as C# has Path.DirectorySeparatorChar etc.
+    #define DIRECTORY_SEPARATOR "\\"
+    #define PATH_SEPARATOR ";"
+    // ****************************************** //
+#else
+    // Assumes we are targeting Linux/macOS eventually
+    // Since this one's very easy to do, I'll just define it for now
+    #define DIRECTORY_SEPARATOR "/"
+    #define PATH_SEPARATOR ":"
+#endif
+
 // TODO:
-// 1. Build this as a separate DLL.
-// 2. Load/unload the DLL dynamically in the engine.
-// 3. Refine this further.
-// 4. Make GetComponent similar to how Unity handles it.
-// 5. Exception handling.
+// 1.  Build this as a separate DLL.
+// 2.  Load/unload the DLL dynamically in the engine.
+// 3.  Refine this further.
+// 4.  Make GetComponent similar to how Unity handles it.
+// 5.  Exception handling.
+// 6.  AttachScript() and DetachScript() APIs, support for script parameters (constructor args).
+// 7.  Support for async/await in C# scripts (if possible).
+// 8.  Project/asset path.
+// 9.  Open/read etc for asset files in the project.
+// 10. Proper handling of AppDomain isolation.
+// 11. Hot reloading of scripts.
+
+// Maybe TODO:
+// 1.  Separate API functions into another header or in their related classes
 
 namespace ECS {
     /**
