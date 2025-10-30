@@ -50,20 +50,17 @@ namespace Sandbox {
             FontSystem          = 1210,
 
             // Required M2 rubric tests (re-indexed for milestone continuity)
-            GameGUI             = 1301,    // was 1106
-            FontSys             = 1302,    // was 1107
-            ViewportCamera      = 1303,    // was 1108
-            TransformationSys   = 1304,    // was 1109
-            SpriteAnim          = 1305,    // was 1110
-            MultipleShaders     = 1306,    // was 1115
-            Batching            = 1307,    // was 1121
-            EditorCamera        = 1308,    // was 1208
-            ObjectPicking       = 1309,    // was 1210
+            GameGUI             = 1211,    // was 1106
+            FontSys             = 1212,    // was 1107
+            ViewportCamera      = 1213,    // was 1108
+            TransformationSys   = 1214,    // was 1109
+            SpriteAnim          = 1215,    // was 1110
+            MultipleShaders     = 1216,    // was 1115
+            Batching            = 1217,    // was 1121
+            EditorCamera        = 1218,    // was 1208
+            ObjectPicking       = 1219,    // was 1210
 
             // Extra experimental tests (outside rubric)
-            SplineDeformation   = 2001,
-            FrameBufferObject   = 2002,
-            PostProcessing      = 2003,
             LightingTest        = 2004,
             NormalMaps          = 2005,
             ParticleSystem      = 2006,
