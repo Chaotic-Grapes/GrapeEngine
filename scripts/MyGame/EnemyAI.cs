@@ -18,7 +18,8 @@ public class EnemyAI : ScriptBehaviour
     // incase we need it for specific game scenes
     public float Health = 100f;
     public float MaxHealth = 100f;
-
+    
+    
     // Visual entity of enemy
     private Entity m_visualEntity;
 
@@ -29,6 +30,8 @@ public class EnemyAI : ScriptBehaviour
 
     // Player reference (need to read game manager probably info there)
     private Entity m_playerEntity;
+    //bool flag for playerset
+    private bool m_linkedToPlayer = false;
 
     public override void OnStart()
     {
@@ -63,8 +66,9 @@ public class EnemyAI : ScriptBehaviour
 
         // build state machine
         BuildStateMachine();
+        TryLinkToPlayer();
 
-        Log("Enemy ready with HFSM~!")
+        Log("Enemy ready with HFSM~!");
     }
 
     public override void OnUpdate()
@@ -92,12 +96,22 @@ public class EnemyAI : ScriptBehaviour
         //m_visualEntity.SetComponent(transform);
 
 
+        // Try to link to player if not already linked
+        if (!m_linkedToPlayer)
+        {
+            TryLinkToPlayer();
+        }
 
-        // Update the state machine - basically runs the ai states
-        m_fsm.Update(Time.DeltaTime);
+        // Only update FSM if linked to player
+        if (m_linkedToPlayer)
+        {
 
-        // Update visuals - enemy visuals
-        UpdateEnemyVisual();
+            // Update the state machine - basically runs the ai states
+            m_fsm.Update(Time.DeltaTime);
+
+            // Update visuals - enemy visuals
+            UpdateEnemyVisual();
+        }
     }
 
     private void UpdateEnemyVisual()
@@ -116,6 +130,17 @@ public class EnemyAI : ScriptBehaviour
         circle.Color.A = 1.0f;
 
         m_visualEntity.SetComponent(circle);
+    }
+
+    private void TryLinkToPlayer()
+    {
+        if (PlayerController.Instance != null)
+        {
+            SetPlayerEntity(PlayerController.Instance.GetVisualEntity());
+            m_linkedToPlayer = true;
+           
+        }
+
     }
 
     private void BuildStateMachine()
@@ -144,15 +169,18 @@ public class EnemyAI : ScriptBehaviour
 
     public bool CanSeePlayer()
     {
-        //might wanna use this for monsters that require LOS
-        return m_playerEntity.EntityId != 0; 
+        //might wanna use this for monsters that require LOS <- todo for more detailed implementation
+
+        // Check if player entity is valid before accessing EntityId
+        return m_playerEntity != default && m_playerEntity.EntityId != 0;
     }
 
     public float GetDistanceToPlayer()
     {
+
         //early exit if player doesnt exist
         // if player entity doesnt exist set to max so the check distance will fail = no change state
-        if(m_playerEntity.EntityId == 0)
+        if (m_playerEntity == default || m_playerEntity.EntityId == 0)
         {
             return float.MaxValue;
         }
@@ -193,9 +221,9 @@ public class EnemyAI : ScriptBehaviour
     public void MoveTowardPlayer(float deltaTime)
     {
         //earlyexit if player doesnt exist
-        if (m_playerEntity.EntityId == 0)
+        if (m_playerEntity == default || m_playerEntity.EntityId == 0)
             return;
-        
+
         // if player doesnt have transform set
         if (!m_playerEntity.TryGetComponent<LocalTransform>(out var playerTransform))
             return;
@@ -336,7 +364,7 @@ public class EnemyChaseState : State
     public EnemyAttackState AttackState;
 
     //ranges
-    private float AttackRange = 5.f; //placeholder
+    private float AttackRange = 5.0f; //placeholder
     private float DetectionRange = 150.0f;             
 
     //constructor to create state

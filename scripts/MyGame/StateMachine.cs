@@ -107,3 +107,4 @@ namespace MyGame
             StateHistory.Push(newState);
         }
     }
+}
