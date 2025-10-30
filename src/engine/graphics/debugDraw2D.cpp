@@ -145,15 +145,38 @@ namespace DebugDraw2D {
         const glm::vec4& color,
         GLuint textureId)
     {
-        glm::vec2 v0 = { min.x, min.y };
-        glm::vec2 v1 = { max.x, min.y };
-        glm::vec2 v2 = { max.x, max.y };
-        glm::vec2 v3 = { min.x, max.y };
+        const float halfThick = thickness * 0.5f;
 
-        Line(r, v0, v1, thickness, color, textureId);
-        Line(r, v1, v2, thickness, color, textureId);
-        Line(r, v2, v3, thickness, color, textureId);
-        Line(r, v3, v0, thickness, color, textureId);
+        // Outer rectangle (expanded by half-thickness)
+        const glm::vec2 outerBL = min - glm::vec2(halfThick, halfThick);
+        const glm::vec2 outerBR = { max.x + halfThick, min.y - halfThick };
+        const glm::vec2 outerTR = max + glm::vec2(halfThick, halfThick);
+        const glm::vec2 outerTL = { min.x - halfThick, max.y + halfThick };
+
+        // Inner rectangle (shrunk by half-thickness)
+        const glm::vec2 innerBL = min + glm::vec2(halfThick, halfThick);
+        const glm::vec2 innerBR = { max.x - halfThick, min.y + halfThick };
+        const glm::vec2 innerTR = max - glm::vec2(halfThick, halfThick);
+        const glm::vec2 innerTL = { min.x + halfThick, max.y - halfThick };
+
+        std::vector<Vertex> verts;
+        std::vector<uint32_t> idx;
+        verts.reserve(16);
+        idx.reserve(24);
+
+        // Bottom edge (quad)
+        PushQuad(verts, idx, outerBL, outerBR, innerBR, innerBL, color);
+
+        // Right edge (quad)
+        PushQuad(verts, idx, outerBR, outerTR, innerTR, innerBR, color);
+
+        // Top edge (quad)
+        PushQuad(verts, idx, outerTR, outerTL, innerTL, innerTR, color);
+
+        // Left edge (quad)
+        PushQuad(verts, idx, outerTL, outerBL, innerBL, innerTL, color);
+
+        r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
     void RectFill(Renderer& r,
