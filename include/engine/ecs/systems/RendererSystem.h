@@ -45,6 +45,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/EditorCamera.hpp"
 #include "graphics/RenderGraph.hpp"
 #include "graphics/graphicsConfig.hpp"
+#include "graphics/PixelBufferObject.hpp"
 
 namespace ECS {
 
@@ -135,7 +136,7 @@ namespace ECS {
         \brief Cached current camera orthographic size (world units).
         Updated every frame by RendererSystem::Update().
         */
-        float m_cameraOrthoSize = 1080.0f;
+        float m_cameraOrthoSize = 1000.0f;
 
         /*!
         \brief Reference ortho size considered "default zoom" for bloom scaling.
@@ -169,6 +170,45 @@ namespace ECS {
         std::unique_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
         std::unique_ptr<Shader> m_bloomExtractShader;   ///< Bloom extraction pass
         std::unique_ptr<Shader> m_bloomCombineShader;   ///< Bloom composite pass
+
+        // ====================================================================
+        // Member Variables - Object Picking
+        // ====================================================================
+        std::unique_ptr<Shader> m_pickingShader;
+        std::unique_ptr<PixelBufferObject> m_pickingPBO;
+        bool m_pickingRequestPending = false;
+        glm::ivec2 m_pickingPos = { 0, 0 };
+
+        // ====================================================================
+        // Member Variables - UI Scaling
+        // ====================================================================
+
+        /*!
+        \brief Reference resolution for UI design (1920×1080).
+        All UI elements are designed at this resolution and scaled proportionally.
+        */
+        static constexpr float kReferenceWidth = 1920.0f;
+        static constexpr float kReferenceHeight = 1080.0f;
+
+        // ====================================================================
+        // Helper Methods - Text Positioning
+        // ====================================================================
+
+        /*!
+        \brief Calculate screen position for anchored UI text.
+        \param transform Entity's transform (offset from anchor point).
+        \param anchor Anchor point (TopLeft, Center, etc.).
+        \param screenWidth Current window width in pixels.
+        \param screenHeight Current window height in pixels.
+        \param scaleFactor UI scale factor for proportional positioning.
+        \return Absolute screen position in pixels.
+        */
+        glm::vec2 CalculateAnchoredPosition(
+            const Components::LocalTransform& transform,
+            Components::TextAnchor anchor,
+            float screenWidth,
+            float screenHeight,
+            float scaleFactor) const;
     };
 
 } // namespace ECS

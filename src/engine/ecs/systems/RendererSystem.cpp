@@ -1,17 +1,49 @@
+// ============================================================================
+// Engine Systems
+// ============================================================================
 #include "ecs/systems/RendererSystem.h"
+
+// ============================================================================
+// Core Engine
+// ============================================================================
 #include "core/Application.h"
-#include "graphics/renderer.hpp"
-#include <algorithm>
-#include <iterator>
-#include "services/WindowManager.h"
-#include <glm/gtc/matrix_transform.hpp>
-#include "ecs/Components.h"
-#include "graphics/texture.hpp"
-#include "services/Time.h"
-#include "helpers/TransformUtils.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+
+// ============================================================================
+// Graphics
+// ============================================================================
+#include "graphics/renderer.hpp"
+#include "graphics/texture.hpp"
 #include "graphics/RenderGraph.hpp"
+#include "graphics/PixelBufferObject.hpp"
+
+// ============================================================================
+// ECS Components
+// ============================================================================
+#include "ecs/Components.h"
+
+// ============================================================================
+// Services
+// ============================================================================
+#include "services/WindowManager.h"
+#include "services/Time.h"
+
+// ============================================================================
+// Helpers
+// ============================================================================
+#include "helpers/TransformUtils.h"
+
+// ============================================================================
+// Standard Library
+// ============================================================================
+#include <algorithm>
+#include <iterator>
+
+// ============================================================================
+// Third-Party Libraries
+// ============================================================================
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace ECS {
     // Helper function to get the effective transform for rendering
@@ -124,6 +156,55 @@ namespace ECS {
         // OpenGL state
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+
+    glm::vec2 RendererSystem::CalculateAnchoredPosition(
+        const Components::LocalTransform& transform,
+        Components::TextAnchor anchor,
+        float screenWidth,
+        float screenHeight,
+        float scaleFactor) const
+    {
+        // Scale the offset based on UI scale
+        float scaledOffsetX = transform.Position.X * scaleFactor;
+        float scaledOffsetY = transform.Position.Y * scaleFactor;
+
+        switch (anchor) {
+        case Components::TextAnchor::TopLeft:
+            return glm::vec2(
+                scaledOffsetX,
+                screenHeight - scaledOffsetY
+            );
+
+        case Components::TextAnchor::TopRight:
+            return glm::vec2(
+                screenWidth - scaledOffsetX,
+                screenHeight - scaledOffsetY
+            );
+
+        case Components::TextAnchor::BottomLeft:
+            return glm::vec2(
+                scaledOffsetX,
+                scaledOffsetY
+            );
+
+        case Components::TextAnchor::BottomRight:
+            return glm::vec2(
+                screenWidth - scaledOffsetX,
+                scaledOffsetY
+            );
+
+        case Components::TextAnchor::Center:
+            return glm::vec2(
+                screenWidth * 0.5f + scaledOffsetX,
+                screenHeight * 0.5f + scaledOffsetY
+            );
+
+        case Components::TextAnchor::Absolute:
+        default:
+            // No scaling or anchoring for absolute positioning
+            return glm::vec2(transform.Position.X, transform.Position.Y);
+        }
     }
 
     void RendererSystem::Update(World& world, const float dt) {
@@ -416,6 +497,130 @@ namespace ECS {
                     }
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
+
+                    // ============================================================
+                    // --- Sub-pass 3: TEXT RENDERING ---
+                    // ============================================================
+                    if (m_textShader) {
+                        m_textShader->use();
+
+                        const auto& win = WindowManager::GetMainWindow();
+                        const float screenWidth = static_cast<float>(win->Width());
+                        const float screenHeight = static_cast<float>(win->Height());
+
+                        // Calculate UI scale factor (simple calculation each frame)
+                        const float uiScaleFactor = screenHeight / kReferenceHeight;
+
+                        // Screen-space orthographic projection
+                        glm::mat4 screenOrtho = glm::ortho(
+                            0.0f, screenWidth,
+                            0.0f, screenHeight,
+                            -1.0f, 1.0f
+                        );
+                        m_textShader->setMat4("uProjection", screenOrtho);
+                        m_renderer->beginFrame();
+
+                        // Font cache (static to persist across frames)
+                        static std::unordered_map<std::string, std::shared_ptr<Font>> fontCache;
+
+                        for (ECS::Entity entity : list) {
+                            // Skip inactive entities
+                            if (world.Has<Components::Active>(entity) &&
+                                !world.Get<Components::Active>(entity).Enabled) continue;
+
+                            // Only process entities with Text component
+                            if (!world.Has<Components::Text>(entity)) continue;
+
+                            // Get transform and text data
+                            const auto& lt = world.Get<Components::LocalTransform>(entity);
+                            const auto& text = world.Get<Components::Text>(entity);  // Now const!
+
+                            // Load/cache font
+                            std::string fontPath(text.FontPath);
+                            auto it = fontCache.find(fontPath);
+                            if (it == fontCache.end()) {
+                                try {
+                                    auto font = std::make_shared<Font>(fontPath, 96);
+                                    fontCache[fontPath] = font;
+                                    it = fontCache.find(fontPath);
+                                    LOG_DEBUG("Loaded font: " << fontPath);
+                                }
+                                catch (const std::exception& e) {
+                                    LOG_ERROR("Failed to load font " << fontPath << ": " << e.what());
+                                    continue;
+                                }
+                            }
+
+                            // Calculate position fresh every frame (it's just a few multiplications!)
+                            glm::vec2 screenPos = CalculateAnchoredPosition(
+                                lt, text.Anchor, screenWidth, screenHeight, uiScaleFactor
+                            );
+
+                            // Scale font size proportionally (renderer handles the rest)
+                            float scaledFontSize = text.PixelSize * uiScaleFactor;
+
+                            // Submit text to batcher since the quad scaling happens automatically
+                            m_renderer->submitText(
+                                *it->second,
+                                text.getContent(),
+                                screenPos,
+                                ToGlm(text.Color),
+                                scaledFontSize
+                            );
+                        }
+
+                        m_renderer->endFrame(); // Flush text batch
+                    } //if m_textShader
+
+                    // ============================================================
+                    // --- DEBUG: Draw Non-Editor Camera Frustum ---
+                    // ============================================================
+                    if (m_useEditorCamera) { // Only show when using editor camera
+                        m_shader->use();
+                        m_shader->setMat4("uViewProj", viewProj);
+                        m_renderer->beginFrame();
+
+                        // Get editor camera entity to exclude it
+                        const ECS::Entity editorCameraEntity = m_editorCamera->GetEntity();
+
+                        // Find the active non-editor camera
+                        world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
+                            [&](ECS::Entity entity,
+                                const ECS::Components::LocalTransform& camTransform,
+                                const ECS::Components::Camera3D& camera)
+                            {
+                                // Skip editor camera itself!!!
+                                if (entity == editorCameraEntity) return;
+
+                                if (!camera.Active) return; // Skip inactive cameras
+
+                                // Calculate camera frustum bounds in world space
+                                const float halfH = camera.OrthoSize * 0.5f;
+                                const float halfW = halfH * camera.AspectRatio;
+
+                                // Camera position in world space
+                                const glm::vec2 camPos(camTransform.Position.X, camTransform.Position.Y);
+
+                                // Frustum corners (centered on camera position)
+                                const glm::vec2 frustumMin = camPos - glm::vec2(halfW, halfH);
+                                const glm::vec2 frustumMax = camPos + glm::vec2(halfW, halfH);
+
+                                // Calculate constant screen-space thickness
+                                const auto& win = WindowManager::GetMainWindow();
+                                const float desiredPixelThickness = 2.0f; // Always 2 pixels thick
+                                const float worldThickness = (m_cameraOrthoSize / win->Height()) * desiredPixelThickness;
+
+                                // Draw frustum rectangle with constant screen-space thickness
+                                const glm::vec4 frustumColor(0.0f, 1.0f, 1.0f, 0.6f); // Cyan, semi-transparent
+
+                                DebugDraw2D::RectStroke(*m_renderer, frustumMin, frustumMax,
+                                    worldThickness, frustumColor, 0);
+                            }
+                        );
+
+                        m_renderer->endFrame();
+                    } // if m_useEditorCamera
+
                 }
                 Framebuffer::Unbind();
             });
@@ -429,9 +634,9 @@ namespace ECS {
 
                     extractFbo->BindAndClear(0, 0, 0, 1);
                     m_bloomExtractShader->use();
-                    m_bloomExtractShader->setUniform("uThreshold", 1.1f); // brightness threshold
+                    m_bloomExtractShader->setUniform("uThreshold", 1.1f);   // brightness threshold
                     m_bloomExtractShader->setUniform("uScene", 0);
-                    hdrFbo->BindColorTexture(0); // texture unit 0 in shader
+                    hdrFbo->BindColorTexture(0);                            // texture unit 0 in shader
                     m_renderer->drawFullscreenQuad();
                     Framebuffer::Unbind();
                 });
@@ -490,7 +695,7 @@ namespace ECS {
                 m_bloomCombineShader->use();
                 m_bloomCombineShader->setUniform("uScene", 0);
                 m_bloomCombineShader->setUniform("uBloomBlur", 1);
-                m_bloomCombineShader->setUniform("uExposure", 1.3f);      // Or 0.8f if still too bright
+                m_bloomCombineShader->setUniform("uExposure", 1.3f);      // Or 0.8f if still too bright?
                 m_bloomCombineShader->setUniform("uBloomStrength", 5.2f); // Control bloom intensity
                 m_bloomCombineShader->setUniform("uGamma", 1.5f);
                 hdr->BindColorTexture(0, 0);
