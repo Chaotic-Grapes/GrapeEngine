@@ -75,7 +75,15 @@ namespace Engine {
             }
         }
     }
+    
+    // ============================================================================
+    // Angular Damping
+    // ============================================================================
 
+    void Physics::ApplyAngularDamping(ECS::Components::AngularVelocity2D& angularVel, float dampingFactor) {
+        angularVel.Value *= dampingFactor;
+    }
+    
     // ============================================================================
     // Boundary Collision
     // ============================================================================
