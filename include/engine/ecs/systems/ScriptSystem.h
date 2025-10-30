@@ -212,12 +212,12 @@ namespace ECS {
         // These functions are exported and callable from C# via P/Invoke.
         // They provide safe, type-agnostic component access.
         
-        friend bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
-		friend bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer);
-        friend void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
-        friend bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
-        friend void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
-        friend void ScriptAPI_DestroyEntity(uint64_t entityId);
+        // friend bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
+		// friend bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer);
+        // friend void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
+        // friend bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
+        // friend void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
+        // friend void ScriptAPI_DestroyEntity(uint64_t entityId);
     };
 
 }
@@ -241,6 +241,14 @@ namespace ECS {
  * @return true if component exists and was copied, false otherwise
  */
 SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
+
+/**
+ * @brief Get a pointer to a component on an entity by type hash.
+ * @param entityId Entity to query
+ * @param typeHash FNV-1a hash of component type name
+ * @return Pointer to the component data, or nullptr if not found
+ */
+SCRIPT_API void *ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash);
 
 /**
  * @brief Get a component from an entity by type hash.
@@ -282,6 +290,12 @@ SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
  * @param entityId Entity to destroy
  */
 SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId);
+
+/**
+ * @brief Checks if an entity is alive in the world.
+ * @return Packed entity ID
+ */
+SCRIPT_API bool ScriptAPI_IsAlive(uint64_t entityId);
 
 /**
  * @brief Set the world instance for script API access.

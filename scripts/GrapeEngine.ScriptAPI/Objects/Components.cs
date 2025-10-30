@@ -38,7 +38,7 @@ namespace GrapeEngine.Scripting
             Array.Copy(chars, Value, Math.Min(chars.Length, 63));
         }
 
-        public override string ToString() => new string(Value).TrimEnd('\0');
+        public override readonly string ToString() => new string(Value).TrimEnd('\0');
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -75,7 +75,7 @@ namespace GrapeEngine.Scripting
             Scale = scale;
         }
 
-        public static LocalTransform Default => new LocalTransform(Vector3.Zero, Quaternion.Identity, Vector3.One);
+        public static LocalTransform Default => new(Vector3.Zero, Quaternion.Identity, Vector3.One);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -130,19 +130,19 @@ namespace GrapeEngine.Scripting
 
         public bool IsKinematic
         {
-            get => (Flags & FLAG_KINEMATIC) != 0;
+            readonly get => (Flags & FLAG_KINEMATIC) != 0;
             set => Flags = value ? (Flags | FLAG_KINEMATIC) : (Flags & ~FLAG_KINEMATIC);
         }
 
         public bool UseGravity
         {
-            get => (Flags & FLAG_USE_GRAVITY) != 0;
+            readonly get => (Flags & FLAG_USE_GRAVITY) != 0;
             set => Flags = value ? (Flags | FLAG_USE_GRAVITY) : (Flags & ~FLAG_USE_GRAVITY);
         }
 
         public bool FixedRotation
         {
-            get => (Flags & FLAG_FIXED_ROTATION) != 0;
+            readonly get => (Flags & FLAG_FIXED_ROTATION) != 0;
             set => Flags = value ? (Flags | FLAG_FIXED_ROTATION) : (Flags & ~FLAG_FIXED_ROTATION);
         }
 
@@ -151,10 +151,10 @@ namespace GrapeEngine.Scripting
             return new Rigidbody2D
             {
                 Mass = mass,
-                InverseMass = mass > 0 ? 1.0f / mass : 0,
-                LinearDamping = 0.0f,
-                AngularDamping = 0.0f,
-                GravityScale = 1.0f,
+                InverseMass = mass > 0 ? 1f / mass : 0,
+                LinearDamping = 0f,
+                AngularDamping = 0f,
+                GravityScale = 1f,
                 Flags = FLAG_USE_GRAVITY
             };
         }
@@ -194,7 +194,7 @@ namespace GrapeEngine.Scripting
 
         public bool IsTrigger
         {
-            get => (Flags & FLAG_IS_TRIGGER) != 0;
+            readonly get => (Flags & FLAG_IS_TRIGGER) != 0;
             set => Flags = value ? (Flags | FLAG_IS_TRIGGER) : (Flags & ~FLAG_IS_TRIGGER);
         }
     }
@@ -211,7 +211,7 @@ namespace GrapeEngine.Scripting
 
         public bool IsTrigger
         {
-            get => (Flags & FLAG_IS_TRIGGER) != 0;
+            readonly get => (Flags & FLAG_IS_TRIGGER) != 0;
             set => Flags = value ? (Flags | FLAG_IS_TRIGGER) : (Flags & ~FLAG_IS_TRIGGER);
         }
 
@@ -354,19 +354,22 @@ namespace GrapeEngine.Scripting
     {
         public float R, G, B, A;
 
-        public Color(float r, float g, float b, float a = 1.0f)
+        public Color(float r, float g, float b, float a = 1f)
         {
-            R = r; G = g; B = b; A = a;
+            R = r;
+            G = g;
+            B = b;
+            A = a;
         }
 
-        public static Color White => new Color(1, 1, 1, 1);
-        public static Color Black => new Color(0, 0, 0, 1);
-        public static Color Red => new Color(1, 0, 0, 1);
-        public static Color Green => new Color(0, 1, 0, 1);
-        public static Color Blue => new Color(0, 0, 1, 1);
-        public static Color Yellow => new Color(1, 1, 0, 1);
-        public static Color Cyan => new Color(0, 1, 1, 1);
-        public static Color Magenta => new Color(1, 0, 1, 1);
+        public static Color White => new(1, 1, 1, 1);
+        public static Color Black => new(0, 0, 0, 1);
+        public static Color Red => new(1, 0, 0, 1);
+        public static Color Green => new(0, 1, 0, 1);
+        public static Color Blue => new(0, 0, 1, 1);
+        public static Color Yellow => new(1, 1, 0, 1);
+        public static Color Cyan => new(0, 1, 1, 1);
+        public static Color Magenta => new(1, 0, 1, 1);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -408,8 +411,6 @@ namespace GrapeEngine.Scripting
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public static uint GetTypeHash<T>() where T : unmanaged
-        {
-            return FNV1aHash(typeof(T).Name);
-        }
+            => FNV1aHash(typeof(T).Name);
     }
 }

@@ -16,7 +16,7 @@ public class EnemyAI : ScriptBehaviour
     private float m_detectionRadius = 150f;
 
     // Visual entity
-    private Entity m_visualEntity;
+    private Entity? m_visualEntity;
 
     public override void OnStart()
     {
@@ -52,7 +52,14 @@ public class EnemyAI : ScriptBehaviour
 
     public override void OnUpdate()
     {
-        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
+        if (m_visualEntity == null || !m_visualEntity.IsAlive())
+        {
+            Log("EnemyAI entity is not alive", LogLevel.Warning);
+            return;
+        }
+
+        ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var hasTransform);
+        if (!hasTransform)
             return;
 
         // Simple patrol behavior
@@ -80,8 +87,15 @@ public class EnemyAI : ScriptBehaviour
 
     private void UpdateEnemyVisual()
     {
+        if (m_visualEntity == null || !m_visualEntity.IsAlive())
+        {
+            Log("EnemyAI entity is not alive", LogLevel.Warning);
+            return;
+        }
+
         // Make enemy throb to show it's active
-        if (!m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle))
+        ref var circle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var hasCircle);
+        if (!hasCircle)
             return;
 
         var throb = 0.85f + 0.15f * MathF.Sin((float)Time.ElapsedTime * 3.0f);
