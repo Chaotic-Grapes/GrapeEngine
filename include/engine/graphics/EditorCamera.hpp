@@ -67,6 +67,11 @@ namespace Engine {
         /// Accessor for the internal Transform component.
         ECS::Components::LocalTransform* GetTransform() const { return m_transform; }
 
+        /// Accessor for the internal entity (for filtering in debug visualization)
+        ECS::Entity GetEntity() const { return m_cameraEntity; }
+
+        void OnWindowResize(int newWidth, int newHeight);
+
     private:
         // --------------------------------------------------------------------
         // Internal state
@@ -81,7 +86,7 @@ namespace Engine {
         float m_distance = 10.f;                            //!< Distance from orbit center
         float m_yaw = 0.f;                                  //!< Horizontal rotation angle
         float m_pitch = 0.f;                                //!< Vertical rotation angle
-        float m_targetOrthoSize = 1000.0f;                    //!< Target orthographic size
+        float m_targetOrthoSize = 1000.0f;                  //!< Target orthographic size
         float m_perspectiveBlend = 0.0f;                    //!< 0=ortho, 1=perspective
         bool  m_returningToOrtho = false;                   //!< Whether camera is transitioning to ortho mode
 
