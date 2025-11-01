@@ -2,6 +2,7 @@
 #define MATHHELPER_H
 
 #include <random>
+#include <cmath>
 
 class MathHelper {
 public:
@@ -27,6 +28,13 @@ public:
             return dist(engine);
         }
 		else return 0; // Unsupported type
+    }
+
+    // Distance function
+    static float Distance(float x1, float y1, float x2, float y2) {
+        float dx = x1 - x2;
+        float dy = y1 - y2;
+        return std::sqrt(dx * dx + dy * dy);
     }
 };
 #endif

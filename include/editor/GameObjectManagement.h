@@ -78,7 +78,38 @@ public:
 	 * Provides interface for creating, editing, cloning, and deleting
 	 * game objects with real-time entity management.
 	 */
-	void _showGameObjectEditor();
+	//void _showGameObjectEditor();
+
+	/**
+	 * @brief Renders all editor windows (Hierarchy, Property Editor, Main Menu).
+	 *
+	 * Replaces the original _showGameObjectEditor call in the main loop.
+	 */
+	void ShowEditorWindows();
+
+	/**
+	 * @brief Handles selection and dragging of objects using mouse input.
+	 *
+	 * Should be called in the main editor update loop BEFORE rendering.
+	 */
+	void HandleInWorldInteraction();
+
+	/**
+	 * @brief Saves the current world/level state to a JSON file.
+	 * @param filename Full path and name of the file to save to.
+	 */
+	void SaveLevel(const std::string& filename);
+
+	/**
+	 * @brief Loads a new world/level state from a JSON file.
+	 * @param filename Full path and name of the file to load from.
+	 */
+	void LoadLevel(const std::string& filename);
+
+	/**
+	 * @brief Sets the currently selected entity.
+	 */
+	void SetSelectedEntityId(EntityId id) { m_selectedEntityId = id; }
 
 private:
 	DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
@@ -93,6 +124,14 @@ private:
 	// Event counters for input debugging
 	int m_spacePressed = 0;   ///< Counter for space key press events
 	int m_spaceReleased = 0;  ///< Counter for space key release events
+
+	// State for the currently selected object
+	EntityId m_selectedEntityId = 0;
+
+	// Helper functions to draw specific editor windows
+	void _showMainMenu();
+	void _showHierarchyWindow();
+	void _showPropertyEditorWindow();
 
 	// Cached UI elements to avoid string creation every frame
 	mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;    ///< Cached delete button labels

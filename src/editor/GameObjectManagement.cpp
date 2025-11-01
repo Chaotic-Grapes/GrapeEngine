@@ -26,7 +26,362 @@
 #include "audio/FmodAudioDevice.h"
 #include "audio/SoundTypes.h"
 
+ // --- Level Management Implementation ---
 
+ // Assumed directory for level files, please change as needed
+static constexpr const char* LEVEL_DIR = "assets/levels/";
+
+void GameObjectEditor::SaveLevel(const std::string& filename) {
+	if (!HasValidWorld()) return;
+	try {
+		// Assumed: EntitySerializer::SerializeWorld exists and handles file output
+		Serialization::EntitySerializer::SerializeWorld(*m_world, filename);
+		LOG_INFO("Successfully saved level to: " << filename);
+	}
+	catch (const std::exception& e) {
+		LOG_ERROR("Failed to save world: " << e.what());
+	}
+}
+
+void GameObjectEditor::LoadLevel(const std::string& filename) {
+	if (!HasValidWorld()) return;
+	try {
+		// 1. Clear current level before loading a new one
+		ClearAllGameObjects();
+
+		// 2. Assumed: EntitySerializer::DeserializeWorld exists and handles entity creation
+		Serialization::EntitySerializer::DeserializeWorld(*m_world, filename);
+		LOG_INFO("Successfully loaded level from: " << filename);
+
+		m_selectedEntityId = 0; // Deselect everything on load
+		_invalidateCache();
+	}
+	catch (const std::exception& e) {
+		LOG_ERROR("Failed to load world: " << e.what());
+	}
+}
+
+// --- In-World Picking/Dragging Implementation ---
+
+void GameObjectEditor::HandleInWorldInteraction() {
+	if (!HasValidWorld()) return;
+
+	// State for dragging
+	static bool isDragging = false;
+
+	// Only proceed if the mouse is not interacting with an ImGui window
+	if (ImGui::GetIO().WantCaptureMouse) return;
+
+	// Get mouse position
+	double xPos, yPos;
+	Input::GetMousePosition(xPos, yPos);
+	Vector2D mouseWorldPos(static_cast<float>(xPos), static_cast<float>(yPos));
+
+	// --- 1. Picking (Select/Start Drag) ---
+	if (Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
+		EntityId newSelection = 0;
+
+		// Iterate over objects in reverse order to pick the visually top-most object.
+		const auto entities = m_world->GetEntityManager().GetAllEntities();
+		for (auto it = entities.rbegin(); it != entities.rend(); ++it) {
+			auto entity = m_world->GetEntityManager().GetEntity(*it);
+			auto* transform = entity.GetComponent<Component::Transform>();
+			auto* collider = entity.GetComponent<Component::CircleCollider2D>(); // Assuming circle collider for picking
+
+			// Only pick if it has a Transform and a Collider/Sizing component
+			if (transform && collider) {
+				// Simple circle-based pick: Check if mouse is inside the object's radius
+				float distance = MathHelper::Distance(transform->Position, mouseWorldPos); // Assumed helper exists
+				if (distance <= collider->Radius) {
+					newSelection = *it;
+					isDragging = true;
+					break; // Found the top-most object
+				}
+			}
+		}
+
+		// Update selection state
+		if (m_selectedEntityId != newSelection) {
+			m_selectedEntityId = newSelection;
+			_invalidateCache();
+		}
+	}
+
+	// --- 2. Dragging ---
+	if (isDragging && m_selectedEntityId != 0 && Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
+		auto selectedEntity = m_world->GetEntityManager().GetEntity(m_selectedEntityId);
+		if (selectedEntity.GetId() != 0) {
+			// Directly set position to mouse world position
+			selectedEntity.Transform().Position = mouseWorldPos;
+		}
+	}
+
+	// --- 3. Drop (Stop Dragging) ---
+	if (isDragging && !Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
+		isDragging = false;
+	}
+}
+
+
+// --- Editor Windows Entry Point ---
+
+void GameObjectEditor::ShowEditorWindows() {
+	_showMainMenu();
+	_showHierarchyWindow();
+	_showPropertyEditorWindow();
+}
+
+
+// --- 1. Main Menu (for Save/Load) ---
+
+void GameObjectEditor::_showMainMenu() {
+	if (ImGui::BeginMainMenuBar()) {
+		if (ImGui::BeginMenu("File")) {
+			// Save Level
+			if (ImGui::MenuItem("Save Level...")) {
+				ImGui::OpenPopup("Save Level");
+			}
+
+			// Load Level
+			if (ImGui::MenuItem("Load Level...")) {
+				ImGui::OpenPopup("Load Level");
+			}
+
+			ImGui::Separator();
+			if (ImGui::MenuItem("Exit", "Alt+F4")) {
+				// Handle application exit
+			}
+
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
+	}
+
+	// Modal for Save Level
+	if (ImGui::BeginPopupModal("Save Level", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+		static char filenameBuffer[128] = "NewLevel";
+		ImGui::Text("Enter level filename (will be saved in %s):", LEVEL_DIR);
+		ImGui::InputText("##savefilename", filenameBuffer, sizeof(filenameBuffer));
+
+		if (ImGui::Button("Save") && strlen(filenameBuffer) > 0) {
+			std::string fullPath = std::string(LEVEL_DIR) + std::string(filenameBuffer) + ".json";
+			SaveLevel(fullPath);
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel")) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+	// Modal for Load Level
+	if (ImGui::BeginPopupModal("Load Level", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+		static std::string selectedFile = "";
+		ImGui::Text("Select level to load from %s:", LEVEL_DIR);
+
+		if (ImGui::BeginListBox("##LevelList", ImVec2(200, 150))) {
+			try {
+				for (const auto& entry : std::filesystem::directory_iterator(LEVEL_DIR)) {
+					if (entry.path().extension() == ".json") {
+						std::string filename = entry.path().filename().string();
+						bool is_selected = (selectedFile == filename);
+						if (ImGui::Selectable(filename.c_str(), is_selected)) {
+							selectedFile = filename;
+						}
+					}
+				}
+			}
+			catch (const std::exception& e) {
+				ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error reading dir: %s", e.what());
+			}
+			ImGui::EndListBox();
+		}
+
+		if (ImGui::Button("Load") && !selectedFile.empty()) {
+			LoadLevel(std::string(LEVEL_DIR) + selectedFile);
+			selectedFile = ""; // Reset selection
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel")) {
+			selectedFile = "";
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
+
+// --- 2. Hierarchy Objects List Window ---
+
+void GameObjectEditor::_showHierarchyWindow() {
+	// Use config values (Assumed for window docking/position)
+	// UICommon::ApplyLayout(UICommon::WindowId::DEBUG_EDITOR); 
+
+	ImGui::Begin("Hierarchy Objects List");
+
+	// Add new game object section (kept here for quick access)
+	ImGui::Text("Create New Object:");
+	static char nameBuffer[DebugUIConfig::MAX_OBJECT_NAME_LENGTH] = "NewObject";
+	ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.5f);
+	ImGui::InputText("##NewObjectName", nameBuffer, sizeof(nameBuffer));
+
+	ImGui::SameLine();
+	if (ImGui::Button("Add Object") && strlen(nameBuffer) > 0) {
+		AddGameObject(nameBuffer);
+	}
+
+	ImGui::Separator();
+
+	// Display list of current objects
+	const auto entities = m_world->GetEntityManager().GetAllEntities();
+	ImGui::Text("Current Objects (%zu):", entities.size());
+
+	// Scrollable region for the list
+	ImGui::BeginChild("ObjectsScrollingRegion", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2), true);
+
+	// For each object
+	for (const auto& entId : entities) {
+		auto entity = m_world->GetEntityManager().GetEntity(entId);
+		if (entity.GetId() == 0) continue;
+
+		std::stringstream oss;
+		oss << "[" << entity.GetId() << "] " << entity.GetName();
+		std::string label = oss.str();
+
+		// CORE HIERARCHY / SELECTION LOGIC
+		const bool is_selected = (m_selectedEntityId == entId);
+
+		// Use Selectable for the hierarchy list item
+		if (ImGui::Selectable(label.c_str(), is_selected)) {
+			// Select the object, or deselect if already selected
+			m_selectedEntityId = is_selected ? 0 : entId;
+		}
+
+		// Handle right-click context menu on the selected item
+		if (ImGui::BeginPopupContextItem()) {
+			if (ImGui::Selectable("Clone")) {
+				CloneGameObject(entity);
+			}
+			if (ImGui::Selectable("Delete")) {
+				RemoveGameObject(entId);
+				if (m_selectedEntityId == entId) {
+					m_selectedEntityId = 0; // Deselect if deleted
+				}
+				ImGui::EndPopup();
+				break; // Break the loop after deletion
+			}
+			ImGui::EndPopup();
+		}
+	}
+
+	ImGui::EndChild();
+
+	// Clear all button
+	ImGui::Separator();
+	if (ImGui::Button("Clear All Objects")) {
+		ClearAllGameObjects();
+		m_selectedEntityId = 0; // Deselect everything
+	}
+
+	ImGui::End();
+}
+
+
+// --- 3. Level and Content Editor - Property Editor Window ---
+
+void GameObjectEditor::_showPropertyEditorWindow() {
+	// Use config values
+	// UICommon::ApplyLayout(UICommon::WindowId::PROPERTY_EDITOR); 
+
+	ImGui::Begin("Property Editor");
+
+	// Check if an entity is selected
+	if (m_selectedEntityId != 0 && HasValidWorld()) {
+		auto selectedEntity = m_world->GetEntityManager().GetEntity(m_selectedEntityId);
+
+		if (selectedEntity.GetId() == 0) {
+			m_selectedEntityId = 0;
+			ImGui::Text("Selected Entity is no longer valid.");
+			ImGui::End();
+			return;
+		}
+
+		// Entity Header and Deselect button
+		ImGui::Text("Selected Object: %s (ID: %u)", selectedEntity.GetName().c_str(), m_selectedEntityId);
+		ImGui::SameLine(ImGui::GetWindowWidth() - 70);
+		if (ImGui::SmallButton("Deselect")) {
+			m_selectedEntityId = 0;
+			ImGui::End();
+			return;
+		}
+		ImGui::Separator();
+
+		ImGui::BeginChild("PropertyScroll", ImVec2(0, 0), false);
+
+		// ** Component Property Editing: Transform Component **
+		if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+			auto* transform = selectedEntity.GetComponent<Component::Transform>();
+			if (transform) {
+				float inputWidth = (ImGui::GetWindowWidth() - ImGui::GetStyle().ItemSpacing.x * 3) / 2.0f;
+
+				// Position
+				ImGui::Text("Position");
+				ImGui::SetNextItemWidth(inputWidth);
+				ImGui::InputFloat(std::string("X##Pos" + std::to_string(m_selectedEntityId)).c_str(), &transform->Position.X, 0.0f, 0.0f, "%.2f");
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(inputWidth);
+				ImGui::InputFloat(std::string("Y##Pos" + std::to_string(m_selectedEntityId)).c_str(), &transform->Position.Y, 0.0f, 0.0f, "%.2f");
+
+				// Rotation
+				ImGui::SetNextItemWidth(inputWidth);
+				ImGui::InputFloat(std::string("Rotation##Rot" + std::to_string(m_selectedEntityId)).c_str(), &transform->Rotation, 0.0f, 0.0f, "%.2f");
+
+				// Scale
+				ImGui::Text("Scale");
+				ImGui::SetNextItemWidth(inputWidth);
+				ImGui::InputFloat(std::string("X##Scale" + std::to_string(m_selectedEntityId)).c_str(), &transform->Scale.X, 0.0f, 0.0f, "%.2f");
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(inputWidth);
+				ImGui::InputFloat(std::string("Y##Scale" + std::to_string(m_selectedEntityId)).c_str(), &transform->Scale.Y, 0.0f, 0.0f, "%.2f");
+			}
+		}
+
+		// ** Component Property Editing: ShapeRenderer2D Component **
+		if (ImGui::CollapsingHeader("ShapeRenderer2D")) {
+			auto* shapeRenderer = selectedEntity.GetComponent<Component::ShapeRenderer2D>();
+			if (shapeRenderer) {
+				ImGui::ColorEdit4(std::string("Fill Color##Color" + std::to_string(m_selectedEntityId)).c_str(), (float*) & shapeRenderer->FillColor.R);
+
+				// Radius (Specific to Circle type)
+				if (shapeRenderer->Type == Component::ShapeRenderer2D::ShapeType::Circle) {
+					ImGui::SetNextItemWidth(100.f);
+					ImGui::InputFloat(std::string("Radius##Rad" + std::to_string(m_selectedEntityId)).c_str(), &shapeRenderer->Radius, 1.0f, 10.0f, "%.2f");
+				}
+
+				// Future: Add logic for other shape types (Square, Sprite, etc.)
+			}
+		}
+
+		// ** Component Property Editing: CircleCollider2D Component **
+		if (ImGui::CollapsingHeader("CircleCollider2D")) {
+			auto* collider = selectedEntity.GetComponent<Component::CircleCollider2D>();
+			if (collider) {
+				ImGui::SetNextItemWidth(100.f);
+				ImGui::InputFloat(std::string("Radius##ColRad" + std::to_string(m_selectedEntityId)).c_str(), &collider->Radius, 1.0f, 10.0f, "%.2f");
+			}
+		}
+
+		ImGui::EndChild();
+
+	}
+	else {
+		ImGui::Text("No Game Object Selected.");
+	}
+
+	ImGui::End();
+}
 
 
 // Check if World object exists
