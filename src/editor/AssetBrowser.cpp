@@ -301,6 +301,17 @@ void AssetBrowser::_displayFile(const std::filesystem::path& filePath) {
         // If clicked, remember it as selected
         m_selectedAsset = filePath.string();
     }
+
+    // Enable file dragging
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+        // Store the file path as payload
+        std::string path = filePath.string();
+        ImGui::SetDragDropPayload("ASSET_PATH", path.c_str(), path.size() + 1);
+
+        // Show preview while dragging
+        ImGui::Text("\xEF\x8E\xB2 %s", filename.c_str());
+        ImGui::EndDragDropSource();
+    }
 }
 
 // Display information about the currently selected file in the right panel
