@@ -306,6 +306,7 @@ void AssetBrowser::_displayFile(const std::filesystem::path& filePath) {
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         // Store the file path as payload
         std::string path = filePath.string();
+        // ASSET_PATH is data's type name; size includes null terminator (hence +1)
         ImGui::SetDragDropPayload("ASSET_PATH", path.c_str(), path.size() + 1);
 
         // Show preview while dragging
@@ -889,13 +890,32 @@ void AssetBrowser::_showPrefabEditor() {
                 // Texture, color tint, flip options, sorting
                 else if (componentType == "SpriteRenderer") {
                     _renderComponentSection("Sprite Renderer", data, [this](nlohmann::json& d) {
-                        // Sprite texture path (read-only for now)
+                        // Sprite texture path
                         std::string texPath = d.value("TexturePath", "");
                         ImGui::Text("Sprite");
                         ImGui::SameLine();
                         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 107.0f);
+
+                        // Make the text a drop target
                         ImGui::TextDisabled("%s", texPath.empty() ? "None"
                             : std::filesystem::path(texPath).filename().string().c_str());
+
+                        // Drop target (accepts dragged files)
+                        if (ImGui::BeginDragDropTarget()) {
+                            // A payload is the data we attach to a drag operation, so what we're "carrying"
+                            // When we start dragging something
+                            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+                                std::string droppedPath = static_cast<const char*>(payLoad->Data);
+
+                                // Only accept .png files for sprites
+                                if (std::filesystem::path(droppedPath).extension() == ".png") {
+                                    d["TexturePath"] = droppedPath;
+                                    d["Sprite"] = droppedPath;
+                                    LOG_INFO("Dropped texture: " << droppedPath);
+                                }
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
 
                         // Color tint picker
                         _renderColorProperty("Color##Sprite", d["Color"], 110.0f);
