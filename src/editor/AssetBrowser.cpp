@@ -29,7 +29,6 @@ References:
 #endif
 
 #include "../editor/AssetBrowser.h"
-#include "services/UICommon.h"
 #include "core/Logger.h" 
 #include <vector>
 #include <services/ResourceManager.h>
@@ -37,17 +36,20 @@ References:
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 
-void AssetBrowser::Initialize(ImFont* mainFont, ImFont* symbolsFont, World* world) {
+void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
     m_mainFont = mainFont;
+    m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
     m_world = world;
 }
 
 // Render the asset browser UI window
 void AssetBrowser::Render() {
-    UICommon::ApplyLayout(UICommon::WindowId::EDITOR_ASSET_BROWSER);
     ImGui::PushFont(m_mainFont);
     ImGui::Begin("Asset Browser");
+
+    // Apply font scale to this window
+    ImGui::SetWindowFontScale(m_fontScale);
 
     // Display clickable breadcrumb navigation
     _displayBreadcrumbs();
@@ -80,7 +82,7 @@ void AssetBrowser::Render() {
     // Show tooltip even when disabled
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         if (hasSelection) {
-            ImGui::SetTooltip("Replace selected texture with a new file");
+            ImGui::SetTooltip("Replace the selected texture with a new file while keeping the original name");
         }
         else {
             ImGui::SetTooltip("Replace selected texture with a new file (disabled)");
@@ -131,12 +133,12 @@ void AssetBrowser::Render() {
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 193);
 
     ImGui::SetNextItemWidth(120);
-    if (ImGui::SliderFloat("##Scale", &m_fontScale, 0.5f, 2.0f, "%.1fx")) {
-        m_fontScale = std::clamp(m_fontScale, 0.5f, 2.0f);
+    if (ImGui::SliderFloat("##Scale", &m_fontScale, 0.5f, 1.5f, "%.1fx")) {
+        m_fontScale = std::clamp(m_fontScale, 0.5f, 1.5f);
     }
 
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("UI Scale");
+        ImGui::SetTooltip("Global UI Scale");
     }
 
     ImGui::SameLine();
@@ -182,9 +184,6 @@ void AssetBrowser::Render() {
 
     ImGui::End();
     ImGui::PopFont();
-
-    // Reset scaling for other windows
-    ImGui::SetWindowFontScale(1.0f);
 
     // Show prefab editor window if user clicked "Edit Prefab"
     if (m_editingPrefab) {
@@ -631,12 +630,14 @@ bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
             if (updateComponent.operator()<Component::SpriteRenderer>("SpriteRenderer")) continue;
             // Updates Mass, Velocity, BodyType, etc.
             if (updateComponent.operator()<Component::Rigidbody2D>("Rigidbody2D")) continue;
-            // Updates Type, FillColor, Radius, etc.
-            if (updateComponent.operator()<Component::ShapeRenderer2D>("ShapeRenderer2D")) continue;
             // Updates Radius, Offset, IsTrigger, etc.
             if (updateComponent.operator()<Component::CircleCollider2D>("CircleCollider2D")) continue;
             // Updates Radius, Offset, IsTrigger, etc.
             if (updateComponent.operator()<Component::BoxCollider2D>("BoxCollider2D")) continue;
+            // Updates Type, FillColor, Radius, etc.
+            if (updateComponent.operator()<Component::ShapeRenderer2D>("ShapeRenderer2D")) continue;
+            // Updates Start, End, Thickness, etc.
+            if (updateComponent.operator()<Component::LineRenderer>("LineRenderer")) continue;
         }
 
         LOG_INFO("Updated entity " << entity.GetId() << " from prefab");
@@ -653,7 +654,14 @@ bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
 void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& data, const std::string& xKey,
     const std::string& yKey, float dragSpeed, float labelOffset)
 {
-    ImGui::Text(label.c_str());
+    // Strip ## suffix for display
+    std::string displayLabel = label;
+    size_t pos = label.find("##");
+    if (pos != std::string::npos) {
+        displayLabel = label.substr(0, pos);
+    }
+
+    ImGui::Text(displayLabel.c_str());
 
     // Extract current values from JSON
     float x = data[xKey];
@@ -666,7 +674,7 @@ void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& 
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
     // Hold to drag, double click to type
-    if (ImGui::DragFloat(("##" + label + "X").c_str(), &x, dragSpeed)) {
+    if (ImGui::DragFloat(("##" + label + "X").c_str(), &x, dragSpeed, 0.0f, 0.0f, "%.2f")) {
         data[xKey] = x;  // Write back to JSON
     }
 
@@ -676,7 +684,7 @@ void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& 
     ImGui::Text("Y");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
-    if (ImGui::DragFloat(("##" + label + "Y").c_str(), &y, dragSpeed)) {
+    if (ImGui::DragFloat(("##" + label + "Y").c_str(), &y, dragSpeed, 0.0f, 0.0f, "%.2f")) {
         data[yKey] = y;  // Write back to JSON
     }
 }
@@ -685,8 +693,14 @@ void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& 
 void AssetBrowser::_renderFloatRow(const std::string& label, const std::string& fieldLabel, nlohmann::json& data,
     const std::string& key, float dragSpeed, float labelOffset)
 {
-    ImGui::Text(label.c_str());
+    // Strip ## suffix for display
+    std::string displayLabel = label;
+    size_t pos = label.find("##");
+    if (pos != std::string::npos) {
+        displayLabel = label.substr(0, pos);
+    }
 
+    ImGui::Text(displayLabel.c_str());
     float value = data[key];
 
     ImGui::SameLine();
@@ -694,7 +708,7 @@ void AssetBrowser::_renderFloatRow(const std::string& label, const std::string& 
     ImGui::Text(fieldLabel.c_str());  // Field label like "kg", "m", etc.
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
-    if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed)) {
+    if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed, 0.0f, 0.0f, "%.2f")) {
         data[key] = value;  // Write back to JSON
     }
 }
@@ -724,20 +738,34 @@ void AssetBrowser::_renderIntProperty(const std::string& label, nlohmann::json& 
 {
     int value = data[key];
 
-    ImGui::Text(label.c_str());
+    // Strip ## suffix for display
+    std::string displayLabel = label;
+    size_t pos = label.find("##");
+    if (pos != std::string::npos) {
+        displayLabel = label.substr(0, pos);
+    }
+
+    ImGui::Text(displayLabel.c_str());
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
     ImGui::SetNextItemWidth(100);
 
     // Integer drag field
-    if (ImGui::DragInt(("##" + key).c_str(), &value)) {
+    if (ImGui::DragInt(("##" + label).c_str(), &value)) {
         data[key] = value;  // Write back to JSON
     }
 }
 
 // Render a color picker property (works for any RGBA color in JSON)
 void AssetBrowser::_renderColorProperty(const std::string& label, nlohmann::json& colorData, float labelOffset) {
-    ImGui::Text(label.c_str());
+    // Strip ## suffix for display
+    std::string displayLabel = label;
+    size_t pos = label.find("##");
+    if (pos != std::string::npos) {
+        displayLabel = label.substr(0, pos);
+    }
+
+    ImGui::Text(displayLabel.c_str());
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
 
@@ -757,7 +785,7 @@ void AssetBrowser::_renderColorProperty(const std::string& label, nlohmann::json
     // AlphaBar = show alpha (like Unity)
     // NoLabel = removes the title next to the freaking box thing
     // PickerHueWheel = color picker wheel (not default vertical hue bar)
-    if (ImGui::ColorEdit4("Color", &color.x, ImGuiColorEditFlags_NoInputs |
+    if (ImGui::ColorEdit4(label.c_str(), &color.x, ImGuiColorEditFlags_NoInputs |
         ImGuiColorEditFlags_NoDragDrop |
         ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel))
     {
@@ -816,8 +844,6 @@ void AssetBrowser::_renderComponentSection(const std::string& headerName, nlohma
 // Prefab editor window: displays editable properties for the selected prefab
 // (This will eventually move to Inspector when it's implemented)
 void AssetBrowser::_showPrefabEditor() {
-    UICommon::ApplyLayout(UICommon::WindowId::EDITOR_PREFAB_EDITOR);
-
     // Window with close button (X) that sets m_editingPrefab to false
     if (ImGui::Begin("Prefab Editor", &m_editingPrefab)) {
         ImGui::SetWindowFontScale(m_fontScale);
@@ -854,26 +880,228 @@ void AssetBrowser::_showPrefabEditor() {
                     _renderComponentSection("Sprite Renderer", data, [this](nlohmann::json& d) {
                         // Sprite texture path (read-only for now)
                         std::string texPath = d.value("TexturePath", "");
-                        _renderReadOnlyText("Sprite", texPath.empty() ? "None"
-                            : std::filesystem::path(texPath).filename().string());
+                        ImGui::Text("Sprite");
+                        ImGui::SameLine();
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 107.0f);
+                        ImGui::TextDisabled("%s", texPath.empty() ? "None"
+                            : std::filesystem::path(texPath).filename().string().c_str());
 
                         // Color tint picker
-                        _renderColorProperty("Color", d["Color"], 14.0f);
+                        _renderColorProperty("Color##Sprite", d["Color"], 110.0f);
 
                         // Flip X/Y checkboxes
-                        _renderCheckboxRow("Flip", d, "FlipX", "X", "FlipY", "Y");
+                        _renderCheckboxRow("Flip", d, "FlipX", "X", "FlipY", "Y", 126.0f);
 
                         ImGui::Separator();
-                        ImGui::Text("Additional Settings");
+                        ImGui::PushFont(m_boldFont);
+                        // Save current header colors
+                        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));           // Transparent when not hovered
+                        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));    // Transparent when hovered
+                        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));     // Transparent when active
+                        // Collapsing header (click triangle to expand/collapse)
+                        if (ImGui::CollapsingHeader("Additional Settings")) {
+                            ImGui::PopStyleColor(3);                                          // Pop all 3 color styles
+                            ImGui::PopFont();
+                            // Sorting layer name (for render order grouping)
+                            _renderTextProperty("Sorting Layer", d, "SortingLayerName", 44.0f);
 
-                        // Sorting layer name (for render order grouping)
-                        _renderTextProperty("Sorting Layer", d, "SortingLayerName", 44.0f);
-
-                        // Order in layer (fine-grained sorting within a layer)
-                        _renderIntProperty("Order in Layer", d, "SortingOrder", 37.0f);
+                            // Order in layer (fine-grained sorting within a layer)
+                            _renderIntProperty("Order in Layer", d, "SortingOrder", 37.0f);
+                        }
+                        else {
+                            // Also pop if header is collapsed
+                            ImGui::PopStyleColor(3);
+                            ImGui::PopFont();
+                        }
                         });
                 }
-                // I'll do more in the future
+                // RIGIDBODY 2D
+                else if (componentType == "Rigidbody2D") {
+                    _renderComponentSection("Rigidbody2D", data, [this](nlohmann::json& d) {
+                        // Body Type dropdown
+                        ImGui::Text("Body Type");
+                        ImGui::SameLine();
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 65.0f);
+                        ImGui::SetNextItemWidth(100);
+
+                        const char* bodyTypes[] = { "Dynamic", "Kinematic", "Static" };
+                        int currentType = d["BodyType"];
+                        if (ImGui::Combo("##BodyType", &currentType, bodyTypes, 3)) {
+                            d["BodyType"] = currentType;
+                        }
+
+                        _renderFloatRow("Mass", "kg", d, "Mass", 0.1f, 82.0f);
+                        _renderFloatRow("Linear Damping", "", d, "LinearDamping", 0.01f, 16.0f);
+                        _renderFloatRow("Angular Damping", "", d, "AngularDamping", 0.01f, 3.0f);
+                        _renderFloatRow("Gravity Scale", "", d, "GravityScale", 0.1f, 37.0f);
+
+                        // Freeze Rotation
+                        ImGui::Text("Freeze Rotation");
+                        ImGui::SameLine();
+                        ImGui::SetCursorPosX(172);
+
+                        bool freezeRot = d.value("FreezeRotation", false);
+                        if (ImGui::Checkbox("##FreezeRotation", &freezeRot)) {
+                            d["FreezeRotation"] = freezeRot;
+                        }
+                        ImGui::SameLine();
+                        ImGui::Text("Z");
+
+                        ImGui::Separator();
+                        ImGui::PushFont(m_boldFont);
+                        // Save current header colors
+                        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));           
+                        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));    
+                        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));     
+                        // Collapsing header (click triangle to expand/collapse)
+                        if (ImGui::CollapsingHeader("Info")) {
+                            ImGui::PopStyleColor(3);                                         
+                            ImGui::PopFont();
+                            _renderVector2DRow("Linear Velocity", d["LinearVelocity"], "X", "Y", 1.0f, 11.0f);
+                            _renderFloatRow("Angular Velocity", "", d, "AngularVelocity", 1.0f, 10.0f);
+                            _renderFloatRow("Inertia", "", d, "Inertia", 0.1f, 95.0f);
+                            _renderVector2DRow("Center of Mass", d["CenterOfMass"], "X", "Y", 0.1f, 7.0f);
+                        }
+                        else {
+                            ImGui::PopStyleColor(3);
+                            ImGui::PopFont();
+                        }
+                        });
+                }
+                // CIRCLE COLLIDER 2D
+                else if (componentType == "CircleCollider2D") {
+                    _renderComponentSection("Circle Collider 2D", data, [this](nlohmann::json& d) {
+                        // Is Trigger
+                        ImGui::Text("Is Trigger");
+                        ImGui::SameLine();
+                        ImGui::SetCursorPosX(173);
+
+                        bool isTrigger = d.value("IsTrigger", false);
+                        if (ImGui::Checkbox("##IsTriggerCircle", &isTrigger)) {
+                            d["IsTrigger"] = isTrigger;
+                        }
+                        _renderVector2DRow("Offset##Circle", d["Offset"], "X", "Y", 1.0f, 83.0f);
+                        _renderFloatRow("Radius", "px", d, "Radius", 1.0f, 71.0f);
+                        _renderIntProperty("Layer##Circle", d, "Layer", 110.0f);
+                        });
+                }
+                // BOX COLLIDER 2D
+                else if (componentType == "BoxCollider2D") {
+                    _renderComponentSection("Box Collider 2D", data, [this](nlohmann::json& d) {
+                        // Is Trigger
+                        ImGui::Text("Is Trigger");
+                        ImGui::SameLine();
+                        ImGui::SetCursorPosX(173);
+
+                        bool isTrigger = d.value("IsTrigger", false);
+                        if (ImGui::Checkbox("##IsTriggerBox", &isTrigger)) {
+                            d["IsTrigger"] = isTrigger;
+                        }
+                        _renderVector2DRow("Offset##Box", d["Offset"], "X", "Y", 1.0f, 83.0f);
+                        _renderVector2DRow("Size", d["Size"], "X", "Y", 1.0f, 100.0f);
+                        _renderIntProperty("Layer##Box", d, "Layer", 110.0f);
+                        });
+                }
+                // LINE RENDERER
+                else if (componentType == "LineRenderer") {
+                    _renderComponentSection("Line Renderer", data, [this](nlohmann::json& d) {
+                        _renderVector2DRow("Start", d["Start"], "X", "Y", 1.0f, 95.0f);
+                        _renderVector2DRow("End", d["End"], "X", "Y", 1.0f, 103.0f);
+                        _renderFloatRow("Thickness", "px", d, "Thickness", 0.1f, 42.0f);
+                        _renderColorProperty("Color##Line", d["Color"], 111.0f);
+                        });
+                }
+                // SHAPE RENDERER 2D
+                else if (componentType == "ShapeRenderer2D") {
+                    _renderComponentSection("Shape Renderer 2D", data, [this](nlohmann::json& d) {
+                        // Shape Type dropdown
+                        ImGui::Text("Shape Type");
+                        ImGui::SameLine();
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 56.0f);
+                        ImGui::SetNextItemWidth(100);
+
+                        const char* shapeTypes[] = { "Rectangle", "Circle", "Polygon" };
+                        int currentShape = d.value("Type", 0);
+                        if (ImGui::Combo("##ShapeType", &currentShape, shapeTypes, 3)) {
+                            d["Type"] = currentShape;
+                        }
+
+                        // Shape-specific properties
+                        if (currentShape == 0) {      // Rectangle
+                            _renderVector2DRow("Size", d["Size"], "X", "Y", 1.0f, 100.0f);
+                        }
+                        else if (currentShape == 1) { // Circle
+                            _renderFloatRow("Radius", "px", d, "Radius", 1.0f, 71.0f);
+                        }
+                        else if (currentShape == 2) { // Polygon
+                            ImGui::PushFont(m_boldFont);
+                            ImGui::Text("Points");
+                            ImGui::PopFont();
+
+                            // Get points array
+                            auto& points = d["Points"];
+                            float maxWidth = ImGui::CalcTextSize("Point 88").x; // A wide number
+
+                            // Display each point
+                            for (size_t i = 0; i < points.size(); i++) {
+                                ImGui::PushID(static_cast<int>(i));
+
+                                // Fixed width label
+                                std::string label = "Point " + std::to_string(i);
+                                ImGui::Text("%s", label.c_str());
+                                float currentWidth = ImGui::CalcTextSize(label.c_str()).x;
+                                if (currentWidth < maxWidth) {
+                                    ImGui::SameLine();
+                                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (maxWidth - currentWidth));
+                                }
+
+                                // Now the vector fields will always start at the same position
+                                _renderVector2DRow("##Point", points[i], "X", "Y", 1.0f, 58.0f);
+
+                                // Delete point button
+                                ImGui::SameLine();
+                                ImGui::PushFont(m_symbolsFont);
+
+                                // Make button transparent but text red
+                                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));                    // Transparent background
+                                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f)); // Subtle hover
+                                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));  // Subtle active
+                                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));          // Red text/icon
+
+                                if (ImGui::SmallButton("\xEE\xA1\xB2")) { // Trash can icon
+                                    points.erase(points.begin() + i);
+                                    ImGui::PopStyleColor(4);              // Pop all 4 color styles
+                                    ImGui::PopFont();
+                                    ImGui::PopID();
+                                    break;
+                                }
+                                ImGui::PopStyleColor(4);
+                                ImGui::PopFont();
+                                ImGui::PopID();
+                            }
+
+                            // Add point button
+                            if (ImGui::Button("Add Point")) {
+                                points.push_back({ {"X", 0.0f}, {"Y", 0.0f} });
+                            }
+
+                            // Closed checkbox
+                            ImGui::SameLine();
+                            bool closed = d.value("Closed", true);
+                            if (ImGui::Checkbox("Closed##PolygonClosed", &closed)) {
+                                d["Closed"] = closed;
+                            }
+                        }
+
+                        ImGui::Separator();
+                        ImGui::PushFont(m_boldFont);
+                        ImGui::Text("Colors");
+                        ImGui::PopFont();
+                        _renderColorProperty("Fill Color##Shape", d["FillColor"], 84.0f);
+                        _renderColorProperty("Outline Color##Shape", d["OutlineColor"], 47.0f);
+                        _renderFloatRow("\" Thickness", "px", d, "OutlineThickness", 0.1f, 29.0f);
+                        });
+                }
             }
         }
 

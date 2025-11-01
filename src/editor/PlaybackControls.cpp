@@ -1,4 +1,4 @@
-﻿/* Start Header *****************************************************************/
+/* Start Header *****************************************************************/
 /*!
 \file   PlaybackControls.cpp
 \author Foo Rui Qin (100%)
@@ -22,7 +22,6 @@ Reference:
 
 #include "../editor/PlaybackControls.h"
 #include "services/Input.h"
-#include "services/UICommon.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
@@ -83,8 +82,6 @@ void Playback::ProcessInput() {
 }
 
 void Playback::Render() {
-    // Use config values
-    UICommon::ApplyLayout(UICommon::WindowId::EDITOR_PLAYBACK);
     ImGui::Begin("Game Controls", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
     // If mouse is over window then show tooltips (with keyboard shortcuts)

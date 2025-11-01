@@ -39,7 +39,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     io.Fonts->Clear();
 
-    // 1. Load Inter as main font for text
+    // 1. Load regular Inter as main font for text
     float textFontSize = m_config.FontSize;
     m_mainFont = io.Fonts->AddFontFromFileTTF(
         "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
@@ -47,11 +47,22 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     );
 
     if (!m_mainFont) {
-        LOG_ERROR("Failed to load Inter font, using default");
+        LOG_ERROR("Failed to load regular Inter font, using default");
         m_mainFont = io.Fonts->AddFontDefault();
     }
 
-    // 2. Load Material Symbols as SEPARATE font
+    // 2. Load bold Inter font for headers
+    m_boldFont = io.Fonts->AddFontFromFileTTF(
+        "assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf",
+        textFontSize
+    );
+
+    if (!m_boldFont) {
+        LOG_ERROR("Failed to load bold Inter font");
+        m_boldFont = io.Fonts->AddFontDefault();
+    }
+
+    // 3. Load Material Symbols as SEPARATE font
     static const ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
 
     ImFontConfig iconsConfig;
@@ -72,7 +83,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     // Pass both fonts to components
     m_playback.Initialize(m_mainFont, m_symbolsFont);  // Update to take both fonts
-    m_assetBrowser.Initialize(m_mainFont, m_symbolsFont, m_world);
+    m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
 }
 
 // Process input for all editor panels

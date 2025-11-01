@@ -11,11 +11,16 @@ namespace {
 }
 
 static void FramebufferSizeCallback(GLFWwindow* window, const int width, const int height) {
-	(void)window;
-	glViewport(0, 0, width, height);
+    // Update GL viewport
+    glViewport(0, 0, width, height);
 
-	// Broadcast resize message
-	Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
+    // Update stored window dimensions
+    if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window))) {
+        self->Resize(width, height);
+    }
+
+    // Broadcast resize message
+    Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
 }
 
 Window::~Window() { Destroy(); }
@@ -64,23 +69,13 @@ bool Window::Create(const std::string& title, const int width, const int height,
 
 	glViewport(0, 0, width, height);
 
-	// This callback function is called when the window is resized
-	// to update the viewport and store the new width and height
-	glfwSetFramebufferSizeCallback(m_windowHandle, [](GLFWwindow* window, const int w, const int h) {
-		glViewport(0, 0, w, h);
-		if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window))) {
-			self->m_width = w;
-			self->m_height = h;
-		}
-	});
+    // Store the pointer to this instance for use in callbacks
+    // because GLFW does not know context
+    glfwSetWindowUserPointer(m_windowHandle, this);
 
-	// Store the pointer to this instance for use in callbacks
-	// because GLFW does not know context
-	glfwSetWindowUserPointer(m_windowHandle, this);
-
-	// Register callback for resize
-	glfwSetFramebufferSizeCallback(m_windowHandle, FramebufferSizeCallback);
-	return true;
+    // Register callback for resize
+    glfwSetFramebufferSizeCallback(m_windowHandle, FramebufferSizeCallback);
+    return true;
 }
 
 void Window::Destroy() {

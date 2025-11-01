@@ -38,7 +38,7 @@ class Entity;
 class AssetBrowser {
 public:
     // Initialize with symbols font for icons and world reference
-    void Initialize(ImFont* mainFont, ImFont* symbolsFont, World* world);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world);
 
     // Render the asset browser UI
     void Render();
@@ -118,6 +118,7 @@ private:
     // References to external systems
     float m_fontScale = 1.0f;
     ImFont* m_mainFont = nullptr;
+    ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;   // Material Symbols font for icons
     World* m_world = nullptr;          // Game world reference for entity management
 

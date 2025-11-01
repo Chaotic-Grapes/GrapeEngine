@@ -60,7 +60,8 @@ private:
     Playback m_playback;              // Playback controls panel
     AssetBrowser m_assetBrowser;      // Asset browser panel
     ImFont* m_symbolsFont = nullptr;  // Material Symbols icon font
-    ImFont* m_mainFont = nullptr;     // Inter font for text
+    ImFont* m_mainFont = nullptr;     // Regular Inter font for text
+    ImFont* m_boldFont = nullptr;     // Bold Inter font
 };
 
 #endif

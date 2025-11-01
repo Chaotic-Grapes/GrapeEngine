@@ -31,6 +31,8 @@ Features:
 #include "ecs/World.h"
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
+// DockBuilder APIs
+#include <imgui_internal.h>
 
 // Initialize UI instances and default layouts
 void Overlay::OnCreate() {
@@ -71,6 +73,69 @@ void Overlay::OnUpdate() {
 
     // Update UI every frame
     m_debugUI->NewFrame();
+
+    // Create a full-screen DockSpace and initialize layout once
+    {
+        ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->Pos);
+        ImGui::SetNextWindowSize(vp->Size);
+        ImGui::SetNextWindowViewport(vp->ID);
+        ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+            ImGuiWindowFlags_NoBackground; // Keep scene visible under dockspace host
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);
+        ImGui::PopStyleVar(3);
+
+        ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
+        ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Show scene through central node
+        ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), dockFlags);
+
+        // Build initial docking layout once
+        if (!m_dockLayoutBuilt) {
+            m_dockLayoutBuilt = true;
+            // Reset and rebuild
+            ImGui::DockBuilderRemoveNode(dockspaceId);
+            ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
+            ImGui::DockBuilderSetNodeSize(dockspaceId, vp->Size);
+
+            // Split right for Prefab Editor (full height)
+            ImGuiID rightNode;
+            ImGuiID leftNode = dockspaceId;
+            ImGui::DockBuilderSplitNode(leftNode, ImGuiDir_Right, 0.35f, &rightNode, &leftNode);
+
+            // Split left vertically: top (playback), bottom (asset browser)
+            ImGuiID topNode;
+            ImGuiID bottomNode;
+            ImGui::DockBuilderSplitNode(leftNode, ImGuiDir_Up, 0.25f, &topNode, &bottomNode);
+
+            // Further split top area into left/center/right; dock controls in center
+            ImGuiID topLeft;
+            ImGuiID topRest;
+            ImGui::DockBuilderSplitNode(topNode, ImGuiDir_Left, 0.33f, &topLeft, &topRest);
+            ImGuiID topRight;
+            ImGuiID topCenter;
+            ImGui::DockBuilderSplitNode(topRest, ImGuiDir_Right, 0.33f, &topRight, &topCenter);
+
+            // Split bottom area into left/right; dock asset browser to bottom-left
+            ImGuiID bottomLeft;
+            ImGuiID bottomRight;
+            ImGui::DockBuilderSplitNode(bottomNode, ImGuiDir_Left, 0.60f, &bottomLeft, &bottomRight);
+
+            // Dock windows by title
+            ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
+            ImGui::DockBuilderDockWindow("Asset Browser", bottomLeft);
+            ImGui::DockBuilderDockWindow("Game Controls", topCenter);
+
+            ImGui::DockBuilderFinish(dockspaceId);
+        }
+
+        ImGui::End();
+    }
+
     m_levelEditor->Update();
 
     // Draw debugUI and level editor
