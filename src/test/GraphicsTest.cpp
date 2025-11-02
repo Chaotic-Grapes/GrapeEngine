@@ -308,63 +308,39 @@ void GraphicsTestScene::runDebugDrawing() {
         ECS::World& world = GetWorld();
         const std::string spritePath = "assets/textures/test/player.png";
 
+        // Load texture (if valid)
         const auto tex = RM.Get<Texture>(spritePath);
-        uint32_t texId = tex ? tex->ID() : 0;
+        if (!tex) {
+            LOG_ERROR("Failed to load sprite texture: " << spritePath);
+            return;
+        }
 
+        // Create the sprite entity
         const ECS::Entity sprite = CreateOnLayer(
             m_gameplayLayer,
-            ECS::Components::LocalTransform{ Vector3D{0,0,0}, Quaternion{0,0,0,1}, Vector3D{3,3,3} },
-            ECS::Components::WorldTransform{ },
-            ECS::Components::SpriteRenderer2D{
-                tex ? tex->ID() : 0,
-                Color{1.f,1.f,1.f,1.f},
-                Vector2D{1.f,1.f},
-                Vector2D{0.f,0.f}
-            },
-            ECS::Components::Name{ "DebugDrawing_Sprite" }
-        );
-
-        auto tr = world.Get<ECS::Components::LocalTransform>(sprite);
-        tr.Scale = Vector3D {
-            static_cast<float>(tex->Width()),
-            static_cast<float>(tex->Height()),
-            1.f
-        };
-
-        m_testEntities.push_back(EntityUtils::Pack(sprite));
-
-        auto* meta = _getMetaDataForTexture(spritePath);
-
-        const ECS::Entity debug = CreateOnLayer(
-            m_gameplayLayer,
-            ECS::Components::LocalTransform{ 
+            ECS::Components::LocalTransform{
+                Vector3D{ 0.f, 0.f, 0.f },
+                Quaternion{ 0.f, 0.f, 0.f, 1.f },
                 Vector3D{
-                    tr.Position.X + meta->collider.offset.x - tr.Scale.X * 0.5f + meta->collider.size.x * 0.5f,
-                    tr.Position.Y + meta->collider.offset.y - tr.Scale.Y * 0.5f + meta->collider.size.y * 0.5f,
-                    0
-                },
-                Quaternion{0,0,0,1},
-                Vector3D{
-                    static_cast<float>(meta->collider.size.x),
-                    static_cast<float>(meta->collider.size.y),
+                    graphicsConfig::PixelsToWorld(static_cast<float>(tex->Width())),
+                    graphicsConfig::PixelsToWorld(static_cast<float>(tex->Height())),
                     1.f
                 }
             },
             ECS::Components::WorldTransform{ },
-            ECS::Components::ShapeBox2D{
-                Vector2D{ static_cast<float>(meta->collider.size.x) * 0.5f, static_cast<float>(meta->collider.size.y) * 0.5f }, // half extents
-                Vector2D{0.f, 0.f},   // offset
-                Color{0.f, 1.f, 0.f, 1.f}, // color
-                2.f,                  // thickness
-                false                 // filled
+            ECS::Components::SpriteRenderer2D{
+                tex->ID(),
+                Color{ 1.f, 1.f, 1.f, 1.f },
+                Vector2D{ 1.f, 1.f },
+                Vector2D{ 0.f, 0.f }
             },
-            ECS::Components::Name{ "DebugDrawing_SpriteCollider" }
+            ECS::Components::Name{ "DebugDrawing_Sprite" }
         );
 
-        world.Attach(debug, sprite);
-        m_testEntities.push_back(EntityUtils::Pack(debug));
+        // Store for later cleanup
+        m_testEntities.push_back(EntityUtils::Pack(sprite));
 
-        LOG_DEBUG("Spawned DebugDrawing entities");
+        LOG_DEBUG("Spawned DebugDrawing sprite entity");
     }
 }
 
@@ -432,13 +408,6 @@ void GraphicsTestScene::runBasicSprites() {
             }
         },
         ECS::Components::WorldTransform{},
-        ECS::Components::ShapeBox2D{
-            Vector2D{128.f, 128.f}, // half extents
-            Vector2D{0.f, 0.f},     // offset
-            Color{1.f, 1.f, 1.f, 1.f}, // color
-            2.f,                    // thickness
-            false                   // filled
-        },
         ECS::Components::Name{"PlayerSprite"},
         ECS::Components::SpriteRenderer2D{
             playerTexId,
@@ -466,13 +435,6 @@ void GraphicsTestScene::runBasicSprites() {
             }
         },
         ECS::Components::WorldTransform{},
-        ECS::Components::ShapeBox2D{
-            Vector2D{128.f, 128.f}, // half extents
-            Vector2D{0.f, 0.f},     // offset
-            Color{1.f, 1.f, 1.f, 1.f}, // color
-            2.f,                    // thickness
-            false                   // filled
-        },
         ECS::Components::Name{"FishBoySprite"},
         ECS::Components::SpriteRenderer2D{
             fishBoyTexId,
