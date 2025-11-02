@@ -18,7 +18,7 @@ Features:
 */
 /* End Header *******************************************************************/
 
-#include "services/Overlay.h"
+#include "services/OverlayService.h"
 
 #ifdef USE_IMGUI
 #include "services/DebugUI.h"
