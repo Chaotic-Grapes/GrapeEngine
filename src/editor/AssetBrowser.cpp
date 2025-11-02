@@ -867,6 +867,19 @@ void AssetBrowser::_renderComponentSection(const std::string& headerName, nlohma
     }
 }
 
+// Check if prefab already has a specific component type
+bool AssetBrowser::_prefabHasComponent(const std::string& componentType) {
+    if (!m_prefabData.contains("Components")) return false;
+
+    // Self-explanatory
+    for (const auto& component : m_prefabData["Components"]) {
+        if (component["Type"] == componentType) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Prefab editor window: displays editable properties for the selected prefab
 // (This will eventually move to Inspector when it's implemented)
 void AssetBrowser::_showPrefabEditor() {

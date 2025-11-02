@@ -111,6 +111,9 @@ private:
     void _renderComponentSection(const std::string& headerName, nlohmann::json& data,
         T renderContent);
 
+    // Helper to check if prefab already has a component type
+    bool _prefabHasComponent(const std::string& componentType);
+
     // Display prefab editor window with property editing
     // (Will eventually move to Inspector when implemented)
     void _showPrefabEditor();
