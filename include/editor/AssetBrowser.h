@@ -114,6 +114,9 @@ private:
     // Helper to check if prefab already has a component type
     bool _prefabHasComponent(const std::string& componentType);
 
+    // Add a component to the currently editing prefab
+    void _addComponentToPrefab(const std::string& componentType);
+
     // Display prefab editor window with property editing
     // (Will eventually move to Inspector when implemented)
     void _showPrefabEditor();

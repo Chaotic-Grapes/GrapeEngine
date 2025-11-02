@@ -880,6 +880,30 @@ bool AssetBrowser::_prefabHasComponent(const std::string& componentType) {
     return false;
 }
 
+// Add a new component to the prefab with default values
+void AssetBrowser::_addComponentToPrefab(const std::string& componentType) {
+    // Prevent duplicate components
+    if (_prefabHasComponent(componentType)) {
+        LOG_WARNING("Component " << componentType << " already exists in prefab");
+        m_statusMessage = "Component already exists";
+        m_statusTimer = 3.0f;
+        return;
+    }
+
+    // Ensure the "Components" array exists in the prefab JSON
+    if (!m_prefabData.contains("Components")) {
+        m_prefabData["Components"] = nlohmann::json::array();
+    }
+
+    // Create a new JSON entry for the component
+    nlohmann::json newComponent;
+    newComponent["Type"] = componentType;
+
+    // Add the new component to the prefab's component list
+    m_prefabData["Components"].push_back(newComponent);
+    LOG_INFO("Added " << componentType << " to prefab");
+}
+
 // Prefab editor window: displays editable properties for the selected prefab
 // (This will eventually move to Inspector when it's implemented)
 void AssetBrowser::_showPrefabEditor() {
