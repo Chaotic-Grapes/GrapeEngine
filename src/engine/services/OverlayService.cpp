@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file   Overlay.cpp
+\file   OverlayService.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
