@@ -39,6 +39,7 @@
 // ============================================================================
 #include <algorithm>
 #include <iterator>
+#include <iostream>
 
 // ============================================================================
 // Third-Party Libraries
@@ -100,6 +101,11 @@ namespace ECS {
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_combine.frag");
 
+        // Object Picking
+        m_pickingFBO.Create(width, height, false, false, 1);
+        m_pbos[0].Create(4, GL_STREAM_READ);
+        m_pbos[1].Create(4, GL_STREAM_READ);
+
         // Renderer
         m_renderer = std::make_unique<Renderer>(15000);
 
@@ -142,8 +148,8 @@ namespace ECS {
                     -1.f, 1.f
                 );
 
-                // Optional camera aspect update
-                // if (m_editorCamera) m_editorCamera->OnResize(msg.Width, msg.Height);
+                // Resize picking FBO
+                m_pickingFBO.Resize(msg.Width, msg.Height, false, false);
             });
 
         // Projection matrix
@@ -370,6 +376,7 @@ namespace ECS {
                     m_sdfCircleShader->use();
                     m_sdfCircleShader->setMat4("uViewProj", viewProj);
                     m_sdfCircleShader->setUniform("uStrokePx", 0.0f);
+                    m_sdfCircleShader->setUniform("uUseOverrideColor", 0);   // normal circles use their own color
                     m_renderer->beginFrame();
 
                     for (ECS::Entity entity : list) {
@@ -401,6 +408,7 @@ namespace ECS {
                     // --- Sub-pass 2: everything else on this layer ---
                     m_shader->use();
                     m_shader->setMat4("uViewProj", viewProj);
+                    m_shader->setUniform("uPicking", 0);
                     m_renderer->beginFrame();
 
                     for (ECS::Entity entity : list) {
@@ -622,6 +630,455 @@ namespace ECS {
                     } // if m_useEditorCamera
 
                 }
+                Framebuffer::Unbind();
+            });
+
+        // Object Picking Pass
+        m_renderGraph->AddPass("Picking", {}, {},
+            [this, &world, &viewProj, &buckets](ResourceAccessor& res)
+            {
+                // single-click detection
+                if (!Input::IsMousePressed(MOUSE_LEFT)) return;
+
+                m_pickingFBO.BindAndClear(0, 0, 0, 1);
+
+                // Disable blending for picking to prevent ID color contamination
+                GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+                if (blendWasEnabled) glDisable(GL_BLEND);
+
+                // ============================================================
+                // Pass 1: Render circles with SDF shader
+                // ============================================================
+                m_sdfCircleShader->use();
+                m_sdfCircleShader->setMat4("uViewProj", viewProj);
+                m_sdfCircleShader->setUniform("uPicking", 1);
+                m_renderer->beginFrame();
+
+                for (int layer = 0; layer <= (int)buckets.size() - 1; ++layer) {
+                    const auto& list = buckets[layer];
+
+                    for (ECS::Entity entity : list) {
+                        // Skip inactive
+                        if (world.Has<Components::Active>(entity) &&
+                            !world.Get<Components::Active>(entity).Enabled) continue;
+
+                        // Only render circles in this pass
+                        if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
+
+                        // Encode entity ID as RGB
+                        uint32_t id = entity.Index;
+                        glm::vec4 idColor(
+                            ((id >> 0) & 0xFF) / 255.0f,
+                            ((id >> 8) & 0xFF) / 255.0f,
+                            ((id >> 16) & 0xFF) / 255.0f,
+                            1.0f
+                        );
+
+                        // Get transform
+                        const auto& lt = world.Get<Components::LocalTransform>(entity);
+                        Vector3D position, scale;
+                        Quaternion rotation;
+                        GetRenderTransform(world, entity, lt, position, rotation, scale);
+
+                        const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+                        DebugDraw2D::Circle(
+                            *m_renderer,
+                            ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sc.Offset),
+                            sc.Radius * ((scale.X + scale.Y) * 0.5f),
+                            idColor,
+                            0.0f,
+                            0
+                        );
+                    }
+                }
+
+                m_renderer->endFrame();
+
+                // ============================================================
+                // Pass 2: Render boxes and sprites with batch shader
+                // ============================================================
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_shader->setUniform("uPicking", 1);
+
+                m_renderer->beginFrame();
+
+                for (int layer = 0; layer <= (int)buckets.size() - 1; ++layer) {
+                    const auto& list = buckets[layer];
+
+                    for (ECS::Entity entity : list) {
+                        // Skip inactive
+                        if (world.Has<Components::Active>(entity) &&
+                            !world.Get<Components::Active>(entity).Enabled) continue;
+
+                        // Skip circles (already rendered above)
+                        if (world.Has<Components::ShapeCircle2D>(entity)) continue;
+
+                        // Encode entity ID as RGB
+                        uint32_t id = entity.Index;
+                        glm::vec4 idColor(
+                            ((id >> 0) & 0xFF) / 255.0f,
+                            ((id >> 8) & 0xFF) / 255.0f,
+                            ((id >> 16) & 0xFF) / 255.0f,
+                            1.0f
+                        );
+
+                        // Get transform
+                        const auto& lt = world.Get<Components::LocalTransform>(entity);
+                        Vector3D position, scale;
+                        Quaternion rotation;
+                        GetRenderTransform(world, entity, lt, position, rotation, scale);
+
+                        // Render BOXES with ID color
+                        if (world.Has<Components::ShapeBox2D>(entity)) {
+                            const auto& sb = world.Get<Components::ShapeBox2D>(entity);
+                            const glm::vec2 halfExtents = ToGlm(Vector2D{ sb.HalfExtents.X * scale.X, sb.HalfExtents.Y * scale.Y });
+                            const glm::vec2 center = ToGlm(Vector2D{ position.X, position.Y }) + ToGlm(sb.Offset);
+                            const glm::vec2 min = center - halfExtents;
+                            const glm::vec2 max = center + halfExtents;
+
+                            // Use -1 so the shader treats this as a solid-color shape (no texture sampling).
+                            // In the picking shader, texIndex >= 0 samples a texture and may alpha-discard.
+                            // Negative indices skip sampling and always write the ID color.
+                            DebugDraw2D::RectFill(*m_renderer, min, max, idColor, -1);
+                        }
+
+                        // Render SPRITES with ID color
+                        if (world.Has<Components::SpriteRenderer2D>(entity)) {
+                            const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
+                            const float angleZ = std::atan2(
+                                2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
+                                1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z)
+                            );
+                            m_renderer->submitSprite({
+                                ToGlm(Vector2D{position.X, position.Y}),
+                                ToGlm(Vector2D{scale.X, scale.Y}),
+                                {0.f, 0.f, 1.f, 1.f},
+                                idColor,
+                                sr.TextureId,
+                                angleZ,
+                                1.0f
+                                });
+                        }
+                    }
+                }
+
+                m_renderer->endFrame();
+
+                // Read pixel at mouse position (async)
+                glm::dvec2 mousePos;
+                Input::GetMousePosition(mousePos.x, mousePos.y);
+
+                int x = static_cast<int>(mousePos.x);
+                int y = m_pickingFBO.height - static_cast<int>(mousePos.y); // Flip Y
+
+                static bool firstFrame = true;
+                if (!firstFrame) {
+                    // Frame N: Read from PBO 1 (contains data from frame N-1)
+                    int readPBO = 1 - m_currentPBO;
+                    uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF; // Mask to 24-bit
+
+                    if (pickedID > 0) {
+                        m_selectedEntityID = pickedID; // Store for outline rendering and doing property updates etc.
+                        std::cout << "Picked entity index: " << pickedID << std::endl;
+                        // ... handle picked ID
+                    } else {
+                        m_selectedEntityID = 0; // Clear selection if clicking empty space
+                    }
+                }
+                firstFrame = false;
+
+                // Frame N: Swap for next frame
+                // Swap PBOs FIRST
+                m_currentPBO = 1 - m_currentPBO;
+
+                // Frame N: Write to PBO 0
+                // Write to current PBO (async transfer starts)
+                m_pbos[m_currentPBO].Bind(GL_PIXEL_PACK_BUFFER);
+                glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+                m_pbos[m_currentPBO].Unbind(GL_PIXEL_PACK_BUFFER);
+
+
+                // Restore blending state
+                if (blendWasEnabled) glEnable(GL_BLEND);
+
+                Framebuffer::Unbind();
+            });
+
+        // Highlight the currently selected entity (overlay onto HDR)
+        // Read from HDR target, then write back to the same HDR target (overlay)
+        m_renderGraph->AddPass("SelectionOutline", { "HDR" }, { "HDR" },
+            [this, &world, &viewProj, &buckets, &transformedCorners, &polyPoints](ResourceAccessor& res)
+            {
+                // nothing selected this frame
+                if (m_selectedEntityID == 0) return;
+
+                auto* hdrFbo = res.GetFramebuffer("HDR");
+                if (!hdrFbo) return;
+
+                // IMPORTANT: do NOT clear since we want to draw on top
+                hdrFbo->Bind();
+
+                // make outline look 2px thick in screen space
+                const auto& win = WindowManager::GetMainWindow();
+                const float desiredPx = 2.0f;
+                const float worldThickness = (m_cameraOrthoSize / win->Height()) * desiredPx;
+
+                // selection color (pick whatever you like but it should contrast against viewport)
+                const glm::vec4 selColor(1.0f, 0.85f, 0.15f, 1.0f); // yellow-ish
+
+                // start with the normal 2D batch shader
+                m_shader->use();
+                m_shader->setMat4("uViewProj", viewProj);
+                m_renderer->beginFrame();
+
+                // scan all layers we rendered in Scene2D
+                for (const auto& list : buckets)
+                {
+                    for (ECS::Entity entity : list)
+                    {
+                        // match by index, since picking stores only Index
+                        if (entity.Index != m_selectedEntityID)
+                            continue;
+
+                        // skip inactive
+                        if (world.Has<Components::Active>(entity) &&
+                            !world.Get<Components::Active>(entity).Enabled)
+                            continue;
+
+                        // get transform (same helper as Scene2D)
+                        const auto& lt = world.Get<Components::LocalTransform>(entity);
+                        Vector3D position, scale;
+                        Quaternion rotation;
+                        GetRenderTransform(world, entity, lt, position, rotation, scale);
+
+                        // 1) BOXES ----------------------------------------------------
+                        if (world.Has<Components::ShapeBox2D>(entity))
+                        {
+                            const auto& sb = world.Get<Components::ShapeBox2D>(entity);
+
+                            // check if rotated
+                            const float rotAngle = 2.0f * std::acos(rotation.W);
+                            const bool rotated = std::abs(rotAngle) > 0.01f;
+
+                            if (!rotated)
+                            {
+                                const glm::vec2 halfExtents = {
+                                    sb.HalfExtents.X * scale.X,
+                                    sb.HalfExtents.Y * scale.Y
+                                };
+
+                                const glm::vec2 center = {
+                                    position.X + sb.Offset.X,
+                                    position.Y + sb.Offset.Y
+                                };
+
+                                const glm::vec2 min = center - halfExtents;
+                                const glm::vec2 max = center + halfExtents;
+
+                                DebugDraw2D::RectStroke(
+                                    *m_renderer,
+                                    min, max,
+                                    worldThickness,
+                                    selColor,
+                                    /*textureId*/ 0);
+                            }
+                            else
+                            {
+                                // rotated box: build 4 corners like Scene2D
+                                const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                                transformedCorners.clear(); transformedCorners.reserve(4);
+
+                                const Vector2D he = sb.HalfExtents;
+                                const Vector3D corners[4] = {
+                                    { -he.X, -he.Y, 0.0f },
+                                    {  he.X, -he.Y, 0.0f },
+                                    {  he.X,  he.Y, 0.0f },
+                                    { -he.X,  he.Y, 0.0f }
+                                };
+
+                                for (auto c : corners)
+                                {
+                                    const Vector4D hc = m * Vector4D{ c.X, c.Y, c.Z, 1.0f };
+                                    transformedCorners.push_back(
+                                        glm::vec2(hc.X + sb.Offset.X, hc.Y + sb.Offset.Y)
+                                    );
+                                }
+
+                                // draw 4 edges
+                                for (int i = 0; i < 4; ++i)
+                                {
+                                    DebugDraw2D::Line(
+                                        *m_renderer,
+                                        transformedCorners[i],
+                                        transformedCorners[(i + 1) % 4],
+                                        worldThickness,
+                                        selColor,
+                                        0);
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        // 2) SPRITES --------------------------------------------------
+                        if (world.Has<Components::SpriteRenderer2D>(entity))
+                        {
+                            // we outline the *quad*, not opaque pixels
+                            const float angleZ = std::atan2(
+                                2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
+                                1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z)
+                            );
+
+                            const bool rotated = std::abs(angleZ) > 0.001f;
+
+                            if (!rotated)
+                            {
+                                const glm::vec2 half = {
+                                    scale.X * 0.5f,
+                                    scale.Y * 0.5f
+                                };
+
+                                const glm::vec2 min = {
+                                    position.X - half.x,
+                                    position.Y - half.y
+                                };
+                                const glm::vec2 max = {
+                                    position.X + half.x,
+                                    position.Y + half.y
+                                };
+
+                                DebugDraw2D::RectStroke(
+                                    *m_renderer,
+                                    min, max,
+                                    worldThickness,
+                                    selColor,
+                                    0);
+                            }
+                            else
+                            {
+                                // build unit quad and TRS it
+                                const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                                transformedCorners.clear(); transformedCorners.reserve(4);
+
+                                const Vector3D corners[4] = {
+                                    { -0.5f, -0.5f, 0.0f },
+                                    {  0.5f, -0.5f, 0.0f },
+                                    {  0.5f,  0.5f, 0.0f },
+                                    { -0.5f,  0.5f, 0.0f }
+                                };
+
+                                for (auto c : corners)
+                                {
+                                    const Vector4D hc = m * Vector4D{ c.X, c.Y, c.Z, 1.0f };
+                                    transformedCorners.push_back(glm::vec2(hc.X, hc.Y));
+                                }
+
+                                for (int i = 0; i < 4; ++i)
+                                {
+                                    DebugDraw2D::Line(
+                                        *m_renderer,
+                                        transformedCorners[i],
+                                        transformedCorners[(i + 1) % 4],
+                                        worldThickness,
+                                        selColor,
+                                        0);
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        // 3) CIRCLES --------------------------------------------------
+                        if (world.Has<Components::ShapeCircle2D>(entity))
+                        {
+                            const auto& sc = world.Get<Components::ShapeCircle2D>(entity);
+
+                            // circle center in world
+                            const glm::vec2 center = {
+                                position.X + sc.Offset.X,
+                                position.Y + sc.Offset.Y
+                            };
+
+                            // apply non-uniform scale by averaging (same as the circle draw)
+                            const float radius =
+                                sc.Radius * ((scale.X + scale.Y) * 0.5f);
+
+                            // just outline the circle's quad (AABB)
+                            const glm::vec2 half = { radius, radius };
+                            const glm::vec2 min = center - half;
+                            const glm::vec2 max = center + half;
+
+                            DebugDraw2D::RectStroke(
+                                *m_renderer,
+                                min, max,
+                                worldThickness,
+                                selColor,
+                                0);
+
+                            continue;
+                        }
+
+                        // 4) POLYGONS -------------------------------------------------
+                        if (world.Has<Components::ShapePolygon2D<32>>(entity))
+                        {
+                            const auto& pl = world.Get<Components::ShapePolygon2D<32>>(entity);
+                            if (pl.Count >= 2)
+                            {
+                                const auto m = TransformUtils::MakeTRS(position, rotation, scale);
+                                polyPoints.clear(); polyPoints.reserve(pl.Count);
+
+                                for (uint32_t i = 0; i < pl.Count; ++i)
+                                {
+                                    const Vector3D p3{ pl.Points[i].X, pl.Points[i].Y, 0.0f };
+                                    const Vector4D hp = m * Vector4D{ p3.X, p3.Y, p3.Z, 1.0f };
+                                    polyPoints.push_back(glm::vec2(hp.X, hp.Y));
+                                }
+
+                                for (uint32_t i = 0; i < pl.Count; ++i)
+                                {
+                                    DebugDraw2D::Line(
+                                        *m_renderer,
+                                        polyPoints[i],
+                                        polyPoints[(i + 1) % pl.Count],
+                                        worldThickness,
+                                        selColor,
+                                        0);
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        // 5) LINES ----------------------------------------------------
+                        if (world.Has<Components::ShapeLine2D>(entity))
+                        {
+                            const auto& sl = world.Get<Components::ShapeLine2D>(entity);
+
+                            const glm::vec2 a = {
+                                position.X + sl.A.X,
+                                position.Y + sl.A.Y
+                            };
+                            const glm::vec2 b = {
+                                position.X + sl.B.X,
+                                position.Y + sl.B.Y
+                            };
+
+                            DebugDraw2D::Line(
+                                *m_renderer,
+                                a, b,
+                                worldThickness,
+                                selColor,
+                                0);
+
+                            continue;
+                        }
+
+                        // other component types: ignore
+                    }
+                }
+
+                m_renderer->endFrame();
                 Framebuffer::Unbind();
             });
 
