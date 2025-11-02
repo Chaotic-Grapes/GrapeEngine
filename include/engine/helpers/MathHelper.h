@@ -31,9 +31,9 @@ public:
     }
 
     // Distance function
-    static float Distance(float x1, float y1, float x2, float y2) {
-        float dx = x1 - x2;
-        float dy = y1 - y2;
+    static float Distance(const Vector2D& a, const Vector2D& b) {
+        float dx = a.X - b.X;
+        float dy = a.Y - b.Y;
         return std::sqrt(dx * dx + dy * dy);
     }
 };
