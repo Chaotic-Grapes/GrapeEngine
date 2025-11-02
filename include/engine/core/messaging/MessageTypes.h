@@ -30,6 +30,10 @@ namespace Messaging {
     struct KeyReleased {
         int Key;
     };
+
+    struct FileDropped {
+        std::string filePath;
+    };
 }
 
 #endif // MESSAGETYPES_H

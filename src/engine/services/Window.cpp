@@ -57,19 +57,11 @@ bool Window::Create(const std::string& title, const int width, const int height,
 	glfwSetDropCallback(m_windowHandle, [](GLFWwindow* window, int count, const char** paths) {
 		for (int i = 0; i < count; i++) {
 			std::filesystem::path droppedFile(paths[i]);
-			// Copy file to assets folder
-			std::filesystem::path destPath = std::filesystem::path("assets") / droppedFile.filename();
-
-			try {
-				std::filesystem::copy_file(droppedFile, destPath,
-					std::filesystem::copy_options::overwrite_existing);
-				LOG_INFO("Imported file from OS: " << droppedFile.filename().string());
-			}
-			catch (const std::exception& e) {
-				LOG_ERROR("Failed to import dropped file: " << e.what());
-			}
+			// Broadcast message for AssetBrowser to handle
+			Messaging::MessageSystem::Broadcast(Messaging::FileDropped{ droppedFile.string() });
+			LOG_INFO("File dropped from OS: " << droppedFile.filename().string());
 		}
-		});
+	});
 
 	// === ENABLE OR DISABLE VSYNC HERE ===
 	glfwSwapInterval(1);

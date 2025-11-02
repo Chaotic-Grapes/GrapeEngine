@@ -124,12 +124,19 @@ private:
     // (Will eventually move to Inspector when implemented)
     void _showPrefabEditor();
 
+    // Handle file dropped from OS
+    void _handleFileDrop(const std::string& sourcePath);
+
+    // Delete the currently selected file or folder
+    void _deleteSelectedAsset();
+
     // References to external systems
     float m_fontScale = 1.0f;
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
-    ImFont* m_symbolsFont = nullptr;   // Material Symbols font for icons
-    World* m_world = nullptr;          // Game world reference for entity management
+    ImFont* m_symbolsFont = nullptr;                // Material Symbols font for icons
+    World* m_world = nullptr;                       // Game world reference for entity management
+    std::vector<std::string> m_componentsToDelete;  // Track components marked for deletion
 
     // Navigation state
     std::string m_assetsRootPath = "assets\\";  // Root assets folder

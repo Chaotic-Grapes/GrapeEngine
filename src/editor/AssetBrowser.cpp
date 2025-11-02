@@ -35,12 +35,21 @@ References:
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 
 void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
     m_world = world;
+
+    // Subscribe to file drop events
+    Messaging::MessageSystem::Subscribe<Messaging::FileDropped>(
+        [this](const Messaging::FileDropped& msg) {
+            _handleFileDrop(msg.filePath);
+        }
+    );
 }
 
 // Render the asset browser UI window
@@ -50,16 +59,6 @@ void AssetBrowser::Render() {
 
     // Apply font scale to this window
     ImGui::SetWindowFontScale(m_fontScale);
-
-    // Accept files dragged from Windows Explorer
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("FILES")) {
-            // ImGui doesn't handle OS drag-drop by default
-            // So we need to enable this in window creation
-            LOG_INFO("File dropped from OS");
-        }
-        ImGui::EndDragDropTarget();
-    }
 
     // Display clickable breadcrumb navigation
     _displayBreadcrumbs();
@@ -105,7 +104,7 @@ void AssetBrowser::Render() {
     bool isPrefab = !m_selectedAsset.empty() && std::filesystem::path(m_selectedAsset).extension() == ".prefab";
     if (!isPrefab) ImGui::BeginDisabled();
 
-    // + button containing load and edit prefab buttons
+    // Contains load and edit prefab buttons
     ImGui::PushFont(m_symbolsFont);
     if (ImGui::Button("\xEE\x85\x85\xEE\x8C\x93")) {
         ImGui::OpenPopup("Prefabs");
@@ -179,11 +178,11 @@ void AssetBrowser::Render() {
     if (m_statusTimer > 0.0f) {
         // Position at bottom of the window
         ImGui::SetCursorPosX(20);
-        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 30);
+        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 35);
 
         // Green text for success, red for errors
         ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)  // Red
+            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)   // Red
             : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);  // Green
 
         ImGui::TextColored(color, "%s", m_statusMessage.c_str());
@@ -258,14 +257,14 @@ void AssetBrowser::_displayBreadcrumbs() {
 // Display all files and folders in the given directory
 void AssetBrowser::_displayFolder(const std::filesystem::path& folderPath) {
     ImGui::PushFont(m_mainFont);
-
+    
     // Check if path exists or if path exists but it's a file, not a folder
     if (!std::filesystem::exists(folderPath) || !std::filesystem::is_directory(folderPath)) {
         ImGui::TextColored(ImVec4(1, 0, 0, 1), "Folder not found");
         ImGui::PopFont();
         return;
     }
-
+    
     // Iterate through each item in directory (file or folder)
     for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
         // If item is folder
@@ -274,16 +273,23 @@ void AssetBrowser::_displayFolder(const std::filesystem::path& folderPath) {
             ImGui::PushFont(m_symbolsFont);
             ImGui::Text("\xEE\x8B\x87");
             ImGui::PopFont();
-
+            
             ImGui::SameLine();
-
+            
             // Render folder name with main font
             std::string folderName = entry.path().filename().string();
-            if (ImGui::Selectable(folderName.c_str())) {
-                // If clicked, navigate into it by changing current path
+            bool isFolderSelected = (m_selectedAsset == entry.path().string());
+            
+            // Single click: select the folder (shows info in right panel)
+            if (ImGui::Selectable(folderName.c_str(), isFolderSelected)) {
+                m_selectedAsset = entry.path().string();
+            }
+            
+            // Double click: navigate into the folder
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
                 m_currentPath = entry.path().string();
                 // Clear selection when navigating
-                m_selectedAsset.clear();
+                m_selectedAsset.clear();  
             }
         }
         // If item is file
@@ -338,52 +344,85 @@ void AssetBrowser::_displaySelectedFileInfo() {
 
     std::filesystem::path selectedPath(m_selectedAsset);
 
-    // Check if file still exists
+    // Check if file/folder still exists
     if (!std::filesystem::exists(selectedPath)) {
         ImGui::TextColored(ImVec4(1, 0, 0, 1), "Selected file no longer exists");
         return;
     }
 
-    ImGui::Text("Selected File:");
+    bool isFolder = std::filesystem::is_directory(selectedPath);
+    ImGui::Text(isFolder ? "Selected Folder:" : "Selected File:");
     ImGui::Indent();
 
-    // File name
+    // File/folder name
     ImGui::Text("Name: %s", selectedPath.filename().string().c_str());
 
-    // File path
+    // File/folder path
     ImGui::Text("Path: %s", m_selectedAsset.c_str());
 
-    // File extension
-    std::string extension = selectedPath.extension().string();
-    if (!extension.empty()) {
-        ImGui::Text("Type: %s", extension.c_str());
+    // Type
+    if (isFolder) {
+        ImGui::Text("Type: Folder");
     }
-
-    // File size (display in bytes, KB or MB depending on size)
-    try {
-        // Get file size in bytes
-        auto fileSize = std::filesystem::file_size(selectedPath);
-
-        // If less than 1KB, show in bytes
-        if (fileSize < 1024) {
-            ImGui::Text("Size: %llu bytes", fileSize);
-        }
-        // If less than 1MB, show in KB (divide by 1024)
-        else if (fileSize < 1024 * 1024) {
-            ImGui::Text("Size: %.2f KB", fileSize / 1024.0);
-        }
-        // Otherwise show in MB (divide by 1024 * 1024)
-        else {
-            ImGui::Text("Size: %.2f MB", fileSize / (1024.0 * 1024.0));
+    else {
+        // File extension
+        std::string extension = selectedPath.extension().string();
+        if (!extension.empty()) {
+            ImGui::Text("Type: %s", extension.c_str());
         }
     }
-    catch (const std::exception& e) {
-        ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "Could not get file size");
-        LOG_ERROR("Failed to get file size: " << e.what());
-    }
+    
+    // File size (display in bytes, KB or MB depending on size); only for files, not folders
+    if (!isFolder) {
+        try {
+            // Get file size in bytes
+            auto fileSize = std::filesystem::file_size(selectedPath);
 
+            // If less than 1KB, show in bytes
+            if (fileSize < 1024) {
+                ImGui::Text("Size: %llu bytes", fileSize);
+            }
+            // If less than 1MB, show in KB (divide by 1024)
+            else if (fileSize < 1024 * 1024) {
+                ImGui::Text("Size: %.2f KB", fileSize / 1024.0);
+            }
+            // Otherwise show in MB (divide by 1024 * 1024)
+            else {
+                ImGui::Text("Size: %.2f MB", fileSize / (1024.0 * 1024.0));
+            }
+        }
+        catch (const std::exception& e) {
+            ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "Could not get file size");
+            LOG_ERROR("Failed to get file size: " << e.what());
+        }
+    }
     // Stop indenting text
     ImGui::Unindent();
+    ImGui::Dummy(ImVec2(0, 5));
+    ImGui::Separator();
+    ImGui::Dummy(ImVec2(0, 5));
+
+    // Style the delete button: icon font + transparent background + red text (if canDelete, else gray)
+    ImGui::PushFont(m_symbolsFont);
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
+
+    // Render delete icon button 
+    // componentType should be accessible in the calling context
+    if (ImGui::SmallButton("\xEE\xA1\xB2\##Delete2")) {
+        _deleteSelectedAsset();
+    }
+
+    // Restore style and font state
+    ImGui::PopStyleColor(4);
+    ImGui::PopFont();
+
+    // Show tooltip on hover (even if button disabled)
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip(isFolder ? "Delete selected folder and all contents" : "Delete selected file");
+    }
 }
 
 // Import a new asset file into the current folder using Windows file dialog
@@ -865,10 +904,11 @@ void AssetBrowser::_renderComponentSection(const std::string& headerName, const 
     // Collapsing header (click triangle to expand/collapse)
     bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 
-    // Delete button on same line as header
-    ImGui::SameLine(ImGui::GetWindowWidth() - 50);
+    // Store previous cursor position
+    ImVec2 originalCursorPos = ImGui::GetCursorPos();
 
     // Disable delete button for protected components (e.g. Transform)
+    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 50);
     if (!canDelete) ImGui::BeginDisabled();
 
     // Style the delete button: icon font + transparent background + red text (if canDelete, else gray)
@@ -876,13 +916,13 @@ void AssetBrowser::_renderComponentSection(const std::string& headerName, const 
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
-    ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? ImVec4(1.0f, 0.0f, 0.0f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? ImVec4(0.7f, 0.2f, 0.2f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 
     // Render delete icon button 
     // componentType should be accessible in the calling context
-    if (ImGui::SmallButton(("\xEE\xA1\xB2##Delete" + componentType).c_str())) {
-        // Notify prefab system to remove this component
-        _removeComponentFromPrefab(componentType);
+    if (ImGui::SmallButton(("\xEE\xA1\xB2\##Delete" + componentType).c_str())) {
+        // Push to vector
+        m_componentsToDelete.push_back(componentType);
     }
 
     // Restore style and font state
@@ -896,6 +936,9 @@ void AssetBrowser::_renderComponentSection(const std::string& headerName, const 
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip(canDelete ? "Remove Component" : "Transform cannot be removed");
     }
+
+    // Restore original cursor position so content renders in correct place
+    ImGui::SetCursorPos(originalCursorPos);
 
     // If the section is expanded, call the provided lambda
     // to render the component's editable fields (e.g. position, rotation, etc.)
@@ -1049,8 +1092,6 @@ void AssetBrowser::_showPrefabEditor() {
         ImGui::TextDisabled("%s", m_editingPrefabPath.empty() ? "None" :
             std::filesystem::path(m_editingPrefabPath).filename().string().c_str());
 
-        ImGui::Separator();
-
         // Render all components in the prefab
         if (m_prefabData.contains("Components")) {
             for (auto& componentEntry : m_prefabData["Components"]) {
@@ -1072,7 +1113,7 @@ void AssetBrowser::_showPrefabEditor() {
                 // SPRITE RENDERER
                 // Texture, color tint, flip options, sorting
                 else if (componentType == "SpriteRenderer") {
-                    _renderComponentSection("Sprite Renderer", "Sprite Renderer", data, [this](nlohmann::json& d) {
+                    _renderComponentSection("Sprite Renderer", "SpriteRenderer", data, [this](nlohmann::json& d) {
                         // Sprite texture path
                         std::string texPath = d.value("TexturePath", "");
                         ImGui::Text("Sprite");
@@ -1284,11 +1325,11 @@ void AssetBrowser::_showPrefabEditor() {
                                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));                    // Transparent background
                                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f)); // Subtle hover
                                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));  // Subtle active
-                                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));          // Red text/icon
+                                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));          // Red text/icon
 
-                                if (ImGui::SmallButton("\xEE\xA1\xB2")) { // Trash can icon
+                                if (ImGui::SmallButton("\xEE\x97\x89")) {  // x icon
                                     points.erase(points.begin() + i);
-                                    ImGui::PopStyleColor(4);              // Pop all 4 color styles
+                                    ImGui::PopStyleColor(4);               // Pop all 4 color styles
                                     ImGui::PopFont();
                                     ImGui::PopID();
                                     break;
@@ -1321,6 +1362,12 @@ void AssetBrowser::_showPrefabEditor() {
                         });
                 }
             }
+
+            // Notify prefab system to remove this component
+            for (const auto& componentType : m_componentsToDelete) {
+                _removeComponentFromPrefab(componentType);
+            }
+            m_componentsToDelete.clear();
         }
 
         ImGui::Separator();
@@ -1460,3 +1507,95 @@ void AssetBrowser::_showPrefabEditor() {
     }
     ImGui::End();
 }
+
+// Handle file dropped from OS (uses current folder path)
+void AssetBrowser::_handleFileDrop(const std::string& sourcePathStr) {
+    std::filesystem::path sourcePath(sourcePathStr);
+
+    // Where to copy it: current folder + just the filename
+    std::filesystem::path destPathBuild = std::filesystem::path(m_currentPath) / sourcePath.filename();
+
+    // Check if path contains "assets"
+    std::string sourceAssetsPath = m_currentPath;
+    if (sourceAssetsPath.find("assets") != std::string::npos) {
+        // Also copy to source assets folder
+        std::filesystem::path destPathSource = std::filesystem::path("..") / m_currentPath / sourcePath.filename();
+
+        try {
+            // Copy to build/assets (runtime)
+            std::filesystem::copy_file(sourcePath, destPathBuild, std::filesystem::copy_options::overwrite_existing);
+
+            // Copy to ../assets (source)
+            std::filesystem::create_directories(destPathSource.parent_path());
+            std::filesystem::copy_file(sourcePath, destPathSource, std::filesystem::copy_options::overwrite_existing);
+
+            LOG_INFO("Successfully imported dropped file to: " << m_currentPath);
+            m_statusMessage = "File imported: " + sourcePath.filename().string();
+            m_statusTimer = 3.0f;
+
+            // Auto-select the newly imported file
+            m_selectedAsset = destPathBuild.string();
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to import dropped file: " << e.what());
+            m_statusMessage = "Failed to import file";
+            m_statusTimer = 3.0f;
+        }
+    }
+}
+
+// Delete the currently selected file or folder
+void AssetBrowser::_deleteSelectedAsset() {
+    if (m_selectedAsset.empty()) {
+        LOG_WARNING("No file or folder selected to delete");
+        return;
+    }
+    std::filesystem::path selectedPath(m_selectedAsset);
+
+    // Check if file/folder exists
+    if (!std::filesystem::exists(selectedPath)) {
+        LOG_WARNING("Selected item no longer exists");
+        m_statusMessage = "Item not found";
+        m_statusTimer = 3.0f;
+        m_selectedAsset.clear();
+        return;
+    }
+    bool isFolder = std::filesystem::is_directory(selectedPath);
+
+    try {
+        // Delete from build/assets
+        if (isFolder) {
+            std::filesystem::remove_all(selectedPath);  // Remove folder and contents
+        }
+        else {
+            std::filesystem::remove(selectedPath);      // Remove file
+        }
+        // Also delete from source assets folder (../assets)
+        std::string sourceAssetsPath = m_selectedAsset;
+        if (sourceAssetsPath.find("assets") != std::string::npos) {
+            std::filesystem::path relativePath = std::filesystem::relative(selectedPath, "assets");
+            std::filesystem::path sourcePathToDelete = std::filesystem::path("..") / "assets" / relativePath;
+
+            if (std::filesystem::exists(sourcePathToDelete)) {
+                if (isFolder) {
+                    std::filesystem::remove_all(sourcePathToDelete);
+                }
+                else {
+                    std::filesystem::remove(sourcePathToDelete);
+                }
+            }
+        }
+        LOG_INFO("Deleted: " << selectedPath.filename().string());
+        m_statusMessage = "Deleted: " + selectedPath.filename().string();
+        m_statusTimer = 3.0f;
+
+        // Clear selection after deletion
+        m_selectedAsset.clear();
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Failed to delete: " << e.what());
+        m_statusMessage = "Failed to delete item";
+        m_statusTimer = 3.0f;
+    }
+}
+
