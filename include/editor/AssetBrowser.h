@@ -108,14 +108,17 @@ private:
     // Generic component section renderer: wraps content in collapsing header
     // Uses lambda function for flexible component-specific rendering
     template <typename T>
-    void _renderComponentSection(const std::string& headerName, nlohmann::json& data,
-        T renderContent);
+    void _renderComponentSection(const std::string& headerName, const std::string& componentType, 
+        nlohmann::json& data, T renderContent, bool canDelete = true);
 
     // Helper to check if prefab already has a component type
     bool _prefabHasComponent(const std::string& componentType);
 
     // Add a component to the currently editing prefab
     void _addComponentToPrefab(const std::string& componentType);
+
+    // Remove a component from the currently editing prefab
+    void _removeComponentFromPrefab(const std::string& componentType);
 
     // Display prefab editor window with property editing
     // (Will eventually move to Inspector when implemented)

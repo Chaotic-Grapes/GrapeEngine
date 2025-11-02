@@ -859,11 +859,48 @@ void AssetBrowser::_renderCheckboxRow(const std::string& label, nlohmann::json& 
 
 // Generic component section renderer: wraps content in a collapsing header
 // Lambda function allows flexible rendering of any component's properties
+// + delete button
 template <typename T>
-void AssetBrowser::_renderComponentSection(const std::string& headerName, nlohmann::json& data, T renderContent) {
+void AssetBrowser::_renderComponentSection(const std::string& headerName, const std::string& componentType, nlohmann::json& data, T renderContent, bool canDelete) {
     // Collapsing header (click triangle to expand/collapse)
-    if (ImGui::CollapsingHeader(headerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-        renderContent(data);  // Call the lambda to render component-specific properties
+    bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+    // Delete button on same line as header
+    ImGui::SameLine(ImGui::GetWindowWidth() - 50);
+
+    // Disable delete button for protected components (e.g. Transform)
+    if (!canDelete) ImGui::BeginDisabled();
+
+    // Style the delete button: icon font + transparent background + red text (if canDelete, else gray)
+    ImGui::PushFont(m_symbolsFont);
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? ImVec4(1.0f, 0.0f, 0.0f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+
+    // Render delete icon button 
+    // componentType should be accessible in the calling context
+    if (ImGui::SmallButton(("\xEE\xA1\xB2##Delete" + componentType).c_str())) {
+        // Notify prefab system to remove this component
+        _removeComponentFromPrefab(componentType);
+    }
+
+    // Restore style and font state
+    ImGui::PopStyleColor(4);
+    ImGui::PopFont();
+
+    // Re-enable UI if disabled earlier
+    if (!canDelete) ImGui::EndDisabled();
+
+    // Show tooltip on hover (even if button disabled)
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip(canDelete ? "Remove Component" : "Transform cannot be removed");
+    }
+
+    // If the section is expanded, call the provided lambda
+    // to render the component's editable fields (e.g. position, rotation, etc.)
+    if (nodeOpen) {
+        renderContent(data); 
     }
 }
 
@@ -977,6 +1014,28 @@ void AssetBrowser::_addComponentToPrefab(const std::string& componentType) {
     LOG_INFO("Added " << componentType << " to prefab");
 }
 
+// Remove a component from the prefab
+void AssetBrowser::_removeComponentFromPrefab(const std::string& componentType) {
+    // Ensure the prefab actually has a "Components" array before proceeding
+    if (!m_prefabData.contains("Components")) return;
+
+    auto& components = m_prefabData["Components"];
+
+    // Search for the component with the matching type
+    for (auto it = components.begin(); it != components.end(); it++) {
+        if ((*it)["Type"] == componentType) {
+            // Remove the component from the array
+            components.erase(it);
+            LOG_INFO("Removed " << componentType << " from prefab");
+            m_statusMessage = "Component removed: " + componentType;
+            m_statusTimer = 3.0f;
+            return;
+        }
+    }
+
+    LOG_WARNING("Component " << componentType << " not found in prefab");
+}
+
 // Prefab editor window: displays editable properties for the selected prefab
 // (This will eventually move to Inspector when it's implemented)
 void AssetBrowser::_showPrefabEditor() {
@@ -1004,16 +1063,16 @@ void AssetBrowser::_showPrefabEditor() {
                     // [this] lets the lambda call member functions of this class (e.g. _renderFloatRow)
                     // Without it, these function calls wouldn't compile because the lambda wouldn't
                     // have access to the current class instance
-                    _renderComponentSection("Transform", data, [this](nlohmann::json& d) {
+                    _renderComponentSection("Transform", "Transform", data, [this](nlohmann::json& d) {
                         _renderFloatRow("Local Rotation", "R", d, "Rotation", 1.0f, 19.0f);
                         _renderVector2DRow("Local Position", d["Position"], "X", "Y", 1.0f);
                         _renderVector2DRow("Local Scale", d["Scale"], "X", "Y", 0.01f, 41.0f);
-                        });
+                        }, false);
                 }
                 // SPRITE RENDERER
                 // Texture, color tint, flip options, sorting
                 else if (componentType == "SpriteRenderer") {
-                    _renderComponentSection("Sprite Renderer", data, [this](nlohmann::json& d) {
+                    _renderComponentSection("Sprite Renderer", "Sprite Renderer", data, [this](nlohmann::json& d) {
                         // Sprite texture path
                         std::string texPath = d.value("TexturePath", "");
                         ImGui::Text("Sprite");
@@ -1076,7 +1135,7 @@ void AssetBrowser::_showPrefabEditor() {
                 }
                 // RIGIDBODY 2D
                 else if (componentType == "Rigidbody2D") {
-                    _renderComponentSection("Rigidbody2D", data, [this](nlohmann::json& d) {
+                    _renderComponentSection("Rigidbody2D", "Rigidbody2D", data, [this](nlohmann::json& d) {
                         // Body Type dropdown
                         ImGui::Text("Body Type");
                         ImGui::SameLine();
@@ -1129,7 +1188,7 @@ void AssetBrowser::_showPrefabEditor() {
                 }
                 // CIRCLE COLLIDER 2D
                 else if (componentType == "CircleCollider2D") {
-                    _renderComponentSection("Circle Collider 2D", data, [this](nlohmann::json& d) {
+                    _renderComponentSection("CircleCollider2D", "CircleCollider2D", data, [this](nlohmann::json& d) {
                         // Is Trigger
                         ImGui::Text("Is Trigger");
                         ImGui::SameLine();
@@ -1146,7 +1205,7 @@ void AssetBrowser::_showPrefabEditor() {
                 }
                 // BOX COLLIDER 2D
                 else if (componentType == "BoxCollider2D") {
-                    _renderComponentSection("Box Collider 2D", data, [this](nlohmann::json& d) {
+                    _renderComponentSection("BoxCollider2D", "BoxCollider2D", data, [this](nlohmann::json& d) {
                         // Is Trigger
                         ImGui::Text("Is Trigger");
                         ImGui::SameLine();
@@ -1163,7 +1222,7 @@ void AssetBrowser::_showPrefabEditor() {
                 }
                 // LINE RENDERER
                 else if (componentType == "LineRenderer") {
-                    _renderComponentSection("Line Renderer", data, [this](nlohmann::json& d) {
+                    _renderComponentSection("LineRenderer", "LineRenderer", data, [this](nlohmann::json& d) {
                         _renderVector2DRow("Start", d["Start"], "X", "Y", 1.0f, 95.0f);
                         _renderVector2DRow("End", d["End"], "X", "Y", 1.0f, 103.0f);
                         _renderFloatRow("Thickness", "px", d, "Thickness", 0.1f, 42.0f);
@@ -1172,7 +1231,7 @@ void AssetBrowser::_showPrefabEditor() {
                 }
                 // SHAPE RENDERER 2D
                 else if (componentType == "ShapeRenderer2D") {
-                    _renderComponentSection("Shape Renderer 2D", data, [this](nlohmann::json& d) {
+                    _renderComponentSection("ShapeRenderer2D", "ShapeRenderer2D", data, [this](nlohmann::json& d) {
                         // Shape Type dropdown
                         ImGui::Text("Shape Type");
                         ImGui::SameLine();
