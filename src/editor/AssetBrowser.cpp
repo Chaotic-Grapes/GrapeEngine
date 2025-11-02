@@ -29,6 +29,7 @@ References:
 #endif
 
 #include "../editor/AssetBrowser.h"
+#include "../editor/EditorUIHelpers.h"
 #include "core/Logger.h" 
 #include <vector>
 #include <services/ResourceManager.h>
@@ -715,185 +716,53 @@ bool AssetBrowser::_updateEntityFromPrefab(Entity& entity) {
     }
 }
 
+// NOTE: Helper implementations were centralized in EditorUIHelpers.cpp to allow reuse
+// across AssetBrowser and a future Inspector. Your original explanatory comments
+// have been preserved there alongside the widgets.
 // Render a property with X and Y fields (works for Position, Scale, Velocity, Size, etc.)
 void AssetBrowser::_renderVector2DRow(const std::string& label, nlohmann::json& data, const std::string& xKey,
     const std::string& yKey, float dragSpeed, float labelOffset)
 {
-    // Strip ## suffix for display
-    std::string displayLabel = label;
-    size_t pos = label.find("##");
-    if (pos != std::string::npos) {
-        displayLabel = label.substr(0, pos);
-    }
-
-    ImGui::Text(displayLabel.c_str());
-
-    // Extract current values from JSON
-    float x = data[xKey];
-    float y = data[yKey];
-
-    // X field
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);  // Align with other fields
-    ImGui::Text("X");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(100);
-    // Hold to drag, double click to type
-    if (ImGui::DragFloat(("##" + label + "X").c_str(), &x, dragSpeed, 0.0f, 0.0f, "%.2f")) {
-        data[xKey] = x;  // Write back to JSON
-    }
-
-    // Y field
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
-    ImGui::Text("Y");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::DragFloat(("##" + label + "Y").c_str(), &y, dragSpeed, 0.0f, 0.0f, "%.2f")) {
-        data[yKey] = y;  // Write back to JSON
-    }
+    EditorUI::RenderVector2DRow(label, data, xKey, yKey, dragSpeed, labelOffset);
 }
 
 // Render a single float property with custom field label (works for Mass, Rotation, Volume, etc.)
 void AssetBrowser::_renderFloatRow(const std::string& label, const std::string& fieldLabel, nlohmann::json& data,
     const std::string& key, float dragSpeed, float labelOffset)
 {
-    // Strip ## suffix for display
-    std::string displayLabel = label;
-    size_t pos = label.find("##");
-    if (pos != std::string::npos) {
-        displayLabel = label.substr(0, pos);
-    }
-
-    ImGui::Text(displayLabel.c_str());
-    float value = data[key];
-
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);  // Align with other fields
-    ImGui::Text(fieldLabel.c_str());  // Field label like "kg", "m", etc.
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed, 0.0f, 0.0f, "%.2f")) {
-        data[key] = value;  // Write back to JSON
-    }
+    EditorUI::RenderFloatRow(label, fieldLabel, data, key, dragSpeed, labelOffset);
 }
 
 // Render a text input property (works for TexturePath, Name, Tag, etc.)
 void AssetBrowser::_renderTextProperty(const std::string& label, nlohmann::json& data, const std::string& key,
     float labelOffset)
 {
-    std::string value = data[key];
-    char buf[128];
-    strncpy_s(buf, value.c_str(), sizeof(buf) - 1);
-
-    ImGui::Text(label.c_str());
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
-    ImGui::SetNextItemWidth(100);
-
-    // Text input field
-    if (ImGui::InputText(("##" + key).c_str(), buf, sizeof(buf))) {
-        data[key] = std::string(buf);  // Write back to JSON
-    }
+    EditorUI::RenderTextProperty(label, data, key, labelOffset);
 }
 
 // Render an integer drag property (works for SortingOrder, MaxParticles, FontSize, etc.)
 void AssetBrowser::_renderIntProperty(const std::string& label, nlohmann::json& data, const std::string& key,
     float labelOffset)
 {
-    int value = data[key];
-
-    // Strip ## suffix for display
-    std::string displayLabel = label;
-    size_t pos = label.find("##");
-    if (pos != std::string::npos) {
-        displayLabel = label.substr(0, pos);
-    }
-
-    ImGui::Text(displayLabel.c_str());
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
-    ImGui::SetNextItemWidth(100);
-
-    // Integer drag field
-    if (ImGui::DragInt(("##" + label).c_str(), &value)) {
-        data[key] = value;  // Write back to JSON
-    }
+    EditorUI::RenderIntProperty(label, data, key, labelOffset);
 }
 
 // Render a color picker property (works for any RGBA color in JSON)
+// Delegates to shared helper; see EditorUIHelpers.cpp for detailed ImGui flags notes
 void AssetBrowser::_renderColorProperty(const std::string& label, nlohmann::json& colorData, float labelOffset) {
-    // Strip ## suffix for display
-    std::string displayLabel = label;
-    size_t pos = label.find("##");
-    if (pos != std::string::npos) {
-        displayLabel = label.substr(0, pos);
-    }
-
-    ImGui::Text(displayLabel.c_str());
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
-
-    // Convert JSON RGBA (0-255) to ImGui color (0-1)
-    // Normalize it first
-    ImVec4 color(
-        colorData["R"].get<float>() / 255.0f,
-        colorData["G"].get<float>() / 255.0f,
-        colorData["B"].get<float>() / 255.0f,
-        colorData["A"].get<float>() / 255.0f
-    );
-
-    // IMGUI HAS BUILT-IN COLOR EDITORS AND PICKERS
-    // ColorEdit4 = RGBA editor with sliders + color square
-    // NoInputs cause we don't want to show the RGBA values before clicking into the color picker
-    // NoDragDrop = can't drag and drop color between widgets 
-    // AlphaBar = show alpha (like Unity)
-    // NoLabel = removes the title next to the freaking box thing
-    // PickerHueWheel = color picker wheel (not default vertical hue bar)
-    if (ImGui::ColorEdit4(label.c_str(), &color.x, ImGuiColorEditFlags_NoInputs |
-        ImGuiColorEditFlags_NoDragDrop | ImGuiColorEditFlags_NoLabel | 
-        ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar))
-    {
-        // When user edits color, ImGui gives a float (0-1 range) back
-        // Write back to JSON (convert 0-1 back to 0-255 for saving)
-        colorData["R"] = color.x * 255.0f;
-        colorData["G"] = color.y * 255.0f;
-        colorData["B"] = color.z * 255.0f;
-        colorData["A"] = color.w * 255.0f;
-    }
+    EditorUI::RenderColorProperty(label, colorData, labelOffset);
 }
 
 // Render read-only text with label (for displaying non-editable info like file paths)
 void AssetBrowser::_renderReadOnlyText(const std::string& label, const std::string& value, float labelOffset) {
-    ImGui::Text(label.c_str());
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
-    ImGui::TextDisabled("%s", value.c_str());  // Gray text = read-only
+    EditorUI::RenderReadOnlyText(label, value, labelOffset);
 }
 
 // Render two checkboxes on same row (works for FlipX/FlipY, Loop/PlayOnAwake, etc.)
 void AssetBrowser::_renderCheckboxRow(const std::string& label, nlohmann::json& data, const std::string& key1,
     const std::string& label1, const std::string& key2, const std::string& label2, float labelOffset)
 {
-    ImGui::Text(label.c_str());
-    ImGui::SameLine();
-
-    bool value1 = data[key1];
-    bool value2 = data[key2];
-
-    // First checkbox
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelOffset);
-    ImGui::SetNextItemWidth(20);
-    if (ImGui::Checkbox(("##" + key1).c_str(), &value1)) data[key1] = value1;
-    ImGui::SameLine();
-    ImGui::Text(label1.c_str());
-
-    // Second checkbox
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(20);
-    if (ImGui::Checkbox(("##" + key2).c_str(), &value2)) data[key2] = value2;
-    ImGui::SameLine();
-    ImGui::Text(label2.c_str());
+    EditorUI::RenderCheckboxRow(label, data, key1, label1, key2, label2, labelOffset);
 }
 
 // Generic component section renderer: wraps content in a collapsing header
