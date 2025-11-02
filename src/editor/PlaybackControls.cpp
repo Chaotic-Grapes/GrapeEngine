@@ -1,4 +1,4 @@
-﻿/* Start Header *****************************************************************/
+/* Start Header *****************************************************************/
 /*!
 \file   PlaybackControls.cpp
 \author Foo Rui Qin (100%)
@@ -22,7 +22,6 @@ Reference:
 
 #include "../editor/PlaybackControls.h"
 #include "services/Input.h"
-#include "services/UICommon.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
@@ -35,7 +34,8 @@ Playback::Playback(World* world)
 
 Playback::~Playback() {}
 
-void Playback::Initialize(ImFont* symbolsFont) {
+void Playback::Initialize(ImFont* mainFont, ImFont* symbolsFont) {
+    m_mainFont = mainFont;
     m_symbolsFont = symbolsFont;
 }
 
@@ -82,8 +82,6 @@ void Playback::ProcessInput() {
 }
 
 void Playback::Render() {
-    // Use config values
-    UICommon::ApplyLayout(UICommon::WindowId::EDITOR_PLAYBACK);
     ImGui::Begin("Game Controls", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
     // If mouse is over window then show tooltips (with keyboard shortcuts)
@@ -132,22 +130,30 @@ void Playback::Render() {
     // Single play/pause toggle button
     // Shows play when stopped/paused
     if (m_gameState == GameState::Stopped || m_gameState == GameState::Paused) {
+        ImGui::PushFont(m_symbolsFont);
         button("\xEE\x80\xB7", true, GameState::Playing,
             m_gameState == GameState::Stopped ? "Game started" : "Game resumed");
+        ImGui::PopFont();
     }
     // Shows pause when playing
     else {
+        ImGui::PushFont(m_symbolsFont);
         button("\xEE\x80\xB4", true, GameState::Paused, "Game paused");
+        ImGui::PopFont();
     }
     ImGui::SameLine();
 
     // STOP: playing/paused > stopped
+    ImGui::PushFont(m_symbolsFont);
     button("\xEE\x81\x87", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
+    ImGui::PopFont();
     ImGui::SameLine();
 
     // Step button (for step-by-step physics)
     // Only enabled when paused
+    ImGui::PushFont(m_symbolsFont);
     button("\xEE\x81\x84", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true);
+    ImGui::PopFont();
 
     ImGui::End();
 }

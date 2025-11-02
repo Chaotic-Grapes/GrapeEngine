@@ -75,6 +75,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Component::LineRenderer,
 	Start, End, Thickness, Color
 )
 
+// PrefabLink
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Component::PrefabLink, prefabPath)
+
 namespace Serialization {
 
 	// this class handles serialization and deserialziation of entities to/from JSON format.
@@ -102,6 +105,7 @@ namespace Serialization {
 			RegisterComponent<Component::BoxCollider2D>("BoxCollider2D");
 			RegisterComponent<Component::ShapeRenderer2D>("ShapeRenderer2D");
 			RegisterComponent<Component::LineRenderer>("LineRenderer");
+			RegisterComponent<Component::PrefabLink>("PrefabLink");
 
 			LOG_DEBUG("Registered components:");
 			for (const auto& [name, _] : s_deserializationRegistry) {

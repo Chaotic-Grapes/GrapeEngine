@@ -38,7 +38,7 @@ public:
     ~Playback();                  
 
     // Initialize with symbols font for icons
-    void Initialize(ImFont* symbolsFont);
+    void Initialize(ImFont* mainFont, ImFont* symbolsFont);
 
     // Handle keyboard shortcuts
     void ProcessInput();
@@ -54,6 +54,7 @@ public:
 
 private:
     World* m_world;
+    ImFont* m_mainFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
     GameState m_gameState = GameState::Stopped;
     bool m_stepRequested = false;

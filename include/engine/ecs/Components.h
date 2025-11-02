@@ -218,6 +218,17 @@ namespace Component {
 
         const char* GetTypeName() const override { return "LineRenderer"; }
     };
+
+    // Stores reference to prefab file that entity was originally instantiated from
+    // We do this so the editor can trace the entity back to its source prefab asset
+    struct PrefabLink : IComponent {
+        std::string prefabPath;  // Path to the prefab file this entity was created from
+
+        PrefabLink() = default;
+        PrefabLink(const std::string& path) : prefabPath(path) {}
+
+        const char* GetTypeName() const override { return "PrefabLink"; }
+    };
 }
 
 #endif

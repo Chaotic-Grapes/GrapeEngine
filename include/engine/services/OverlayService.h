@@ -83,6 +83,7 @@ private:
     std::unique_ptr<DebugUI> m_debugUI;          // Debug UI instance
     std::unique_ptr<LevelEditor> m_levelEditor;  // Level editor instance
     bool m_initialized = false;                  // ImGui initialization flag
+    bool m_dockLayoutBuilt = false;              // Dock space layout built flag
 #endif
 };
 
