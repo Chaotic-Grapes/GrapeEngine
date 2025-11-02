@@ -3,6 +3,8 @@
 #include <iostream>
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include <filesystem>
+#include "core/Logger.h"
 
 namespace {
 	bool HasFlag(const WindowMode::Flags a, const WindowMode::Flags b) {
@@ -50,6 +52,24 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		return false;
 	}
 	glfwMakeContextCurrent(m_windowHandle);
+
+	// Enable drag-drop from OS
+	glfwSetDropCallback(m_windowHandle, [](GLFWwindow* window, int count, const char** paths) {
+		for (int i = 0; i < count; i++) {
+			std::filesystem::path droppedFile(paths[i]);
+			// Copy file to assets folder
+			std::filesystem::path destPath = std::filesystem::path("assets") / droppedFile.filename();
+
+			try {
+				std::filesystem::copy_file(droppedFile, destPath,
+					std::filesystem::copy_options::overwrite_existing);
+				LOG_INFO("Imported file from OS: " << droppedFile.filename().string());
+			}
+			catch (const std::exception& e) {
+				LOG_ERROR("Failed to import dropped file: " << e.what());
+			}
+		}
+		});
 
 	// === ENABLE OR DISABLE VSYNC HERE ===
 	glfwSwapInterval(1);

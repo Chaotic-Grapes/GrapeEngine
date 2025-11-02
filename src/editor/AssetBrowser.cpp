@@ -51,6 +51,16 @@ void AssetBrowser::Render() {
     // Apply font scale to this window
     ImGui::SetWindowFontScale(m_fontScale);
 
+    // Accept files dragged from Windows Explorer
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("FILES")) {
+            // ImGui doesn't handle OS drag-drop by default
+            // So we need to enable this in window creation
+            LOG_INFO("File dropped from OS");
+        }
+        ImGui::EndDragDropTarget();
+    }
+
     // Display clickable breadcrumb navigation
     _displayBreadcrumbs();
 
@@ -310,7 +320,11 @@ void AssetBrowser::_displayFile(const std::filesystem::path& filePath) {
         ImGui::SetDragDropPayload("ASSET_PATH", path.c_str(), path.size() + 1);
 
         // Show preview while dragging
-        ImGui::Text("\xEF\x8E\xB2 %s", filename.c_str());
+        ImGui::PushFont(m_symbolsFont);
+        ImGui::Text("\xEF\x8E\xB2");
+        ImGui::PopFont();
+        ImGui::SameLine();
+        ImGui::Text("%s", filename.c_str());
         ImGui::EndDragDropSource();
     }
 }
@@ -798,8 +812,8 @@ void AssetBrowser::_renderColorProperty(const std::string& label, nlohmann::json
     // NoLabel = removes the title next to the freaking box thing
     // PickerHueWheel = color picker wheel (not default vertical hue bar)
     if (ImGui::ColorEdit4(label.c_str(), &color.x, ImGuiColorEditFlags_NoInputs |
-        ImGuiColorEditFlags_NoDragDrop |
-        ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel))
+        ImGuiColorEditFlags_NoDragDrop | ImGuiColorEditFlags_NoLabel | 
+        ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar))
     {
         // When user edits color, ImGui gives a float (0-1 range) back
         // Write back to JSON (convert 0-1 back to 0-255 for saving)
@@ -902,6 +916,9 @@ void AssetBrowser::_showPrefabEditor() {
 
                         // Drop target (accepts dragged files)
                         if (ImGui::BeginDragDropTarget()) {
+                            // Customize drop target appearance
+                            ImGui::PushStyleColor(ImGuiCol_DragDropTarget, ImVec4(0.2f, 0.5f, 1.0f, 1.0f)); // Blue highlight
+
                             // A payload is the data we attach to a drag operation, so what we're "carrying"
                             // When we start dragging something
                             if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
@@ -911,9 +928,41 @@ void AssetBrowser::_showPrefabEditor() {
                                 if (std::filesystem::path(droppedPath).extension() == ".png") {
                                     d["TexturePath"] = droppedPath;
                                     d["Sprite"] = droppedPath;
+
+                                    // AUTO-SAVE THE PREFAB TO BOTH LOCATIONS (build/assets and ../assets)
+                                    // 1. Save to build/assets (runtime)
+                                    std::ofstream file(m_editingPrefabPath);
+                                    if (file.is_open()) {
+                                        file << m_prefabData.dump(2);
+                                        file.close();
+                                    }
+
+                                    // 2. Save to ../assets (source)
+                                    // Copy the prefab data to the external "assets" folder if the path contains "assets"
+                                    std::string sourceAssetsPath = m_editingPrefabPath;
+
+                                    // Check if the prefab being edited is inside the "assets" directory
+                                    if (sourceAssetsPath.find("assets") != std::string::npos) {
+
+                                        // Compute the relative path from "assets" to the current prefab file
+                                        std::filesystem::path relativePath = std::filesystem::relative(
+                                            std::filesystem::path(m_editingPrefabPath), "assets");
+
+                                        // Construct the destination path: ../assets/<same relative path>
+                                        std::filesystem::path destPathSource = std::filesystem::path("..") / "assets" / relativePath;
+
+                                        // Open the destination file for writing
+                                        std::ofstream fileSource(destPathSource);
+                                        if (fileSource.is_open()) {
+                                            // Write the current prefab JSON data with indentation = 2 spaces
+                                            fileSource << m_prefabData.dump(2);
+                                            fileSource.close();
+                                        }
+                                    }
                                     LOG_INFO("Dropped texture: " << droppedPath);
                                 }
                             }
+                            ImGui::PopStyleColor(); // Pop the color style
                             ImGui::EndDragDropTarget();
                         }
 
