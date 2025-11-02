@@ -174,10 +174,10 @@ namespace ECS {
         // ====================================================================
         // Member Variables - Object Picking
         // ====================================================================
-        std::unique_ptr<Shader> m_pickingShader;
-        std::unique_ptr<PixelBufferObject> m_pickingPBO;
-        bool m_pickingRequestPending = false;
-        glm::ivec2 m_pickingPos = { 0, 0 };
+        Framebuffer m_pickingFBO;
+        PixelBufferObject m_pbos[2];
+        int m_currentPBO = 0;
+        uint32_t m_selectedEntityID = 0;  // Currently selected entity
 
         // ====================================================================
         // Member Variables - UI Scaling
