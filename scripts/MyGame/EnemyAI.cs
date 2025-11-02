@@ -1,6 +1,7 @@
 using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
+using System.Collections.Generic;
 
 namespace MyGame;
 
@@ -13,29 +14,51 @@ public class EnemyAI : ScriptBehaviour
     public float BaseSpeed = 80.0f;
     public float Speed = 80.0f;
     public float AttackDamage = 10.0f;
-    private float m_detectionRadius = 150.0f;
+    private float m_detectionRadius = 350.0f;
 
     // incase we need it for specific game scenes
     public float Health = 100f;
     public float MaxHealth = 100f;
-    
-    
+
+
     // Visual entity of enemy
     private Entity m_visualEntity;
+    private List<Entity> m_obstacleEntities = new List<Entity>();
 
     // state references so it can be reusable
     private EnemyPatrolState m_patrolState;
     private EnemyChaseState m_chaseState;
     private EnemyAttackState m_attackState;
 
+    // pathfinding
+    private List<Vector3> m_currentPath;
+    private int m_currentWaypointIndex = 0;
+    private float m_pathUpdateTimer = 0f;
+    private const float PATH_UPDATE_INTERVAL = 0.5f;
+    private const float WAYPOINT_REACH_DISTANCE = 15.0f;
+
+    // anti-stuck mechanism
+    private Vector3 m_lastPosition;
+    private float m_stuckTimer = 0f;
+    private const float STUCK_THRESHOLD = 0.5f;
+
+    // debug visualization
+    private List<Entity> m_pathDebugEntities = new List<Entity>();
+
     // Player reference (need to read game manager probably info there)
     private Entity m_playerEntity;
     //bool flag for playerset
     private bool m_linkedToPlayer = false;
 
+    // cache obstacles
+    private List<Vector3> m_cachedObstacles;
+
     public override void OnStart()
     {
         Log("EnemyAI initialized!", LogLevel.Info);
+
+        AStarPathfinder.EnsureInitialized();
+        m_cachedObstacles = AStarPathfinder.GetObstacles();
 
         // Create the visual entity for this enemy
         m_visualEntity = CreateEntity(
@@ -62,13 +85,55 @@ public class EnemyAI : ScriptBehaviour
         //m_patrolPointA = transform.Position;
         //m_patrolPointB = transform.Position + new Vector3(200.0f, 0.0f, 0.0f);
 
+        if (m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
+        {
+            m_lastPosition = transform.Position;
+        }
+
         Log($"Enemy visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
+
+        CreateObstacleVisuals();
 
         // build state machine
         BuildStateMachine();
         TryLinkToPlayer();
 
         Log("Enemy ready with HFSM~!");
+    }
+
+    private void CreateObstacleVisuals()
+    {
+        // Log($"Creating {m_cachedObstacles.Count} obstacle visuals...", LogLevel.Info); // debug
+
+        if (m_cachedObstacles.Count == 0)
+        {
+            return;
+        }
+
+        var (width, height) = AStarPathfinder.GetObstacleDimensions();
+
+        foreach (var obstaclePos in m_cachedObstacles)
+        {
+            var obstacleEntity = CreateEntity(
+                new ComponentData<LocalTransform>(new()
+                {
+                    Position = obstaclePos,
+                    Rotation = Quaternion.Identity,
+                    Scale = new Vector3(1, 1, 1)
+                }),
+                new ComponentData<ShapeBox2D>(new()
+                {
+                    HalfExtents = new Vector2(width / 2, height / 2),
+                    Offset = Vector2.Zero,
+                    Color = new Color { R = 0.8f, G = 0.2f, B = 0.2f, A = 1f },
+                    Filled = true
+                }),
+                new ComponentData<Layer>(new() { Id = 0 }),
+                new ComponentData<Active>(new() { Enabled = true })
+            );
+            m_obstacleEntities.Add(obstacleEntity);
+        }
+        // Log($"Created {m_obstacleEntities.Count} rectangular obstacle visuals", LogLevel.Info); // debug
     }
 
     public override void OnUpdate()
@@ -89,6 +154,9 @@ public class EnemyAI : ScriptBehaviour
 
             // Update visuals - enemy visuals
             UpdateEnemyVisual();
+
+            // update path visual - debugging
+            UpdatePathDebugVisuals();
         }
     }
 
@@ -145,13 +213,50 @@ public class EnemyAI : ScriptBehaviour
         m_visualEntity.SetComponent(circle);
     }
 
+    private void UpdatePathDebugVisuals()
+    {
+        foreach (var entity in m_pathDebugEntities)
+        {
+            entity.Destroy();
+        }
+        m_pathDebugEntities.Clear();
+
+        if (m_currentPath != null && m_currentPath.Count > 0)
+        {
+            for (int i = 0; i < m_currentPath.Count; i++)
+            {
+                bool isCurrent = (i == m_currentWaypointIndex);
+
+                var debugEntity = CreateEntity(
+                    new ComponentData<LocalTransform>(new()
+                    {
+                        Position = m_currentPath[i],
+                        Rotation = Quaternion.Identity,
+                        Scale = new Vector3(1, 1, 1)
+                    }),
+                    new ComponentData<ShapeCircle2D>(new()
+                    {
+                        Radius = isCurrent ? 8.0f : 5.0f,
+                        Color = isCurrent
+                            ? new Color { R = 0f, G = 1f, B = 0f, A = 0.8f }
+                            : new Color { R = 1f, G = 1f, B = 0f, A = 0.5f },
+                        Filled = true
+                    }),
+                    new ComponentData<Layer>(new() { Id = 0 }),
+                    new ComponentData<Active>(new() { Enabled = true })
+                );
+                m_pathDebugEntities.Add(debugEntity);
+            }
+        }
+    }
+
     private void TryLinkToPlayer()
     {
         if (PlayerController.Instance != null)
         {
             SetPlayerEntity(PlayerController.Instance.GetVisualEntity());
             m_linkedToPlayer = true;
-           
+
         }
 
     }
@@ -222,14 +327,25 @@ public class EnemyAI : ScriptBehaviour
         if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
             return;
 
-        
+        /*
         var normalizedDir = direction.Normalized;
         transform.Position += normalizedDir * Speed * deltaTime;
         m_visualEntity.SetComponent(transform);
-       /*
-       * a-star to be set here
-       */
+        /*
+        * a-star to be set here
+        */
 
+        if (direction.Magnitude < 0.01f)
+            return;
+
+        Vector3 movement = direction.Normalized * Speed * deltaTime;
+        Vector3 newPosition = transform.Position + movement;
+
+        if (!WouldCollideWithObstacle(newPosition))
+        {
+            transform.Position = newPosition;
+            m_visualEntity.SetComponent(transform);
+        }
     }
 
     public void MoveTowardPlayer(float deltaTime)
@@ -246,12 +362,135 @@ public class EnemyAI : ScriptBehaviour
         if (!m_visualEntity.TryGetComponent<LocalTransform>(out var myTransform))
             return;
 
-        if (GetDistanceToPlayer() < m_detectionRadius)
+        // if (GetDistanceToPlayer() < m_detectionRadius)
+
+        m_pathUpdateTimer -= deltaTime;
+
+        float distanceMoved = (myTransform.Position - m_lastPosition).Magnitude;
+
+        if (distanceMoved > 1.0f * deltaTime)
+        {
+            m_stuckTimer = 0f;
+        }
+        else
         {
             // direction - direction vector 
-            var direction = playerTransform.Position - myTransform.Position;
-            MoveInDirection(direction, deltaTime);
+            // var direction = playerTransform.Position - myTransform.Position;
+            // MoveInDirection(direction, deltaTime);
+            m_stuckTimer += deltaTime;
         }
+
+        m_lastPosition = myTransform.Position;
+
+        bool needsNewPath = m_currentPath == null ||
+                           m_currentPath.Count == 0 ||
+                           m_currentWaypointIndex >= m_currentPath.Count ||
+                           m_pathUpdateTimer <= 0f ||
+                           m_stuckTimer > STUCK_THRESHOLD;
+
+        if (needsNewPath)
+        {
+            var newPath = AStarPathfinder.FindPath(myTransform.Position, playerTransform.Position);
+
+            if (newPath != null && newPath.Count > 0)
+            {
+                m_currentPath = newPath;
+                m_currentWaypointIndex = 0;
+                m_pathUpdateTimer = PATH_UPDATE_INTERVAL;
+                m_stuckTimer = 0f;
+            }
+            else
+            {
+                m_currentPath = null;
+                MoveWithWallSliding(playerTransform.Position, myTransform, deltaTime);
+                return;
+            }
+        }
+
+        if (m_currentPath != null && m_currentWaypointIndex < m_currentPath.Count)
+        {
+            Vector3 targetWaypoint = m_currentPath[m_currentWaypointIndex];
+            Vector3 toWaypoint = targetWaypoint - myTransform.Position;
+            float distanceToWaypoint = toWaypoint.Magnitude;
+
+            if (distanceToWaypoint < WAYPOINT_REACH_DISTANCE)
+            {
+                m_currentWaypointIndex++;
+                return;
+            }
+
+            MoveWithWallSliding(targetWaypoint, myTransform, deltaTime);
+        }
+    }
+
+    private void MoveWithWallSliding(Vector3 target, LocalTransform transform, float deltaTime)
+    {
+        Vector3 direction = (target - transform.Position).Normalized;
+        Vector3 movement = direction * Speed * deltaTime;
+        Vector3 newPosition = transform.Position + movement;
+
+        if (!WouldCollideWithObstacle(newPosition))
+        {
+            transform.Position = newPosition;
+            m_visualEntity.SetComponent(transform);
+            return;
+        }
+
+        Vector3 slideDir = GetSlideDirection(transform.Position, direction);
+        if (slideDir.Magnitude > 0.001f)
+        {
+            Vector3 slideMove = slideDir * Speed * deltaTime;
+            Vector3 slidePos = transform.Position + slideMove;
+
+            if (!WouldCollideWithObstacle(slidePos))
+            {
+                transform.Position = slidePos;
+                m_visualEntity.SetComponent(transform);
+                return;
+            }
+        }
+
+        Vector3 backStep = new Vector3(-direction.X, -direction.Y, -direction.Z) * (Speed * deltaTime * 0.5f);
+        Vector3 backPos = transform.Position + backStep;
+        if (!WouldCollideWithObstacle(backPos))
+        {
+            transform.Position = backPos;
+            m_visualEntity.SetComponent(transform);
+        }
+    }
+
+    private Vector3 GetSlideDirection(Vector3 position, Vector3 direction)
+    {
+        bool blockedX = WouldCollideWithObstacle(position + new Vector3(direction.X * 10f, 0, 0));
+        bool blockedY = WouldCollideWithObstacle(position + new Vector3(0, direction.Y * 10f, 0));
+
+        if (blockedX && !blockedY)
+            return new Vector3(0, direction.Y, 0);
+        if (blockedY && !blockedX)
+            return new Vector3(direction.X, 0, 0);
+
+        return Vector3.Zero;
+    }
+
+    private bool WouldCollideWithObstacle(Vector3 newPosition)
+    {
+        var (obstacleWidth, obstacleHeight) = AStarPathfinder.GetObstacleDimensions();
+
+        float enemyHalfSize = 10.0f;
+        float obstacleHalfWidth = obstacleWidth / 2f;
+        float obstacleHalfHeight = obstacleHeight / 2f;
+
+        foreach (var obstacle in m_cachedObstacles)
+        {
+            bool collisionX = Math.Abs(newPosition.X - obstacle.X) < (enemyHalfSize + obstacleHalfWidth);
+            bool collisionY = Math.Abs(newPosition.Y - obstacle.Y) < (enemyHalfSize + obstacleHalfHeight);
+
+            if (collisionX && collisionY)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     // this helps enemy know who the player is 
@@ -292,7 +531,7 @@ public class EnemyPatrolState : State
 
     // flag to help set patrollings
     private bool m_movingToB = true;
-    private float m_detectionR = 150.0f;
+    private float m_detectionR = 350.0f;
 
     //minimum distance 
     private float m_minD = 5.0f;
@@ -309,7 +548,7 @@ public class EnemyPatrolState : State
     //once patrolling state starts
     public override void OnEnter()
     {
-        
+
         // set visualentity to menemy of current state
         var entity = m_enemy.GetVisualEntity();
 
@@ -344,15 +583,15 @@ public class EnemyPatrolState : State
         }
         else
         {
-        // todo - set facing direction function somewhats heresss just a simple flip would do
-        // Reached patrol point, switch direction
+            // todo - set facing direction function somewhats heresss just a simple flip would do
+            // Reached patrol point, switch direction
             m_movingToB = !m_movingToB;
         }
     }
 
     public override void OnExit()
     {
-      // for possible behaviours
+        // for possible behaviours
     }
 
     public override State CheckTransitions()
@@ -379,7 +618,7 @@ public class EnemyChaseState : State
 
     //ranges
     private float AttackRange = 5.0f; //placeholder
-    private float DetectionRange = 150.0f;             
+    private float DetectionRange = 350.0f;
 
     //constructor to create state
     public EnemyChaseState(EnemyAI enemy)
@@ -437,9 +676,9 @@ public class EnemyAttackState : State
     public float m_attackCooldown = 0f;
 
     //detection radius
-    private float AttackRange = 5.0f; 
-    private float DetectionRange = 150.0f;     
-    
+    private float AttackRange = 5.0f;
+    private float DetectionRange = 350.0f;
+
 
 
     //resetter
@@ -466,7 +705,7 @@ public class EnemyAttackState : State
     {
         // to make sure that cool down is always refreshed if enemy in attack state
         m_attackCooldown -= deltaTime;
-        
+
         //if cd < 0 and in attack state deal damage 
         if (m_attackCooldown <= 0f)
         {
@@ -487,14 +726,16 @@ public class EnemyAttackState : State
     {
         float distance = m_enemy.GetDistanceToPlayer();
 
-        if(distance <= AttackRange)
+        if (distance <= AttackRange)
         {
             return null;
         }
-        else if (distance <= DetectionRange && distance >=AttackRange) {
-             return ChaseState;
+        else if (distance <= DetectionRange && distance >= AttackRange)
+        {
+            return ChaseState;
         }
-        else {
+        else
+        {
             return PatrolState;
         }
 
