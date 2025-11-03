@@ -29,7 +29,7 @@ References:
 
 // Forward declarations
 struct ImFont;
-class AssetBrowser;             // Forward declare to use as friend
+class AssetBrowser;  // Forward declare to use as friend
 
 class AssetLibrary {
     friend class AssetBrowser;  // Only AssetBrowser can access private members
