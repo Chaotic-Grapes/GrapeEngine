@@ -453,6 +453,9 @@ namespace ECS {
                 }
                 else if (boxA && circleB) {
                     collided = TestCircleBox(*circleB, *tB_ptr, *boxA, *tA_ptr, normal, depth);
+                    if (collided) {
+                        normal = -normal;  // Negate normal since we swapped the entities
+                    }
                 }
 
                 if (!collided) continue;

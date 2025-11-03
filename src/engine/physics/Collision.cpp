@@ -419,100 +419,64 @@ namespace Engine {
        Overlap: Circle vs AABB
        ================================================================ */
        
-       // Replace the Overlap(Circle, AABB) function in Collision.cpp with this:
+    bool Collision::Overlap(const Circle& a, const AABB& b, Manifold* m)
+    {
+        // 1) Clamp circle center to box to get closest point on AABB to the circle
+        const float left = b.Min.X;
+        const float right = b.Max.X;
+        const float bottom = b.Min.Y;
+        const float top = b.Max.Y;
 
-    bool Collision::Overlap(const Circle& a, const AABB& b, Manifold* m) {
-        // Find the closest point on the AABB to the circle center
-        const float cx = std::min(std::max(a.Center.X, b.Min.X), b.Max.X);
-        const float cy = std::min(std::max(a.Center.Y, b.Min.Y), b.Max.Y);
-        const Vector2D closest(cx, cy);
+        const float closestX = std::max(left, std::min(a.Center.X, right));
+        const float closestY = std::max(bottom, std::min(a.Center.Y, top));
 
-        // Vector from closest point to circle center
-        const Vector2D d = a.Center - closest;
-        const float d2 = d.SquareLength();
+        const Vector2D closest(closestX, closestY);
+        const Vector2D toClosest = closest - a.Center;        // A -> closest on B
+        const float d2 = toClosest.SquareLength();
 
-        // Check if there's overlap
+        // 2) Quick reject: if outside and farther than radius, no overlap
         if (d2 > a.Radius * a.Radius) return false;
         if (!m) return true;
 
-        const float dLen = std::sqrt(std::max(d2, EPS));
-
-        // ========================================================================
-        // Check if circle center is inside the AABB
-        // ========================================================================
-        const bool insideX = (a.Center.X > b.Min.X && a.Center.X < b.Max.X);
-        const bool insideY = (a.Center.Y > b.Min.Y && a.Center.Y < b.Max.Y);
-        const bool centerInside = insideX && insideY;
-
         Vector2D normal;
-        float penetration;
+        float penetration = 0.0f;
 
-        if (centerInside) {
-            // ====================================================================
-            // CIRCLE CENTER IS INSIDE BOX - Find shortest path out
-            // ====================================================================
-            // Calculate distance to each edge
-            const float leftDist = a.Center.X - b.Min.X;      // Distance to left edge
-            const float rightDist = b.Max.X - a.Center.X;     // Distance to right edge
-            const float bottomDist = a.Center.Y - b.Min.Y;    // Distance to bottom edge
-            const float topDist = b.Max.Y - a.Center.Y;       // Distance to top edge
-
-            // Find the minimum distance (closest edge to exit through)
-            float minDist = leftDist;
-            normal = Vector2D(-1.0f, 0.0f);  // Push left
-
-            if (rightDist < minDist) {
-                minDist = rightDist;
-                normal = Vector2D(1.0f, 0.0f);  // Push right
-            }
-            if (bottomDist < minDist) {
-                minDist = bottomDist;
-                normal = Vector2D(0.0f, -1.0f);  // Push down
-            }
-            if (topDist < minDist) {
-                minDist = topDist;
-                normal = Vector2D(0.0f, 1.0f);  // Push up
-            }
-
-            // Penetration is the radius plus distance to nearest edge
-            penetration = a.Radius + minDist;
-        }
-        else if (dLen < EPS) {
-            // ====================================================================
-            // EDGE CASE: Circle touching edge/corner exactly
-            // ====================================================================
-            // This happens when closest point equals circle center
-            // Default to pushing away from box center
-            const Vector2D boxCenter = (b.Min + b.Max) * 0.5f;
-            const Vector2D toCircle = a.Center - boxCenter;
-            const float toCircleLen = std::sqrt(toCircle.SquareLength());
-
-            if (toCircleLen > EPS) {
-                normal = toCircle / toCircleLen;
-            }
-            else {
-                // Extremely rare: circle center at box center
-                normal = Vector2D(0.0f, 1.0f);
-            }
-
-            penetration = a.Radius;
+        // 3) Two cases: center outside (or on edge/corner) vs center inside box
+        if (d2 > 1e-6f) {
+            // Outside: normal is towards closest point; penetration is R - d
+            const float d = std::sqrt(d2);
+            normal = toClosest / d;                 // A -> B
+            penetration = a.Radius - d;             // full depth
         }
         else {
-            // ====================================================================
-            // NORMAL CASE: Circle center is outside box
-            // ====================================================================
-            // Normal points from closest point on box toward circle center
-            normal = d / dLen;
-            penetration = a.Radius - dLen;
+            // Inside: push out along the nearest face (smallest exit distance)
+            const float leftDist = a.Center.X - left;
+            const float rightDist = right - a.Center.X;
+            const float downDist = a.Center.Y - bottom;
+            const float upDist = top - a.Center.Y;
+
+            float minDist = leftDist;
+            normal = Vector2D(-1.0f, 0.0f);        // toward left face initially
+
+            if (rightDist < minDist) { minDist = rightDist; normal = Vector2D(1.0f, 0.0f); }
+            if (downDist < minDist) { minDist = downDist;  normal = Vector2D(0.0f, -1.0f); }
+            if (upDist < minDist) { minDist = upDist;    normal = Vector2D(0.0f, 1.0f); }
+
+            // Important: if your solver moves A by posA -= n * corr, keep n as A->B.
+            // With the choices above, n already points from circle toward the chosen face.
+            penetration = a.Radius + minDist;      // full depth to clear from inside
         }
 
-        m->Normal = normal;
-        m->Penetration = penetration;
-        m->Contact = closest;
-        m->Valid = true;
+        // 4) Contact from the invariant relation; equals 'closest' in the outside case
+        const Vector2D contact = a.Center + normal * (a.Radius - penetration);
 
+        m->Normal = normal;            // A -> B
+        m->Penetration = penetration;  // full depth
+        m->Contact = contact;
+        m->Valid = true;
         return true;
     }
+
 
     /* ================================================================
        Overlap: ConvexPolygon vs ConvexPolygon
