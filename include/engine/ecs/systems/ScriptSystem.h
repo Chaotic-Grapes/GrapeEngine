@@ -56,6 +56,9 @@ using hostfxr_handle = void*;
 // 10. Proper handling of AppDomain isolation.
 // 11. Hot reloading of scripts.
 
+// !! Important !! //
+// Possibly need a rewrite as this implementation don't seem to adhere to the core design of the ECS.
+
 // Maybe TODO:
 // 1.  Separate API functions into another header or in their related classes
 

@@ -25,6 +25,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <utility>
 #include <functional>
 #include <string>
+#include <cstring>
+#include <iostream>
 #include "ecs/Entity.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
@@ -52,8 +54,8 @@ namespace Serialization {
 }
 #pragma endregion
 
-#define REGISTER_COMPONENT_SERIALIZER(VAR, TYPE) \
-    namespace { const bool _registered_##VAR = (Serialization::EntitySerializer::RegisterComponent<TYPE>(#TYPE), true); }
+#define REGISTER_COMPONENT_SERIALIZER(VAR, TYPE, NAME) \
+    namespace { const bool _registered_##VAR = (Serialization::EntitySerializer::RegisterComponent<TYPE>(NAME), true); }
 
 // --- Nested Type Serialization Definitions ---
 
@@ -69,7 +71,18 @@ namespace ECS {
 	namespace Components {
 		// Place component-specific NLOHMANN macros inside the component namespace so ADL
 		// can locate the generated to_json/from_json overloads for these types.
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Name, Value)
+		
+		// Custom serialization for Name component (char array needs special handling)
+		inline void to_json(nlohmann::json& j, const Name& n) {
+			j = nlohmann::json{{"Value", std::string(n.Value)}};
+		}
+		
+		inline void from_json(const nlohmann::json& j, Name& n) {
+			std::string value = j.at("Value").get<std::string>();
+			std::strncpy(n.Value, value.c_str(), sizeof(n.Value) - 1);
+			n.Value[sizeof(n.Value) - 1] = '\0'; // null terminator
+		}
+		
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TagMask, Mask)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Active, Enabled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Lifetime, Time)
@@ -97,7 +110,26 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ZIndex2D, ZOrder)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScriptInstance, ManagedHandle, TypeHash, Initialized, TypeName)
+		
+		// Custom serialization for ScriptInstance component (char array needs special handling)
+		inline void to_json(nlohmann::json& j, const ScriptInstance& s) {
+			j = nlohmann::json{
+				{"ManagedHandle", s.ManagedHandle},
+				{"TypeHash", s.TypeHash},
+				{"Initialized", s.Initialized},
+				{"TypeName", std::string(s.TypeName)}
+			};
+		}
+		
+		inline void from_json(const nlohmann::json& j, ScriptInstance& s) {
+			s.ManagedHandle = j.at("ManagedHandle").get<uint64_t>();
+			s.TypeHash = j.at("TypeHash").get<uint32_t>();
+			s.Initialized = j.at("Initialized").get<bool>();
+			std::string typeName = j.at("TypeName").get<std::string>();
+			std::strncpy(s.TypeName, typeName.c_str(), sizeof(s.TypeName) - 1);
+			s.TypeName[sizeof(s.TypeName) - 1] = '\0';
+		}
+		
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop)
 	} 
 }
@@ -158,7 +190,6 @@ namespace Serialization {
 				info.Serialize(world, e, compJson);
 				if (!compJson.is_null() && !compJson.empty()) {
 					entityJson["Components"].push_back({
-						{"TypeId", tid},
 						{"TypeName", info.Name},
 						{"Data", compJson}
 						});
@@ -170,12 +201,25 @@ namespace Serialization {
 		// Deserialize a single entity
 		static ECS::Entity DeserializeEntity(ECS::World& world, const json& entityJson) {
 			ECS::Entity e = world.Create();
-			if (entityJson.contains("Components")) {
+			if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
 				for (const auto& comp : entityJson["Components"]) {
-					TypeId tid = comp["TypeId"];
-					auto it = Registry().find(tid);
-					if (it != Registry().end()) {
-						it->second.Deserialize(world, e, comp["Data"]);
+					if (!comp.contains("TypeName") || !comp.contains("Data")) {
+						continue; // Skip malformed component entries
+					}
+					
+					std::string typeName = comp["TypeName"].get<std::string>();
+					// Find component by name instead of TypeId
+					for (const auto& [tid, info] : Registry()) {
+						if (info.Name == typeName) {
+							try {
+								info.Deserialize(world, e, comp["Data"]);
+							} 
+							catch (const std::exception& ex) {
+								// Log error but continue with other components
+								std::cerr << "Failed to deserialize component " << typeName << ": " << ex.what() << std::endl;
+							}
+							break;
+						}
 					}
 				}
 			}
@@ -216,38 +260,38 @@ namespace Serialization {
 
 	// --- Register all component serializers ---
 
-	REGISTER_COMPONENT_SERIALIZER(Name, ECS::Components::Name)
-	REGISTER_COMPONENT_SERIALIZER(TagMask, ECS::Components::TagMask)
-	REGISTER_COMPONENT_SERIALIZER(Active, ECS::Components::Active)
-	REGISTER_COMPONENT_SERIALIZER(Lifetime, ECS::Components::Lifetime)
-	REGISTER_COMPONENT_SERIALIZER(Layer, ECS::Components::Layer)
-	REGISTER_COMPONENT_SERIALIZER(LocalTransform, ECS::Components::LocalTransform)
-	REGISTER_COMPONENT_SERIALIZER(WorldTransform, ECS::Components::WorldTransform)
-	REGISTER_COMPONENT_SERIALIZER(Velocity, ECS::Components::Velocity)
-	REGISTER_COMPONENT_SERIALIZER(Acceleration, ECS::Components::Acceleration)
-	REGISTER_COMPONENT_SERIALIZER(AngularVelocity, ECS::Components::AngularVelocity)
-	REGISTER_COMPONENT_SERIALIZER(Rigidbody, ECS::Components::Rigidbody)
-	REGISTER_COMPONENT_SERIALIZER(PhysicsMaterial2D, ECS::Components::PhysicsMaterial2D)
-	REGISTER_COMPONENT_SERIALIZER(BoxCollider, ECS::Components::BoxCollider)
-	REGISTER_COMPONENT_SERIALIZER(SphereCollider, ECS::Components::SphereCollider)
-	REGISTER_COMPONENT_SERIALIZER(LinearVelocity2D, ECS::Components::LinearVelocity2D)
-	REGISTER_COMPONENT_SERIALIZER(Acceleration2D, ECS::Components::Acceleration2D)
-	REGISTER_COMPONENT_SERIALIZER(AngularVelocity2D, ECS::Components::AngularVelocity2D)
-	REGISTER_COMPONENT_SERIALIZER(Rigidbody2D, ECS::Components::Rigidbody2D)
-	REGISTER_COMPONENT_SERIALIZER(BoxCollider2D, ECS::Components::BoxCollider2D)
-	REGISTER_COMPONENT_SERIALIZER(CircleCollider2D, ECS::Components::CircleCollider2D)
-	REGISTER_COMPONENT_SERIALIZER(SpriteRenderer2D, ECS::Components::SpriteRenderer2D)
-	REGISTER_COMPONENT_SERIALIZER(SpriteFlip2D, ECS::Components::SpriteFlip2D)
-	REGISTER_COMPONENT_SERIALIZER(ShapeCircle2D, ECS::Components::ShapeCircle2D)
-	REGISTER_COMPONENT_SERIALIZER(ShapeBox2D, ECS::Components::ShapeBox2D)
-	REGISTER_COMPONENT_SERIALIZER(ShapeLine2D, ECS::Components::ShapeLine2D)
+	REGISTER_COMPONENT_SERIALIZER(Name, ECS::Components::Name, "Name")
+	REGISTER_COMPONENT_SERIALIZER(TagMask, ECS::Components::TagMask, "TagMask")
+	REGISTER_COMPONENT_SERIALIZER(Active, ECS::Components::Active, "Active")
+	REGISTER_COMPONENT_SERIALIZER(Lifetime, ECS::Components::Lifetime, "Lifetime")
+	REGISTER_COMPONENT_SERIALIZER(Layer, ECS::Components::Layer, "Layer")
+	REGISTER_COMPONENT_SERIALIZER(LocalTransform, ECS::Components::LocalTransform, "LocalTransform")
+	REGISTER_COMPONENT_SERIALIZER(WorldTransform, ECS::Components::WorldTransform, "WorldTransform")
+	REGISTER_COMPONENT_SERIALIZER(Velocity, ECS::Components::Velocity, "Velocity")
+	REGISTER_COMPONENT_SERIALIZER(Acceleration, ECS::Components::Acceleration, "Acceleration")
+	REGISTER_COMPONENT_SERIALIZER(AngularVelocity, ECS::Components::AngularVelocity, "AngularVelocity")
+	REGISTER_COMPONENT_SERIALIZER(Rigidbody, ECS::Components::Rigidbody, "Rigidbody")
+	REGISTER_COMPONENT_SERIALIZER(PhysicsMaterial2D, ECS::Components::PhysicsMaterial2D, "PhysicsMaterial2D")
+	REGISTER_COMPONENT_SERIALIZER(BoxCollider, ECS::Components::BoxCollider, "BoxCollider")
+	REGISTER_COMPONENT_SERIALIZER(SphereCollider, ECS::Components::SphereCollider, "SphereCollider")
+	REGISTER_COMPONENT_SERIALIZER(LinearVelocity2D, ECS::Components::LinearVelocity2D, "LinearVelocity2D")
+	REGISTER_COMPONENT_SERIALIZER(Acceleration2D, ECS::Components::Acceleration2D, "Acceleration2D")
+	REGISTER_COMPONENT_SERIALIZER(AngularVelocity2D, ECS::Components::AngularVelocity2D, "AngularVelocity2D")
+	REGISTER_COMPONENT_SERIALIZER(Rigidbody2D, ECS::Components::Rigidbody2D, "Rigidbody2D")
+	REGISTER_COMPONENT_SERIALIZER(BoxCollider2D, ECS::Components::BoxCollider2D, "BoxCollider2D")
+	REGISTER_COMPONENT_SERIALIZER(CircleCollider2D, ECS::Components::CircleCollider2D, "CircleCollider2D")
+	REGISTER_COMPONENT_SERIALIZER(SpriteRenderer2D, ECS::Components::SpriteRenderer2D, "SpriteRenderer2D")
+	REGISTER_COMPONENT_SERIALIZER(SpriteFlip2D, ECS::Components::SpriteFlip2D, "SpriteFlip2D")
+	REGISTER_COMPONENT_SERIALIZER(ShapeCircle2D, ECS::Components::ShapeCircle2D, "ShapeCircle2D")
+	REGISTER_COMPONENT_SERIALIZER(ShapeBox2D, ECS::Components::ShapeBox2D, "ShapeBox2D")
+	REGISTER_COMPONENT_SERIALIZER(ShapeLine2D, ECS::Components::ShapeLine2D, "ShapeLine2D")
 	// ShapePolygon2D is a template, therefore it needs to be rewritten
-	// REGISTER_COMPONENT_SERIALIZER(ShapePolygon2D, ECS::Components::ShapePolygon2D)
-	REGISTER_COMPONENT_SERIALIZER(ZIndex2D, ECS::Components::ZIndex2D)
-	REGISTER_COMPONENT_SERIALIZER(Camera, ECS::Components::Camera3D)
-	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices)
-	REGISTER_COMPONENT_SERIALIZER(ScriptInstance, ECS::Components::ScriptInstance)
-	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource)
+	// REGISTER_COMPONENT_SERIALIZER(ShapePolygon2D, ECS::Components::ShapePolygon2D, "ShapePolygon2D")
+	REGISTER_COMPONENT_SERIALIZER(ZIndex2D, ECS::Components::ZIndex2D, "ZIndex2D")
+	REGISTER_COMPONENT_SERIALIZER(Camera, ECS::Components::Camera3D, "Camera3D")
+	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices, "CameraMatrices")
+	REGISTER_COMPONENT_SERIALIZER(ScriptInstance, ECS::Components::ScriptInstance, "ScriptInstance")
+	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource, "AudioSource")
 }
 
 #endif

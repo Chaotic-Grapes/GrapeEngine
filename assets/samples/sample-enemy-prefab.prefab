@@ -4,7 +4,6 @@
             "Data": {
                 "Value": "EnemyPrefab"
             },
-            "TypeId": 0,
             "TypeName": "Name"
         },
         {
@@ -26,7 +25,6 @@
                     "Z": 1.0
                 }
             },
-            "TypeId": 0,
             "TypeName": "LocalTransform"
         },
         {
@@ -47,7 +45,6 @@
                     "Y": 1.0
                 }
             },
-            "TypeId": 0,
             "TypeName": "SpriteRenderer2D"
         }
     ],
