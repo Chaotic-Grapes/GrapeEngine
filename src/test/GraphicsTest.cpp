@@ -20,27 +20,43 @@ Features:
 */
 /* End Header *******************************************************************/
 
-#include "GraphicsTest.hpp"
+// Core
 #include "core/Application.h"
+#include "core/Logger.h"
+
+// ECS
 #include "ecs/Components.h"
 #include "ecs/systems/RendererSystem.h"
+
+// Graphics
 #include "graphics/font.hpp"
+#include "graphics/graphicsConfig.hpp"
 #include "graphics/renderer.hpp"
+#include "graphics/SpriteMetaData.hpp"
+
+// Helpers
 #include "helpers/EntityUtils.h"
 #include "helpers/MathUtils.h"
+
+// Services
 #include "services/Input.h"
+#include "services/ResourceManager.h"
 #include "services/Time.h"
 #include "services/Window.h"
 #include "services/WindowManager.h"
+
+// Test
+#include "GraphicsTest.hpp"
+
+// External
 #include <glm/glm.hpp>
 #include <iostream>
-#include "core/Logger.h"
-#include "graphics/SpriteMetaData.hpp"
-#include "services/ResourceManager.h"
-
 
 using namespace Sandbox;
 using namespace ECS;
+
+constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::BasicGraphics;
+constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::ObjectPicking;
 
 extern ResourceManager RM;
 
@@ -83,14 +99,14 @@ void GraphicsTestScene::OnLoad() {
     const int windowHeight = config.WindowConfig.Height;
 
     CREATE_WINDOW("Graphics Test", windowWidth, windowHeight);
-    m_worldWidth  = static_cast<float>(windowWidth);
-    m_worldHeight = static_cast<float>(windowHeight);
-    m_currentTest = TestType::BasicGraphics;
+    m_worldWidth = graphicsConfig::PixelsToWorld(static_cast<float>(windowWidth));
+    m_worldHeight = graphicsConfig::PixelsToWorld(static_cast<float>(windowHeight));
+    m_currentTest = DEFAULT_TEST;
 
     m_gameplayLayer = GetLayers().CreateOrGetLayer("gameplay");
 
     m_rendererSystem = std::make_shared<ECS::RendererSystem>();
-    m_rendererSystem->Initialize();
+    m_rendererSystem->Initialize(GetWorld());
     AddSystem([this](Scenes::Scene& s, const float dt){
         m_rendererSystem->Update(s.GetWorld(), dt);
     }, "Renderer System");
@@ -107,8 +123,8 @@ void GraphicsTestScene::OnUpdate() {
             int current = static_cast<int>(m_currentTest);
             current++;
 
-            if (current > static_cast<int>(TestType::FontSystem)) {
-                current = static_cast<int>(TestType::BasicGraphics);
+            if (current > static_cast<int>(LAST_TEST)) {
+                current = static_cast<int>(DEFAULT_TEST);
             }
 
             // cleanup old test entities
@@ -129,7 +145,9 @@ void GraphicsTestScene::OnUpdate() {
         m_gHandled = false; // reset when key is released
     }
 
-    // Run the current test
+    // ============================================================
+    // M1 RUBRIC TESTS
+    // ============================================================
     switch (m_currentTest) {
     case TestType::BasicGraphics:     runBasicGraphics();  break;
     case TestType::DebugDrawing:      runDebugDrawing();   break;
@@ -141,6 +159,19 @@ void GraphicsTestScene::OnUpdate() {
     case TestType::MultiAnimation:    runMultiAnimation(); break;
     case TestType::PerformanceTest:   runBatchStress();    break;
     case TestType::FontSystem:        runFontSystem();     break;
+
+    // ============================================================
+    // M2 RUBRIC TESTS
+    // ============================================================
+    case TestType::GameGUI:           runGameGUI();          break;
+    case TestType::FontSys:           runFontSys();          break;
+    case TestType::ViewportCamera:    runViewportCamera();   break;
+    case TestType::TransformationSys: runTransformationSys(); break;
+    case TestType::SpriteAnim:        runSpriteAnim();       break;
+    case TestType::MultipleShaders:   runMultipleShaders();  break;
+    case TestType::Batching:          runBatching();         break;
+    case TestType::EditorCamera:      runEditorCamera();     break;
+    case TestType::ObjectPicking:     runObjectPicking();    break;
 
     // ============================================================
     // PERFORMANCE / PROFILING DEBUG TESTS
@@ -179,24 +210,96 @@ void GraphicsTestScene::OnUnload() {
 // ------------------------------------
 // Stub functions (to be implemented later)
 // ------------------------------------
-void GraphicsTestScene::runBasicGraphics() { 
+void GraphicsTestScene::runBasicGraphics() {
     if (m_testEntities.empty()) {
+        // ------------------------------------------------------------
+        // Red filled square (center)
+        // ------------------------------------------------------------
         const ECS::Entity square = CreateOnLayer(
             m_gameplayLayer,
-            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{1.f,1.f,1.f} },
-            ECS::Components::WorldTransform{ },
+            ECS::Components::LocalTransform{
+                Vector3D{0.f, 0.f, 0.f},    // T
+                Quaternion{0, 0, 0, 1},     // R
+                Vector3D{1.f, 1.f, 1.f}     // S
+            },
+            ECS::Components::WorldTransform{},
             ECS::Components::ShapeBox2D{
-                Vector2D{50.f, 50.f}, // half extents
-                Vector2D{0.f, 0.f},   // offset
-                Color{1.f, 0.f, 0.f, 1.f}, // color
-                0.f,                  // thickness
-                true                  // filled
+                Vector2D{0.5f, 0.5f},
+                Vector2D{0.f, 0.f},
+                Color{3.f, 0.f, 0.5f, 1.f}, // Magenta
+                0.f,                       // thickness (ignored for filled)
+                true                       // filled
             },
             ECS::Components::Name{ "BasicGraphics_Square" }
         );
 
+        // ------------------------------------------------------------
+        // circle (left)
+        // ------------------------------------------------------------
+        const ECS::Entity filledCircle = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{5.f, 0.f, 0.f},
+                Quaternion{0, 0, 0, 1},
+                Vector3D{1.f, 1.f, 1.f}
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                0.5f,                          // radius
+                Vector2D{0.f, 0.f},            // offset
+                Color{2.f, 1.4f, 7.4f, 1.f},
+                0.f                            // strokePx (0 = filled)
+            },
+            ECS::Components::Name{ "Filled_Circle" }
+        );
+
+        // ------------------------------------------------------------
+        // Outlined green circle (center-right)
+        // ------------------------------------------------------------
+        const ECS::Entity outlinedCircle = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{0.f, 2.5f, 0.f},
+                Quaternion{0, 0, 0, 1},
+                Vector3D{1.f, 1.f, 1.f}
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                0.5f,                          // radius
+                Vector2D{0.f, 0.f},            // offset
+                Color{0.f, 4.f, 0.f, 1.f},     // green outline
+                graphicsConfig::PixelsToWorld(50.f)                         // strokePx > 0 = outline
+            },
+            ECS::Components::Name{ "Outlined_Circle" }
+        );
+
+        // ------------------------------------------------------------
+        // Hollow magenta collider circle (semi-transparent outline)
+        // ------------------------------------------------------------
+        const ECS::Entity colliderCircle = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{-5.f, 0.f, 0.f},
+                Quaternion{0, 0, 0, 1},
+                Vector3D{1.f, 1.f, 1.f}
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                0.6f,                          // radius
+                Vector2D{0.f, 0.f},            // offset
+                Color{4.5f, 1.2f, 0.2f, 1.0f},
+                0.f                           
+            },
+            ECS::Components::Name{ "Collider_Circle" }
+        );
+
+        // Track created entities
         m_testEntities.push_back(EntityUtils::Pack(square));
-        LOG_DEBUG("Spawned BasicGraphics entity");
+        m_testEntities.push_back(EntityUtils::Pack(filledCircle));
+        m_testEntities.push_back(EntityUtils::Pack(outlinedCircle));
+        m_testEntities.push_back(EntityUtils::Pack(colliderCircle));
+
+        LOG_DEBUG("Spawned BasicGraphics test entities");
     }
 }
 
@@ -205,63 +308,39 @@ void GraphicsTestScene::runDebugDrawing() {
         ECS::World& world = GetWorld();
         const std::string spritePath = "assets/textures/test/player.png";
 
+        // Load texture (if valid)
         const auto tex = RM.Get<Texture>(spritePath);
-        uint32_t texId = tex ? tex->ID() : 0;
+        if (!tex) {
+            LOG_ERROR("Failed to load sprite texture: " << spritePath);
+            return;
+        }
 
+        // Create the sprite entity
         const ECS::Entity sprite = CreateOnLayer(
             m_gameplayLayer,
-            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{128.f,128.f,1} },
-            ECS::Components::WorldTransform{ },
-            ECS::Components::SpriteRenderer2D{
-                tex ? tex->ID() : 0,
-                Color{1.f,1.f,1.f,1.f},
-                Vector2D{1.f,1.f},
-                Vector2D{0.f,0.f}
-            },
-            ECS::Components::Name{ "DebugDrawing_Sprite" }
-        );
-
-        auto tr = world.Get<ECS::Components::LocalTransform>(sprite);
-        tr.Scale = Vector3D {
-            static_cast<float>(tex->Width()),
-            static_cast<float>(tex->Height()),
-            1.f
-        };
-
-        m_testEntities.push_back(EntityUtils::Pack(sprite));
-
-        auto* meta = _getMetaDataForTexture(spritePath);
-
-        const ECS::Entity debug = CreateOnLayer(
-            m_gameplayLayer,
-            ECS::Components::LocalTransform{ 
+            ECS::Components::LocalTransform{
+                Vector3D{ 0.f, 0.f, 0.f },
+                Quaternion{ 0.f, 0.f, 0.f, 1.f },
                 Vector3D{
-                    tr.Position.X + meta->collider.offset.x - tr.Scale.X * 0.5f + meta->collider.size.x * 0.5f,
-                    tr.Position.Y + meta->collider.offset.y - tr.Scale.Y * 0.5f + meta->collider.size.y * 0.5f,
-                    0
-                },
-                Quaternion{0,0,0,1},
-                Vector3D{
-                    static_cast<float>(meta->collider.size.x),
-                    static_cast<float>(meta->collider.size.y),
+                    graphicsConfig::PixelsToWorld(static_cast<float>(tex->Width())),
+                    graphicsConfig::PixelsToWorld(static_cast<float>(tex->Height())),
                     1.f
                 }
             },
             ECS::Components::WorldTransform{ },
-            ECS::Components::ShapeBox2D{
-                Vector2D{ static_cast<float>(meta->collider.size.x) * 0.5f, static_cast<float>(meta->collider.size.y) * 0.5f }, // half extents
-                Vector2D{0.f, 0.f},   // offset
-                Color{0.f, 1.f, 0.f, 1.f}, // color
-                2.f,                  // thickness
-                false                 // filled
+            ECS::Components::SpriteRenderer2D{
+                tex->ID(),
+                Color{ 1.f, 1.f, 1.f, 1.f },
+                Vector2D{ 1.f, 1.f },
+                Vector2D{ 0.f, 0.f }
             },
-            ECS::Components::Name{ "DebugDrawing_SpriteCollider" }
+            ECS::Components::Name{ "DebugDrawing_Sprite" }
         );
 
-        world.Attach(debug, sprite);
-        m_testEntities.push_back(EntityUtils::Pack(debug));
+        // Store for later cleanup
+        m_testEntities.push_back(EntityUtils::Pack(sprite));
 
-        LOG_DEBUG("Spawned DebugDrawing entities");
+        LOG_DEBUG("Spawned DebugDrawing sprite entity");
     }
 }
 
@@ -317,25 +396,18 @@ void GraphicsTestScene::runBasicSprites() {
         m_gameplayLayer,
         ECS::Components::LocalTransform{
             Vector3D{
-                m_worldWidth * 0.4f,
-                m_worldHeight * 0.5f,
+                -2,
+                0,
                 0
             },
             Quaternion{0, 0, 0, 1},
             Vector3D{
-                256.f,
-                256.f,
+                4.f,
+                4.f,
                 1.f
             }
         },
         ECS::Components::WorldTransform{},
-        ECS::Components::ShapeBox2D{
-            Vector2D{128.f, 128.f}, // half extents
-            Vector2D{0.f, 0.f},     // offset
-            Color{1.f, 1.f, 1.f, 1.f}, // color
-            2.f,                    // thickness
-            false                   // filled
-        },
         ECS::Components::Name{"PlayerSprite"},
         ECS::Components::SpriteRenderer2D{
             playerTexId,
@@ -351,25 +423,18 @@ void GraphicsTestScene::runBasicSprites() {
         m_gameplayLayer,
         ECS::Components::LocalTransform{
             Vector3D{
-                m_worldWidth * 0.6f,
-                m_worldHeight * 0.5f,
+                2,
+                0,
                 0
             },
             Quaternion{0, 0, 0, 1},
             Vector3D{
-                256.f,
-                256.f,
+                4.f,
+                4.f,
                 1.f
             }
         },
         ECS::Components::WorldTransform{},
-        ECS::Components::ShapeBox2D{
-            Vector2D{128.f, 128.f}, // half extents
-            Vector2D{0.f, 0.f},     // offset
-            Color{1.f, 1.f, 1.f, 1.f}, // color
-            2.f,                    // thickness
-            false                   // filled
-        },
         ECS::Components::Name{"FishBoySprite"},
         ECS::Components::SpriteRenderer2D{
             fishBoyTexId,
@@ -390,7 +455,7 @@ void GraphicsTestScene::runBackground() {
     ECS::Entity bg = CreateOnLayer(
         m_gameplayLayer,
         ECS::Components::LocalTransform{
-            Vector3D{m_worldWidth * 0.5f, m_worldHeight * 0.5f, 0},
+            Vector3D{0, 0, 0},
             Quaternion{0,0,0,1},
             Vector3D{m_worldWidth, m_worldHeight, 1.f}
         },
@@ -417,7 +482,11 @@ void GraphicsTestScene::runSpriteScaling() {
     if (m_testEntities.empty()) {
         ECS::Entity sprite = CreateOnLayer(
             m_gameplayLayer,
-            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{256.f,256.f,1.f} },
+            ECS::Components::LocalTransform{
+                Vector3D{0, 0, 0},
+                Quaternion{0,0,0,1},
+                Vector3D{3, 3, 1.f}
+            },
             ECS::Components::WorldTransform{ },
             ECS::Components::SpriteRenderer2D{
                 RM.Get<Texture>("assets/textures/test/player.png")->ID(),
@@ -435,15 +504,15 @@ void GraphicsTestScene::runSpriteScaling() {
     float scaleSpeed = 200.f;
 
     ECS::Entity sprite = EntityUtils::Unpack(m_testEntities[0]); // reconstruct from ID
-    auto tr = world.Get<ECS::Components::LocalTransform>(sprite);
+    auto& tr = world.Get<ECS::Components::LocalTransform>(sprite);
 
     if (Input::IsKeyDown(KEY_J)) {
-        tr.Scale.X += scaleSpeed * Time::FixedDeltaTime();
-        tr.Scale.Y += scaleSpeed * Time::FixedDeltaTime();
+        tr.Scale.X += scaleSpeed * Time::DeltaTime();
+        tr.Scale.Y += scaleSpeed * Time::DeltaTime();
     }
     if (Input::IsKeyDown(KEY_K)) {
-        tr.Scale.X = std::max(10.f, tr.Scale.X - scaleSpeed * Time::FixedDeltaTime());
-        tr.Scale.Y = std::max(10.f, tr.Scale.Y - scaleSpeed * Time::FixedDeltaTime());
+        tr.Scale.X = std::max(10.f, tr.Scale.X - scaleSpeed * Time::DeltaTime());
+        tr.Scale.Y = std::max(10.f, tr.Scale.Y - scaleSpeed * Time::DeltaTime());
     }
 }
 
@@ -453,7 +522,11 @@ void GraphicsTestScene::runSpriteRotation() {
     if (m_testEntities.empty()) {
         ECS::Entity sprite = CreateOnLayer(
             m_gameplayLayer,
-            ECS::Components::LocalTransform{ Vector3D{m_worldWidth * 0.5f,m_worldHeight * 0.5f,0}, Quaternion{0,0,0,1}, Vector3D{512.f,512.f,1.f} },
+            ECS::Components::LocalTransform{
+                Vector3D{0, 0, 0},
+                Quaternion{0,0,0,1},
+                Vector3D{4, 4, 1.f}
+            },
             ECS::Components::WorldTransform{ },
             ECS::Components::SpriteRenderer2D{
                 RM.Get<Texture>("assets/textures/test/fishBoy.png")->ID(),
@@ -475,8 +548,13 @@ void GraphicsTestScene::runSpriteRotation() {
     auto& tr = world.Get<ECS::Components::LocalTransform>(sprite);
 
     if (Input::IsKeyDown(KEY_R)) {
-        auto deltaRotation = Quaternion::FromAxisAngle(Vector3D::Right, rotationSpeed * Time::FixedDeltaTime());
-        tr.Rotation = deltaRotation * tr.Rotation;
+        // rotationSpeed is in DEGREES/second; convert to RADIANS/second
+        const float angleRad = glm::radians(rotationSpeed) * Time::DeltaTime();
+
+        // rotate about Z for 2D sprites
+        const auto deltaRotation = Quaternion::FromAxisAngle(Vector3D{ 0.f, 0.f, 1.f }, angleRad);
+
+        tr.Rotation = deltaRotation * tr.Rotation; // apply incremental rotation
         tr.Rotation.Normalize();
     }
 }
@@ -532,7 +610,7 @@ void GraphicsTestScene::runAnimation() {
     }
 
     // Use the Time system's delta time directly
-    float deltaTime = Time::FixedDeltaTime();
+    float deltaTime = Time::DeltaTime();
 
     // Update animation and get current frame
     glm::vec2 pos = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
@@ -542,7 +620,7 @@ void GraphicsTestScene::runAnimation() {
 
     // Submit to renderer
     shader->use();
-    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
+    shader->setMat4("uViewProj", m_rendererSystem->GetProjection());
     renderer->beginFrame();
     renderer->submitSprite(currentSprite);
     renderer->endFrame();
@@ -622,7 +700,7 @@ void GraphicsTestScene::runMultiAnimation() {
     }
 
     // Use delta time
-    float deltaTime = Time::FixedDeltaTime();
+    float deltaTime = Time::DeltaTime();
 
     // Position & size for the "main character"
     glm::vec2 pos = { m_worldWidth * 0.5f, m_worldHeight * 0.5f };
@@ -632,179 +710,108 @@ void GraphicsTestScene::runMultiAnimation() {
     Sprite currentSprite = currentAnim->play(pos, size, deltaTime);
 
     shader->use();
-    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
+    shader->setMat4("uViewProj", m_rendererSystem->GetProjection());
     renderer->beginFrame();
     renderer->submitSprite(currentSprite);
     renderer->endFrame();
 }
 
-#if 0
 void GraphicsTestScene::runBatchStress() {
-    World& world = GetWorld();
+    ECS::World& world = GetWorld();
 
+    // One-time initialization
     if (m_testEntities.empty()) {
-        const int count = 2500; // can increase if performance allows
+        // Load texture and verify it worked
+        auto fishBoyTexture = RM.Get<Texture>("assets/textures/test/fishBoy.png");
+        if (!fishBoyTexture) {
+            LOG_ERROR("Failed to load fishBoy.png texture!");
+            return;
+        }
 
-        for (int i = 0; i < count; ++i) {
+        const GLuint texId = fishBoyTexture->ID();
+        if (texId == 0) {
+            LOG_ERROR("Texture loaded but ID is 0!");
+            return;
+        }
+
+        LOG_DEBUG("Loaded fishBoy.png - Texture ID: " << texId);
+
+        // Sprite size in world units (32px sprite = 0.32 world units)
+        constexpr float spriteWU = graphicsConfig::PixelsToWorld(32.0f);
+
+        // Calculate spawn bounds centered at origin
+        const float halfWidth = m_worldWidth * 0.5f;
+        const float halfHeight = m_worldHeight * 0.5f;
+
+        // Spawn 2500 sprites with random positions and colors
+        constexpr int kCount = 2500;
+        for (int i = 0; i < kCount; ++i) {
+            // Random position in world space (0 to worldWidth/Height)
+            const float x = (static_cast<float>(rand() % 100) / 100.0f * m_worldWidth) - halfWidth;
+            const float y = (static_cast<float>(rand() % 100) / 100.0f * m_worldHeight) - halfHeight;
+
+            // Random vibrant color (avoid near-black or near-white)
+            const Color randomColor{
+                0.3f + (rand() % 70) / 100.0f,  // 0.3 to 1.0
+                0.3f + (rand() % 70) / 100.0f,
+                0.3f + (rand() % 70) / 100.0f,
+                1.0f
+            };
+
+            // Random rotation speed (30-120 degrees per second)
+            const float rotSpeed = 30.0f + static_cast<float>(rand() % 90);
+
+            // Random starting rotation offset (0-360 degrees)
+            const float rotOffset = static_cast<float>(rand() % 360);
+
+            // Create entity with all components
             ECS::Entity sprite = CreateOnLayer(
                 m_gameplayLayer,
-                ECS::Components::LocalTransform{ 
-                    Vector3D{
-                        MathUtils::Randomize(0, static_cast<int>(m_worldWidth)),
-                        MathUtils::Randomize(0, static_cast<int>(m_worldHeight)),
-                        0
-                    }, 
-                    Quaternion::FromAxisAngle(
-                        Vector3D::Right,
-                        MathUtils::Randomize(0, 360)
-                    ),
-                    Vector3D{
-                        MathUtils::Randomize(16.f, 32.f),
-                        MathUtils::Randomize(16.f, 32.f),
-                        1.f
-                    }
+                ECS::Components::LocalTransform{
+                    Vector3D{ x, y, 0.0f },
+                    Quaternion::FromAxisAngle(Vector3D{ 0.f, 0.f, 1.f }, glm::radians(rotOffset)),
+                    Vector3D{ spriteWU, spriteWU, 1.0f }
                 },
-                ECS::Components::WorldTransform{ },
+                ECS::Components::WorldTransform{},
                 ECS::Components::SpriteRenderer2D{
-                    RM.Get<Texture>("assets/textures/test/fishBoy.png")->ID(),
-                    Color{
-                        MathUtils::Randomize(0.f, 1.f),
-                        MathUtils::Randomize(0.f, 1.f),
-                        MathUtils::Randomize(0.f, 1.f),
-                        1.f
-                    },
-                    Vector2D{1.f,1.f},
-                    Vector2D{0.f,0.f}
-                }
+                    texId,
+                    randomColor,
+                    Vector2D{ 1.0f, 1.0f },
+                    Vector2D{ 0.0f, 0.0f }
+                },
+                ECS::Components::Rotator{
+                    rotSpeed,
+                    rotOffset
+                },
+                ECS::Components::Name{ "BatchStress_Sprite_" }
             );
 
             m_testEntities.push_back(EntityUtils::Pack(sprite));
         }
 
-        std::cout << "Spawned " << m_testEntities.size()
-            << " sprites for Batch Stress Test\n";
+        LOG_DEBUG("Spawned " << kCount << " rotating sprites for batch stress test");
+        LOG_DEBUG("  Sprite size: " << spriteWU << " world units (" << graphicsConfig::WorldToPixels(spriteWU) << " pixels)");
+        LOG_DEBUG("  Spawn area: " << m_worldWidth << " × " << m_worldHeight << " world units");
     }
 
-    // ------------------------------------
-    // Per-frame updates
-    // ------------------------------------
-    for (EntityId id : m_testEntities) {
-        ECS::Entity e = EntityUtils::Unpack(id);
-        if (!world.IsAlive(e) || !world.Has<ECS::Components::LocalTransform>(e)) continue;
-        auto& tr = world.Get<ECS::Components::LocalTransform>(e);
+    // Per-frame rotation update
+    const double elapsed = Time::ElapsedTime();
 
-        auto deltaRotation = Quaternion::FromAxisAngle(
-            Vector3D::Right,
-            90.0f * Time::DeltaTime() // where 90.0f is degrees per second
-        );
-        tr.Rotation = deltaRotation * tr.Rotation;
-        tr.Rotation.Normalize();
-    }
+    world.Each<ECS::Components::LocalTransform, ECS::Components::Rotator>(
+        [elapsed](ECS::Entity /*e*/,
+            ECS::Components::LocalTransform& lt,
+            const ECS::Components::Rotator& rot)
+        {
+            // Calculate current rotation: offset + speed * time
+            const float degrees = rot.RotationOffset + rot.RotationSpeed * static_cast<float>(elapsed);
+            const float radians = glm::radians(degrees);
 
-    // ------------------------------------
-    // Print FPS once per second
-    // ------------------------------------
-    static float timeAccum = 0.0f;
-    static int frameCounter = 0;
-
-    timeAccum += Time::DeltaTime();
-    frameCounter++;
-
-    if (timeAccum >= 1.0f) {
-        float fps = frameCounter / timeAccum;
-        LOG_DEBUG("FPS: " << fps);
-
-        timeAccum = 0.0f;
-        frameCounter = 0;
-    }
-}
-#endif
-
-#if 1
-    void GraphicsTestScene::runBatchStress() {
-    if (!m_rendererSystem) {
-        LOG_ERROR("RendererSystem not found!");
-        return;
-    }
-
-    auto* renderer = m_rendererSystem->GetRenderer();
-    auto* shader = m_rendererSystem->GetShader();
-
-    // Load texture once
-    static bool initialized = false;
-    static Texture texture("assets/textures/test/fishBoy.png");
-    static GLuint textureId = 0;
-
-    struct SpriteData {
-        glm::vec2 pos;
-        glm::vec2 size;
-        glm::vec4 baseColor;   // static hue
-        float rotationOffset;  // per-sprite random phase
-        float rotationSpeed;   // per-sprite spin speed
-    };
-
-    static std::vector<SpriteData> sprites;
-
-    if (!initialized) {
-        textureId = texture.ID();
-        sprites.reserve(2500);
-
-        for (int i = 0; i < 2500; ++i) {
-            float x = static_cast<float>(rand() % static_cast<int>(m_worldWidth));
-            float y = static_cast<float>(rand() % static_cast<int>(m_worldHeight));
-
-            // Random base color (RGB only, alpha = 1)
-            glm::vec4 col = {
-                (rand() % 100) / 100.f,
-                (rand() % 100) / 100.f,
-                (rand() % 100) / 100.f,
-                1.f
-            };
-
-            // Random speed between 30�120 degrees/sec
-            float speed = 30.f + (rand() % 90);
-
-            sprites.push_back({
-                { x, y },                 // position
-                { 32.f, 32.f },           // size
-                col,                      // base color
-                static_cast<float>(rand() % 360), // random phase
-                speed                     // per-sprite spin speed
-                });
+            // Update rotation quaternion
+            lt.Rotation = Quaternion::FromAxisAngle(Vector3D{ 0.f, 0.f, 1.f }, radians);
         }
+    );
 
-        initialized = true;
-        std::cout << "Initialized 2500 rotating quads with random colors\n";
-    }
-
-    // Prepare frame
-    shader->use();
-    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
-    renderer->beginFrame();
-
-    glm::vec4 uv = { 0.f, 0.f, 1.f, 1.f };
-
-    // Use absolute elapsed time for rotation
-    double elapsed = Time::ElapsedTime();
-
-    for (const auto& s : sprites) {
-        float rotation = s.rotationOffset + s.rotationSpeed * static_cast<float>(elapsed);
-
-        renderer->submitQuad(
-            s.pos,
-            s.size,
-            textureId,
-            uv,
-            s.baseColor,
-            glm::radians(rotation), // convert to radians
-            1.f,
-            0
-        );
-    }
-
-    renderer->endFrame();
-
-    // FPS counter
+    // FPS counter (print once per second)
     static float timeAccum = 0.0f;
     static int frameCounter = 0;
 
@@ -812,54 +819,350 @@ void GraphicsTestScene::runBatchStress() {
     frameCounter++;
 
     if (timeAccum >= 1.0f) {
-        float fps = frameCounter / timeAccum;
-        std::cout << "[Batcher test] FPS: " << fps << "\n";
+        const float fps = frameCounter / timeAccum;
+        LOG_DEBUG("[BatchStress] FPS: " << fps
+            << " | Sprites: " << m_testEntities.size());
 
         timeAccum = 0.0f;
         frameCounter = 0;
     }
 }
-#endif
 
 void GraphicsTestScene::runFontSystem() {
-    if (!m_rendererSystem) return;
-    auto* renderer = m_rendererSystem->GetRenderer();
-    auto* shader = m_rendererSystem->GetTextShader(); // returns m_shaderText
-    if (!shader) return;
+    if (m_testEntities.empty()) {
 
-    static bool initialized = false;
-    static std::unique_ptr<Font> font;
+        // Design at reference resolution (1920×1080)
+        // Positions and font sizes will scale automatically
 
-    if (!initialized) {
-        font = std::make_unique<Font>("assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf", 96);
-        initialized = true;
+        // Top-left: Poetry quote (50px offset from corner)
+        ECS::Entity text1 = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ 50.f, 80.f, 0.0f },  // Offset from anchor at 1920x1080
+                Quaternion::Identity(),
+                Vector3D{ 1.0f, 1.0f, 1.0f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::Text{
+                "Do not go gentle into that good night,\n"
+                "Old age should burn and rave at close of day;",
+                61.0f,  // Font size at 1920x1080
+                Color{ 1.0f, 1.0f, 1.0f, 0.8f },
+                ECS::Components::TextAnchor::TopLeft
+            },
+            ECS::Components::Name{ "Poetry" }
+        );
+
+        // Center: Kerning test
+        ECS::Entity text2 = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ 0.f, -100.f, 0.0f },  // 100px below center
+                Quaternion::Identity(),
+                Vector3D{ 1.0f, 1.0f, 1.0f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::Text{
+                "AV AW To Yo Wa Fo\n"
+                "if fi fl fj fk yj yp\n"
+                "mmm iii lll HHO UI Il Ty Fo\n"
+                "i.i i,i i!i i?i T.T T,T T!T T?T\n",
+                40.0f,
+                Color{ 1.0f, 1.0f, 1.0f, 0.8f },
+                ECS::Components::TextAnchor::Center
+            },
+            ECS::Components::Name{ "Kerning" }
+        );
+
+        // Bottom-left: Shakespeare with Open Sans font
+        ECS::Entity text3 = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ 100.f, 100.f, 0.0f },
+                Quaternion::Identity(),
+                Vector3D{ 1.0f, 1.0f, 1.0f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::Text{
+                "Men at some time are masters of their fates.\n"
+                "The fault, dear Brutus, is not in our stars,\n"
+                "but in ourselves, that we are underlings.",
+                24.0f,
+                Color{ 1.0f, 1.0f, 1.0f, 0.8f },
+                ECS::Components::TextAnchor::BottomLeft,
+                "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf"  // Font path here
+            },
+            ECS::Components::Name{ "Shakespeare" }
+        );
+
+        // Top-right: FPS counter
+        ECS::Entity fps = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ 140.f, 40.f, 0.0f },
+                Quaternion::Identity(),
+                Vector3D{ 1.0f, 1.0f, 1.0f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::Text{
+                "FPS: 0",
+                32.0f,
+                Color{ 0.0f, 1.0f, 0.0f, 1.0f },
+                ECS::Components::TextAnchor::TopRight
+            },
+            ECS::Components::Name{ "FPS" }
+        );
+
+        m_testEntities.push_back(EntityUtils::Pack(text1));
+        m_testEntities.push_back(EntityUtils::Pack(text2));
+        m_testEntities.push_back(EntityUtils::Pack(text3));
+        m_testEntities.push_back(EntityUtils::Pack(fps));
+
+        LOG_DEBUG("Spawned scaled text entities");
     }
 
-    shader->use();
-    shader->setMat4("uProjection", m_rendererSystem->GetProjection());
+    // Update FPS counter
+    ECS::World& world = GetWorld();
+    ECS::Entity fpsEntity = EntityUtils::Unpack(m_testEntities.back());
 
-    renderer->beginFrame();
-    renderer->submitText(*font, "Do not go gentle into that good night,\n Old age should burn and rave at close of day; ", 
-                        { 50.f, 200.f }, { 1.f, 1.f, 1.f, 1.f }, 61.f);
+    if (world.Has<Components::Text>(fpsEntity)) {
+        auto& fpsText = world.Get<Components::Text>(fpsEntity);
 
-    // Test string covers:
-    // - Kerning-sensitive pairs (AV, To, Yo, Wa, Fo)
-    // - Ascender/descender overlaps (if, fl, yj, yp)
-    // - Baseline/bearing alignment (mmm, iii, lll, HHO)
-    // - Mixed-case spacing (UI, Il, Ty, Fo)
-    // - Punctuation placement (.,?!;:���� -- �)
-    // Render this to visually inspect spacing, kerning, and glyph metrics accuracy
-    renderer->submitText(*font,
-        "AV AW To Yo Wa Fo\n"
-        "if fi fl fj fk yj yp\n"
-        "mmm iii lll HHO UI Il Ty Fo\n"
-        "i.i i,i i!i i?i T.T T,T T!T T?T\n",
-        { 400.f, 500.f }, { 1.f, 1.f, 1.f, 0.8f }, 40.f);
+        static float updateTimer = 0.0f;
+        updateTimer += Time::DeltaTime();
 
-    renderer->submitText(*font, "Men at some time are masters of their fates.\n The fault, dear Brutus, is not in our stars, but in ourselves, that we are underlings.",
-                        { 100.f, 800.f }, { 1.f, 1.f, 1.f, 0.8f }, 24.f);
+        if (updateTimer >= 0.5f) {
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "FPS: %.1f", 1.0f / Time::DeltaTime());
+            fpsText.setContent(buffer);
+            updateTimer = 0.0f;
+        }
+    }
+}
 
-    renderer->endFrame();
+// ============================================================
+// M2 TEST RUNNERS
+// ============================================================
+
+void Sandbox::GraphicsTestScene::runGameGUI() {
+    // TODO: Implement M2 Game GUI test
+}
+
+void Sandbox::GraphicsTestScene::runFontSys() {
+    runFontSystem();
+}
+
+void GraphicsTestScene::runViewportCamera() {
+    // ------------------------------------------------------------
+    // INITIALIZATION (runs once)
+    // ------------------------------------------------------------
+    ECS::World& world = GetWorld();
+
+    if (m_testEntities.empty()) {
+        // -------------------------------
+        // Player (cyan circle)
+        // -------------------------------
+        ECS::Entity player = world.Create();
+
+        auto& playerTr = world.Add<ECS::Components::LocalTransform>(player);
+        playerTr.Position = { 0.f, 0.f, 0.f };
+        playerTr.Scale = { 1.f, 1.f, 1.f };
+        playerTr.Rotation = Quaternion::Identity();
+
+        auto& playerCircle = world.Add<ECS::Components::ShapeCircle2D>(player);
+        playerCircle.Radius = 0.55f;                    // world units
+        playerCircle.Color = { 0.f, 2.f, 2.f, 1.f };    // cyan
+        playerCircle.Thickness = 1.0f;                  // used if not Filled
+        playerCircle.Filled = true;
+
+        auto& playerLayer = world.Add<ECS::Components::Layer>(player);
+        playerLayer.Id = m_gameplayLayer;
+
+        // -------------------------------
+        // Camera (follows player)
+        // -------------------------------
+        ECS::Entity cam = world.Create();
+
+        auto& camTr = world.Add<ECS::Components::LocalTransform>(cam);
+        camTr.Position = { playerTr.Position.X, playerTr.Position.Y, 10.f }; // Z = camera height
+        camTr.Scale = { 1.f, 1.f, 1.f };
+        camTr.Rotation = Quaternion::Identity();
+
+        auto& camera = world.Add<ECS::Components::Camera3D>(cam);
+        camera.Active = true;
+        camera.UsePerspective = false;
+        camera.OrthoSize = 16.f;
+        camera.NearPlane = 0.1f;
+        camera.FarPlane = 100.f;
+
+        // Aspect from current window
+        const auto window = WindowManager::GetMainWindow();
+        camera.AspectRatio = static_cast<float>(window->Width())
+            / static_cast<float>(window->Height());
+
+        // -------------------------------
+        // Static box object
+        // -------------------------------
+        ECS::Entity box = world.Create();
+
+        auto& boxTr = world.Add<ECS::Components::LocalTransform>(box);
+        boxTr.Position = { 0.f, 0.f, 0.f };
+        boxTr.Scale = { 2.f, 2.f, 1.f };
+        boxTr.Rotation = Quaternion::Identity();
+
+        auto& boxShape = world.Add<ECS::Components::ShapeBox2D>(box);
+        boxShape.HalfExtents = { 1.f, 1.f };            // half of 2x2
+        boxShape.Color = { 1.f, 0.f, 0.5f, 1.f }; // pink
+        boxShape.Thickness = 1.0f;
+        boxShape.Filled = true;
+
+        auto& boxLayer = world.Add<ECS::Components::Layer>(box);
+        boxLayer.Id = m_gameplayLayer;
+
+        // Track created entities (store ECS::Entity directly)
+        m_testEntities.push_back(EntityUtils::Pack(player));
+        m_testEntities.push_back(EntityUtils::Pack(cam));
+        m_testEntities.push_back(EntityUtils::Pack(box));
+
+        std::cout << "Viewport camera test initialized\n";
+    }
+
+    // ------------------------------------------------------------
+    // UPDATE LOOP (runs every frame)
+    // ------------------------------------------------------------
+    ECS::Entity playerEntity = EntityUtils::Unpack(m_testEntities[0]);
+    ECS::Entity camEntity = EntityUtils::Unpack(m_testEntities[1]);
+
+    auto& playerTr = world.Get<ECS::Components::LocalTransform>(playerEntity);
+    auto& camTr = world.Get<ECS::Components::LocalTransform>(camEntity);
+    auto& camComp = world.Get<ECS::Components::Camera3D>(camEntity); // if you need params
+
+    // Movement input (keep your units the same)
+    const float dt = Time::DeltaTime();
+    const float moveSpeed = graphicsConfig::PixelsToWorld(500.f) * dt;
+
+    if (Input::IsKeyDown(KEY_A)) playerTr.Position.X -= moveSpeed;
+    if (Input::IsKeyDown(KEY_D)) playerTr.Position.X += moveSpeed;
+    if (Input::IsKeyDown(KEY_W)) playerTr.Position.Y += moveSpeed;
+    if (Input::IsKeyDown(KEY_S)) playerTr.Position.Y -= moveSpeed;
+
+    // Smooth camera follow (XY only; keep Z = camera height)
+    // Controls how quickly the camera catches up (seconds)
+    const float tau = 0.3f;          // increase for more lag
+    const float alpha = 1.0f - expf(-dt / tau);
+
+    camTr.Position.X += alpha * (playerTr.Position.X - camTr.Position.X);
+    camTr.Position.Y += alpha * (playerTr.Position.Y - camTr.Position.Y);
+
+    // camTr.Position.Z stays as is (e.g., 10.f)
+}
+
+
+void Sandbox::GraphicsTestScene::runTransformationSys() {
+    // TODO: Implement M2 Transformation System test
+}
+
+void Sandbox::GraphicsTestScene::runSpriteAnim() {
+    runAnimation();
+}
+
+void GraphicsTestScene::runMultipleShaders() {
+    if (m_testEntities.empty()) {
+        const float midX = m_worldWidth * 0.5f;
+        const float midY = m_worldHeight * 0.5f;
+
+        // ---------------------------------------------
+        // Player: controllable yellow circle (filled)
+        // ---------------------------------------------
+        ECS::Entity player = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ midX, midY, 0.f },
+                Quaternion::Identity(),
+                Vector3D{ 1.f, 1.f, 1.f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                60.f,
+                Vector2D{ 0.f, 0.f },
+                Color{ 9.f, 3.f, 0.f, 1.f }, // brighter yellow
+                0.f                          // filled
+            },
+            ECS::Components::Name{ "Player" }
+        );
+
+        // ---------------------------------------------
+        // Static red circle (left side)
+        // ---------------------------------------------
+        ECS::Entity redCircle = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ midX - 250.f, midY, 0.f },
+                Quaternion::Identity(),
+                Vector3D{ 1.f, 1.f, 1.f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                50.f,
+                Vector2D{ 0.f, 0.f },
+                Color{ 1.f, 0.f, 0.f, 1.f },
+                0.f
+            },
+            ECS::Components::Name{ "RedCircle" }
+        );
+
+        // ---------------------------------------------
+        // Static green outlined circle (right side)
+        // ---------------------------------------------
+        ECS::Entity greenOutline = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{ midX + 250.f, midY, 0.f },
+                Quaternion::Identity(),
+                Vector3D{ 1.f, 1.f, 1.f }
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::ShapeCircle2D{
+                60.f,
+                Vector2D{ 0.f, 0.f },
+                Color{ 0.f, 1.f, 0.f, 1.f },
+                3.f // outline stroke
+            },
+            ECS::Components::Name{ "GreenOutlinedCircle" }
+        );
+
+        // Track entities
+        m_testEntities.push_back(EntityUtils::Pack(player));
+        m_testEntities.push_back(EntityUtils::Pack(redCircle));
+        m_testEntities.push_back(EntityUtils::Pack(greenOutline));
+
+        LOG_DEBUG("Spawned player and test circles for MultipleShaders test");
+    }
+
+    // ---------------------------------------------
+    // Simple player movement logic
+    // ---------------------------------------------
+    ECS::World& world = GetWorld();
+    ECS::Entity playerEntity = EntityUtils::Unpack(m_testEntities[0]);
+    auto& playerTr = world.Get<ECS::Components::LocalTransform>(playerEntity);
+
+    const float moveSpeed = 400.f * Time::DeltaTime();
+    if (Input::IsKeyDown(KEY_A)) playerTr.Position.X -= moveSpeed;
+    if (Input::IsKeyDown(KEY_D)) playerTr.Position.X += moveSpeed;
+    if (Input::IsKeyDown(KEY_W)) playerTr.Position.Y += moveSpeed;
+    if (Input::IsKeyDown(KEY_S)) playerTr.Position.Y -= moveSpeed;
+}
+
+void Sandbox::GraphicsTestScene::runBatching() {
+    // TODO: Implement M2 Batching / draw-call reduction test
+}
+
+void Sandbox::GraphicsTestScene::runEditorCamera() {
+    // TODO: Implement M2 Editor Camera test
+}
+
+void Sandbox::GraphicsTestScene::runObjectPicking() {
+    // TODO: Implement M2 Object Picking test
 }
 
 // ============================================================
@@ -912,7 +1215,7 @@ void GraphicsTestScene::testSingleTexture() {
         return;
     }
 
-    // No updates � measure raw rendering cost
+    // No updates => measure raw rendering cost
     static int frameCount = 0;
     frameCount++;
     if (frameCount % 60 == 0) {

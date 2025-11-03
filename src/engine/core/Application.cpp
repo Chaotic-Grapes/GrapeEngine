@@ -81,7 +81,7 @@ namespace Engine {
                     m_shouldStop = true;
                     break;
                 }
-                glfwSwapBuffers(win->Handle());
+                win->SwapBuffers();
             }
 
             const double frameDuration = m_lastFrameTime - frameStart;
