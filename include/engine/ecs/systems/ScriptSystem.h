@@ -55,6 +55,7 @@ using hostfxr_handle = void*;
 // 9.  Open/read etc for asset files in the project.
 // 10. Proper handling of AppDomain isolation.
 // 11. Hot reloading of scripts.
+// 12. Potentially replace std::memcpy with safer alternatives (like std::copy, std::copy_n, etc).
 
 // !! Important !! //
 // Possibly need a rewrite as this implementation don't seem to adhere to the core design of the ECS.

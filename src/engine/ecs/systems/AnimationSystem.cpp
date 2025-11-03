@@ -22,7 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/Components.h"
-#include <cmath>
+#include <algorithm>
 
 namespace ECS {
     void AnimationSystem::Update(World& world, float dt) {
@@ -77,50 +77,42 @@ namespace ECS {
                 // Calculate the absolute frame index in the sprite sheet
                 const int absoluteFrame = anim.StartFrame + state.CurrentFrame;
 
-                // Calculate sprite sheet layout
-                // Determine number of columns and rows in the sprite sheet
-                const int cols = (anim.SheetWidth > 0 && anim.FrameWidth > 0) // Check. Also to avoid division by zero
-                    ? (anim.SheetWidth / anim.FrameWidth) : 1; // Default to 1 column
-
-                // Determine number of rows in the sprite sheet
-                const int rows = (anim.SheetHeight > 0 && anim.FrameHeight > 0)
-                    ? (anim.SheetHeight / anim.FrameHeight) : 1; // Default to 1 row
-
-                // Prevent division by zero or invalid values
-                // Extra safety check
-                if (cols <= 0 || rows <= 0)
-                    return;
-
-                // Calculate row and column for this frame
-                const int col = absoluteFrame % cols; // Column index
-                const int row = absoluteFrame / cols; // Row index
-
-                // Calculate UV coordinates (normalized 0-1)
-                // (col     * frameWidth, row     * frameHeight) = top-left corner
-                // (col + 1 * frameWidth, row + 1 * frameHeight) = bottom-right corner
-                // (col     * frameWidth, row + 1 * frameHeight) = bottom-left corner
-                // (col + 1 * frameWidth, row     * frameHeight) = top-right corner
-                const float u0 =       static_cast<float>(col * anim.FrameWidth)  / static_cast<float>(anim.SheetWidth);
-                const float v0 =       static_cast<float>(row * anim.FrameHeight) / static_cast<float>(anim.SheetHeight);
-                const float u1 = u0 + (static_cast<float>(anim.FrameWidth)        / static_cast<float>(anim.SheetWidth));
-                const float v1 = v0 + (static_cast<float>(anim.FrameHeight)       / static_cast<float>(anim.SheetHeight));
-
-                // Update SpriteRenderer2D if it exists
-                // Would put this at the top before all the calculations to skip unnecessary work + performance
-                // But also thought of the case where the sprite component might be added later dynamically
-                // Therefore, keep it here to ensure UVs are updated when sprite component is present
+                // Only compute sprite-sheet layout and UVs if a SpriteRenderer2D exists for this entity (reduce unnecessary work)
+                // Also, advance animation state above even when no sprite is present
                 if (auto* sprite = world.TryGet<Components::SpriteRenderer2D>(entity)) {
+                    // Calculate sprite sheet layout
+                    const int cols = (anim.SheetWidth > 0 && anim.FrameWidth > 0) // Check. Also avoid division by zero
+                        ? std::max(1, anim.SheetWidth / anim.FrameWidth) : 1;     // Clamp to at least 1
+
+                    const int rows = (anim.SheetHeight > 0 && anim.FrameHeight > 0)
+                        ? std::max(1, anim.SheetHeight / anim.FrameHeight) : 1;
+
+                    // Extra safety check
+                    if (cols <= 0 || rows <= 0)
+                        return;
+
+                    // Calculate row and column for this frame
+                    const int col = absoluteFrame % cols; // Column index
+                    const int row = absoluteFrame / cols; // Row index
+
+                    // Calculate UV coordinates (normalized 0-1)
+                    // (col     * frameWidth, row     * frameHeight) = top-left corner
+                    // (col + 1 * frameWidth, row + 1 * frameHeight) = bottom-right corner
+                    // (col     * frameWidth, row + 1 * frameHeight) = bottom-left corner
+                    // (col + 1 * frameWidth, row     * frameHeight) = top-right corner
+                    const float u0 =       static_cast<float>(col * anim.FrameWidth)  / static_cast<float>(anim.SheetWidth);
+                    const float v0 =       static_cast<float>(row * anim.FrameHeight) / static_cast<float>(anim.SheetHeight);
+                    // const float u1 = u0 + (static_cast<float>(anim.FrameWidth)        / static_cast<float>(anim.SheetWidth));
+                    // const float v1 = v0 + (static_cast<float>(anim.FrameHeight)       / static_cast<float>(anim.SheetHeight));
+
+                    // Update SpriteRenderer2D
                     sprite->TextureId = anim.TextureId;
                     sprite->Width = anim.FrameWidth;
                     sprite->Height = anim.FrameHeight;
-                    
-                    // Set tiling to show only the current frame
-                    sprite->Tiling = Vector2D{ 
-                        static_cast<float>(anim.FrameWidth) / static_cast<float>(anim.SheetWidth),
+                    sprite->Tiling = Vector2D{
+                        static_cast<float>(anim.FrameWidth)  / static_cast<float>(anim.SheetWidth),
                         static_cast<float>(anim.FrameHeight) / static_cast<float>(anim.SheetHeight)
                     };
-                    
-                    // Set offset to position at the correct frame
                     sprite->Offset = Vector2D{ u0, v0 };
                 }
             }
