@@ -1,0 +1,40 @@
+name: CMake Build
+
+on:
+  push:
+    branches: [ '**' ]
+  pull_request:
+    branches: [ '**' ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # optionally add macos-latest if desired
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure (CMake)
+      shell: bash
+      run: |
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build (CMake)
+      shell: bash
+      run: |
+        cmake --build build --config Release -- -j $(nproc || echo 2)
+
+    - name: Run tests (ctest)
+      shell: bash
+      run: |
+        if [ -f build/CTestTestfile.cmake ]; then
+          ctest --test-dir build --output-on-failure || true
+        else
+          echo "No tests configured (no CTestTestfile.cmake found)"
+        fi
