@@ -14,7 +14,7 @@
 #include <string>
 #include <unordered_map>
 #include "ecs/Entity.h"
-
+#include <services/DebugUI.h>
 
 
 class GameObjectEditor {
@@ -98,13 +98,13 @@ public:
 	 * @brief Saves the current world/level state to a JSON file.
 	 * @param filename Full path and name of the file to save to.
 	 */
-	void SaveLevel(const std::string& filename);
+	//void SaveLevel(const std::string& filename);
 
 	/**
 	 * @brief Loads a new world/level state from a JSON file.
 	 * @param filename Full path and name of the file to load from.
 	 */
-	void LoadLevel(const std::string& filename);
+	//void LoadLevel(const std::string& filename);
 
 	/**
 	 * @brief Sets the currently selected entity.

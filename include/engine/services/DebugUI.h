@@ -34,6 +34,9 @@ struct GLFWwindow;
 class World;
 namespace Audio { class IAudioDevice; }
 
+// forward declaration
+class GameObjectEditor;
+
 // Configuration structure for DebugUI appearance and layout
 struct DebugUIConfig {
     float FontScale = 1.35f;  // Global font scaling factor
@@ -105,6 +108,10 @@ private:
     int m_spacePressed = 0;   // Space key press event counter
     int m_spaceReleased = 0;  // Space key release event counter
 
+    // Pointer to the dedicated editor system responsible for rendering 
+    // and managing game object hierarchy and component properties.
+    GameObjectEditor* m_gameObjectEditor = nullptr;
+
     // Cached UI elements to avoid string creation every frame
     mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;
     mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;
@@ -120,7 +127,7 @@ private:
     void _showInputDebugWindow();
 
     // Display entity list with creation, deletion, cloning, and component editing
-    void _showGameObjectEditor();
+    //void _showGameObjectEditor();
 
     // Display audio system controls and library window
     void _showAudioWindow(Audio::FmodAudioDevice* audio);

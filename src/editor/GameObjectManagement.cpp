@@ -51,17 +51,17 @@ static constexpr const char* LEVEL_DIR = "assets/levels/";
  * @param filename Full path and filename to save the level data to.
  * @exception std::exception If serialization or file I/O fails.
  */
-void GameObjectEditor::SaveLevel(const std::string& filename) {
-	if (!HasValidWorld()) return;
-	try {
-		// Assumed: EntitySerializer::SerializeWorld exists and handles file output
-		Serialization::EntitySerializer::SerializeWorld(*m_world, filename);
-		LOG_INFO("Successfully saved level to: " << filename);
-	}
-	catch (const std::exception& e) {
-		LOG_ERROR("Failed to save world: " << e.what());
-	}
-}
+//void GameObjectEditor::SaveLevel(const std::string& filename) {
+//	if (!HasValidWorld()) return;
+//	try {
+//		// Assumed: EntitySerializer::SerializeWorld exists and handles file output
+//		Serialization::EntitySerializer::SerializeWorld(*m_world, filename);
+//		LOG_INFO("Successfully saved level to: " << filename);
+//	}
+//	catch (const std::exception& e) {
+//		LOG_ERROR("Failed to save world: " << e.what());
+//	}
+//}
 
 /**
  * @brief Loads a level from a JSON file and replaces the current world.
@@ -69,23 +69,23 @@ void GameObjectEditor::SaveLevel(const std::string& filename) {
  * @param filename Full path and filename to load the level data from.
  * @exception std::exception If deserialization or file reading fails.
  */
-void GameObjectEditor::LoadLevel(const std::string& filename) {
-	if (!HasValidWorld()) return;
-	try {
-		// 1. Clear current level before loading a new one
-		ClearAllGameObjects();
-
-		// 2. Assumed: EntitySerializer::DeserializeWorld exists and handles entity creation
-		Serialization::EntitySerializer::DeserializeWorld(*m_world, filename);
-		LOG_INFO("Successfully loaded level from: " << filename);
-
-		m_selectedEntityId = 0; // Deselect everything on load
-		_invalidateCache();
-	}
-	catch (const std::exception& e) {
-		LOG_ERROR("Failed to load world: " << e.what());
-	}
-}
+//void GameObjectEditor::LoadLevel(const std::string& filename) {
+//	if (!HasValidWorld()) return;
+//	try {
+//		// 1. Clear current level before loading a new one
+//		ClearAllGameObjects();
+//
+//		// 2. Assumed: EntitySerializer::DeserializeWorld exists and handles entity creation
+//		Serialization::EntitySerializer::DeserializeWorld(*m_world, filename);
+//		LOG_INFO("Successfully loaded level from: " << filename);
+//
+//		m_selectedEntityId = 0; // Deselect everything on load
+//		_invalidateCache();
+//	}
+//	catch (const std::exception& e) {
+//		LOG_ERROR("Failed to load world: " << e.what());
+//	}
+//}
 
 // --- In-World Picking/Dragging Implementation ---
 
@@ -197,7 +197,7 @@ void GameObjectEditor::_showMainMenu() {
 	}
 
 	// Modal for Save Level
-	if (ImGui::BeginPopupModal("Save Level", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+	/*if (ImGui::BeginPopupModal("Save Level", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 		static char filenameBuffer[128] = "NewLevel";
 		ImGui::Text("Enter level filename (will be saved in %s):", LEVEL_DIR);
 		ImGui::InputText("##savefilename", filenameBuffer, sizeof(filenameBuffer));
@@ -212,43 +212,43 @@ void GameObjectEditor::_showMainMenu() {
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
-	}
+	}*/
 
 	// Modal for Load Level
-	if (ImGui::BeginPopupModal("Load Level", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-		static std::string selectedFile = "";
-		ImGui::Text("Select level to load from %s:", LEVEL_DIR);
-
-		if (ImGui::BeginListBox("##LevelList", ImVec2(200, 150))) {
-			try {
-				for (const auto& entry : std::filesystem::directory_iterator(LEVEL_DIR)) {
-					if (entry.path().extension() == ".json") {
-						std::string filename = entry.path().filename().string();
-						bool is_selected = (selectedFile == filename);
-						if (ImGui::Selectable(filename.c_str(), is_selected)) {
-							selectedFile = filename;
-						}
-					}
-				}
-			}
-			catch (const std::exception& e) {
-				ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error reading dir: %s", e.what());
-			}
-			ImGui::EndListBox();
-		}
-
-		if (ImGui::Button("Load") && !selectedFile.empty()) {
-			LoadLevel(std::string(LEVEL_DIR) + selectedFile);
-			selectedFile = ""; // Reset selection
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Cancel")) {
-			selectedFile = "";
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
-	}
+//	if (ImGui::BeginPopupModal("Load Level", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+//		static std::string selectedFile = "";
+//		ImGui::Text("Select level to load from %s:", LEVEL_DIR);
+//
+//		if (ImGui::BeginListBox("##LevelList", ImVec2(200, 150))) {
+//			try {
+//				for (const auto& entry : std::filesystem::directory_iterator(LEVEL_DIR)) {
+//					if (entry.path().extension() == ".json") {
+//						std::string filename = entry.path().filename().string();
+//						bool is_selected = (selectedFile == filename);
+//						if (ImGui::Selectable(filename.c_str(), is_selected)) {
+//							selectedFile = filename;
+//						}
+//					}
+//				}
+//			}
+//			catch (const std::exception& e) {
+//				ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Error reading dir: %s", e.what());
+//			}
+//			ImGui::EndListBox();
+//		}
+//
+//		if (ImGui::Button("Load") && !selectedFile.empty()) {
+//			LoadLevel(std::string(LEVEL_DIR) + selectedFile);
+//			selectedFile = ""; // Reset selection
+//			ImGui::CloseCurrentPopup();
+//		}
+//		ImGui::SameLine();
+//		if (ImGui::Button("Cancel")) {
+//			selectedFile = "";
+//			ImGui::CloseCurrentPopup();
+//		}
+//		ImGui::EndPopup();
+//	}
 }
 
 

@@ -3,7 +3,7 @@
 #include <iostream>
 #include "physics/Collision.h"
 #include "ecs/Entity.h"
-#include <services/Overlay.h>
+#include <services/OverlayService.h>
 
 namespace Engine {
     Vector2D PhysicsSystem::m_gravity = Vector2D(0.0f, -9.81f);
