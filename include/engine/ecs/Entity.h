@@ -72,6 +72,7 @@ namespace ECS {
     // Constant representing a null or invalid entity
     static inline constexpr Entity NULL_ENTITY{};
 
+    // Hash function for Entity to be used in unordered containers
     struct EntityHash {
         size_t operator()(const Entity& e) const noexcept {
             // Combine index and generation into a single size_t hash
@@ -80,6 +81,10 @@ namespace ECS {
         }
     };
 
+    /**
+     * @brief Generates a unique TypeId for each component type at runtime.
+     * @return A unique TypeId.
+     */
     inline TypeId TypeIdNext() {
         // Thread-safe unique id generation
         // std::atomic ensures that even in multithreaded contexts,
@@ -88,12 +93,21 @@ namespace ECS {
         return counter++;
     }
 
+    /**
+     * @brief Gets the unique TypeId for the specified component type T.
+     * @tparam T The component type.
+     * @return The unique TypeId for type T.
+     */
     template<typename T>
     inline TypeId TypeIdOf() {
         static const TypeId id = TypeIdNext();
         return id;
     }
 
+    /**
+     * @brief TypeList is a helper struct to hold a list of types as a parameter pack.
+     * This is useful for template metaprogramming and type manipulations.
+     */
     template<typename... Ts>
     struct TypeList {};
 }

@@ -1,0 +1,112 @@
+{
+    "EntityCount": 2,
+    "Entities": [
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Value": "TestSprite"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 400.0,
+                            "Y": 450.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 0.92388,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.382683
+                        },
+                        "Scale": {
+                            "X": 128.0,
+                            "Y": 128.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.5,
+                            "G": 0.5,
+                            "R": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 1,
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                }
+            ],
+            "EntityId": 0
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Value": "MovingEntity"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 100.0,
+                            "Y": 100.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 50.0,
+                            "Y": 50.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 10.0,
+                            "Y": 5.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                }
+            ],
+            "EntityId": 0
+        }
+    ],
+    "SceneName": "SerializationTest",
+    "Version": "1.0"
+}

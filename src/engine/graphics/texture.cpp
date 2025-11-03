@@ -32,7 +32,7 @@ roughness maps) where gamma correction must not be applied.
 #include "services/ResourceManager.h"
 #include <iostream>
 
-ResourceManager RM;
+// ResourceManager RM;
 
 // ============================================================================
 // Loads texture data from disk using stb_image and uploads it to the GPU.

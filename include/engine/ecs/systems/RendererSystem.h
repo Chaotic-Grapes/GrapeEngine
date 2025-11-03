@@ -1,8 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
-\file   RendererSystem.h
-\author Your Name
-\date   27th October 2025
+\file    RendererSystem.h
+\authors Muhammad Nur Fadzly Bin Zulkifli (15%), Choi Meng Yew (85%)
+\par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
+\date    20th October 2025
 \brief
 High-level rendering system for the ECS. Manages shaders, camera, and
 orchestrates the render graph for multi-pass rendering.
@@ -184,7 +185,7 @@ namespace ECS {
         // ====================================================================
 
         /*!
-        \brief Reference resolution for UI design (1920×1080).
+        \brief Reference resolution for UI design (1920ï¿½1080).
         All UI elements are designed at this resolution and scaled proportionally.
         */
         static constexpr float kReferenceWidth = 1920.0f;

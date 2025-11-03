@@ -1,39 +1,58 @@
 {
-  "Name": "PrefabSample",
-  "Components": [
-    {
-      "Type": "SpriteRenderer",
-      "Data": {
-        "Color": {
-          "A": 255,
-          "B": 127,
-          "G": 127,
-          "R": 255
+    "Components": [
+        {
+            "Data": {
+                "Value": "EnemyPrefab"
+            },
+            "TypeName": "Name"
         },
-        "FlipX": false,
-        "FlipY": false,
-        "Height": 449,
-        "SortingLayerName": "Default",
-        "SortingOrder": 0,
-        "Sprite": "assets/textures/test/player.png",
-        "TextureId": 1,
-        "TexturePath": "assets/textures/test/player.png",
-        "Width": 224
-      }
-    },
-    {
-      "Type": "Transform",
-      "Data": {
-        "Position": {
-          "X": 650,
-          "Y": 750
+        {
+            "Data": {
+                "Id": 0
+            },
+            "TypeName": "Layer"
         },
-        "Rotation": 0,
-        "Scale": {
-          "X": 256,
-          "Y": 256
+        {
+            "Data": {
+                "Position": {
+                    "X": 650.0,
+                    "Y": 750.0,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "W": 1.0,
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 256.0,
+                    "Y": 256.0,
+                    "Z": 1.0
+                }
+            },
+            "TypeName": "LocalTransform"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.0,
+                    "B": 0.498039,
+                    "G": 0.498039,
+                    "R": 1.0
+                },
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "TextureId": 1,
+                "Tiling": {
+                    "X": 1.0,
+                    "Y": 1.0
+                }
+            },
+            "TypeName": "SpriteRenderer2D"
         }
-      }
-    }
-  ]
+    ],
+    "EntityId": 0
 }

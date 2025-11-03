@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file   ECSTest.h
+\file   ECSTest.hpp
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \date   20th October 2025
@@ -17,6 +17,10 @@ systems, components, and their interactions. This test scene covers:
 
 The scene provides structured test cases that can be cycled through using
 keyboard input, with each test validating specific ECS functionality.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -76,7 +80,7 @@ namespace Sandbox {
             
             // Advanced Tests
             EntityPooling           = 1024,  // Test entity reuse and generation
-            ComponentIteration      = 1025,  // Test World.Each() performance
+            SpriteAnimation         = 1025,  // Test AnimationSystem with sprite sheets
             ArchetypeChanges        = 1026,  // Adding/removing components dynamically
         };
 
@@ -86,6 +90,7 @@ namespace Sandbox {
         TestType m_currentTest{ TestType::BasicEntityCreation };
         
         // Layers
+        uint16_t m_boundaryLayer = 0;
         uint16_t m_testLayer = 0;
         uint16_t m_physicsLayer = 0;
         uint16_t m_renderLayer = 0;
@@ -145,7 +150,7 @@ namespace Sandbox {
         
         // Advanced Tests
         void _testEntityPooling();
-        void _testComponentIteration();
+        void _testSpriteAnimation();
         void _testArchetypeChanges();
         
         // ------------------------------------
