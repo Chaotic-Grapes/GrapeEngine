@@ -16,9 +16,21 @@
 #include "ecs/Entity.h"
 #include <services/DebugUI.h>
 
+ // Forward declarations
+struct ImFont;
+class World;
+class Entity;
 
 class GameObjectEditor {
 public:
+
+	// Initialize with symbols font for icons and world reference
+	void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world);
+
+	// Render the asset browser UI
+	//void Render();
+
+	explicit GameObjectEditor(World* world);
 
 	/**
  * @brief Set the world reference for entity management
@@ -113,9 +125,15 @@ public:
 
 private:
 	DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
-	World* m_world;             ///< Pointer to World object for entity management
+	World* m_world = nullptr;   ///< Pointer to World object for entity management
 	bool m_enabled = false;     ///< Flag indicating if debug UI is currently enabled
 	bool m_initialized = false; ///< Flag indicating if ImGui has been initialized
+	
+	// References to external systems
+	float m_fontScale = 1.0f;
+	ImFont* m_mainFont = nullptr;
+	ImFont* m_boldFont = nullptr;
+	ImFont* m_symbolsFont = nullptr;   // Material Symbols font for icons
 
 	// UI state
 	bool m_showDemo = false;                    ///< Flag to show/hide ImGui demo window

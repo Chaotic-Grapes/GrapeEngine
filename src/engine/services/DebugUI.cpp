@@ -40,7 +40,7 @@ Features:
 #include "core/Logger.h"
 #include "audio/FmodAudioDevice.h"
 #include "audio/SoundTypes.h"
-#include "../editor/GameObjectManagement.h"
+
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
@@ -112,7 +112,6 @@ void DebugUI::Render() {
         _showInputDebugWindow();
         //_showGameObjectEditor();
         _showAudioWindow(audioPtr);
-        m_gameObjectEditor->ShowEditorWindows();
         
 
         if (m_showDemo) {

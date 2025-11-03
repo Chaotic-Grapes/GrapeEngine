@@ -40,6 +40,18 @@ written consent of DigiPen Institute of Technology is prohibited.
 #include "audio/FmodAudioDevice.h"
 #include "audio/SoundTypes.h"
 
+
+void GameObjectEditor::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
+	m_mainFont = mainFont;
+	m_boldFont = boldFont;
+	m_symbolsFont = symbolsFont;
+	m_world = world;
+}
+
+GameObjectEditor::GameObjectEditor(World* world)
+	: m_world(world) {
+}
+
  // --- Level Management Implementation ---
 
  // Assumed directory for level files, please change as needed

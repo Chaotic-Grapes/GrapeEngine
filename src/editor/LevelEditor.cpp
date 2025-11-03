@@ -28,7 +28,7 @@ References:
 
 // Constructor: initialize level editor with world and config
 LevelEditor::LevelEditor(World* world, const LevelEditorConfig& config)
-    : m_world(world), m_config(config), m_playback(world), m_assetBrowser() {
+    : m_world(world), m_config(config), m_playback(world), m_assetBrowser(), m_gameObjectEditor(world) {
 }
 
 LevelEditor::~LevelEditor() {}
@@ -89,6 +89,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 // Process input for all editor panels
 void LevelEditor::Update() {
     m_playback.ProcessInput();
+    m_gameObjectEditor.HandleInWorldInteraction();
 }
 
 // Render all editor panels
@@ -96,4 +97,5 @@ void LevelEditor::Render() {
     if (!m_world) return;
     m_playback.Render();
     m_assetBrowser.Render();
+    m_gameObjectEditor.ShowEditorWindows();
 }
