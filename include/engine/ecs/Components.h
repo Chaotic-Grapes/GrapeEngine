@@ -458,20 +458,20 @@ namespace ECS {
 
             void setContent(const char* str) {
                 if (str) {
-                    strncpy(Content, str, MaxTextLength - 1);
+                    strncpy_s(Content, str, MaxTextLength - 1);
                     Content[MaxTextLength - 1] = '\0';
                 }
             }
 
             void setFontPath(const char* path) {
                 if (path) {
-                    strncpy(FontPath, path, 127);
+                    strncpy_s(FontPath, path, 127);
                     FontPath[127] = '\0';
                 }
             }
 
-            std::string_view getContent() const { return std::string_view(Content); }
-            std::string_view getFontPath() const { return std::string_view(FontPath); }
+            std::string_view getContent() const { return { Content }; }
+            std::string_view getFontPath() const { return { FontPath }; }
         };
         static_assert(std::is_trivially_copyable_v<Text>, "Text must be trivially copyable");
 

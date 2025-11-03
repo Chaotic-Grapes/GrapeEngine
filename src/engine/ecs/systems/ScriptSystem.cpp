@@ -535,6 +535,7 @@ namespace ECS {
         // Call OnUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
+                (void)entity;
                 if (!active.Enabled || !script.Initialized)
                     return;
 
@@ -551,6 +552,7 @@ namespace ECS {
         // Call OnFixedUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
+                (void)entity;
                 if (!active.Enabled || !script.Initialized)
                     return;
 
@@ -567,6 +569,7 @@ namespace ECS {
         // Call OnLateUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
+				(void)entity;
                 if (!active.Enabled || !script.Initialized)
                     return;
 
@@ -580,6 +583,7 @@ namespace ECS {
     }
 
     void ScriptSystem::UpdateActiveState(World& world) {
+        (void)world;
         // Track active state changes to call OnEnable/OnDisable
         // This requires storing previous active state in ScriptInstance component
         // For now, this is a placeholder
@@ -592,11 +596,13 @@ namespace ECS {
     }
 
     void ScriptSystem::OnDestroy(World& world) {
+        (void)world;
         // Cleanup scripts on entities that are being destroyed
         // This is typically called in a cleanup phase
-        
+
+		// TODO: Implement entity destruction tracking
         // For now, this is a placeholder
-        // In a full implementation, we'd track destroyed entities and cleanup their scripts
+        // In a full implementation, do track destroyed entities and cleanup their scripts
     }
 
 }

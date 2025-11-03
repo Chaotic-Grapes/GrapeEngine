@@ -351,7 +351,8 @@ namespace ECS {
 
         // Collect entities that have LocalTransform + Layer
         world.Each<Components::LocalTransform, Components::Layer>([&](const ECS::Entity entity, Components::LocalTransform& lt, const Components::Layer& ly){
-            const uint16_t lid = ly.Id;
+            (void)lt;
+        	const uint16_t lid = ly.Id;
             if (lid < buckets.size())
                 buckets[lid].push_back(entity);
             });
@@ -369,6 +370,7 @@ namespace ECS {
         m_renderGraph->AddPass("Scene2D", {}, { "HDR" },
             [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints](ResourceAccessor& res)
             {
+                (void)res;
                 // Get HDR framebuffer from render graph
                 auto* hdrFbo = res.GetFramebuffer("HDR");
                 if (!hdrFbo) {

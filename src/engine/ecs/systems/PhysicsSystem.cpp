@@ -59,6 +59,7 @@ namespace ECS {
 
         const int substeps = 3;  // Run physics 3 times per frame
         const float subDt = dt / static_cast<float>(substeps);
+		(void)subDt; // Remove unused variable warning if needed
         // 1) Integrate velocities -> update positions & rotations for all dynamic bodies
         std::vector<Entity> dynamicEntities;
         dynamicEntities.reserve(512);

@@ -35,6 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include <helpers/EntityUtils.h>
 #include "Serializer.h"
+#include <string.h>
 
 using json = nlohmann::json;
 
@@ -77,12 +78,12 @@ namespace ECS {
 		
 		// Custom serialization for Name component (char array needs special handling)
 		inline void to_json(nlohmann::json& j, const Name& n) {
-			j = nlohmann::json{{"Value", std::string(n.Value)}};
+			j = nlohmann::json{ {"Value", std::string(n.Value)} }; // convert char array to std::string
 		}
 		
 		inline void from_json(const nlohmann::json& j, Name& n) {
-			std::string value = j.at("Value").get<std::string>();
-			std::strncpy(n.Value, value.c_str(), sizeof(n.Value) - 1);
+			std::string value = j.at("Value").get<std::string>(); // get as std::string
+			strncpy_s(n.Value, value.c_str(), sizeof(n.Value) - 1); // copy to char array
 			n.Value[sizeof(n.Value) - 1] = '\0'; // null terminator
 		}
 		
@@ -118,7 +119,7 @@ namespace ECS {
 		
 		// Custom serialization for ScriptInstance component (char array needs special handling)
 		inline void to_json(nlohmann::json& j, const ScriptInstance& s) {
-			j = nlohmann::json{
+			j = nlohmann::json{ // convert char array to std::string
 				{"ManagedHandle", s.ManagedHandle},
 				{"TypeHash", s.TypeHash},
 				{"Initialized", s.Initialized},
@@ -127,11 +128,11 @@ namespace ECS {
 		}
 		
 		inline void from_json(const nlohmann::json& j, ScriptInstance& s) {
-			s.ManagedHandle = j.at("ManagedHandle").get<uint64_t>();
-			s.TypeHash = j.at("TypeHash").get<uint32_t>();
-			s.Initialized = j.at("Initialized").get<bool>();
-			std::string typeName = j.at("TypeName").get<std::string>();
-			std::strncpy(s.TypeName, typeName.c_str(), sizeof(s.TypeName) - 1);
+			s.ManagedHandle = j.at("ManagedHandle").get<uint64_t>(); // get managed handle as uint64_t
+			s.TypeHash = j.at("TypeHash").get<uint32_t>(); // get type hash as uint32_t
+			s.Initialized = j.at("Initialized").get<bool>(); // get initialized as bool
+			std::string typeName = j.at("TypeName").get<std::string>(); // get type name as std::string
+			strncpy_s(s.TypeName, typeName.c_str(), sizeof(s.TypeName) - 1); // copy to char array
 			s.TypeName[sizeof(s.TypeName) - 1] = '\0';
 		}
 		

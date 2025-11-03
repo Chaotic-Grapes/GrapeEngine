@@ -86,7 +86,7 @@ void SerializationTestScene::CreateTestEntities() {
     
     world.Add<ECS::Components::Name>(sprite);
     auto& spriteName = world.Get<ECS::Components::Name>(sprite); // This assumes entity has Name component
-    std::strncpy(spriteName.Value, "TestSprite", sizeof(spriteName.Value) - 1);
+    strncpy_s(spriteName.Value, "TestSprite", sizeof(spriteName.Value) - 1);
     
     world.Add<ECS::Components::LocalTransform>(sprite);
     auto& spriteTransform = world.Get<ECS::Components::LocalTransform>(sprite);
@@ -111,7 +111,7 @@ void SerializationTestScene::CreateTestEntities() {
     
     world.Add<ECS::Components::Name>(movingEntity);
     auto& movingName = world.Get<ECS::Components::Name>(movingEntity);
-    std::strncpy(movingName.Value, "MovingEntity", sizeof(movingName.Value) - 1);
+    strncpy_s(movingName.Value, "MovingEntity", sizeof(movingName.Value) - 1);
     
     world.Add<ECS::Components::LocalTransform>(movingEntity);
     auto& movingTransform = world.Get<ECS::Components::LocalTransform>(movingEntity);

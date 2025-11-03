@@ -305,7 +305,7 @@ void GraphicsTestScene::runBasicGraphics() {
 
 void GraphicsTestScene::runDebugDrawing() {
     if (m_testEntities.empty()) {
-        ECS::World& world = GetWorld();
+        // ECS::World& world = GetWorld();
         const std::string spritePath = "assets/textures/test/player.png";
 
         // Load texture (if valid)
@@ -560,7 +560,7 @@ void GraphicsTestScene::runSpriteRotation() {
 }
 
 void GraphicsTestScene::runAnimation() {
-    ECS::World& world = GetWorld();
+    // ECS::World& world = GetWorld();
 
     if (!m_rendererSystem) return;
     auto* renderer = m_rendererSystem->GetRenderer();
@@ -635,7 +635,7 @@ void GraphicsTestScene::runAnimation() {
 }
 
 void GraphicsTestScene::runMultiAnimation() {
-    ECS::World& world = GetWorld();
+    // ECS::World& world = GetWorld();
 
     if (!m_rendererSystem) return;
     auto* renderer = m_rendererSystem->GetRenderer();
@@ -1036,6 +1036,7 @@ void GraphicsTestScene::runViewportCamera() {
     auto& playerTr = world.Get<ECS::Components::LocalTransform>(playerEntity);
     auto& camTr = world.Get<ECS::Components::LocalTransform>(camEntity);
     auto& camComp = world.Get<ECS::Components::Camera3D>(camEntity); // if you need params
+	(void)camComp; // Remove this if camComp is needed
 
     // Movement input (keep your units the same)
     const float dt = Time::DeltaTime();
@@ -1224,7 +1225,7 @@ void GraphicsTestScene::testSingleTexture() {
 }
 
 void GraphicsTestScene::analyzeRenderer() {
-    ECS::World& world = GetWorld();
+    // ECS::World& world = GetWorld();
 
     if (!m_rendererSystem) {
         LOG_ERROR("RendererSystem system not found!");

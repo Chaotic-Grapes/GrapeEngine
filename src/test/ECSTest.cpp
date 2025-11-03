@@ -383,18 +383,18 @@ void ECSTestScene::_testComponentModification() {
         // Pulse the circle radius and color
         const float pulse = 0.5f + 0.5f * std::sin(m_testTimer * 2.0f);
         circle.Radius = 30.f + 40.f * pulse;
-        circle.Color.R = static_cast<HexValue>(pulse * 255.f);
-        circle.Color.G = static_cast<HexValue>((1.f - pulse) * 255.f);
-        circle.Color.B = 200u;
-        circle.Color.A = static_cast<HexValue>(pulse * 255.f);
+        circle.Color.R = pulse;
+        circle.Color.G = 1.f - pulse;
+        circle.Color.B = 200.f / 255.f;
+        circle.Color.A = pulse;
     }
 }
 
 void ECSTestScene::_testLayerSystem() {
     if (m_testEntities.empty()) {
         // Create entities on different layers, centered horizontally
-        const float spacing = 150.f;
-        const float totalWidth = 2 * spacing;
+        constexpr float spacing = 150.f;
+        constexpr float totalWidth = 2 * spacing;
         const float startX = (m_worldWidth - totalWidth) * 0.5f;
         const float yPos = m_worldHeight * 0.5f;
         
@@ -716,7 +716,7 @@ void ECSTestScene::_testPhysicsGravity() {
 }
 
 void ECSTestScene::_testPhysicsCollision() {
-    ECS::World& world = GetWorld();
+    // ECS::World& world = GetWorld();
 
     if (m_testEntities.empty()) {
         // Create two moving circles that will collide
