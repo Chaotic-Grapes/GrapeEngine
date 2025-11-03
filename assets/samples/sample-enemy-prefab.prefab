@@ -8,6 +8,12 @@
         },
         {
             "Data": {
+                "Id": 0
+            },
+            "TypeName": "Layer"
+        },
+        {
+            "Data": {
                 "Position": {
                     "X": 650.0,
                     "Y": 750.0,

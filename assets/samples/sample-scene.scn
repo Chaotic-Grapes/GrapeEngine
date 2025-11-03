@@ -11,6 +11,12 @@
                 },
                 {
                     "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
                         "Position": {
                             "X": 400.0,
                             "Y": 450.0,
@@ -60,6 +66,12 @@
                         "Value": "MovingEntity"
                     },
                     "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
                 },
                 {
                     "Data": {

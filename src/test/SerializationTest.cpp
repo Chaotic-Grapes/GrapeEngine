@@ -42,7 +42,7 @@ void SerializationTestScene::OnLoad() {
     LOG_INFO("========================================");
 
     m_rendererSystem = std::make_shared<ECS::RendererSystem>();
-    m_rendererSystem->Initialize();
+    m_rendererSystem->Initialize(GetWorld());
     AddSystem([this](Scenes::Scene& s, const float dt) {
         m_rendererSystem->Update(s.GetWorld(), dt);
     }, "Renderer System");
@@ -78,8 +78,12 @@ void SerializationTestScene::RunAutomatedTest() {
 void SerializationTestScene::CreateTestEntities() {
     ECS::World& world = GetWorld();
     
-    // Test 1: Entity with LocalTransform + SpriteRenderer2D + Name
+    // Test 1: Entity with LocalTransform + SpriteRenderer2D + Name + Layer
     ECS::Entity sprite = world.Create();
+    
+    // Add Layer component
+    world.Add<ECS::Components::Layer>(sprite, ECS::Components::Layer{ 0 });
+    
     world.Add<ECS::Components::Name>(sprite);
     auto& spriteName = world.Get<ECS::Components::Name>(sprite); // This assumes entity has Name component
     std::strncpy(spriteName.Value, "TestSprite", sizeof(spriteName.Value) - 1);
@@ -99,8 +103,12 @@ void SerializationTestScene::CreateTestEntities() {
     m_expectedData.push_back({"TestSprite", Vector3D{400.0f, 450.0f, 0.0f},  
         Vector3D{128.0f, 128.0f, 1.0f}, Quaternion{0.0f, 0.0f, 0.382683f, 0.923880f}, 1, 0.0f, 0.0f});
     
-    // Test 2: Entity with LocalTransform + LinearVelocity2D
+    // Test 2: Entity with LocalTransform + LinearVelocity2D + Layer
     ECS::Entity movingEntity = world.Create();
+    
+    // Add Layer component
+    world.Add<ECS::Components::Layer>(movingEntity, ECS::Components::Layer{ 0 });
+    
     world.Add<ECS::Components::Name>(movingEntity);
     auto& movingName = world.Get<ECS::Components::Name>(movingEntity);
     std::strncpy(movingName.Value, "MovingEntity", sizeof(movingName.Value) - 1);

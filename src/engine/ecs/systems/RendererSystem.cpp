@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file    RendererSystem.cpp
-\authors Muhammad Nur Fadzly Bin Zulkifli (75%), Choi Meng Yew (25%)
+\authors Muhammad Nur Fadzly Bin Zulkifli (15%), Choi Meng Yew (85%)
 \par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
 \date    20th October 2025
 \brief
@@ -311,8 +311,8 @@ namespace ECS {
         // fallback (if no active camera found)
         if (!foundActive) {
             const auto& mainWindow = WindowManager::GetMainWindow();
-            projection = glm::ortho(0.f, float(mainWindow->Width()),
-                0.f, float(mainWindow->Height()),
+            projection = glm::ortho(0.f, static_cast<float>(mainWindow->Width()),
+                0.f, static_cast<float>(mainWindow->Height()),
                 -1.f, 1.f);
         }
 
@@ -384,7 +384,7 @@ namespace ECS {
                 // Layered rendering: SDF first, then batch
                 // ---------------------------------------
                 for (int layer = 0; layer <= maxLayerId; ++layer) {
-                    if (layer >= (int)buckets.size()) continue;
+                    if (layer >= static_cast<int>(buckets.size())) continue;
                     const auto& list = buckets[layer];
 
                     // --- Sub-pass 1: SDF circles on this layer ---
@@ -556,7 +556,7 @@ namespace ECS {
 
                             // Get transform and text data
                             const auto& lt = world.Get<Components::LocalTransform>(entity);
-                            const auto& text = world.Get<Components::Text>(entity);  // Now const!
+                            const auto& text = world.Get<Components::Text>(entity); // const
 
                             // Load/cache font
                             std::string fontPath(text.FontPath);
@@ -669,7 +669,7 @@ namespace ECS {
                 m_sdfCircleShader->setUniform("uPicking", 1);
                 m_renderer->beginFrame();
 
-                for (int layer = 0; layer <= (int)buckets.size() - 1; ++layer) {
+                for (int layer = 0; layer <= static_cast<int>(buckets.size()) - 1; ++layer) {
                     const auto& list = buckets[layer];
 
                     for (ECS::Entity entity : list) {
@@ -718,7 +718,7 @@ namespace ECS {
 
                 m_renderer->beginFrame();
 
-                for (int layer = 0; layer <= (int)buckets.size() - 1; ++layer) {
+                for (int layer = 0; layer <= static_cast<int>(buckets.size()) - 1; ++layer) {
                     const auto& list = buckets[layer];
 
                     for (ECS::Entity entity : list) {
@@ -1125,7 +1125,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uHorizontal", 1);
                 m_bloomBlurShader->setUniform("uImage", 0);
                 m_bloomBlurShader->setUniform("uRadius", bloomRadiusTexels);
-                m_bloomBlurShader->setUniform("uSamples", std::max(12, int(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
+                m_bloomBlurShader->setUniform("uSamples", std::max(12, static_cast<int>(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
@@ -1144,7 +1144,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uHorizontal", 0);
                 m_bloomBlurShader->setUniform("uImage", 0);
                 m_bloomBlurShader->setUniform("uRadius", bloomRadiusTexels);
-                m_bloomBlurShader->setUniform("uSamples", std::max(12, int(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
+                m_bloomBlurShader->setUniform("uSamples", std::max(12, static_cast<int>(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
 
                 src->BindColorTexture(0);

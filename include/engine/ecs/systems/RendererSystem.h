@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file    RendererSystem.h
-\authors Muhammad Nur Fadzly Bin Zulkifli (75%), Choi Meng Yew (25%)
+\authors Muhammad Nur Fadzly Bin Zulkifli (15%), Choi Meng Yew (85%)
 \par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
 \date    20th October 2025
 \brief
