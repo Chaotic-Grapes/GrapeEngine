@@ -11,6 +11,9 @@ to and from JSON format. It maintains a registry of supported
 component types and their serialization/deserialization logic,
 allowing entities to be reconstructed within a World.
 
+Originally written by Daniel Neo Zuo Feng Kay, with contributions such as fixes
+and improvements by Muhammad Nur Fadzly Bin Zulkifli.
+
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
