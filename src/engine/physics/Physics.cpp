@@ -75,7 +75,7 @@ namespace Engine {
             }
         }
     }
-    
+
     // ============================================================================
     // Angular Damping
     // ============================================================================
@@ -83,7 +83,7 @@ namespace Engine {
     float Physics::CalculateAngularAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::AngularVelocity2D& angVel) {
         return -angVel.Value * rb.AngularDamping;
     }
-    
+
     // ============================================================================
     // Boundary Collision
     // ============================================================================
@@ -154,135 +154,115 @@ namespace Engine {
     // ============================================================================
     // Generic resolve Collision
     // ============================================================================
-
     Physics::CollisionResult Physics::ResolveCollision(
-        const ECS::Components::Rigidbody2D& rbA, // components for RB
+        const ECS::Components::Rigidbody2D& rbA,
         const ECS::Components::Rigidbody2D& rbB,
-        ECS::Components::LinearVelocity2D& velA,// components for linear vel
+        ECS::Components::LinearVelocity2D& velA,
         ECS::Components::LinearVelocity2D& velB,
-        ECS::Components::LocalTransform& transformA, // components for transform
+        ECS::Components::LocalTransform& transformA,
         ECS::Components::LocalTransform& transformB,
-        const Vector2D& normal, // collision normal B -> A
-        const float depth, // penetration depth
-        const ECS::Components::PhysicsMaterial2D& physics // physicsmaterial
+        const Vector2D& normal,
+        const float depth,
+        const ECS::Components::PhysicsMaterial2D& physics
     ) {
-        // init collision result
         CollisionResult result{};
         result.Collided = true;
         result.Normal = normal;
         result.Depth = depth;
 
-        //calculate inverse masses 
         const float invMassA = GetInverseMass(rbA.Mass);
         const float invMassB = GetInverseMass(rbB.Mass);
         const float invMassSum = invMassA + invMassB;
 
-        // if mass 0 basically static, do nothing
         if (invMassSum == 0.0f) return result;
 
-        // Relative velocity along normal 
         const Vector2D relativeVelocity = velB.Value - velA.Value;
-
-        //get normal velocity by dot producting (relativevel and normal)
         const float normalVelocity = Dot(relativeVelocity, normal);
-
-        //store normal velocity to return later
         result.RelativeNormalVelocity = normalVelocity;
 
-        // if bodies normal velocity < 0 means moving towards each other 
+        // ========================================================================
+        // IMPULSE RESOLUTION (velocity changes)
+        // ========================================================================
         if (normalVelocity < 0.0f) {
-
-            // clamp restituion between 0 to 1
             const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
-            // restitution coefficient calculation where the derived forumla comes from
-            // to become J = -(1* e) * (v_relative * N) / inverse mass sum
             const float j = -(1.0f + restitution) * normalVelocity / invMassSum;
-
-            //impulse is normalised value of j
             const Vector2D impulse = normal * j;
 
-            // edit values by reference for velA and B
             velA.Value -= impulse * invMassA;
             velB.Value += impulse * invMassB;
 
-            // apply friction if physics implemented has preset it above 0
-            // friction applied after normal impulse is applied using updated velocities
-            // stimulate sliding forces
+            // Friction
             if (physics.Friction > 0.0f) {
-
-                // recalculate relative velocity after normal impulse applied
-                // nevessary because normal impulse changed the velocities
                 const Vector2D newRelativeVelocity = velB.Value - velA.Value;
                 const float newNormalVelocity = Dot(newRelativeVelocity, normal);
-
-                // calculate the tangent vector (perpendicular to normal, along the contact surface)
-                // tangent = relative vel - (relative vel . normmal) * normal
                 Vector2D tangent = newRelativeVelocity - normal * newNormalVelocity;
 
-                // this checks if there is significant tangential motion to apply friction
                 const float tangentLengthSquared = Dot(tangent, tangent);
                 if (tangentLengthSquared > MIN_TANGENT_LENGTH_SQUARED) {
-
-                    // normalize tangent vector to get friction direction 
                     tangent = tangent / std::sqrt(tangentLengthSquared);
-
-                    //calculate friction impulse magnitude along tangent
-                    // calculation = -(relative vel dot product with tanget) / invMassSum
-                    // negative sign ensures friction opposes the relative motion direction
                     const float jt = -Dot(newRelativeVelocity, tangent) / invMassSum;
-
-                    // Apply Coulomb's friction law: friction is limited by the normal force
                     const float frictionImpulse = std::clamp(jt, -j * physics.Friction, j * physics.Friction);
-
-                    // Convert the scalar friction impulse to a vector along the tangent
                     const Vector2D frictionVector = tangent * frictionImpulse;
 
-                    // apply friction impulse to both bodies equal and opposite
-                    // object a moves against friction direction therefore -
                     velA.Value -= frictionVector * invMassA;
-
-                    //object b moves with friction direction therefore +
                     velB.Value += frictionVector * invMassB;
                 }
             }
         }
 
-        // positional correction derived from baumgarte stabilization
-        // after applying impulses objects may still be slightly interpenetrating 
-        // due to numerical errors or external force. so this adjusts
-        // position to separate overlapping objects prevents sinking objects to each other
+        // ========================================================================
+        // POSITION CORRECTION (push objects apart)
+        // IMPROVED FOR THIN RECTANGLES
+        // ========================================================================
         {
-            // percentage of penetration to correct per frame (typically 0.2ish)
-            // lower value = softer correction compared to higher value
-            const float percent = physics.PositionCorrectPercent; 
+            // Use smaller slop for thin objects to prevent tunneling
+            const float slop = 0.1f;  // Increased from 0.01f
 
-            // a small penetration tolerance to prevent jittering
-            // basically tolerance of penetration
-            const float slop = 0.01f; 
+            // Use higher percentage for aggressive correction
+            const float percent = std::min(physics.PositionCorrectPercent, 0.95f);
 
-            //calculate how much correction required
-            // only correct penetrations deeper than slop threshold
-            // percent value allows gradual correction over multiple frames
-            const float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
+            // Calculate base correction
+            float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
 
-            //now get correction value vector along collision to be set to the transform
-            //positions of both objects 
+            // CRITICAL FIX: For deep penetrations, use more aggressive correction
+            // This prevents balls from getting stuck in thin walls
+            if (depth > slop * 2.0f) {
+                // Deep penetration - likely tunneled through thin wall
+                // Use even more aggressive correction
+                const float deepPenetrationBoost = 1.5f;
+                correctionMagnitude = std::max(depth - slop, 0.0f) * percent * deepPenetrationBoost;
+            }
+
             const Vector2D correction = normal * (correctionMagnitude / invMassSum);
 
-            // apply position correction to both objects (equal and opposite)
-            // object A moves backward (out of B) along the normal
+            // Apply position correction
             transformA.Position.X -= correction.X * invMassA;
             transformA.Position.Y -= correction.Y * invMassA;
-
-            // object B moves forward (out of A) along the normal
             transformB.Position.X += correction.X * invMassB;
             transformB.Position.Y += correction.Y * invMassB;
+
+            // ADDITIONAL FIX: Kill velocity toward wall for deeply penetrated objects
+            // This prevents infinite bouncing inside thin walls
+            if (depth > slop * 3.0f) {
+                // Check velocity toward collision normal
+                const float vNormalA = Dot(velA.Value, normal);
+                const float vNormalB = Dot(velB.Value, normal);
+
+                // If object A is moving toward B (negative normal velocity), dampen it
+                if (vNormalA < 0.0f && invMassA > 0.0f) {
+                    velA.Value -= normal * vNormalA * 0.5f;  // Remove 50% of inward velocity
+                }
+
+                // If object B is moving toward A (positive normal velocity), dampen it
+                if (vNormalB > 0.0f && invMassB > 0.0f) {
+                    velB.Value -= normal * vNormalB * 0.5f;  // Remove 50% of inward velocity
+                }
+            }
         }
 
         return result;
     }
 }
-
 
     
 

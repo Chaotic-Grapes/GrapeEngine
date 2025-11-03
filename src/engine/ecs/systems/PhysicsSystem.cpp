@@ -74,11 +74,25 @@ public:
         }
     }
 
-    // Overload for box colliders which will use AABB bounds
     void InsertBox(const ECS::Entity entity, const Vector3D& position, const Vector2D& halfExtents) {
-        // For boxes, use the half extents to determine the bounding region
-        float maxExtent = std::max(halfExtents.X, halfExtents.Y);
-        Insert(entity, position, maxExtent);
+        // Calculate the actual AABB bounds for the box
+        float minX = position.X - halfExtents.X;
+        float maxX = position.X + halfExtents.X;
+        float minY = position.Y - halfExtents.Y;
+        float maxY = position.Y + halfExtents.Y;
+
+        // Convert to grid coordinates
+        int cellMinX = static_cast<int>(std::floor(minX / CELL_SIZE));
+        int cellMaxX = static_cast<int>(std::floor(maxX / CELL_SIZE));
+        int cellMinY = static_cast<int>(std::floor(minY / CELL_SIZE));
+        int cellMaxY = static_cast<int>(std::floor(maxY / CELL_SIZE));
+
+        // Insert entity into all overlapping grid cells
+        for (int cx = cellMinX; cx <= cellMaxX; ++cx) {
+            for (int cy = cellMinY; cy <= cellMaxY; ++cy) {
+                m_grid[CellCoord{ cx, cy }].push_back(entity);
+            }
+        }
     }
 
     // to access the internal grid 
@@ -306,8 +320,45 @@ namespace ECS {
                         dynamicEntities.push_back(entity);
                 });
 
+        //collect static entities 
+        std::vector<Entity> staticEntities;
+        staticEntities.reserve(128);
+
+        world.Each<Components::Rigidbody2D, Components::LocalTransform>(
+            [&](const Entity entity, const Components::Rigidbody2D& rb,
+                const Components::LocalTransform& transform) {
+
+                    // Only process STATIC bodies (mass == 0)
+                    if (rb.Mass > 0.0f) return;
+
+                    // Check if entity is active
+                    if (const auto* active = world.TryGet<Components::Active>(entity)) {
+                        if (!active->Enabled) return;
+                    }
+
+                    // Must have a collider to participate in collisions
+                    const bool hasCollider = world.Has<Components::CircleCollider2D>(entity) ||
+                        world.Has<Components::BoxCollider2D>(entity);
+                    if (!hasCollider) return;
+
+                    staticEntities.push_back(entity);
+            });
+
         SpatialPartitioning partition;
         for (const Entity entity : dynamicEntities) {
+            const auto* t = world.TryGet<Components::LocalTransform>(entity);
+            if (!t) continue;
+
+            if (const auto* c = world.TryGet<Components::CircleCollider2D>(entity)) {
+                partition.Insert(entity, t->Position, c->Radius);
+            }
+            else if (const auto* box = world.TryGet<Components::BoxCollider2D>(entity)) {
+                partition.InsertBox(entity, t->Position, box->HalfExtents);
+            }
+        }
+
+        // Add static entities to grid 
+        for (const Entity entity : staticEntities) {
             const auto* t = world.TryGet<Components::LocalTransform>(entity);
             if (!t) continue;
 
@@ -402,7 +453,6 @@ namespace ECS {
                 }
                 else if (boxA && circleB) {
                     collided = TestCircleBox(*circleB, *tB_ptr, *boxA, *tA_ptr, normal, depth);
-                    normal = normal * -1.0f;
                 }
 
                 if (!collided) continue;

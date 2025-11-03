@@ -418,20 +418,96 @@ namespace Engine {
     /* ================================================================
        Overlap: Circle vs AABB
        ================================================================ */
+       
+       // Replace the Overlap(Circle, AABB) function in Collision.cpp with this:
+
     bool Collision::Overlap(const Circle& a, const AABB& b, Manifold* m) {
+        // Find the closest point on the AABB to the circle center
         const float cx = std::min(std::max(a.Center.X, b.Min.X), b.Max.X);
         const float cy = std::min(std::max(a.Center.Y, b.Min.Y), b.Max.Y);
         const Vector2D closest(cx, cy);
 
+        // Vector from closest point to circle center
         const Vector2D d = a.Center - closest;
         const float d2 = d.SquareLength();
 
+        // Check if there's overlap
         if (d2 > a.Radius * a.Radius) return false;
         if (!m) return true;
 
         const float dLen = std::sqrt(std::max(d2, EPS));
-        m->Normal = (dLen > 0.f) ? d / dLen : Vector2D(0.f, 1.f);
-        m->Penetration = a.Radius - dLen;
+
+        // ========================================================================
+        // Check if circle center is inside the AABB
+        // ========================================================================
+        const bool insideX = (a.Center.X > b.Min.X && a.Center.X < b.Max.X);
+        const bool insideY = (a.Center.Y > b.Min.Y && a.Center.Y < b.Max.Y);
+        const bool centerInside = insideX && insideY;
+
+        Vector2D normal;
+        float penetration;
+
+        if (centerInside) {
+            // ====================================================================
+            // CIRCLE CENTER IS INSIDE BOX - Find shortest path out
+            // ====================================================================
+            // Calculate distance to each edge
+            const float leftDist = a.Center.X - b.Min.X;      // Distance to left edge
+            const float rightDist = b.Max.X - a.Center.X;     // Distance to right edge
+            const float bottomDist = a.Center.Y - b.Min.Y;    // Distance to bottom edge
+            const float topDist = b.Max.Y - a.Center.Y;       // Distance to top edge
+
+            // Find the minimum distance (closest edge to exit through)
+            float minDist = leftDist;
+            normal = Vector2D(-1.0f, 0.0f);  // Push left
+
+            if (rightDist < minDist) {
+                minDist = rightDist;
+                normal = Vector2D(1.0f, 0.0f);  // Push right
+            }
+            if (bottomDist < minDist) {
+                minDist = bottomDist;
+                normal = Vector2D(0.0f, -1.0f);  // Push down
+            }
+            if (topDist < minDist) {
+                minDist = topDist;
+                normal = Vector2D(0.0f, 1.0f);  // Push up
+            }
+
+            // Penetration is the radius plus distance to nearest edge
+            penetration = a.Radius + minDist;
+        }
+        else if (dLen < EPS) {
+            // ====================================================================
+            // EDGE CASE: Circle touching edge/corner exactly
+            // ====================================================================
+            // This happens when closest point equals circle center
+            // Default to pushing away from box center
+            const Vector2D boxCenter = (b.Min + b.Max) * 0.5f;
+            const Vector2D toCircle = a.Center - boxCenter;
+            const float toCircleLen = std::sqrt(toCircle.SquareLength());
+
+            if (toCircleLen > EPS) {
+                normal = toCircle / toCircleLen;
+            }
+            else {
+                // Extremely rare: circle center at box center
+                normal = Vector2D(0.0f, 1.0f);
+            }
+
+            penetration = a.Radius;
+        }
+        else {
+            // ====================================================================
+            // NORMAL CASE: Circle center is outside box
+            // ====================================================================
+            // Normal points from closest point on box toward circle center
+            normal = d / dLen;
+            penetration = a.Radius - dLen;
+        }
+
+        m->Normal = normal;
+        m->Penetration = penetration;
         m->Contact = closest;
         m->Valid = true;
 

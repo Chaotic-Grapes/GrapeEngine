@@ -38,12 +38,22 @@ namespace Sandbox {
 		// test entities storage
 		std::vector<uint64_t> testEntities;
 
+		// Systems - NEED THIS FOR RENDERING
+		std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
+
+		// Layer for rendering
+		uint16_t m_testLayer = 0;
+
 		// tests cases
 		void PhysicsCollisionResponse();
 		void PhysicsForces();
 		void BroadNarrowPhaseCollision();
 
 		//helper functions
+
+		//destroy entities
 		void DestroyEntities();
+		// create wall boundaries
+		void CreateStaticWall(float x, float y, float width, float height);
 	};
 }

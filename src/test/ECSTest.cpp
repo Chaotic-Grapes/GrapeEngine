@@ -84,6 +84,7 @@ void ECSTestScene::OnLoad() {
         ECS::LifetimeSystem::Update(s.GetWorld(), dt);
     }, "Lifetime System");
 
+
     // Configure physics world boundaries (account for wall thickness)
     const float wallThickness = 20.0f;
     Engine::Physics::SetWorldBounds(wallThickness, m_worldWidth - wallThickness, wallThickness, m_worldHeight - wallThickness, false, 0.8f);
