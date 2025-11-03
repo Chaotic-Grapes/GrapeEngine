@@ -43,11 +43,6 @@ std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
     // Get reference to appropriate cache (m_textures or m_audioFiles)
     auto& cache = GetCacheMap<T>();
 
-ResourceManager RM;
-
-// Template specialization for Texture
-template <>
-std::shared_ptr<Texture> ResourceManager::Get<Texture>(const std::string& name) {
     // Check cache first
     // typeid(T).name() returns the type name as a string (e.g. "Texture", "AudioData")
     auto it = cache.find(name);

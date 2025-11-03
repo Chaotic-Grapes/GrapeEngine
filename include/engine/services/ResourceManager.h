@@ -94,12 +94,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<Font>> m_fonts;
 };
 
-/**
- * @brief Global ResourceManager instance
- * 
- * Provides engine-wide access to the resource management system.
- * Use this instance to load and manage all game assets.
- */
+// Global ResourceManager instance
 extern ResourceManager RM;
 
 #endif
