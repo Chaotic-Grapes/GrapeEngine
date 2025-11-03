@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [windows-latest] #[ubuntu-latest, windows-latest]
         # optionally add macos-latest if desired
     timeout-minutes: 30
 
