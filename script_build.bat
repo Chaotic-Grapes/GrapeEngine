@@ -2,6 +2,10 @@
 set CONFIG=%1
 if "%CONFIG%"=="" set CONFIG=Debug
 
+REM Optional second arg: number of parallel jobs (defaults to number of processors)
+set JOBS=%2
+if "%JOBS%"=="" set JOBS=%NUMBER_OF_PROCESSORS%
+
 echo.
 echo ===============================================
 echo           Building Project (%CONFIG)
@@ -21,7 +25,7 @@ if %errorlevel% neq 0 (
 )
 
 REM Build the project
-cmake --build . --config %CONFIG%
+cmake --build . --config %CONFIG% --parallel %JOBS%
 if %errorlevel% neq 0 (
     echo ERROR: Build failed
     cd ..

@@ -28,7 +28,7 @@ jobs:
     - name: Build (CMake)
       shell: bash
       run: |
-        cmake --build build --config Release -- -j $(nproc || echo 2)
+        cmake --build build --config Release --parallel $(nproc || echo 2)
 
     - name: Run tests (ctest)
       shell: bash
