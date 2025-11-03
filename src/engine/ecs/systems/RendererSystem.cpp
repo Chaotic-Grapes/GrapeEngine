@@ -507,10 +507,19 @@ namespace ECS {
                                 2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
                                 1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z)
                             );
+                            
+                            // Calculate UV coordinates from Tiling and Offset
+                            // Tiling controls how much of the texture is shown (1.0 = full texture)
+                            // Offset controls where in the texture to start sampling (0.0 = top-left)
+                            const float u0 = sr.Offset.X;
+                            const float v0 = sr.Offset.Y;
+                            const float u1 = sr.Offset.X + sr.Tiling.X;
+                            const float v1 = sr.Offset.Y + sr.Tiling.Y;
+                            
                             m_renderer->submitSprite({
                                 ToGlm(Vector2D{position.X, position.Y}),
                                 ToGlm(Vector2D{scale.X, scale.Y}),
-                                {0.f, 0.f, 1.f, 1.f},
+                                {u0, v0, u1, v1},
                                 ToGlm(sr.Color),
                                 sr.TextureId,
                                 angleZ,

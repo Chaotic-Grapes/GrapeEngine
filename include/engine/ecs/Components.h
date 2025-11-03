@@ -301,6 +301,33 @@ namespace ECS {
 
         // TODO: Add Shader components
 
+        // ---------------------------------- Animation ----------------------------------
+
+        // Sprite sheet animation configuration (POD)
+        struct SpriteSheetAnimation2D {
+        public:
+            uint32_t TextureId = 0;           // Texture containing the sprite sheet
+            int FrameWidth = 0;               // Width of a single frame in pixels
+            int FrameHeight = 0;              // Height of a single frame in pixels
+            int SheetWidth = 0;               // Total width of the sprite sheet
+            int SheetHeight = 0;              // Total height of the sprite sheet
+            int StartFrame = 0;               // First frame index in the animation
+            int FrameCount = 0;               // Number of frames in the animation
+            float FramesPerSecond = 10.0f;    // Animation speed (FPS)
+            bool Loop = true;                 // Whether animation loops
+            bool Playing = true;              // Whether animation is currently playing
+        };
+        static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
+
+        // Animation state (runtime data, updated by AnimationSystem)
+        struct AnimationState2D {
+        public:
+            int CurrentFrame = 0;             // Current frame index (relative to StartFrame)
+            float TimeAccumulator = 0.0f;     // Time accumulated since last frame change
+            bool Finished = false;            // True if non-looping animation completed
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationState2D>, "AnimationState2D must be trivially copyable");
+
         // ---------- Minimal 2D shape data for debug rendering ----------
         // Keep these POD to be fast and compatible with archetype moves.
 

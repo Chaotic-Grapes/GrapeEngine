@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file   ECSTest.h
+\file   ECSTest.hpp
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \date   20th October 2025
@@ -80,7 +80,7 @@ namespace Sandbox {
             
             // Advanced Tests
             EntityPooling           = 1024,  // Test entity reuse and generation
-            ComponentIteration      = 1025,  // Test World.Each() performance
+            SpriteAnimation         = 1025,  // Test AnimationSystem with sprite sheets
             ArchetypeChanges        = 1026,  // Adding/removing components dynamically
         };
 
@@ -150,7 +150,7 @@ namespace Sandbox {
         
         // Advanced Tests
         void _testEntityPooling();
-        void _testComponentIteration();
+        void _testSpriteAnimation();
         void _testArchetypeChanges();
         
         // ------------------------------------
