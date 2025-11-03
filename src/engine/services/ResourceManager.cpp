@@ -19,6 +19,8 @@
 #include "core/Logger.h"
 #include <fstream>
 
+ResourceManager RM;
+
 // Template specialization for Texture
 template <>
 std::shared_ptr<Texture> ResourceManager::Get<Texture>(const std::string& name) {
