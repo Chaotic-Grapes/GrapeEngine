@@ -34,6 +34,7 @@ struct GLFWwindow;
 class World;
 namespace Audio { class IAudioDevice; }
 
+
 // Configuration structure for DebugUI appearance and layout
 struct DebugUIConfig {
     float FontScale = 1.35f;  // Global font scaling factor
@@ -120,7 +121,7 @@ private:
     void _showInputDebugWindow();
 
     // Display entity list with creation, deletion, cloning, and component editing
-    void _showGameObjectEditor();
+    //void _showGameObjectEditor();
 
     // Display audio system controls and library window
     void _showAudioWindow(Audio::FmodAudioDevice* audio);

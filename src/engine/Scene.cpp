@@ -2,7 +2,7 @@
 #include "services/DebugUI.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
-#include "services/Overlay.h"
+#include "services/OverlayService.h"
 #include "services/Time.h"
 
 void Scene::Update() {

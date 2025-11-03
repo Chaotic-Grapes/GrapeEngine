@@ -41,6 +41,7 @@ Features:
 #include "audio/FmodAudioDevice.h"
 #include "audio/SoundTypes.h"
 
+
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
 #endif
@@ -109,8 +110,9 @@ void DebugUI::Render() {
         _showEngineDebugWindow();
         _showPerformanceWindow();
         _showInputDebugWindow();
-        _showGameObjectEditor();
+        //_showGameObjectEditor();
         _showAudioWindow(audioPtr);
+        
 
         if (m_showDemo) {
             ImGui::ShowDemoWindow(&m_showDemo);
@@ -425,106 +427,106 @@ void DebugUI::_showInputDebugWindow() {
 }
 
 // Display entity list with creation, deletion, cloning and component editing
-void DebugUI::_showGameObjectEditor() {
-    // Use config values
-    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_EDITOR);
-
-    ImGui::Begin("Game Object Editor");
-
-    // Add new game object section
-    ImGui::Text("Create New Object:");
-    static char nameBuffer[DebugUIConfig::MAX_OBJECT_NAME_LENGTH];
-    if (m_newObjectName.length() < sizeof(nameBuffer)) {
-        // Store new object name
-        strcpy_s(nameBuffer, m_newObjectName.c_str());
-    }
-
-    if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))) {
-        m_newObjectName = nameBuffer;
-    }
-
-    // When button is clicked, create the object
-    if (ImGui::Button("Add Object") && !m_newObjectName.empty()) {
-        AddGameObject(m_newObjectName);
-        m_newObjectName = "NewObject"; // Reset
-    }
-
-    ImGui::Separator();
-
-    // Quick add buttons for common objects
-    ImGui::Text("Quick Add:");
-    if (ImGui::Button("Player")) AddGameObject("Player");
-    ImGui::SameLine();  // Make the next button appear on the same line instead of below
-    if (ImGui::Button("Enemy")) AddGameObject("Enemy");
-    ImGui::SameLine();
-    if (ImGui::Button("Collectible")) AddGameObject("Collectible");
-
-    // Display list of current objects
-    const auto entities = m_world->GetEntityManager().GetAllEntities();
-    ImGui::Text("Current Objects (%zu):", entities.size());
-
-    // For each object
-    for (const auto& entId : entities) {
-        auto entity = m_world->GetEntityManager().GetEntity(entId); // Ensure entity is valid
-
-        // Active status
-        std::stringstream oss;
-        oss << "[" << entity.GetId() << "] " << entity.GetName();
-        if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(entId))) {
-            // Delete button for each object
-            if (ImGui::SmallButton(_getDeleteLabel(entId).c_str())) {
-                RemoveGameObject(entId);
-                break;
-            }
-
-            // Clone button for each object
-            ImGui::SameLine();
-            if (ImGui::SmallButton(_getCloneLabel(entId).c_str())) {
-                CloneGameObject(entity);
-                break;
-            }
-
-            ImGui::SeparatorText("Transform");
-
-            // Get pointer to transform component to ensure we're modifying the actual component
-            auto* transform = entity.GetComponent<Component::Transform>();
-            if (transform) {
-                // BEFORE modification
-                ImGui::Text("DEBUG: Current Scale: (%.2f, %.2f)", transform->Scale.X, transform->Scale.Y);
-
-                ImGui::Text("Position");
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("X##P" + std::to_string(entId)).c_str(), &transform->Position.X);
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("Y##P" + std::to_string(entId)).c_str(), &transform->Position.Y);
-
-                ImGui::SetNextItemWidth(100.f);
-                ImGui::InputFloat(std::string("Rotation##" + std::to_string(entId)).c_str(), &transform->Rotation);
-
-                ImGui::Text("Scale");
-                ImGui::SetNextItemWidth(100.f);
-                if (ImGui::InputFloat(std::string("X##S" + std::to_string(entId)).c_str(), &transform->Scale.X)) {
-                    // Print when value changes
-                    std::cout << "Scale.X changed to: " << transform->Scale.X << std::endl;
-                }
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(100.f);
-                if (ImGui::InputFloat(std::string("Y##S" + std::to_string(entId)).c_str(), &transform->Scale.Y)) {
-                    std::cout << "Scale.Y changed to: " << transform->Scale.Y << std::endl;
-                }
-            }
-        }
-    }
-    ImGui::Separator();
-
-    // Clear all buttons
-    if (ImGui::Button("Clear All Objects")) {
-        ClearAllGameObjects();
-    }
-
-    ImGui::End();
-}
+//void DebugUI::_showGameObjectEditor() {
+//    // Use config values
+//    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_EDITOR);
+//
+//    ImGui::Begin("Game Object Editor");
+//
+//    // Add new game object section
+//    ImGui::Text("Create New Object:");
+//    static char nameBuffer[DebugUIConfig::MAX_OBJECT_NAME_LENGTH];
+//    if (m_newObjectName.length() < sizeof(nameBuffer)) {
+//        // Store new object name
+//        strcpy_s(nameBuffer, m_newObjectName.c_str());
+//    }
+//
+//    if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))) {
+//        m_newObjectName = nameBuffer;
+//    }
+//
+//    // When button is clicked, create the object
+//    if (ImGui::Button("Add Object") && !m_newObjectName.empty()) {
+//        AddGameObject(m_newObjectName);
+//        m_newObjectName = "NewObject"; // Reset
+//    }
+//
+//    ImGui::Separator();
+//
+//    // Quick add buttons for common objects
+//    ImGui::Text("Quick Add:");
+//    if (ImGui::Button("Player")) AddGameObject("Player");
+//    ImGui::SameLine();  // Make the next button appear on the same line instead of below
+//    if (ImGui::Button("Enemy")) AddGameObject("Enemy");
+//    ImGui::SameLine();
+//    if (ImGui::Button("Collectible")) AddGameObject("Collectible");
+//
+//    // Display list of current objects
+//    const auto entities = m_world->GetEntityManager().GetAllEntities();
+//    ImGui::Text("Current Objects (%zu):", entities.size());
+//
+//    // For each object
+//    for (const auto& entId : entities) {
+//        auto entity = m_world->GetEntityManager().GetEntity(entId); // Ensure entity is valid
+//
+//        // Active status
+//        std::stringstream oss;
+//        oss << "[" << entity.GetId() << "] " << entity.GetName();
+//        if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(entId))) {
+//            // Delete button for each object
+//            if (ImGui::SmallButton(_getDeleteLabel(entId).c_str())) {
+//                RemoveGameObject(entId);
+//                break;
+//            }
+//
+//            // Clone button for each object
+//            ImGui::SameLine();
+//            if (ImGui::SmallButton(_getCloneLabel(entId).c_str())) {
+//                CloneGameObject(entity);
+//                break;
+//            }
+//
+//            ImGui::SeparatorText("Transform");
+//
+//            // Get pointer to transform component to ensure we're modifying the actual component
+//            auto* transform = entity.GetComponent<Component::Transform>();
+//            if (transform) {
+//                // BEFORE modification
+//                ImGui::Text("DEBUG: Current Scale: (%.2f, %.2f)", transform->Scale.X, transform->Scale.Y);
+//
+//                ImGui::Text("Position");
+//                ImGui::SetNextItemWidth(100.f);
+//                ImGui::InputFloat(std::string("X##P" + std::to_string(entId)).c_str(), &transform->Position.X);
+//                ImGui::SameLine();
+//                ImGui::SetNextItemWidth(100.f);
+//                ImGui::InputFloat(std::string("Y##P" + std::to_string(entId)).c_str(), &transform->Position.Y);
+//
+//                ImGui::SetNextItemWidth(100.f);
+//                ImGui::InputFloat(std::string("Rotation##" + std::to_string(entId)).c_str(), &transform->Rotation);
+//
+//                ImGui::Text("Scale");
+//                ImGui::SetNextItemWidth(100.f);
+//                if (ImGui::InputFloat(std::string("X##S" + std::to_string(entId)).c_str(), &transform->Scale.X)) {
+//                    // Print when value changes
+//                    std::cout << "Scale.X changed to: " << transform->Scale.X << std::endl;
+//                }
+//                ImGui::SameLine();
+//                ImGui::SetNextItemWidth(100.f);
+//                if (ImGui::InputFloat(std::string("Y##S" + std::to_string(entId)).c_str(), &transform->Scale.Y)) {
+//                    std::cout << "Scale.Y changed to: " << transform->Scale.Y << std::endl;
+//                }
+//            }
+//        }
+//    }
+//    ImGui::Separator();
+//
+//    // Clear all buttons
+//    if (ImGui::Button("Clear All Objects")) {
+//        ClearAllGameObjects();
+//    }
+//
+//    ImGui::End();
+//}
 
 // Helper function to create entities with basic components
 Entity DebugUI::_createGameEntity(const std::string& name) {
