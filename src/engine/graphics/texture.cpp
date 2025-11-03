@@ -32,7 +32,7 @@ roughness maps) where gamma correction must not be applied.
 #include "services/ResourceManager.h"
 #include <iostream>
 
-ResourceManager RM;
+// ResourceManager RM;
 
 // ============================================================================
 // Loads texture data from disk using stb_image and uploads it to the GPU.
@@ -67,10 +67,10 @@ void Texture::loadFromFile(const std::string& path) {
     // ------------------------------------------------------------
     // Configure texture sampling and wrapping behavior
     // ------------------------------------------------------------
-    // NEAREST filtering keeps pixel edges sharp — ideal for sprites or pixel art.
+    // NEAREST filtering keeps pixel edges sharp ï¿½ ideal for sprites or pixel art.
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    // Clamp UVs beyond [0,1] to edge texel — prevents bleeding between atlas regions.
+    // Clamp UVs beyond [0,1] to edge texel ï¿½ prevents bleeding between atlas regions.
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
@@ -149,7 +149,7 @@ Texture::Texture(Texture&& other) noexcept {
 
 // ============================================================================
 // Move assignment: releases current texture, then takes ownership of another.
-// Prevents double-deletion by resetting the source texture’s state.
+// Prevents double-deletion by resetting the source textureï¿½s state.
 // ============================================================================
 Texture& Texture::operator=(Texture&& other) noexcept {
     if (this != &other) {

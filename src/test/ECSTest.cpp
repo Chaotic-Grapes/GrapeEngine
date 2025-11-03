@@ -47,7 +47,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using namespace Sandbox;
 using namespace ECS;
 
-extern ResourceManager RM;
+// extern ResourceManager RM;
 
 // ================================================================================================
 // SCENE LIFECYCLE

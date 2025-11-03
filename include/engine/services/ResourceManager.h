@@ -150,6 +150,6 @@ private:
  * Provides engine-wide access to the resource management system.
  * Use this instance to load and manage all game assets.
  */
-extern ResourceManager RM;
+inline ResourceManager RM;
 
 #endif

@@ -58,7 +58,7 @@ using namespace ECS;
 constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::BasicGraphics;
 constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::ObjectPicking;
 
-extern ResourceManager RM;
+// extern ResourceManager RM;
 
 namespace {
     SpriteMetadata* _getMetaDataForTexture(const std::string& texturePath) {
