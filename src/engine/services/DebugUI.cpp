@@ -50,22 +50,15 @@ Features:
 
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the scene
-DebugUI::DebugUI(const DebugUIConfig& config) : m_config(config) {}
+DebugUI::DebugUI(World* world, const DebugUIConfig& config) {
+    m_world = world;
+    m_config = config;
+}
 
 DebugUI::~DebugUI() {
     // Clean up resources only if UI was initialized
     if (m_initialized) Shutdown();
 }
-
-namespace {
-    Audio::FmodAudioDevice* audioPtr = nullptr;
-}
-
-// Attach audio device for monitoring
-void DebugUI::AttachAudio(Audio::FmodAudioDevice* device) { audioPtr = device; }
-
-// Detach audio device
-void DebugUI::DetachAudio() { audioPtr = nullptr; }
 
 // Initialize ImGui context and backends
 void DebugUI::Initialize(GLFWwindow* pWin) {
@@ -83,7 +76,7 @@ void DebugUI::Initialize(GLFWwindow* pWin) {
     ImGui::StyleColorsDark(); // Set dark theme colors
     ImGuiStyle& style = ImGui::GetStyle();
     style.TabBarBorderSize = 0.0f; // keep outline under tabs hidden
-    ImGui_ImplGlfw_InitForOpenGL(window, true); // GLFW backend (window/input handling)
+    ImGui_ImplGlfw_InitForOpenGL(pWin, true); // GLFW backend (window/input handling)
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
 
     m_initialized = true;  // Mark that DebugUI has been initialized
@@ -113,7 +106,7 @@ void DebugUI::Render() {
         _showEngineDebugWindow();
         _showPerformanceWindow();
         _showInputDebugWindow();
-        _showAudioWindow(audioPtr);
+        _showAudioWindow(m_audioPtr);
         
 
         if (m_showDemo) {

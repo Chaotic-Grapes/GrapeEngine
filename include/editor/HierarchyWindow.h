@@ -26,7 +26,9 @@ parent-child relationships.
 
 // Forward declarations
 struct ImFont;
-class World;
+namespace ECS {
+    class World;
+}
 
 class HierarchyWindow {
 public:
@@ -34,7 +36,7 @@ public:
     using SelectionCallback = std::function<void(EntityId)>;
 
     // Initialize with fonts, world reference, and EditorCore for entity operations
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world, EditorCore* editorCore);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, EditorCore* editorCore);
 
     // Render the hierarchy window
     void Render();
@@ -65,7 +67,7 @@ private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
-    World* m_world = nullptr;
+    ECS::World* m_world = nullptr;
     EditorCore* m_editorCore = nullptr;
 
     // Selection state

@@ -1,3 +1,13 @@
+#include "services/OverlayService.h"
+#include "services/WindowManager.h"
+#include "services/DebugUI.h"
+#include "services/Input.h"
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_internal.h>
+
+#ifdef USE_IMGUI
+
 namespace Services {
     void OverlayService::Initialize() {
         if (m_world) {
@@ -26,7 +36,7 @@ namespace Services {
     }
 
     void OverlayService::Update() {
-        if (Input::IsKeyDown(GLFW_KEY_F1))
+        if (Input::IsKeyDown(KEY_F1))
             SetEnabled(!IsEnabled());
         if (!IsEnabled()) return;
 
@@ -154,9 +164,7 @@ namespace Services {
     void OverlayService::Terminate() {
         if (m_debugUI) 
             m_debugUI->Shutdown();
-        if (m_levelEditor)
-            m_levelEditor->Shutdown(); // Assuming LevelEditor has Shutdown method
-        DebugUI::DetachAudio();
+            m_debugUI->DetachAudio();
     }
 
 #else

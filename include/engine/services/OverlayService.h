@@ -23,68 +23,73 @@ References:
 */
 /* End Header *******************************************************************/
 
-#ifndef OVERLAY_H
-#define OVERLAY_H
+#ifndef OVERLAY_SERVICE_H
+#define OVERLAY_SERVICE_H
 #include <memory>
-#include "ecs/ISystem.h"
-#include "services/DebugUI.h"
-#include "core/Application.h"
+#include <string>
+#include "core/IService.h"
 #include "audio/FmodAudioDevice.h"
+#include "services/DebugUI.h"
+#include "services/UICommon.h"
+#include "services/WindowManager.h"
+#include "services/Input.h"
+#include "scene/SceneManager.h"
+#include "ecs/World.h"
 #include "../editor/LevelEditor.h"
 
-// Forward declarations
-class World;
-#ifdef USE_IMGUI
-class DebugUI;
-class LevelEditor;
-#endif
+namespace Services {
 
-// Overlay system for managing debug UI, level editor, and ImGui integration
-class Overlay final : public Engine::ISystem {
-public:
-    // Constructor: initialize overlay with world reference
-    explicit Overlay(World* world) : m_world(world) {}
+    // Service that manages debug UI, level editor, and ImGui integration
+    class OverlayService final : public Engine::IService {
+    public:
+        // We need static inline because PhysicsSystem needs to find the existing OverlayService
+        // but doesn't have an OverlayService object to call Get() on
+        // Static methods can be called without an instance, allowing access to the singleton instance
+        static inline OverlayService* m_overlayInstance = nullptr;
 
-    // Initialize overlay system and create UI instances
-    void OnCreate() override;
+        // Set instance in constructor
+        explicit OverlayService(Scenes::SceneManager& sceneManager) : IService("Overlay Service"), 
+            m_sceneManager(sceneManager) { m_overlayInstance = this; }
 
-    // Update overlay system each frame (handles UI rendering and updates)
-    void OnUpdate() override;
+        // Clear instance in destructor
+        ~OverlayService() { m_overlayInstance = nullptr; }
 
-#ifdef USE_IMGUI
-    // Destructor: cleanup debug UI and detach audio system
-    ~Overlay() override;
-#endif
+        // Standard functions
+        void Initialize() override;
+        void Update() override;
+        void Render() override;
+        void Terminate() override;
 
-    // Get system name for debugging and logging
-    std::string Name() const override { return "Overlay"; }
+        // Audio passthrough for debug monitoring
+        void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
 
-    // Set audio system for debug monitoring
-    void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
+        // Scene/world configuration
+        void SetWorld(ECS::World* world) { m_world = world; }
 
-    // Check if game is currently playing (exposed for physics system)
-    bool IsGamePlaying() const { return m_levelEditor && m_levelEditor->IsPlaying(); }
+        // Game playback helpers exposed to other systems
+        bool IsGamePlaying() const { return m_levelEditor && m_levelEditor->IsPlaying(); }
+        bool IsStepRequested() const { return m_levelEditor && m_levelEditor->IsStepRequested(); }
+        void ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
 
-    // Check if physics step is requested
-    bool IsStepRequested() const { return m_levelEditor && m_levelEditor->IsStepRequested(); }
+        // This method belongs to the CLASS, not instances
+        // Can be called as OverlayService::Get() without needing an object first
+        static inline OverlayService* Get() { return m_overlayInstance; }
 
-    // Clear step request flag after processing
-    void ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
+    private:
+        // References
+        Scenes::SceneManager& m_sceneManager;
+        Audio::FmodAudioDevice* m_audioDevice = nullptr;
+        ECS::World* m_world = nullptr;
 
-private:
-    Audio::FmodAudioDevice* m_audioDevice = nullptr;  // Audio system for debug monitoring
+    #ifdef USE_IMGUI
+        // ImGui-driven UI
+        std::unique_ptr<DebugUI> m_debugUI;
+        std::unique_ptr<LevelEditor> m_levelEditor;
+        bool m_initialized = false;
+        bool m_dockLayoutBuilt = false;
+    #endif
+    };
 
-    // Set world reference for entity management
-    void SetWorld(World* world) { m_world = world; }
-
-    World* m_world = nullptr;  // World reference for entity management
-
-#ifdef USE_IMGUI
-    std::unique_ptr<DebugUI> m_debugUI;          // Debug UI instance
-    std::unique_ptr<LevelEditor> m_levelEditor;  // Level editor instance
-    bool m_initialized = false;                  // ImGui initialization flag
-    bool m_dockLayoutBuilt = false;              // Dock space layout built flag
-#endif
-};
+}
 
 #endif

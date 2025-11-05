@@ -29,7 +29,7 @@ Reference:
 #include <imgui.h>
 
 // Constructor: stores pointer to the world
-Playback::Playback(World* world)
+Playback::Playback(ECS::World* world)
     : m_world(world) {
 }
 
@@ -107,6 +107,7 @@ void Playback::Render() {
         );
         ImGui::EndTooltip();
     }
+
     // If the buttons have been clicked, they get grayed out
     auto button = [&](const char* icon, bool shouldBeEnabled, GameState newState, const char* logMsg,
         bool isStepButton = false, ImVec2 size = ImVec2(100, 40))
@@ -143,11 +144,11 @@ void Playback::Render() {
     // Center buttons horizontally within available content region (Y unchanged)
     {
         float btnWidth = 100.0f;
-        float spacing = ImGui::GetStyle().ItemSpacing.x;      // Default horizontal spacing between buttons from ImGui style
-        float totalWidth = btnWidth * 3.0f + spacing * 2.0f;  // Total width = 3 buttons + 2 spaces between them
-        float availWidth = ImGui::GetContentRegionAvail().x;  // Get width of available space in current ImGui window/content region
-        float startX = (availWidth - totalWidth) * 0.5f;      // Compute starting X position so buttons are centered
-        if (startX < 0.0f) startX = 0.0f;                     // If available width < total width, don't use negative starting pos
+        float spacing = ImGui::GetStyle().ItemSpacing.x;       // Default horizontal spacing between buttons from ImGui style
+        float totalWidth = btnWidth * 3.0f + spacing * 2.0f;   // Total width = 3 buttons + 2 spaces between them
+        float availWidth = ImGui::GetContentRegionAvail().x;   // Get width of available space in current ImGui window/content region
+        float startX = (availWidth - totalWidth) * 0.5f;       // Compute starting X position so buttons are centered
+        if (startX < 0.0f) startX = 0.0f;                      // If available width < total width, don't use negative starting pos
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startX);
     }
 
@@ -188,22 +189,22 @@ void Playback::_saveWorldState() {
 
     LOG_INFO("Saving world state...");
 
-    // Get all entities and serialize them
-    auto entities = m_world->GetEntityManager().GetAllEntities();
+    // Collect all entities and serialize them
     nlohmann::json worldJson = nlohmann::json::array();
+    size_t entityCount = 0;
 
-    // Loop through each entity and serialize it to JSON
-    for (const auto& entityId : entities) {
-        auto entity = m_world->GetEntityManager().GetEntity(entityId);
+    // Use World's Each() to iterate all entities
+    m_world->Each([&](ECS::Entity entity) {
         // Serialize the entity (including all components and their data)
-        auto entityJson = Serialization::EntitySerializer::SerializeEntity(entity);
+        auto entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
         // Add serialized entity to the world snapshot
         worldJson.push_back(entityJson);
-    }
+        entityCount++;
+        });
 
     // Store the snapshot in a member variable for later restoration
     m_savedWorldState = worldJson;
-    LOG_INFO("Saved " << entities.size() << " entities");
+    LOG_INFO("Saved " << entityCount << " entities");
 }
 
 // Restore the world state to previously saved snapshot
@@ -216,7 +217,14 @@ void Playback::_restoreWorldState() {
     LOG_INFO("Restoring world state...");
 
     // Delete all current entities
-    m_world->GetEntityManager().DestroyAllEntities();
+    std::vector<ECS::Entity> allEntities;
+    m_world->Each([&](ECS::Entity e) {
+        allEntities.push_back(e);
+        });
+
+    for (const auto& e : allEntities) {
+        m_world->Destroy(e);
+    }
 
     // Recreate from saved JSON
     for (const auto& entityJson : m_savedWorldState) {

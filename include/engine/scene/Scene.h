@@ -91,24 +91,24 @@ namespace Scenes {
         virtual void OnExit() {}
 
         // ********************** Core API ********************** //
-        
+
         /**
          * @brief Access the ECS world for this scene.
          * @return Reference to the ECS::World instance.
          */
-        ECS::World& GetWorld()                { return m_world; }
+        ECS::World& GetWorld() { return m_world; }
 
         /**
          * @brief Access the ECS world for this scene (const version).
          * @return Const reference to the ECS::World instance.
          */
-        const ECS::World& GetWorld() const    { return m_world; }
+        const ECS::World& GetWorld() const { return m_world; }
 
         /**
          * @brief Access the LayerManager for this scene.
          * @return Reference to the LayerManager instance.
          */
-        LayerManager& GetLayers()             { return m_layers; }
+        LayerManager& GetLayers() { return m_layers; }
 
         /**
          * @brief Access the LayerManager for this scene (const version).
@@ -165,7 +165,7 @@ namespace Scenes {
             entry.Enabled = true;
             entry.Callback = std::move(sys);
             m_systems.emplace_back(std::move(entry));
-            
+
             return m_systems.back().Id;
         }
 
@@ -178,7 +178,7 @@ namespace Scenes {
         template<typename... TCs>
         ECS::Entity CreateOnLayer(const uint16_t layerId, TCs&&... cs) {
             const ECS::Entity e = m_world.Create(std::forward<TCs>(cs)...);
-            m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{layerId});
+            m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ layerId });
             m_layers.OnLayerSet(e, layerId);
 
             return e;
@@ -198,7 +198,7 @@ namespace Scenes {
                 m_layers.OnLayerRemoved(e, prev);
             }
 
-            m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{id});
+            m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ id });
             m_layers.OnLayerSet(e, id);
         }
 
@@ -305,7 +305,7 @@ namespace Scenes {
                 if (s.Enabled && s.Callback) {
                     Profiler::Get().BeginScope(s.Name ? s.Name : "Unknown System");
                     s.Callback(*this, dt);
-					Profiler::Get().EndScope(s.Name ? s.Name : "Unknown System");
+                    Profiler::Get().EndScope(s.Name ? s.Name : "Unknown System");
                 }
             }
             ECS::Hierarchy::UpdateTransforms(m_world);

@@ -79,7 +79,7 @@ namespace ECS {
         // 2 instances when physics should run:
         // 1) Playing (IsGamePlaying() == true, IsStepRequested() == false) 
         // 2) Paused + STEP (IsGamePlaying() == false, IsStepRequested() == true)
-        auto* overlay = world.GetSystem<Overlay>();
+        auto* overlay = Services::OverlayService::Get();
         if (!overlay) {
             return; 
         }

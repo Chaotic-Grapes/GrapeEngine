@@ -29,7 +29,9 @@ HOW IT WORKS:
 
 // Forward declarations
 struct ImFont;
-class World;
+namespace ECS {
+    class World;
+}
 
 class InspectorWindow {
 public:
@@ -41,7 +43,7 @@ public:
     };
 
     // Initialize with fonts and world reference
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
 
     // Render the inspector window
     void Render(float fontScale);
@@ -101,7 +103,7 @@ private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
-    World* m_world = nullptr;
+    ECS::World* m_world = nullptr;
 
     // Inspection state
     InspectionMode m_mode = InspectionMode::None;

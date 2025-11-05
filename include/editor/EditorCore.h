@@ -32,7 +32,7 @@ public:
     ~EditorCore() = default;
 
     // Initialize with fonts and world reference
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
 
     // Render main menu bar at top of screen
     void ShowEditorWindows();
@@ -58,8 +58,8 @@ private:
     // Render main menu bar with File menu
     void _showMainMenu();
 
-    // Create entity with default components (Transform, Shape, Collider)
-    Entity _createGameEntity(const std::string& name);
+    // Create entity with default components (Name, LocalTransform, Shape, Collider)
+    ECS::Entity _createGameEntity(const std::string& name);
 
     // Clear cached UI labels when entities change
     void _invalidateCache();
@@ -73,7 +73,7 @@ private:
     const bool& _getCollapsedHeaderBool(EntityId id) const;
 
     // Core state
-    World* m_world = nullptr;
+    ECS::World* m_world = nullptr;
     EntityId m_selectedEntityId = 0;
 
     // Fonts for UI rendering

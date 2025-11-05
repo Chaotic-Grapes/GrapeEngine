@@ -1,4 +1,4 @@
-#include "Scene.h"
+#include "scene/Scene.h"
 #include "services/DebugUI.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
@@ -29,7 +29,7 @@ void Scene::Load() {
     m_world->AddSystem<Engine::PhysicsSystem>(m_world.get());
     m_world->AddSystem<Engine::RendererSystem>(m_world.get());
 
-	// This must be added last so it renders on top of everything else
+    // This must be added last so it renders on top of everything else
 #ifdef USE_IMGUI
     const auto overlay = m_world->AddSystem<Overlay>(m_world.get());
 
@@ -43,7 +43,7 @@ void Scene::Load() {
 }
 
 void Scene::Unload() {
-	if (!m_world) return;
+    if (!m_world) return;
     m_world->_shutdown();
     OnUnload();
 }

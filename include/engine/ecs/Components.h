@@ -29,7 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <vector>
 #include <iostream>
 #include "services/ResourceManager.h"
-#include "ecs/ComponentManager.h"
+#include "ecs/ComponentRegistry.h"
 #include "math/Vector2D.h"
 #include "math/Vector3D.h"
 #include "math/Vector4D.h"
@@ -177,7 +177,6 @@ namespace ECS {
             Vector3D Position{0,0,0};
             Quaternion Rotation{0,0,0,1.f};
             Vector3D Scale{1.f,1.f,1.f};
-            EntityId ParentId = 0;  // 0 means no parent (root entity)
         };
         static_assert(std::is_trivially_copyable_v<LocalTransform>, "LocalTransform must be trivially copyable");
 

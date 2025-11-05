@@ -35,9 +35,9 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
     m_symbolsFont = symbolsFont;
 }
 
-// Render Transform component UI
+// Render LocalTransform component UI (was RenderTransform)
 // Allows editing of rotation, position and scale
-void ComponentUI::RenderTransform(nlohmann::json& data) {
+void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Local Rotation", "Local Position", "Local Scale" });
     EditorUI::RenderFloatRow("Local Rotation", "R", data, "Rotation", 1.0f);         // Single float row
     EditorUI::RenderVector2DRow("Local Position", data["Position"], "X", "Y", 1.0f); // 2D vector row
@@ -45,9 +45,9 @@ void ComponentUI::RenderTransform(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
-// Render SpriteRenderer component UI
+// Render SpriteRenderer2D component UI (was RenderSpriteRenderer)
 // Includes sprite texture, color tint, flip options and sorting info
-void ComponentUI::RenderSpriteRenderer(nlohmann::json& data) {
+void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Sprite", "Color", "Flip", "Sorting Layer", "Order in Layer" });
 
     // Sprite texture path display with drag-and-drop support
@@ -230,127 +230,60 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
-// Render LineRenderer component UI
-// Allows editing start/end points, thickness and color
-void ComponentUI::RenderLineRenderer(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Start", "End", "Thickness", "Color" });
+// Render ShapeCircle2D component UI
+// Allows editing radius, offset, color, thickness and fill options
+void ComponentUI::RenderShapeCircle2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Radius", "Offset", "Color", "Thickness", "Filled" });
 
-    // Same same
-    EditorUI::RenderVector2DRow("Start", data["Start"], "X", "Y", 1.0f);
-    EditorUI::RenderVector2DRow("End", data["End"], "X", "Y", 1.0f);
+    EditorUI::RenderFloatRow("Radius", "px", data, "Radius", 1.0f);
+    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
+    EditorUI::RenderColorProperty("Color##ShapeCircle", data["Color"]);
     EditorUI::RenderFloatRow("Thickness", "px", data, "Thickness", 0.1f);
-    EditorUI::RenderColorProperty("Color##Line", data["Color"]);
+
+    // Filled checkbox
+    ImGui::Text("Filled");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetCurrentLabelOffset());
+    bool filled = data.value("Filled", false);
+    if (ImGui::Checkbox("##FilledCircle", &filled)) {
+        data["Filled"] = filled;
+    }
 
     EditorUI::EndPropertySection();
 }
 
-// Render ShapeRenderer2D component UI
-// Allows editing shape type (rectangle, circle, polygon), dimensions, points, colors and outline
-void ComponentUI::RenderShapeRenderer2D(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Shape Type", "Size", "Radius", "Fill Color", "Outline Color", "Thickness" });
+// Render ShapeBox2D component UI
+// Allows editing half extents (size), offset, color, thickness and fill options
+void ComponentUI::RenderShapeBox2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Half Extents", "Offset", "Color", "Thickness", "Filled" });
 
-    // Shape Type dropdown (Rectangle, Circle, Polygon)
-    ImGui::Text("Shape Type");
+    EditorUI::RenderVector2DRow("Half Extents", data["HalfExtents"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
+    EditorUI::RenderColorProperty("Color##ShapeBox", data["Color"]);
+    EditorUI::RenderFloatRow("Thickness", "px", data, "Thickness", 0.1f);
+
+    // Filled checkbox
+    ImGui::Text("Filled");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetCurrentLabelOffset());
-    ImGui::SetNextItemWidth(100);
-
-    // Dropdown options
-    const char* shapeTypes[] = { "Rectangle", "Circle", "Polygon" };
-
-    // Read current shape type from JSON
-    int currentShape = data.value("Type", 0);
-    if (ImGui::Combo("##ShapeType", &currentShape, shapeTypes, 3)) {
-        // Update JSON if user changes selection
-        data["Type"] = currentShape;
+    bool filled = data.value("Filled", false);
+    if (ImGui::Checkbox("##FilledBox", &filled)) {
+        data["Filled"] = filled;
     }
 
-    // Shape-specific properties based on selected type
-    if (currentShape == 0) {       // Rectangle
-        EditorUI::RenderVector2DRow("Size##Rectangle", data["Size"], "X", "Y", 1.0f);
-    }
-    else if (currentShape == 1) {  // Circle
-        EditorUI::RenderFloatRow("Radius##Circle2", "px", data, "Radius", 1.0f);
-    }
-    else if (currentShape == 2) {  // Polygon
-        ImGui::PushFont(m_boldFont);
-        ImGui::Text("Points");
-        ImGui::PopFont();
+    EditorUI::EndPropertySection();
+}
 
-        // Reference JSON array of points
-        auto& points = data["Points"];
-        // Width for widest expected label
-        float maxWidth = ImGui::CalcTextSize("Point 88").x;  
+// Render ShapeLine2D component UI (was RenderLineRenderer)
+// Allows editing start/end points, thickness and color
+void ComponentUI::RenderShapeLine2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Point A", "Point B", "Thickness", "Color" });
 
-        // Loop through all polygon points
-        for (size_t i = 0; i < points.size(); i++) {
-            // Unique ID for ImGui widgets to avoid conflicts
-            ImGui::PushID(static_cast<int>(i));
-
-            // Display point label (Point 0, Point 1, etc.) and align X/Y fields
-            std::string label = "Point " + std::to_string(i);
-            ImGui::Text("%s", label.c_str());
-            // Get the width of the label in pixels
-            float currentWidth = ImGui::CalcTextSize(label.c_str()).x;
-
-            // If the label is narrower than the max width, adjust next widget position
-            if (currentWidth < maxWidth) {
-                ImGui::SameLine();
-                // Shift cursor to align X/Y fields with other points
-                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (maxWidth - currentWidth));
-            }
-
-            // Render the X/Y editable fields for this point
-            EditorUI::BeginPropertySection({ "Point" });
-            EditorUI::RenderVector2DRow("##Point", points[i], "X", "Y", 1.0f);
-            EditorUI::EndPropertySection();
-
-            // Delete point button
-            ImGui::SameLine();
-            ImGui::PushFont(m_symbolsFont);
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));                    // Transparent background
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f)); // Subtle hover
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));  // Subtle active
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));          // Red text/icon
-
-            // Like a red circle with an X inside icon (don't know which looks best)
-            if (ImGui::SmallButton("\xEE\x97\x89")) { 
-                points.erase(points.begin() + i);
-                ImGui::PopStyleColor(4);
-                ImGui::PopFont();
-                ImGui::PopID();
-                break;  // Exit loop since we modified the array
-            }
-
-            // Restore ImGui style & font for next iteration
-            ImGui::PopStyleColor(4);
-            ImGui::PopFont();
-            ImGui::PopID();
-        }
-
-        // Add new point button
-        if (ImGui::Button("Add Point")) {
-            points.push_back({ {"X", 0.0f}, {"Y", 0.0f} });
-        }
-
-        // Closed polygon checkbox
-        ImGui::SameLine();
-        bool closed = data.value("Closed", true);
-        if (ImGui::Checkbox("Closed##PolygonClosed", &closed)) {
-            data["Closed"] = closed;
-        }
-    }
-
-    // Color properties (shared by all shape types)
-    ImGui::Separator();
-    ImGui::PushFont(m_boldFont);
-    ImGui::Text("Colors"); // Header for color section
-    ImGui::PopFont();
-
-    // Fill and outline colors
-    EditorUI::RenderColorProperty("Fill Color##Shape", data["FillColor"]);
-    EditorUI::RenderColorProperty("Outline Color##Shape", data["OutlineColor"]);
-    EditorUI::RenderFloatRow("\" Thickness", "px", data, "OutlineThickness", 0.1f); // Outline thickness
+    // Using "A" and "B" to match the component struct field names
+    EditorUI::RenderVector2DRow("Point A", data["A"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Point B", data["B"], "X", "Y", 1.0f);
+    EditorUI::RenderFloatRow("Thickness", "px", data, "Thickness", 0.1f);
+    EditorUI::RenderColorProperty("Color##ShapeLine", data["Color"]);
 
     EditorUI::EndPropertySection();
 }

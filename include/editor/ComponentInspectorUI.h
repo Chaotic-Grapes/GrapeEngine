@@ -33,13 +33,15 @@ public:
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
 
     // Render functions that work on BOTH JSON and live components
-    void RenderTransform(nlohmann::json& data);
-    void RenderSpriteRenderer(nlohmann::json& data);
-    void RenderRigidbody2D(nlohmann::json& data);
-    void RenderCircleCollider2D(nlohmann::json& data);
-    void RenderBoxCollider2D(nlohmann::json& data);
-    void RenderShapeRenderer2D(nlohmann::json& data);
-    void RenderLineRenderer(nlohmann::json& data);
+    // Updated to match new ECS::Components namespace
+    void RenderLocalTransform(nlohmann::json& data);        
+    void RenderSpriteRenderer2D(nlohmann::json& data);      
+    void RenderRigidbody2D(nlohmann::json& data);           
+    void RenderCircleCollider2D(nlohmann::json& data);      
+    void RenderBoxCollider2D(nlohmann::json& data);         
+    void RenderShapeCircle2D(nlohmann::json& data);         
+    void RenderShapeBox2D(nlohmann::json& data);            
+    void RenderShapeLine2D(nlohmann::json& data);           
 
     // This lets us use ONE set of Render*() functions for BOTH prefabs and entities
     // Prefabs store data as JSON files that can be edited directly

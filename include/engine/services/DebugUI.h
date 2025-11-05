@@ -28,10 +28,10 @@ Features:
 #include <unordered_map>
 #include "audio/FmodAudioDevice.h"
 #include "ecs/Entity.h"
-#include <ecs/World.h>
 
 // Forward declarations (avoid unnecessary includes)
 struct GLFWwindow;
+class World;
 namespace Audio { class IAudioDevice; }
 namespace Scenes { class Scene; }
 
@@ -69,6 +69,22 @@ public:
     // Check if debug UI is currently enabled
     bool IsEnabled() const { return m_enabled; }
 
+    void AttachScene(Scenes::Scene* scene) { m_scenePtr = scene; }
+    void DetachScene() { m_scenePtr = nullptr; }
+
+    bool HasValidScene(const Scenes::Scene* scene = nullptr) const {
+        // Check if member scene pointer is valid first
+        if (!m_scenePtr)
+            return false;
+
+        // If a specific scene is provided, check for equality
+        if (scene)
+            return m_scenePtr == scene;
+
+        // Otherwise, just confirm member pointer is valid
+        return m_scenePtr != nullptr;
+    }
+
     // Set world reference for entity management
     void SetWorld(World* world) { m_world = world; }
 
@@ -76,14 +92,17 @@ public:
     bool HasValidWorld() const;
 
     // Attach audio system for monitoring
-    static void AttachAudio(Audio::FmodAudioDevice* device);
+    void AttachAudio(Audio::FmodAudioDevice* device) { m_audioPtr = device; }
 
     // Detach audio system
-    static void DetachAudio();
+    void DetachAudio() { m_audioPtr = nullptr; }
+    bool HasValidAudio() const { return m_audioPtr != nullptr; }
 
 private:
     DebugUIConfig m_config;     // Configuration settings
     World* m_world;             // Pointer to World for entity management
+    Scenes::Scene* m_scenePtr = nullptr;
+    Audio::FmodAudioDevice* m_audioPtr = nullptr;
     bool m_enabled = false;     // Flag for UI enabled state
     bool m_initialized = false; // Flag for ImGui initialization state
 
@@ -98,7 +117,7 @@ private:
     void _showEngineDebugWindow();
 
     // Display FPS, frame times and profiler scope data
-    void _showPerformanceWindow();
+    void _showPerformanceWindow() const;
 
     // Display mouse, keyboard and window input state
     void _showInputDebugWindow();

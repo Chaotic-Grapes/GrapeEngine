@@ -28,7 +28,7 @@ Implements the EditorCore class for core editor functionality and entity managem
 static constexpr const char* LEVEL_DIR = "assets/levels/";
 
 // Set up fonts and world reference
-void EditorCore::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
+void EditorCore::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
 	m_mainFont = mainFont;
 	m_boldFont = boldFont;
 	m_symbolsFont = symbolsFont;
@@ -84,23 +84,32 @@ void EditorCore::HandleInWorldInteraction() {
 	if (Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
 		EntityId newSelection = 0;
 
-		// Iterate entities in reverse to pick topmost rendered object first
-		const auto entities = m_world->GetEntityManager().GetAllEntities();
-		for (auto it = entities.rbegin(); it != entities.rend(); it++) {
-			// // Fetch entity by ID, get transform & collider
-			auto entity = m_world->GetEntityManager().GetEntity(*it);
-			auto* transform = entity.GetComponent<Component::Transform>();
-			auto* collider = entity.GetComponent<Component::CircleCollider2D>();
+		// Collect all entities with both LocalTransform and CircleCollider2D
+		std::vector<ECS::Entity> pickableEntities;
+		m_world->Each<ECS::Components::LocalTransform, ECS::Components::CircleCollider2D>(
+			[&](ECS::Entity e, ECS::Components::LocalTransform&, ECS::Components::CircleCollider2D&) {
+				pickableEntities.push_back(e);
+			}
+		);
 
-			// Need both transform and collider for picking
-			if (transform && collider) {
-				// Simple circle based picking: is mouse inside radius
-				float distance = MathHelper::Distance(transform->Position, mouseWorldPos);
-				if (distance <= collider->Radius) {
-					newSelection = *it;
-					isDragging = true;
-					break; // Found topmost object
-				}
+		// Iterate entities in reverse to pick topmost rendered object first
+		for (auto it = pickableEntities.rbegin(); it != pickableEntities.rend(); it++) {
+			ECS::Entity entity = *it;
+
+			// Get transform & collider
+			const auto& transform = m_world->Get<ECS::Components::LocalTransform>(entity);
+			const auto& collider = m_world->Get<ECS::Components::CircleCollider2D>(entity);
+
+			// Simple circle based picking: is mouse inside radius
+			float distance = MathHelper::Distance(
+				Vector2D(transform.Position.X, transform.Position.Y),
+				mouseWorldPos
+			);
+
+			if (distance <= collider.Radius) {
+				newSelection = entity.Index;
+				isDragging = true;
+				break; // Found topmost object
 			}
 		}
 
@@ -113,10 +122,13 @@ void EditorCore::HandleInWorldInteraction() {
 
 	// DRAGGING: Move entity to follow mouse while button held
 	if (isDragging && m_selectedEntityId != 0 && Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
-		auto selectedEntity = m_world->GetEntityManager().GetEntity(m_selectedEntityId);
-		if (selectedEntity.GetId() != 0) {
+		ECS::Entity selectedEntity{ m_selectedEntityId, 0 };
+
+		if (m_world->IsAlive(selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(selectedEntity)) {
 			// Directly set position to mouse world position
-			selectedEntity.Transform().Position = mouseWorldPos;
+			auto& transform = m_world->Get<ECS::Components::LocalTransform>(selectedEntity);
+			transform.Position.X = mouseWorldPos.X;
+			transform.Position.Y = mouseWorldPos.Y;
 		}
 	}
 
@@ -236,15 +248,20 @@ void EditorCore::AddEntity(const std::string& name, EntityId parentId) {
 	// Create entity with default components
 	auto entity = _createGameEntity(name);
 
-	// Set parent if specified
+	// Set parent if specified (use Parent component instead of Transform.ParentId)
 	if (parentId != 0) {
-		auto* transform = entity.GetComponent<Component::Transform>();
-		if (transform) transform->ParentId = parentId;
+		ECS::Entity parentEntity{ parentId, 0 };
+		if (m_world->IsAlive(parentEntity)) {
+			m_world->Add<ECS::Parent>(entity, parentEntity);
+		}
 	}
 
 	// Random position so entities don't spawn on top of each other
-	entity.Transform().Position.X = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
-	entity.Transform().Position.Y = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
+	if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
+		auto& transform = m_world->Get<ECS::Components::LocalTransform>(entity);
+		transform.Position.X = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
+		transform.Position.Y = MathHelper::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
+	}
 
 	// Clear cached UI labels for new entity
 	_invalidateCache();
@@ -254,6 +271,9 @@ void EditorCore::AddEntity(const std::string& name, EntityId parentId) {
 void EditorCore::RemoveEntity(const EntityId id, bool recursive) {
 	if (!HasValidWorld()) return;
 
+	ECS::Entity entity{ id, 0 };
+	if (!m_world->IsAlive(entity)) return;
+
 	// If recursive, delete all children first
 	if (recursive) {
 		auto children = _getChildren(id);
@@ -262,9 +282,7 @@ void EditorCore::RemoveEntity(const EntityId id, bool recursive) {
 		}
 	}
 
-	const auto entity = m_world->GetEntityManager().GetEntity(id);
-	m_world->GetEntityManager().DestroyEntity(entity);
-
+	m_world->Destroy(entity);
 	_invalidateCache();
 }
 
@@ -272,15 +290,23 @@ void EditorCore::RemoveEntity(const EntityId id, bool recursive) {
 void EditorCore::CloneEntity(const EntityId id) {
 	if (!HasValidWorld()) return;
 
-	auto entity = m_world->GetEntityManager().GetEntity(id);
-	if (entity.GetId() == 0) return; // Invalid entity
+	ECS::Entity entity{ id, 0 };
+	if (!m_world->IsAlive(entity)) return;
 
-	auto cloned = entity.Clone();
+	// Use World's Clone method with options
+	ECS::CloneOptions options;
+	options.KeepParent = false;  // Don't copy parent relationship
+	options.KeepName = true;     // Keep the name
+	options.KeepLayer = true;    // Keep the layer
+
+	ECS::Entity cloned = m_world->Clone(entity, options);
 
 	// Offset so clone is visible next to original
-	auto& transform = cloned.Transform();
-	transform.Position.X += 50.0f;
-	transform.Position.Y += 50.0f;
+	if (m_world->Has<ECS::Components::LocalTransform>(cloned)) {
+		auto& transform = m_world->Get<ECS::Components::LocalTransform>(cloned);
+		transform.Position.X += 50.0f;
+		transform.Position.Y += 50.0f;
+	}
 
 	_invalidateCache();
 }
@@ -288,35 +314,53 @@ void EditorCore::CloneEntity(const EntityId id) {
 // Delete all entities in world
 void EditorCore::ClearAllEntities() {
 	if (!HasValidWorld()) return;
-	m_world->GetEntityManager().DestroyAllEntities();
+
+	// Collect all entities first to avoid iterator invalidation
+	std::vector<ECS::Entity> allEntities;
+	m_world->Each([&](ECS::Entity e) {
+		allEntities.push_back(e);
+		});
+
+	// Destroy them all
+	for (const auto& e : allEntities) {
+		m_world->Destroy(e);
+	}
+
 	_invalidateCache();
 }
 
-// Create entity with default components: Transform, ShapeRenderer2D, CircleCollider2D
+// Create entity with default components: Name, LocalTransform, ShapeCircle2D, CircleCollider2D
 // Color is set based on entity name for quick visual identification
-Entity EditorCore::_createGameEntity(const std::string& name) {
-	auto entity = m_world->CreateEntity(name);
+ECS::Entity EditorCore::_createGameEntity(const std::string& name) {
+	// Create entity
+	auto entity = m_world->Create();
+
+	// Add Name component
+	auto& nameComp = m_world->Add<ECS::Components::Name>(entity);
+	strncpy(nameComp.Value, name.c_str(), sizeof(nameComp.Value) - 1);
+	nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
 
 	// Transform is required for all entities
-	entity.AddComponent<Component::Transform>();
+	m_world->Add<ECS::Components::LocalTransform>(entity);
 
-	// Visual shape for rendering
-	auto& shapeRenderer = entity.AddComponent<Component::ShapeRenderer2D>();
-	shapeRenderer.Type = Component::ShapeRenderer2D::ShapeType::Circle;
-	shapeRenderer.Radius = 35.0f;
+	// Visual shape for rendering (using ShapeCircle2D instead of old ShapeRenderer2D)
+	auto& shapeCircle = m_world->Add<ECS::Components::ShapeCircle2D>(entity);
+	shapeCircle.Radius = 35.0f;
+	shapeCircle.Filled = true;
 
 	// Color based on name for easy identification
 	if (name == "Player")
-		shapeRenderer.FillColor = Color(0.0f, 0.0f, 1.0f, 1.0f); // Blue
+		shapeCircle.Color = Color(0.0f, 0.0f, 1.0f, 1.0f); // Blue
 	else if (name == "Enemy")
-		shapeRenderer.FillColor = Color(1.0f, 0.0f, 0.0f, 1.0f); // Red
+		shapeCircle.Color = Color(1.0f, 0.0f, 0.0f, 1.0f); // Red
 	else if (name == "Collectible")
-		shapeRenderer.FillColor = Color(1.0f, 1.0f, 0.0f, 1.0f); // Yellow
+		shapeCircle.Color = Color(1.0f, 1.0f, 0.0f, 1.0f); // Yellow
 	else
-		shapeRenderer.FillColor = Color(1.0f, 1.0f, 1.0f, 1.0f); // White
+		shapeCircle.Color = Color(1.0f, 1.0f, 1.0f, 1.0f); // White
 
 	// Collider for picking and physics
-	entity.AddComponent<Component::CircleCollider2D>(35.0f);
+	auto& collider = m_world->Add<ECS::Components::CircleCollider2D>(entity);
+	collider.Radius = 35.0f;
 
 	return entity;
 }
@@ -332,6 +376,12 @@ void EditorCore::ReparentEntity(EntityId childId, EntityId newParentId) {
 	// Can't parent to self
 	if (!HasValidWorld() || childId == newParentId) return;
 
+	ECS::Entity childEntity{ childId, 0 };
+	ECS::Entity newParentEntity{ newParentId, 0 };
+
+	if (!m_world->IsAlive(childEntity)) return;
+	if (newParentId != 0 && !m_world->IsAlive(newParentEntity)) return;
+
 	// Walk up the ancestry chain of the new parent to check for circular parenting
 	// If we encounter the child anywhere in the chain, we would create a loop
 	EntityId checkId = newParentId;
@@ -341,42 +391,51 @@ void EditorCore::ReparentEntity(EntityId childId, EntityId newParentId) {
 			return;
 		}
 
-		// Move one level up in the hierarchy by following ParentId
-		auto checkEntity = m_world->GetEntityManager().GetEntity(checkId);
-		auto* checkTransform = checkEntity.GetComponent<Component::Transform>();
+		// Move one level up in the hierarchy by following Parent component
+		ECS::Entity checkEntity{ checkId, 0 };
+		if (!m_world->IsAlive(checkEntity) || !m_world->Has<ECS::Parent>(checkEntity)) {
+			break;
+		}
 
-		// Continue up the chain if transform exists otherwise stop at root
-		checkId = checkTransform ? checkTransform->ParentId : 0;
+		const auto& parentComp = m_world->Get<ECS::Parent>(checkEntity);
+		checkId = parentComp.ParentEntity.Index;
 	}
 
 	// At this point we are sure there is no circular parenting happening
-	// Grab the child entity from the world
-	auto entity = m_world->GetEntityManager().GetEntity(childId);
-
-	// Get its Transform component which stores the ParentId
-	auto* transform = entity.GetComponent<Component::Transform>();
-
-	// If the transform exists we can safely update its ParentId to the new parent
-	if (transform) {
-		transform->ParentId = newParentId;
-		LOG_INFO("Reparented entity " << childId << " to " << newParentId);
+	// Update or add the Parent component
+	if (newParentId == 0) {
+		// Remove parent (make it a root entity)
+		if (m_world->Has<ECS::Parent>(childEntity)) {
+			m_world->Remove<ECS::Parent>(childEntity);
+		}
 	}
+	else {
+		// Set new parent
+		if (m_world->Has<ECS::Parent>(childEntity)) {
+			auto& parentComp = m_world->Get<ECS::Parent>(childEntity);
+			parentComp.ParentEntity = newParentEntity;
+		}
+		else {
+			m_world->Add<ECS::Parent>(childEntity, newParentEntity);
+		}
+	}
+
+	LOG_INFO("Reparented entity " << childId << " to " << newParentId);
 }
 
 // Helper to find all entities that have this entity as their parent
 // We need this for recursive deletion, otherwise we'd orphan child entities when deleting parents
-// Just loops through all entities and checks if their ParentId matches what we're looking for
+// Uses World's ForChildren helper which uses the Parent component
 std::vector<EntityId> EditorCore::_getChildren(EntityId parentId) const {
 	std::vector<EntityId> children;
-	auto allEntities = m_world->GetEntityManager().GetAllEntities();
+	ECS::Entity parentEntity{ parentId, 0 };
 
-	for (auto id : allEntities) {
-		auto entity = m_world->GetEntityManager().GetEntity(id);
-		auto* transform = entity.GetComponent<Component::Transform>();
-		if (transform && transform->ParentId == parentId) {
-			children.push_back(id);
-		}
-	}
+	if (!m_world->IsAlive(parentEntity)) return children;
+
+	// Use World's ForChildren method to iterate children
+	m_world->ForChildren(parentEntity, [&](ECS::Entity child) {
+		children.push_back(child.Index);
+		});
 
 	return children;
 }

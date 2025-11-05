@@ -34,7 +34,7 @@ HOW TO USE:
 #include <filesystem>
 
 // Initialize fonts, world reference, and EditorCore for entity operations
-void HierarchyWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world, EditorCore* editorCore) {
+void HierarchyWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, EditorCore* editorCore) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
@@ -67,7 +67,12 @@ void HierarchyWindow::Render() {
     ImGui::Separator();
     ImGui::Dummy(ImVec2(0, 2));
 
-    const auto allEntities = m_world->GetEntityManager().GetAllEntities(); // Get all entity IDs
+    // Get all entities using the new World API
+    std::vector<ECS::Entity> allEntities;
+    m_world->Each([&](ECS::Entity e) {
+        allEntities.push_back(e);
+        });
+
     ImGui::Text("Objects (%zu)", allEntities.size());                      // Display total entity count
 
     // Child region for scrolling tree
@@ -135,20 +140,29 @@ void HierarchyWindow::Render() {
 
 // Render a single entity node and its children recursively
 void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
-    // Fetch entity object
-    auto entity = m_world->GetEntityManager().GetEntity(entityId);
+    // Convert EntityId to ECS::Entity
+    ECS::Entity entity{ entityId, 0 }; // You may need to get proper generation
+
     // Skip invalid entity
-    if (entity.GetId() == 0) return;
+    if (!m_world->IsAlive(entity)) return;
 
     auto children = _getChildren(entityId); // Get children for this entity
     bool hasChildren = !children.empty();   // Check if node should be expandable
 
-    // Build display label
+    // Build display label - get name from Name component if it exists
     std::stringstream oss;
-    oss << entity.GetName() << " (" << entityId << ")"; // Show name and ID
-    if (auto* link = entity.GetComponent<Component::PrefabLink>()) {
+    if (m_world->Has<ECS::Components::Name>(entity)) {
+        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
+        oss << nameComp.Value << " (" << entityId << ")";
+    }
+    else {
+        oss << "Entity (" << entityId << ")"; // Show name and ID
+    }
+
+    if (m_world->Has<ECS::Components::PrefabLink>(entity)) {
         // PrefabLink exists -> append prefab filename
-        std::string prefabName = std::filesystem::path(link->prefabPath).stem().string();
+        const auto& link = m_world->Get<ECS::Components::PrefabLink>(entity);
+        std::string prefabName = std::filesystem::path(link.getPath()).stem().string();
         oss << " [" << prefabName << "]";
     }
     std::string label = oss.str();
@@ -169,7 +183,13 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
     // Drag source for reparenting
     if (ImGui::BeginDragDropSource()) {
         ImGui::SetDragDropPayload("ENTITY_ID", &entityId, sizeof(EntityId)); // Pass entity ID
-        ImGui::Text("Reparent %s", entity.GetName().c_str());                // Show feedback while dragging
+        if (m_world->Has<ECS::Components::Name>(entity)) {
+            const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
+            ImGui::Text("Reparent %s", nameComp.Value);
+        }
+        else {
+            ImGui::Text("Reparent Entity %u", entityId);
+        }
         ImGui::EndDragDropSource();
     }
 
@@ -222,19 +242,23 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
     }
 }
 
-// Get all root entities (ParentId == 0)
+// Get all root entities (entities without Parent component or with null parent)
 std::vector<EntityId> HierarchyWindow::_getRootEntities() {
-    std::vector<EntityId> roots;                                       // Store IDs of root entities
-    auto allEntities = m_world->GetEntityManager().GetAllEntities();   // Get all IDs
+    std::vector<EntityId> roots;
 
-    for (auto id : allEntities) {
-        auto entity = m_world->GetEntityManager().GetEntity(id);       // Fetch entity
-        auto* transform = entity.GetComponent<Component::Transform>(); // Only care if has Transform
-        // No parent means root
-        if (transform && transform->ParentId == 0) {
-            roots.push_back(id);
+    // Iterate through all entities
+    m_world->Each([&](ECS::Entity e) {
+        // Check if entity has no parent or parent is null
+        if (!m_world->Has<ECS::Parent>(e)) {
+            roots.push_back(e.Index);
         }
-    }
+        else {
+            const auto& parent = m_world->Get<ECS::Parent>(e);
+            if (parent.ParentEntity.IsNull()) {
+                roots.push_back(e.Index);
+            }
+        }
+        });
 
     return roots;
 }
@@ -242,16 +266,12 @@ std::vector<EntityId> HierarchyWindow::_getRootEntities() {
 // Get all children of a given parent
 std::vector<EntityId> HierarchyWindow::_getChildren(EntityId parentId) {
     std::vector<EntityId> children;
-    auto allEntities = m_world->GetEntityManager().GetAllEntities();   // Get all entity IDs
+    ECS::Entity parentEntity{ parentId, 0 };
 
-    for (auto id : allEntities) {
-        auto entity = m_world->GetEntityManager().GetEntity(id);       // Fetch entity
-        auto* transform = entity.GetComponent<Component::Transform>(); // Check Transform
-        // ParentId matches -> is child
-        if (transform && transform->ParentId == parentId) {
-            children.push_back(id);
-        }
-    }
+    // Use World's ForChildren method to get all children
+    m_world->ForChildren(parentEntity, [&](ECS::Entity child) {
+        children.push_back(child.Index);
+        });
 
     return children;
 }
@@ -273,11 +293,25 @@ void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, E
         file.close();
 
         // Deserialize creates a new entity with all prefab components
-        Entity instance = Serialization::EntitySerializer::DeserializeEntity(*m_world, prefabJson);
+        ECS::Entity instance = Serialization::EntitySerializer::DeserializeEntity(*m_world, prefabJson);
 
-        // Set parent
-        if (auto* transform = instance.GetComponent<Component::Transform>()) {
-            transform->ParentId = parentId;
+        // Set parent using the Parent component
+        ECS::Entity parentEntity{ parentId, 0 };
+        if (parentId == 0 || parentEntity.IsNull()) {
+            // Root entity - ensure no parent or remove parent component
+            if (m_world->Has<ECS::Parent>(instance)) {
+                m_world->Remove<ECS::Parent>(instance);
+            }
+        }
+        else {
+            // Set parent
+            if (m_world->Has<ECS::Parent>(instance)) {
+                auto& parent = m_world->Get<ECS::Parent>(instance);
+                parent.ParentEntity = parentEntity;
+            }
+            else {
+                m_world->Add<ECS::Parent>(instance, parentEntity);
+            }
         }
 
         // Add PrefabLink component to mark as instance
@@ -285,7 +319,13 @@ void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, E
         std::string normalizedPath = p.lexically_normal().string();
 
         // lexically_normal ensures path uses consistent separators and format
-        instance.AddComponent<Component::PrefabLink>(normalizedPath);
+        if (m_world->Has<ECS::Components::PrefabLink>(instance)) {
+            auto& link = m_world->Get<ECS::Components::PrefabLink>(instance);
+            link.setPath(normalizedPath);
+        }
+        else {
+            m_world->Add<ECS::Components::PrefabLink>(instance, normalizedPath);
+        }
 
         std::string prefabName = std::filesystem::path(prefabPath).stem().string();
         LOG_INFO("Instantiated prefab '" << prefabName << "' as child of entity " << parentId);

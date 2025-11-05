@@ -23,7 +23,9 @@ Features:
 #include "nlohmann/json.hpp"
 
 // Forward declarations
-class World;
+namespace ECS {
+    class World;
+}
 struct ImFont;
 
 class Playback {
@@ -35,8 +37,8 @@ public:
         Paused     // Freeze
     };
 
-    explicit Playback(World* world);  
-    ~Playback();                  
+    explicit Playback(ECS::World* world);
+    ~Playback();
 
     // Initialize with symbols font for icons
     void Initialize(ImFont* mainFont, ImFont* symbolsFont);
@@ -54,7 +56,7 @@ public:
     void ClearStepRequest();      // Resets step request flag
 
 private:
-    World* m_world;                             // Pointer to the game world being edited
+    ECS::World* m_world;                        // Pointer to the game world being edited
     ImFont* m_mainFont = nullptr;               // Font for UI text
     ImFont* m_symbolsFont = nullptr;            // Font for Material Symbols icons
     GameState m_gameState = GameState::Stopped; // Current playback state
