@@ -14,7 +14,7 @@ public class CollectibleItem : ScriptBehaviour
     private Vector3 m_originalPosition;
 
     // Visual entity
-    private Entity? m_visualEntity;
+    private Entity m_visualEntity;
 
     public override void OnStart()
     {
@@ -32,6 +32,7 @@ public class CollectibleItem : ScriptBehaviour
             Rotation = Quaternion.Identity,
             Scale = new Vector3(1, 1, 1)
         };
+
         m_visualEntity.SetComponent(transform);
 
         // Add yellow/gold circle visual
@@ -50,24 +51,18 @@ public class CollectibleItem : ScriptBehaviour
 
     public override void OnUpdate()
     {
-        if (m_visualEntity == null || !m_visualEntity.IsAlive())
-        {
-            Log("Item entity is not alive", LogLevel.Warning);
-            return;
-        }
-
-        ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (!hasTransform)
-            return;
+       
+        ref var visualTransform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var Transform);
+        if (!Transform) return;
 
         // Bob up and down
         var bobOffset = MathF.Sin((float)Time.ElapsedTime * m_bobSpeed) * m_bobHeight;
-        transform.Position.Y = m_originalPosition.Y + bobOffset;
+        visualTransform.Position.Y = m_originalPosition.Y + bobOffset;
 
         // Rotate
         // Note: Simplified rotation - would use quaternions properly in full implementation
 
-        m_visualEntity.SetComponent(transform);
+        m_visualEntity.SetComponent(visualTransform);
 
         // Update visual
         UpdateCollectibleVisual();
@@ -75,15 +70,9 @@ public class CollectibleItem : ScriptBehaviour
 
     private void UpdateCollectibleVisual()
     {
-        if (m_visualEntity == null || !m_visualEntity.IsAlive())
-        {
-            Log("Item entity is not alive", LogLevel.Warning);
-            return;
-        }
 
-        ref var circle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var hasCircle);
-        if (!hasCircle)
-            return;
+        ref var shapeVisual = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle);
+        if (!circle) return;
 
         // Rainbow color cycle
         var hue = ((float)Time.ElapsedTime * 0.5f) % 1.0f;
@@ -91,10 +80,10 @@ public class CollectibleItem : ScriptBehaviour
         // Since hue is being used, we need to convert HSV to RGB
         // More details below in HSVToRGB method
 
-        circle.Color.R = r;
-        circle.Color.G = g;
-        circle.Color.B = b;
-        circle.Color.A = 1.0f;
+        shapeVisual.Color.R = r;
+        shapeVisual.Color.G = g;
+        shapeVisual.Color.B = b;
+        shapeVisual.Color.A = 1.0f;
 
         m_visualEntity.SetComponent(circle);
     }

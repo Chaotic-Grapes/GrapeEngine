@@ -31,7 +31,7 @@ void PhysicsTestScene::OnLoad() {
 
     // Initialize renderer system
     m_rendererSystem = std::make_shared<ECS::RendererSystem>();
-    m_rendererSystem->Initialize();
+    m_rendererSystem->Initialize(GetWorld());
     AddSystem([this](Scenes::Scene& s, const float dt) {
         m_rendererSystem->Update(s.GetWorld(), dt);
         }, "Renderer System");

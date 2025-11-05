@@ -85,7 +85,9 @@ public class EnemyAI : ScriptBehaviour
         //m_patrolPointA = transform.Position;
         //m_patrolPointB = transform.Position + new Vector3(200.0f, 0.0f, 0.0f);
 
-        if (m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
+
+        ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var Transform);
+        if(Transform)
         {
             m_lastPosition = transform.Position;
         }
@@ -162,19 +164,13 @@ public class EnemyAI : ScriptBehaviour
 
     private void UpdateEnemyVisual()
     {
-        if (m_visualEntity == null || !m_visualEntity.IsAlive())
-        {
-            Log("EnemyAI entity is not alive", LogLevel.Warning);
-            return;
-        }
-
         // Make enemy throb to show it's active
-        ref var circle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var hasCircle);
-        if (!hasCircle)
-            return;
+   
+        ref var shapeCircle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle);
+        if (!circle) return;
 
         var throb = 0.85f + 0.15f * MathF.Sin((float)Time.ElapsedTime * 3.0f);
-        circle.Radius = 15.0f * throb;
+        shapeCircle.Radius = 15.0f * throb;
 
 
         // Change color based on current state
@@ -185,36 +181,36 @@ public class EnemyAI : ScriptBehaviour
             if (m_attackState.m_attackCooldown > 0.0f)
             {
                 //  BLACK when on cooldown (can't attack yet)
-                circle.Color.R = 0.0f;
-                circle.Color.G = 0.0f;
-                circle.Color.B = 0.0f;
-                circle.Color.A = 1.0f;
+                shapeCircle.Color.R = 0.0f;
+                shapeCircle.Color.G = 0.0f;
+                shapeCircle.Color.B = 0.0f;
+                shapeCircle.Color.A = 1.0f;
             }
             else
             {
                 // WHITE when ready to attack (cooldown finished)
-                circle.Color.R = 1.0f;
-                circle.Color.G = 1.0f;
-                circle.Color.B = 1.0f;
-                circle.Color.A = 1.0f;
+                shapeCircle.Color.R = 1.0f;
+                shapeCircle.Color.G = 1.0f;
+                shapeCircle.Color.B = 1.0f;
+                shapeCircle.Color.A = 1.0f;
             }
         }
 
         else if (m_fsm.CurrentState is EnemyChaseState)
         {
             // Orange when chasing
-            circle.Color.R = 1.0f;
-            circle.Color.G = 0.5f;
-            circle.Color.B = 0.0f;
-            circle.Color.A = 1.0f;
+            shapeCircle.Color.R = 1.0f;
+            shapeCircle.Color.G = 0.5f;
+            shapeCircle.Color.B = 0.0f;
+            shapeCircle.Color.A = 1.0f;
         }
         else
         {
             // Red color when patrolling (default)
-            circle.Color.R = throb;
-            circle.Color.G = 0.0f;
-            circle.Color.B = 0.0f;
-            circle.Color.A = 1.0f;
+            shapeCircle.Color.R = throb;
+            shapeCircle.Color.G = 0.0f;
+            shapeCircle.Color.B = 0.0f;
+            shapeCircle.Color.A = 1.0f;
         }
 
         m_visualEntity.SetComponent(circle);
@@ -310,18 +306,17 @@ public class EnemyAI : ScriptBehaviour
         {
             return float.MaxValue;
         }
+      
         // early exit if enemy doesnt move
-        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var myTransform))
-            return float.MaxValue;
+        ref var mytransform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var myTransform);
+        if (!myTransform) return float.MaxValue;
 
         // preventative incase entity is created but no transform is set if player is nearby
-        if (!m_playerEntity.TryGetComponent<LocalTransform>(out var playerTransform))
-        {
-            return float.MaxValue;
-        }
+        ref var playertransform = ref m_playerEntity.TryGetComponent<LocalTransform>(out var playerTransform);
+        if (!playerTransform) return float.MaxValue;
 
         //diff gets the difference vector of values
-        var diff = playerTransform.Position - myTransform.Position;
+        var diff = playertransform.Position - mytransform.Position;
         // .magnitude converts it into distance
         var distance = diff.Magnitude;
 
@@ -330,10 +325,9 @@ public class EnemyAI : ScriptBehaviour
 
     public void MoveInDirection(Vector3 direction, float deltaTime)
     {
-        // for static enemies (example like grabber kinds) because they dont need to move
-        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
-            return;
-
+ 
+        ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var myTransform);
+        if (!myTransform) return;
         /*
         var normalizedDir = direction.Normalized;
         transform.Position += normalizedDir * Speed * deltaTime;
@@ -362,18 +356,17 @@ public class EnemyAI : ScriptBehaviour
             return;
 
         // if player doesnt have transform set
-        if (!m_playerEntity.TryGetComponent<LocalTransform>(out var playerTransform))
-            return;
+        ref var playertransform = ref m_playerEntity.TryGetComponent<LocalTransform>(out var playerTransform);
+        if (!playerTransform) return;
 
-        //early exit for non moving enemies
-        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var myTransform))
-            return;
+        ref var mytransform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var myTransform);
+        if (!myTransform) return;
 
         // if (GetDistanceToPlayer() < m_detectionRadius)
 
         m_pathUpdateTimer -= deltaTime;
 
-        float distanceMoved = (myTransform.Position - m_lastPosition).Magnitude;
+        float distanceMoved = (mytransform.Position - m_lastPosition).Magnitude;
 
         if (distanceMoved > 1.0f * deltaTime)
         {
@@ -387,7 +380,7 @@ public class EnemyAI : ScriptBehaviour
             m_stuckTimer += deltaTime;
         }
 
-        m_lastPosition = myTransform.Position;
+        m_lastPosition = mytransform.Position;
 
         bool needsNewPath = m_currentPath == null ||
                            m_currentPath.Count == 0 ||
@@ -397,7 +390,7 @@ public class EnemyAI : ScriptBehaviour
 
         if (needsNewPath)
         {
-            var newPath = AStarPathfinder.FindPath(myTransform.Position, playerTransform.Position);
+            var newPath = AStarPathfinder.FindPath(mytransform.Position, playertransform.Position);
 
             if (newPath != null && newPath.Count > 0)
             {
@@ -409,7 +402,7 @@ public class EnemyAI : ScriptBehaviour
             else
             {
                 m_currentPath = null;
-                MoveWithWallSliding(playerTransform.Position, myTransform, deltaTime);
+                MoveWithWallSliding(playertransform.Position, mytransform, deltaTime);
                 return;
             }
         }
@@ -417,7 +410,7 @@ public class EnemyAI : ScriptBehaviour
         if (m_currentPath != null && m_currentWaypointIndex < m_currentPath.Count)
         {
             Vector3 targetWaypoint = m_currentPath[m_currentWaypointIndex];
-            Vector3 toWaypoint = targetWaypoint - myTransform.Position;
+            Vector3 toWaypoint = targetWaypoint - mytransform.Position;
             float distanceToWaypoint = toWaypoint.Magnitude;
 
             if (distanceToWaypoint < WAYPOINT_REACH_DISTANCE)
@@ -426,7 +419,7 @@ public class EnemyAI : ScriptBehaviour
                 return;
             }
 
-            MoveWithWallSliding(targetWaypoint, myTransform, deltaTime);
+            MoveWithWallSliding(targetWaypoint, mytransform, deltaTime);
         }
     }
 
@@ -559,10 +552,18 @@ public class EnemyPatrolState : State
         // set visualentity to menemy of current state
         var entity = m_enemy.GetVisualEntity();
 
-        // if enemy is of move type set patrol points based on current position
-        if (entity.TryGetComponent<LocalTransform>(out var transform))
+        //if (entity.TryGetComponent<LocalTransform>(out var transform))
+        //{
+        //    // needs to be modified later presumably
+        //    m_patrolPointA = transform.Position;
+        //    m_patrolPointB = transform.Position + new Vector3(200.0f, 0.0f, 0.0f);
+        //}
+
+
+        //// if enemy is of move type set patrol points based on current position
+        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
+        if (hasTransform)
         {
-            // needs to be modified later presumably
             m_patrolPointA = transform.Position;
             m_patrolPointB = transform.Position + new Vector3(200.0f, 0.0f, 0.0f);
         }
@@ -575,8 +576,8 @@ public class EnemyPatrolState : State
         var entity = m_enemy.GetVisualEntity();
 
         //early return if enemy cant even move
-        if (!entity.TryGetComponent<LocalTransform>(out var transform))
-            return;
+        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
+        if (!hasTransform) return;
 
         // Simple patrol between two points
         var targetPoint = m_movingToB ? m_patrolPointB : m_patrolPointA;
