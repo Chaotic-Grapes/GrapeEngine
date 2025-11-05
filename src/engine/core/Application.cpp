@@ -42,6 +42,11 @@ namespace Engine {
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
 
+        // Ensure overlay has a valid world from the active scene
+        if (auto* initialScene = m_sceneManager.GetActive()) {
+            m_overlay->SetWorld(&initialScene->GetWorld());
+        }
+
         m_lastFrameTime = glfwGetTime();
         while (!m_shouldStop) {
             const double frameStart = glfwGetTime();
@@ -59,6 +64,8 @@ namespace Engine {
             m_sceneManager.Update();
             auto* currentScene = m_sceneManager.GetActive();
             if (currentScene) {
+                // Keep overlay world in sync with active scene
+                m_overlay->SetWorld(&currentScene->GetWorld());
 
                 while (m_accumulator >= Time::FixedDeltaTime()) {
                     currentScene->OnFixedUpdate();

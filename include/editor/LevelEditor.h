@@ -39,7 +39,7 @@ struct LevelEditorConfig {
 // Level editor orchestrates all editor panels and manages editor state
 class LevelEditor {
 public:
-    explicit LevelEditor(World* world, const LevelEditorConfig& config = {});
+    explicit LevelEditor(ECS::World* world, const LevelEditorConfig& config = {});
     ~LevelEditor();
 
     // Initialize ImGui fonts and editor panels
@@ -58,7 +58,7 @@ public:
     void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
-    World* m_world;                    // Reference to game world
+    ECS::World* m_world;               // Reference to game world
     LevelEditorConfig m_config;        // Editor configuration settings
     Playback m_playback;               // Playback controls panel
     ImFont* m_symbolsFont = nullptr;   // Material Symbols icon font

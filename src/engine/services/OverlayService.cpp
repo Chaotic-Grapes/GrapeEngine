@@ -18,7 +18,7 @@ namespace Services {
         
         // Fallback if no world but still need debugUI
         if (!m_debugUI)
-            m_debugUI = std::make_unique<DebugUI>();
+            m_debugUI = std::make_unique<DebugUI>(nullptr); // Pass nullptr
 
         if (!m_initialized) {
             // Get main window handle and set up ImGUI
@@ -38,6 +38,9 @@ namespace Services {
     void OverlayService::Update() {
         if (Input::IsKeyDown(KEY_F1))
             SetEnabled(!IsEnabled());
+        // Toggle Level Editor visibility with F2 (press)
+        if (Input::IsKeyPressed(GLFW_KEY_F2))
+            ToggleLevelEditor();
         if (!IsEnabled()) return;
 
         // If we don't have instances yet, try to create them
@@ -127,11 +130,14 @@ namespace Services {
                 ImGuiID leftTopNode, centerTopSection;
                 ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &centerTopSection);
 
-                // Split center top section: 90% viewport, 10% controls at the bottom (relative to the 65% height)
+                // Split center top section so Game Controls sits at TOP (~15%) and Viewport below (~85%)
                 ImGuiID centerControlsNode, centerViewportNode;
-                // 10% of total height / 65% of total height = ~0.154
-                ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Down, 0.154f, &centerControlsNode, &centerViewportNode);
+                // Using ImGuiDir_Up: out_node_at_dir = TOP (Controls), remainder = BOTTOM (Viewport)
+                ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Up, 0.154f, &centerControlsNode, &centerViewportNode);
                 // Keep the tab bar visible for Game Controls so users can access the tab
+
+                // The remainder from the last split (centerViewportNode) stays the central node
+                // We intentionally rely on DockBuilderSplitNode semantics to avoid multiple central nodes
 
                 // Dock windows
                 ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
@@ -146,9 +152,11 @@ namespace Services {
             ImGui::End();
         }
         
-        // Update and render both UIs
-        m_levelEditor->Update();
-        m_levelEditor->Render();
+        // Update and render UIs (LevelEditor is conditional)
+        if (m_levelEditor && IsLevelEditorEnabled()) {
+            m_levelEditor->Update();
+            m_levelEditor->Render();
+        }
         m_debugUI->Render();
 
         // Finalize and draw everything at once

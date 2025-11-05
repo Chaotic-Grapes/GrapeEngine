@@ -30,7 +30,7 @@ References:
 #include <fstream>
 
 // Initialize the AssetBrowser with editor fonts, world reference and event subscriptions
-void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
+void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
@@ -146,8 +146,8 @@ void AssetBrowser::Render() {
                     // Failure, log it
                     if (!file.is_open()) {
                         LOG_ERROR("Cannot open file: " << m_selectedAsset);
-                        m_statusMessage = "Failed to open prefab"; 
-                        m_statusTimer = 3.0f;                     
+                        m_statusMessage = "Failed to open prefab";
+                        m_statusTimer = 3.0f;
                     }
                     else {
                         nlohmann::json entityJson;
@@ -160,7 +160,7 @@ void AssetBrowser::Render() {
                         // Add PrefabLink component to store normalized path of prefab
                         std::filesystem::path p(m_selectedAsset);
                         std::string linkPath = p.lexically_normal().string();
-                        entity.AddComponent<Component::PrefabLink>(linkPath);
+                        m_world->Set<ECS::Components::PrefabLink>(entity, ECS::Components::PrefabLink(linkPath));
 
                         // Log info and update status message on successful load
                         LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
@@ -184,12 +184,12 @@ void AssetBrowser::Render() {
                 LOG_WARNING("Inspector not available for prefab editing");
                 m_statusMessage = "Inspector not available";
                 m_statusTimer = 3.0f;
-            } 
+            }
             // Check if prefab is selected
             else if (m_selectedAsset.empty()) {
                 m_statusMessage = "Failed to open prefab: none selected";
                 m_statusTimer = 3.0f;
-            } 
+            }
             else {
                 try {
                     // Validate the prefab can be opened and parsed
@@ -198,7 +198,7 @@ void AssetBrowser::Render() {
                         LOG_ERROR("Cannot open prefab file: " << m_selectedAsset);
                         m_statusMessage = "Failed to open prefab";
                         m_statusTimer = 3.0f;
-                    } 
+                    }
                     else {
                         nlohmann::json prefabJson;
                         file >> prefabJson; // Parse JSON content
@@ -209,7 +209,8 @@ void AssetBrowser::Render() {
                         m_statusMessage = "Prefab opened";
                         m_statusTimer = 3.0f;
                     }
-                } catch (const std::exception& e) {
+                }
+                catch (const std::exception& e) {
                     LOG_ERROR("Failed to parse prefab file: " << e.what());
                     m_statusMessage = "Failed to open prefab";
                     m_statusTimer = 3.0f;
@@ -222,7 +223,7 @@ void AssetBrowser::Render() {
 
     // Font scale controls
     ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 193);
+    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 207);
 
     // Standard stuff
     ImGui::SetNextItemWidth(120);
@@ -254,7 +255,7 @@ void AssetBrowser::Render() {
 
     // Clicking empty space in file list clears EVERYTHING (File/folder list)
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered()) 
+        && !ImGui::IsAnyItemHovered())
     {
         // Clear currently selected asset
         m_selectedAsset.clear();

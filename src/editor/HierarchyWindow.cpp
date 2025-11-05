@@ -115,15 +115,13 @@ void HierarchyWindow::Render() {
         ImGui::EndDragDropTarget();
     }
 
-    // Clicking empty space deselects any entity
+    // Clicking empty space deselects any entity (regardless of current ID)
     // !IsAnyItemHovered ensures clicks on buttons or text don't deselect
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
         && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
         && !ImGui::IsAnyItemHovered()) {
-        if (m_selectedEntityId != 0) {
-            m_selectedEntityId = 0;                          // Clear selected entity
-            if (m_selectionCallback) m_selectionCallback(0); // Notify inspector to clear
-        }
+        m_selectedEntityId = 0;                          // Clear selected entity
+        if (m_selectionCallback) m_selectionCallback(0); // Notify inspector to clear
     }
 
     // Clear all entities button

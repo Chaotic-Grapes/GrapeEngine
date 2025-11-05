@@ -57,8 +57,10 @@ void RenderVector2DRow(const std::string& label, nlohmann::json& data,
     std::string displayLabel = _displayLabel(label);
     ImGui::Text("%s", displayLabel.c_str());
 
-    float x = data[xKey];
-    float y = data[yKey];
+    float x = 0.0f;
+    float y = 0.0f;
+    if (data.contains(xKey) && data[xKey].is_number()) x = data[xKey].get<float>();
+    if (data.contains(yKey) && data[yKey].is_number()) y = data[yKey].get<float>();
 
     // Position "X" label just before the alignment point
     ImGui::SameLine();
@@ -93,7 +95,8 @@ void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
     std::string displayLabel = _displayLabel(label);
     ImGui::Text("%s", displayLabel.c_str());
 
-    float value = data[key];
+    float value = 0.0f;
+    if (data.contains(key) && data[key].is_number()) value = data[key].get<float>();
 
     // Position field label just before the alignment point
     ImGui::SameLine();
@@ -114,7 +117,7 @@ void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
 void RenderTextProperty(const std::string& label, nlohmann::json& data,
     const std::string& key)
 {
-    std::string value = data[key];
+    std::string value = data.value(key, std::string());
     char buf[128];
     strncpy_s(buf, value.c_str(), sizeof(buf) - 1);
 
@@ -133,7 +136,7 @@ void RenderTextProperty(const std::string& label, nlohmann::json& data,
 void RenderIntProperty(const std::string& label, nlohmann::json& data,
     const std::string& key)
 {
-    int value = data[key];
+    int value = data.value(key, 0);
     std::string displayLabel = _displayLabel(label);
     ImGui::Text("%s", displayLabel.c_str());
     ImGui::SameLine();
@@ -146,7 +149,8 @@ void RenderIntProperty(const std::string& label, nlohmann::json& data,
     }
 }
 
-// Render a color picker widget backed by RGBA values stored in JSON (0-255)
+// Render a color picker widget backed by RGBA values stored in JSON (0.0–1.0 floats)
+// Backward-compatible: if existing JSON uses 0–255 ints, normalize on read and store floats.
 void RenderColorProperty(const std::string& label, nlohmann::json& colorData)
 {
     // Strip '##' suffix for display purposes (used only for ImGui unique IDs)
@@ -156,30 +160,35 @@ void RenderColorProperty(const std::string& label, nlohmann::json& colorData)
     // Position at absolute offset for alignment
     ImGui::SetCursorPosX(currentLabelOffset);
 
-    // Convert JSON RGBA (0-255 range) to ImGui color (0-1 range)
-    // ImGui's ColorEdit expects normalized floats between 0 and 1
+    // Read RGBA from JSON as floats. If values look like 0–255 ints, normalize to 0–1.
+    auto _getChannel = [&](const char* key) -> float {
+        if (!colorData.contains(key) || !colorData[key].is_number()) return 1.0f;
+        float v = colorData[key].get<float>();
+        // If legacy integer representation is detected, normalize
+        if (v > 1.0f) v /= 255.0f;
+        // Clamp to [0,1] for safety
+        if (v < 0.0f) v = 0.0f; else if (v > 1.0f) v = 1.0f;
+        return v;
+    };
+
     float col[4] = {
-        colorData["R"].get<float>() / 255.0f,
-        colorData["G"].get<float>() / 255.0f,
-        colorData["B"].get<float>() / 255.0f,
-        colorData["A"].get<float>() / 255.0f
+        _getChannel("R"),
+        _getChannel("G"),
+        _getChannel("B"),
+        _getChannel("A")
     };
 
     ImGui::SetNextItemWidth(180);
     // Render ImGui color picker
-    // ImGuiColorEditFlags_NoInputs: hides the numeric RGBA input boxes
-    // ImGuiColorEditFlags_AlphaBar: shows an alpha (transparency) bar
-    // ImGuiColorEditFlags_NoLabel: removes inline label (we already draw our own)
-    // ImGuiColorEditFlags_PickerHueWheel: uses a hue wheel instead of a vertical hue bar
     if (ImGui::ColorEdit4(("##" + label).c_str(), col,
         ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar |
         ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel))
     {
-        // Convert back from ImGui's 0-1 range to 0-255 before storing in JSON
-        colorData["R"] = static_cast<int>(col[0] * 255.0f);
-        colorData["G"] = static_cast<int>(col[1] * 255.0f);
-        colorData["B"] = static_cast<int>(col[2] * 255.0f);
-        colorData["A"] = static_cast<int>(col[3] * 255.0f);
+        // Store normalized floats directly in JSON (0.0–1.0)
+        colorData["R"] = col[0];
+        colorData["G"] = col[1];
+        colorData["B"] = col[2];
+        colorData["A"] = col[3];
     }
 }
 
@@ -201,8 +210,8 @@ void RenderCheckboxRow(const std::string& label, nlohmann::json& data,
     ImGui::Text("%s", label.c_str());
     ImGui::SameLine();
 
-    bool value1 = data[key1];
-    bool value2 = data[key2];
+    bool value1 = data.value(key1, false);
+    bool value2 = data.value(key2, false);
 
     // Position at absolute offset for alignment
     ImGui::SetCursorPosX(currentLabelOffset);

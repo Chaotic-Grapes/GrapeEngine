@@ -18,15 +18,10 @@ Implements the LevelEditor class which orchestrates all editor panels.
 #include <imgui.h>
 
 // Constructor: Initialize level editor with world reference and configuration
-LevelEditor::LevelEditor(World* world, const LevelEditorConfig& config)
-    : m_world(world),
-    m_config(config),
-    m_playback(world),         // Playback controls (play/pause/step)
-    m_assetBrowser(),           // File browser + prefab creation
-    m_editorCore(),           // Entity manipulation tools
-    m_hierarchyWindow(),        // Entity tree view
-    m_inspector()               // Unified component inspector
-{
+LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
+    : m_world(world), m_config(config), m_playback(world), m_symbolsFont(nullptr), 
+    m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_editorCore(), 
+    m_hierarchyWindow(), m_inspector() {
 }
 
 LevelEditor::~LevelEditor() {}

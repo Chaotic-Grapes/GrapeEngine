@@ -31,7 +31,7 @@ Features:
 
 // Forward declarations (avoid unnecessary includes)
 struct GLFWwindow;
-class World;
+namespace ECS { class World; }
 namespace Audio { class IAudioDevice; }
 namespace Scenes { class Scene; }
 
@@ -46,7 +46,7 @@ struct DebugUIConfig {
 class DebugUI {
 public:
     // Constructor: initialize debug UI with world reference and config
-    explicit DebugUI(World* world, const DebugUIConfig& config = {});
+    explicit DebugUI(ECS::World* world, const DebugUIConfig& config = {});
 
     // Destructor: cleanup ImGui resources if initialized
     ~DebugUI();
@@ -86,7 +86,7 @@ public:
     }
 
     // Set world reference for entity management
-    void SetWorld(World* world) { m_world = world; }
+    void SetWorld(ECS::World* world) { m_world = world; }
 
     // Check if world pointer is valid
     bool HasValidWorld() const;
@@ -100,7 +100,7 @@ public:
 
 private:
     DebugUIConfig m_config;     // Configuration settings
-    World* m_world;             // Pointer to World for entity management
+    ECS::World* m_world;             // Pointer to World for entity management
     Scenes::Scene* m_scenePtr = nullptr;
     Audio::FmodAudioDevice* m_audioPtr = nullptr;
     bool m_enabled = false;     // Flag for UI enabled state

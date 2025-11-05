@@ -29,16 +29,16 @@ References:
 #include <filesystem>
 #include <imgui.h>
 #include "../editor/AssetLibrary.h"
-class InspectorWindow; // forward
 
 // Forward declarations
 struct ImFont;
-class World;
+namespace ECS { class World; }  // Add namespace
+class InspectorWindow;
 
 class AssetBrowser {
 public:
     // Initialize with symbols font for icons and world reference
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
 
     // Render the asset browser UI
     void Render();
@@ -52,7 +52,7 @@ private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
-    World* m_world = nullptr;
+    ECS::World* m_world = nullptr;  // Add namespace
 
     // Navigation state
     std::string m_assetsRootPath = "assets\\";  // Root assets folder

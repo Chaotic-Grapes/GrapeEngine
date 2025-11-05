@@ -58,6 +58,9 @@ private:
     // Render main menu bar with File menu
     void _showMainMenu();
 
+    // Render the docked Viewport window and helper overlays
+    void _showViewport();
+
     // Create entity with default components (Name, LocalTransform, Shape, Collider)
     ECS::Entity _createGameEntity(const std::string& name);
 

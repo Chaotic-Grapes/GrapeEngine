@@ -75,6 +75,11 @@ namespace Services {
         // Can be called as OverlayService::Get() without needing an object first
         static inline OverlayService* Get() { return m_overlayInstance; }
 
+        // Level Editor visibility toggle (F2)
+        void ToggleLevelEditor() { m_showLevelEditor = !m_showLevelEditor; }
+        bool IsLevelEditorEnabled() const { return m_showLevelEditor; }
+        void SetLevelEditorEnabled(bool enabled) { m_showLevelEditor = enabled; }
+
     private:
         // References
         Scenes::SceneManager& m_sceneManager;
@@ -87,6 +92,7 @@ namespace Services {
         std::unique_ptr<LevelEditor> m_levelEditor;
         bool m_initialized = false;
         bool m_dockLayoutBuilt = false;
+        bool m_showLevelEditor = false; // Default false per request
     #endif
     };
 

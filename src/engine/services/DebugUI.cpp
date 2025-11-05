@@ -50,7 +50,7 @@ Features:
 
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the scene
-DebugUI::DebugUI(World* world, const DebugUIConfig& config) {
+DebugUI::DebugUI(ECS::World* world, const DebugUIConfig& config) {
     m_world = world;
     m_config = config;
 }

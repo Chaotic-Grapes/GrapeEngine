@@ -142,7 +142,7 @@ namespace ECS {
             
             // Safe string copy with null termination guarantee
             void setPath(const std::string& path) {
-                strncpy(prefabPath, path.c_str(), MaxPathLength - 1);
+                strncpy_s(prefabPath, path.c_str(), MaxPathLength - 1);
                 prefabPath[MaxPathLength - 1] = '\0'; // Always null-terminate
             }
             // Convert back to std::string for convenience
@@ -461,14 +461,14 @@ namespace ECS {
 
             void setContent(const char* str) {
                 if (str) {
-                    strncpy(Content, str, MaxTextLength - 1);
+                    strncpy_s(Content, str, MaxTextLength - 1);
                     Content[MaxTextLength - 1] = '\0';
                 }
             }
 
             void setFontPath(const char* path) {
                 if (path) {
-                    strncpy(FontPath, path, 127);
+                    strncpy_s(FontPath, path, 127);
                     FontPath[127] = '\0';
                 }
             }

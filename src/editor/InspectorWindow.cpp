@@ -73,7 +73,13 @@ void InspectorWindow::Render(float fontScale) {
 // If ID is 0, we clear the selection instead
 void InspectorWindow::InspectEntity(EntityId id) {
     m_inspectedEntityId = id;
-    m_mode = id ? InspectionMode::Entity : InspectionMode::None;
+    // Treat any alive entity (including index 0) as valid selection; otherwise clear
+    if (!m_world) {
+        m_mode = InspectionMode::None;
+        return;
+    }
+    ECS::Entity e{ id, 0 };
+    m_mode = m_world->IsAlive(e) ? InspectionMode::Entity : InspectionMode::None;
 }
 
 // Switch to inspecting a prefab template (the .prefab file itself)
