@@ -80,6 +80,8 @@ void DebugUI::Initialize(GLFWwindow* window) {
     io.FontGlobalScale = m_config.FontScale;              // Scale the entire UI
 
     ImGui::StyleColorsDark(); // Set dark theme colors
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.TabBarBorderSize = 0.0f; // keep outline under tabs hidden
     ImGui_ImplGlfw_InitForOpenGL(window, true); // GLFW backend (window/input handling)
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
 

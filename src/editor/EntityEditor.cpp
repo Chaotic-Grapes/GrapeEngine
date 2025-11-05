@@ -45,9 +45,7 @@ void EntityEditor::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 	m_world = world;
 }
 
-EntityEditor::EntityEditor(World* world)
-	: m_world(world) {
-}
+// Note: EntityEditor is default-constructible; use Initialize() to set fonts/world.
 
  // --- Level Management Implementation ---
 
@@ -169,9 +167,9 @@ void EntityEditor::HandleInWorldInteraction() {
  * @brief Displays all editor windows, including the main menu, hierarchy, and property editor.
  */
 void EntityEditor::ShowEditorWindows() {
-	_showMainMenu();
-	_showHierarchyWindow();
-	_showPropertyEditorWindow();
+    // Only show the main menu; Hierarchy and Property Editor are rendered
+    // by dedicated panels (HierarchyWindow, InspectorWindow) to avoid conflicts
+    _showMainMenu();
 }
 
 
@@ -183,12 +181,14 @@ void EntityEditor::ShowEditorWindows() {
  * Displays ImGui modals for save/load dialogs and allows users to select existing JSON files from disk.
  */
 void EntityEditor::_showMainMenu() {
-	if (ImGui::BeginMainMenuBar()) {
-		if (ImGui::BeginMenu("File")) {
-			// Save Level
-			if (ImGui::MenuItem("Save Level...")) {
-				ImGui::OpenPopup("Save Level");
-			}
+    // Apply a black background to the global main menu bar
+    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ImVec4(0.10f, 0.10f, 0.10f, 1.0f));
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+            // Save Level
+            if (ImGui::MenuItem("Save Level...")) {
+                ImGui::OpenPopup("Save Level");
+            }
 
 			// Load Level
 			if (ImGui::MenuItem("Load Level...")) {
@@ -202,8 +202,9 @@ void EntityEditor::_showMainMenu() {
 
 			ImGui::EndMenu();
 		}
-		ImGui::EndMainMenuBar();
-	}
+        ImGui::EndMainMenuBar();
+    }
+    ImGui::PopStyleColor();
 
 	// Modal for Save Level
 	/*if (ImGui::BeginPopupModal("Save Level", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {

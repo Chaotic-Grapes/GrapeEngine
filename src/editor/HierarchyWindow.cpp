@@ -76,7 +76,6 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
     // Get children to determine if this is a parent node
     auto children = _getChildren(entityId);
     bool hasChildren = !children.empty();
-    bool isExpanded = std::find(m_expandedNodes.begin(), m_expandedNodes.end(), entityId) != m_expandedNodes.end();
 
     // Build label
     std::stringstream oss;

@@ -182,13 +182,40 @@ namespace Serialization {
 				for (const auto& componentEntry : entityJson["Components"]) {
 					if (componentEntry.contains("Type") && componentEntry.contains("Data")) {
 						std::string typeName = componentEntry["Type"];
-						auto it = s_deserializationRegistry.find(typeName);
+							auto it = s_deserializationRegistry.find(typeName);
+
+							// Special-case Transform to tolerate missing keys (e.g., ParentId)
+							if (typeName == "Transform") {
+								if (!entity.HasComponent<Component::Transform>()) {
+									entity.AddComponent<Component::Transform>();
+								}
+								if (auto* t = entity.GetComponent<Component::Transform>()) {
+									const auto& d = componentEntry["Data"];
+									// Position
+									if (d.contains("Position")) {
+										const auto& p = d["Position"];
+										t->Position.X = p.value("X", t->Position.X);
+										t->Position.Y = p.value("Y", t->Position.Y);
+									}
+									// Rotation
+									t->Rotation = d.value("Rotation", t->Rotation);
+									// Scale
+									if (d.contains("Scale")) {
+										const auto& s = d["Scale"];
+										t->Scale.X = s.value("X", t->Scale.X);
+										t->Scale.Y = s.value("Y", t->Scale.Y);
+									}
+									// ParentId (optional in prefab JSON)
+									t->ParentId = d.value("ParentId", t->ParentId);
+								}
+								continue;
+							}
 
 						// A little messy but needed
 						// SpriteRenderer has a custom constructor that takes a texture path
 						// and is needed to initialize the component properly.
 						if (it != s_deserializationRegistry.end()) {
-							if (typeName == "SpriteRenderer") {
+								if (typeName == "SpriteRenderer") {
 								const auto& data = componentEntry["Data"];
 								if (!entity.HasComponent<Component::SpriteRenderer>()) {
 									std::string path = data.value("TexturePath", "");

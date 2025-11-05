@@ -23,6 +23,7 @@ Features:
 #include "../editor/AssetBrowser.h"
 #include "../editor/EntityEditor.h"
 #include "../editor/HierarchyWindow.h"
+#include "../editor/InspectorWindow.h"
 
 // Forward declarations
 struct GLFWwindow;
@@ -60,12 +61,13 @@ private:
     World* m_world;                   // Reference to game world
     LevelEditorConfig m_config;       // Editor configuration settings
     Playback m_playback;              // Playback controls panel
-    AssetBrowser m_assetBrowser;      // Asset browser panel
     ImFont* m_symbolsFont = nullptr;  // Material Symbols icon font
     ImFont* m_mainFont = nullptr;     // Regular Inter font for text
     ImFont* m_boldFont = nullptr;     // Bold Inter font
-    GameObjectEditor m_entityEditor;  // Entity editor panel
+    AssetBrowser m_assetBrowser;      // Asset browser panel
+    EntityEditor m_entityEditor;      // Entity editor panel
     HierarchyWindow m_hierarchyWindow;
+    InspectorWindow m_inspector;     // Unified inspector absorbing PrefabEditor
 };
 
 #endif

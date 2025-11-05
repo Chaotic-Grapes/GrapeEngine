@@ -1,4 +1,4 @@
-﻿/* Start Header *****************************************************************/
+/* Start Header *****************************************************************/
 /*!
 \file   PrefabEditor.cpp
 \author Foo Rui Qin (100%)
@@ -23,6 +23,7 @@ References:
 
 #include "../editor/PrefabEditor.h"
 #include "../editor/ComponentInspectorUI.h"  // Use shared component UI
+#include "../editor/InspectorWindow.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
@@ -38,6 +39,10 @@ void PrefabEditor::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 
 // Render the prefab editor window if currently editing
 void PrefabEditor::RenderEditor(float fontScale, std::string& statusMessage, float& statusTimer) {
+    if (m_inspector) {
+        // Unified inspector owns rendering; nothing to do here
+        return;
+    }
     if (m_editingPrefab) {
         _showPrefabEditor(fontScale, statusMessage, statusTimer);
     }
@@ -89,37 +94,24 @@ void PrefabEditor::_loadPrefab(const std::string& prefabPath, std::string& statu
 
 // Open prefab for editing (loads JSON into memory and sets flag to show editor window)
 void PrefabEditor::_editPrefab(const std::string& prefabPath, std::string& statusMessage, float& statusTimer) {
-    // Ensure prefab is selected
-    if (prefabPath.empty()) {
-        LOG_WARNING("No prefab selected to edit");
-        return;
-    }
-
-    // Try to open the prefab file
-    std::ifstream file(prefabPath);
-    if (!file.is_open()) {
-        LOG_ERROR("Cannot open prefab file: " << prefabPath);
-        statusMessage = "Failed to open prefab";
-        statusTimer = 3.0f;
-        return;
-    }
-
-    try {
-        // Parse prefab JSON into memory
-        m_prefabData = nlohmann::json::parse(file);
+    // Forward to Inspector when available
+    if (m_inspector) {
+        if (prefabPath.empty()) { LOG_WARNING("No prefab selected to edit"); return; }
+        m_inspector->InspectPrefab(prefabPath);
+        statusMessage = "Opened in Inspector";
+        statusTimer = 2.0f;
+        m_editingPrefab = false; // Inspector now owns the UI
         m_editingPrefabPath = prefabPath;
-        m_editingPrefab = true;  // This flag triggers _showPrefabEditor() to render
-        file.close();
+        m_prefabData = {}; // Clear legacy buffer
+        return;
+    }
 
-        LOG_INFO("Opened prefab for editing: " << std::filesystem::path(prefabPath).filename().string());
-    }
-    catch (const std::exception& e) {
-        // Handle parsing errors
-        LOG_ERROR("Failed to parse prefab: " << e.what());
-        statusMessage = "Failed to parse prefab";
-        statusTimer = 3.0f;
-        m_editingPrefab = false;
-    }
+    // Legacy fallback
+    if (prefabPath.empty()) { LOG_WARNING("No prefab selected to edit"); return; }
+    std::ifstream file(prefabPath);
+    if (!file.is_open()) { LOG_ERROR("Cannot open prefab file: " << prefabPath); statusMessage = "Failed to open prefab"; statusTimer = 3.0f; return; }
+    try { m_prefabData = nlohmann::json::parse(file); m_editingPrefabPath = prefabPath; m_editingPrefab = true; file.close(); LOG_INFO("Opened prefab for editing: " << std::filesystem::path(prefabPath).filename().string()); }
+    catch (const std::exception& e) { LOG_ERROR("Failed to parse prefab: " << e.what()); statusMessage = "Failed to parse prefab"; statusTimer = 3.0f; m_editingPrefab = false; }
 }
 
 // Find all entities using this prefab and update them with new prefab data
@@ -171,9 +163,34 @@ bool PrefabEditor::_updateEntityFromPrefab(Entity& entity) {
                 return false;
             };
 
-            // For each component type, call the lambda with the type + JSON type name
-            // Updates Position, Rotation, Scale
-            if (updateComponent.operator() < Component::Transform > ("Transform")) continue;
+            // Special-case Transform to tolerate missing keys (e.g., ParentId)
+            if (typeName == "Transform") {
+                if (!entity.HasComponent<Component::Transform>()) {
+                    entity.AddComponent<Component::Transform>();
+                }
+                if (auto* t = entity.GetComponent<Component::Transform>()) {
+                    const auto& d = componentEntry["Data"];
+                    // Position
+                    if (d.contains("Position")) {
+                        const auto& p = d["Position"];
+                        t->Position.X = p.value("X", t->Position.X);
+                        t->Position.Y = p.value("Y", t->Position.Y);
+                    }
+                    // Rotation
+                    t->Rotation = d.value("Rotation", t->Rotation);
+                    // Scale
+                    if (d.contains("Scale")) {
+                        const auto& s = d["Scale"];
+                        t->Scale.X = s.value("X", t->Scale.X);
+                        t->Scale.Y = s.value("Y", t->Scale.Y);
+                    }
+                    // ParentId (optional in prefab JSON)
+                    t->ParentId = d.value("ParentId", t->ParentId);
+                }
+                continue;
+            }
+            
+            // For other component types, call the lambda with the type + JSON type name
             // Updates TexturePath, Color, FlipX, etc.
             if (updateComponent.operator() < Component::SpriteRenderer > ("SpriteRenderer")) continue;
             // Updates Mass, Velocity, BodyType, etc.

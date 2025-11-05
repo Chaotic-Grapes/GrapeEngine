@@ -21,16 +21,14 @@ struct ImFont;
 class World;
 class Entity;
 
-class GameObjectEditor {
+class EntityEditor {
 public:
 
 	// Initialize with symbols font for icons and world reference
 	void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world);
 
-	// Render the asset browser UI
-	//void Render();
-
-	explicit GameObjectEditor(World* world);
+    // Render the asset browser UI
+    //void Render();
 
 	/**
  * @brief Set the world reference for entity management

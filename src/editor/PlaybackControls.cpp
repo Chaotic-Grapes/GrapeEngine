@@ -82,7 +82,17 @@ void Playback::ProcessInput() {
 }
 
 void Playback::Render() {
-    ImGui::Begin("Game Controls", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    // Show title bar, allow moving; keep non-resizable and keep docking enabled
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize;
+    // Set a lower initial position only on first use (ignored when docked)
+    ImGui::SetNextWindowPos(ImVec2(20, 180), ImGuiCond_FirstUseEver);
+    // Local style tweak: neutralize any blue tab accent for this window
+    const ImVec4 bg = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+    ImGui::PushStyleColor(ImGuiCol_Tab, bg);
+    ImGui::PushStyleColor(ImGuiCol_TabHovered, bg);
+    ImGui::PushStyleColor(ImGuiCol_TabActive, bg);
+    ImGui::PushStyleColor(ImGuiCol_DockingPreview, ImVec4(bg.x, bg.y, bg.z, 0.8f));
+    ImGui::Begin("Game Controls", nullptr, flags);
 
     // If mouse is over window then show tooltips (with keyboard shortcuts)
     if (ImGui::IsWindowHovered()) {
@@ -156,6 +166,7 @@ void Playback::Render() {
     ImGui::PopFont();
 
     ImGui::End();
+    ImGui::PopStyleColor(4);
 }
 
 void Playback::_saveWorldState() {

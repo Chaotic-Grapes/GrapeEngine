@@ -33,6 +33,7 @@ References:
 struct ImFont;
 class World;
 class Entity;
+class InspectorWindow; // forward
 
 class PrefabEditor {
     friend class AssetBrowser;  // Only AssetBrowser can access private members
@@ -46,6 +47,9 @@ public:
 
     // Check if currently editing a prefab
     bool IsEditing() const { return m_editingPrefab; }
+
+    // Hook unified Inspector to absorb prefab editing
+    void SetInspector(InspectorWindow* inspector) { m_inspector = inspector; }
 
 private:
     // Load prefab file from disk and instantiate it into the world
@@ -90,6 +94,7 @@ private:
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
     World* m_world = nullptr;
+    InspectorWindow* m_inspector = nullptr; // not owned
 
     // Prefab editing state
     bool m_editingPrefab = false;

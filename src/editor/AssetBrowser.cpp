@@ -1,4 +1,4 @@
-﻿/* Start Header *****************************************************************/
+/* Start Header *****************************************************************/
 /*!
 \file   AssetBrowser.cpp
 \author Foo Rui Qin (100%)
@@ -42,6 +42,15 @@ void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
             m_assetLibrary._handleFileDrop(msg.filePath, m_currentPath, m_selectedAsset, m_statusMessage, m_statusTimer);
         }
     );
+}
+
+// Connect the InspectorWindow so prefab actions in Asset Browser
+// are inspected in the unified inspector UI.
+void AssetBrowser::SetInspector(InspectorWindow* inspector) {
+    m_inspector = inspector;
+    if (m_inspector) {
+        m_prefabEditor.SetInspector(m_inspector);
+    }
 }
 
 // Render the asset browser UI window

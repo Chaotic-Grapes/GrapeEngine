@@ -28,7 +28,7 @@ References:
 
 // Constructor: initialize level editor with world and config
 LevelEditor::LevelEditor(World* world, const LevelEditorConfig& config)
-    : m_world(world), m_config(config), m_playback(world), m_assetBrowser(), m_gameObjectEditor(world) {
+    : m_world(world), m_config(config), m_playback(world), m_assetBrowser(), m_entityEditor(), m_hierarchyWindow(), m_inspector() {
 }
 
 LevelEditor::~LevelEditor() {}
@@ -86,6 +86,16 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
     m_entityEditor.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
     m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+    m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+
+    // Wire PrefabEditor to unified Inspector via AssetBrowser
+    m_assetBrowser.SetInspector(&m_inspector);
+
+    // Drive Inspector selection from Hierarchy
+    m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
+        if (id) m_inspector.InspectEntity(id);
+        else m_inspector.ClearSelection();
+    });
 }
 
 // Process input for all editor panels
@@ -99,5 +109,8 @@ void LevelEditor::Render() {
     if (!m_world) return;
     m_playback.Render();
     m_assetBrowser.Render();
-    m_gameObjectEditor.ShowEditorWindows();
+    m_entityEditor.ShowEditorWindows();
+    m_hierarchyWindow.Render();
+    // Render unified Inspector last
+    m_inspector.Render(1.0f);
 }

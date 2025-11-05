@@ -30,6 +30,7 @@ References:
 #include <imgui.h>
 #include "../editor/AssetLibrary.h"
 #include "../editor/PrefabEditor.h"
+class InspectorWindow; // forward
 
 // Forward declarations
 struct ImFont;
@@ -42,6 +43,9 @@ public:
 
     // Render the asset browser UI
     void Render();
+
+    // Wire unified Inspector for prefab editing
+    void SetInspector(InspectorWindow* inspector);
 
 private:
     // References to external systems
@@ -59,6 +63,9 @@ private:
     // Helper modules
     AssetLibrary m_assetLibrary;                // File operations helper
     PrefabEditor m_prefabEditor;                // Prefab editing helper
+
+    // Unified inspector wiring
+    InspectorWindow* m_inspector = nullptr;
 
     // Status notification
     std::string m_statusMessage = "";           // Success/error message text

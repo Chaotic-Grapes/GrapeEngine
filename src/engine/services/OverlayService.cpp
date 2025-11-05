@@ -77,8 +77,10 @@ void Overlay::OnUpdate() {
     // Create a full-screen DockSpace and initialize layout once
     {
         ImGuiViewport* vp = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(vp->Pos);
-        ImGui::SetNextWindowSize(vp->Size);
+        // Offset dockspace host below the global main menu bar to avoid overlapping tabs
+        const float topOffset = ImGui::GetFrameHeight();
+        ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + topOffset));
+        ImGui::SetNextWindowSize(ImVec2(vp->Size.x, vp->Size.y - topOffset));
         ImGui::SetNextWindowViewport(vp->ID);
         ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -114,10 +116,11 @@ void Overlay::OnUpdate() {
             ImGuiID leftTopNode, centerTopSection;
             ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &centerTopSection);
 
-            // Split center top section: 10% controls, 90% viewport (relative to the 65% height)
+            // Split center top section: 90% viewport, 10% controls at the bottom (relative to the 65% height)
             ImGuiID centerControlsNode, centerViewportNode;
             // 10% of total height / 65% of total height = ~0.154
-            ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Up, 0.154f, &centerControlsNode, &centerViewportNode);
+            ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Down, 0.154f, &centerControlsNode, &centerViewportNode);
+            // Keep the tab bar visible for Game Controls so users can access the tab
 
             // Dock windows
             ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);

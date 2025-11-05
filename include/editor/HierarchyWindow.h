@@ -3,8 +3,8 @@
 \file   HierarchyWindow.h
 \author Samantha Leong (70%)
         Foo Rui Qin    (30%)
-\par    ruiqin.foo@digipen.edu
-        s.leong@digipen.edu
+\par    s.leong@digipen.edu
+        ruiqin.foo@digipen.edu
 \date   5th November 2025
 \brief
 Handles the hierarchy window displaying all entities in a tree structure with
