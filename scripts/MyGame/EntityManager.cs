@@ -14,11 +14,11 @@ public class EntityManager : ScriptBehaviour
 // Could consider changing to something more standard and not specific to American/British English.
 {
     // Entity references for spawned objects
-    private Entity m_player;
-    private Entity m_enemy1;
-    private Entity m_enemy2;
-    private Entity m_collectible1;
-    private Entity m_collectible2;
+    //private Entity m_player;
+    //private Entity m_enemy1;
+    //private Entity m_enemy2;
+    //private Entity m_collectible1;
+    //private Entity m_collectible2;
 
     // Controller entities (separate from visuals)
     private Entity m_playerController;

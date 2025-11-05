@@ -14,7 +14,6 @@ public class EnemyAI : ScriptBehaviour
     public float BaseSpeed = 80.0f;
     public float Speed = 80.0f;
     public float AttackDamage = 10.0f;
-    private float m_detectionRadius = 350.0f;
 
     // incase we need it for specific game scenes
     public float Health = 100f;
