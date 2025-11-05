@@ -35,6 +35,7 @@ bool Window::Create(const std::string& title, const int width, const int height,
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+	glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	
 	m_windowHandle = glfwCreateWindow(width, height, title.c_str(), monitor, parent);
@@ -46,8 +47,9 @@ bool Window::Create(const std::string& title, const int width, const int height,
 	}
 	glfwMakeContextCurrent(m_windowHandle);
 
-	// === ENABLE OR DISABLE VSYNC HERE ===
-	glfwSwapInterval(1);
+	// Lock the aspect ratio (16:9)
+	glfwSetWindowAspectRatio(m_windowHandle, 16, 9);
+
 
 	if (!gladLoadGL()) {
 		// Log: "Failed to initialize GLAD";
@@ -55,6 +57,9 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		glfwTerminate();
 		return false;
 	}
+
+	// === ENABLE OR DISABLE VSYNC HERE ===
+	glfwSwapInterval(1);
 
 	// Initialize input system with the window
 	Input::Initialize(m_windowHandle);
@@ -64,22 +69,19 @@ bool Window::Create(const std::string& title, const int width, const int height,
 
 	glViewport(0, 0, width, height);
 
-	// This callback function is called when the window is resized
-	// to update the viewport and store the new width and height
-	glfwSetFramebufferSizeCallback(m_windowHandle, [](GLFWwindow* window, const int w, const int h) {
-		glViewport(0, 0, w, h);
-		if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window))) {
-			self->m_width = w;
-			self->m_height = h;
-		}
-	});
-
 	// Store the pointer to this instance for use in callbacks
 	// because GLFW does not know context
 	glfwSetWindowUserPointer(m_windowHandle, this);
 
-	// Register callback for resize
-	glfwSetFramebufferSizeCallback(m_windowHandle, FramebufferSizeCallback);
+	// One unified framebuffer-size callback
+	glfwSetFramebufferSizeCallback(m_windowHandle, [](GLFWwindow* w, int fbw, int fbh) {
+		glViewport(0, 0, fbw, fbh);
+		if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(w))) {
+			self->m_width = fbw;
+			self->m_height = fbh;
+		}
+		Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ fbw, fbh });
+		});
 	return true;
 }
 

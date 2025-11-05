@@ -135,6 +135,12 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Layer>, "Layer must be trivially copyable");
 
+        struct Rotator {
+            float RotationSpeed;   // degrees per second
+            float RotationOffset;  // starting phase
+        };
+        static_assert(std::is_trivially_copyable_v<Rotator>, "LocalTransform must be trivially copyable");
+
         // Local transform is relative to parent entity (if any)
         struct LocalTransform { 
         public:
@@ -280,6 +286,8 @@ namespace ECS {
             Color Color{1.0f, 1.0f, 1.0f, 1.0f};
             Vector2D Tiling{1.0f, 1.0f};
             Vector2D Offset{0.0f, 0.0f};
+            int Width = 0;
+            int Height = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -291,6 +299,12 @@ namespace ECS {
             bool FlipY = false;
         };
         static_assert(std::is_trivially_copyable_v<SpriteFlip2D>, "SpriteFlip2D must be trivially copyable");
+
+        // Optional: sprite shader options
+        struct SpriteShader2D {
+        public:
+            bool Bloom = false;
+        };
 
         // TODO: Add Shader components
 
@@ -327,6 +341,7 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<ShapeLine2D>, "ShapeLine2D must be trivially copyable");
 
         // Fixed-capacity polyline/polygon for debug; avoids heap
+        // TODO: Change this to something more flexible AND without class template
         template<size_t TCapacity = 16>
         struct ShapePolygon2D {
         public:
@@ -338,13 +353,14 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<ShapePolygon2D<>>, "ShapePolygon2D must be trivially copyable");
 
-        // Optional: simple 2D sorting hint for renderer (e.g. painter's algorithm)
+        // This is the Z-order for 2D rendering; lower values drawn first
+        // Can be used with Layer component
         struct ZIndex2D {
         public:
             int16_t ZOrder = 0;  // smaller drawn first
         };
         static_assert(std::is_trivially_copyable_v<ZIndex2D>, "ZIndex2D must be trivially copyable");
-
+        
         // ---------- Cameras ----------
 
         struct Camera3D {
@@ -355,6 +371,7 @@ namespace ECS {
             float FarPlane      = 100.f;
             float OrthoSize     = 10.f;
             float AspectRatio   = 16.f / 9.f; // width / height
+            bool  Active        = false;
         };
         static_assert(std::is_trivially_copyable_v<Camera3D>, "Camera3D must be trivially copyable");
 
@@ -366,6 +383,77 @@ namespace ECS {
             Matrix4x4 ViewProjection{};
         };
         static_assert(std::is_trivially_copyable_v<CameraMatrices>, "CameraMatrices must be trivially copyable");
+
+        struct Light2D {
+        public:
+            enum class Type : uint8_t {
+                Directional = 0,
+                Point = 1
+            };
+
+            Type      LightType = Type::Directional;    // defaults to directional
+            Vector3D  Position{ 0.f, 0.f, 0.f };        // used if Point
+            Vector3D  Direction{ 0.f, -1.f, 0.f };      // used if Directional
+            Color     Color{ 1.f, 1.f, 1.f, 1.f };      // RGB intensity
+            float     Intensity = 1.0f;                 // brightness scalar
+            float     Range = 10.0f;                    // used if Point
+            bool      CastsShadows = false;             // for later extensions
+        };
+        static_assert(std::is_trivially_copyable_v<Light2D>, "Light2D must be trivially copyable");
+
+        enum class TextAnchor : uint8_t {
+            Absolute = 0,    ///< Position is absolute pixels (no anchoring)
+            TopLeft,         ///< Offset from top-left corner
+            TopRight,        ///< Offset from top-right corner
+            BottomLeft,      ///< Offset from bottom-left corner
+            BottomRight,     ///< Offset from bottom-right corner
+            Center           ///< Offset from screen center
+        };
+
+        struct Text {
+            static constexpr size_t MaxTextLength = 256;
+            char Content[MaxTextLength] = {};   // Text to display
+            char FontPath[128] = {};            // Initialize to empty, not with default path
+            float PixelSize = 24.0f;
+            Color Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+            TextAnchor Anchor = TextAnchor::Absolute;
+
+            Text() {
+                // Default constructor sets default font
+                setFontPath("assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf");
+            }
+
+            Text(const char* content,
+                float pixelSize = 24.0f,
+                const ::Color& color = { 1.0f, 1.0f, 1.0f, 1.0f },
+                TextAnchor anchor = TextAnchor::Absolute,
+                const char* fontPath = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf")
+                : PixelSize(pixelSize)
+                , Color(color)
+                , Anchor(anchor)
+            {
+                setContent(content);
+                setFontPath(fontPath);  // this initializes the empty array
+            }
+
+            void setContent(const char* str) {
+                if (str) {
+                    strncpy(Content, str, MaxTextLength - 1);
+                    Content[MaxTextLength - 1] = '\0';
+                }
+            }
+
+            void setFontPath(const char* path) {
+                if (path) {
+                    strncpy(FontPath, path, 127);
+                    FontPath[127] = '\0';
+                }
+            }
+
+            std::string_view getContent() const { return std::string_view(Content); }
+            std::string_view getFontPath() const { return std::string_view(FontPath); }
+        };
+        static_assert(std::is_trivially_copyable_v<Text>, "Text must be trivially copyable");
 
         // ---------- Scripting / Audio (kept minimal) ----------
 

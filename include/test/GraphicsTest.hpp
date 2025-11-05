@@ -33,10 +33,10 @@ namespace Sandbox {
         void OnUpdate() override;
         void OnUnload() override;
 
-        // NOTE: The enum values (1201�1210) are aligned with the official
+        // NOTE: The enum values (1201 => 1210) are aligned with the official
         // rubric test IDs from M1. This makes it easy to cross-reference
         // between engine code and grading requirements.
-        enum class TestType {
+        enum class TestType : int {
             // Required M1 rubric tests
             BasicGraphics       = 1201,
             DebugDrawing        = 1202,
@@ -49,10 +49,18 @@ namespace Sandbox {
             PerformanceTest     = 1209,
             FontSystem          = 1210,
 
+            // Required M2 rubric tests (re-indexed for milestone continuity)
+            GameGUI             = 1211,    // was 1106
+            FontSys             = 1212,    // was 1107
+            ViewportCamera      = 1213,    // was 1108
+            TransformationSys   = 1214,    // was 1109
+            SpriteAnim          = 1215,    // was 1110
+            MultipleShaders     = 1216,    // was 1115
+            Batching            = 1217,    // was 1121
+            EditorCamera        = 1218,    // was 1208
+            ObjectPicking       = 1219,    // was 1210
+
             // Extra experimental tests (outside rubric)
-            SplineDeformation   = 2001,
-            FrameBufferObject   = 2002,
-            PostProcessing      = 2003,
             LightingTest        = 2004,
             NormalMaps          = 2005,
             ParticleSystem      = 2006,
@@ -60,10 +68,10 @@ namespace Sandbox {
             ShaderPlayground    = 2008,
 
             // PERFORMANCE / PROFILING DEBUG TESTS
-            DebugPerformance = 3001,
-            SingleTextureTest = 3002,
-            AnalyzeRenderer = 3003,
-            SmallBatchTest = 3004
+            DebugPerformance    = 3001,
+            SingleTextureTest   = 3002,
+            AnalyzeRenderer     = 3003,
+            SmallBatchTest      = 3004
         };
 
     private:
@@ -72,7 +80,7 @@ namespace Sandbox {
         std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
 
         // Background, sprites, debugObjects
-        std::vector<uint64_t> m_testEntities;
+        std::vector<PackedEntityId> m_testEntities;
 
         // Stress test
         std::vector<ECS::Entity> m_batchSprites;
@@ -84,7 +92,7 @@ namespace Sandbox {
         TestType m_currentTest{ TestType::BasicGraphics };
 
         // ------------------------------------
-        // Private test runners (declared here)
+        // Private test runners (M1 rubric tests)
         // ------------------------------------
         void runBasicGraphics();
         void runDebugDrawing();
@@ -96,6 +104,19 @@ namespace Sandbox {
         void runMultiAnimation();
         void runBatchStress();
         void runFontSystem();
+
+        // ------------------------------------
+        // Private test runners (M2 rubric tests)
+        // ------------------------------------
+        void runGameGUI();
+        void runFontSys();
+        void runViewportCamera();
+        void runTransformationSys();
+        void runSpriteAnim();
+        void runMultipleShaders();
+        void runBatching();
+        void runEditorCamera();
+        void runObjectPicking();
 
         // ===================================================
         // PERFORMANCE PROFILING + DEBUGGING 

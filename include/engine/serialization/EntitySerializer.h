@@ -244,7 +244,7 @@ namespace Serialization {
 	// ShapePolygon2D is a template, therefore it needs to be rewritten
 	// REGISTER_COMPONENT_SERIALIZER(ShapePolygon2D, ECS::Components::ShapePolygon2D)
 	REGISTER_COMPONENT_SERIALIZER(ZIndex2D, ECS::Components::ZIndex2D)
-	REGISTER_COMPONENT_SERIALIZER(Camera, ECS::Components::Camera3D)
+	REGISTER_COMPONENT_SERIALIZER(Camera3D, ECS::Components::Camera3D)
 	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices)
 	REGISTER_COMPONENT_SERIALIZER(ScriptInstance, ECS::Components::ScriptInstance)
 	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource)

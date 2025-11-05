@@ -91,7 +91,7 @@ namespace Engine {
                     m_shouldStop = true;
                     break;
                 }
-                glfwSwapBuffers(win->Handle());
+                win->SwapBuffers();
             }
 
             // --- FPS Controller ---
