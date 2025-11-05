@@ -86,12 +86,7 @@ void Playback::Render() {
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize;
     // Set a lower initial position only on first use (ignored when docked)
     ImGui::SetNextWindowPos(ImVec2(20, 180), ImGuiCond_FirstUseEver);
-    // Local style tweak: neutralize any blue tab accent for this window
-    const ImVec4 bg = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
-    ImGui::PushStyleColor(ImGuiCol_Tab, bg);
-    ImGui::PushStyleColor(ImGuiCol_TabHovered, bg);
-    ImGui::PushStyleColor(ImGuiCol_TabActive, bg);
-    ImGui::PushStyleColor(ImGuiCol_DockingPreview, ImVec4(bg.x, bg.y, bg.z, 0.8f));
+    // Use default ImGui tab styling; no local overrides
     ImGui::Begin("Game Controls", nullptr, flags);
 
     // If mouse is over window then show tooltips (with keyboard shortcuts)
@@ -137,36 +132,46 @@ void Playback::Render() {
             }
         };
 
+    // Center buttons horizontally within available content region (Y unchanged)
+    {
+        float btnWidth = 100.0f;
+        float spacing = ImGui::GetStyle().ItemSpacing.x;
+        float totalWidth = btnWidth * 3.0f + spacing * 2.0f;
+        float availWidth = ImGui::GetContentRegionAvail().x;
+        float startX = (availWidth - totalWidth) * 0.5f;
+        if (startX < 0.0f) startX = 0.0f;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startX);
+    }
+
     // Single play/pause toggle button
     // Shows play when stopped/paused
     if (m_gameState == GameState::Stopped || m_gameState == GameState::Paused) {
         ImGui::PushFont(m_symbolsFont);
         button("\xEE\x80\xB7", true, GameState::Playing,
-            m_gameState == GameState::Stopped ? "Game started" : "Game resumed");
+            m_gameState == GameState::Stopped ? "Game started" : "Game resumed", false, ImVec2(100, 40));
         ImGui::PopFont();
     }
     // Shows pause when playing
     else {
         ImGui::PushFont(m_symbolsFont);
-        button("\xEE\x80\xB4", true, GameState::Paused, "Game paused");
+        button("\xEE\x80\xB4", true, GameState::Paused, "Game paused", false, ImVec2(100, 40));
         ImGui::PopFont();
     }
     ImGui::SameLine();
 
     // STOP: playing/paused > stopped
     ImGui::PushFont(m_symbolsFont);
-    button("\xEE\x81\x87", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped");
+    button("\xEE\x81\x87", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped", false, ImVec2(100, 40));
     ImGui::PopFont();
     ImGui::SameLine();
 
     // Step button (for step-by-step physics)
     // Only enabled when paused
     ImGui::PushFont(m_symbolsFont);
-    button("\xEE\x81\x84", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true);
+    button("\xEE\x81\x84", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true, ImVec2(100, 40));
     ImGui::PopFont();
 
     ImGui::End();
-    ImGui::PopStyleColor(4);
 }
 
 void Playback::_saveWorldState() {

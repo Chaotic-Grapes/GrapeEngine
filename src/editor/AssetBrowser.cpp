@@ -24,6 +24,10 @@ References:
 #include "core/Logger.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "serialization/EntitySerializer.h"
+#include "ecs/Entity.h"
+#include "../editor/InspectorWindow.h"
+#include <fstream>
 
 // Initialize the AssetBrowser with editor fonts, world reference and event subscriptions
 void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
@@ -34,7 +38,6 @@ void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 
     // Initialize helper modules
     m_assetLibrary.Initialize(mainFont, boldFont, symbolsFont);
-    m_prefabEditor.Initialize(mainFont, boldFont, symbolsFont, world);
 
     // Subscribe to file drop events
     Messaging::MessageSystem::Subscribe<Messaging::FileDropped>(
@@ -48,9 +51,6 @@ void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 // are inspected in the unified inspector UI.
 void AssetBrowser::SetInspector(InspectorWindow* inspector) {
     m_inspector = inspector;
-    if (m_inspector) {
-        m_prefabEditor.SetInspector(m_inspector);
-    }
 }
 
 // Render the asset browser UI window
@@ -66,6 +66,13 @@ void AssetBrowser::Render() {
     m_assetLibrary._displayBreadcrumbs(m_currentPath, m_selectedAsset, newPath);
     if (!newPath.empty()) {
         m_currentPath = newPath;
+        // Navigating to a new folder clears file selection and inspector
+        if (!m_selectedAsset.empty()) {
+            m_selectedAsset.clear();
+        }
+        if (m_inspector) {
+            m_inspector->ClearSelection();
+        }
     }
 
     // Import button (upload icon)
@@ -132,11 +139,66 @@ void AssetBrowser::Render() {
     if (ImGui::BeginPopup("Prefabs")) {
         // Load prefab option: instantiate into world
         if (ImGui::Selectable("Load Prefab")) {
-            m_prefabEditor._loadPrefab(m_selectedAsset, m_statusMessage, m_statusTimer);
+            // Instantiate selected prefab into the world
+            if (!m_selectedAsset.empty() && m_world) {
+                try {
+                    std::ifstream file(m_selectedAsset);
+                    if (!file.is_open()) {
+                        LOG_ERROR("Cannot open file: " << m_selectedAsset);
+                        m_statusMessage = "Failed to open prefab";
+                        m_statusTimer = 3.0f;
+                    } else {
+                        nlohmann::json entityJson;
+                        file >> entityJson;
+                        file.close();
+
+                        auto entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+                        entity.AddComponent<Component::PrefabLink>(m_selectedAsset);
+
+                        LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
+                        m_statusMessage = "Prefab loaded successfully";
+                        m_statusTimer = 3.0f;
+                    }
+                } catch (const std::exception& e) {
+                    LOG_ERROR("Failed to parse prefab file: " << e.what());
+                    m_statusMessage = "Failed to load prefab";
+                    m_statusTimer = 3.0f;
+                }
+            }
         }
-        // Edit prefab option: open prefab editor
+        // Edit prefab option: open in unified Inspector
         if (ImGui::Selectable("Edit Prefab")) {
-            m_prefabEditor._editPrefab(m_selectedAsset, m_statusMessage, m_statusTimer);
+            if (!m_inspector) {
+                LOG_WARNING("Inspector not available for prefab editing");
+                m_statusMessage = "Inspector not available";
+                m_statusTimer = 3.0f;
+            } else if (m_selectedAsset.empty()) {
+                m_statusMessage = "Failed to open prefab: none selected";
+                m_statusTimer = 3.0f;
+            } else {
+                // Validate the prefab can be opened and parsed
+                try {
+                    std::ifstream file(m_selectedAsset);
+                    if (!file.is_open()) {
+                        LOG_ERROR("Cannot open prefab file: " << m_selectedAsset);
+                        m_statusMessage = "Failed to open prefab";
+                        m_statusTimer = 3.0f;
+                    } else {
+                        nlohmann::json prefabJson;
+                        file >> prefabJson;
+                        file.close();
+
+                        // If parsing succeeded, open in inspector and report success
+                        m_inspector->InspectPrefab(m_selectedAsset);
+                        m_statusMessage = "Prefab opened";
+                        m_statusTimer = 3.0f;
+                    }
+                } catch (const std::exception& e) {
+                    LOG_ERROR("Failed to parse prefab file: " << e.what());
+                    m_statusMessage = "Failed to open prefab";
+                    m_statusTimer = 3.0f;
+                }
+            }
         }
 
         ImGui::EndPopup();
@@ -168,6 +230,18 @@ void AssetBrowser::Render() {
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
     ImGui::SetWindowFontScale(m_fontScale);
     m_assetLibrary._displayFolder(m_currentPath, m_selectedAsset, m_currentPath);
+
+    // Clicking empty space in file list clears selection and inspector
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
+        && !ImGui::IsAnyItemHovered()) {
+        if (!m_selectedAsset.empty()) {
+            m_selectedAsset.clear();
+            if (m_inspector) {
+                m_inspector->ClearSelection();
+            }
+        }
+    }
     ImGui::EndChild();
 
     ImGui::SameLine();
@@ -233,6 +307,5 @@ void AssetBrowser::Render() {
     ImGui::End();
     ImGui::PopFont();
 
-    // Render prefab editor window if active
-    m_prefabEditor.RenderEditor(m_fontScale, m_statusMessage, m_statusTimer);
+    // Prefab editing is absorbed by Inspector; no separate window to render
 }

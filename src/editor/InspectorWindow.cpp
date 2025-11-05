@@ -85,12 +85,8 @@ void InspectorWindow::InspectPrefab(const std::string& prefabPath) {
         file.close();
         m_inspectedPrefabPath = prefabPath;
         m_mode = InspectionMode::Prefab;
-        m_statusMessage = "Opened prefab";
-        m_statusTimer = 2.0f;
     }
     catch (const std::exception& e) {
-        m_statusMessage = std::string("Failed: Parse prefab ") + e.what();
-        m_statusTimer = 3.0f;
         m_mode = InspectionMode::None;
     }
 }
@@ -508,14 +504,28 @@ void InspectorWindow::_renderComponentSection(const std::string& headerName, con
     nlohmann::json& data, T renderContent, bool canDelete) {
     bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
     ImVec2 originalCursorPos = ImGui::GetCursorPos();
-    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 50);
+    // Extend the visual header bar to span the full content width
+    {
+        ImVec2 headerMin = ImGui::GetItemRectMin();
+        ImVec2 headerMax = ImGui::GetItemRectMax();
+        float rowLeft = ImGui::GetWindowPos().x + originalCursorPos.x;
+        float rowRight = ImGui::GetWindowPos().x + ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+        ImU32 headerColor = ImGui::GetColorU32(ImGui::GetStyleColorVec4(ImGuiCol_Header));
+        ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(rowLeft, headerMin.y), ImVec2(rowRight, headerMax.y), headerColor);
+    }
+    // Place delete button outside (to the right) of the header row, aligned to the visible content region
+    const char* deleteIcon = "\xEE\xA1\xB2";
+    float iconWidth = ImGui::CalcTextSize(deleteIcon).x;
+    float btnWidth = iconWidth + ImGui::GetStyle().FramePadding.x * 2.0f;
+    float rightEdge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+    ImGui::SetCursorPosX(std::max(originalCursorPos.x, rightEdge - btnWidth - ImGui::GetStyle().ItemSpacing.x));
     if (!canDelete) ImGui::BeginDisabled();
     ImGui::PushFont(m_symbolsFont);
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
     ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? ImVec4(0.7f, 0.2f, 0.2f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-    if (ImGui::SmallButton((std::string("\xEE\xA1\xB2") + "##Delete" + componentType).c_str())) {
+    if (ImGui::SmallButton((std::string(deleteIcon) + "##Delete" + componentType).c_str())) {
         m_componentsToDelete.push_back(componentType);
     }
     ImGui::PopStyleColor(4);

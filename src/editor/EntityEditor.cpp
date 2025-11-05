@@ -183,15 +183,17 @@ void EntityEditor::ShowEditorWindows() {
 void EntityEditor::_showMainMenu() {
     // Apply a black background to the global main menu bar
     ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ImVec4(0.10f, 0.10f, 0.10f, 1.0f));
+    // Remove the menu bar window border only (keep other window borders)
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
             // Save Level
-            if (ImGui::MenuItem("Save Level...")) {
+            if (ImGui::MenuItem("Save Level")) {
                 ImGui::OpenPopup("Save Level");
             }
 
 			// Load Level
-			if (ImGui::MenuItem("Load Level...")) {
+			if (ImGui::MenuItem("Load Level")) {
 				ImGui::OpenPopup("Load Level");
 			}
 
@@ -201,10 +203,11 @@ void EntityEditor::_showMainMenu() {
 			}
 
 			ImGui::EndMenu();
-		}
+        }
         ImGui::EndMainMenuBar();
     }
-    ImGui::PopStyleColor();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor(); // MenuBarBg
 
 	// Modal for Save Level
 	/*if (ImGui::BeginPopupModal("Save Level", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {

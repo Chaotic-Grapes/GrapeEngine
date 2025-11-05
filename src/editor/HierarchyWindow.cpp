@@ -30,22 +30,24 @@ void HierarchyWindow::Render() {
     ImGui::Begin("Hierarchy");
 
     // Add new entity section
-    ImGui::Text("Create New Object:");
+    ImGui::Text("Create New Object");
     static char nameBuffer[128] = "NewObject";
     ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.5f);
     ImGui::InputText("##NewObjectName", nameBuffer, sizeof(nameBuffer));
 
     ImGui::SameLine();
-    if (ImGui::Button("Add Object") && strlen(nameBuffer) > 0) {
+    if (ImGui::Button("Add") && strlen(nameBuffer) > 0) {
         // Add as child of selected entity if one is selected
         _addEntity(nameBuffer, m_selectedEntityId);
     }
 
+    ImGui::Dummy(ImVec2(0, 2));
     ImGui::Separator();
+    ImGui::Dummy(ImVec2(0, 2));
 
     // Display entity count
     const auto allEntities = m_world->GetEntityManager().GetAllEntities();
-    ImGui::Text("Objects (%zu):", allEntities.size());
+    ImGui::Text("Objects (%zu)", allEntities.size());
 
     // Scrollable tree region
     ImGui::BeginChild("HierarchyTree", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2), true);
@@ -56,10 +58,19 @@ void HierarchyWindow::Render() {
         _renderEntityNode(entityId, 0);
     }
 
+    // If user clicks on empty space inside the hierarchy tree, clear selection
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
+        && !ImGui::IsAnyItemHovered()) {
+        if (m_selectedEntityId != 0) {
+            m_selectedEntityId = 0;
+            if (m_selectionCallback) m_selectionCallback(0);
+        }
+    }
+
     ImGui::EndChild();
 
     // Bottom buttons
-    ImGui::Separator();
     if (ImGui::Button("Clear All")) {
         m_world->GetEntityManager().DestroyAllEntities();
         m_selectedEntityId = 0;

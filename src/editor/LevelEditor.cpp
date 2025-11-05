@@ -36,6 +36,10 @@ LevelEditor::~LevelEditor() {}
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
     auto& io = ImGui::GetIO();
+    // Global UI style: make window borders thinner across editor panels
+    ImGuiStyle& style = ImGui::GetStyle();
+    // Keep window/popup border sizes as theme defaults; only tune child borders
+    style.ChildBorderSize  = 0.75f;  // borders on BeginChild regions
 
     io.Fonts->Clear();
 

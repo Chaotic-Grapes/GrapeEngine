@@ -29,7 +29,6 @@ References:
 #include <filesystem>
 #include <imgui.h>
 #include "../editor/AssetLibrary.h"
-#include "../editor/PrefabEditor.h"
 class InspectorWindow; // forward
 
 // Forward declarations
@@ -62,7 +61,6 @@ private:
 
     // Helper modules
     AssetLibrary m_assetLibrary;                // File operations helper
-    PrefabEditor m_prefabEditor;                // Prefab editing helper
 
     // Unified inspector wiring
     InspectorWindow* m_inspector = nullptr;
