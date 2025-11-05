@@ -1,14 +1,15 @@
 /* Start Header *****************************************************************/
 /*!
 \file   InspectorWindow.cpp
-\author Foo Rui Qin (70%)
-        Samantha Leong (30%)
+\author Foo Rui Qin    (80%)
+        Samantha Leong (20%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
 \date   5th November 2025
 \brief
 Implements the unified InspectorWindow that adapts to selection context:
-entities, prefabs, and general assets. Absorbs PrefabEditor functionality.
+- Entity mode: Shows components of a selected entity instance
+- Prefab mode: Shows components of a prefab template (editing the .prefab file)
 */
 /* End Header *******************************************************************/
 
@@ -23,36 +24,42 @@ entities, prefabs, and general assets. Absorbs PrefabEditor functionality.
 #include <fstream>
 #include <algorithm>
 
+// Store font references and pass them down to ComponentUI for consistent styling
+// ComponentUI is the shared rendering system for all component types
 void InspectorWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
     m_world = world;
-    ComponentUI::Initialize(mainFont, boldFont, symbolsFont);
+    m_componentUI.Initialize(mainFont, boldFont, symbolsFont);
 }
 
 void InspectorWindow::Render(float fontScale) {
     ImGui::PushFont(m_mainFont);
-    // Match OverlayService docking layout window titles
+
+    // Window title changes based on mode
+    // "Prefab Editor" when editing the template file, "Property Editor" for entity instances
     const char* windowTitle = (m_mode == InspectionMode::Prefab) ? "Prefab Editor" : "Property Editor";
     ImGui::Begin(windowTitle);
     ImGui::SetWindowFontScale(fontScale);
 
+    // Render different content based on inspection mode
     if (m_mode == InspectionMode::None) {
         ImGui::TextDisabled("No selection");
     }
     else if (m_mode == InspectionMode::Entity) {
-        _renderEntityInspector();
+        _renderEntityCore();
     }
     else if (m_mode == InspectionMode::Prefab) {
         _renderPrefabInspector();
     }
 
-    // Status toast
+    // Status message toast appears at bottom of window
+    // Red text for errors, green for success, automatically fades after a few seconds
     if (m_statusTimer > 0.0f) {
         ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
-            : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)   // Red for errors
+            : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);  // Green for success
         ImGui::Separator();
         ImGui::TextColored(color, "%s", m_statusMessage.c_str());
         m_statusTimer -= ImGui::GetIO().DeltaTime;
@@ -62,35 +69,57 @@ void InspectorWindow::Render(float fontScale) {
     ImGui::PopFont();
 }
 
+// Switch to inspecting an entity instance in the scene
+// If ID is 0, we clear the selection instead
 void InspectorWindow::InspectEntity(EntityId id) {
     m_inspectedEntityId = id;
     m_mode = id ? InspectionMode::Entity : InspectionMode::None;
 }
 
+// Switch to inspecting a prefab template (the .prefab file itself)
+// Loads the JSON from disk so we can edit the template directly
+// Any changes here will affect ALL instances of this prefab in the scene
 void InspectorWindow::InspectPrefab(const std::string& prefabPath) {
+    // Make sure we actually got a path
     if (prefabPath.empty()) {
-        m_statusMessage = "Failed: No prefab path";
-        m_statusTimer = 3.0f;
+        m_statusMessage = "Failed: No prefab path";           // Show error in UI
+        m_statusTimer = 3.0f;                                 // Keep message visible for 3 seconds
         return;
     }
+
+    // Try to open the prefab file for reading
     std::ifstream file(prefabPath);
     if (!file.is_open()) {
-        m_statusMessage = "Failed: Cannot open prefab";
+        m_statusMessage = "Failed: Cannot open prefab";       // Show error in UI
         m_statusTimer = 3.0f;
-        LOG_ERROR("Cannot open prefab file: " << prefabPath);
+        LOG_ERROR("Cannot open prefab file: " << prefabPath); // Log detailed error
         return;
     }
+
     try {
+        // Parse the JSON content of the prefab
         m_prefabData = nlohmann::json::parse(file);
-        file.close();
+        file.close(); 
+
+        // Keep track of the prefab path we are inspecting
         m_inspectedPrefabPath = prefabPath;
+
+        // Hash the initial content so we can detect changes later
+        // This prevents writing to disk if nothing actually changed
+        // Also prevents unnecessary updates on all instances in the scene
+        m_lastSavedPrefabHash = std::hash<std::string>{}(m_prefabData.dump());
+
+        // Switch mode to prefab inspection
         m_mode = InspectionMode::Prefab;
     }
     catch (const std::exception& e) {
+        // If parsing failed, reset mode
         m_mode = InspectionMode::None;
+        LOG_ERROR("Failed to parse prefab JSON: " << e.what());
     }
 }
 
+// Clears current selection
 void InspectorWindow::ClearSelection() {
     m_mode = InspectionMode::None;
     m_inspectedEntityId = 0;
@@ -99,134 +128,177 @@ void InspectorWindow::ClearSelection() {
     m_componentsToDelete.clear();
 }
 
-// === Private: Entity inspection ===
-void InspectorWindow::_renderEntityInspector() {
+// Shows all components of a selected entity instance
+void InspectorWindow::_renderEntityCore() {
+    // Nothing to render if no entity selected
     if (!m_world || m_inspectedEntityId == 0) {
         ImGui::TextDisabled("No entity selected");
         return;
     }
+
+    // Selected ID does not correspond to a valid entity
     auto entity = m_world->GetEntityManager().GetEntity(m_inspectedEntityId);
     if (entity.GetId() == 0) {
-        ImGui::TextDisabled("Entity invalid");
+        ImGui::TextDisabled("Entity invalid");    
         return;
     }
 
+    // Header: Show entity name and ID
     ImGui::Text("Entity ");
     ImGui::SameLine();
     ImGui::TextDisabled("%s (ID: %u)", entity.GetName().c_str(), (unsigned)m_inspectedEntityId);
 
-    // Prefab header if entity links to a prefab
+    // If entity has PrefabLink component, it means this entity was created from a prefab
+    // Show which prefab it came from and offer to open that prefab for editing
     if (auto* link = entity.GetComponent<Component::PrefabLink>()) {
-        ImGui::Text("Prefab");
+        ImGui::Separator();
+        ImGui::Text("Prefab Instance");
         ImGui::SameLine();
         ImGui::TextDisabled("%s", std::filesystem::path(link->prefabPath).filename().string().c_str());
+
+        // "Open" button switches inspector to Prefab Editor mode
+        // This lets us edit the template that this instance came from
         ImGui::SameLine();
-        if (ImGui::Button("Open")) {
+        if (ImGui::Button("Open Prefab")) {
             InspectPrefab(link->prefabPath);
         }
-        ImGui::SameLine();
-        if (ImGui::Button("Apply")) {
-            try {
-                // Load prefab JSON
-                std::ifstream in(link->prefabPath);
-                nlohmann::json prefabJson;
-                in >> prefabJson;
-                in.close();
 
-                // Instantiate prefab entity
-                Entity child = Serialization::EntitySerializer::DeserializeEntity(*m_world, prefabJson);
-
-                // Parent under the inspected entity so it shows in Hierarchy
-                if (auto* t = child.GetComponent<Component::Transform>()) {
-                    t->ParentId = m_inspectedEntityId;
-                }
-
-                m_statusMessage = "Prefab instance created under entity";
-                m_statusTimer = 2.0f;
-            }
-            catch (const std::exception& e) {
-                m_statusMessage = std::string("Failed: Apply prefab ") + e.what();
-                m_statusTimer = 3.0f;
-            }
+        // Tooltip explaining the relationship between instance and template
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Opens the prefab template file for editing.\nChanges to prefab will update ALL instances.");
         }
+
+        ImGui::Separator();
     }
     else {
-        // Show attach prompt and accept drag-drop of a .prefab to attach PrefabLink
-        ImGui::Text("Prefab");
+        // Entity is NOT a prefab instance yet
+        // Show drag-drop zone where we can drop a .prefab file to convert this into an instance
+        ImGui::Separator();
+        ImGui::Text("Prefab Link");
         ImGui::SameLine();
-        ImGui::TextDisabled("None");
-        ImGui::SameLine();
-        ImGui::TextDisabled("(drag a .prefab here)");
+        ImGui::TextDisabled("None (drag .prefab here to link)");
 
+        // Accept drag-drop of .prefab file to add PrefabLink component
+        // This turns a regular entity into a prefab instance
         if (ImGui::BeginDragDropTarget()) {
-            ImGui::PushStyleColor(ImGuiCol_DragDropTarget, ImVec4(0.2f, 0.5f, 1.0f, 1.0f));
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
                 std::string droppedPath = static_cast<const char*>(payload->Data);
                 if (std::filesystem::path(droppedPath).extension() == ".prefab") {
+                    // Add PrefabLink component to mark this as a prefab instance
                     entity.AddComponent<Component::PrefabLink>(droppedPath);
-                    m_statusMessage = "Prefab attached";
+                    m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
                 }
                 else {
-                    m_statusMessage = "Not a prefab: drop a .prefab";
+                    m_statusMessage = "Not a prefab: drop a .prefab file";
                     m_statusTimer = 2.0f;
                 }
             }
-            ImGui::PopStyleColor();
             ImGui::EndDragDropTarget();
         }
+
+        ImGui::Separator();
     }
 
-    // Removed the separator under Prefab for a cleaner look
-    ImGui::BeginChild("EntityComponents", ImVec2(0, 0), false);
+    // Use scrollable child region for components list
+    // Always show both scrollbars to prevent annoying layout jitter when content changes size
+    ImGuiWindowFlags childFlags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar;
+    float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
-    // Serialize entity -> JSON for unified component UI
+    // Add a bit of padding inside the child to reduce awkward horizontal scroll
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+
+    // Fix content width to prevent horizontal scrollbar from jumping around
+    // 420px is wide enough for most content without being excessive
+    ImGui::SetNextWindowContentSize(ImVec2(420.0f, 0));
+    ImGui::BeginChild("EntityComponents", ImVec2(0, childHeight), false, childFlags);
+
+    // Serialize entity to JSON so we can use the same component UI code for both entities and prefabs
+    // This gives us a unified editing interface regardless of what we're inspecting
     nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(entity);
-    if (entityJson.contains("Components")) {
-        for (auto& componentEntry : entityJson["Components"]) {
-            std::string componentType = componentEntry["Type"];
-            auto& data = componentEntry["Data"];
 
-            if (componentType == "Transform") {
-                _renderComponentSection("Transform", "Transform", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderTransform(d); }, false);
-            }
-            else if (componentType == "SpriteRenderer") {
-                _renderComponentSection("Sprite Renderer", "SpriteRenderer", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderSpriteRenderer(d); });
-            }
-            else if (componentType == "Rigidbody2D") {
-                _renderComponentSection("Rigidbody2D", "Rigidbody2D", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderRigidbody2D(d); });
-            }
-            else if (componentType == "CircleCollider2D") {
-                _renderComponentSection("CircleCollider2D", "CircleCollider2D", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderCircleCollider2D(d); });
-            }
-            else if (componentType == "BoxCollider2D") {
-                _renderComponentSection("BoxCollider2D", "BoxCollider2D", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderBoxCollider2D(d); });
-            }
-            else if (componentType == "ShapeRenderer2D") {
-                _renderComponentSection("ShapeRenderer2D", "ShapeRenderer2D", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderShapeRenderer2D(d); });
-            }
-            else if (componentType == "LineRenderer") {
-                _renderComponentSection("LineRenderer", "LineRenderer", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderLineRenderer(d); });
+    if (entityJson.contains("Components")) {
+        ImGui::Dummy(ImVec2(0, 4));  // Top padding
+
+        // ALWAYS render Transform first
+        // Transform can't be deleted, so we pass false for the canDelete parameter
+        for (auto& componentEntry : entityJson["Components"]) {
+            if (componentEntry["Type"] == "Transform") {
+                _renderComponentSection("Transform", "Transform", componentEntry["Data"],
+                    [this](nlohmann::json& d) { m_componentUI.RenderTransform(d); }, false);
+                ImGui::Dummy(ImVec2(0, 4));
+                break;
             }
         }
 
-        // Apply deletions
+        // Then render all other components in a consistent, predictable order
+        // This prevents components from jumping around in the list when we add/remove things
+        const std::vector<std::string> orderedTypes = {
+            "ShapeRenderer2D",
+            "SpriteRenderer",
+            "Rigidbody2D",
+            "CircleCollider2D",
+            "BoxCollider2D",
+            "LineRenderer"
+        };
+
+        // Loop through components in a consistent, predefined order
+        for (const auto& type : orderedTypes) {
+            // Loop over all components in the serialized entity JSON
+            for (auto& componentEntry : entityJson["Components"]) {
+                // Skip any component that doesn't match the current type we're rendering
+                if (componentEntry["Type"] != type) continue;
+                // Reference to the actual data JSON for this component
+                auto& data = componentEntry["Data"];
+
+                // Render the component using its corresponding UI function
+                // _renderComponentSection handles collapsing header + proprties + delete button (optional)
+                if (type == "SpriteRenderer") {
+                    _renderComponentSection("SpriteRenderer", "SpriteRenderer", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderSpriteRenderer(d); });
+                }
+                else if (type == "Rigidbody2D") {
+                    _renderComponentSection("Rigidbody2D", "Rigidbody2D", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderRigidbody2D(d); });
+                }
+                else if (type == "CircleCollider2D") {
+                    _renderComponentSection("CircleCollider2D", "CircleCollider2D", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderCircleCollider2D(d); });
+                }
+                else if (type == "BoxCollider2D") {
+                    _renderComponentSection("BoxCollider2D", "BoxCollider2D", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderBoxCollider2D(d); });
+                }
+                else if (type == "ShapeRenderer2D") {
+                    _renderComponentSection("ShapeRenderer2D", "ShapeRenderer2D", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderShapeRenderer2D(d); });
+                }
+                else if (type == "LineRenderer") {
+                    _renderComponentSection("LineRenderer", "LineRenderer", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderLineRenderer(d); });
+                }
+
+                ImGui::Dummy(ImVec2(0, 4));
+                break; // Stop scanning once we rendered this type
+            }
+        }
+
+        // Apply component deletions that were queued from delete button clicks
+        // We queue them instead of deleting immediately to avoid iterator invalidation
         for (const auto& type : m_componentsToDelete) {
             _removeComponentFromEntity(type);
         }
         m_componentsToDelete.clear();
 
-        // Write back modified JSON to live components
+        // Write modified JSON data back to the actual live entity components
+        // This is where UI changes actually get applied to the game state
+        // The UI modifies the JSON, then we deserialize that JSON back into the real components
         for (const auto& componentEntry : entityJson["Components"]) {
             std::string typeName = componentEntry["Type"];
-            auto applyComponent = [&]<typename T>(const std::string& name) {
+
+            // Lambda helper to apply JSON data to the correct component type
+            // Returns true if this was the right type, false to keep trying other types
+            auto applyComponent = [&]<typename T>(const std::string & name) {
                 if (typeName == name) {
                     if (auto* comp = entity.GetComponent<T>()) {
                         from_json(componentEntry["Data"], *comp);
@@ -235,6 +307,8 @@ void InspectorWindow::_renderEntityInspector() {
                 }
                 return false;
             };
+
+            // Try each component type
             if (applyComponent.operator()<Component::Transform>("Transform")) continue;
             if (applyComponent.operator()<Component::SpriteRenderer>("SpriteRenderer")) continue;
             if (applyComponent.operator()<Component::Rigidbody2D>("Rigidbody2D")) continue;
@@ -245,6 +319,12 @@ void InspectorWindow::_renderEntityInspector() {
         }
     }
 
+    // Capture scroll extent for stable overlay positioning next frame
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+
+    // Bottom section: "Add Component" button lives outside the scroll region
+    // This keeps it always visible at the bottom, even when scrolling through lots of components
     ImGui::Separator();
     if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");
@@ -254,111 +334,185 @@ void InspectorWindow::_renderEntityInspector() {
         ImGui::Text("Components");
         ImGui::PopFont();
         ImGui::Separator();
+
+        // List all available component types (order aligned with inspector)
         _renderComponentMenuItem("Transform", "Transform");
+        _renderComponentMenuItem("Shape Renderer 2D", "ShapeRenderer2D");
         _renderComponentMenuItem("Sprite Renderer", "SpriteRenderer");
         _renderComponentMenuItem("Rigidbody 2D", "Rigidbody2D");
         _renderComponentMenuItem("Circle Collider 2D", "CircleCollider2D");
         _renderComponentMenuItem("Box Collider 2D", "BoxCollider2D");
-        _renderComponentMenuItem("Shape Renderer 2D", "ShapeRenderer2D");
         _renderComponentMenuItem("Line Renderer", "LineRenderer");
         ImGui::EndPopup();
     }
 
-    ImGui::EndChild();
+    ImGui::SameLine();
+    if (ImGui::Button("Save As Prefab")) {
+        _saveEntityAsPrefab();
+    }
 }
 
-// === Private: Prefab inspection ===
+// Shows components of the prefab TEMPLATE (editing the .prefab file directly)
+// Any changes made here will automatically propagate to ALL instances when we hit "Apply"
 void InspectorWindow::_renderPrefabInspector() {
     if (m_inspectedPrefabPath.empty()) {
         ImGui::TextDisabled("No prefab selected");
         return;
     }
 
-    ImGui::Text("Prefab");
+    // Header: Show prefab filename
+    ImGui::Text("Editing Prefab Template");
     ImGui::SameLine();
     ImGui::TextDisabled("%s", std::filesystem::path(m_inspectedPrefabPath).filename().string().c_str());
 
+    ImGui::Separator();
+    // Warning to make it crystal clear that editing the template affects all instances
+    ImGui::TextWrapped("Changes to this prefab will update ALL instances in the scene.");
+    ImGui::Separator();
+
+    // Use scrollable child for component list
+    // Keep both vertical and horizontal scrollbars always visible to prevent jitter
+    ImGuiWindowFlags childFlags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar;
+    float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 3;
+
+    // Padding inside the child for visual spacing
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+
+    // Fixed content width to stabilize horizontal scroll without being too wide
+    ImGui::SetNextWindowContentSize(ImVec2(420.0f, 0));
+    ImGui::BeginChild("PrefabComponents", ImVec2(0, childHeight), false, childFlags);
+
     // Render all components in the prefab JSON
     if (m_prefabData.contains("Components")) {
-        for (auto& componentEntry : m_prefabData["Components"]) {
-            std::string componentType = componentEntry["Type"];
-            auto& data = componentEntry["Data"];
+        ImGui::Dummy(ImVec2(0, 4));  // Top padding
 
-            if (componentType == "Transform") {
-                _renderComponentSection("Transform", "Transform", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderTransform(d); }, false);
-            }
-            else if (componentType == "SpriteRenderer") {
-                _renderComponentSection("Sprite Renderer", "SpriteRenderer", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderSpriteRenderer(d); });
-            }
-            else if (componentType == "Rigidbody2D") {
-                _renderComponentSection("Rigidbody2D", "Rigidbody2D", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderRigidbody2D(d); });
-            }
-            else if (componentType == "CircleCollider2D") {
-                _renderComponentSection("CircleCollider2D", "CircleCollider2D", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderCircleCollider2D(d); });
-            }
-            else if (componentType == "BoxCollider2D") {
-                _renderComponentSection("BoxCollider2D", "BoxCollider2D", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderBoxCollider2D(d); });
-            }
-            else if (componentType == "ShapeRenderer2D") {
-                _renderComponentSection("ShapeRenderer2D", "ShapeRenderer2D", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderShapeRenderer2D(d); });
-            }
-            else if (componentType == "LineRenderer") {
-                _renderComponentSection("LineRenderer", "LineRenderer", data,
-                    [](nlohmann::json& d) { ComponentUI::RenderLineRenderer(d); });
+        // ALWAYS render Transform first
+        for (auto& componentEntry : m_prefabData["Components"]) {
+            if (componentEntry["Type"] == "Transform") {
+                _renderComponentSection("Transform", "Transform", componentEntry["Data"],
+                    [this](nlohmann::json& d) { m_componentUI.RenderTransform(d); }, false);
+                ImGui::Dummy(ImVec2(0, 4));
+                break;
             }
         }
 
-        // Process deletions
+        // Then render all other components in a fixed, consistent order
+        const std::vector<std::string> orderedTypes = {
+            "ShapeRenderer2D",
+            "SpriteRenderer",
+            "Rigidbody2D",
+            "CircleCollider2D",
+            "BoxCollider2D",
+            "LineRenderer"
+        };
+
+        // Iterate over the component types in the desired order
+        for (const auto& type : orderedTypes) {
+            // Scan all components in the prefab data
+            for (auto& componentEntry : m_prefabData["Components"]) {
+                // Skip if the current component type doesn't match
+                if (componentEntry["Type"] != type) continue;
+
+                // Reference to the component's JSON data
+                auto& data = componentEntry["Data"];
+
+                // Render the component using its corresponding UI function
+                if (type == "SpriteRenderer") {
+                    _renderComponentSection("SpriteRenderer", "SpriteRenderer", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderSpriteRenderer(d); });
+                }
+                else if (type == "Rigidbody2D") {
+                    _renderComponentSection("Rigidbody2D", "Rigidbody2D", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderRigidbody2D(d); });
+                }
+                else if (type == "CircleCollider2D") {
+                    _renderComponentSection("CircleCollider2D", "CircleCollider2D", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderCircleCollider2D(d); });
+                }
+                else if (type == "BoxCollider2D") {
+                    _renderComponentSection("BoxCollider2D", "BoxCollider2D", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderBoxCollider2D(d); });
+                }
+                else if (type == "ShapeRenderer2D") {
+                    _renderComponentSection("ShapeRenderer2D", "ShapeRenderer2D", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderShapeRenderer2D(d); });
+                }
+                else if (type == "LineRenderer") {
+                    _renderComponentSection("LineRenderer", "LineRenderer", data,
+                        [this](nlohmann::json& d) { m_componentUI.RenderLineRenderer(d); });
+                }
+
+                ImGui::Dummy(ImVec2(0, 4));
+                break; // Stop scanning once we rendered this type
+            }
+        }
+
+        // Process component deletions
         for (const auto& type : m_componentsToDelete) {
             _removeComponentFromPrefab(type);
         }
         m_componentsToDelete.clear();
     }
 
+    // Capture scroll extent for stable overlay positioning next frame
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+
+    // Bottom buttons (outside scroll region)
     ImGui::Separator();
     if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");
     }
+
+    // Begin "Add Component" popup menu
     if (ImGui::BeginPopup("AddComponentMenu")) {
         ImGui::PushFont(m_boldFont);
         ImGui::Text("Components");
         ImGui::PopFont();
         ImGui::Separator();
+
+        // Render menu items for each component type
         _renderComponentMenuItem("Transform", "Transform");
+        _renderComponentMenuItem("Shape Renderer 2D", "ShapeRenderer2D");
         _renderComponentMenuItem("Sprite Renderer", "SpriteRenderer");
         _renderComponentMenuItem("Rigidbody 2D", "Rigidbody2D");
         _renderComponentMenuItem("Circle Collider 2D", "CircleCollider2D");
         _renderComponentMenuItem("Box Collider 2D", "BoxCollider2D");
-        _renderComponentMenuItem("Shape Renderer 2D", "ShapeRenderer2D");
         _renderComponentMenuItem("Line Renderer", "LineRenderer");
         ImGui::EndPopup();
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Apply")) {
+
+    // "Apply" button saves prefab template to disk and updates all instances in the current scene
+    // This is the key difference from entity editing where changes are immediate
+    if (ImGui::Button("Apply Changes")) {
         _savePrefab();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Save prefab template and update all instances in scene");
     }
 }
 
-// === Component management helpers ===
+// Add component to an entity instance
 void InspectorWindow::_addComponentToEntity(const std::string& componentType) {
     if (!m_world || m_inspectedEntityId == 0) return;
     auto entity = m_world->GetEntityManager().GetEntity(m_inspectedEntityId);
+
+    // Transform is special, every entity has one by default and it has no configurable defaults
     if (componentType == "Transform") {
         if (!entity.GetComponent<Component::Transform>()) {
             entity.AddComponent<Component::Transform>();
         }
-        return; // Transform defaults fine
+        return;
     }
 
+    // Get default component data from our defaults table
     nlohmann::json defaults = _getDefaultComponentData(componentType);
-    auto applyDefault = [&]<typename T>(const std::string& name) {
+
+    // Add component to entity and apply the default values
+    // We use a lambda pattern to handle all the different component types uniformly
+    auto applyDefault = [&]<typename T>(const std::string & name) {
         if (componentType == name) {
             if (!entity.GetComponent<T>()) {
                 entity.AddComponent<T>();
@@ -370,6 +524,8 @@ void InspectorWindow::_addComponentToEntity(const std::string& componentType) {
         }
         return false;
     };
+
+    // Try each component type
     if (applyDefault.operator()<Component::SpriteRenderer>("SpriteRenderer")) return;
     if (applyDefault.operator()<Component::Rigidbody2D>("Rigidbody2D")) return;
     if (applyDefault.operator()<Component::CircleCollider2D>("CircleCollider2D")) return;
@@ -378,11 +534,16 @@ void InspectorWindow::_addComponentToEntity(const std::string& componentType) {
     if (applyDefault.operator()<Component::LineRenderer>("LineRenderer")) return;
 }
 
+// Remove component from entity instance
 void InspectorWindow::_removeComponentFromEntity(const std::string& componentType) {
     if (!m_world || m_inspectedEntityId == 0) return;
-    auto& em = m_world->GetEntityManager();
-    auto remove = [&]<typename T>(const std::string& name) {
+    auto& em = m_world->GetEntityManager();  // Get reference to entity manager
+
+    // Generic lambda to remove component T if type matches
+    auto remove = [&]<typename T>(const std::string & name) {
+        // Check if current component matches type
         if (componentType == name) {
+            // Remove component from entity
             em.RemoveComponent<T>(m_inspectedEntityId);
             m_statusMessage = std::string("Removed ") + componentType + " from entity";
             m_statusTimer = 2.0f;
@@ -390,7 +551,11 @@ void InspectorWindow::_removeComponentFromEntity(const std::string& componentTyp
         }
         return false;
     };
-    if (componentType == "Transform") return; // cannot remove
+
+    // Transform cannot be removed, every entity needs one
+    if (componentType == "Transform") return;
+
+    // Try removing each component type
     if (remove.operator()<Component::SpriteRenderer>("SpriteRenderer")) return;
     if (remove.operator()<Component::Rigidbody2D>("Rigidbody2D")) return;
     if (remove.operator()<Component::CircleCollider2D>("CircleCollider2D")) return;
@@ -399,17 +564,28 @@ void InspectorWindow::_removeComponentFromEntity(const std::string& componentTyp
     if (remove.operator()<Component::LineRenderer>("LineRenderer")) return;
 }
 
+// Add component to prefab template JSON
 void InspectorWindow::_addComponentToPrefab(const std::string& componentType) {
-    if (!m_prefabData.contains("Components")) m_prefabData["Components"] = nlohmann::json::array();
+    if (!m_prefabData.contains("Components")) {
+        m_prefabData["Components"] = nlohmann::json::array();
+    }
+
+    // Don't add duplicates, check if this component type already exists
     if (_prefabHasComponent(componentType)) return;
+    
+    // Get default data for component + add component to JSON
     nlohmann::json data = _getDefaultComponentData(componentType);
     m_prefabData["Components"].push_back({ {"Type", componentType}, {"Data", data} });
 }
 
+// Remove component from prefab template JSON
 void InspectorWindow::_removeComponentFromPrefab(const std::string& componentType) {
     if (!m_prefabData.contains("Components")) return;
+
     auto& components = m_prefabData["Components"];
-    for (auto it = components.begin(); it != components.end(); ++it) {
+    // Find component of given type
+    for (auto it = components.begin(); it != components.end(); it++) {
+        // Remove it from JSON
         if ((*it)["Type"] == componentType) {
             components.erase(it);
             m_statusMessage = std::string("Component removed: ") + componentType;
@@ -419,13 +595,19 @@ void InspectorWindow::_removeComponentFromPrefab(const std::string& componentTyp
     }
 }
 
+// Check if entity has component
 bool InspectorWindow::_entityHasComponent(EntityId id, const std::string& componentType) {
     auto entity = m_world->GetEntityManager().GetEntity(id);
-    auto has = [&]<typename T>(const std::string& name) {
+
+    // Lambda to check component type
+    // Return true if entity has this component
+    auto has = [&]<typename T>(const std::string & name) {
         if (componentType == name) return entity.GetComponent<T>() != nullptr;
         return false;
     };
-    if (componentType == "Transform") return entity.GetComponent<Component::Transform>() != nullptr;
+
+    // Check if the entity has the specified component type; returning true if found, false otherwise
+    if (componentType == "Transform") return entity.GetComponent<Component::Transform>() != nullptr; // Transform always exists
     if (has.operator()<Component::SpriteRenderer>("SpriteRenderer")) return true;
     if (has.operator()<Component::Rigidbody2D>("Rigidbody2D")) return true;
     if (has.operator()<Component::CircleCollider2D>("CircleCollider2D")) return true;
@@ -435,113 +617,172 @@ bool InspectorWindow::_entityHasComponent(EntityId id, const std::string& compon
     return false;
 }
 
+// Check if prefab JSON contains a component of a given type
 bool InspectorWindow::_prefabHasComponent(const std::string& componentType) {
-    if (!m_prefabData.contains("Components")) return false;
-    for (const auto& comp : m_prefabData["Components"]) {
-        if (comp["Type"] == componentType) return true;
+    if (!m_prefabData.contains("Components")) return false; // If prefab has no "Components" array, return false
+    for (const auto& comp : m_prefabData["Components"]) {   // Iterate through each component in the prefab
+        if (comp["Type"] == componentType) return true;     // If component type matches, return true
     }
-    return false;
+    return false;                                           // No matching component found, return false
 }
 
+// Get default JSON data for a component type
+// Keys MUST match EntitySerializer.h's NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE macros EXACTLY
+// If the keys don't match, deserialization will silently fail or crash
 nlohmann::json InspectorWindow::_getDefaultComponentData(const std::string& componentType) {
+    // Transform: Position, Rotation, Scale, ParentId
     if (componentType == "Transform") {
         return {
-            {"Position", { {"x", 0.0f}, {"y", 0.0f} }},
+            {"Position", {{"X", 0.0f}, {"Y", 0.0f}}},
             {"Rotation", 0.0f},
-            {"Scale",    { {"x", 1.0f}, {"y", 1.0f} }}
+            {"Scale", {{"X", 1.0f}, {"Y", 1.0f}}},
+            {"ParentId", 0}
         };
     }
+    // SpriteRenderer: Width, Height, Color, FlipX, FlipY, SortingOrder, SortingLayerName, TexturePath, Sprite
     else if (componentType == "SpriteRenderer") {
         return {
-            {"TexturePath", ""},
-            {"Color", { {"r", 1.0f}, {"g", 1.0f}, {"b", 1.0f}, {"a", 1.0f} }},
+            {"Width", 0},
+            {"Height", 0},
+            {"Color", {{"R", 255}, {"G", 255}, {"B", 255}, {"A", 255}}},
             {"FlipX", false},
             {"FlipY", false},
-            {"SortingLayer", 0},
-            {"OrderInLayer", 0}
+            {"SortingOrder", 0},
+            {"SortingLayerName", "Default"},
+            {"TexturePath", ""},
+            {"Sprite", ""}
         };
     }
+    // Rigidbody2D: LinearVelocity, Inertia, AngularVelocity, AngularDamping, LinearDamping, CenterOfMass, 
+    // Mass, GravityScale, FreezeRotation, BodyType
     else if (componentType == "Rigidbody2D") {
         return {
+            {"LinearVelocity", {{"X", 0.0f}, {"Y", 0.0f}}},
+            {"Inertia", 0.0f},
+            {"AngularVelocity", 0.0f},
+            {"AngularDamping", 0.05f},
+            {"LinearDamping", 0.0f},
+            {"CenterOfMass", {{"X", 0.0f}, {"Y", 0.0f}}},
             {"Mass", 1.0f},
-            {"Velocity", { {"x", 0.0f}, {"y", 0.0f} }},
-            {"BodyType", "Dynamic"}
+            {"GravityScale", 1.0f},
+            {"FreezeRotation", false},
+            {"BodyType", 0}
         };
     }
+    // CircleCollider2D: IsTrigger, Offset, Layer, Radius
     else if (componentType == "CircleCollider2D") {
         return {
-            {"Radius", 0.5f},
-            {"Offset", { {"x", 0.0f}, {"y", 0.0f} }},
-            {"IsTrigger", false}
-        };
-    }
-    else if (componentType == "BoxCollider2D") {
-        return {
-            {"Size", { {"x", 1.0f}, {"y", 1.0f} }},
-            {"Offset", { {"x", 0.0f}, {"y", 0.0f} }},
-            {"IsTrigger", false}
-        };
-    }
-    else if (componentType == "ShapeRenderer2D") {
-        return {
-            {"Type", "Circle"},
-            {"FillColor", { {"r", 1.0f}, {"g", 1.0f}, {"b", 1.0f}, {"a", 1.0f} }},
+            {"IsTrigger", false},
+            {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
+            {"Layer", 0},
             {"Radius", 0.5f}
         };
     }
-    else if (componentType == "LineRenderer") {
+    // BoxCollider2D: IsTrigger, Offset, Layer, Size
+    else if (componentType == "BoxCollider2D") {
         return {
-            {"Start", { {"x", 0.0f}, {"y", 0.0f} }},
-            {"End", { {"x", 1.0f}, {"y", 1.0f} }},
-            {"Thickness", 1.0f}
+            {"IsTrigger", false},
+            {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
+            {"Layer", 0},
+            {"Size", {{"X", 1.0f}, {"Y", 1.0f}}}
         };
     }
+    // ShapeRenderer2D: Type, FillColor, OutlineColor, OutlineThickness, Size, Radius, Points, Closed
+    else if (componentType == "ShapeRenderer2D") {
+        return {
+            {"Type", 0},
+            {"FillColor", {{"R", 255}, {"G", 255}, {"B", 255}, {"A", 255}}},
+            {"OutlineColor", {{"R", 0}, {"G", 0}, {"B", 0}, {"A", 255}}},
+            {"OutlineThickness", 1.0f},
+            {"Size", {{"X", 100.0f}, {"Y", 100.0f}}},
+            {"Radius", 50.0f},
+            {"Points", nlohmann::json::array()},
+            {"Closed", true}
+        };
+    }
+    // LineRenderer: Start, End, Thickness, Color
+    else if (componentType == "LineRenderer") {
+        return {
+            {"Start", {{"X", 0.0f}, {"Y", 0.0f}}},
+            {"End", {{"X", 1.0f}, {"Y", 1.0f}}},
+            {"Thickness", 1.0f},
+            {"Color", {{"R", 255}, {"G", 255}, {"B", 255}, {"A", 255}}}
+        };
+    }
+
     return {};
 }
 
+// Renders a collapsible inspector section for a component, including its editable fields and an optional delete button.
 template <typename T>
 void InspectorWindow::_renderComponentSection(const std::string& headerName, const std::string& componentType,
     nlohmann::json& data, T renderContent, bool canDelete) {
+
+    // Render collapsible header for this component
     bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-    ImVec2 originalCursorPos = ImGui::GetCursorPos();
-    // Extend the visual header bar to span the full content width
-    {
-        ImVec2 headerMin = ImGui::GetItemRectMin();
-        ImVec2 headerMax = ImGui::GetItemRectMax();
-        float rowLeft = ImGui::GetWindowPos().x + originalCursorPos.x;
-        float rowRight = ImGui::GetWindowPos().x + ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
-        ImU32 headerColor = ImGui::GetColorU32(ImGui::GetStyleColorVec4(ImGuiCol_Header));
-        ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(rowLeft, headerMin.y), ImVec2(rowRight, headerMax.y), headerColor);
-    }
-    // Place delete button outside (to the right) of the header row, aligned to the visible content region
-    const char* deleteIcon = "\xEE\xA1\xB2";
-    float iconWidth = ImGui::CalcTextSize(deleteIcon).x;
-    float btnWidth = iconWidth + ImGui::GetStyle().FramePadding.x * 2.0f;
-    float rightEdge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
-    ImGui::SetCursorPosX(std::max(originalCursorPos.x, rightEdge - btnWidth - ImGui::GetStyle().ItemSpacing.x));
-    if (!canDelete) ImGui::BeginDisabled();
-    ImGui::PushFont(m_symbolsFont);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
-    ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? ImVec4(0.7f, 0.2f, 0.2f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-    if (ImGui::SmallButton((std::string(deleteIcon) + "##Delete" + componentType).c_str())) {
-        m_componentsToDelete.push_back(componentType);
-    }
-    ImGui::PopStyleColor(4);
-    ImGui::PopFont();
-    if (!canDelete) ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip(canDelete ? "Remove Component" : "Transform cannot be removed");
-    }
-    ImGui::SetCursorPos(originalCursorPos);
+
+    // Delete button BELOW header
     if (nodeOpen) {
+        const char* deleteIcon = "\xEE\xA1\xB2"; 
+
+        // Calculate button width so we can reserve space for it
+        ImGui::PushFont(m_symbolsFont);
+        float iconWidth = ImGui::CalcTextSize(deleteIcon).x;
+        float btnWidth = iconWidth + ImGui::GetStyle().FramePadding.x * 2.0f;
+        ImGui::PopFont();
+
+        // Save cursor position BEFORE rendering button so content can go here
+        // This is a trick to make the button appear on the right while content flows normally
+        ImVec2 contentCursorPos = ImGui::GetCursorPos();
+
+        // Use a 2-column table: left column stretches for content, right column fixed for delete button
+        // This keeps the delete button always aligned to the right edge
+        if (ImGui::BeginTable((std::string("ComponentHeaderTable##") + componentType).c_str(), 2, ImGuiTableFlags_SizingStretchProp | 
+            ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_NoPadInnerX)) 
+        {
+            ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+            ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, btnWidth);
+            ImGui::TableNextRow();
+
+            // Right column: delete button
+            ImGui::TableSetColumnIndex(1);
+            if (!canDelete) ImGui::BeginDisabled();
+            ImGui::PushFont(m_symbolsFont);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? ImVec4(0.7f, 0.2f, 0.2f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+
+            // Just stylistic stuff
+            if (ImGui::SmallButton((std::string(deleteIcon) + "##Delete" + componentType).c_str())) {
+                m_componentsToDelete.push_back(componentType);
+            }
+
+            ImGui::PopStyleColor(4);
+            ImGui::PopFont();
+            if (!canDelete) ImGui::EndDisabled();
+
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip(canDelete ? "Remove Component" : "Transform cannot be removed");
+            }
+
+            ImGui::EndTable();
+        }
+
+        // Restore cursor to where it was before the table
+        // This lets the component content render in the left column area
+        ImGui::SetCursorPos(contentCursorPos);
+
+        // Render component content below the header action row
         renderContent(data);
     }
 }
 
+// Render menu item for adding component
 void InspectorWindow::_renderComponentMenuItem(const char* displayName, const char* componentType) {
     bool hasComponent = false;
+
+    // Check if the component already exists (either on entity or in prefab)
     if (m_mode == InspectionMode::Entity) {
         hasComponent = _entityHasComponent(m_inspectedEntityId, componentType);
     }
@@ -549,65 +790,211 @@ void InspectorWindow::_renderComponentMenuItem(const char* displayName, const ch
         hasComponent = _prefabHasComponent(componentType);
     }
 
+    // Gray out the menu item if component already added
     if (hasComponent) ImGui::BeginDisabled();
+
+    // More stylistic stuff
     if (ImGui::Selectable(displayName)) {
         if (m_mode == InspectionMode::Entity) _addComponentToEntity(componentType);
         else if (m_mode == InspectionMode::Prefab) _addComponentToPrefab(componentType);
     }
+
     if (hasComponent) ImGui::EndDisabled();
+
     if (hasComponent && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip("Component already added");
     }
 }
 
+// Saves the prefab JSON to file, skips if unchanged and applies updated component data to 
+// all entity instances while preserving hierarchy relationships
 void InspectorWindow::_savePrefab() {
     if (m_inspectedPrefabPath.empty()) return;
+
     try {
+        // Guard against unnecessary saves by comparing content hashes
+        // If nothing changed since last save, skip the file write and instance updates
+        std::string snapshot = m_prefabData.dump();
+        size_t currentHash = std::hash<std::string>{}(snapshot); // Compute a hash of the snapshot to detect changes
+
+        // If the hash matches the last saved version, nothing changed
+        if (currentHash == m_lastSavedPrefabHash) {
+            m_statusMessage = "No changes to save";
+            m_statusTimer = 1.5f;
+            return;
+        }
+
+        // Write prefab JSON to file
         std::ofstream out(m_inspectedPrefabPath);
-        out << m_prefabData.dump(4);
+        out << m_prefabData.dump(4);  // Pretty-print with 4-space indentation
         out.close();
-        m_statusMessage = "Prefab saved";
-        m_statusTimer = 2.0f;
 
-        // Update instances
-        auto updateEntityFromPrefab = [&](Entity& entity) {
-            try {
-                for (const auto& componentEntry : m_prefabData["Components"]) {
-                    std::string typeName = componentEntry["Type"];
-                    auto apply = [&]<typename T>(const std::string& name) {
-                        if (typeName == name) {
-                            if (auto* comp = entity.GetComponent<T>()) {
-                                from_json(componentEntry["Data"], *comp);
-                            }
-                            return true;
-                        }
-                        return false;
-                    };
-                    if (apply.operator()<Component::Transform>("Transform")) continue;
-                    if (apply.operator()<Component::SpriteRenderer>("SpriteRenderer")) continue;
-                    if (apply.operator()<Component::Rigidbody2D>("Rigidbody2D")) continue;
-                    if (apply.operator()<Component::CircleCollider2D>("CircleCollider2D")) continue;
-                    if (apply.operator()<Component::BoxCollider2D>("BoxCollider2D")) continue;
-                    if (apply.operator()<Component::ShapeRenderer2D>("ShapeRenderer2D")) continue;
-                    if (apply.operator()<Component::LineRenderer>("LineRenderer")) continue;
-                }
-                return true;
-            } catch (...) { return false; }
-        };
-
+        // Find every entity in the scene that came from this prefab and update it
         if (m_world) {
-            int updated = 0;
+            // Lambda to normalize file paths for consistent comparison across different OS path formats
+            auto normalizePath = [](const std::string& path) -> std::string {
+                std::filesystem::path p(path);
+                return p.lexically_normal().string();
+                };
+
+            std::string inspectedNorm = normalizePath(m_inspectedPrefabPath);
+            int updated = 0;         // Count of successfully updated instances
+            int failed = 0;          // Count of instances that failed to update
+
+            // Iterate over every entity in the world
             for (auto id : m_world->GetEntityManager().GetAllEntities()) {
                 auto entity = m_world->GetEntityManager().GetEntity(id);
                 auto* link = entity.GetComponent<Component::PrefabLink>();
-                if (!link || link->prefabPath != m_inspectedPrefabPath) continue;
-                if (updateEntityFromPrefab(entity)) ++updated;
+                if (!link) continue; // Skip entities that aren't prefab instances
+
+                // Only update instances that came from this prefab
+                std::string linkNorm = normalizePath(link->prefabPath);
+                if (linkNorm != inspectedNorm) continue;
+
+                // Update this instance from prefab data
+                try {
+                    // Iterate over all components in the prefab
+                    for (const auto& componentEntry : m_prefabData["Components"]) {
+                        std::string typeName = componentEntry["Type"];
+                        auto compData = componentEntry["Data"];  // Make a COPY
+
+                        // Preserve ParentId for Transform to maintain scene hierarchy
+                        // The prefab template doesn't know where instances are in the hierarchy
+                        if (typeName == "Transform") {
+                            if (auto* existingTransform = entity.GetComponent<Component::Transform>()) {
+                                // Keep the instance's parent relationship intact
+                                compData["ParentId"] = existingTransform->ParentId;
+                            }
+                        }
+                        // Helper lambda to update component of the correct type
+                        // Adds the component if missing, then applies the prefab data to it
+                        auto updateComp = [&]<typename T>(const std::string & name) -> bool {
+                            if (typeName != name) return false;
+
+                            // Add component if this instance doesn't have it yet
+                            if (!entity.HasComponent<T>()) {
+                                // SpriteRenderer needs texture path in constructor
+                                if constexpr (std::is_same_v<T, Component::SpriteRenderer>) {
+                                    std::string path = compData.value("TexturePath", compData.value("Sprite", ""));
+                                    entity.AddComponent<Component::SpriteRenderer>(path);
+                                }
+                                else {
+                                    entity.AddComponent<T>();
+                                }
+                            }
+
+                            // Apply data (with ParentId preserved for Transform earlier)
+                            if (auto* comp = entity.GetComponent<T>()) {
+                                from_json(compData, *comp);
+                            }
+                            return true;
+                        };
+
+                        // Try each component type
+                        if (updateComp.template operator()<Component::Transform>("Transform")) continue;
+                        if (updateComp.template operator()<Component::SpriteRenderer>("SpriteRenderer")) continue;
+                        if (updateComp.template operator()<Component::Rigidbody2D>("Rigidbody2D")) continue;
+                        if (updateComp.template operator()<Component::CircleCollider2D>("CircleCollider2D")) continue;
+                        if (updateComp.template operator()<Component::BoxCollider2D>("BoxCollider2D")) continue;
+                        if (updateComp.template operator()<Component::ShapeRenderer2D>("ShapeRenderer2D")) continue;
+                        if (updateComp.template operator()<Component::LineRenderer>("LineRenderer")) continue;
+                    }
+                    // Count successful update
+                    ++updated;
+                }
+                catch (const std::exception& e) {
+                    // Count failures
+                    LOG_ERROR("Failed to update prefab instance " << id << ": " << e.what());
+                    ++failed;
+                }
             }
-            LOG_INFO("Updated " << updated << " prefab instances");
+            m_statusMessage = "Prefab saved. Updated " + std::to_string(updated) + " instance(s)";
+            if (failed > 0) {
+                m_statusMessage += " (" + std::to_string(failed) + " failed)";
+            }
+            m_statusTimer = 3.0f;
+            LOG_INFO("Updated " << updated << " prefab instances, " << failed << " failed");
         }
+        // Save current hash to detect future changes
+        m_lastSavedPrefabHash = currentHash;
     }
     catch (const std::exception& e) {
-        m_statusMessage = std::string("Failed: Save prefab ") + e.what();
+        m_statusMessage = std::string("Failed: ") + e.what();
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Prefab save failed: " << e.what());
+    }
+}
+
+// Save the currently selected entity as a prefab asset on disk
+void InspectorWindow::_saveEntityAsPrefab() {
+    if (!m_world || m_inspectedEntityId == 0) {
+        m_statusMessage = "Failed: No entity to save";
+        m_statusTimer = 2.0f;
+        return;
+    }
+
+    try {
+        // Get live entity from the world
+        auto entity = m_world->GetEntityManager().GetEntity(m_inspectedEntityId);
+
+        // Serialize the entity to JSON (all components included)
+        nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(entity);
+
+        // Save to BOTH locations to cover different execution contexts:
+        // 1. Build working dir: assets/prefabs (when running from build folder)
+        // 2. Project root dir: ../assets/prefabs OR assets/prefabs (depending on where we are)
+        std::filesystem::path dirBuild = std::filesystem::path("assets") / "prefabs";
+        std::filesystem::path dirRoot;
+        if (std::filesystem::exists("CMakeLists.txt")) {
+            // At project root
+            dirRoot = std::filesystem::path("assets") / "prefabs";
+        }
+        else {
+            // Inside build/ directory
+            dirRoot = std::filesystem::path("..") / "assets" / "prefabs";
+        }
+
+        // Ensure directories exist (creates if missing)
+        std::error_code ec;
+        std::filesystem::create_directories(dirBuild, ec);
+        std::filesystem::create_directories(dirRoot, ec);
+
+        // Base name for the prefab file (use entity name or default "Entity")
+        std::string baseName = entity.GetName().empty() ? std::string("Entity") : entity.GetName();
+
+        // Lambda to generate unique filename by appending numbers if file already exists
+        // This prevents accidentally overwriting existing prefabs
+        auto makeUniquePath = [&](const std::filesystem::path& dir) {
+            std::filesystem::path candidate = dir / (baseName + std::string(".prefab"));
+            int counter = 1;
+            while (std::filesystem::exists(candidate)) {
+                candidate = dir / (baseName + std::string("_") + std::to_string(counter++) + std::string(".prefab"));
+            }
+            return candidate;
+        };
+
+        // Generate unique paths for both build and project locations
+        std::filesystem::path pathBuild = makeUniquePath(dirBuild);
+        std::filesystem::path pathRoot = makeUniquePath(dirRoot);
+
+        // Write to build directory
+        {
+            std::ofstream out(pathBuild);
+            out << entityJson.dump(4);
+            out.close();
+        }
+        // Write to project root directory
+        {
+            std::ofstream out(pathRoot);
+            out << entityJson.dump(4);
+            out.close();
+        }
+
+        m_statusMessage = std::string("Prefab saved to: assets/ folder");
+        m_statusTimer = 2.0f;
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = std::string("Failed: Save entity prefab ") + e.what();
         m_statusTimer = 3.0f;
     }
 }

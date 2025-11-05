@@ -1,7 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorUIHelpers.cpp
-\author Foo Rui Qin
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
 \date   2nd November 2025
 \brief
 Implements reusable, stateless ImGui helper functions for editing
@@ -145,7 +146,7 @@ void RenderIntProperty(const std::string& label, nlohmann::json& data,
     }
 }
 
-// Render a color picker widget backed by RGBA values stored in JSON (0–255)
+// Render a color picker widget backed by RGBA values stored in JSON (0-255)
 void RenderColorProperty(const std::string& label, nlohmann::json& colorData)
 {
     // Strip '##' suffix for display purposes (used only for ImGui unique IDs)
@@ -155,7 +156,7 @@ void RenderColorProperty(const std::string& label, nlohmann::json& colorData)
     // Position at absolute offset for alignment
     ImGui::SetCursorPosX(currentLabelOffset);
 
-    // Convert JSON RGBA (0–255 range) to ImGui color (0–1 range)
+    // Convert JSON RGBA (0-255 range) to ImGui color (0-1 range)
     // ImGui's ColorEdit expects normalized floats between 0 and 1
     float col[4] = {
         colorData["R"].get<float>() / 255.0f,
@@ -174,11 +175,11 @@ void RenderColorProperty(const std::string& label, nlohmann::json& colorData)
         ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar |
         ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel))
     {
-        // Convert back from ImGui's 0–1 range to 0–255 before storing in JSON
-        colorData["R"] = col[0] * 255.0f;
-        colorData["G"] = col[1] * 255.0f;
-        colorData["B"] = col[2] * 255.0f;
-        colorData["A"] = col[3] * 255.0f;
+        // Convert back from ImGui's 0-1 range to 0-255 before storing in JSON
+        colorData["R"] = static_cast<int>(col[0] * 255.0f);
+        colorData["G"] = static_cast<int>(col[1] * 255.0f);
+        colorData["B"] = static_cast<int>(col[2] * 255.0f);
+        colorData["A"] = static_cast<int>(col[3] * 255.0f);
     }
 }
 

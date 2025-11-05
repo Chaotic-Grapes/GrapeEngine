@@ -21,7 +21,7 @@ Features:
 
 #include "../editor/PlaybackControls.h"
 #include "../editor/AssetBrowser.h"
-#include "../editor/EntityEditor.h"
+#include "../editor/EditorCore.h"
 #include "../editor/HierarchyWindow.h"
 #include "../editor/InspectorWindow.h"
 
@@ -58,16 +58,16 @@ public:
     void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
-    World* m_world;                   // Reference to game world
-    LevelEditorConfig m_config;       // Editor configuration settings
-    Playback m_playback;              // Playback controls panel
-    ImFont* m_symbolsFont = nullptr;  // Material Symbols icon font
-    ImFont* m_mainFont = nullptr;     // Regular Inter font for text
-    ImFont* m_boldFont = nullptr;     // Bold Inter font
-    AssetBrowser m_assetBrowser;      // Asset browser panel
-    EntityEditor m_entityEditor;      // Entity editor panel
-    HierarchyWindow m_hierarchyWindow;
-    InspectorWindow m_inspector;     // Unified inspector absorbing PrefabEditor
+    World* m_world;                    // Reference to game world
+    LevelEditorConfig m_config;        // Editor configuration settings
+    Playback m_playback;               // Playback controls panel
+    ImFont* m_symbolsFont = nullptr;   // Material Symbols icon font
+    ImFont* m_mainFont = nullptr;      // Regular Inter font for text
+    ImFont* m_boldFont = nullptr;      // Bold Inter font
+    AssetBrowser m_assetBrowser;       // Asset browser panel
+    EditorCore m_editorCore;           // Entity editor panel
+    HierarchyWindow m_hierarchyWindow; // Hierarchy panel
+    InspectorWindow m_inspector;       // Unified inspector absorbing PrefabEditor
 };
 
 #endif

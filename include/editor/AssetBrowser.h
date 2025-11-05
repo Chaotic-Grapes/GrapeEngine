@@ -61,9 +61,7 @@ private:
 
     // Helper modules
     AssetLibrary m_assetLibrary;                // File operations helper
-
-    // Unified inspector wiring
-    InspectorWindow* m_inspector = nullptr;
+    InspectorWindow* m_inspector = nullptr;     // Unified inspector wiring
 
     // Status notification
     std::string m_statusMessage = "";           // Success/error message text

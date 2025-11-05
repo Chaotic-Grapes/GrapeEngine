@@ -28,17 +28,20 @@ Reference:
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
+// Constructor: stores pointer to the world
 Playback::Playback(World* world)
     : m_world(world) {
 }
 
 Playback::~Playback() {}
 
+// Initialize the fonts for UI and icons
 void Playback::Initialize(ImFont* mainFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_symbolsFont = symbolsFont;
 }
 
+// Process keyboard input for playback shortcuts
 void Playback::ProcessInput() {
     // Play/Stop: Ctrl + P
     if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
@@ -81,11 +84,10 @@ void Playback::ProcessInput() {
     }
 }
 
+// Render the playback control UI using ImGui
 void Playback::Render() {
     // Show title bar, allow moving; keep non-resizable and keep docking enabled
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize;
-    // Set a lower initial position only on first use (ignored when docked)
-    ImGui::SetNextWindowPos(ImVec2(20, 180), ImGuiCond_FirstUseEver);
     // Use default ImGui tab styling; no local overrides
     ImGui::Begin("Game Controls", nullptr, flags);
 
@@ -105,14 +107,20 @@ void Playback::Render() {
         );
         ImGui::EndTooltip();
     }
-    // Buttons 
     // If the buttons have been clicked, they get grayed out
     auto button = [&](const char* icon, bool shouldBeEnabled, GameState newState, const char* logMsg,
         bool isStepButton = false, ImVec2 size = ImVec2(100, 40))
         {
+            // If the button should not be enabled (e.g. Stop button while already stopped), wrap 
+            // the button in ImGui's BeginDisabled/EndDisabled to gray it out and prevent clicks
             if (!shouldBeEnabled) ImGui::BeginDisabled();
+
+            // ImGui::Button returns true if the user clicks it during this frame.
             bool clicked = ImGui::Button(icon, size);
+            // Close the disabled block if it was opened
             if (!shouldBeEnabled) ImGui::EndDisabled();
+
+            // Handle click logic
             if (clicked) {
                 if (isStepButton) {
                     // Special case: STEP just sets flag
@@ -135,11 +143,11 @@ void Playback::Render() {
     // Center buttons horizontally within available content region (Y unchanged)
     {
         float btnWidth = 100.0f;
-        float spacing = ImGui::GetStyle().ItemSpacing.x;
-        float totalWidth = btnWidth * 3.0f + spacing * 2.0f;
-        float availWidth = ImGui::GetContentRegionAvail().x;
-        float startX = (availWidth - totalWidth) * 0.5f;
-        if (startX < 0.0f) startX = 0.0f;
+        float spacing = ImGui::GetStyle().ItemSpacing.x;      // Default horizontal spacing between buttons from ImGui style
+        float totalWidth = btnWidth * 3.0f + spacing * 2.0f;  // Total width = 3 buttons + 2 spaces between them
+        float availWidth = ImGui::GetContentRegionAvail().x;  // Get width of available space in current ImGui window/content region
+        float startX = (availWidth - totalWidth) * 0.5f;      // Compute starting X position so buttons are centered
+        if (startX < 0.0f) startX = 0.0f;                     // If available width < total width, don't use negative starting pos
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startX);
     }
 
@@ -174,6 +182,7 @@ void Playback::Render() {
     ImGui::End();
 }
 
+// Save current world state for restoring later
 void Playback::_saveWorldState() {
     if (!HasValidWorld()) return;
 
@@ -183,16 +192,21 @@ void Playback::_saveWorldState() {
     auto entities = m_world->GetEntityManager().GetAllEntities();
     nlohmann::json worldJson = nlohmann::json::array();
 
+    // Loop through each entity and serialize it to JSON
     for (const auto& entityId : entities) {
         auto entity = m_world->GetEntityManager().GetEntity(entityId);
+        // Serialize the entity (including all components and their data)
         auto entityJson = Serialization::EntitySerializer::SerializeEntity(entity);
+        // Add serialized entity to the world snapshot
         worldJson.push_back(entityJson);
     }
 
+    // Store the snapshot in a member variable for later restoration
     m_savedWorldState = worldJson;
     LOG_INFO("Saved " << entities.size() << " entities");
 }
 
+// Restore the world state to previously saved snapshot
 void Playback::_restoreWorldState() {
     if (!HasValidWorld() || m_savedWorldState.empty()) {
         LOG_WARNING("No saved state to restore");
@@ -212,14 +226,17 @@ void Playback::_restoreWorldState() {
     LOG_INFO("World restored");
 }
 
+// Query if the game is currently playing
 bool Playback::IsPlaying() const {
     return m_gameState == GameState::Playing;
 }
 
+// Query if a step-frame request was made
 bool Playback::IsStepRequested() const {
     return m_stepRequested;
 }
 
+// Clear the step request flag
 void Playback::ClearStepRequest() {
     m_stepRequested = false;
 }

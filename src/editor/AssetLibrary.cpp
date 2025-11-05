@@ -29,10 +29,12 @@ References:
 #endif
 
 #include "../editor/AssetLibrary.h"
+#include "../editor/InspectorWindow.h"
 #include "core/Logger.h"
 #include <vector>
 #include <services/ResourceManager.h>
 
+// Initialize the asset library with fonts for rendering
 void AssetLibrary::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
@@ -84,7 +86,10 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
             // When clicked, navigate to that folder level
             if (ImGui::SmallButton(pathParts[i].string().c_str())) {
                 outNewPath = accumulatedPath;
-                selectedAsset.clear();  // Clear file selection when changing folders
+                // Only clear selection if we actually navigate to a different folder
+                if (outNewPath != currentPath) {
+                    selectedAsset.clear();
+                }
             }
 
             ImGui::PopStyleColor(4);  // Pop all 4 color style overrides (Text, Button, ButtonHovered, ButtonActive)
@@ -155,6 +160,14 @@ void AssetLibrary::_displayFile(const std::filesystem::path& filePath, std::stri
     if (ImGui::Selectable(filename.c_str(), isSelected)) {
         // If clicked, remember it as selected
         selectedAsset = filePath.string();
+    }
+
+    // Double-click: open prefab in inspector if applicable
+    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+        selectedAsset = filePath.string();
+        if (filePath.extension() == ".prefab" && m_inspector) {
+            m_inspector->InspectPrefab(selectedAsset);
+        }
     }
 
     // Enable file dragging
@@ -444,11 +457,12 @@ void AssetLibrary::_deleteSelectedAsset(std::string& selectedAsset, std::string&
             std::filesystem::path relativePath = std::filesystem::relative(selectedPath, "assets");
             std::filesystem::path sourcePathToDelete = std::filesystem::path("..") / "assets" / relativePath;
 
+            // Only proceed if path exists
             if (std::filesystem::exists(sourcePathToDelete)) {
-                if (isFolder) {
+                if (isFolder) {  // Remove entire folder recursively
                     std::filesystem::remove_all(sourcePathToDelete);
                 }
-                else {
+                else {           // Remove single file
                     std::filesystem::remove(sourcePathToDelete);
                 }
             }

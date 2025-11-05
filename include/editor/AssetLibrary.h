@@ -29,14 +29,18 @@ References:
 
 // Forward declarations
 struct ImFont;
-class AssetBrowser;  // Forward declare to use as friend
+class AssetBrowser;            // Forward declare to use as friend
+class InspectorWindow;         // Forward declare to wire double-click open
 
 class AssetLibrary {
-    friend class AssetBrowser;  // Only AssetBrowser can access private members
+    friend class AssetBrowser; // Only AssetBrowser can access private members
 
 public:
     // Initialize with fonts for rendering
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
+
+    // Wire the unified Inspector to enable double-click open for prefabs
+    void SetInspector(InspectorWindow* inspector) { m_inspector = inspector; }
 
 private:
     // Display clickable breadcrumb navigation trail
@@ -69,6 +73,7 @@ private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
+    InspectorWindow* m_inspector = nullptr;
 };
 
 #endif

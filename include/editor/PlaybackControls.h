@@ -28,6 +28,7 @@ struct ImFont;
 
 class Playback {
 public:
+    // Enum representing the current playback state
     enum class GameState {
         Stopped,   // Editor mode
         Playing,   // Game running
@@ -48,17 +49,17 @@ public:
 
     // Expose game state
     GameState GetGameState() const { return m_gameState; }
-    bool IsPlaying() const;
-    bool IsStepRequested() const;
-    void ClearStepRequest();
+    bool IsPlaying() const;       // Returns true if game is running
+    bool IsStepRequested() const; // Returns true if user requested a single physics step
+    void ClearStepRequest();      // Resets step request flag
 
 private:
-    World* m_world;
-    ImFont* m_mainFont = nullptr;
-    ImFont* m_symbolsFont = nullptr;
-    GameState m_gameState = GameState::Stopped;
-    bool m_stepRequested = false;
-    nlohmann::json m_savedWorldState;
+    World* m_world;                             // Pointer to the game world being edited
+    ImFont* m_mainFont = nullptr;               // Font for UI text
+    ImFont* m_symbolsFont = nullptr;            // Font for Material Symbols icons
+    GameState m_gameState = GameState::Stopped; // Current playback state
+    bool m_stepRequested = false;               // Flag for single-step execution
+    nlohmann::json m_savedWorldState;           // Stores world state snapshot for restore on stop
 
     // Save current world state before playing
     void _saveWorldState();
@@ -66,6 +67,7 @@ private:
     // Restore world state when stopping
     void _restoreWorldState();
 
+    // Convenience check for valid world pointer
     bool HasValidWorld() const { return m_world != nullptr; }
 };
 

@@ -48,9 +48,11 @@ void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 }
 
 // Connect the InspectorWindow so prefab actions in Asset Browser
-// are inspected in the unified inspector UI.
+// are inspected in the unified inspector UI
 void AssetBrowser::SetInspector(InspectorWindow* inspector) {
     m_inspector = inspector;
+    // Propagate to AssetLibrary for double-click open behavior
+    m_assetLibrary.SetInspector(inspector);
 }
 
 // Render the asset browser UI window
@@ -64,14 +66,11 @@ void AssetBrowser::Render() {
     // Display clickable breadcrumb navigation
     std::string newPath;
     m_assetLibrary._displayBreadcrumbs(m_currentPath, m_selectedAsset, newPath);
-    if (!newPath.empty()) {
+    if (!newPath.empty() && newPath != m_currentPath) {
         m_currentPath = newPath;
-        // Navigating to a new folder clears file selection and inspector
+        // Navigating to a different folder clears file selection and inspector
         if (!m_selectedAsset.empty()) {
             m_selectedAsset.clear();
-        }
-        if (m_inspector) {
-            m_inspector->ClearSelection();
         }
     }
 
@@ -135,58 +134,75 @@ void AssetBrowser::Render() {
         }
     }
 
-    // Popup window with prefab options
+    // Open ImGui popup named "Prefabs"
     if (ImGui::BeginPopup("Prefabs")) {
-        // Load prefab option: instantiate into world
+        // Display selectable option "Load Prefab" in the popup
         if (ImGui::Selectable("Load Prefab")) {
-            // Instantiate selected prefab into the world
+            // Only proceed if an asset is selected and world pointer is valid
             if (!m_selectedAsset.empty() && m_world) {
                 try {
+                    // Open the selected prefab file
                     std::ifstream file(m_selectedAsset);
+                    // Failure, log it
                     if (!file.is_open()) {
                         LOG_ERROR("Cannot open file: " << m_selectedAsset);
-                        m_statusMessage = "Failed to open prefab";
-                        m_statusTimer = 3.0f;
-                    } else {
+                        m_statusMessage = "Failed to open prefab"; 
+                        m_statusTimer = 3.0f;                     
+                    }
+                    else {
                         nlohmann::json entityJson;
-                        file >> entityJson;
-                        file.close();
+                        file >> entityJson; // Read JSON content
+                        file.close();       // Close file after reading
 
+                        // Deserialize JSON into an entity in the current world
                         auto entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
-                        entity.AddComponent<Component::PrefabLink>(m_selectedAsset);
 
+                        // Add PrefabLink component to store normalized path of prefab
+                        std::filesystem::path p(m_selectedAsset);
+                        std::string linkPath = p.lexically_normal().string();
+                        entity.AddComponent<Component::PrefabLink>(linkPath);
+
+                        // Log info and update status message on successful load
                         LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
                         m_statusMessage = "Prefab loaded successfully";
                         m_statusTimer = 3.0f;
                     }
-                } catch (const std::exception& e) {
+                }
+                catch (const std::exception& e) {
+                    // Catch JSON parse or deserialization errors
                     LOG_ERROR("Failed to parse prefab file: " << e.what());
                     m_statusMessage = "Failed to load prefab";
                     m_statusTimer = 3.0f;
                 }
             }
         }
+
         // Edit prefab option: open in unified Inspector
         if (ImGui::Selectable("Edit Prefab")) {
+            // Check if inspector instance is available
             if (!m_inspector) {
                 LOG_WARNING("Inspector not available for prefab editing");
                 m_statusMessage = "Inspector not available";
                 m_statusTimer = 3.0f;
-            } else if (m_selectedAsset.empty()) {
+            } 
+            // Check if prefab is selected
+            else if (m_selectedAsset.empty()) {
                 m_statusMessage = "Failed to open prefab: none selected";
                 m_statusTimer = 3.0f;
-            } else {
-                // Validate the prefab can be opened and parsed
+            } 
+            else {
                 try {
+                    // Validate the prefab can be opened and parsed
                     std::ifstream file(m_selectedAsset);
                     if (!file.is_open()) {
                         LOG_ERROR("Cannot open prefab file: " << m_selectedAsset);
                         m_statusMessage = "Failed to open prefab";
                         m_statusTimer = 3.0f;
-                    } else {
+                    } 
+                    else {
                         nlohmann::json prefabJson;
-                        file >> prefabJson;
-                        file.close();
+                        file >> prefabJson; // Parse JSON content
+                        file.close();       // Close file after reading
 
                         // If parsing succeeded, open in inspector and report success
                         m_inspector->InspectPrefab(m_selectedAsset);
@@ -208,13 +224,15 @@ void AssetBrowser::Render() {
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 193);
 
+    // Standard stuff
     ImGui::SetNextItemWidth(120);
     if (ImGui::SliderFloat("##Scale", &m_fontScale, 0.5f, 1.5f, "%.1fx")) {
         m_fontScale = std::clamp(m_fontScale, 0.5f, 1.5f);
     }
 
+    // Show tooltip on hover
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Global UI Scale");
+        ImGui::SetTooltip("Asset Browser UI Scale");
     }
 
     ImGui::SameLine();
@@ -222,24 +240,28 @@ void AssetBrowser::Render() {
         m_fontScale = 1.0f;
     }
 
-    // Two-column layout (.x is width): file list on left, info panel on right
+    // Reserve space for status bar at bottom
     float windowWidth = ImGui::GetContentRegionAvail().x;
+    float statusBarHeight = 26.0f;
+
+    // Content region above status bar
+    ImGui::BeginChild("ContentRegion", ImVec2(0, -statusBarHeight), false);
 
     // Left side: File/folder list (65% width)
-    // Child window = scrollable region within parent window
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
     ImGui::SetWindowFontScale(m_fontScale);
     m_assetLibrary._displayFolder(m_currentPath, m_selectedAsset, m_currentPath);
 
-    // Clicking empty space in file list clears selection and inspector
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
-        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered()) {
-        if (!m_selectedAsset.empty()) {
-            m_selectedAsset.clear();
-            if (m_inspector) {
-                m_inspector->ClearSelection();
-            }
+    // Clicking empty space in file list clears EVERYTHING (File/folder list)
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
+        && !ImGui::IsAnyItemHovered()) 
+    {
+        // Clear currently selected asset
+        m_selectedAsset.clear();
+
+        // Clear inspector if it exists
+        if (m_inspector) {
+            m_inspector->ClearSelection();
         }
     }
     ImGui::EndChild();
@@ -247,10 +269,20 @@ void AssetBrowser::Render() {
     ImGui::SameLine();
 
     // Right side: File info panel (35% width)
-    // ImVec2(0, 0) = take up remaining horizontal + vertical space
     ImGui::BeginChild("FileInfo", ImVec2(0, 0), true);
     ImGui::SetWindowFontScale(m_fontScale);
     m_assetLibrary._displaySelectedFileInfo(m_selectedAsset);
+
+    // Clicking empty space in file info clears EVERYTHING (File info)
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
+        && !ImGui::IsAnyItemHovered()) {
+
+        // So it's just the same thing (repetitive?)
+        m_selectedAsset.clear();
+        if (m_inspector) {
+            m_inspector->ClearSelection();
+        }
+    }
 
     // Only show delete button if something is selected
     if (!m_selectedAsset.empty()) {
@@ -289,19 +321,32 @@ void AssetBrowser::Render() {
 
     ImGui::EndChild();
 
-    // Status message popup (shows success/error messages for 3 seconds)
+    // End content region above status bar
+    ImGui::EndChild();
+
+    // Status bar (fixed at bottom; does not overlap content)
+    ImGui::BeginChild("StatusBar", ImVec2(0, statusBarHeight), false, ImGuiWindowFlags_NoScrollbar);
     if (m_statusTimer > 0.0f) {
-        // Position at bottom of the window
-        ImGui::SetCursorPosX(20);
-        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 35);
-
-        // Green text for success, red for errors
         ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)   // Red
-            : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);  // Green
-
+            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
+            : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+        ImGui::SetCursorPosX(12);
         ImGui::TextColored(color, "%s", m_statusMessage.c_str());
-        m_statusTimer -= ImGui::GetIO().DeltaTime;  // Countdown timer
+        m_statusTimer -= ImGui::GetIO().DeltaTime;
+    }
+    ImGui::EndChild();
+
+    // Click on empty space in parent Asset Browser window to clear everything
+    // !IsAnyItemHovered() prevents clearing when clicking breadcrumbs, buttons, sliders, etc.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
+        && !ImGui::IsAnyItemHovered()) {
+
+        m_selectedAsset.clear();
+
+        if (m_inspector) {
+            m_inspector->ClearSelection();
+        }
     }
 
     ImGui::End();

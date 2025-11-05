@@ -1,7 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorUIHelpers.h
-\author Foo Rui Qin
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
 \date   2nd November 2025
 \brief
 Provides reusable, stateless ImGui helper functions for editing JSON-backed
