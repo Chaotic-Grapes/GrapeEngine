@@ -1,11 +1,11 @@
 /*****************************************************************************/
 /*!
-\file       GameObjectManagement.cpp
+\file       EntityEditor.cpp
 \author     Samantha Leong (s.leong@digipen.edu)
-\par        DigiPen login: 2403088
-\date       2025-11-03
+\par        2403088
+\date       03-11-2025
 \brief
-Implements the GameObjectEditor class responsible for managing game objects
+Implements the EntityEditor class responsible for managing game objects
 within the in-editor environment. This includes level loading/saving,
 object creation, deletion, cloning, property editing, and interactive
 in-world picking and dragging. It integrates ImGui-based editor windows
@@ -19,14 +19,12 @@ written consent of DigiPen Institute of Technology is prohibited.
 */
 /*****************************************************************************/
 
-
-#include "../editor/GameObjectManagement.h"
+#include "../editor/EntityEditor.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "services/DebugUI.h"
 #include "services/Input.h"
 #include <imgui.h>
-//#include "services/UICommon.h"
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <algorithm>
@@ -40,15 +38,14 @@ written consent of DigiPen Institute of Technology is prohibited.
 #include "audio/FmodAudioDevice.h"
 #include "audio/SoundTypes.h"
 
-
-void GameObjectEditor::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
+void EntityEditor::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
 	m_mainFont = mainFont;
 	m_boldFont = boldFont;
 	m_symbolsFont = symbolsFont;
 	m_world = world;
 }
 
-GameObjectEditor::GameObjectEditor(World* world)
+EntityEditor::EntityEditor(World* world)
 	: m_world(world) {
 }
 
@@ -63,7 +60,7 @@ static constexpr const char* LEVEL_DIR = "assets/levels/";
  * @param filename Full path and filename to save the level data to.
  * @exception std::exception If serialization or file I/O fails.
  */
-//void GameObjectEditor::SaveLevel(const std::string& filename) {
+//void EntityEditor::SaveLevel(const std::string& filename) {
 //	if (!HasValidWorld()) return;
 //	try {
 //		// Assumed: EntitySerializer::SerializeWorld exists and handles file output
@@ -81,7 +78,7 @@ static constexpr const char* LEVEL_DIR = "assets/levels/";
  * @param filename Full path and filename to load the level data from.
  * @exception std::exception If deserialization or file reading fails.
  */
-//void GameObjectEditor::LoadLevel(const std::string& filename) {
+//void EntityEditor::LoadLevel(const std::string& filename) {
 //	if (!HasValidWorld()) return;
 //	try {
 //		// 1. Clear current level before loading a new one
@@ -106,7 +103,7 @@ static constexpr const char* LEVEL_DIR = "assets/levels/";
  *
  * Uses circle collider picking and updates object positions during drag operations.
  */
-void GameObjectEditor::HandleInWorldInteraction() {
+void EntityEditor::HandleInWorldInteraction() {
 	if (!HasValidWorld()) return;
 
 	// State for dragging
@@ -171,7 +168,7 @@ void GameObjectEditor::HandleInWorldInteraction() {
 /**
  * @brief Displays all editor windows, including the main menu, hierarchy, and property editor.
  */
-void GameObjectEditor::ShowEditorWindows() {
+void EntityEditor::ShowEditorWindows() {
 	_showMainMenu();
 	_showHierarchyWindow();
 	_showPropertyEditorWindow();
@@ -185,7 +182,7 @@ void GameObjectEditor::ShowEditorWindows() {
  *
  * Displays ImGui modals for save/load dialogs and allows users to select existing JSON files from disk.
  */
-void GameObjectEditor::_showMainMenu() {
+void EntityEditor::_showMainMenu() {
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
 			// Save Level
@@ -271,11 +268,11 @@ void GameObjectEditor::_showMainMenu() {
  *
  * Allows object selection, addition, cloning, and deletion via context menus.
  */
-void GameObjectEditor::_showHierarchyWindow() {
+void EntityEditor::_showHierarchyWindow() {
 	// Use config values (Assumed for window docking/position)
 	// UICommon::ApplyLayout(UICommon::WindowId::DEBUG_EDITOR); 
 
-	ImGui::Begin("Hierarchy Objects List");
+	ImGui::Begin("Hierarchy");
 
 	// Add new game object section (kept here for quick access)
 	ImGui::Text("Create New Object:");
@@ -352,7 +349,7 @@ void GameObjectEditor::_showHierarchyWindow() {
  *
  * Supported components include Transform, ShapeRenderer2D, and CircleCollider2D.
  */
-void GameObjectEditor::_showPropertyEditorWindow() {
+void EntityEditor::_showPropertyEditorWindow() {
 	// Use config values
 	// UICommon::ApplyLayout(UICommon::WindowId::PROPERTY_EDITOR); 
 
@@ -451,7 +448,7 @@ void GameObjectEditor::_showPropertyEditorWindow() {
  * @return false Otherwise.
  */
 // Check if World object exists
-bool GameObjectEditor::HasValidWorld() const {
+bool EntityEditor::HasValidWorld() const {
     return m_world != nullptr;
 }
 
@@ -462,7 +459,7 @@ bool GameObjectEditor::HasValidWorld() const {
  * @param name The desired name of the new game object.
  */
 // Create a new object
-void GameObjectEditor::AddGameObject(const std::string& name) {
+void EntityEditor::AddGameObject(const std::string& name) {
     // Safety check
     if (name.empty() || name.length() > m_config.MAX_OBJECT_NAME_LENGTH
         || !HasValidWorld()) return;
@@ -484,7 +481,7 @@ void GameObjectEditor::AddGameObject(const std::string& name) {
  * @param id The ID of the entity to remove.
  */
 // Find and delete an object by ID
-void GameObjectEditor::RemoveGameObject(const EntityId id) {
+void EntityEditor::RemoveGameObject(const EntityId id) {
     // Safety check
     if (!HasValidWorld()) return;
 
@@ -499,7 +496,7 @@ void GameObjectEditor::RemoveGameObject(const EntityId id) {
  *
  * @param entity The entity to be cloned.
  */
-void GameObjectEditor::CloneGameObject(const Entity& entity) {
+void EntityEditor::CloneGameObject(const Entity& entity) {
     // Safety check
     if (!HasValidWorld()) return;
 
@@ -516,7 +513,7 @@ void GameObjectEditor::CloneGameObject(const Entity& entity) {
 /**
  * @brief Removes all game objects from the current world.
  */
-void GameObjectEditor::ClearAllGameObjects() {
+void EntityEditor::ClearAllGameObjects() {
     // Safety check
     if (!HasValidWorld()) return;
 
@@ -525,7 +522,7 @@ void GameObjectEditor::ClearAllGameObjects() {
     _invalidateCache();
 }
 
-//void GameObjectEditor::_showGameObjectEditor() {
+//void EntityEditor::_showEntityEditor() {
 //    // Use config values
 //    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_EDITOR);
 //
@@ -660,7 +657,7 @@ void GameObjectEditor::ClearAllGameObjects() {
  * @return The created Entity.
  */
 // Helper function to create entities with basic components
-Entity GameObjectEditor::_createGameEntity(const std::string& name) {
+Entity EntityEditor::_createGameEntity(const std::string& name) {
     // Create new entity in ECS
     auto entity = m_world->CreateEntity(name);
 
@@ -688,7 +685,7 @@ Entity GameObjectEditor::_createGameEntity(const std::string& name) {
  * @brief Clears cached UI labels for delete/clone buttons to ensure unique naming.
  */
 // Clear cached button labels
-void GameObjectEditor::_invalidateCache() {
+void EntityEditor::_invalidateCache() {
     m_cachedDeleteLabels.clear();
     m_cachedCloneLabels.clear();
 }
@@ -699,7 +696,7 @@ void GameObjectEditor::_invalidateCache() {
  * @param id Entity ID.
  * @return const std::string& Reference to the generated label.
  */
-const std::string& GameObjectEditor::_getDeleteLabel(const EntityId id) const {
+const std::string& EntityEditor::_getDeleteLabel(const EntityId id) const {
     // Same thing
     auto it = m_cachedDeleteLabels.find(id);
     if (it == m_cachedDeleteLabels.end()) {
@@ -716,7 +713,7 @@ const std::string& GameObjectEditor::_getDeleteLabel(const EntityId id) const {
  * @param id Entity ID.
  * @return const std::string& Reference to the generated label.
  */
-const std::string& GameObjectEditor::_getCloneLabel(const EntityId id) const {
+const std::string& EntityEditor::_getCloneLabel(const EntityId id) const {
     // Same thing
     auto it = m_cachedCloneLabels.find(id);
     if (it == m_cachedCloneLabels.end()) {
@@ -733,7 +730,7 @@ const std::string& GameObjectEditor::_getCloneLabel(const EntityId id) const {
  * @param id Entity ID.
  * @return const bool& Reference to the collapse state.
  */
-const bool& GameObjectEditor::_getCollapsedHeaderBool(const EntityId id) const {
+const bool& EntityEditor::_getCollapsedHeaderBool(const EntityId id) const {
     auto it = m_cachedCollapsedHeaders.find(id);
     if (it == m_cachedCollapsedHeaders.end()) {
         it = m_cachedCollapsedHeaders.insert({ id, false }).first;

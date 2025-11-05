@@ -31,7 +31,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Color, R, G, B, A)
 
 // Transform
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Component::Transform,
-	Position, Rotation, Scale
+	Position, Rotation, Scale, ParentId
 )
 
 // SpriteRenderer (excluding TextureId, Meta)

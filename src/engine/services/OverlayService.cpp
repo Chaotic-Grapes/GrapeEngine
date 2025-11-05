@@ -43,7 +43,7 @@ void Overlay::OnCreate() {
     }
 }
 
-// Update UI every frame (handle initialization, rendering, and finalization)
+// Update UI every frame (handle initialization, rendering and finalization)
 void Overlay::OnUpdate() {
     // If we don't have a DebugUI instance yet, try to create it
     if (!m_debugUI && m_world) {
@@ -102,40 +102,36 @@ void Overlay::OnUpdate() {
             ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
             ImGui::DockBuilderSetNodeSize(dockspaceId, vp->Size);
 
-            // Split right for Prefab Editor (full height)
-            ImGuiID rightNode;
-            ImGuiID leftNode = dockspaceId;
-            ImGui::DockBuilderSplitNode(leftNode, ImGuiDir_Right, 0.35f, &rightNode, &leftNode);
+            // First: split off right column (25% instead of 33%)
+            ImGuiID leftCenterNode, rightNode;
+            ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);
 
-            // Split left vertically: top (playback), bottom (asset browser)
-            ImGuiID topNode;
-            ImGuiID bottomNode;
-            ImGui::DockBuilderSplitNode(leftNode, ImGuiDir_Up, 0.25f, &topNode, &bottomNode);
+            // Split left + center vertically: top 65%, bottom 35% (for Asset Browser)
+            ImGuiID topSection, assetBrowserNode;
+            ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.65f, &topSection, &assetBrowserNode);
 
-            // Further split top area into left/center/right; dock controls in center
-            ImGuiID topLeft;
-            ImGuiID topRest;
-            ImGui::DockBuilderSplitNode(topNode, ImGuiDir_Left, 0.33f, &topLeft, &topRest);
-            ImGuiID topRight;
-            ImGuiID topCenter;
-            ImGui::DockBuilderSplitNode(topRest, ImGuiDir_Right, 0.33f, &topRight, &topCenter);
+            // Split top section into left (33.3% of 75% = 25% total) and center (66.6% of 75% = 50% total)
+            ImGuiID leftTopNode, centerTopSection;
+            ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &centerTopSection);
 
-            // Split bottom area into left/right; dock asset browser to bottom-left
-            ImGuiID bottomLeft;
-            ImGuiID bottomRight;
-            ImGui::DockBuilderSplitNode(bottomNode, ImGuiDir_Left, 0.60f, &bottomLeft, &bottomRight);
+            // Split center top section: 10% controls, 90% viewport (relative to the 65% height)
+            ImGuiID centerControlsNode, centerViewportNode;
+            // 10% of total height / 65% of total height = ~0.154
+            ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Up, 0.154f, &centerControlsNode, &centerViewportNode);
 
-            // Dock windows by title
+            // Dock windows
+            ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
+            ImGui::DockBuilderDockWindow("Game Controls", centerControlsNode);
+            ImGui::DockBuilderDockWindow("Viewport", centerViewportNode);
+            ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode); // Spans left + center bottom
             ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
-            ImGui::DockBuilderDockWindow("Asset Browser", bottomLeft);
-            ImGui::DockBuilderDockWindow("Game Controls", topCenter);
+            ImGui::DockBuilderDockWindow("Property Editor", rightNode);
 
             ImGui::DockBuilderFinish(dockspaceId);
         }
-
         ImGui::End();
     }
-
+    
     m_levelEditor->Update();
 
     // Draw debugUI and level editor

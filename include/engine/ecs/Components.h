@@ -14,6 +14,7 @@
 #include <vector>
 #include <iostream>
 #include "services/ResourceManager.h"
+#include "ecs/ComponentManager.h"
 
 /*
 ================================================================================
@@ -53,6 +54,7 @@ namespace Component {
         Vector2D Position {0, 0};
         float Rotation = 0;
         Vector2D Scale{ 1, 1};
+        EntityId ParentId = 0;  // 0 means no parent (root entity)
 
         Transform(const float x = 0, const float y = 0, const float rotation = 0, const float scaleX = 1.f, const float scaleY = 1.f)
             : Position({ x, y }), Rotation(rotation), Scale({ scaleX, scaleY }) {}

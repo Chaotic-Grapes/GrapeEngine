@@ -84,12 +84,14 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     // Pass both fonts to components
     m_playback.Initialize(m_mainFont, m_symbolsFont);  // Update to take both fonts
     m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+    m_entityEditor.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+    m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
 }
 
 // Process input for all editor panels
 void LevelEditor::Update() {
     m_playback.ProcessInput();
-    m_gameObjectEditor.HandleInWorldInteraction();
+    m_entityEditor.HandleInWorldInteraction();
 }
 
 // Render all editor panels

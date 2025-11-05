@@ -75,20 +75,12 @@ private:
     // Display prefab editor window with property editing
     void _showPrefabEditor(float fontScale, std::string& statusMessage, float& statusTimer);
 
-    // Render an item in the “Add Component” menu
+    // Render an item in the "Add Component" menu
     void _renderComponentMenuItem(const char* displayName, const char* componentType);
-
-    // Component-specific UI renderers (called per component type)
-    void _renderTransformUI(nlohmann::json& data);
-    void _renderSpriteRendererUI(nlohmann::json& data);
-    void _renderRigidbody2DUI(nlohmann::json& data);
-    void _renderCircleCollider2DUI(nlohmann::json& data);
-    void _renderBoxCollider2DUI(nlohmann::json& data);
-    void _renderLineRendererUI(nlohmann::json& data);
-    void _renderShapeRenderer2DUI(nlohmann::json& data);
 
     // Generic component section renderer: wraps content in a collapsing header
     // Uses lambda function for flexible component-specific rendering
+    // Component rendering now delegated to ComponentUI namespace
     template <typename T>
     void _renderComponentSection(const std::string& headerName, const std::string& componentType,
         nlohmann::json& data, T renderContent, bool canDelete = true);

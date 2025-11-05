@@ -21,7 +21,8 @@ Features:
 
 #include "../editor/PlaybackControls.h"
 #include "../editor/AssetBrowser.h"
-#include "../editor/GameObjectManagement.h"
+#include "../editor/EntityEditor.h"
+#include "../editor/HierarchyWindow.h"
 
 // Forward declarations
 struct GLFWwindow;
@@ -63,7 +64,8 @@ private:
     ImFont* m_symbolsFont = nullptr;  // Material Symbols icon font
     ImFont* m_mainFont = nullptr;     // Regular Inter font for text
     ImFont* m_boldFont = nullptr;     // Bold Inter font
-    GameObjectEditor m_gameObjectEditor; // Game object editor panel
+    GameObjectEditor m_entityEditor;  // Entity editor panel
+    HierarchyWindow m_hierarchyWindow;
 };
 
 #endif
