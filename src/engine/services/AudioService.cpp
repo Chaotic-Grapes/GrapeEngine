@@ -3,10 +3,6 @@
 #include "core/Logger.h"
 
 namespace Services {
-    AudioService::AudioService() : Engine::IService("AudioService") {}
-
-    AudioService::~AudioService() { Terminate(); };
-
     void AudioService::Initialize() {
         m_device = std::make_unique<Audio::FmodAudioDevice>();
 

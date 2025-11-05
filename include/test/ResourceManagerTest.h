@@ -1,29 +1,29 @@
-#ifndef RESOURCEMANAGERTEST_H
-#define RESOURCEMANAGERTEST_H
+// #ifndef RESOURCEMANAGERTEST_H
+// #define RESOURCEMANAGERTEST_H
 
-#include "Scene.h"
+// #include "Scene.h"
 
-namespace Sandbox {
-    class ResourceManagerTestScene : public Scene {
-    public:
-        ResourceManagerTestScene();
-        ~ResourceManagerTestScene() override = default;
+// namespace Sandbox {
+//     class ResourceManagerTestScene : public Scene {
+//     public:
+//         ResourceManagerTestScene();
+//         ~ResourceManagerTestScene() override = default;
 
-        void OnLoad() override;
-        void OnUpdate() override;
-        void OnFixedUpdate() override {}
-        void OnLateUpdate() override {}
-        void OnUnload() override;
+//         void OnLoad() override;
+//         void OnUpdate() override;
+//         void OnFixedUpdate() override {}
+//         void OnLateUpdate() override {}
+//         void OnUnload() override;
 
-    private:
-        void RunTests();
-        void TestBasicCaching();
-        void TestMultipleAssets();
-        void TestErrorHandling();
-        void TestCacheManagement();
+//     private:
+//         void RunTests();
+//         void TestBasicCaching();
+//         void TestMultipleAssets();
+//         void TestErrorHandling();
+//         void TestCacheManagement();
 
-        bool m_testsComplete = false;
-    };
-}
+//         bool m_testsComplete = false;
+//     };
+// }
 
-#endif
+// #endif

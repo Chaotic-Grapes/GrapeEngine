@@ -85,6 +85,16 @@ public:
     static bool IsMousePressed(int button);
 
     /*!
+    \brief Check if a mouse button is currently held down.
+    \param button The mouse button to check (use MOUSE_* constants).
+    \return True if the button is currently held down, false otherwise.
+
+    This is equivalent to IsMousePressed(), but is intended for continuous
+    checks such as dragging or camera movement.
+    */
+    static bool IsMouseDown(int button);
+
+    /*!
     \brief Get the current mouse cursor position.
     \param xPos Reference to store the X coordinate.
     \param yPos Reference to store the Y coordinate.
@@ -262,6 +272,8 @@ constexpr int KEY_G     = GLFW_KEY_G;     ///< G key
 constexpr int KEY_J     = GLFW_KEY_J;     ///< J key
 constexpr int KEY_K     = GLFW_KEY_K;     ///< K key
 constexpr int KEY_R     = GLFW_KEY_R;     ///< R key
+constexpr int KEY_O     = GLFW_KEY_O;     ///< R key
+constexpr int KEY_T     = GLFW_KEY_T;     ///< T key
 //! @}
 
 //! \name Mouse Button Constants

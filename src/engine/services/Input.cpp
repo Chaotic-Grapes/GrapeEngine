@@ -59,6 +59,10 @@ bool Input::IsMousePressed(const int button) {
     return glfwGetMouseButton(m_window, button) == PRESS;
 }
 
+bool Input::IsMouseDown(const int button) {
+    return glfwGetMouseButton(m_window, button) == PRESS;
+}
+
 // Get current mouse position
 void Input::GetMousePosition(double& xPos, double& yPos) {
     glfwGetCursorPos(m_window, &xPos, &yPos);
@@ -106,6 +110,11 @@ void Input::_processInput() {
     m_keyDown.clear();
     m_keyUp.clear();
     m_keyPressed.clear();
+
+    // Reset scroll deltas so scroll input only lasts one frame
+    m_scrollX = 0.0;
+    m_scrollY = 0.0;
+
     glfwPollEvents();
 }
 

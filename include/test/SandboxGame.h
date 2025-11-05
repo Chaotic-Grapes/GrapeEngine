@@ -2,13 +2,13 @@
 #define SANDBOXGAME_H
 
 #include "Game.h"
-#include "ecs/SceneManager.h"
+#include "scene/SceneManager.h"
 
 class SandboxGame final : public Game {
 public:
-	void OnStart(SceneManager& sceneManager) override;
-	void OnUpdate(SceneManager& sceneManager) override;
-	void OnShutdown(SceneManager& sceneManager) override;
+		void OnStart(Scenes::SceneManager& sceneManager) override;
+		void OnUpdate(Scenes::SceneManager& sceneManager) override;
+		void OnShutdown(Scenes::SceneManager& sceneManager) override;
 };
 
 #endif
