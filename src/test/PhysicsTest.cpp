@@ -49,7 +49,7 @@ void PhysicsTestScene::OnLoad() {
 }
 
 void PhysicsTestScene::OnUpdate() {
-    if (Input::IsKeyDown(KEY_C)) {
+    if (Input::IsKeyDown(KEY_T)) {
         if (!testHandler) {
 
             //test cycling logic
@@ -165,6 +165,7 @@ void PhysicsTestScene::CreateStaticWall(float x, float y, float width, float hei
     testEntities.push_back(EntityUtils::Pack(wall));
 }
 
+// test 2 -  Forces, Gravity, and Friction
 void PhysicsTestScene::PhysicsCollisionResponse() {
     if (testEntities.empty()) {
         LOG_DEBUG("=== TEST 1: Physics Collision Response ===");
@@ -187,7 +188,7 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
         for (int row = 0; row < rows; ++row) {
             float restitution = 0.1f + (row * 0.2f);
 
-            for (int col = 0; col < 15; ++col) {
+            for (int col = 0; col < 10; ++col) {
                 float xPos = startX + col * spacing;
                 float yPos = startY + row * spacing;
 
@@ -201,9 +202,9 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                         1.5f, 1.0f / 1.5f, 0.1f, 0.1f, 1.0f, 0
                     },
                     Components::LinearVelocity2D{
-                        Vector2D(RandomFloat(-400.0f, 400.0f), RandomFloat(-400.0f, 400.0f))
+                        Vector2D(RandomFloat(-700.0f, 700.0f), RandomFloat(-700.0f, 700.0f))
                     },
-                    Components::AngularVelocity2D{ RandomFloat(-300.0f, 300.0f) },
+                    Components::AngularVelocity2D{ RandomFloat(-500.0f, 500.0f) },
                     Components::PhysicsMaterial2D{  // ADD THIS!
                         0.2f,           // Friction
                         restitution,    // Restitution (varies by row)
@@ -213,7 +214,7 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                         15.0f, Vector2D(0.0f, 0.0f), 0xFFFFFFFF, 0
                     },
                     Components::ShapeCircle2D{
-                        15.0f, Vector2D(0.0f, 0.0f),
+                        25.0f, Vector2D(0.0f, 0.0f),
                         Color(1.0f - restitution, restitution, 0.5f, 1.0f),
                         1.0f, true
                     },
