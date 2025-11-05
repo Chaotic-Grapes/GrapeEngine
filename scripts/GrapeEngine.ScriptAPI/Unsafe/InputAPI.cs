@@ -1,46 +1,87 @@
+using GrapeEngine.ScriptAPI.Unsafe;
 using System.Runtime.InteropServices;
 
-namespace GrapeEngine.Scripting.Unsafe
+namespace GrapeEngine.Scripting.Unsafe;
+
+/// <summary>
+/// Internal use only. P/Invoke declarations for the Input API.
+/// </summary>
+internal static partial class InputAPI
 {
-    /// <summary>
-    /// Low-level P/Invoke declarations for the Input API.
-    /// These map directly to the C++ Input service functions.
-    /// </summary>
-    internal static class InputAPI
-    {
-        private const string NativeLib = "GrapeEngine.exe";
+    // Keyboard input
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsKeyPressed")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsKeyPressed(int key);
 
-        // Keyboard input
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_IsKeyPressed", CallingConvention = CallingConvention.Cdecl)]
-        public static extern bool IsKeyPressed(int key);
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsKeyDown")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsKeyDown(int key);
 
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_IsKeyDown", CallingConvention = CallingConvention.Cdecl)]
-        public static extern bool IsKeyDown(int key);
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsKeyUp")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsKeyUp(int key);
 
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_IsKeyUp", CallingConvention = CallingConvention.Cdecl)]
-        public static extern bool IsKeyUp(int key);
+    // Mouse input
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsMousePressed")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsMousePressed(int button);
 
-        // Mouse input
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_IsMousePressed", CallingConvention = CallingConvention.Cdecl)]
-        public static extern bool IsMousePressed(int button);
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetMouseX")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double GetMouseX();
 
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_GetMouseX", CallingConvention = CallingConvention.Cdecl)]
-        public static extern double GetMouseX();
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetMouseY")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double GetMouseY();
 
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_GetMouseY", CallingConvention = CallingConvention.Cdecl)]
-        public static extern double GetMouseY();
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetScrollX")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double GetScrollX();
 
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_GetScrollX", CallingConvention = CallingConvention.Cdecl)]
-        public static extern double GetScrollX();
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetScrollY")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double GetScrollY();
 
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_GetScrollY", CallingConvention = CallingConvention.Cdecl)]
-        public static extern double GetScrollY();
+    // Window dimensions
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetWindowWidth")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int GetWindowWidth();
 
-        // Window dimensions
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_GetWindowWidth", CallingConvention = CallingConvention.Cdecl)]
-        public static extern int GetWindowWidth();
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetWindowHeight")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int GetWindowHeight();
 
-        [DllImport(NativeLib, EntryPoint = "ScriptAPI_GetWindowHeight", CallingConvention = CallingConvention.Cdecl)]
-        public static extern int GetWindowHeight();
-    }
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsKeyPressed", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern bool IsKeyPressed(int key);
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsKeyDown", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern bool IsKeyDown(int key);
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsKeyUp", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern bool IsKeyUp(int key);
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsMousePressed", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern bool IsMousePressed(int button);
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetMouseX", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern double GetMouseX();
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetMouseY", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern double GetMouseY();
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetScrollX", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern double GetScrollX();
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetScrollY", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern double GetScrollY();
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetWindowWidth", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern int GetWindowWidth();
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetWindowHeight", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern int GetWindowHeight();
 }

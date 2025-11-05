@@ -535,6 +535,7 @@ namespace ECS {
         // Call OnUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
+                (void)entity;
                 if (!active.Enabled || !script.Initialized)
                     return;
 
@@ -551,6 +552,7 @@ namespace ECS {
         // Call OnFixedUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
+                (void)entity;
                 if (!active.Enabled || !script.Initialized)
                     return;
 
@@ -567,6 +569,7 @@ namespace ECS {
         // Call OnLateUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
+				(void)entity;
                 if (!active.Enabled || !script.Initialized)
                     return;
 
@@ -580,6 +583,7 @@ namespace ECS {
     }
 
     void ScriptSystem::UpdateActiveState(World& world) {
+        (void)world;
         // Track active state changes to call OnEnable/OnDisable
         // This requires storing previous active state in ScriptInstance component
         // For now, this is a placeholder
@@ -592,11 +596,13 @@ namespace ECS {
     }
 
     void ScriptSystem::OnDestroy(World& world) {
+        (void)world;
         // Cleanup scripts on entities that are being destroyed
         // This is typically called in a cleanup phase
-        
+
+		// TODO: Implement entity destruction tracking
         // For now, this is a placeholder
-        // In a full implementation, we'd track destroyed entities and cleanup their scripts
+        // In a full implementation, do track destroyed entities and cleanup their scripts
     }
 
 }
@@ -697,6 +703,57 @@ namespace {
 
         std::cerr << "[ScriptAPI] Unknown component type hash: " << typeHash << '\n';
         return false;
+    }
+
+    void* GetComponentPtr(uint64_t entityId, uint32_t typeHash) {
+        ECS::World* world = GetScriptWorld();
+        if (!world) {
+            std::cerr << "[ScriptAPI] No world set for script access\n";
+            return nullptr;
+        }
+
+        ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
+        if (!world->IsAlive(entity))
+            return nullptr;
+
+        #define HANDLE_COMPONENT_TYPE_PTR(ComponentType, HashName) \
+            if (typeHash == FNV1aHash(HashName)) { \
+                auto* comp = world->TryGet<ECS::Components::ComponentType>(entity); \
+                return comp ? static_cast<void*>(comp) : nullptr; \
+            }
+
+        HANDLE_COMPONENT_TYPE_PTR(LocalTransform,       "LocalTransform")
+        HANDLE_COMPONENT_TYPE_PTR(WorldTransform,       "WorldTransform")
+        HANDLE_COMPONENT_TYPE_PTR(LinearVelocity2D,     "LinearVelocity2D")
+        HANDLE_COMPONENT_TYPE_PTR(Acceleration2D,       "Acceleration2D")
+        HANDLE_COMPONENT_TYPE_PTR(AngularVelocity2D,    "AngularVelocity2D")
+        HANDLE_COMPONENT_TYPE_PTR(Rigidbody2D,          "Rigidbody2D")
+        HANDLE_COMPONENT_TYPE_PTR(PhysicsMaterial2D,    "PhysicsMaterial2D")
+        HANDLE_COMPONENT_TYPE_PTR(BoxCollider2D,        "BoxCollider2D")
+        HANDLE_COMPONENT_TYPE_PTR(CircleCollider2D,     "CircleCollider2D")
+        HANDLE_COMPONENT_TYPE_PTR(Velocity,             "Velocity")
+        HANDLE_COMPONENT_TYPE_PTR(Acceleration,         "Acceleration")
+        HANDLE_COMPONENT_TYPE_PTR(AngularVelocity,      "AngularVelocity")
+        HANDLE_COMPONENT_TYPE_PTR(Rigidbody,            "Rigidbody")
+        HANDLE_COMPONENT_TYPE_PTR(BoxCollider,          "BoxCollider")
+        HANDLE_COMPONENT_TYPE_PTR(SphereCollider,       "SphereCollider")
+        HANDLE_COMPONENT_TYPE_PTR(SpriteRenderer2D,     "SpriteRenderer2D")
+        HANDLE_COMPONENT_TYPE_PTR(ShapeCircle2D,        "ShapeCircle2D")
+        HANDLE_COMPONENT_TYPE_PTR(ShapeBox2D,           "ShapeBox2D")
+        HANDLE_COMPONENT_TYPE_PTR(ShapeLine2D,          "ShapeLine2D")
+        HANDLE_COMPONENT_TYPE_PTR(ZIndex2D,             "ZIndex2D")
+        HANDLE_COMPONENT_TYPE_PTR(Layer,                "Layer")
+        HANDLE_COMPONENT_TYPE_PTR(Camera3D,             "Camera3D")
+        HANDLE_COMPONENT_TYPE_PTR(CameraMatrices,       "CameraMatrices")
+        HANDLE_COMPONENT_TYPE_PTR(Active,               "Active")
+        HANDLE_COMPONENT_TYPE_PTR(Name,                 "Name")
+        HANDLE_COMPONENT_TYPE_PTR(TagMask,              "TagMask")
+        HANDLE_COMPONENT_TYPE_PTR(Lifetime,             "Lifetime")
+
+        #undef HANDLE_COMPONENT_TYPE_PTR
+
+        std::cerr << "[ScriptAPI] Unknown component type hash: " << typeHash << '\n';
+        return nullptr;
     }
 
     // Make it return bool to indicate success/failure
@@ -919,6 +976,7 @@ namespace {
     }
 }
 
+// Consideration: Move to their respective headers
 // ============================================================================
 // Exported C Functions for P/Invoke
 // ============================================================================
@@ -933,6 +991,10 @@ namespace {
 
 SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize) {
     return GetComponentGeneric(entityId, typeHash, outBuffer, bufferSize);
+}
+
+SCRIPT_API void *ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash) {
+    return GetComponentPtr(entityId, typeHash);
 }
 
 SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
@@ -973,6 +1035,17 @@ SCRIPT_API uint64_t ScriptAPI_CreateEntity() {
 
     ECS::Entity entity = world->Create();
     return ECS::EntityUtils::Pack(entity);
+}
+
+SCRIPT_API bool ScriptAPI_IsAlive(uint64_t entityId) {
+    ECS::World* world = GetScriptWorld();
+    if (!world) {
+        std::cerr << "[ScriptAPI] No world set for script access" << '\n';
+        return false;
+    }
+
+    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
+    return world->IsAlive(entity);
 }
 
 // World management - must be called before using script API

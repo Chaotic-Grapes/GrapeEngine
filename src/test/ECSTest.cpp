@@ -32,6 +32,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/LifetimeSystem.h"
 #include "ecs/systems/TransformSystem.h"
+#include "ecs/systems/AnimationSystem.h"
 #include "physics/Physics.h"
 #include "helpers/EntityUtils.h"
 #include "helpers/MathUtils.h"
@@ -46,7 +47,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using namespace Sandbox;
 using namespace ECS;
 
-extern ResourceManager RM;
+// extern ResourceManager RM;
 
 // ================================================================================================
 // SCENE LIFECYCLE
@@ -67,13 +68,6 @@ void ECSTestScene::OnLoad() {
     m_physicsLayer = GetLayers().CreateOrGetLayer("physics");
     m_renderLayer = GetLayers().CreateOrGetLayer("render");
 
-    // Initialize renderer system
-    m_rendererSystem = std::make_shared<ECS::RendererSystem>();
-    m_rendererSystem->Initialize(GetWorld());
-    AddSystem([this](Scenes::Scene& s, const float dt) {
-        m_rendererSystem->Update(s.GetWorld(), dt);
-    }, "Renderer System");
-
     // Initialize physics system
     AddSystem([](Scenes::Scene& s, const float dt) {
         ECS::PhysicsSystem::Update(s.GetWorld(), dt);
@@ -84,6 +78,17 @@ void ECSTestScene::OnLoad() {
         ECS::LifetimeSystem::Update(s.GetWorld(), dt);
     }, "Lifetime System");
 
+    // Initialize animation system
+    AddSystem([](Scenes::Scene& s, const float dt) {
+        ECS::AnimationSystem::Update(s.GetWorld(), dt);
+    }, "Animation System");
+
+    // Initialize renderer system
+    m_rendererSystem = std::make_shared<ECS::RendererSystem>();
+    m_rendererSystem->Initialize(GetWorld());
+    AddSystem([this](Scenes::Scene& s, const float dt) {
+        m_rendererSystem->Update(s.GetWorld(), dt);
+    }, "Renderer System");
 
     // Configure physics world boundaries (account for wall thickness)
     const float wallThickness = 20.0f;
@@ -152,7 +157,7 @@ void ECSTestScene::OnUpdate() {
         
         // Advanced Tests
         case TestType::EntityPooling:           _testEntityPooling(); break;
-        case TestType::ComponentIteration:      _testComponentIteration(); break;
+        case TestType::SpriteAnimation:         _testSpriteAnimation(); break;
         case TestType::ArchetypeChanges:        _testArchetypeChanges(); break;
     }
 
@@ -213,7 +218,7 @@ void ECSTestScene::_cycleTests() {
         "RenderShapes", "RenderSprites", "RenderLayers", "RenderStressTest",
         "LifetimeBasic", "LifetimeWithPhysics", "LifetimeSpawner",
         "PhysicsRenderCombo", "AllSystemsTest", "StressTestAll",
-        "EntityPooling", "ComponentIteration", "ArchetypeChanges"
+        "EntityPooling", "SpriteAnimation", "ArchetypeChanges"
     };
     
     int index = current - 1001;
@@ -378,18 +383,18 @@ void ECSTestScene::_testComponentModification() {
         // Pulse the circle radius and color
         const float pulse = 0.5f + 0.5f * std::sin(m_testTimer * 2.0f);
         circle.Radius = 30.f + 40.f * pulse;
-        circle.Color.R = static_cast<HexValue>(pulse * 255.f);
-        circle.Color.G = static_cast<HexValue>((1.f - pulse) * 255.f);
-        circle.Color.B = 200u;
-        circle.Color.A = static_cast<HexValue>(pulse * 255.f);
+        circle.Color.R = pulse;
+        circle.Color.G = 1.f - pulse;
+        circle.Color.B = 200.f / 255.f;
+        circle.Color.A = pulse;
     }
 }
 
 void ECSTestScene::_testLayerSystem() {
     if (m_testEntities.empty()) {
         // Create entities on different layers, centered horizontally
-        const float spacing = 150.f;
-        const float totalWidth = 2 * spacing;
+        constexpr float spacing = 150.f;
+        constexpr float totalWidth = 2 * spacing;
         const float startX = (m_worldWidth - totalWidth) * 0.5f;
         const float yPos = m_worldHeight * 0.5f;
         
@@ -711,7 +716,7 @@ void ECSTestScene::_testPhysicsGravity() {
 }
 
 void ECSTestScene::_testPhysicsCollision() {
-    ECS::World& world = GetWorld();
+    // ECS::World& world = GetWorld();
 
     if (m_testEntities.empty()) {
         // Create two moving circles that will collide
@@ -1259,53 +1264,240 @@ void ECSTestScene::_testEntityPooling() {
     }
 }
 
-// TODO: Need fixing
-void ECSTestScene::_testComponentIteration() {
+void ECSTestScene::_testSpriteAnimation() {
+    ECS::World& world = GetWorld();
+
     if (m_testEntities.empty()) {
-        // Create entities with various component combinations
-        const int count = 100;
-        for (int i = 0; i < count; ++i) {
-            if (i % 3 == 0) {
-                // Type A: Transform + Circle
-                const Entity e = CreateOnLayer(m_testLayer,
-                    Components::LocalTransform{ Vector3D{0,0,0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
-                    Components::ShapeCircle2D{ 10.f, Vector2D{0,0}, Color{1.f,0.f,0.f,1.f}, 0.f, true }
-                );
-                m_testEntities.push_back(EntityUtils::Pack(e));
-            }
-            else if (i % 3 == 1) {
-                // Type B: Transform + Box + Active
-                const Entity e = CreateOnLayer(m_testLayer,
-                    Components::LocalTransform{ Vector3D{0,0,0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
-                    Components::ShapeBox2D{ Vector2D{10,10}, Vector2D{0,0}, Color{0.f,1.f,0.f,1.f}, 0.f, true },
-                    Components::Active{ true }
-                );
-                m_testEntities.push_back(EntityUtils::Pack(e));
-            }
-            else {
-                // Type C: Transform + Circle + Active + TagMask
-                const Entity e = CreateOnLayer(m_testLayer,
-                    Components::LocalTransform{ Vector3D{0,0,0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
-                    Components::ShapeCircle2D{ 10.f, Vector2D{0,0}, Color{0.f,0.f,1.f,1.f}, 0.f, true },
-                    Components::Active{ true },
-                    Components::TagMask{ static_cast<uint32_t>(i) }
-                );
-                m_testEntities.push_back(EntityUtils::Pack(e));
-            }
+        // Load the sprite sheet texture
+        const std::string spritePath = "assets/textures/test/FishfolkSheet.png";
+        auto spriteSheet = RM.Get<Texture>(spritePath);
+
+        if (!spriteSheet) {
+            LOG_ERROR("Failed to load sprite sheet: " << spritePath);
+            return;
         }
-        LOG_DEBUG("Created " << count << " entities with different archetypes");
+
+        const uint32_t textureId = spriteSheet->ID();
+        const int sheetWidth = spriteSheet->Width();
+        const int sheetHeight = spriteSheet->Height();
+        const int frameWidth = 32;
+        const int frameHeight = 32;
+        
+        LOG_DEBUG("Loaded sprite sheet: " << sheetWidth << "x" << sheetHeight);
+        LOG_DEBUG("Frame size: " << frameWidth << "x" << frameHeight);
+
+        // Create multiple animated entities with different animation settings
+        const float spacing = 200.f;
+        const float totalWidth = 3 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+        const float yPos = m_worldHeight * 0.5f;
+
+        // Entity 1: Slow animation, first row, looping
+        const Entity e1 = CreateOnLayer(m_renderLayer,
+            Components::LocalTransform{ 
+                Vector3D{startX, yPos + 150, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{128, 128, 1} 
+            },
+            Components::SpriteRenderer2D{ 
+                textureId,
+                Color{1.f, 1.f, 1.f, 1.f},
+                Vector2D{1, 1},
+                Vector2D{0, 0},
+                frameWidth,
+                frameHeight
+            },
+            Components::SpriteSheetAnimation2D{
+                textureId,
+                frameWidth,
+                frameHeight,
+                sheetWidth,
+                sheetHeight,
+                0,      // Start at frame 0 (row 0)
+                16,     // First row has 16 frames
+                6.0f,   // 6 FPS (slow)
+                true,   // Loop
+                true    // Playing
+            },
+            Components::AnimationState2D{ 0, 0.0f, false },
+            Components::Name{"Anim_Slow_Loop"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(e1));
+
+        // Entity 2: Medium speed, second row, looping
+        const int cols = sheetWidth / frameWidth;
+        const Entity e2 = CreateOnLayer(m_renderLayer,
+            Components::LocalTransform{ 
+                Vector3D{startX + spacing, yPos + 150, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{128, 128, 1} 
+            },
+            Components::SpriteRenderer2D{ 
+                textureId,
+                Color{1.f, 0.8f, 0.8f, 1.f},
+                Vector2D{1, 1},
+                Vector2D{0, 0},
+                frameWidth,
+                frameHeight
+            },
+            Components::SpriteSheetAnimation2D{
+                textureId,
+                frameWidth,
+                frameHeight,
+                sheetWidth,
+                sheetHeight,
+                cols,   // Start at frame 16 (row 1)
+                8,      // 8 frames
+                12.0f,  // 12 FPS (medium)
+                true,   // Loop
+                true    // Playing
+            },
+            Components::AnimationState2D{ 0, 0.0f, false },
+            Components::Name{"Anim_Medium_Loop"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(e2));
+
+        // Entity 3: Fast animation, third row, looping
+        const Entity e3 = CreateOnLayer(m_renderLayer,
+            Components::LocalTransform{ 
+                Vector3D{startX + 2 * spacing, yPos + 150, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{128, 128, 1} 
+            },
+            Components::SpriteRenderer2D{ 
+                textureId,
+                Color{0.8f, 0.8f, 1.f, 1.f},
+                Vector2D{1, 1},
+                Vector2D{0, 0},
+                frameWidth,
+                frameHeight
+            },
+            Components::SpriteSheetAnimation2D{
+                textureId,
+                frameWidth,
+                frameHeight,
+                sheetWidth,
+                sheetHeight,
+                cols * 2,  // Start at frame 32 (row 2)
+                8,         // 8 frames
+                20.0f,     // 20 FPS (fast)
+                true,      // Loop
+                true       // Playing
+            },
+            Components::AnimationState2D{ 0, 0.0f, false },
+            Components::Name{"Anim_Fast_Loop"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(e3));
+
+        // Entity 4: One-shot animation (non-looping) that expires
+        const Entity e4 = CreateOnLayer(m_renderLayer,
+            Components::LocalTransform{ 
+                Vector3D{startX + spacing, yPos - 150, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{128, 128, 1} 
+            },
+            Components::SpriteRenderer2D{ 
+                textureId,
+                Color{1.f, 1.f, 0.5f, 1.f},
+                Vector2D{1, 1},
+                Vector2D{0, 0},
+                frameWidth,
+                frameHeight
+            },
+            Components::SpriteSheetAnimation2D{
+                textureId,
+                frameWidth,
+                frameHeight,
+                sheetWidth,
+                sheetHeight,
+                cols * 3,  // Start at frame 48 (row 3)
+                8,         // 8 frames
+                10.0f,     // 10 FPS
+                false,     // Don't loop
+                true       // Playing
+            },
+            Components::AnimationState2D{ 0, 0.0f, false },
+            Components::Lifetime{ 0.8f },  // Destroy after animation completes
+            Components::Name{"Anim_OneShot"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(e4));
+
+        LOG_DEBUG("Created 4 animated sprite entities");
+        LOG_DEBUG("Top row: 3 looping animations at different speeds");
+        LOG_DEBUG("Bottom center: One-shot animation that expires");
     }
 
-    // Measure iteration performance
-    static float perfTimer = 0.f;
-    perfTimer += Time::DeltaTime();
-    if (perfTimer >= 1.0f) {
-        int count = 0;
-        GetWorld().Each<Components::LocalTransform>([&count](Entity, const Components::LocalTransform&) {
-            count++;
-        });
-        LOG_DEBUG("Iterated over " << count << " entities with LocalTransform");
-        perfTimer = 0.f;
+    // Respawn the one-shot animation periodically
+    static float respawnTimer = 0.f;
+    respawnTimer += Time::DeltaTime();
+    
+    if (respawnTimer >= 2.0f) {
+        respawnTimer = 0.f;
+        
+        // Check if the one-shot entity still exists
+        bool needsRespawn = true;
+        if (m_testEntities.size() >= 4) {
+            const Entity e4 = EntityUtils::Unpack(m_testEntities[3]);
+            if (world.IsAlive(e4)) {
+                needsRespawn = false;
+            }
+        }
+        
+        if (needsRespawn) {
+            // Respawn the one-shot animation
+            const std::string spritePath = "assets/textures/test/FishfolkSheet.png";
+            auto spriteSheet = RM.Get<Texture>(spritePath);
+            if (spriteSheet) {
+                const uint32_t textureId = spriteSheet->ID();
+                const int sheetWidth = spriteSheet->Width();
+                const int sheetHeight = spriteSheet->Height();
+                const int frameWidth = 32;
+                const int frameHeight = 32;
+                const int cols = sheetWidth / frameWidth;
+                const float spacing = 200.f;
+                const float totalWidth = 3 * spacing;
+                const float startX = (m_worldWidth - totalWidth) * 0.5f;
+                const float yPos = m_worldHeight * 0.5f;
+
+                const Entity e4 = CreateOnLayer(m_renderLayer,
+                    Components::LocalTransform{ 
+                        Vector3D{startX + spacing, yPos - 150, 0}, 
+                        Quaternion{0,0,0,1}, 
+                        Vector3D{128, 128, 1} 
+                    },
+                    Components::SpriteRenderer2D{ 
+                        textureId,
+                        Color{1.f, 1.f, 0.5f, 1.f},
+                        Vector2D{1, 1},
+                        Vector2D{0, 0},
+                        frameWidth,
+                        frameHeight
+                    },
+                    Components::SpriteSheetAnimation2D{
+                        textureId,
+                        frameWidth,
+                        frameHeight,
+                        sheetWidth,
+                        sheetHeight,
+                        cols * 3,
+                        8,
+                        10.0f,
+                        false,
+                        true
+                    },
+                    Components::AnimationState2D{ 0, 0.0f, false },
+                    Components::Lifetime{ 0.8f },
+                    Components::Name{"Anim_OneShot"}
+                );
+                
+                if (m_testEntities.size() >= 4) {
+                    m_testEntities[3] = EntityUtils::Pack(e4);
+                }
+                else {
+                    m_testEntities.push_back(EntityUtils::Pack(e4));
+                }
+            }
+        }
     }
 }
 

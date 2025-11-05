@@ -14,7 +14,7 @@ public class CollectibleItem : ScriptBehaviour
     private Vector3 m_originalPosition;
 
     // Visual entity
-    private Entity m_visualEntity;
+    private Entity? m_visualEntity;
 
     public override void OnStart()
     {
@@ -50,7 +50,14 @@ public class CollectibleItem : ScriptBehaviour
 
     public override void OnUpdate()
     {
-        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
+        if (m_visualEntity == null || !m_visualEntity.IsAlive())
+        {
+            Log("Item entity is not alive", LogLevel.Warning);
+            return;
+        }
+
+        ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var hasTransform);
+        if (!hasTransform)
             return;
 
         // Bob up and down
@@ -68,7 +75,14 @@ public class CollectibleItem : ScriptBehaviour
 
     private void UpdateCollectibleVisual()
     {
-        if (!m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle))
+        if (m_visualEntity == null || !m_visualEntity.IsAlive())
+        {
+            Log("Item entity is not alive", LogLevel.Warning);
+            return;
+        }
+
+        ref var circle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var hasCircle);
+        if (!hasCircle)
             return;
 
         // Rainbow color cycle

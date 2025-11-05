@@ -117,6 +117,8 @@ namespace Engine {
         const float screenWidth = static_cast<float>(newWidth);
         const float screenHeight = static_cast<float>(newHeight);
         const float worldHeight = graphicsConfig::PixelsToWorld(screenHeight);
+        (void)screenWidth;
+        (void)worldHeight;
 
         m_camera->AspectRatio = kDefaultAspectRatio;
     }

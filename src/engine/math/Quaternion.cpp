@@ -70,35 +70,6 @@ Quaternion Quaternion::FromEulerRad(float pitchX, float yawY, float rollZ) {
     return Multiply(Multiply(qx, qy), qz).Normalized();
 }
 
-Vector3D Quaternion::ToEulerRad() const {
-    Vector3D euler;
-
-    // Roll (Z axis)
-    float sinr_cosp = 2.0f * (W * Z + X * Y);
-    float cosr_cosp = 1.0f - 2.0f * (Y * Y + Z * Z);
-    euler.Z = std::atan2(sinr_cosp, cosr_cosp);
-
-    // Pitch (X axis)
-    float sinp = 2.0f * (W * X - Y * Z);
-    if (std::abs(sinp) >= 1)
-        euler.X = std::copysign(M_PI / 2.0f, sinp); // use 90 degrees if out of range
-    else
-        euler.X = std::asin(sinp);
-
-    // Yaw (Y axis)
-    float siny_cosp = 2.0f * (W * Y + Z * X);
-    float cosy_cosp = 1.0f - 2.0f * (X * X + Y * Y);
-    euler.Y = std::atan2(siny_cosp, cosy_cosp);
-
-    return euler;
-}
-
-Vector3D Quaternion::ToEulerDeg() const {
-    Vector3D eulerRad = ToEulerRad();
-    const float radToDeg = 180.0f / static_cast<float>(M_PI);
-    return Vector3D(eulerRad.X * radToDeg, eulerRad.Y * radToDeg, eulerRad.Z * radToDeg);
-}
-
 Quaternion Quaternion::Slerp(const Quaternion& a, const Quaternion& b, float t) {
     // Clamp t
     if (t <= 0.0f) return a;

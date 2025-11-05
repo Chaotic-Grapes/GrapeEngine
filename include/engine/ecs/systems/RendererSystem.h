@@ -1,8 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
-\file   RendererSystem.h
-\author Your Name
-\date   27th October 2025
+\file    RendererSystem.h
+\authors Muhammad Nur Fadzly Bin Zulkifli (15%), Choi Meng Yew (85%)
+\par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
+\date    20th October 2025
 \brief
 High-level rendering system for the ECS. Manages shaders, camera, and
 orchestrates the render graph for multi-pass rendering.

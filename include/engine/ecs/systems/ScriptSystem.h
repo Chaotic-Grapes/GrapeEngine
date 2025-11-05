@@ -27,12 +27,41 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // CoreCLR handle
 using hostfxr_handle = void*;
 
+// Platform-specific macros
+#ifdef _WIN32
+    // ****************************************** //
+    // Unused for now but will be used later for path handling (see TODO 9)
+    // Will probably be moved to a different header for project path management
+    // We don't have to define these for C# as C# has Path.DirectorySeparatorChar etc.
+    #define DIRECTORY_SEPARATOR "\\"
+    #define PATH_SEPARATOR ";"
+    // ****************************************** //
+#else
+    // Assumes we are targeting Linux/macOS eventually
+    // Since this one's very easy to do, I'll just define it for now
+    #define DIRECTORY_SEPARATOR "/"
+    #define PATH_SEPARATOR ":"
+#endif
+
 // TODO:
-// 1. Build this as a separate DLL.
-// 2. Load/unload the DLL dynamically in the engine.
-// 3. Refine this further.
-// 4. Make GetComponent similar to how Unity handles it.
-// 5. Exception handling.
+// 1.  Build this as a separate DLL.
+// 2.  Load/unload the DLL dynamically in the engine.
+// 3.  Refine this further.
+// 4.  Make GetComponent similar to how Unity handles it.
+// 5.  Exception handling.
+// 6.  AttachScript() and DetachScript() APIs, support for script parameters (constructor args).
+// 7.  Support for async/await in C# scripts (if possible).
+// 8.  Project/asset path.
+// 9.  Open/read etc for asset files in the project.
+// 10. Proper handling of AppDomain isolation.
+// 11. Hot reloading of scripts.
+// 12. Potentially replace std::memcpy with safer alternatives (like std::copy, std::copy_n, etc).
+
+// !! Important !! //
+// Possibly need a rewrite as this implementation don't seem to adhere to the core design of the ECS.
+
+// Maybe TODO:
+// 1.  Separate API functions into another header or in their related classes
 
 namespace ECS {
     /**
@@ -187,12 +216,12 @@ namespace ECS {
         // These functions are exported and callable from C# via P/Invoke.
         // They provide safe, type-agnostic component access.
         
-        friend bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
-		friend bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer);
-        friend void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
-        friend bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
-        friend void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
-        friend void ScriptAPI_DestroyEntity(uint64_t entityId);
+        // friend bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
+		// friend bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer);
+        // friend void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
+        // friend bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
+        // friend void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
+        // friend void ScriptAPI_DestroyEntity(uint64_t entityId);
     };
 
 }
@@ -216,6 +245,14 @@ namespace ECS {
  * @return true if component exists and was copied, false otherwise
  */
 SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
+
+/**
+ * @brief Get a pointer to a component on an entity by type hash.
+ * @param entityId Entity to query
+ * @param typeHash FNV-1a hash of component type name
+ * @return Pointer to the component data, or nullptr if not found
+ */
+SCRIPT_API void *ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash);
 
 /**
  * @brief Get a component from an entity by type hash.
@@ -257,6 +294,12 @@ SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
  * @param entityId Entity to destroy
  */
 SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId);
+
+/**
+ * @brief Checks if an entity is alive in the world.
+ * @return Packed entity ID
+ */
+SCRIPT_API bool ScriptAPI_IsAlive(uint64_t entityId);
 
 /**
  * @brief Set the world instance for script API access.

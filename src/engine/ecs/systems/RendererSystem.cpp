@@ -1,12 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
 \file    RendererSystem.cpp
-\authors Muhammad Nur Fadzly Bin Zulkifli (85%), Choi Meng Yew (15%)
+\authors Muhammad Nur Fadzly Bin Zulkifli (15%), Choi Meng Yew (85%)
 \par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
 \date    20th October 2025
 \brief
-Implements the RendererSystem which handles rendering of entities that can be
-rendered, taking into account their transforms and layers.
+Implements the RendererSystem.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -312,8 +311,8 @@ namespace ECS {
         // fallback (if no active camera found)
         if (!foundActive) {
             const auto& mainWindow = WindowManager::GetMainWindow();
-            projection = glm::ortho(0.f, float(mainWindow->Width()),
-                0.f, float(mainWindow->Height()),
+            projection = glm::ortho(0.f, static_cast<float>(mainWindow->Width()),
+                0.f, static_cast<float>(mainWindow->Height()),
                 -1.f, 1.f);
         }
 
@@ -351,8 +350,9 @@ namespace ECS {
         buckets.resize(std::max(1, maxLayerId + 1));
 
         // Collect entities that have LocalTransform + Layer
-        world.Each<Components::LocalTransform, Components::Layer>([&](ECS::Entity entity, Components::LocalTransform& lt, Components::Layer& ly) {
-            uint16_t lid = static_cast<uint16_t>(ly.Id);
+        world.Each<Components::LocalTransform, Components::Layer>([&](const ECS::Entity entity, Components::LocalTransform& lt, const Components::Layer& ly){
+            (void)lt;
+        	const uint16_t lid = ly.Id;
             if (lid < buckets.size())
                 buckets[lid].push_back(entity);
             });
@@ -370,6 +370,7 @@ namespace ECS {
         m_renderGraph->AddPass("Scene2D", {}, { "HDR" },
             [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints](ResourceAccessor& res)
             {
+                (void)res;
                 // Get HDR framebuffer from render graph
                 auto* hdrFbo = res.GetFramebuffer("HDR");
                 if (!hdrFbo) {
@@ -385,7 +386,7 @@ namespace ECS {
                 // Layered rendering: SDF first, then batch
                 // ---------------------------------------
                 for (int layer = 0; layer <= maxLayerId; ++layer) {
-                    if (layer >= (int)buckets.size()) continue;
+                    if (layer >= static_cast<int>(buckets.size())) continue;
                     const auto& list = buckets[layer];
 
                     // --- Sub-pass 1: SDF circles on this layer ---
@@ -508,10 +509,19 @@ namespace ECS {
                                 2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
                                 1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z)
                             );
+                            
+                            // Calculate UV coordinates from Tiling and Offset
+                            // Tiling controls how much of the texture is shown (1.0 = full texture)
+                            // Offset controls where in the texture to start sampling (0.0 = top-left)
+                            const float u0 = sr.Offset.X;
+                            const float v0 = sr.Offset.Y;
+                            const float u1 = sr.Offset.X + sr.Tiling.X;
+                            const float v1 = sr.Offset.Y + sr.Tiling.Y;
+                            
                             m_renderer->submitSprite({
                                 ToGlm(Vector2D{position.X, position.Y}),
                                 ToGlm(Vector2D{scale.X, scale.Y}),
-                                {0.f, 0.f, 1.f, 1.f},
+                                {u0, v0, u1, v1},
                                 ToGlm(sr.Color),
                                 sr.TextureId,
                                 angleZ,
@@ -557,7 +567,7 @@ namespace ECS {
 
                             // Get transform and text data
                             const auto& lt = world.Get<Components::LocalTransform>(entity);
-                            const auto& text = world.Get<Components::Text>(entity);  // Now const!
+                            const auto& text = world.Get<Components::Text>(entity); // const
 
                             // Load/cache font
                             std::string fontPath(text.FontPath);
@@ -670,7 +680,7 @@ namespace ECS {
                 m_sdfCircleShader->setUniform("uPicking", 1);
                 m_renderer->beginFrame();
 
-                for (int layer = 0; layer <= (int)buckets.size() - 1; ++layer) {
+                for (int layer = 0; layer <= static_cast<int>(buckets.size()) - 1; ++layer) {
                     const auto& list = buckets[layer];
 
                     for (ECS::Entity entity : list) {
@@ -719,7 +729,7 @@ namespace ECS {
 
                 m_renderer->beginFrame();
 
-                for (int layer = 0; layer <= (int)buckets.size() - 1; ++layer) {
+                for (int layer = 0; layer <= static_cast<int>(buckets.size()) - 1; ++layer) {
                     const auto& list = buckets[layer];
 
                     for (ECS::Entity entity : list) {
@@ -1126,7 +1136,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uHorizontal", 1);
                 m_bloomBlurShader->setUniform("uImage", 0);
                 m_bloomBlurShader->setUniform("uRadius", bloomRadiusTexels);
-                m_bloomBlurShader->setUniform("uSamples", std::max(12, int(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
+                m_bloomBlurShader->setUniform("uSamples", std::max(12, static_cast<int>(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
                 src->BindColorTexture(0);
                 m_renderer->drawFullscreenQuad();
@@ -1145,7 +1155,7 @@ namespace ECS {
                 m_bloomBlurShader->setUniform("uHorizontal", 0);
                 m_bloomBlurShader->setUniform("uImage", 0);
                 m_bloomBlurShader->setUniform("uRadius", bloomRadiusTexels);
-                m_bloomBlurShader->setUniform("uSamples", std::max(12, int(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
+                m_bloomBlurShader->setUniform("uSamples", std::max(12, static_cast<int>(bloomRadiusTexels * 0.6f)));     // Increase uSamples proportionally to uRadius
                 m_bloomBlurShader->setUniform("uFalloff", 0.15f);  // LESS FALLOFF
 
                 src->BindColorTexture(0);

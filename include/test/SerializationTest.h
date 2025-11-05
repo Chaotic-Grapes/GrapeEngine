@@ -13,9 +13,12 @@
 #ifndef SERIALIZATIONTEST_H
 #define SERIALIZATIONTEST_H
 
+#include "ecs/systems/RendererSystem.h"
 #include "scene/Scene.h"
 #include "ecs/Entity.h"
 #include <vector>
+#include <string>
+#include <memory>
 
 namespace Sandbox {
     class SerializationTestScene : public Scenes::Scene {
@@ -47,6 +50,7 @@ namespace Sandbox {
             float linearVelocityY;
         };
         std::vector<ExpectedData> m_expectedData;
+        std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
     };
 }
 

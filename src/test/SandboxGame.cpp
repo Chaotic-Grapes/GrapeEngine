@@ -1,7 +1,6 @@
 #include "Game.h"
 #include "GraphicsTest.hpp"
 #include "MemoryTest.h"
-#include "PhysicsCollision2DTest.h"
 #include "ResourceManagerTest.h"
 #include "SandboxGame.h"
 #include "SerializationTest.h"

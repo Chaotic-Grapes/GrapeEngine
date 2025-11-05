@@ -17,7 +17,7 @@ public class PlayerController : ScriptBehaviour
     private float m_rotationSpeed = 180.0f;
 
     // Visual entity that represents the player
-    private Entity m_visualEntity;
+    private Entity? m_visualEntity;
 
     public override void OnStart()
     {
@@ -51,11 +51,19 @@ public class PlayerController : ScriptBehaviour
 
     public override void OnUpdate()
     {
-        if (!m_visualEntity.TryGetComponent<LocalTransform>(out var transform))
+        if (m_visualEntity == null || !m_visualEntity.IsAlive())
         {
-            Log("PlayerController: No LocalTransform component on visual entity!", LogLevel.Warning);
+            Log("PlayerController entity is not alive", LogLevel.Warning);
             return;
         }
+
+        if (!m_visualEntity.HasComponent<LocalTransform>())
+        {
+            Log("PlayerController entity missing LocalTransform component", LogLevel.Warning);
+            return;
+        }
+
+        ref var transform = ref m_visualEntity.GetComponent<LocalTransform>();
 
         // WASD movement with keyboard input
         var movement = Vector2.Zero;
@@ -97,12 +105,16 @@ public class PlayerController : ScriptBehaviour
             transform.Rotation.Z = MathF.Sin(newAngle / 2.0f);
         }
 
+        var oldPosition = transform.Position;
+
         // Clamp to world bounds
         transform.Position.X = Math.Clamp(transform.Position.X, World.WallThickness, World.Width - World.WallThickness);
         transform.Position.Y = Math.Clamp(transform.Position.Y, World.WallThickness, World.Height - World.WallThickness);
 
-        // Update component
-        m_visualEntity.SetComponent(transform);
+        if (!oldPosition.Equals(transform.Position))
+        {
+            Log($"Player position clamped to: {transform.Position}", LogLevel.Info);
+        }
 
         // Update visual feedback
         UpdateVisual();
@@ -110,9 +122,19 @@ public class PlayerController : ScriptBehaviour
 
     private void UpdateVisual()
     {
-        // Make the player pulse to show it's active
-        if (!m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle))
+        if (m_visualEntity == null || !m_visualEntity.IsAlive())
+        {
+            Log("PlayerController entity is not alive", LogLevel.Warning);
             return;
+        }
+
+        if (!m_visualEntity.HasComponent<ShapeCircle2D>())
+        {
+            Log("PlayerController entity missing ShapeCircle2D component", LogLevel.Warning);
+            return;
+        }
+
+        ref var circle = ref m_visualEntity.GetComponent<ShapeCircle2D>();
 
         var pulse = 0.9f + 0.1f * MathF.Sin((float)Time.ElapsedTime * 5.0f);
         circle.Radius = 20.0f * pulse;
@@ -122,8 +144,6 @@ public class PlayerController : ScriptBehaviour
         circle.Color.G = pulse;
         circle.Color.B = 0.0f;
         circle.Color.A = 1.0f;
-
-        m_visualEntity.SetComponent(circle);
     }
 
     //getter for visual entity (so EnemyAI can access it)

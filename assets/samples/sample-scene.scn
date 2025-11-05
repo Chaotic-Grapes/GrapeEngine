@@ -7,8 +7,13 @@
                     "Data": {
                         "Value": "TestSprite"
                     },
-                    "TypeId": 0,
                     "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
                 },
                 {
                     "Data": {
@@ -29,7 +34,6 @@
                             "Z": 1.0
                         }
                     },
-                    "TypeId": 0,
                     "TypeName": "LocalTransform"
                 },
                 {
@@ -50,7 +54,6 @@
                             "Y": 1.0
                         }
                     },
-                    "TypeId": 0,
                     "TypeName": "SpriteRenderer2D"
                 }
             ],
@@ -62,8 +65,13 @@
                     "Data": {
                         "Value": "MovingEntity"
                     },
-                    "TypeId": 0,
                     "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
                 },
                 {
                     "Data": {
@@ -84,7 +92,6 @@
                             "Z": 1.0
                         }
                     },
-                    "TypeId": 0,
                     "TypeName": "LocalTransform"
                 },
                 {
@@ -94,7 +101,6 @@
                             "Y": 5.0
                         }
                     },
-                    "TypeId": 0,
                     "TypeName": "LinearVelocity2D"
                 }
             ],

@@ -10,7 +10,7 @@ public class EnemyAI : ScriptBehaviour
     //AI state machine
     private HFSM m_fsm;
 
-    // stats
+        // stats
     public float BaseSpeed = 80.0f;
     public float Speed = 80.0f;
     public float AttackDamage = 10.0f;
@@ -52,6 +52,9 @@ public class EnemyAI : ScriptBehaviour
 
     // cache obstacles
     private List<Vector3> m_cachedObstacles;
+    // Visual entity
+    
+    private Entity? m_visualEntity;
 
     public override void OnStart()
     {
@@ -138,6 +141,15 @@ public class EnemyAI : ScriptBehaviour
 
     public override void OnUpdate()
     {
+        if (m_visualEntity == null || !m_visualEntity.IsAlive())
+        {
+            Log("EnemyAI entity is not alive", LogLevel.Warning);
+            return;
+        }
+
+        ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var hasTransform);
+        if (!hasTransform)
+            return;
 
         // Try to link to player if not already linked
         if (!m_linkedToPlayer)
@@ -162,8 +174,15 @@ public class EnemyAI : ScriptBehaviour
 
     private void UpdateEnemyVisual()
     {
+        if (m_visualEntity == null || !m_visualEntity.IsAlive())
+        {
+            Log("EnemyAI entity is not alive", LogLevel.Warning);
+            return;
+        }
+
         // Make enemy throb to show it's active
-        if (!m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle))
+        ref var circle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var hasCircle);
+        if (!hasCircle)
             return;
 
         var throb = 0.85f + 0.15f * MathF.Sin((float)Time.ElapsedTime * 3.0f);

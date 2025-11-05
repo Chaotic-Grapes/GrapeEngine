@@ -289,8 +289,11 @@ void DebugUI::_showPerformanceWindow() const {
     ImGui::Separator();
 
     if (ImGui::Button("Simulate Crash")) {
+#pragma warning( push )
+#pragma warning( disable : 6011 ) // Suppress null pointer dereference warning
         int* p = nullptr;
         *p = 42; // Dereference null pointer to cause crash
+#pragma warning( pop )            // Restore warnings
     }
 
     ImGui::End();

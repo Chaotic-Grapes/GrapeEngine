@@ -23,6 +23,8 @@
 #include "serialization/Serializer.h"
 #include "ecs/Components.h"
 #include "core/Logger.h"
+#include "core/Application.h"
+#include "services/WindowManager.h"
 #include <filesystem>
 #include <cmath>
 #include <cstring>
@@ -30,9 +32,21 @@
 using namespace Sandbox;
 
 void SerializationTestScene::OnLoad() {
+    const auto &config = Engine::CORE->GetConfig();
+    const int windowWidth = config.WindowConfig.Width;
+    const int windowHeight = config.WindowConfig.Height;
+
+    CREATE_WINDOW("Serialization Test Scene", windowWidth, windowHeight);
     LOG_INFO("========================================");
     LOG_INFO("SERIALIZATION INTEGRITY TEST");
     LOG_INFO("========================================");
+
+    m_rendererSystem = std::make_shared<ECS::RendererSystem>();
+    m_rendererSystem->Initialize(GetWorld());
+    AddSystem([this](Scenes::Scene& s, const float dt) {
+        m_rendererSystem->Update(s.GetWorld(), dt);
+    }, "Renderer System");
+
     RunAutomatedTest();
 }
 
@@ -64,11 +78,15 @@ void SerializationTestScene::RunAutomatedTest() {
 void SerializationTestScene::CreateTestEntities() {
     ECS::World& world = GetWorld();
     
-    // Test 1: Entity with LocalTransform + SpriteRenderer2D + Name
+    // Test 1: Entity with LocalTransform + SpriteRenderer2D + Name + Layer
     ECS::Entity sprite = world.Create();
+    
+    // Add Layer component
+    world.Add<ECS::Components::Layer>(sprite, ECS::Components::Layer{ 0 });
+    
     world.Add<ECS::Components::Name>(sprite);
     auto& spriteName = world.Get<ECS::Components::Name>(sprite); // This assumes entity has Name component
-    std::strncpy(spriteName.Value, "TestSprite", sizeof(spriteName.Value) - 1);
+    strncpy_s(spriteName.Value, "TestSprite", sizeof(spriteName.Value) - 1);
     
     world.Add<ECS::Components::LocalTransform>(sprite);
     auto& spriteTransform = world.Get<ECS::Components::LocalTransform>(sprite);
@@ -85,11 +103,15 @@ void SerializationTestScene::CreateTestEntities() {
     m_expectedData.push_back({"TestSprite", Vector3D{400.0f, 450.0f, 0.0f},  
         Vector3D{128.0f, 128.0f, 1.0f}, Quaternion{0.0f, 0.0f, 0.382683f, 0.923880f}, 1, 0.0f, 0.0f});
     
-    // Test 2: Entity with LocalTransform + LinearVelocity2D
+    // Test 2: Entity with LocalTransform + LinearVelocity2D + Layer
     ECS::Entity movingEntity = world.Create();
+    
+    // Add Layer component
+    world.Add<ECS::Components::Layer>(movingEntity, ECS::Components::Layer{ 0 });
+    
     world.Add<ECS::Components::Name>(movingEntity);
     auto& movingName = world.Get<ECS::Components::Name>(movingEntity);
-    std::strncpy(movingName.Value, "MovingEntity", sizeof(movingName.Value) - 1);
+    strncpy_s(movingName.Value, "MovingEntity", sizeof(movingName.Value) - 1);
     
     world.Add<ECS::Components::LocalTransform>(movingEntity);
     auto& movingTransform = world.Get<ECS::Components::LocalTransform>(movingEntity);
@@ -222,7 +244,8 @@ void SerializationTestScene::VerifyLoadedEntities() {
             const auto& sprite = world.Get<ECS::Components::SpriteRenderer2D>(entity);
             bool texMatch = sprite.TextureId == expected->textureId;
             LOG_DEBUG("  " << name << " - TextureId: " << (texMatch ? "[PASS]" : "[FAIL]"));
-            if (!texMatch) allTestsPassed = false;
+            if (!texMatch)
+                allTestsPassed = false;
         }
         
         if (name == "MovingEntity" && world.Has<ECS::Components::LinearVelocity2D>(entity)) {
@@ -230,7 +253,8 @@ void SerializationTestScene::VerifyLoadedEntities() {
             bool velMatch = (std::abs(vel.Value.X - expected->linearVelocityX) < 0.01f &&
                            std::abs(vel.Value.Y - expected->linearVelocityY) < 0.01f);
             LOG_DEBUG("  " << name << " - Velocity: " << (velMatch ? "[PASS]" : "[FAIL]"));
-            if (!velMatch) allTestsPassed = false;
+            if (!velMatch)
+                allTestsPassed = false;
         }
     }
     
@@ -245,6 +269,8 @@ void SerializationTestScene::PrintTestResults() {
         LOG_ERROR("[FAIL] SOME TESTS FAILED");
     
     LOG_INFO("========================================");
+
+    // exit(m_testPassed ? 0 : 1);
 }
 
 void SerializationTestScene::OnUpdate() {}
