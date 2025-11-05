@@ -26,7 +26,7 @@ void PhysicsTestScene::OnLoad() {
     worldWidth = static_cast<float>(windowWidth);
     worldHeight = static_cast<float>(windowHeight);
 
-    // Create a test layer (IMPORTANT: Some renderers filter by layer)
+    // Create a test layer 
     m_testLayer = GetLayers().CreateOrGetLayer("physics_test");
 
     // Initialize renderer system
@@ -187,7 +187,7 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
         for (int row = 0; row < rows; ++row) {
             float restitution = 0.1f + (row * 0.2f);
 
-            for (int col = 0; col < cols; ++col) {
+            for (int col = 0; col < 15; ++col) {
                 float xPos = startX + col * spacing;
                 float yPos = startY + row * spacing;
 
@@ -201,9 +201,9 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                         1.5f, 1.0f / 1.5f, 0.1f, 0.1f, 1.0f, 0
                     },
                     Components::LinearVelocity2D{
-                        Vector2D(RandomFloat(-100.0f, 100.0f), RandomFloat(-50.0f, 50.0f))
+                        Vector2D(RandomFloat(-400.0f, 400.0f), RandomFloat(-400.0f, 400.0f))
                     },
-                    Components::AngularVelocity2D{ RandomFloat(-90.0f, 90.0f) },
+                    Components::AngularVelocity2D{ RandomFloat(-300.0f, 300.0f) },
                     Components::PhysicsMaterial2D{  // ADD THIS!
                         0.2f,           // Friction
                         restitution,    // Restitution (varies by row)
@@ -297,9 +297,9 @@ void PhysicsTestScene::PhysicsForces() {
         }
 
         // Create falling balls with different masses
-        for (int i = 0; i < 10; ++i) {
-            float mass = 0.5f + (i * 0.5f);
-            float radius = 10.0f + (mass * 3.0f);
+        for (int i = 0; i < 23; ++i) {
+            float mass = 1.5f + (i * 0.5f);
+            float radius = 20.0f;
 
             Entity ball = CreateOnLayer(m_testLayer,
                 Components::LocalTransform{
@@ -317,8 +317,8 @@ void PhysicsTestScene::PhysicsForces() {
                 },
                 Components::PhysicsMaterial2D{  // ADD THIS!
                         0.2f,           // Friction
-                        0.2f,    // Restitution (varies by row)
-                        0.5f            // PositionCorrectPercent
+                        1.2f,    // Restitution (varies by row)
+                        1.5f            // PositionCorrectPercent
                 },
                 Components::ShapeCircle2D{
                     radius, Vector2D(0.0f, 0.0f),

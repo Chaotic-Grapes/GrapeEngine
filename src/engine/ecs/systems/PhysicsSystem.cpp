@@ -398,7 +398,7 @@ namespace ECS {
             }
         }
 
-        const int positionCorrectionIterations = 4;
+        const int positionCorrectionIterations = 8;
 
         for (int iter = 0; iter < positionCorrectionIterations; ++iter) {
             int collisionsResolved = 0;
