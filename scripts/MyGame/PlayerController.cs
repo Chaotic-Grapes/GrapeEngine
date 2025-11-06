@@ -51,7 +51,6 @@ public class PlayerController : ScriptBehaviour
 
     public override void OnUpdate()
     {
-
         ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var Transform);
         if (!Transform)
         {
@@ -104,9 +103,6 @@ public class PlayerController : ScriptBehaviour
         transform.Position.X = Math.Clamp(transform.Position.X, World.WallThickness, World.Width - World.WallThickness);
         transform.Position.Y = Math.Clamp(transform.Position.Y, World.WallThickness, World.Height - World.WallThickness);
 
-        // Update component
-        m_visualEntity.SetComponent(transform);
-
         // Update visual feedback
         UpdateVisual();
     }
@@ -126,8 +122,6 @@ public class PlayerController : ScriptBehaviour
         shapeCircle.Color.G = pulse;
         shapeCircle.Color.B = 0.0f;
         shapeCircle.Color.A = 1.0f;
-
-        m_visualEntity.SetComponent(shapeCircle);
     }
 
     //getter for visual entity (so EnemyAI can access it)

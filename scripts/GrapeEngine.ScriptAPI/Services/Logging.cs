@@ -3,6 +3,7 @@
 public enum LogLevel
 {
     Info,
+    Debug,
     Warning,
     Error
 }
@@ -18,16 +19,19 @@ internal static class Logging
         switch (level)
         {
             case LogLevel.Info:
-                Console.WriteLine($"[ScriptHost] {message}");
+                Console.WriteLine($"[INF] {message}");
+                break;
+            case LogLevel.Debug:
+                Console.WriteLine($"[DBG] {message}");
                 break;
             case LogLevel.Warning:
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[ScriptHost] {message}");
+                Console.WriteLine($"[WRN] {message}");
                 Console.ResetColor();
                 break;
             case LogLevel.Error:
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[ScriptHost] {message}");
+                Console.WriteLine($"[ERR] {message}");
                 Console.ResetColor();
                 break;
         }

@@ -211,8 +211,6 @@ public class EnemyAI : ScriptBehaviour
             shapeCircle.Color.B = 0.0f;
             shapeCircle.Color.A = 1.0f;
         }
-
-        m_visualEntity.SetComponent(circle);
     }
 
     private void UpdatePathDebugVisuals()
@@ -344,7 +342,6 @@ public class EnemyAI : ScriptBehaviour
         if (!WouldCollideWithObstacle(newPosition))
         {
             transform.Position = newPosition;
-            m_visualEntity.SetComponent(transform);
         }
     }
 
@@ -401,7 +398,7 @@ public class EnemyAI : ScriptBehaviour
             else
             {
                 m_currentPath = null;
-                MoveWithWallSliding(playertransform.Position, mytransform, deltaTime);
+                MoveWithWallSliding(playertransform.Position, ref mytransform, deltaTime);
                 return;
             }
         }
@@ -418,11 +415,11 @@ public class EnemyAI : ScriptBehaviour
                 return;
             }
 
-            MoveWithWallSliding(targetWaypoint, mytransform, deltaTime);
+            MoveWithWallSliding(targetWaypoint, ref mytransform, deltaTime);
         }
     }
 
-    private void MoveWithWallSliding(Vector3 target, LocalTransform transform, float deltaTime)
+    private void MoveWithWallSliding(Vector3 target, ref LocalTransform transform, float deltaTime)
     {
         Vector3 direction = (target - transform.Position).Normalized;
         Vector3 movement = direction * Speed * deltaTime;
@@ -431,7 +428,6 @@ public class EnemyAI : ScriptBehaviour
         if (!WouldCollideWithObstacle(newPosition))
         {
             transform.Position = newPosition;
-            m_visualEntity.SetComponent(transform);
             return;
         }
 
@@ -444,7 +440,6 @@ public class EnemyAI : ScriptBehaviour
             if (!WouldCollideWithObstacle(slidePos))
             {
                 transform.Position = slidePos;
-                m_visualEntity.SetComponent(transform);
                 return;
             }
         }
@@ -454,7 +449,6 @@ public class EnemyAI : ScriptBehaviour
         if (!WouldCollideWithObstacle(backPos))
         {
             transform.Position = backPos;
-            m_visualEntity.SetComponent(transform);
         }
     }
 
