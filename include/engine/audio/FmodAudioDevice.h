@@ -41,61 +41,87 @@ namespace Audio {
         bool operator==(const PlaybackHandle& o) const { return Id == o.Id; }
     };
    
-    // Loaded cue entry: FMOD::Sound plus the creation params used.
+    // Struct for cache to keep loaded path that hit previously
     struct CueEntry {
-        FMOD::Sound* Sound = nullptr; // owned by this device; released on Shutdown/UnloadCue
-        SoundParams Params{}; // remembers how the sound was created (stream/3D)
+        FMOD::Sound* Sound = nullptr;
+        SoundParams  Params{};
+        std::string  SourcePath;   // NEW: keep original file path (for display / reload)
+    };
+
+    // Policy for PlaySingle behavior
+    enum class PlayPolicy {
+        NewInstance,             // do not enforce single-instance
+        SingleInstanceRestart,   // if playing, restart from time 0 on same channel
+        SingleInstanceResume,    // if paused, unpause; if playing, return same channel
+        SingleInstanceIgnore     // if already playing, do nothing (return existing)
     };
 
     class FmodAudioDevice final {
     public:
         FmodAudioDevice() = default; // POD-like; call Initialize() before use
 
+        // Lifecycle
+        bool Initialize();
+        void Update();    // pumps FMOD and prunes stale singletons
+        void Shutdown();
 
-        bool Initialize(); // create FMOD system and master group
-        void Update(); // pump FMOD mixer and async tasks
-        void Shutdown(); // release sounds/channels/system
+        // Cues
+        bool LoadCue(const std::string& cueId, const std::string& filePath, const SoundParams& params);
+        void UnloadCue(const std::string& cueId);
+        bool HasCue(const std::string& cueId) const;
 
+        // Playback
+        PlaybackHandle Play(const std::string& cueId, const PlaySettings& settings);
+        void Stop(PlaybackHandle handle, StopMode mode);
 
-        bool LoadCue(const std::string& cueId, const std::string& filePath, const SoundParams& params); // create or reuse sound
-        void UnloadCue(const std::string& cueId); // release sound by id if loaded
-        bool HasCue(const std::string& cueId) const; // query existence of a cue
+        // Single-instance helpers (stop stacking, make Stop reliable by cue)
+        PlaybackHandle PlaySingle(const std::string& cueId,
+            const PlaySettings& settings,
+            PlayPolicy policy = PlayPolicy::SingleInstanceRestart);
+        void StopCue(const std::string& cueId, StopMode mode);
+        bool IsCuePlaying(const std::string& cueId) const;
 
+        // Per-instance controls
+        void SetInstanceVolume(PlaybackHandle handle, float volume);
+        void SetInstancePitch(PlaybackHandle handle, float pitch);
+        void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel);
 
-        PlaybackHandle Play(const std::string& cueId, const PlaySettings& settings); // start playing a sound
-        void Stop(PlaybackHandle handle, StopMode mode); // stop channel immediately or allow fade
-        void SetInstanceVolume(PlaybackHandle handle, float volume); // per-channel volume
-        void SetInstancePitch(PlaybackHandle handle, float pitch); // per-channel pitch
+        // Listener and master
+        void SetListener(const ListenerParams& listener);
+        void SetMasterVolume(float volume);
+        float GetMasterVolume() const;
 
-
-        void SetListener(const ListenerParams& listener); // update 3D listener state
-        void SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel); // 3D attributes
-
-
-        void SetMasterVolume(float volume); // clamp 0..1 and apply to FMOD master group
-        float GetMasterVolume() const; // return cached value
-
+        // Introspection
+        void GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const;
 
     private:
         // FMOD objects
-        FMOD::System* m_system = nullptr; // created in Initialize(), released in Shutdown()
-        FMOD::ChannelGroup* m_master = nullptr; // master channel group for global volume
-        float m_masterVolume = 1.0f; // cached master volume (UI friendly)
+        FMOD::System* m_system = nullptr;
+        FMOD::ChannelGroup* m_master = nullptr;
+        float               m_masterVolume = 1.0f;
 
+        // Maps
+        std::unordered_map<uint64_t, FMOD::Channel*> m_channels;  // active channels keyed by handle id
+        std::unordered_map<std::string, CueEntry>    m_cues;      // loaded sounds keyed by cueId
 
-        // Book-keeping
-        std::unordered_map<uint64_t, FMOD::Channel*> m_channels; // active instances
-        std::unordered_map<std::string, CueEntry> m_cues; // loaded sounds per cue id
-        uint64_t m_nextId = 1; // monotonically increasing instance ids
+        // Single-instance bookkeeping: cueId -> last active handle id
+        std::unordered_map<std::string, uint64_t>    m_activeByCue;
 
+        // Handle ids
+        uint64_t m_nextId = 1;
 
         // Helpers
-        FMOD::Sound* _getOrCreateSound(const std::string& cueId, const std::string& path, const SoundParams& params); // loads and caches
-        FMOD::Channel* _channelFromHandle(PlaybackHandle h); // map handle to channel pointer (or nullptr)
+        FMOD::Sound* _getOrCreateSound(const std::string& cueId,
+            const std::string& path,
+            const SoundParams& params);
+        FMOD::Channel* _channelFromHandle(PlaybackHandle h);
+        FMOD::Sound* _createSoundFromMemory(const std::string& cueId,
+            const std::string& path,
+            const SoundParams& params);
     };
 
+} // namespace Audio
 
-}
-
+extern Audio::FmodAudioDevice* gAudioDevice;
 
 #endif

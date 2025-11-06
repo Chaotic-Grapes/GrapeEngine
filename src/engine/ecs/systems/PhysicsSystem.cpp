@@ -46,7 +46,14 @@
 #include "helpers/MathUtils.h"
 #include "helpers/EntityUtils.h"
 #include <iostream>
+#include "../engine/audio/FmodAudioDevice.h"
 
+    extern Audio::FmodAudioDevice* gAudioDevice;    
+
+
+#ifndef PHYSICS_AUDIO_DEVICE
+#define PHYSICS_AUDIO_DEVICE (gAudioDevice)
+#endif
 
  /**
  * @brief: Class that divides active world into a grid to quickly find entities. Application of this
@@ -298,8 +305,12 @@ namespace ECS {
         if (dt <= 0.0f) return;
 
         // 0) Choose substep count; make it a tunable or cvar if you like.
-        const int   substeps = 3;                         // try 2–5; higher = more stable, slower
+        const int   substeps = 3;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
+
+        // Running frame counter to reset per-frame SFX dedupe
+        static uint64_t s_frameCounter = 0;
+        ++s_frameCounter;
 
         // 1) Collect entity sets ONCE per frame (usually fine).
         //    If your scene can add/remove colliders mid-frame, you can also
@@ -322,7 +333,7 @@ namespace ECS {
                         dynamicEntities.push_back(e); //Push the entity into dynamicEntities for later broad-phase insertion
                 });
 
-        
+
         // Find and stores static entities
         std::vector<Entity> staticEntities;
         staticEntities.reserve(128);
@@ -418,8 +429,8 @@ namespace ECS {
             pairs.reserve(dynamicEntities.size() * 4);
             seen.reserve(dynamicEntities.size() * 4);
 
-           // Builds a list of unique candidate collision pairs from each spatial - grid cell, deduplicating pairs that appear in multiple cells.
-            auto pairKey = [](uint64_t a, uint64_t b) -> uint64_t { if (a > b) std::swap(a, b); return (a << 32) | (b & 0xffffffffull); };    
+            // Builds a list of unique candidate collision pairs from each spatial - grid cell, deduplicating pairs that appear in multiple cells.
+            auto pairKey = [](uint64_t a, uint64_t b) -> uint64_t { if (a > b) std::swap(a, b); return (a << 32) | (b & 0xffffffffull); };
 
             //Iterates all occupied cells in the spatial hash/grid. Each cell has a small list of entities that overlap that cell.
             for (const auto& cell : grid.Grid()) {
@@ -514,10 +525,48 @@ namespace ECS {
                     if (vBp) *vBp = vB;
 
                     ++resolved;
+                    {
+                        // Compute impact magnitude from relative velocity along normal BEFORE the next iteration changes it further.
+                        const Vector2D rel = vB.Value - vA.Value;
+                        const float    vn = rel.X * n.X + rel.Y * n.Y; // dot(rel, n)
+                        const float    impactSpeed = std::abs(vn);
+
+                        // Filter tiny contacts to avoid spam; tune as needed.
+                        constexpr float kImpactThreshold = 80.0f;
+
+                        if (impactSpeed >= kImpactThreshold) {
+                            // Per-frame dedupe for this pair
+                            static uint64_t s_lastFrameSeen = 0;
+                            static std::unordered_set<uint64_t> sfxPlayedThisFrame;
+                            if (s_lastFrameSeen != s_frameCounter) {
+                                sfxPlayedThisFrame.clear(); s_lastFrameSeen = s_frameCounter;
+                            }
+                            const uint64_t pk = pairKey(ECS::EntityUtils::Pack(A), ECS::EntityUtils::Pack(B));
+                            if (sfxPlayedThisFrame.insert(pk).second) {
+                                if (auto* audio = PHYSICS_AUDIO_DEVICE) {
+                                    const std::string cue = "sfx_collide";
+                                    const std::string path =
+                                        std::filesystem::absolute("assets/Audio/SFX/Squishy-Splatter_1.wav").string();
+                                    Audio::SoundParams sp; sp.stream = false; sp.is3D = false;
+                                    // Preload is cheap after first time; keep for safety:
+                                    audio->LoadCue(cue, path, sp);
+
+                                    Audio::PlaySettings ps;
+                                    ps.loop = false;
+                                    // Scale volume by impact; clamp to [0.2, 1.0]
+                                    ps.volume = std::max(0.2f, std::min(impactSpeed / 350.0f, 1.0f));
+                                    ps.pitch = 1.0f;
+                                    audio->PlaySingle(cue, ps, Audio::PlayPolicy::SingleInstanceRestart);
+                                }
+                            }
+                        }
+                    }
                 }
-                // Early exit if nothing was resolved this iteration (system has stabilized).
+
                 if (resolved == 0) break;
             }
-        } // end substeps
+
+            // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
+        }
     }
-}
+}// namespace ECS

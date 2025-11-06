@@ -32,6 +32,8 @@
 #include "services/AudioService.h"
 #include "core/Logger.h"
 
+Audio::FmodAudioDevice* gAudioDevice = nullptr;
+
 namespace Services {
     /**
       * @brief Create and initialize the FMOD device. Safe to call once at startup.
@@ -51,8 +53,10 @@ namespace Services {
             m_device.reset(); // leave service in a safe 'no device' state
             return;
         }
+        // let system activate device
+        gAudioDevice = m_device.get();
 
-        // Success: FMOD system + master group are ready for use.
+        // FMOD system + master group are ready for use.
         Trace("Audio initialized: FMOD");
     }
 
@@ -79,6 +83,7 @@ namespace Services {
      * - Logs a short termination message.
      */
     void AudioService::Terminate() {
+        gAudioDevice = nullptr;
         if (m_device) {
             m_device->Shutdown();
             m_device.reset();

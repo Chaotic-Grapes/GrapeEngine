@@ -278,6 +278,18 @@ void ResourceManager::PrintCacheInfo() const {
     LOG_INFO("Total assets: " << GetCacheSize());
 }
 
+// Get cached audio paths for Audio to load in library
+std::vector<std::string> ResourceManager::ListCachedAudioPaths() const {
+    std::vector<std::string> result;
+    result.reserve(m_audioFiles.size());
+    for (const auto& [path, audioPtr] : m_audioFiles) {
+        if (audioPtr && audioPtr->IsValid) {
+            result.push_back(path);
+        }
+    }
+    return result;
+}
+
 // Check if a specific asset is cached
 bool ResourceManager::IsAssetCached(const std::string& name) const {
     return (m_textures.find(name) != m_textures.end()) ||
