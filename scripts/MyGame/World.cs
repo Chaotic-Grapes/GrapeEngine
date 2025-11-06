@@ -1,4 +1,15 @@
-﻿namespace MyGame;
+﻿/**
+* @Name: 
+* @email:
+* @file 
+* @brief
+*
+* @details
+*
+* @dependencies
+*/
+
+namespace MyGame;
 
 /// <summary>
 /// The world dimensions and constants.
