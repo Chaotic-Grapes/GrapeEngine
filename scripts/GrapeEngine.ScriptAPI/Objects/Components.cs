@@ -1,5 +1,7 @@
 using GrapeEngine.Numerics;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
+using GrapeEngine;
 
 namespace GrapeEngine.Scripting
 {
@@ -411,6 +413,31 @@ namespace GrapeEngine.Scripting
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public static uint GetTypeHash<T>() where T : unmanaged
-            => FNV1aHash(typeof(T).Name);
+        {
+            var name = typeof(T).Name;
+            var hash = FNV1aHash(name);
+
+            // Uncomment this for debugging
+            // Log the computed type name and hash to help debug mismatches with the native side
+            // Logging.Log($"ComponentTypeRegistry: Type '{name}' -> Hash {hash}", LogLevel.Debug);
+
+            // Uncomment this and replacement the if statement to debug unexpected primitive types
+            // So if an unexpected primitive type like Boolean is being used as a component type,
+            // log a stacktrace so we can find the call-site that requested it.
+            // if (name == "Boolean")
+            // {
+            //     try
+            //     {
+            //         var st = new StackTrace(1, true).ToString();
+            //         Logging.Log($"ComponentTypeRegistry: {name} requested from:\n{st}", LogLevel.Error);
+            //     }
+            //     catch (Exception ex)
+            //     {
+            //         // If stacktrace capture fails, log a warning (new StackTrace())
+            //         Logging.Log($"ComponentTypeRegistry: Failed to capture stacktrace: {ex.Message}", LogLevel.Warning);
+            //     }
+            // }
+            return hash;
+        }
     }
 }
