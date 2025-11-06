@@ -20,7 +20,9 @@
  * simple physics responses. All math is done in engine Vector2D.
  *
  * @sources
- * Logics and formulaes derived from GIT trimester 2, with s
+ * Logics and formulaes derived from GIT trimester 2, with submissions Asteroids
+ * and balls/segment in mind.
+ * 
  * @dependencies
  *   - Math/Vector2D, Collision.h, <cmath>, <limits>, <algorithm>.
  *
@@ -68,32 +70,11 @@ namespace Engine {
     */
     Collision::AABB Collision::MakeAABBCenterSize(const Vector2D& center, const Vector2D& size) {
         const Vector2D half = Vector2D(size.X * 0.5f, size.Y * 0.5f);// Half extents
-        
+
         // Convert center/size to min/max.
         return { Vector2D(center.X - half.X, center.Y - half.Y),
                  Vector2D(center.X + half.X, center.Y + half.Y) };
     }
-
-    //Collision::Triangle Collision::MakeEquilateral(const Vector2D& c, const float side, const float angleRad) {
-    //    const float h = (std::sqrt(3.0f) * 0.5f) * side;
-    //    const float hb = 0.5f * side;
-    //    const float hh = (2.0f / 3.0f) * h;  // centroid -> top
-    //    const float lh = (1.0f / 3.0f) * h;  // centroid -> base line
-
-    //    const Vector2D v0Local(0.0f, hh);
-    //    const Vector2D v1Local(-hb, -lh);
-    //    const Vector2D v2Local(hb, -lh);
-
-    //    const float cs = std::cos(angleRad);
-    //    const float sn = std::sin(angleRad);
-    //    auto rot = [&](const Vector2D& p) { return Vector2D(p.X * cs - p.Y * sn, p.X * sn + p.Y * cs); };
-
-    //    Triangle t;
-    //    t.V0 = c + rot(v0Local);
-    //    t.V1 = c + rot(v1Local);
-    //    t.V2 = c + rot(v2Local);
-    //    return t;
-    //}
 
 
     /**

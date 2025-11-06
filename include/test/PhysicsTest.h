@@ -1,3 +1,14 @@
+/**
+* @Name: Dalton koh, 2403250
+* @email: d.koh@digipen.edu
+* @file PhysicsTest.h
+* @brief Test scene declarations for exercising the 2D PhysicsSystem.
+*
+* @details
+* Declares a Sandbox scene that cycles through functions declared here
+* in class PhysicsTestScene
+*/
+
 #pragma once
 #include "Game.h"
 #include "ecs/Entity.h"
@@ -8,7 +19,10 @@
 #include <vector>
 #include <memory>
 
-
+/**
+* @class PhysicsTestScene
+* @brief  sandbox scene to drive physics demonstrations.
+*/
 namespace Sandbox {
 	class PhysicsTestScene : public Scenes::Scene {
 	public:

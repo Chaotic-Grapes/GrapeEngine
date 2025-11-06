@@ -28,7 +28,7 @@ public class PlayerController : ScriptBehaviour
         Log("PlayerController initialized!", LogLevel.Info);
         Log("Use WASD to move, Q/E to rotate", LogLevel.Info);
 
-        // Create the visual entity for the player
+        // Create the entity for the player
         m_visualEntity = CreateEntity(
             new ComponentData<LocalTransform>(new()
             {
@@ -51,9 +51,12 @@ public class PlayerController : ScriptBehaviour
 
     public override void OnUpdate()
     {
+        // get transform of player
         ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var Transform);
+
+        // player has no transform log problem
         if (!Transform)
-        {
+        { 
             Log("PlayerController: No LocalTransform component on visual entity!", LogLevel.Warning);
             return;
         }

@@ -1,3 +1,26 @@
+/**
+* @Name: Dalton koh, 2403250
+* @email: d.koh@digipen.edu
+* @file PhysicsTest.cpp
+* @brief Physics sandbox scene: spawns entities and cycles physics demos.
+*
+* @details
+* Implements a small interactive scene that exercises the PhysicsSystem by
+* toggling between different test modes with keyboard input. Typical flow:
+* - OnLoad: initialize labels/systems and show help
+* - OnUpdate: listen for keys, switch tests, spawn stress entities
+* - Test functions: build the entities/world for each scenario
+*
+* The code assumes basic services (Input, Time, Window) and an ECS World.
+* RendererSystem is used to draw debug primitives for the spawned shapes.
+*
+*
+* @dependencies
+* - ecs/systems/PhysicsSystem.h, ecs/systems/RendererSystem.h
+* - services/Input.h, Window/Resource services
+* - ecs/Components.h for collider/material/transform components
+*/
+
 #include "ecs\systems\PhysicsSystem.h"
 #include "ecs\systems\RendererSystem.h"
 #include "PhysicsTest.h"
@@ -165,7 +188,12 @@ void PhysicsTestScene::CreateStaticWall(float x, float y, float width, float hei
     testEntities.push_back(EntityUtils::Pack(wall));
 }
 
-// test 2 -  Forces, Gravity, and Friction
+// ----------------------------------------------------------------------------
+// basic collision response 
+// ----------------------------------------------------------------------------
+// This stimulates basic collision response that happens in between a mixture of small balls
+// in a boxed up environment
+
 void PhysicsTestScene::PhysicsCollisionResponse() {
     if (testEntities.empty()) {
         LOG_DEBUG("=== TEST 1: Physics Collision Response ===");
@@ -185,6 +213,7 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
         const float startX = 300.0f;
         const float startY = 200.0f;
 
+        // use I/J loop to create circle entities 
         for (int row = 0; row < rows; ++row) {
             float restitution = 0.1f + (row * 0.2f);
 
@@ -201,6 +230,7 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                     Components::Rigidbody2D{
                         1.5f, 1.0f / 1.5f, 0.1f, 0.1f, 1.0f, 0
                     },
+                    // with high initial velocity to seem like an explosion
                     Components::LinearVelocity2D{
                         Vector2D(RandomFloat(-700.0f, 700.0f), RandomFloat(-700.0f, 700.0f))
                     },
@@ -229,7 +259,14 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
     }
 }
 
-// test 2 -  Forces, Gravity, and Friction
+// ----------------------------------------------------------------------------
+// Physics forces test
+// ----------------------------------------------------------------------------
+// This stimulates forces tests of gravity on different shapes firstly.
+// following up more physics components like friction, restitution and basic 
+// collision response that happens after each collision detection happens 
+// on different shapes.
+
 void PhysicsTestScene::PhysicsForces() {
     if (testEntities.empty()) {
         LOG_DEBUG("=== TEST 2: Physics Forces ===");
@@ -269,6 +306,7 @@ void PhysicsTestScene::PhysicsForces() {
             float friction = static_cast<float>(i) / static_cast<float>(boxCount - 1);
             float xPos = 200.0f + (i * 80.0f);
 
+           // create boxe entities
             Entity box = CreateOnLayer(m_testLayer,
                 Components::LocalTransform{
                     Vector3D(xPos, 500.0f, 0.0f),
@@ -302,6 +340,7 @@ void PhysicsTestScene::PhysicsForces() {
             float mass = 1.5f + (i * 0.5f);
             float radius = 20.0f;
 
+            //create ball entities
             Entity ball = CreateOnLayer(m_testLayer,
                 Components::LocalTransform{
                     Vector3D(RandomFloat(200.0f, worldWidth - 200.0f), 700.0f, 0.0f),
@@ -334,7 +373,13 @@ void PhysicsTestScene::PhysicsForces() {
     }
 }
 
-// test 3 - broad & narrow Phase Collision Detection Stress Test
+// ----------------------------------------------------------------------------
+// Broad/Narrow phase stress test 
+// ----------------------------------------------------------------------------
+// This stimulates and basically show case a small stress test case for broad narrow
+// phase implementation with static and dynamic cases where the small balls are dynamic 
+// and clash with each other and static entities. however the static entities dont 
+// clash with each other.
 void PhysicsTestScene::BroadNarrowPhaseCollision() {
     if (testEntities.empty()) {
         LOG_DEBUG("=== TEST 3: Broad & Narrow Phase Collision ===");

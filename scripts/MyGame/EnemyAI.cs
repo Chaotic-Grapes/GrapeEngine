@@ -325,13 +325,6 @@ public class EnemyAI : ScriptBehaviour
  
         ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var myTransform);
         if (!myTransform) return;
-        /*
-        var normalizedDir = direction.Normalized;
-        transform.Position += normalizedDir * Speed * deltaTime;
-        m_visualEntity.SetComponent(transform);
-        /*
-        * a-star to be set here
-        */
 
         if (direction.Magnitude < 0.01f)
             return;
