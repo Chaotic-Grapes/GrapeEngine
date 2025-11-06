@@ -1,6 +1,6 @@
 /**
-* @Name: Dalton koh, 2403250 ( to be added daniel)
-* @email: d.koh@digipen.edu, TBA
+* @Name: Dalton koh, 2403250. Daniel Neo, 2401180
+* @email: d.koh@digipen.edu, k.danielneozuofeng@digipen.edu
 * @file EnemyAI.cs
 * @brief Enemy HFSM with patrol, chase, and attack; A* path following.
 *
@@ -39,8 +39,7 @@ public class EnemyAI : ScriptBehaviour
     public float Health = 100f;
     public float MaxHealth = 100f;
 
-
-    // Visual entity of enemy
+    // visual entity of enemy
     private Entity m_visualEntity;
     private List<Entity> m_obstacleEntities = new List<Entity>();
 
@@ -49,17 +48,17 @@ public class EnemyAI : ScriptBehaviour
     private EnemyChaseState m_chaseState;
     private EnemyAttackState m_attackState;
 
-    // pathfinding
+    // pathfinding stuff - for chasing the player
     private List<Vector3> m_currentPath;
     private int m_currentWaypointIndex = 0;
     private float m_pathUpdateTimer = 0f;
-    private const float PATH_UPDATE_INTERVAL = 0.5f;
-    private const float WAYPOINT_REACH_DISTANCE = 15.0f;
+    private const float PATH_UPDATE_INTERVAL = 0.5f;        // how often to recalculate path
+    private const float WAYPOINT_REACH_DISTANCE = 15.0f;    // how close we need to get to the waypoint
 
-    // anti-stuck mechanism
+    // anti-stuck mechanism - detects if enemy isn't moving
     private Vector3 m_lastPosition;
     private float m_stuckTimer = 0f;
-    private const float STUCK_THRESHOLD = 0.5f;
+    private const float STUCK_THRESHOLD = 0.5f;             // seconds before we consider enemy stuck
 
     // debug visualization
     private List<Entity> m_pathDebugEntities = new List<Entity>();
@@ -76,6 +75,7 @@ public class EnemyAI : ScriptBehaviour
     {
         Log("EnemyAI initialized!", LogLevel.Info);
 
+        // make sure the pathfinder knows all the walls
         AStarPathfinder.EnsureInitialized();
         m_cachedObstacles = AStarPathfinder.GetObstacles();
 
@@ -113,6 +113,7 @@ public class EnemyAI : ScriptBehaviour
 
         Log($"Enemy visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
 
+        // shows the walls as red rectangles
         CreateObstacleVisuals();
 
         // build state machine
@@ -131,8 +132,10 @@ public class EnemyAI : ScriptBehaviour
             return;
         }
 
+        // get how big the wall blocks should be
         var (width, height) = AStarPathfinder.GetObstacleDimensions();
 
+        // create a red rectangle for each wall position
         foreach (var obstaclePos in m_cachedObstacles)
         {
             var obstacleEntity = CreateEntity(
@@ -233,14 +236,17 @@ public class EnemyAI : ScriptBehaviour
         }
     }
 
+    // shows circles along the current path of enemy - debugging!
     private void UpdatePathDebugVisuals()
     {
+        // clear old debug visuals
         foreach (var entity in m_pathDebugEntities)
         {
             entity.Destroy();
         }
         m_pathDebugEntities.Clear();
 
+        // create new debug visuals for current path
         if (m_currentPath != null && m_currentPath.Count > 0)
         {
             for (int i = 0; i < m_currentPath.Count; i++)
@@ -256,10 +262,10 @@ public class EnemyAI : ScriptBehaviour
                     }),
                     new ComponentData<ShapeCircle2D>(new()
                     {
-                        Radius = isCurrent ? 8.0f : 5.0f,
+                        Radius = isCurrent ? 8.0f : 5.0f,   // current waypoint is bigger?
                         Color = isCurrent
-                            ? new Color { R = 0f, G = 1f, B = 0f, A = 0.8f }
-                            : new Color { R = 1f, G = 1f, B = 0f, A = 0.5f },
+                            ? new Color { R = 0f, G = 1f, B = 0f, A = 0.8f }    // green
+                            : new Color { R = 1f, G = 1f, B = 0f, A = 0.5f },   // yellow
                         Filled = true
                     }),
                     new ComponentData<Layer>(new() { Id = 0 }),
@@ -340,6 +346,7 @@ public class EnemyAI : ScriptBehaviour
         return distance;
     }
 
+    // simple movement in a direction (used for patrolling)
     public void MoveInDirection(Vector3 direction, float deltaTime)
     {
  
@@ -349,15 +356,18 @@ public class EnemyAI : ScriptBehaviour
         if (direction.Magnitude < 0.01f)
             return;
 
+        // calculate movement and new position
         Vector3 movement = direction.Normalized * Speed * deltaTime;
         Vector3 newPosition = transform.Position + movement;
 
+        // only move if we wont hit a wall
         if (!WouldCollideWithObstacle(newPosition))
         {
             transform.Position = newPosition;
         }
     }
 
+    // smart movement towards player using pathfinding
     public void MoveTowardPlayer(float deltaTime)
     {
         //earlyexit if player doesnt exist
@@ -373,24 +383,26 @@ public class EnemyAI : ScriptBehaviour
 
         // if (GetDistanceToPlayer() < m_detectionRadius)
 
+        // stuck detection (thsi will check if enemy is actually moving)
         m_pathUpdateTimer -= deltaTime;
 
         float distanceMoved = (mytransform.Position - m_lastPosition).Magnitude;
 
         if (distanceMoved > 1.0f * deltaTime)
         {
-            m_stuckTimer = 0f;
+            m_stuckTimer = 0f;  // we are moving, resets stuck timer
         }
         else
         {
             // direction - direction vector 
             // var direction = playerTransform.Position - myTransform.Position;
             // MoveInDirection(direction, deltaTime);
-            m_stuckTimer += deltaTime;
+            m_stuckTimer += deltaTime;  // we are not moving, counts as stuck
         }
 
         m_lastPosition = mytransform.Position;
 
+        // do we need a new path?
         bool needsNewPath = m_currentPath == null ||
                            m_currentPath.Count == 0 ||
                            m_currentWaypointIndex >= m_currentPath.Count ||
@@ -399,6 +411,7 @@ public class EnemyAI : ScriptBehaviour
 
         if (needsNewPath)
         {
+            // ask pathfinder for a new route to player
             var newPath = AStarPathfinder.FindPath(mytransform.Position, playertransform.Position);
 
             if (newPath != null && newPath.Count > 0)
@@ -410,40 +423,47 @@ public class EnemyAI : ScriptBehaviour
             }
             else
             {
+                // no path found! - try to move directly with wall sliding
                 m_currentPath = null;
                 MoveWithWallSliding(playertransform.Position, ref mytransform, deltaTime);
                 return;
             }
         }
 
+        // follows the current path
         if (m_currentPath != null && m_currentWaypointIndex < m_currentPath.Count)
         {
             Vector3 targetWaypoint = m_currentPath[m_currentWaypointIndex];
             Vector3 toWaypoint = targetWaypoint - mytransform.Position;
             float distanceToWaypoint = toWaypoint.Magnitude;
 
+            // move to next waypoint if we are close enough
             if (distanceToWaypoint < WAYPOINT_REACH_DISTANCE)
             {
                 m_currentWaypointIndex++;
                 return;
             }
 
+            // move toward current waypoint with wall sliding
             MoveWithWallSliding(targetWaypoint, ref mytransform, deltaTime);
         }
     }
 
+    // tries to move towards target, slides along wall if blocked
     private void MoveWithWallSliding(Vector3 target, ref LocalTransform transform, float deltaTime)
     {
         Vector3 direction = (target - transform.Position).Normalized;
         Vector3 movement = direction * Speed * deltaTime;
         Vector3 newPosition = transform.Position + movement;
 
+        // try direct movement first
         if (!WouldCollideWithObstacle(newPosition))
         {
             transform.Position = newPosition;
             return;
         }
 
+        // if blocked, try sliding along the wall
         Vector3 slideDir = GetSlideDirection(transform.Position, direction);
         if (slideDir.Magnitude > 0.001f)
         {
@@ -457,6 +477,7 @@ public class EnemyAI : ScriptBehaviour
             }
         }
 
+        // if still stuck, back up a bit
         Vector3 backStep = new Vector3(-direction.X, -direction.Y, -direction.Z) * (Speed * deltaTime * 0.5f);
         Vector3 backPos = transform.Position + backStep;
         if (!WouldCollideWithObstacle(backPos))
@@ -465,11 +486,14 @@ public class EnemyAI : ScriptBehaviour
         }
     }
 
+    // figures out which direction to slide when blocked
     private Vector3 GetSlideDirection(Vector3 position, Vector3 direction)
     {
+        // check if we are blocked in X or Y direction
         bool blockedX = WouldCollideWithObstacle(position + new Vector3(direction.X * 10f, 0, 0));
         bool blockedY = WouldCollideWithObstacle(position + new Vector3(0, direction.Y * 10f, 0));
 
+        // slide in the unblocked direction
         if (blockedX && !blockedY)
             return new Vector3(0, direction.Y, 0);
         if (blockedY && !blockedX)
@@ -478,14 +502,16 @@ public class EnemyAI : ScriptBehaviour
         return Vector3.Zero;
     }
 
+    // checks if a position would hit any walls
     private bool WouldCollideWithObstacle(Vector3 newPosition)
     {
         var (obstacleWidth, obstacleHeight) = AStarPathfinder.GetObstacleDimensions();
 
-        float enemyHalfSize = 10.0f;
+        float enemyHalfSize = 10.0f; // how big the enemy is
         float obstacleHalfWidth = obstacleWidth / 2f;
         float obstacleHalfHeight = obstacleHeight / 2f;
 
+        // check against all walls
         foreach (var obstacle in m_cachedObstacles)
         {
             bool collisionX = Math.Abs(newPosition.X - obstacle.X) < (enemyHalfSize + obstacleHalfWidth);
@@ -493,10 +519,10 @@ public class EnemyAI : ScriptBehaviour
 
             if (collisionX && collisionY)
             {
-                return true;
+                return true;    // would hit a wall
             }
         }
-        return false;
+        return false;   // clear path
     }
 
     // this helps enemy know who the player is 
@@ -537,7 +563,7 @@ public class EnemyPatrolState : State
 
     // flag to help set patrollings
     private bool m_movingToB = true;
-    private float m_detectionR = 350.0f;
+    private float m_detectionR = 350.0f;   // important to set big enough for pathfinding to work
 
     //minimum distance 
     private float m_minD = 5.0f;
@@ -692,8 +718,6 @@ public class EnemyAttackState : State
     //detection radius
     private float AttackRange = 5.0f;
     private float DetectionRange = 350.0f;
-
-
 
     //resetter
     private const float ATTACK_COOLDOWN_TIME = 1.5f;
