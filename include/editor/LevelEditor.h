@@ -58,6 +58,11 @@ public:
     void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
+    void _buildDockLayout();
+    void _renderDockSpace();
+    bool m_dockLayoutBuilt = false;
+    ImGuiID m_dockspaceId = 0;
+
     ECS::World* m_world;               // Reference to game world
     LevelEditorConfig m_config;        // Editor configuration settings
     Playback m_playback;               // Playback controls panel

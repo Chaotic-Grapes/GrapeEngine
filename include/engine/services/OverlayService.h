@@ -72,14 +72,12 @@ namespace Services {
         bool IsStepRequested() const { return m_levelEditor && m_levelEditor->IsStepRequested(); }
         void ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
 
+        // Enable LevelEditor specifically for a scene
+        void EnableLevelEditorForScene(Scenes::Scene* scene);
+
         // This method belongs to the CLASS, not instances
         // Can be called as OverlayService::Get() without needing an object first
         static inline OverlayService* Get() { return m_overlayInstance; }
-
-        // Level Editor visibility toggle (F2)
-        void ToggleLevelEditor() { m_showLevelEditor = !m_showLevelEditor; }
-        bool IsLevelEditorEnabled() const { return m_showLevelEditor; }
-        void SetLevelEditorEnabled(bool enabled) { m_showLevelEditor = enabled; }
 
     private:
         // Listen for resize events
@@ -96,7 +94,7 @@ namespace Services {
         std::unique_ptr<LevelEditor> m_levelEditor;
         bool m_initialized = false;
         bool m_dockLayoutBuilt = false;
-        bool m_showLevelEditor = false; // Default false per request
+        bool m_showLevelEditor = true; // Always show when LevelEditor is active
         Vector2D m_lastWindowSize{ 0, 0 };
     #endif
     };

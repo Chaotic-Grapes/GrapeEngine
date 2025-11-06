@@ -10,7 +10,7 @@
 #include <iostream>
 #include <memory>
 #include "ECSTest.hpp"
-
+#include "LevelEditorTest.h"
 
 void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     // Get configuration from the application
@@ -24,6 +24,7 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     std::cout << "3. Serialization Check Test" << '\n';
     std::cout << "4. Memory Tracking Test" << '\n';
 	std::cout << "5. Entity Component System Test" << '\n';
+    std::cout << "6. Open Level Editor" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -65,6 +66,13 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
 
         break;
 	}
+    case 6: {
+        LOG_INFO("Starting Level Editor Test...");
+        size_t levelEditorTest = sceneManager.AddScene(new Sandbox::LevelEditorTest());
+        sceneManager.SetActive(levelEditorTest);
+
+        break;
+    }
     default:
         std::cout << "Invalid choice" << '\n';
         break;

@@ -16,6 +16,7 @@ Implements the LevelEditor class which orchestrates all editor panels.
 #include "../editor/LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
+#include <imgui_internal.h>
 
 // Constructor: Initialize level editor with world reference and configuration
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
@@ -25,6 +26,90 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
 }
 
 LevelEditor::~LevelEditor() {}
+
+void LevelEditor::_buildDockLayout() {
+    if (m_dockLayoutBuilt) return;
+
+    // Create a full-screen DockSpace and initialize layout once
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+
+    // Safety check to prevent negative sizes
+    if (vp->Size.x <= 0 || vp->Size.y <= 0) return;
+
+    // Reset and rebuild
+    ImGui::DockBuilderRemoveNode(m_dockspaceId);
+    ImGui::DockBuilderAddNode(m_dockspaceId, ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::DockBuilderSetNodeSize(m_dockspaceId, vp->Size);
+
+    // First: split off right column (25% instead of 33%)
+    ImGuiID leftCenterNode, rightNode;
+    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);
+
+    // Split left + center vertically: top 65%, bottom 35% (for Asset Browser)
+    ImGuiID topSection, assetBrowserNode;
+    ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.65f, &topSection, &assetBrowserNode);
+
+    // Split top section into left (33.3% of 75% = 25% total) and center (66.6% of 75% = 50% total)
+    ImGuiID leftTopNode, centerTopSection;
+    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &centerTopSection);
+
+    // Split center top section so Game Controls sits at TOP (~15%) and Viewport below (~85%)
+    ImGuiID centerControlsNode, centerViewportNode;
+    // Using ImGuiDir_Up: out_node_at_dir = TOP (Controls), remainder = BOTTOM (Viewport)
+    ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Up, 0.154f, &centerControlsNode, &centerViewportNode);
+    // Keep the tab bar visible for Game Controls so users can access the tab
+
+    // The remainder from the last split (centerViewportNode) stays the central node
+    // We intentionally rely on DockBuilderSplitNode semantics to avoid multiple central nodes
+
+    // Dock windows
+    ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
+    ImGui::DockBuilderDockWindow("Game Controls", centerControlsNode);
+    ImGui::DockBuilderDockWindow("Viewport", centerViewportNode);
+    ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode); // Spans left + center bottom
+    ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
+    ImGui::DockBuilderDockWindow("Property Editor", rightNode);
+
+    ImGui::DockBuilderFinish(m_dockspaceId);
+    m_dockLayoutBuilt = true;
+}
+
+void LevelEditor::_renderDockSpace() {
+    // Safety check
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    if (vp->Size.x <= 0 || vp->Size.y <= 0) return;
+
+    // Offset dockspace host below the global main menu bar to avoid overlapping tabs
+    const float topOffset = ImGui::GetFrameHeight();
+
+    // Calculate safe sizes that aren't negative
+    ImVec2 safePos(vp->Pos.x, vp->Pos.y + topOffset);
+    ImVec2 safeSize(vp->Size.x, std::max(1.0f, vp->Size.y - topOffset)); // Ensure at least 1px height
+
+    ImGui::SetNextWindowPos(safePos);
+    ImGui::SetNextWindowSize(safeSize);
+    ImGui::SetNextWindowViewport(vp->ID);
+
+    ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent black
+    ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
+
+    m_dockspaceId = ImGui::GetID("MainDockSpace");
+    ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Show scene through central node
+    ImGui::DockSpace(m_dockspaceId, ImVec2(0.0f, 0.0f), dockFlags);
+
+    _buildDockLayout();
+    ImGui::End();
+}
 
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
@@ -123,6 +208,9 @@ void LevelEditor::Update() {
 // Render all editor panels each frame
 void LevelEditor::Render() {
     if (!m_world) return;
+
+    // Render dockspace first
+    _renderDockSpace();
 
     // Render panels in order
     m_playback.Render();                 // Top toolbar with play controls

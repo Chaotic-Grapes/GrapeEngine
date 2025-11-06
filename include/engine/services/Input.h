@@ -94,6 +94,9 @@ public:
     */
     static bool IsMouseDown(int button);
 
+    // Check if a mouse button was just released this frame
+    static bool IsMouseUp(int button);
+
     /*!
     \brief Get the current mouse cursor position.
     \param xPos Reference to store the X coordinate.
@@ -175,6 +178,11 @@ private:
     static std::unordered_map<int, bool> m_keyPressed; ///< Tracks keys pressed this frame
     static std::unordered_map<int, bool> m_keyUp;      ///< Tracks keys released this frame
 
+    // Mouse button state tracking
+    static std::unordered_map<int, bool> m_mouseDown;    // Mouse buttons currently held down
+    static std::unordered_map<int, bool> m_mousePressed; // Mouse buttons pressed this frame
+    static std::unordered_map<int, bool> m_mouseUp;      // Mouse buttons released this frame
+
     static int m_windowWidth;  ///< Current window width in pixels
     static int m_windowHeight; ///< Current window height in pixels
     static double m_scrollX;   ///< Horizontal scroll offset from last scroll event
@@ -241,48 +249,116 @@ private:
     Should be called once per frame.
     */
     static void _processInput();
+
+    static void _fileDropCallback(GLFWwindow* pWin, int count, const char** paths);
+    static void _windowFocusCallback(GLFWwindow* pWin, int focused);
 };
 
-/*!
-\defgroup InputConstants Input Constants
-\brief Predefined constants for input handling.
+// Action constants
+constexpr int PRESS = GLFW_PRESS;
+constexpr int REPEAT = GLFW_REPEAT;
+constexpr int RELEASE = GLFW_RELEASE;
 
-These constants provide convenient aliases for GLFW input codes,
-making the code more readable and reducing dependency on GLFW headers.
-@{
-*/
+// Keyboard constants: letters
+constexpr int KEY_A = GLFW_KEY_A;
+constexpr int KEY_B = GLFW_KEY_B;
+constexpr int KEY_C = GLFW_KEY_C;
+constexpr int KEY_D = GLFW_KEY_D;
+constexpr int KEY_E = GLFW_KEY_E;
+constexpr int KEY_F = GLFW_KEY_F;
+constexpr int KEY_G = GLFW_KEY_G;
+constexpr int KEY_H = GLFW_KEY_H;
+constexpr int KEY_I = GLFW_KEY_I;
+constexpr int KEY_J = GLFW_KEY_J;
+constexpr int KEY_K = GLFW_KEY_K;
+constexpr int KEY_L = GLFW_KEY_L;
+constexpr int KEY_M = GLFW_KEY_M;
+constexpr int KEY_N = GLFW_KEY_N;
+constexpr int KEY_O = GLFW_KEY_O;
+constexpr int KEY_P = GLFW_KEY_P;
+constexpr int KEY_Q = GLFW_KEY_Q;
+constexpr int KEY_R = GLFW_KEY_R;
+constexpr int KEY_S = GLFW_KEY_S;
+constexpr int KEY_T = GLFW_KEY_T;
+constexpr int KEY_U = GLFW_KEY_U;
+constexpr int KEY_V = GLFW_KEY_V;
+constexpr int KEY_W = GLFW_KEY_W;
+constexpr int KEY_X = GLFW_KEY_X;
+constexpr int KEY_Y = GLFW_KEY_Y;
+constexpr int KEY_Z = GLFW_KEY_Z;
 
-//! \name Action Constants
-//! @{
-constexpr int PRESS     = GLFW_PRESS;   ///< Key/button press action
-constexpr int REPEAT    = GLFW_REPEAT;  ///< Key repeat action
-constexpr int RELEASE   = GLFW_RELEASE; ///< Key/button release action
-//! @}
+// Keyboard constants: numbers
+constexpr int KEY_0 = GLFW_KEY_0;
+constexpr int KEY_1 = GLFW_KEY_1;
+constexpr int KEY_2 = GLFW_KEY_2;
+constexpr int KEY_3 = GLFW_KEY_3;
+constexpr int KEY_4 = GLFW_KEY_4;
+constexpr int KEY_5 = GLFW_KEY_5;
+constexpr int KEY_6 = GLFW_KEY_6;
+constexpr int KEY_7 = GLFW_KEY_7;
+constexpr int KEY_8 = GLFW_KEY_8;
+constexpr int KEY_9 = GLFW_KEY_9;
 
-//! \name Keyboard Constants
-//! @{
-constexpr int KEY_W     = GLFW_KEY_W;     ///< W key
-constexpr int KEY_A     = GLFW_KEY_A;     ///< A key
-constexpr int KEY_S     = GLFW_KEY_S;     ///< S key
-constexpr int KEY_D     = GLFW_KEY_D;     ///< D key
-constexpr int KEY_C     = GLFW_KEY_C;     ///< C key
-constexpr int KEY_P     = GLFW_KEY_P;     ///< P key
-constexpr int KEY_SPACE = GLFW_KEY_SPACE; ///< Space key
-constexpr int KEY_G     = GLFW_KEY_G;     ///< G key
-constexpr int KEY_J     = GLFW_KEY_J;     ///< J key
-constexpr int KEY_K     = GLFW_KEY_K;     ///< K key
-constexpr int KEY_R     = GLFW_KEY_R;     ///< R key
-constexpr int KEY_O     = GLFW_KEY_O;     ///< R key
-constexpr int KEY_T     = GLFW_KEY_T;     ///< T key
+// Keyboard constants: function keys
 constexpr int KEY_F1 = GLFW_KEY_F1;
-//! @}
+constexpr int KEY_F2 = GLFW_KEY_F2;
+constexpr int KEY_F3 = GLFW_KEY_F3;
+constexpr int KEY_F4 = GLFW_KEY_F4;
+constexpr int KEY_F5 = GLFW_KEY_F5;
+constexpr int KEY_F6 = GLFW_KEY_F6;
+constexpr int KEY_F7 = GLFW_KEY_F7;
+constexpr int KEY_F8 = GLFW_KEY_F8;
+constexpr int KEY_F9 = GLFW_KEY_F9;
+constexpr int KEY_F10 = GLFW_KEY_F10;
+constexpr int KEY_F11 = GLFW_KEY_F11;
+constexpr int KEY_F12 = GLFW_KEY_F12;
 
-//! \name Mouse Button Constants
-//! @{
-constexpr int MOUSE_LEFT    = GLFW_MOUSE_BUTTON_LEFT;  ///< Left mouse button
-constexpr int MOUSE_RIGHT   = GLFW_MOUSE_BUTTON_RIGHT; ///< Right mouse button
-//! @}
+// Keyboard constants: special keys
+constexpr int KEY_SPACE = GLFW_KEY_SPACE;
+constexpr int KEY_APOSTROPHE = GLFW_KEY_APOSTROPHE;       // '
+constexpr int KEY_COMMA = GLFW_KEY_COMMA;                 // ,
+constexpr int KEY_MINUS = GLFW_KEY_MINUS;                 // -
+constexpr int KEY_PERIOD = GLFW_KEY_PERIOD;               // .
+constexpr int KEY_SLASH = GLFW_KEY_SLASH;                 // /
+constexpr int KEY_SEMICOLON = GLFW_KEY_SEMICOLON;         // ;
+constexpr int KEY_EQUAL = GLFW_KEY_EQUAL;                 // =
+constexpr int KEY_LEFT_BRACKET = GLFW_KEY_LEFT_BRACKET;   // [
+constexpr int KEY_BACKSLASH = GLFW_KEY_BACKSLASH;         // '\'
+constexpr int KEY_RIGHT_BRACKET = GLFW_KEY_RIGHT_BRACKET; // ]
+constexpr int KEY_GRAVE_ACCENT = GLFW_KEY_GRAVE_ACCENT;   // `
+constexpr int KEY_ESCAPE = GLFW_KEY_ESCAPE;
+constexpr int KEY_ENTER = GLFW_KEY_ENTER;
+constexpr int KEY_TAB = GLFW_KEY_TAB;
+constexpr int KEY_BACKSPACE = GLFW_KEY_BACKSPACE;
+constexpr int KEY_INSERT = GLFW_KEY_INSERT;
+constexpr int KEY_DELETE = GLFW_KEY_DELETE;
 
-/*! @} */ // end of InputConstants group
+// Keyboard constants: arrow keys
+constexpr int KEY_RIGHT = GLFW_KEY_RIGHT;
+constexpr int KEY_LEFT = GLFW_KEY_LEFT;
+constexpr int KEY_DOWN = GLFW_KEY_DOWN;
+constexpr int KEY_UP = GLFW_KEY_UP;
+
+// Keyboard constants: modifiers
+constexpr int KEY_LEFT_SHIFT = GLFW_KEY_LEFT_SHIFT;
+constexpr int KEY_LEFT_CONTROL = GLFW_KEY_LEFT_CONTROL;
+constexpr int KEY_LEFT_ALT = GLFW_KEY_LEFT_ALT;
+constexpr int KEY_LEFT_SUPER = GLFW_KEY_LEFT_SUPER;      // Windows/Command key
+constexpr int KEY_RIGHT_SHIFT = GLFW_KEY_RIGHT_SHIFT;
+constexpr int KEY_RIGHT_CONTROL = GLFW_KEY_RIGHT_CONTROL;
+constexpr int KEY_RIGHT_ALT = GLFW_KEY_RIGHT_ALT;
+constexpr int KEY_RIGHT_SUPER = GLFW_KEY_RIGHT_SUPER;    // Windows/Command key
+
+// Keyboard constants: navigation
+constexpr int KEY_PAGE_UP = GLFW_KEY_PAGE_UP;
+constexpr int KEY_PAGE_DOWN = GLFW_KEY_PAGE_DOWN;
+constexpr int KEY_HOME = GLFW_KEY_HOME;
+constexpr int KEY_END = GLFW_KEY_END;
+constexpr int KEY_CAPS_LOCK = GLFW_KEY_CAPS_LOCK;
+
+// Mouse button constants
+constexpr int MOUSE_LEFT = GLFW_MOUSE_BUTTON_LEFT;
+constexpr int MOUSE_RIGHT = GLFW_MOUSE_BUTTON_RIGHT;
+constexpr int MOUSE_MIDDLE = GLFW_MOUSE_BUTTON_MIDDLE;
 
 #endif
