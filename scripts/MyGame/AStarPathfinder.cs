@@ -162,8 +162,8 @@ namespace MyGame
         // makes the path smoother by cutting corners where we have clear LOS
         private static List<Vector3> SmoothPath(List<Vector3> path, Vector3 actualStart)
         {
-            if (path == null || path.Count <= 2)
-                return path;
+            if (path == null)       return new List<Vector3>();
+            if (path.Count <= 2)    return path;
 
             var smoothed = new List<Vector3> { actualStart };
             int currentIndex = 0;
@@ -205,8 +205,7 @@ namespace MyGame
             Vector3 direction = end - start;
             float distance = direction.Magnitude;
 
-            if (distance < 0.1f)
-                return true;
+            if (distance < 0.1f)    return true;
 
             direction = direction.Normalized;
 
@@ -305,6 +304,7 @@ namespace MyGame
 
                 // get the most optimal node
                 var current = openSet.Min;
+                if (current == null) break;
                 openSet.Remove(current);
 
                 // if found target
@@ -355,7 +355,7 @@ namespace MyGame
                 }
             }
 
-            return null;    // if no paths is found
+            return new List<Vector2Int>();    // if no paths is found - returns empty list
         }
 
         // estimate cost from A to B - octile distance (8d movement)
@@ -444,7 +444,7 @@ namespace MyGame
         public static bool operator ==(Vector2Int a, Vector2Int b) => a.X == b.X && a.Y == b.Y;
         public static bool operator !=(Vector2Int a, Vector2Int b) => !(a == b);
 
-        public override bool Equals(object obj) => obj is Vector2Int other && this == other;
+        public override bool Equals(object? obj) => obj is Vector2Int other && this == other;
         public override int GetHashCode() => (X, Y).GetHashCode();
 
         public override string ToString() => $"({X}, {Y})";

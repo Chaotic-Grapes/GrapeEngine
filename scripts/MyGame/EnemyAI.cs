@@ -31,7 +31,7 @@ namespace MyGame;
 public class EnemyAI : ScriptBehaviour
 {
     //AI state machine
-    private HFSM m_fsm;
+    private HFSM m_fsm = null!;
 
     // stats
     public float BaseSpeed = 80.0f;
@@ -43,19 +43,19 @@ public class EnemyAI : ScriptBehaviour
     public float MaxHealth = 100f;
 
     // visual entity of enemy
-    private Entity m_visualEntity;
+    private Entity m_visualEntity = null!;
     private List<Entity> m_obstacleEntities = new List<Entity>();
 
     // state references so it can be reusable
-    private EnemyPatrolState m_patrolState;
-    private EnemyChaseState m_chaseState;
-    private EnemyAttackState m_attackState;
+    private EnemyPatrolState m_patrolState  = null!;
+    private EnemyChaseState m_chaseState    = null!;
+    private EnemyAttackState m_attackState  = null!;
 
     // pathfinding stuff - for chasing the player
-    private List<Vector3> m_currentPath;
-    private int m_currentWaypointIndex = 0;
-    private float m_pathUpdateTimer = 0f;
-    private const float PATH_UPDATE_INTERVAL = 0.5f;        // how often to recalculate path
+    private List<Vector3> m_currentPath         = null!;
+    private int m_currentWaypointIndex          = 0;
+    private float m_pathUpdateTimer             = 0f;
+    private const float PATH_UPDATE_INTERVAL    = 0.5f;        // how often to recalculate path
     private const float WAYPOINT_REACH_DISTANCE = 15.0f;    // how close we need to get to the waypoint
 
     // anti-stuck mechanism - detects if enemy isn't moving
@@ -67,12 +67,12 @@ public class EnemyAI : ScriptBehaviour
     private List<Entity> m_pathDebugEntities = new List<Entity>();
 
     // Player reference (need to read game manager probably info there)
-    private Entity m_playerEntity;
+    private Entity m_playerEntity = null!;
     //bool flag for playerset
     private bool m_linkedToPlayer = false;
 
     // cache obstacles
-    private List<Vector3> m_cachedObstacles;
+    private List<Vector3> m_cachedObstacles = null!;
 
     public override void OnStart()
     {
@@ -430,7 +430,7 @@ public class EnemyAI : ScriptBehaviour
             else
             {
                 // no path found! - try to move directly with wall sliding
-                m_currentPath = null;
+                m_currentPath = new List<Vector3>();
                 MoveWithWallSliding(playertransform.Position, ref mytransform, deltaTime);
                 return;
             }
@@ -575,7 +575,7 @@ public class EnemyPatrolState : State
     private float m_minD = 5.0f;
 
     //linkage from patrol -> chase
-    public EnemyChaseState ChaseState;
+    public EnemyChaseState? ChaseState;
 
     // constructor required to create state
     public EnemyPatrolState(EnemyAI enemy)
@@ -645,10 +645,10 @@ public class EnemyPatrolState : State
         // if player detected -> chase
         if (m_enemy.GetDistanceToPlayer() < m_detectionR)
         {
-            return ChaseState;
+            return ChaseState!;
         }
 
-        return null;
+        return null!;
     }
 }
 
@@ -659,8 +659,8 @@ public class EnemyChaseState : State
     private EnemyAI m_enemy;
 
     //needed for state linkage
-    public EnemyPatrolState PatrolState;
-    public EnemyAttackState AttackState;
+    public EnemyPatrolState? PatrolState;
+    public EnemyAttackState? AttackState;
 
     //ranges
     private float AttackRange = 5.0f; //placeholder
@@ -699,16 +699,16 @@ public class EnemyChaseState : State
         // Close enough to attack
         if (distance <= AttackRange)
         {
-            return AttackState;
+            return AttackState!;
         }
 
         // Lost player (too far away)
         if (distance > DetectionRange)
         {
-            return PatrolState;
+            return PatrolState!;
         }
 
-        return null;
+        return null!;
     }
 }
 
@@ -729,8 +729,8 @@ public class EnemyAttackState : State
     private const float ATTACK_COOLDOWN_TIME = 1.5f;
 
     //needed for state linkage
-    public EnemyChaseState ChaseState;
-    public EnemyPatrolState PatrolState;
+    public EnemyChaseState? ChaseState;
+    public EnemyPatrolState? PatrolState;
 
     // constructor to create state
     public EnemyAttackState(EnemyAI enemy)
@@ -773,19 +773,19 @@ public class EnemyAttackState : State
         //if dist less then attack range continue state
         if (distance <= AttackRange)
         {
-            return null;
+            return null!;
         }
         // if distance less then detection range and more then attack range change to chase state
         else if (distance <= DetectionRange && distance >= AttackRange)
         {
-            return ChaseState;
+            return ChaseState!;
         }
         else
         {
         // other wise just back to patrol because totally out of range
-            return PatrolState;
+            return PatrolState!;
         }
 
-        return null;
+        //  return null;    // unreachable
     }
 }
