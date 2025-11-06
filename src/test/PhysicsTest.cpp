@@ -205,13 +205,13 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                         Vector2D(RandomFloat(-700.0f, 700.0f), RandomFloat(-700.0f, 700.0f))
                     },
                     Components::AngularVelocity2D{ RandomFloat(-500.0f, 500.0f) },
-                    Components::PhysicsMaterial2D{  // ADD THIS!
+                    Components::PhysicsMaterial2D{
                         0.2f,           // Friction
                         restitution,    // Restitution (varies by row)
                         0.5f            // PositionCorrectPercent
                     },
                     Components::CircleCollider2D{
-                        15.0f, Vector2D(0.0f, 0.0f), 0xFFFFFFFF, 0
+                        25.0f, Vector2D(0.0f, 0.0f), 0xFFFFFFFF, 0
                     },
                     Components::ShapeCircle2D{
                         25.0f, Vector2D(0.0f, 0.0f),
@@ -249,7 +249,7 @@ void PhysicsTestScene::PhysicsForces() {
                 Vector2D((worldWidth - 100.0f) / 2.0f, 20.0f),
                 Vector2D(0.0f, 0.0f), 0.0f, 0xFFFFFFFF, 0
             },
-            Components::PhysicsMaterial2D{  // ADD THIS!
+            Components::PhysicsMaterial2D{ 
                         0.2f,           // Friction
                         0.0f,    // Restitution (varies by row)
                         0.5f            // PositionCorrectPercent
@@ -287,7 +287,7 @@ void PhysicsTestScene::PhysicsForces() {
                     Vector2D(15.0f, 15.0f), Vector2D(0.0f, 0.0f),
                     Color(friction, 0.5f, 1.0f - friction, 1.0f), 1.0f, true
                 },
-                Components::PhysicsMaterial2D{  // ADD THIS!
+                Components::PhysicsMaterial2D{
                         0.2f,           // Friction
                         0.5f,    // Restitution (varies by row)
                         0.5f            // PositionCorrectPercent
@@ -316,7 +316,7 @@ void PhysicsTestScene::PhysicsForces() {
                 Components::CircleCollider2D{
                     radius, Vector2D(0.0f, 0.0f), 0xFFFFFFFF, 0
                 },
-                Components::PhysicsMaterial2D{  // ADD THIS!
+                Components::PhysicsMaterial2D{ 
                         0.2f,           // Friction
                         1.2f,    // Restitution (varies by row)
                         1.5f            // PositionCorrectPercent
@@ -369,7 +369,7 @@ void PhysicsTestScene::BroadNarrowPhaseCollision() {
                 Components::CircleCollider2D{
                     12.0f, Vector2D(0.0f, 0.0f), 0xFFFFFFFF, 0
                 },
-                Components::PhysicsMaterial2D{  // ADD THIS!
+                Components::PhysicsMaterial2D{ 
                         0.2f,           // Friction
                         0.3f,    // Restitution (varies by row)
                         0.5f            // PositionCorrectPercent
@@ -401,7 +401,7 @@ void PhysicsTestScene::BroadNarrowPhaseCollision() {
                 Components::CircleCollider2D{
                     50.0f, Vector2D(0.0f, 0.0f), 0xFFFFFFFF, 0
                 },
-                Components::PhysicsMaterial2D{  // ADD THIS!
+                Components::PhysicsMaterial2D{ 
                         0.2f,           // Friction
                         0.2f,    // Restitution (varies by row)
                         0.5f            // PositionCorrectPercent
