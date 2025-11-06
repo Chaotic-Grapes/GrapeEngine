@@ -104,6 +104,9 @@ void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
     // Store the new window dimensions
     m_windowWidth = width;
     m_windowHeight = height;
+
+    // Broadcast resize events
+    Messaging::MessageSystem::Broadcast(Messaging::WindowResized(width, height));
 }
 
 void Input::_processInput() {

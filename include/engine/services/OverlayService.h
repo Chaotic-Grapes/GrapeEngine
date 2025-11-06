@@ -36,6 +36,7 @@ References:
 #include "scene/SceneManager.h"
 #include "ecs/World.h"
 #include "../editor/LevelEditor.h"
+#include "math/Vector2D.h"
 
 namespace Services {
 
@@ -81,6 +82,9 @@ namespace Services {
         void SetLevelEditorEnabled(bool enabled) { m_showLevelEditor = enabled; }
 
     private:
+        // Listen for resize events
+        void _onWindowResize(int width, int height);
+
         // References
         Scenes::SceneManager& m_sceneManager;
         Audio::FmodAudioDevice* m_audioDevice = nullptr;
@@ -93,6 +97,7 @@ namespace Services {
         bool m_initialized = false;
         bool m_dockLayoutBuilt = false;
         bool m_showLevelEditor = false; // Default false per request
+        Vector2D m_lastWindowSize{ 0, 0 };
     #endif
     };
 

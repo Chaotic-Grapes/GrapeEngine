@@ -215,7 +215,7 @@ void InspectorWindow::_renderEntityCore() {
 
     // Use scrollable child region for components list
     // Always show both scrollbars to prevent annoying layout jitter when content changes size
-    ImGuiWindowFlags childFlags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar;
+    // ImGuiWindowFlags childFlags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar;
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
     // Add a bit of padding inside the child to reduce awkward horizontal scroll
@@ -223,8 +223,8 @@ void InspectorWindow::_renderEntityCore() {
 
     // Fix content width to prevent horizontal scrollbar from jumping around
     // 420px is wide enough for most content without being excessive
-    ImGui::SetNextWindowContentSize(ImVec2(420.0f, 0));
-    ImGui::BeginChild("EntityComponents", ImVec2(0, childHeight), false, childFlags);
+    // ImGui::SetNextWindowContentSize(ImVec2(420.0f, 0));
+    ImGui::BeginChild("EntityComponents", ImVec2(0, childHeight), false);
 
     // Serialize entity to JSON so we can use the same component UI code for both entities and prefabs
     // This gives us a unified editing interface regardless of what we're inspecting
@@ -393,15 +393,15 @@ void InspectorWindow::_renderPrefabInspector() {
 
     // Use scrollable child for component list
     // Keep both vertical and horizontal scrollbars always visible to prevent jitter
-    ImGuiWindowFlags childFlags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar;
+    // ImGuiWindowFlags childFlags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar;
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 3;
 
     // Padding inside the child for visual spacing
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
 
     // Fixed content width to stabilize horizontal scroll without being too wide
-    ImGui::SetNextWindowContentSize(ImVec2(420.0f, 0));
-    ImGui::BeginChild("PrefabComponents", ImVec2(0, childHeight), false, childFlags);
+    // ImGui::SetNextWindowContentSize(ImVec2(420.0f, 0));
+    ImGui::BeginChild("PrefabComponents", ImVec2(0, childHeight), false);
 
     // Render all components in the prefab JSON
     if (m_prefabData.contains("Components")) {

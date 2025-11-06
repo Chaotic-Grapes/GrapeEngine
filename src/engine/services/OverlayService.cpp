@@ -5,10 +5,17 @@
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_internal.h>
+#include "core/messaging/MessageTypes.h"
+#include "core/messaging/MessageSystem.h"
 
 #ifdef USE_IMGUI
 
 namespace Services {
+    void OverlayService::_onWindowResize(int width, int height) {
+        m_dockLayoutBuilt = false; // Force layout to rebuild
+        m_lastWindowSize = Vector2D(static_cast<float>(width), static_cast<float>(height));
+    }
+
     void OverlayService::Initialize() {
         if (m_world) {
             m_debugUI = std::make_unique<DebugUI>(m_world);
@@ -30,9 +37,18 @@ namespace Services {
                     m_levelEditor->Initialize(mainWindow->Handle());
                 if (m_audioDevice && m_debugUI)
                     m_debugUI->AttachAudio(m_audioDevice);
+
+                // Save layout to file (docking purposes)
+                ImGuiIO& io = ImGui::GetIO();
+                io.IniFilename = "imgui.ini";
                 m_initialized = true;
             }
         }
+        // Subscribe to window resize events
+        Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
+            [this](const Messaging::WindowResized& msg) {
+                _onWindowResize(msg.Width, msg.Height);
+            });
     }
 
     void OverlayService::Update() {
@@ -91,19 +107,32 @@ namespace Services {
         // Create a full-screen DockSpace and initialize layout once
         {
             ImGuiViewport* vp = ImGui::GetMainViewport();
+
+            // Safety check to prevent negative sizes
+            if (vp->Size.x <= 0 || vp->Size.y <= 0) return;
+
             // Offset dockspace host below the global main menu bar to avoid overlapping tabs
             const float topOffset = ImGui::GetFrameHeight();
-            ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + topOffset));
-            ImGui::SetNextWindowSize(ImVec2(vp->Size.x, vp->Size.y - topOffset));
+
+            // Calculate safe sizes that aren't negative
+            ImVec2 safePos(vp->Pos.x, vp->Pos.y + topOffset);
+            ImVec2 safeSize(vp->Size.x, std::max(1.0f, vp->Size.y - topOffset)); // Ensure at least 1px height
+
+            ImGui::SetNextWindowPos(safePos);
+            ImGui::SetNextWindowSize(safeSize);
             ImGui::SetNextWindowViewport(vp->ID);
+
             ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-                ImGuiWindowFlags_NoBackground; // Keep scene visible under dockspace host
+                ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent black
             ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);
+            ImGui::PopStyleColor();
             ImGui::PopStyleVar(3);
 
             ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
@@ -113,6 +142,16 @@ namespace Services {
             // Build initial docking layout once
             if (!m_dockLayoutBuilt) {
                 m_dockLayoutBuilt = true;
+
+                // Another safety check
+                if (vp->Size.x <= 0 || vp->Size.y <= 0) {
+                    // Skip layout building this frame, try again next frame
+                    ImGui::End();
+                    return;
+                }
+
+                m_dockLayoutBuilt = true;
+
                 // Reset and rebuild
                 ImGui::DockBuilderRemoveNode(dockspaceId);
                 ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);

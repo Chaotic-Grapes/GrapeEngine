@@ -141,8 +141,8 @@ void EditorCore::HandleInWorldInteraction() {
 
 // Render main menu bar (currently just File menu)
 void EditorCore::ShowEditorWindows() {
-    _showMainMenu();
-    _showViewport();
+	_showMainMenu();
+	_showViewport();
 }
 
 // Render File menu with save/load options (currently disabled)
@@ -236,61 +236,34 @@ void EditorCore::_showMainMenu() {
 	// }
 }
 
-// Render a docked Viewport window. Scene rendering happens behind via dockspace passthrough.
-// This window provides camera usage hints and future overlay controls.
+// Render a docked Viewport window
+// Scene rendering happens behind via dockspace passthrough
 void EditorCore::_showViewport() {
-    if (!HasValidWorld()) return;
+	if (!HasValidWorld()) return;
 
-    // Make the viewport window transparent so the scene remains visible
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground;
-    if (ImGui::Begin("Viewport", nullptr, flags)) {
-        const ImVec2 avail = ImGui::GetContentRegionAvail();
+	// Configure window flags: allow mouse interaction but disable scrolling
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar;
 
-        // Helper bar at the top of the viewport
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));
-        ImGui::BeginChild("ViewportToolbar", ImVec2(avail.x, 28.0f), false);
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));
-        ImGui::Text("Camera: Press 'C' to toggle Editor Camera | LMB to pan | RMB to orbit | Scroll to zoom");
-        ImGui::PopStyleColor();
-        ImGui::EndChild();
-        ImGui::PopStyleColor();
+	// Begin the Viewport window (will be docked in main dockspace)
+	if (ImGui::Begin("Viewport", nullptr, flags)) {
+		// Get available rendering space inside the window
+		const ImVec2 avail = ImGui::GetContentRegionAvail();
 
-        // Main viewport area (engine renders scene behind via passthrough central node)
-        ImGui::BeginChild("ViewportArea", ImVec2(avail.x, avail.y - 28.0f), false);
+		// Toolbar section
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f)); // Set dark gray bg
+		ImGui::BeginChild("ViewportToolbar", ImVec2(avail.x, 28.0f), false);        // Create toolbar child window (full width, 28 px)
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.85f, 0.85f, 1.0f));    // Set light gray text color for instructions
+		ImGui::Text("Camera: Press 'C' to toggle Editor Camera | LMB to pan | RMB to orbit | Scroll to zoom");
+		ImGui::PopStyleColor();
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
 
-        // When Level Editor is enabled, visually shrink the effective viewport area
-        // by masking the outside region with a dim overlay, leaving a centered window.
-        if (Services::OverlayService::Get() && Services::OverlayService::Get()->IsLevelEditorEnabled()) {
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 areaPos = ImGui::GetCursorScreenPos();
-            const ImVec2 areaSize = ImGui::GetContentRegionAvail();
-            const float scale = 0.7f; // shrink factor for visual viewport
-            const ImVec2 innerSize = ImVec2(areaSize.x * scale, areaSize.y * scale);
-            const ImVec2 innerMin = ImVec2(areaPos.x + (areaSize.x - innerSize.x) * 0.5f,
-                                           areaPos.y + (areaSize.y - innerSize.y) * 0.5f);
-            const ImVec2 innerMax = ImVec2(innerMin.x + innerSize.x, innerMin.y + innerSize.y);
-
-            // Mask outside area with semi-transparent black
-            const ImU32 maskColor = IM_COL32(0, 0, 0, 160);
-            const ImVec2 outerMin = areaPos;
-            const ImVec2 outerMax = ImVec2(areaPos.x + areaSize.x, areaPos.y + areaSize.y);
-
-            // Top mask
-            dl->AddRectFilled(outerMin, ImVec2(outerMax.x, innerMin.y), maskColor);
-            // Bottom mask
-            dl->AddRectFilled(ImVec2(outerMin.x, innerMax.y), outerMax, maskColor);
-            // Left mask
-            dl->AddRectFilled(ImVec2(outerMin.x, innerMin.y), ImVec2(innerMin.x, innerMax.y), maskColor);
-            // Right mask
-            dl->AddRectFilled(ImVec2(innerMax.x, innerMin.y), ImVec2(outerMax.x, innerMax.y), maskColor);
-
-            // Border to indicate the viewport
-            dl->AddRect(innerMin, innerMax, IM_COL32(255, 255, 255, 120), 4.0f, 0, 2.0f);
-        }
-
-        ImGui::EndChild();
-    }
-    ImGui::End();
+		// Create main viewport area(fills remaining space below toolbar)
+		// Scene is rendered to this region via the dockspace central node
+		ImGui::BeginChild("ViewportArea", ImVec2(avail.x, avail.y - 28.0f), false);
+		ImGui::EndChild();
+	}
+	ImGui::End();
 }
 
 // Check if world pointer is valid before doing operations
@@ -307,7 +280,7 @@ void EditorCore::AddEntity(const std::string& name, EntityId parentId) {
 	// Create entity with default components
 	auto entity = _createGameEntity(name);
 
-	// Set parent if specified (use Parent component instead of Transform.ParentId)
+	// Set parent if specified (use Parent component)
 	if (parentId != 0) {
 		ECS::Entity parentEntity{ parentId, 0 };
 		if (m_world->IsAlive(parentEntity)) {
