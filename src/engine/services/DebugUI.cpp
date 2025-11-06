@@ -299,103 +299,97 @@ void DebugUI::_showPerformanceWindow() const {
     ImGui::End();
 }
 
-void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
-    if (!device) return;
-
-    ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(320, 240), ImGuiCond_Once);
-    ImGui::Begin("Audio Monitor");
-
-    // Master volume
-    float masterVol = device->GetMasterVolume();
-    if (ImGui::SliderFloat("Master Volume", &masterVol, 0.0f, 1.0f)) {
-        device->SetMasterVolume(masterVol);
+void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
+{
+    // Always open the window, even if device is null, so we can show status.
+    if (!ImGui::Begin("Audio Monitor / Library")) {
+        ImGui::End();
+        return;
     }
 
-    // Toggle library window
-    static bool showLibrary = false;
-    if (ImGui::Button("Open Audio Library")) showLibrary = true;
+    // Status indicator.
+    ImGui::Text("Device Status: %s", device ? "Attached" : "NULL (No Audio Device)");
+    ImGui::Separator();
 
-    ImGui::End();
+    // If device is not attached, do not attempt to draw controls.
+    if (!device)
+    {
+        ImGui::TextWrapped("No audio device available.\n"
+            "Call DebugUI::AttachAudio(audioService.Device()) "
+            "AFTER AudioService::Initialize().");
+        ImGui::End();
+        return;
+    }
 
-    if (!showLibrary) return;
-
-    ImGui::SetNextWindowSize(ImVec2(560, 440), ImGuiCond_Once);
-    if (ImGui::Begin("Audio Library", &showLibrary)) {
-        struct Row {
-            std::string CueId;
-            std::string Path;
-            Audio::PlaySettings Settings{};
-            Audio::PlaybackHandle Handle{};
-        };
-        static std::vector<Row> rows;
-
-        // Inputs to add a new cue
-        static char cueBuf[128] = {};
-        static char pathBuf[512] = {};
-        ImGui::InputTextWithHint("Cue ID", "Identifier to reference this sound", cueBuf, sizeof(cueBuf));
-        ImGui::InputTextWithHint("Path", "Path to audio file (wav/mp3/ogg/flac...)", pathBuf, sizeof(pathBuf));
-        ImGui::SameLine();
-        if (ImGui::Button("Load")) {
-            std::string cue = cueBuf, path = pathBuf;
-            if (!cue.empty() && !path.empty()) {
-                Audio::SoundParams params{};
-                params.stream = false;
-                params.defaultVolume = 1.0f;
-                params.is3D = false;
-
-                if (device->LoadCue(cue, path, params)) {
-                    rows.push_back(Row{ cue, path, Audio::PlaySettings{}, {} });
-                    cueBuf[0] = '\0';
-                    pathBuf[0] = '\0';
-                } else {
-                    ImGui::OpenPopup("Audio Load Error");
-                }
-            }
+    // -----------------------------------------------------------
+    // Master Volume
+    // -----------------------------------------------------------
+    {
+        float master = device->GetMasterVolume();
+        if (ImGui::SliderFloat("Master Volume", &master, 0.0f, 1.0f)) {
+            device->SetMasterVolume(master);
         }
-        if (ImGui::BeginPopupModal("Audio Load Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted("Failed to load audio cue.");
-            if (ImGui::Button("OK"))
-                ImGui::CloseCurrentPopup();
-            ImGui::EndPopup();
+    }
+
+    ImGui::Separator();
+
+    // -----------------------------------------------------------
+    // Audio Library: Load & Play
+    // -----------------------------------------------------------
+
+    static char cueBuf[128] = { 0 };     // user types the cue name here
+    static char pathBuf[260] = { 0 };    // user types the file path here
+    static bool loop = false;
+    static Audio::PlaybackHandle g_lastHandle{}; //to handle play stop
+
+    // Texts for library buttons or descriptors
+    ImGui::InputText("Cue Name", cueBuf, sizeof(cueBuf));
+    ImGui::InputText("Audio File Path", pathBuf, sizeof(pathBuf));
+    ImGui::Checkbox("Loop", &loop);
+
+    if (ImGui::Button("Load Cue"))
+    {
+        Audio::SoundParams params{};
+        params.stream = true;        // Recommended for music
+        params.is3D = false;       // UI library music is typically 2D
+
+        if (!device->LoadCue(cueBuf, pathBuf, params))
+        {
+            LOG_ERROR("LoadCue failed. Check file path or FMOD init.");
         }
+        else {
+            LOG_INFO("Loaded cue: %s path: %s", cueBuf, pathBuf);
+        }
+    }
 
-        ImGui::Separator();
+    ImGui::SameLine();
+    // play button
+    if (ImGui::Button("Play")) {
+        Audio::PlaySettings settings{};
+        settings.loop = loop;
+        settings.volume = 1.0f;
+        settings.pitch = 1.0f;
 
-        // Rows for loaded cues
-        for (size_t i = 0; i < rows.size(); ++i) {
-            auto& r = rows[i];
-            ImGui::PushID(static_cast<int>(i));
+        auto handle = device->Play(cueBuf, settings);
+        if (!handle) {
+            LOG_ERROR("Play failed. Cue may not be loaded.");
+        }
+        else {
+            g_lastHandle = handle;                        // <-- remember it
+            LOG_INFO("Playing cue: %s (id=%llu)", cueBuf, (unsigned long long)handle.Id);
+        }
+    }
 
-            ImGui::Text("Cue: %s", r.CueId.c_str());
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Play")) {
-                if (r.Handle)
-					device->Stop(r.Handle, Audio::StopMode::Immediate);
-                r.Handle = device->Play(r.CueId, r.Settings);
-            }
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Stop")) {
-                if (r.Handle)
-                    device->Stop(r.Handle, Audio::StopMode::Immediate);
-                r.Handle = {};
-            }
+    ImGui::SameLine();
 
-            // Per-instance controls for next Play; if you want live editing, apply to handle as well
-            ImGui::SliderFloat("Volume", &r.Settings.volume, 0.0f, 1.0f);
-            ImGui::SliderFloat("Pitch", &r.Settings.pitch, 0.25f, 4.0f);
-            ImGui::Checkbox("Loop", &r.Settings.loop);
-
-            // If a handle is active, allow live volume tweak
-            if (r.Handle) {
-                float liveVol = r.Settings.volume;
-                if (ImGui::SliderFloat("Instance Volume", &liveVol, 0.0f, 1.0f)) {
-                    device->SetInstanceVolume(r.Handle, liveVol);
-                }
-            }
-
-            ImGui::Separator();
-            ImGui::PopID();
+    if (ImGui::Button("Stop")) {
+        if (g_lastHandle) {
+            device->Stop(g_lastHandle, Audio::StopMode::Immediate);  // <-- real stop
+            g_lastHandle = {};                                        // optional: clear
+            LOG_INFO("Stopped last handle.");
+        }
+        else {
+            LOG_WARNING("No last handle to stop.");
         }
     }
 
