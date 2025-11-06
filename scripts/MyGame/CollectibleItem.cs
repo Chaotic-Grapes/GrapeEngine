@@ -21,37 +21,28 @@ public class CollectibleItem : ScriptBehaviour
         Log("Collectible item spawned!", LogLevel.Info);
 
         // Create the visual entity
-        m_visualEntity = CreateEntity();
-
-        // Set up initial position
-        m_originalPosition = new Vector3(400.0f, 360.0f, 0.0f);
-
-        var transform = new LocalTransform
-        {
-            Position = m_originalPosition,
-            Rotation = Quaternion.Identity,
-            Scale = new Vector3(1, 1, 1)
-        };
-
-        m_visualEntity.SetComponent(transform);
-
-        // Add yellow/gold circle visual
-        var circle = new ShapeCircle2D
-        {
-            Radius = 12.0f,
-            Color = new Color { R = 1.0f, G = 0.84f, B = 0.0f, A = 1.0f }, // Gold
-            Filled = true
-        };
-        m_visualEntity.SetComponent(circle);
-        m_visualEntity.SetComponent(new Layer { Id = 0 });
-        m_visualEntity.SetComponent(new Active { Enabled = true });
+        m_visualEntity = CreateEntity(
+            new ComponentData<LocalTransform>(new()
+            {
+                Position = Vector3.Zero,
+                Rotation = Quaternion.Identity,
+                Scale = new Vector3(1, 1, 1)
+            }),
+            new ComponentData<ShapeCircle2D>(new()
+            {
+                Radius = 12.0f,
+                Color = new Color { R = 1.0f, G = 0.84f, B = 0.0f, A = 1.0f }, // Gold color
+                Filled = true
+            }),
+            new ComponentData<Layer>(new() { Id = 0 }),
+            new ComponentData<Active>(new() { Enabled = true })
+        );
 
         Log($"Collectible visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
     }
 
     public override void OnUpdate()
     {
-       
         ref var visualTransform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var Transform);
         if (!Transform) return;
 
@@ -62,15 +53,12 @@ public class CollectibleItem : ScriptBehaviour
         // Rotate
         // Note: Simplified rotation - would use quaternions properly in full implementation
 
-        m_visualEntity.SetComponent(visualTransform);
-
         // Update visual
         UpdateCollectibleVisual();
     }
 
     private void UpdateCollectibleVisual()
     {
-
         ref var shapeVisual = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle);
         if (!circle) return;
 
@@ -84,8 +72,6 @@ public class CollectibleItem : ScriptBehaviour
         shapeVisual.Color.G = g;
         shapeVisual.Color.B = b;
         shapeVisual.Color.A = 1.0f;
-
-        m_visualEntity.SetComponent(circle);
     }
 
     // Note: This is only a sample method for the sake of the demo.

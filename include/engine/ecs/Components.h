@@ -271,12 +271,6 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<CircleCollider2D>, "CircleCollider2D must be trivially copyable");
 
-        // rectangle collider in 2D
-       /* struct RectangleCollider2D {
-        public:
-            float 
-        };*/
-
         // ---------------------------------- Rendering ----------------------------------
 
         // 2D sprite renderer (for UI/2D layers)
