@@ -15,6 +15,9 @@
 * - System.Collections.Generic (Stack, List)
 * - GrapeEngine.Scripting (for symmetry with other scripts)
 * - GrapeEngine.Numerics (not strictly required by this file)
+* 
+* Copyright (C) 2025 DigiPen Institute of Technology.
+* Reproduction or disclosure of this file or its contents without the
 */
 
 using System;

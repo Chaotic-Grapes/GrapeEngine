@@ -16,6 +16,9 @@
 * @dependencies
 * - GrapeEngine scripting/Entity APIs, Numerics vectors
 * - AStarPathfinder for pathfinding and obstacle dimensions
+* 
+* Copyright (C) 2025 DigiPen Institute of Technology.
+* Reproduction or disclosure of this file or its contents without the
 */
 
 using GrapeEngine;
@@ -276,11 +279,14 @@ public class EnemyAI : ScriptBehaviour
         }
     }
 
+    // Function to bind to the player's visual entity if available
     private void TryLinkToPlayer()
     {
         if (PlayerController.Instance != null)
         {
+           // Set playerentitiy to visual enttiy
             SetPlayerEntity(PlayerController.Instance.GetVisualEntity());
+            // set bool to true 
             m_linkedToPlayer = true;
 
         }
@@ -764,16 +770,19 @@ public class EnemyAttackState : State
     {
         float distance = m_enemy.GetDistanceToPlayer();
 
+        //if dist less then attack range continue state
         if (distance <= AttackRange)
         {
             return null;
         }
+        // if distance less then detection range and more then attack range change to chase state
         else if (distance <= DetectionRange && distance >= AttackRange)
         {
             return ChaseState;
         }
         else
         {
+        // other wise just back to patrol because totally out of range
             return PatrolState;
         }
 

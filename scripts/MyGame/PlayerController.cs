@@ -16,6 +16,9 @@
 * - GrapeEngine (Log, World, Time, Input)
 * - GrapeEngine.Numerics (Vector2/3, Quaternion, Color)
 * - GrapeEngine.Scripting (ScriptBehaviour, Entity, ComponentData<>)
+* 
+* Copyright (C) 2025 DigiPen Institute of Technology.
+* Reproduction or disclosure of this file or its contents without the
 */
 
 using GrapeEngine;
