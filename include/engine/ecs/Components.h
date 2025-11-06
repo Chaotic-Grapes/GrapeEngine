@@ -22,6 +22,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define COMPONENTS_H
 
 #include "Color.h"
+#include "graphics/texture.hpp"
+#include "graphics/SpriteMetaData.hpp"
+#include <filesystem>
+#include <fstream>
+#include <vector>
+#include <iostream>
+#include "services/ResourceManager.h"
+#include "ecs/ComponentRegistry.h"
 #include "math/Vector2D.h"
 #include "math/Vector3D.h"
 #include "math/Vector4D.h"
@@ -120,6 +128,28 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
 
+        // Tracks source prefab asset for entity instantiation and editor re-import workflows
+        struct PrefabLink {
+        public:
+            // Fixed size buffer for prefab asset path to maintain 
+            // trivially copyable status for ECS performance
+            static constexpr size_t MaxPathLength = 256;
+            char prefabPath[MaxPathLength] = {0};     // Path to the prefab file this entity was created from
+            PrefabLink() = default;
+
+            // Construct from std::string
+            PrefabLink(const std::string& path) { setPath(path); }
+            
+            // Safe string copy with null termination guarantee
+            void setPath(const std::string& path) {
+                strncpy_s(prefabPath, path.c_str(), MaxPathLength - 1);
+                prefabPath[MaxPathLength - 1] = '\0'; // Always null-terminate
+            }
+            // Convert back to std::string for convenience
+            std::string getPath() const { return std::string(prefabPath); }
+        };
+        static_assert(std::is_trivially_copyable_v<PrefabLink>, "PrefabLink must be trivially copyable");
+
         // Lifetime in seconds; entities with Time <= 0 can be culled by a system.
         struct Lifetime {
         public:
@@ -139,7 +169,7 @@ namespace ECS {
             float RotationSpeed;   // degrees per second
             float RotationOffset;  // starting phase
         };
-        static_assert(std::is_trivially_copyable_v<Rotator>, "LocalTransform must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<Rotator>, "Rotator must be trivially copyable");
 
         // Local transform is relative to parent entity (if any)
         struct LocalTransform { 

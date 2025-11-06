@@ -1,8 +1,33 @@
+/* Start Header *****************************************************************/
+/*!
+\file   DebugUI.cpp
+\author Foo Rui Qin (70%)
+        Muhammad Nur Fadzly Bin Zulkifli (30%)
+\par    ruiqin.foo@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
+\date   26th October 2025
+\brief
+Implements the DebugUI class which provides a comprehensive ImGui-based debug
+interface for the game engine.
+
+Features:
+- ImGui initialization and integration with GLFW/OpenGL backends
+- Real-time engine status monitoring and performance metrics display
+- Interactive game object editor with entity creation, deletion, and cloning
+- Input debugging with event tracking and state monitoring
+- Audio system monitoring and control interface
+- Configurable window layouts and font scaling
+- Cached UI elements for performance optimization
+- Toggle-able interface with F1 key support
+*/
+/* End Header *******************************************************************/
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "services/DebugUI.h"
 #include "services/Input.h"
 #include <imgui.h>
+#include "services/UICommon.h"
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <algorithm>
@@ -23,54 +48,19 @@
 #undef max  // Undefine macro to avoid conflicts with std::max
 #endif
 
-/**
- * @file DebugUI.cpp
- * @author Foo Rui Qin
- * @date 2024
- * @brief Implementation of the debug user interface system for engine development
- * 
- * This file implements the DebugUI class which provides a comprehensive ImGui-based
- * debug interface for the game engine. The implementation includes:
- * 
- * Core Features:
- * - ImGui initialization and integration with GLFW/OpenGL backends
- * - Real-time engine status monitoring and performance metrics display
- * - Interactive game object editor with entity creation, deletion, and cloning
- * - Input debugging with event tracking and state monitoring
- * - Audio system monitoring and control interface
- * - Memory usage and profiling information display
- * 
- * UI Management:
- * - Configurable window layouts and positioning
- * - Font scaling and styling customization
- * - Cached UI elements for performance optimization
- * - Toggle-able interface with F1 key support
- * 
- * ECS Integration:
- * - Entity creation with basic components (Transform, Sprite, etc.)
- * - Real-time entity management and modification
- * - Component inspection and editing capabilities
- * - World state monitoring and debugging
- * 
- * Performance Optimizations:
- * - Cached button labels to avoid string creation every frame
- * - Efficient UI state management
- * - Minimal memory allocations during rendering
- * - Optimized ImGui usage patterns
- * 
- * The debug UI provides essential tools for engine development, debugging,
- * and performance analysis, making it easier to develop and optimize games.
- */
-
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the scene
-DebugUI::DebugUI(const DebugUIConfig& config) : m_config(config) {}
+DebugUI::DebugUI(ECS::World* world, const DebugUIConfig& config) {
+    m_world = world;
+    m_config = config;
+}
 
 DebugUI::~DebugUI() {
     // Clean up resources only if UI was initialized
     if (m_initialized) Shutdown();
 }
 
+// Initialize ImGui context and backends
 void DebugUI::Initialize(GLFWwindow* pWin) {
     // Avoid reinitializing ImGUI
     if (!pWin || m_initialized) return;
@@ -80,57 +70,52 @@ void DebugUI::Initialize(GLFWwindow* pWin) {
 
     auto& io = ImGui::GetIO();  // Get input/output config
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Allow keyboard navigation
-    io.FontGlobalScale = m_config.FontScale;    // Scale the entire UI
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable docking functionality
+    io.FontGlobalScale = m_config.FontScale;              // Scale the entire UI
 
     ImGui::StyleColorsDark(); // Set dark theme colors
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.TabBarBorderSize = 0.0f; // keep outline under tabs hidden
     ImGui_ImplGlfw_InitForOpenGL(pWin, true); // GLFW backend (window/input handling)
     ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
 
     m_initialized = true;  // Mark that DebugUI has been initialized
 }
 
-void DebugUI::NewFrame() {  
-    // Check
+// Begin new ImGui frame and handle F1 toggle
+void DebugUI::NewFrame() {
     if (!m_initialized) return;
 
-    // Interact with debug UI (start of every frame so it keeps getting checked)
+    // Toggle only affects which panels are drawn, not frame lifecycle
     if (Input::IsKeyPressed(GLFW_KEY_F1)) {
         SetEnabled(!IsEnabled());
     }
 
-    if (!m_enabled) return;  // Early exit if UI is toggled off
-
-    ImGui_ImplOpenGL3_NewFrame(); // Prepare OpenGL rendering
-    ImGui_ImplGlfw_NewFrame();    // Process window/input events
-    ImGui::NewFrame();            // Start ImGUI's internal frame
+    // Always begin a new ImGui frame so other modules (e.g. LevelEditor) can draw
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 }
 
+// Render all debug windows
 void DebugUI::Render() {
-    if (!m_initialized || !m_enabled) return;  // Early exit if UI is toggled off
+    if (!m_initialized) return;
 
-    // Render custom debug windows
-    _showEngineDebugWindow(); // Pass demo control to debug window
-    _showPerformanceWindow();  // Show FPS and performance stats
-    _showInputDebugWindow();   // Input debugging
-    _showGameObjectEditor();   // Game object editor
-    _showAudioWindow(m_audioPtr);
+    // Draw debug panels only when enabled
+    if (m_enabled) {
+        _showEngineDebugWindow();
+        _showPerformanceWindow();
+        _showInputDebugWindow();
+        _showAudioWindow(m_audioPtr);
+        
 
-    // Show ImGUI's built-in demo window
-    if (m_showDemo) {
-        // Toggle functionality shown later in engine debug window func
-        ImGui::ShowDemoWindow(&m_showDemo);
-    }
-
-    // Finalize the frame and send to GPU
-    ImGui::Render();  // Generate draw commands from UI
-    auto* drawData = ImGui::GetDrawData();  // Get rendering data structure
-
-    if (drawData) {
-        // Submit to OpenGL for GPU execution
-        ImGui_ImplOpenGL3_RenderDrawData(drawData);
+        if (m_showDemo) {
+            ImGui::ShowDemoWindow(&m_showDemo);
+        }
     }
 }
 
+// Shutdown ImGui and cleanup resources
 void DebugUI::Shutdown() {
     if (!m_initialized) return;
 
@@ -144,79 +129,12 @@ void DebugUI::Shutdown() {
     m_initialized = false;
 }
 
-// Create a new object
-void DebugUI::AddGameObject(const std::string& name) const {
-    // Safety check
-    if (name.empty() ||
-        name.length() > DebugUIConfig::MAX_OBJECT_NAME_LENGTH ||
-        !HasValidScene())
-        return;
-
-    // Create real ECS entity with components
-    const auto entity = _createGameEntity(name);
-
-    auto& world = m_scenePtr->GetWorld();
-    auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
-
-    transform.Position.X = MathUtils::Randomize(0.0f, static_cast<float>(Input::GetWindowWidth()));
-    transform.Position.Y = MathUtils::Randomize(0.0f, static_cast<float>(Input::GetWindowHeight()));
-
-    // Add to editor list for UI display + clear cached toggle/delete
-    // button labels so new objects get proper unique labels
-    _invalidateCache();
-}
-
-// Find and delete an object by ID
-void DebugUI::RemoveGameObject(const PackedEntityId id) const {
-    // Safety check
-    if (!HasValidScene()) return;
-
-    auto& world = m_scenePtr->GetWorld();
-    const ECS::Entity ent = ECS::EntityUtils::Unpack(id);
-    if (!world.IsAlive(ent))
-        return;
-	world.Destroy(ent);
-
-    _invalidateCache();
-}
-
-void DebugUI::CloneGameObject(const ECS::Entity& entity) const {
-    // Safety check
-    if (!HasValidScene()) return;
-
-    auto& world = m_scenePtr->GetWorld();
-    const auto cloned = world.Clone(entity, ECS::CloneOptions{
-        true
-    });
-
-    // Offset position so clone doesn't overlap original
-    if (world.Has<ECS::Components::LocalTransform>(cloned)) {
-        auto& transform = world.Get<ECS::Components::LocalTransform>(cloned);
-        transform.Position.X += 50.0f;
-        transform.Position.Y += 50.0f;
-	}
-
-    _invalidateCache();
-}
-
-void DebugUI::ClearAllGameObjects() const {
-    // Safety check
-    if (!HasValidScene()) return;
-
-    auto& world = m_scenePtr->GetWorld();
-    world.Clear();
-
-    _invalidateCache();
-}
-
+// Display engine status and demo window toggle
 void DebugUI::_showEngineDebugWindow() {
     // Use config values
-    const auto& layout = m_config.Layout;
-    ImGui::SetNextWindowPos(ImVec2(layout.EngineX, layout.EngineY), ImGuiCond_Once);   // Position window (only on first appearance)
-    ImGui::SetNextWindowSize(ImVec2(layout.EngineW, layout.EngineH), ImGuiCond_Once);  // Size
-
-    // Display current engine state info
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_ENGINE);
     ImGui::Begin("GrapeEngine Debug Console");
+
     ImGui::Text("Engine Status: Running");
     ImGui::Text("Debug UI: %s", m_enabled ? "Active" : "Inactive");
     ImGui::Text("Scene: %s", HasValidScene() ? "Hooked" : "Unhooked");
@@ -234,9 +152,7 @@ void DebugUI::_showEngineDebugWindow() {
 
 void DebugUI::_showPerformanceWindow() const {
     // Use config values
-    const auto& layout = m_config.Layout;
-    ImGui::SetNextWindowPos(ImVec2(layout.PerfX, layout.PerfY), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(layout.PerfW, layout.PerfH), ImGuiCond_Once);
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_PERF);
 
     ImGui::Begin("Performance Monitor");
 
@@ -274,8 +190,6 @@ void DebugUI::_showPerformanceWindow() const {
         }
     }
 
-    ImGui::Separator();
-
     // Reset profiler history
     if (ImGui::Button("Clear Performance History")) {
         Profiler::ClearHistory();
@@ -299,11 +213,11 @@ void DebugUI::_showPerformanceWindow() const {
     ImGui::End();
 }
 
+// Display audio system controls and library window
 void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
     if (!device) return;
 
-    ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(320, 240), ImGuiCond_Once);
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_AUDIO);
     ImGui::Begin("Audio Monitor");
 
     // Master volume
@@ -311,6 +225,8 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
     if (ImGui::SliderFloat("Master Volume", &masterVol, 0.0f, 1.0f)) {
         device->SetMasterVolume(masterVol);
     }
+
+    ImGui::Separator();
 
     // Toggle library window
     static bool showLibrary = false;
@@ -402,12 +318,10 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
     ImGui::End();
 }
 
+// Display mouse, keyboard and window input state
 void DebugUI::_showInputDebugWindow() {
     // Use config values
-    const auto& layout = m_config.Layout;
-    // Same stuff as before
-    ImGui::SetNextWindowPos(ImVec2(layout.InputX, layout.InputY), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(layout.InputW, layout.InputH), ImGuiCond_Once);
+    UICommon::ApplyLayout(UICommon::WindowId::DEBUG_INPUT);
 
     ImGui::Begin("Input Debug");
 
@@ -448,251 +362,4 @@ void DebugUI::_showInputDebugWindow() {
     }
 
     ImGui::End();
-}
-
-void DebugUI::_showGameObjectEditor() {
-    // Same same
-    const auto& layout = m_config.Layout;
-    // Position the window to the right of existing windows
-    ImGui::SetNextWindowPos(ImVec2(layout.EditorX, layout.EditorY), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(layout.EditorW, layout.EditorH), ImGuiCond_Once);
-
-    ImGui::Begin("Game Object Editor");
-
-    // Add new game object section
-    ImGui::Text("Create New Object:");
-    static char nameBuffer[DebugUIConfig::MAX_OBJECT_NAME_LENGTH];
-    if (m_newObjectName.length() < sizeof(nameBuffer)) {
-        // Store new object name
-        strcpy_s(nameBuffer, m_newObjectName.c_str());
-    }
-
-    if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer))) {
-        m_newObjectName = nameBuffer;
-    }
-
-    // When button is clicked, create the object
-    if (ImGui::Button("Add Object") && !m_newObjectName.empty()) {
-        AddGameObject(m_newObjectName);
-        m_newObjectName = "NewObject"; // Reset
-    }
-
-    ImGui::Separator();
-
-    // Quick add buttons for common objects
-    ImGui::Text("Quick Add:");
-    if (ImGui::Button("Player")) AddGameObject("Player");
-    ImGui::SameLine();  // Make the next button appear on the same line instead of below
-    if (ImGui::Button("Enemy")) AddGameObject("Enemy");
-    ImGui::SameLine();
-    if (ImGui::Button("Collectible")) AddGameObject("Collectible");
-
-    ImGui::Separator();
-
-    // TODO: Use Serializer
-    static char prefabName[128] = "sample-enemy-prefab";
-    ImGui::InputText("Prefab Name", prefabName, sizeof(prefabName));
-    if (ImGui::Button("Load Prefab") && strlen(prefabName) > 0) {
-        std::string path = "assets/samples/" + std::string(prefabName) + ".prefab";
-        auto& world = m_scenePtr->GetWorld();
-        if (!Serialization::EntitySerializer::LoadPrefab(path, world)) {
-            LOG_ERROR("Failed to load prefab: " << path);
-        }
-        else {
-            _invalidateCache();
-        }
-    }
-
-    // TODO: Find a way to add count
-    ImGui::Text("Current Objects:");
-
-    if (HasValidScene()) {
-        auto& world = m_scenePtr->GetWorld();
-
-        world.Each<>([&](const ECS::Entity entity) {
-            // Explanations for different Id usage in this block:
-            // EntityId is for display only, to show unique entity index
-            // PackedEntityId is for unique ImGui labels (delete/clone buttons, collapsing headers)
-            // EntityId is without the generation bits, so it's easier to read
-            // PackedEntityId is needed to uniquely identify entities in ImGui widgets
-
-            // Active status
-            //ImGui::Text("%s", entity.GetName());
-            std::stringstream oss;
-            oss << "[" << entity.Index << "] ";
-            if (world.Has<ECS::Components::Name>(entity)) {
-                const auto& [name] = world.Get<ECS::Components::Name>(entity);
-                oss << name;
-            }
-            else
-                oss << "Entity";
-
-            const PackedEntityId packedEntityId = ECS::EntityUtils::Pack(entity);
-
-            if (ImGui::CollapsingHeader(oss.str().c_str(), _getCollapsedHeaderBool(packedEntityId))) {
-                // Delete button for each object
-                if (ImGui::SmallButton(_getDeleteLabel(packedEntityId).c_str())) {
-                    RemoveGameObject(packedEntityId);
-                    return;
-                }
-
-                // Clone button for each object
-                ImGui::SameLine();
-                if (ImGui::SmallButton(_getCloneLabel(packedEntityId).c_str())) {
-                    CloneGameObject(entity);
-                    return;
-                }
-
-                ImGui::SameLine();
-                if (ImGui::SmallButton("Save Prefab")) {
-                    // Build a name from the entity name or index
-                    std::string saveName = "entity-" + std::to_string(entity.Index);
-                    if (world.Has<ECS::Components::Name>(entity)) {
-                        const auto& [name] = world.Get<ECS::Components::Name>(entity);
-                        if (std::strlen(name) > 0)
-                            saveName = name;
-                    }
-                    // sanitize simple characters (replace spaces)
-                    for (auto& c : saveName) if (c == ' ') c = '_';
-
-                    std::string path = "assets/samples/" + saveName + ".prefab";
-                    if (!Serialization::EntitySerializer::SavePrefab(path, world, entity)) {
-                        LOG_ERROR("Failed to save prefab: " << path);
-                    }
-                }
-
-                ImGui::SeparatorText("Transform");
-
-                // TODO: Modify other components too
-                if (world.Has<ECS::Components::LocalTransform>(entity)) {
-                    auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
-
-                    // BEFORE modification
-                    ImGui::Text("DEBUG: Current Scale: (%.2f, %.2f, %.2f)", transform.Scale.X, transform.Scale.Y, transform.Scale.Z);
-
-                    // Position
-                    ImGui::Text("Position");
-                    ImGui::SetNextItemWidth(100.f);
-                    ImGui::InputFloat(std::string("X##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.X);
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(100.f);
-                    ImGui::InputFloat(std::string("Y##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.Y);
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(100.f);
-                    ImGui::InputFloat(std::string("Z##P" + std::to_string(packedEntityId)).c_str(), &transform.Position.Z);
-
-                    // Rotation
-                    ImGui::Text("Rotation");
-                    ImGui::SetNextItemWidth(100.f);
-                    ImGui::InputFloat(std::string("X##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.X);
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(100.f);
-                    ImGui::InputFloat(std::string("Y##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.Y);
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(100.f);
-                    ImGui::InputFloat(std::string("Z##R" + std::to_string(packedEntityId)).c_str(), &transform.Rotation.Z);
-
-                    // Scale
-                    ImGui::Text("Scale");
-                    ImGui::SetNextItemWidth(100.f);
-                    if (ImGui::InputFloat(std::string("X##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.X)) {
-                        // Print when value changes
-                        LOG_DEBUG("Scale.X changed to: " << transform.Scale.X);
-                    }
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(100.f);
-                    if (ImGui::InputFloat(std::string("Y##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.Y)) {
-                        LOG_DEBUG("Scale.Y changed to: " << transform.Scale.Y);
-                    }
-                    ImGui::SameLine();
-                    ImGui::SetNextItemWidth(100.f);
-                    if (ImGui::InputFloat(std::string("Z##S" + std::to_string(packedEntityId)).c_str(), &transform.Scale.Z)) {
-                        LOG_DEBUG("Scale.Z changed to: " << transform.Scale.Z);
-                    }
-                }
-            }
-            });
-    }
-
-	//  if (ImGui::Checkbox(oss.str().c_str(), &entity.IsActive)) {
-	//      Component::ShapeRenderer2D* renderer = entity.GetComponent<Component::ShapeRenderer2D>();
-	//      if (renderer) {
-	//          // Hide by setting alpha to 0, show by setting alpha to 1
-	//          renderer->FillColor.A = entity.IsActive ? 255 : 0;
-	//      }
-	//  }
-    ImGui::Separator();
-
-    // Clear all buttons
-    if (ImGui::Button("Clear All Objects")) {
-        ClearAllGameObjects();
-    }
-
-    ImGui::End();
-}
-
-// Helper function to create entities with basic components
-ECS::Entity DebugUI::_createGameEntity(const std::string& name) const {
-    Color color{};
-
-    if (name == "Player") 
-        color = Color(0.0f, 0.0f, 1.0f, 1.0f);
-    else if (name == "Enemy") 
-        color = Color(1.0f, 0.0f, 0.0f, 1.0f);
-    else if (name == "Collectible") 
-        color = Color(1.0f, 1.0f, 0.0f, 1.0f);
-    else 
-        color = Color(1.0f, 1.0f, 1.0f, 1.0f);
-
-    // Create new entity in ECS
-    auto& world = m_scenePtr->GetWorld();
-
-	// Copy elision should happen here
-    return world.Create(
-        ECS::Components::LocalTransform{},
-        ECS::Components::WorldTransform{},
-        ECS::Components::ShapeCircle2D{
-            35.f,
-            Vector2D{},
-            color
-        },
-        ECS::Components::CircleCollider2D{ 35.f },
-        ECS::Components::Name{ *name.c_str() }
-    );
-}
-
-// Clear cached button labels
-void DebugUI::_invalidateCache() const {
-    m_cachedDeleteLabels.clear();
-    m_cachedCloneLabels.clear();
-}
-
-const std::string& DebugUI::_getDeleteLabel(const PackedEntityId id) const {
-    // Same thing
-    auto it = m_cachedDeleteLabels.find(id);
-    if (it == m_cachedDeleteLabels.end()) {
-        // Build label
-        std::string label = "Delete##" + std::to_string(id);
-        it = m_cachedDeleteLabels.insert({ id, label }).first;
-    }
-    return it->second;
-}
-
-const std::string& DebugUI::_getCloneLabel(const PackedEntityId id) const {
-    // Same thing
-    auto it = m_cachedCloneLabels.find(id);
-    if (it == m_cachedCloneLabels.end()) {
-        // Build label
-        std::string label = "Clone##" + std::to_string(id);
-        it = m_cachedCloneLabels.insert({ id, label }).first;
-    }
-    return it->second;
-}
-
-const bool& DebugUI::_getCollapsedHeaderBool(const PackedEntityId id) const {
-    auto it = m_cachedCollapsedHeaders.find(id);
-    if (it == m_cachedCollapsedHeaders.end()) {
-        it = m_cachedCollapsedHeaders.insert({ id, false }).first;
-    }
-    return it->second;
 }

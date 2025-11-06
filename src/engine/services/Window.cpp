@@ -3,6 +3,8 @@
 #include <iostream>
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include <filesystem>
+#include "core/Logger.h"
 
 namespace {
 	bool HasFlag(const WindowMode::Flags a, const WindowMode::Flags b) {
@@ -11,11 +13,16 @@ namespace {
 }
 
 static void FramebufferSizeCallback(GLFWwindow* window, const int width, const int height) {
-	(void)window;
-	glViewport(0, 0, width, height);
+    // Update GL viewport
+    glViewport(0, 0, width, height);
 
-	// Broadcast resize message
-	Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
+    // Update stored window dimensions
+    if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(window))) {
+        self->Resize(width, height);
+    }
+
+    // Broadcast resize message
+    Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
 }
 
 Window::~Window() { Destroy(); }
@@ -46,6 +53,19 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		return false;
 	}
 	glfwMakeContextCurrent(m_windowHandle);
+
+	// Enable drag-drop from OS
+	glfwSetDropCallback(m_windowHandle, [](GLFWwindow* window, int count, const char** paths) {
+		for (int i = 0; i < count; i++) {
+			std::filesystem::path droppedFile(paths[i]);
+			// Broadcast message for AssetBrowser to handle
+			Messaging::MessageSystem::Broadcast(Messaging::FileDropped{ droppedFile.string() });
+			LOG_INFO("File dropped from OS: " << droppedFile.filename().string());
+		}
+	});
+
+	// === ENABLE OR DISABLE VSYNC HERE ===
+	glfwSwapInterval(1);
 
 	// Lock the aspect ratio (16:9)
 	glfwSetWindowAspectRatio(m_windowHandle, 16, 9);

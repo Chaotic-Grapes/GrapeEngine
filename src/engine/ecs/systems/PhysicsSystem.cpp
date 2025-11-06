@@ -36,6 +36,8 @@
 #include "ecs/systems/PhysicsSystem.h"
 #include "services/Time.h"
 #include "physics/Collision.h"
+#include "ecs/Entity.h"
+#include <services/OverlayService.h>
 #include "physics/Physics.h"
 #include "ecs/Components.h"
 #include <unordered_map>
@@ -298,7 +300,7 @@ namespace ECS {
         if (dt <= 0.0f) return;
 
         // 0) Choose substep count; make it a tunable or cvar if you like.
-        const int   substeps = 3;                         // try 2–5; higher = more stable, slower
+        const int   substeps = 3;                         // try 2ï¿½5; higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
 
         // 1) Collect entity sets ONCE per frame (usually fine).
