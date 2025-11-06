@@ -32,12 +32,41 @@
 #include "services/Window.h"
 #include "services/WindowManager.h"
 #include "services/ResourceManager.h"
+#include <filesystem>
 #include "helpers/EntityUtils.h"
 
 using namespace ECS;
 using namespace Sandbox;
 
 void PhysicsTestScene::OnLoad() {
+
+    // if audio instance 
+    if (gAudioDevice)
+    {
+        // File paths
+        const std::string cue = "bgm_physics";
+        const std::string path =
+            std::filesystem::absolute(
+                "C:/Users/dalto/Documents/GitHub/GrapeEngine/assets/Audio/BGMs/Obelisk_Chapter_1&2_BGM_Loop.wav"
+            ).string();
+
+        // Set file parameters
+        Audio::SoundParams sp;
+        sp.stream = true;   // BGM should stream
+        sp.is3D = false;  // 2D global music
+
+        gAudioDevice->LoadCue(cue, path, sp);
+        
+        // Set to loop and volume settings
+        Audio::PlaySettings ps;
+        ps.loop = true;
+        ps.volume = 1.0f;
+        ps.pitch = 1.0f;
+
+        gAudioDevice->Play(cue, ps);
+       
+    }
+
     // Seed random number generator
     srand(static_cast<unsigned int>(time(nullptr)));
 
@@ -72,6 +101,7 @@ void PhysicsTestScene::OnLoad() {
 }
 
 void PhysicsTestScene::OnUpdate() {
+   
     if (Input::IsKeyDown(KEY_T)) {
         if (!testHandler) {
 
@@ -108,6 +138,34 @@ void PhysicsTestScene::OnUpdate() {
     else {
         testHandler = false;
     }
+
+    // for wash cashling sound press A
+    if (Input::IsKeyPressed(KEY_A))
+    {
+        const std::string cue = "sfx_cashling";
+        const std::string path =
+            std::filesystem::absolute("C:/Users/dalto/Documents/GitHub/GrapeEngine/assets/Audio/SFX/Underwater-Cashling_SFX.wav").string();
+
+        Audio::SoundParams sp; sp.stream = false; sp.is3D = false;
+        gAudioDevice->LoadCue(cue, path, sp);
+
+        Audio::PlaySettings ps; ps.loop = false; ps.volume = 1.0f; ps.pitch = 1.0f;
+        gAudioDevice->Play(cue, ps);
+    }
+    // For water splash cashlnig sound effect 
+    if (Input::IsKeyPressed(KEY_D))
+    {
+        const std::string cue = "sfx_splash";
+        const std::string path =
+            std::filesystem::absolute("C:/Users/dalto/Documents/GitHub/GrapeEngine/assets/Audio/SFX/under-Water-Splash_1.wav").string();
+
+        Audio::SoundParams sp; sp.stream = false; sp.is3D = false;
+        gAudioDevice->LoadCue(cue, path, sp);
+
+        Audio::PlaySettings ps; ps.loop = false; ps.volume = 2.0f; ps.pitch = 1.0f;
+        gAudioDevice->Play(cue, ps);
+    }
+
 
     //switch case to switch around test cases
     switch (currentTest) {
