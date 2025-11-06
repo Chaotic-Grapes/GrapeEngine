@@ -1,3 +1,19 @@
+/**
+* @Name: Fad ( to be added )
+* @email: TBA
+* @file EntityManager.cs
+* @brief Scene bootstrap script: walls, player/enemy/collectible controllers.
+*
+* @details
+* Creates a simple test world fully from script:
+* - Four boundary walls sized to World.* constants
+* - Controller entities for Player, two Enemies, two Collectibles
+* The visual entities are spawned by their respective controllers.
+*
+* @dependencies
+* - GrapeEngine scripting API and Numerics
+*/
+
 using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;

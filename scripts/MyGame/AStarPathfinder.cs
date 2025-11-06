@@ -1,3 +1,28 @@
+/**
+* @Name: Daniel (to be added_
+* @email: to be added
+* @file AStarPathfinder.cs
+* @brief Grid-based A* pathfinding with obstacle cache, LOS smoothing, and helpers.
+*
+* @details
+* Provides a static pathfinding service used by EnemyAI:
+* - World<->grid conversions using fixed cell size
+* - Obstacle initialization and cached list access
+* - A* search over 8-connected grid with octile heuristic
+* - Path post-processing via visibility (line-of-sight) smoothing
+* - Utility checks (walkability, nearest-walkable, LOS samples)
+*
+* All math uses GrapeEngine.Numerics vectors; logic is kept deterministic by
+* avoiding randomness in the core search. Path smoothing samples along segments
+* to allow corner cutting while respecting a small margin from obstacles.
+*
+* @sources
+*  to be added
+*
+* @dependencies
+* - using GrapeEngine.Numerics
+* - System.Collections.Generic, System
+*/
 using GrapeEngine.Numerics;
 using System.Collections.Generic;
 using System;

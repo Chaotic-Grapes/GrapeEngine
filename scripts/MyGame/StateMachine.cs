@@ -1,3 +1,22 @@
+/**
+* @Name: Dalton koh, 2403250
+* @email: d.koh@digipen.edu
+* @file StateMachine.cs
+* @brief Minimal hierarchical FSM (HFSM) framework for gameplay AI.
+*
+* @details
+* Defines an abstract State interface and a lightweight HFSM manager:
+* - Each State has OnEnter/OnUpdate/OnExit and CheckTransitions
+* - States can be nested via Parent/Children and may forward transitions up
+* - HFSM holds CurrentState and a history stack; Update drives logic and checks
+* transitions through the hierarchy (child first, then parents).
+*
+* @dependencies
+* - System.Collections.Generic (Stack, List)
+* - GrapeEngine.Scripting (for symmetry with other scripts)
+* - GrapeEngine.Numerics (not strictly required by this file)
+*/
+
 using System;
 using System.Collections.Generic;
 using GrapeEngine.Scripting;

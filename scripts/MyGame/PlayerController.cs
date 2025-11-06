@@ -1,3 +1,23 @@
+/**
+* @Name: Dalton koh, 2403250
+* @email: d.koh@digipen.edu
+* @file PlayerController.cs
+* @brief Keyboard-controlled green circle with rotation and pulsing visuals.
+*
+* @details
+* Demonstrates basic input-driven movement in GrapeEngine:
+* - WASD for movement, Q/E for rotation around Z (if we going to make it underwwater like but not just yet)
+* - Clamps motion inside world boundaries
+* - Pulsing radius/brightness for active visual feedback
+* Provides a static Instance getter so other scripts (EnemyAI) can query the
+* player's visual entity.
+*
+* @dependencies
+* - GrapeEngine (Log, World, Time, Input)
+* - GrapeEngine.Numerics (Vector2/3, Quaternion, Color)
+* - GrapeEngine.Scripting (ScriptBehaviour, Entity, ComponentData<>)
+*/
+
 using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;

@@ -1,3 +1,23 @@
+/**
+* @Name: Dalton koh, 2403250 ( to be added daniel)
+* @email: d.koh@digipen.edu, TBA
+* @file EnemyAI.cs
+* @brief Enemy HFSM with patrol, chase, and attack; A* path following.
+*
+* @details
+* Implements a hierarchical finite state machine (HFSM) for enemy behavior that
+* uses A* paths to chase the player around scripted obstacles. Key pieces:
+* - Visual entity creation and animated feedback (throb/color by state)
+* - Cached obstacle visuals built from AStarPathfinder list
+* - Patrol/Chase/Attack states with transitions on player distance
+* - Path maintenance with periodic refresh and anti-stuck timer
+* - Wall sliding fallback when pathfinding fails
+*
+* @dependencies
+* - GrapeEngine scripting/Entity APIs, Numerics vectors
+* - AStarPathfinder for pathfinding and obstacle dimensions
+*/
+
 using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
