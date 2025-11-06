@@ -65,7 +65,7 @@ public:
         glm::vec4 color,
         float pixelSize);
 
-    void drawFullscreenQuad() const;
+    void Renderer::drawFullscreenQuad() const;
 
     int flushCountThisFrame = 0;
 

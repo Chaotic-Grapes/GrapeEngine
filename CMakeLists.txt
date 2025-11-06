@@ -7,7 +7,7 @@ cmake_policy(VERSION 3.13)
 project(GrapeEngine)
 
 # Set C++ standard globally
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the directory where custom CMake modules are stored
@@ -71,7 +71,7 @@ add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 #endif()
 
 # Set C++ standard for the target
-set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 23)
+set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 17)
 set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD_REQUIRED ON)
 
 # Compile definitions
