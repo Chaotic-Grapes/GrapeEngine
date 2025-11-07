@@ -16,7 +16,8 @@ systems, components, and their interactions. This test scene covers:
 - Performance and stress testing for ECS operations
 
 The scene provides structured test cases that can be cycled through using
-keyboard input (T key), with each test validating specific ECS functionality.
+keyboard input (Left/Right arrow keys), with each test validating specific ECS
+functionality.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -31,7 +32,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/LifetimeSystem.h"
-#include "ecs/systems/TransformSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "physics/Physics.h"
 #include "helpers/EntityUtils.h"
@@ -67,6 +67,8 @@ void ECSTestScene::OnLoad() {
     m_testLayer = GetLayers().CreateOrGetLayer("test");
     m_physicsLayer = GetLayers().CreateOrGetLayer("physics");
     m_renderLayer = GetLayers().CreateOrGetLayer("render");
+    // Create a top-most UI/text layer so test titles render last
+    m_textLayer = GetLayers().CreateOrGetLayer("ui");
 
     // Initialize physics system
     AddSystem([](Scenes::Scene& s, const float dt) {
@@ -98,14 +100,35 @@ void ECSTestScene::OnLoad() {
     // Create visual boundary walls
     _createWorldBoundaries();
 
-    m_currentTest = TestType::BasicEntityCreation;
+    // Create persistent title text on the UI layer (top-left)
+    {
+        const char* title = "LocalTransformTest"; // initial test name
+        ECS::Entity titleEnt = CreateOnLayer(m_textLayer,
+            Components::LocalTransform{
+                Vector3D{50.f, 50.f, 0.f},
+                Quaternion{0,0,0,1},
+                Vector3D{1.f, 1.f, 1.f}
+            },
+            Components::WorldTransform{},
+            Components::Text{
+                title,
+                28.0f, // pixel size
+                Color{1.f, 1.f, 1.f, 0.95f},
+                Components::TextAnchor::TopLeft
+            },
+            Components::Name{"TestTitle"}
+        );
+        m_testTitleEntity = EntityUtils::Pack(titleEnt);
+    }
+
+    m_currentTest = TestType::LocalTransformTest;
     LOG_INFO("ECSTestScene initialized with " << GetSystemCount() << " systems");
-    _logTestInfo("BasicEntityCreation");
+    _logTestInfo("LocalTransformTest");
 }
 
 void ECSTestScene::OnUpdate() {
     // Cycle through test types with T key
-    if (Input::IsKeyDown(KEY_T)) {
+    if (Input::IsKeyDown(KEY_LEFT) || Input::IsKeyDown(KEY_RIGHT)) {
         if (!m_tHandled) {
             _cycleTests();
             m_tHandled = true;
@@ -120,17 +143,21 @@ void ECSTestScene::OnUpdate() {
 
     // Run the current test
     switch (m_currentTest) {
-        // Core Component Tests
-        case TestType::BasicEntityCreation:     _testBasicEntityCreation(); break;
-        case TestType::ComponentModification:   _testComponentModification(); break;
-        case TestType::LayerSystem:             _testLayerSystem(); break;
-        case TestType::ActiveAndTags:           _testActiveAndTags(); break;
-        
-        // Transform Tests
+        // Transformation System
         case TestType::LocalTransformTest:      _testLocalTransform(); break;
         case TestType::WorldTransformTest:      _testWorldTransform(); break;
         case TestType::TransformInterpolation:  _testTransformInterpolation(); break;
-        
+        case TestType::ComponentModification:   _testComponentModification(); break;
+        case TestType::RotateSquares:           _testRotateSquares(); break;
+
+        // Sprite Animation
+        case TestType::SpriteAnimation:         _testSpriteAnimation(); break;
+
+        // Core Component Tests
+        case TestType::BasicEntityCreation:     _testBasicEntityCreation(); break;
+        case TestType::LayerSystem:             _testLayerSystem(); break;
+        case TestType::ActiveAndTags:           _testActiveAndTags(); break;
+
         // Physics System Tests
         case TestType::PhysicsBasic:            _testPhysicsBasic(); break;
         case TestType::PhysicsGravity:          _testPhysicsGravity(); break;
@@ -138,26 +165,25 @@ void ECSTestScene::OnUpdate() {
         case TestType::PhysicsMaterial:         _testPhysicsMaterial(); break;
         case TestType::PhysicsAngular:          _testPhysicsAngular(); break;
         case TestType::PhysicsComplex:          _testPhysicsComplex(); break;
-        
+
         // Renderer System Tests
         case TestType::RenderShapes:            _testRenderShapes(); break;
         case TestType::RenderSprites:           _testRenderSprites(); break;
         case TestType::RenderLayers:            _testRenderLayers(); break;
         case TestType::RenderStressTest:        _testRenderStressTest(); break;
-        
+
         // Lifetime System Tests
         case TestType::LifetimeBasic:           _testLifetimeBasic(); break;
         case TestType::LifetimeWithPhysics:     _testLifetimeWithPhysics(); break;
         case TestType::LifetimeSpawner:         _testLifetimeSpawner(); break;
-        
+
         // Integration Tests
         case TestType::PhysicsRenderCombo:      _testPhysicsRenderCombo(); break;
         case TestType::AllSystemsTest:          _testAllSystems(); break;
         case TestType::StressTestAll:           _testStressTestAll(); break;
-        
+
         // Advanced Tests
         case TestType::EntityPooling:           _testEntityPooling(); break;
-        case TestType::SpriteAnimation:         _testSpriteAnimation(); break;
         case TestType::ArchetypeChanges:        _testArchetypeChanges(); break;
     }
 
@@ -170,6 +196,14 @@ void ECSTestScene::OnUpdate() {
 
 void ECSTestScene::OnUnload() {
     _clearTestEntities();
+    // Destroy persistent title entity if present
+    if (m_testTitleEntity != 0) {
+        const ECS::Entity te = EntityUtils::Unpack(m_testTitleEntity);
+        if (GetWorld().IsAlive(te)) {
+            DestroyEntity(te);
+        }
+        m_testTitleEntity = 0;
+    }
     LOG_INFO("ECSTestScene shutting down");
 }
 
@@ -199,11 +233,17 @@ void ECSTestScene::_logTestInfo(const char* testName) {
 
 void ECSTestScene::_cycleTests() {
     int current = static_cast<int>(m_currentTest);
-    current++;
+    if (Input::IsKeyDown(KEY_LEFT))
+        current--;
+    else if (Input::IsKeyDown(KEY_RIGHT))
+        current++;
 
-    // Cycle through all test types
+    // Cycle within test type range
     if (current > static_cast<int>(TestType::ArchetypeChanges)) {
-        current = static_cast<int>(TestType::BasicEntityCreation);
+        current = static_cast<int>(TestType::LocalTransformTest);
+    }
+    if (current < static_cast<int>(TestType::LocalTransformTest)) {
+        current = static_cast<int>(TestType::ArchetypeChanges);
     }
 
     _clearTestEntities();
@@ -211,19 +251,28 @@ void ECSTestScene::_cycleTests() {
 
     // Log the test name
     const char* testNames[] = {
-        "BasicEntityCreation", "ComponentModification", "LayerSystem", "ActiveAndTags",
-        "LocalTransformTest", "WorldTransformTest", "TransformInterpolation",
+        "LocalTransformTest", "WorldTransformTest", "TransformInterpolation", "ComponentModification", "RotateSquares", "SpriteAnimation",
+        "BasicEntityCreation", "LayerSystem", "ActiveAndTags",
         "PhysicsBasic", "PhysicsGravity", "PhysicsCollision", "PhysicsMaterial", 
         "PhysicsAngular", "PhysicsComplex",
         "RenderShapes", "RenderSprites", "RenderLayers", "RenderStressTest",
         "LifetimeBasic", "LifetimeWithPhysics", "LifetimeSpawner",
         "PhysicsRenderCombo", "AllSystemsTest", "StressTestAll",
-        "EntityPooling", "SpriteAnimation", "ArchetypeChanges"
+        "EntityPooling", "ArchetypeChanges"
     };
-    
+
     int index = current - 1001;
-    if (index >= 0 && index < 26) {
+    if (index >= 0 && index < 27) {
         _logTestInfo(testNames[index]);
+        // Update the on-screen test title if present
+        if (m_testTitleEntity != 0) {
+            ECS::Entity titleE = EntityUtils::Unpack(m_testTitleEntity);
+            ECS::World& world = GetWorld();
+            if (world.IsAlive(titleE) && world.Has<Components::Text>(titleE)) {
+                auto& t = world.Get<Components::Text>(titleE);
+                t.setContent(testNames[index]);
+            }
+        }
     }
 }
 
@@ -656,6 +705,40 @@ void ECSTestScene::_testTransformInterpolation() {
         auto& tr = world.Get<Components::LocalTransform>(e);
         const float t = (std::sin(m_testTimer * 2.0f) + 1.0f) * 0.5f; // 0 to 1
         tr.Position.X = 100.f + t * (m_worldWidth - 200.f);
+    }
+}
+
+void ECSTestScene::_testRotateSquares() {
+    ECS::World& world = GetWorld();
+
+    if (m_testEntities.empty()) {
+        const float size = 60.f;
+        const float spacing = size + 24.f;
+        const float centerX = m_worldWidth * 0.5f;
+        const float centerY = m_worldHeight * 0.5f;
+
+        static const char* names[3] = { "RotateSquare_0", "RotateSquare_1", "RotateSquare_2" };
+        for (int i = 0; i < 3; ++i) {
+            const float x = centerX + (i - 1) * spacing;
+            const float y = centerY;
+            const Entity e = CreateOnLayer(m_testLayer,
+                Components::LocalTransform{ Vector3D{x, y, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+                Components::ShapeBox2D{ Vector2D{size, size}, Vector2D{0,0}, Color{0.6f, 0.8f, 1.f, 1.f}, 2.f, false },
+                Components::Name{ *names[i] }
+            );
+            m_testEntities.push_back(EntityUtils::Pack(e));
+        }
+    }
+
+    // Rotate each square at slightly different speeds
+    for (int i = 0; i < static_cast<int>(m_testEntities.size()); ++i) {
+        const Entity e = EntityUtils::Unpack(m_testEntities[i]);
+        if (!world.IsAlive(e) || !world.Has<Components::LocalTransform>(e)) continue;
+        auto& tr = world.Get<Components::LocalTransform>(e);
+        const float speed = 60.f + 30.f * static_cast<float>(i); // degrees per second
+        const auto deltaRotation = Quaternion::FromAxisAngle(Vector3D::Forward, speed * Time::DeltaTime());
+        tr.Rotation = deltaRotation * tr.Rotation;
+        tr.Rotation.Normalize();
     }
 }
 
