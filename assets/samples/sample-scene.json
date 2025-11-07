@@ -1,101 +1,71 @@
 {
-    "Entities": [
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "ColorA": 255,
-                        "ColorB": 127,
-                        "ColorG": 127,
-                        "ColorR": 255,
-                        "FlipX": false,
-                        "FlipY": false,
-                        "SortingLayerName": "Default",
-                        "SortingOrder": 0,
-                        "Sprite": "assets/textures/test/player.png",
-                        "TexturePath": "assets/textures/test/player.png"
-                    },
-                    "Type": "SpriteRenderer"
-                },
-                {
-                    "Data": {
-                        "PositionX": 400.0,
-                        "PositionY": 450.0,
-                        "Rotation": 45.0,
-                        "ScaleX": 128.0,
-                        "ScaleY": 128.0
-                    },
-                    "Type": "Transform"
-                }
-            ],
-            "EntityId": 1,
-            "Name": "TestSprite"
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "PositionX": 100.0,
-                        "PositionY": 100.0,
-                        "Rotation": 0.0,
-                        "ScaleX": 50.0,
-                        "ScaleY": 50.0
-                    },
-                    "Type": "Transform"
-                }
-            ],
-            "EntityId": 2,
-            "Name": "SimpleEntity"
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "ColorA": 255,
-                        "ColorB": 127,
-                        "ColorG": 127,
-                        "ColorR": 255,
-                        "FlipX": false,
-                        "FlipY": false,
-                        "SortingLayerName": "Default",
-                        "SortingOrder": 0,
-                        "Sprite": "assets/textures/test/player.png",
-                        "TexturePath": "assets/textures/test/player.png"
-                    },
-                    "Type": "SpriteRenderer"
-                },
-                {
-                    "Data": {
-                        "PositionX": 400.0,
-                        "PositionY": 450.0,
-                        "Rotation": 45.0,
-                        "ScaleX": 128.0,
-                        "ScaleY": 128.0
-                    },
-                    "Type": "Transform"
-                }
-            ],
-            "EntityId": 3,
-            "Name": "TestSprite"
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "PositionX": 100.0,
-                        "PositionY": 100.0,
-                        "Rotation": 0.0,
-                        "ScaleX": 50.0,
-                        "ScaleY": 50.0
-                    },
-                    "Type": "Transform"
-                }
-            ],
-            "EntityId": 4,
-            "Name": "SimpleEntity"
-        }
-    ],
-    "EntityCount": 4,
-    "SceneName": "TestScene",
-    "Version": "1.0"
+  "SceneName": "TestScene",
+  "Version": "1.0",
+  "Entities": [
+    {
+      "EntityId": 1,
+      "Components": [
+        { "TypeName": "ECS::Components::Name", "Data": { "Value": "TestSprite" } },
+        { "TypeName": "ECS::Components::LocalTransform", "Data": {
+          "Position": { "X": 400.0, "Y": 450.0, "Z": 0.0 },
+          "Rotation": { "X": 0.0, "Y": 0.0, "Z": 0.38268343, "W": 0.92387953 },
+          "Scale":    { "X": 128.0, "Y": 128.0, "Z": 1.0 }
+        } },
+        { "TypeName": "ECS::Components::SpriteRenderer2D", "Data": {
+          "TextureId": 0,
+          "Color": { "R": 1.0, "G": 1.0, "B": 1.0, "A": 1.0 },
+          "Tiling": { "X": 1.0, "Y": 1.0 },
+          "Offset": { "X": 0.0, "Y": 0.0 },
+          "Width": 0,
+          "Height": 0
+        } },
+        { "TypeName": "ECS::Components::SpriteFlip2D", "Data": { "FlipX": false, "FlipY": false } },
+        { "TypeName": "ECS::Components::ZIndex2D", "Data": { "ZOrder": 0 } }
+      ]
+    },
+    {
+      "EntityId": 2,
+      "Components": [
+        { "TypeName": "ECS::Components::Name", "Data": { "Value": "SimpleEntity" } },
+        { "TypeName": "ECS::Components::LocalTransform", "Data": {
+          "Position": { "X": 100.0, "Y": 100.0, "Z": 0.0 },
+          "Rotation": { "X": 0.0, "Y": 0.0, "Z": 0.0, "W": 1.0 },
+          "Scale":    { "X": 50.0, "Y": 50.0, "Z": 1.0 }
+        } }
+      ]
+    },
+    {
+      "EntityId": 3,
+      "Components": [
+        { "TypeName": "ECS::Components::Name", "Data": { "Value": "TestSprite" } },
+        { "TypeName": "ECS::Components::LocalTransform", "Data": {
+          "Position": { "X": 400.0, "Y": 450.0, "Z": 0.0 },
+          "Rotation": { "X": 0.0, "Y": 0.0, "Z": 0.38268343, "W": 0.92387953 },
+          "Scale":    { "X": 128.0, "Y": 128.0, "Z": 1.0 }
+        } },
+        { "TypeName": "ECS::Components::SpriteRenderer2D", "Data": {
+          "TextureId": 0,
+          "Color": { "R": 1.0, "G": 1.0, "B": 1.0, "A": 1.0 },
+          "Tiling": { "X": 1.0, "Y": 1.0 },
+          "Offset": { "X": 0.0, "Y": 0.0 },
+          "Width": 0,
+          "Height": 0
+        } },
+        { "TypeName": "ECS::Components::SpriteFlip2D", "Data": { "FlipX": false, "FlipY": false } },
+        { "TypeName": "ECS::Components::ZIndex2D", "Data": { "ZOrder": 0 } }
+      ]
+    },
+    {
+      "EntityId": 4,
+      "Components": [
+        { "TypeName": "ECS::Components::Name", "Data": { "Value": "SimpleEntity" } },
+        { "TypeName": "ECS::Components::LocalTransform", "Data": {
+          "Position": { "X": 100.0, "Y": 100.0, "Z": 0.0 },
+          "Rotation": { "X": 0.0, "Y": 0.0, "Z": 0.0, "W": 1.0 },
+          "Scale":    { "X": 50.0, "Y": 50.0, "Z": 1.0 }
+        } }
+      ]
+    }
+  ],
+  "EntityCount": 4
 }

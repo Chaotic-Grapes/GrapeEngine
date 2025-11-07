@@ -27,8 +27,8 @@ Features:
 
 // Forward declarations
 struct GLFWwindow;
-class World;
 struct ImFont;
+struct ImVec2;
 
 // Configuration structure for level editor UI settings
 struct LevelEditorConfig {
@@ -39,7 +39,9 @@ struct LevelEditorConfig {
 // Level editor orchestrates all editor panels and manages editor state
 class LevelEditor {
 public:
+    // Create editor and keep world reference
     explicit LevelEditor(ECS::World* world, const LevelEditorConfig& config = {});
+    // Destroy editor instance and release owned resources
     ~LevelEditor();
 
     // Initialize ImGui fonts and editor panels
@@ -54,17 +56,27 @@ public:
     // Update world reference and propagate to all panels
     void SetWorld(ECS::World* world);
 
+    // Respond to window resize to keep proportions stable without changing layout structure
+    void OnWindowResized(int width, int height);
+
     // Expose game state for physics system
+    // Get current game state for systems
     Playback::GameState GetGameState() const { return m_playback.GetGameState(); }
+    // Check if the game is playing
     bool IsPlaying() const { return m_playback.IsPlaying(); }
+    // Check if a single step is requested
     bool IsStepRequested() const { return m_playback.IsStepRequested(); }
+    // Clear single step request
     void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
+    // Build docking layout for editor panels
     void _buildDockLayout();
+    // Render dock host window and central dock space
     void _renderDockSpace();
     bool m_dockLayoutBuilt = false;
     ImGuiID m_dockspaceId = 0;
+    ImVec2 m_lastViewportSize; // Tracks viewport size to trigger layout rebuild
 
     ECS::World* m_world;               // Reference to game world
     LevelEditorConfig m_config;        // Editor configuration settings

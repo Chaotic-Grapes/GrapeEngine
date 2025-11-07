@@ -9,13 +9,8 @@
 \brief
 Declares the EditorCore class for core editor functionality and centralized
 entity management.
-- Entity/Level management layer (Model + Controller)
-- Single source of truth for all entity CRUD operations
-- Delegates to World/EntityManager for actual ECS operations
-- Used by HierarchyWindow and other UI panels
 */
 /* End Header *******************************************************************/
-
 #ifndef EDITOR_CORE_H
 #define EDITOR_CORE_H
 
@@ -31,89 +26,92 @@ public:
     EditorCore() = default;
     ~EditorCore() = default;
 
-    // Initialize with fonts and world reference
+    // Initialize core editor with fonts and world
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
-
-    // Render main menu bar at top of screen
+    // Render editor auxiliary windows and menus
     void ShowEditorWindows();
-
-    // Handle mouse picking and dragging entities in viewport
+    // Handle interactions inside the game viewport
     void HandleInWorldInteraction();
 
-    // Level management (currently disabled but kept for future use)
-    // void SaveLevel(const std::string& filename);
-    // void LoadLevel(const std::string& filename);
-
-    // Centralized entity management operations
+    // Add a new entity under optional parent
     void AddEntity(const std::string& name, EntityId parentId = 0);
+    // Remove an entity optionally including children
     void RemoveEntity(EntityId id, bool recursive = true);
+    // Clone an entity and its hierarchy
     void CloneEntity(EntityId id);
+    // Reparent an entity under a new parent
     void ReparentEntity(EntityId childId, EntityId newParentId);
+    // Clear all entities from the scene
     void ClearAllEntities();
 
-    // Check if world is valid before operations
+    // Check if we have a valid world bound
     bool HasValidWorld() const;
-
-    // Update the world reference and clear any stale UI state
+    // Update the world reference for editor operations
     void SetWorld(ECS::World* world);
 
-    // Current scene metadata for Save/Load flows
+    // Current scene path on disk
     std::string m_currentScenePath;
+    // Current scene name for display
     std::string m_currentSceneName = "Untitled";
 
 private:
-    // Render main menu bar with File menu
+    // Show the main menu bar with file and tools
     void _showMainMenu();
-
-    // Render the docked Viewport window and helper overlays
+    // Show the viewport window and render scene
     void _showViewport();
-
-    // Create entity with default components (Name, LocalTransform, Shape, Collider)
+    // Create a new entity with default components
     ECS::Entity _createGameEntity(const std::string& name);
-
-    // Clear cached UI labels when entities change
+    // Invalidate cached labels and states
     void _invalidateCache();
-
-    // Get all children of a parent entity (for recursive operations)
+    // Get direct children of a parent entity
     std::vector<EntityId> _getChildren(EntityId parentId) const;
+    // Get cached delete label for an entity
+    const std::string& _getDeleteLabel(EntityId id);
+    // Get cached clone label for an entity
+    const std::string& _getCloneLabel(EntityId id);
+    // Get cached collapsed header state for an entity
+    const bool& _getCollapsedHeaderBool(EntityId id);
 
-    // Get unique labels for UI buttons (for ImGui ID uniqueness)
-    const std::string& _getDeleteLabel(EntityId id) const;
-    const std::string& _getCloneLabel(EntityId id) const;
-    const bool& _getCollapsedHeaderBool(EntityId id) const;
-
-    // Scene Save/Load helpers
-    bool _saveActiveScene(const std::string& path) const;
+    // Save the active scene to a path
+    bool _saveActiveScene(const std::string& path);
+    // Load a scene from a path into the world
     bool _loadSceneFromPath(const std::string& path);
-
-    // Scene creation and file dialogs
+    // Create a new empty scene file and world
     void _createNewScene();
+    // Open a file dialog for loading scenes
     void _openSceneDialog();
+    // Save the current scene
     void _saveScene();
+    // Save the scene using a dialog optionally as template
     void _saveSceneAsDialog(bool isTemplate);
-
-    // Persist and restore editor session state
-    void _saveEditorState() const;
+    // Persist editor UI state to disk
+    void _saveEditorState();
+    // Load editor UI state from disk
     void _loadEditorState();
 
-    // Core state
+    // World pointer for scene operations
     ECS::World* m_world = nullptr;
+    // Currently selected entity id
     EntityId m_selectedEntityId = 0;
 
-    // Fonts for UI rendering
+    // Main font pointer for UI text
     ImFont* m_mainFont = nullptr;
+    // Bold font pointer for headers
     ImFont* m_boldFont = nullptr;
+    // Symbols font pointer for icons
     ImFont* m_symbolsFont = nullptr;
 
-    // Global UI scale for editor (applies to all fonts except playback)
+    // UI scale for zooming editor windows
     float m_uiScale = 1.35f;
 
-    // Cached UI labels to avoid string allocations every frame
-    mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;
-    mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;
-    mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;
+    // Cached delete labels for entities
+    std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;
+    // Cached clone labels for entities
+    std::unordered_map<EntityId, std::string> m_cachedCloneLabels;
+    // Cached collapsed header states for entities
+    std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;
 
-    // Max name length constraint
+    // Max object name length used by editor input fields
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 64;
 };
 

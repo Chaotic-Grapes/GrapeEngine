@@ -65,19 +65,19 @@ void DebugUI::Initialize(GLFWwindow* pWin) {
     // Avoid reinitializing ImGUI
     if (!pWin || m_initialized) return;
 
-    IMGUI_CHECKVERSION();     // Verify ImGUI version compatibility
-    ImGui::CreateContext();   // Create ImGUI rendering context
+    IMGUI_CHECKVERSION();     // Verify ImGui version compatibility against compiled backends
+    ImGui::CreateContext();   // Create ImGui context (holds state, fonts, style)
 
-    auto& io = ImGui::GetIO();  // Get input/output config
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Allow keyboard navigation
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable docking functionality
-    io.FontGlobalScale = m_config.FontScale;              // Scale the entire UI
+    auto& io = ImGui::GetIO();  // Access global IO for config flags and font scale
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable keyboard controls (Tab/Arrow navigation)
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Allow windows to dock/undock and form layouts
+    io.FontGlobalScale = m_config.FontScale;              // Uniform scaling factor for all fonts/widgets
 
-    ImGui::StyleColorsDark(); // Set dark theme colors
+    ImGui::StyleColorsDark(); // Apply built-in dark color scheme
     ImGuiStyle& style = ImGui::GetStyle();
-    style.TabBarBorderSize = 0.0f; // keep outline under tabs hidden
-    ImGui_ImplGlfw_InitForOpenGL(pWin, true); // GLFW backend (window/input handling)
-    ImGui_ImplOpenGL3_Init("#version 330");     // OpenGL3 backend (GPU rendering)
+    style.TabBarBorderSize = 0.0f; // Remove tab bar outline for a cleaner look
+    ImGui_ImplGlfw_InitForOpenGL(pWin, true); // Initialize GLFW backend (input/events)
+    ImGui_ImplOpenGL3_Init("#version 330");   // Initialize OpenGL3 backend (renderer)
 
     m_initialized = true;  // Mark that DebugUI has been initialized
 }
@@ -91,10 +91,10 @@ void DebugUI::NewFrame() {
         SetEnabled(!IsEnabled());
     }
 
-    // Always begin a new ImGui frame so other modules (e.g. LevelEditor) can draw
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
+    // Begin a new ImGui frame: backend new-frame calls, then core NewFrame
+    ImGui_ImplOpenGL3_NewFrame();  // Prepare OpenGL renderer state for this frame
+    ImGui_ImplGlfw_NewFrame();     // Poll GLFW inputs and update ImGui IO
+    ImGui::NewFrame();             // Reset ImGui frame state and begin UI building
 }
 
 // Render all debug windows
@@ -107,7 +107,7 @@ void DebugUI::Render() {
         _showPerformanceWindow();
         _showInputDebugWindow();
         _showAudioWindow(m_audioPtr);
-        
+
 
         if (m_showDemo) {
             ImGui::ShowDemoWindow(&m_showDemo);
@@ -123,8 +123,8 @@ void DebugUI::Shutdown() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-	m_scenePtr = nullptr;
-	m_audioPtr = nullptr;
+    m_scenePtr = nullptr;
+    m_audioPtr = nullptr;
 
     m_initialized = false;
 }
@@ -133,7 +133,7 @@ void DebugUI::Shutdown() {
 void DebugUI::_showEngineDebugWindow() {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_ENGINE);
-    ImGui::Begin("GrapeEngine Debug Console");
+    ImGui::Begin("GrapeEngine Debug Console"); // Regular window; default flags
 
     ImGui::Text("Engine Status: Running");
     ImGui::Text("Debug UI: %s", m_enabled ? "Active" : "Inactive");
@@ -154,7 +154,7 @@ void DebugUI::_showPerformanceWindow() const {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_PERF);
 
-    ImGui::Begin("Performance Monitor");
+    ImGui::Begin("Performance Monitor"); // Regular window; default flags
 
     // FPS and frame time
     ImGui::Text("FPS: %.1f", Profiler::GetFPS());
@@ -233,8 +233,8 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
 
     if (!showLibrary) return;
 
-    ImGui::SetNextWindowSize(ImVec2(560, 440), ImGuiCond_Once);
-    if (ImGui::Begin("Audio Library", &showLibrary)) {
+    ImGui::SetNextWindowSize(ImVec2(560, 440), ImGuiCond_Once); // One-time suggested size for the library window
+    if (ImGui::Begin("Audio Library", &showLibrary)) { // Closeable window controlled by 'showLibrary'
         struct Row {
             std::string CueId;
             std::string Path;
@@ -261,11 +261,13 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
                     rows.push_back(Row{ cue, path, Audio::PlaySettings{}, {} });
                     cueBuf[0] = '\0';
                     pathBuf[0] = '\0';
-                } else {
+                }
+                else {
                     ImGui::OpenPopup("Audio Load Error");
                 }
             }
         }
+        // Modal popup auto-sizes to fit its content every frame
         if (ImGui::BeginPopupModal("Audio Load Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::TextUnformatted("Failed to load audio cue.");
             if (ImGui::Button("OK"))
@@ -284,7 +286,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
             ImGui::SameLine();
             if (ImGui::SmallButton("Play")) {
                 if (r.Handle)
-					device->Stop(r.Handle, Audio::StopMode::Immediate);
+                    device->Stop(r.Handle, Audio::StopMode::Immediate);
                 r.Handle = device->Play(r.CueId, r.Settings);
             }
             ImGui::SameLine();
@@ -320,7 +322,7 @@ void DebugUI::_showInputDebugWindow() {
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_INPUT);
 
-    ImGui::Begin("Input Debug");
+    ImGui::Begin("Input Debug"); // Regular window; default flags
 
     ImGui::Text("=== Mouse ===");
     ImGui::Text("Position: (%.1f, %.1f)", Input::GetMouseX(), Input::GetMouseY());

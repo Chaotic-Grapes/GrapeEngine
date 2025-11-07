@@ -8,17 +8,6 @@
 \date   5th November 2025
 \brief
 Implements a Unity-like hierarchy window UI for managing entities in a tree structure.
-- HierarchyWindow = Pure UI/View layer
-- EditorCore = Entity/Level management operations
-
-HOW TO USE:
-- Click entity to select it, selection callback triggers
-- Enter name + Add to create new entity (delegates to EditorCore)
-- Tree shows root entities (ParentId 0) and children recursively
-- Drag entity onto another to reparent (delegates to EditorCore)
-- Right-click menu: Add Child, Clone, Delete (all delegate to EditorCore)
-- PrefabLink marks prefab instances and stores normalized path for consistent identification
-- Clicking empty space clears selection, Clear All deletes everything
 */
 /* End Header *******************************************************************/
 
@@ -34,27 +23,23 @@ HOW TO USE:
 #include <fstream>
 #include <filesystem>
 
-// Initialize fonts, world reference, and EditorCore for entity operations
 void HierarchyWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, EditorCore* editorCore) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
-    m_world = world;           // Save reference to world so we can access entities
-    m_editorCore = editorCore; // Save reference to EditorCore for entity operations
+    m_world = world;
+    m_editorCore = editorCore;
 }
 
-// Update world reference and clear selection/expanded nodes to avoid stale IDs
 void HierarchyWindow::SetWorld(ECS::World* world) {
     m_world = world;
     m_selectedEntityId = 0;
     m_expandedNodes.clear();
 }
 
-// Render the full hierarchy window and handle all interactions
 void HierarchyWindow::Render() {
     ImGui::Begin("Hierarchy");
 
-    // If no active scene, show a simple disabled message
     bool noScene = true;
     if (Engine::CORE) {
         auto& sm = Engine::CORE->GetSceneManager();
@@ -66,17 +51,15 @@ void HierarchyWindow::Render() {
         return;
     }
 
-    // Input field for creating a new entity
     ImGui::Text("Create New Object");
-    static char nameBuffer[128] = "NewObject";                           // Buffer for new entity name
-    ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.5f);             // Limit input width
-    ImGui::InputText("##NewObjectName", nameBuffer, sizeof(nameBuffer)); // InputText returns true if edited
+    static char nameBuffer[128] = "NewObject";
+    ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.5f);
+    ImGui::InputText("##NewObjectName", nameBuffer, sizeof(nameBuffer));
 
     ImGui::SameLine();
     if (ImGui::Button("Add") && strlen(nameBuffer) > 0) {
-        // Delegate entity creation to EditorCore
         if (m_editorCore) {
-            m_editorCore->AddEntity(nameBuffer, m_selectedEntityId);
+            m_editorCore->AddEntity(nameBuffer, ECS::Entity::NPOS32);  // Always add at root
         }
     }
 
@@ -84,120 +67,121 @@ void HierarchyWindow::Render() {
     ImGui::Separator();
     ImGui::Dummy(ImVec2(0, 2));
 
-    // Get all entities using the new World API
     std::vector<ECS::Entity> allEntities;
     m_world->Each([&](ECS::Entity e) {
         allEntities.push_back(e);
         });
 
-    ImGui::Text("Objects (%zu)", allEntities.size());                      // Display total entity count
+    ImGui::Text("Objects (%zu)", allEntities.size());
 
-    // Child region for scrolling tree
+    // Child window shows the tree; third param 'true' draws a border around the child
     ImGui::BeginChild("HierarchyTree", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2), true);
-    auto rootEntities = _getRootEntities(); // Fetch all entities with no parent
+    auto rootEntities = _getRootEntities();
     for (auto entityId : rootEntities) {
-        _renderEntityNode(entityId, 0);     // Render each root node recursively
+        _renderEntityNode(entityId, 0);
     }
 
-    // Handle prefab dropped onto empty space (CHILD) to create at root
-    // ImGuiPayload contains the data being dragged (here it is a file path)
-    // We only accept ASSET_PATH payload type
-    // lexically_normal paths used later ensure consistent comparison across OS
+    // Root-level drop target: accept reparenting or prefab instantiation into root
     if (ImGui::BeginDragDropTarget()) {
+        // Drop an entity here to reparent it to root (NPOS32 sentinel)
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
+            EntityId draggedId = *(EntityId*)payload->Data;
+            if (m_editorCore) {
+                m_editorCore->ReparentEntity(draggedId, ECS::Entity::NPOS32);
+            }
+        }
+        // Drop a prefab here to instantiate it at root
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            // Cast payload data to string
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
-            // Only accept .prefab files
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
-                _instantiatePrefabAsChild(droppedPath, 0); // 0 parent means root
+                _instantiatePrefabAsChild(droppedPath, ECS::Entity::NPOS32);
             }
         }
         ImGui::EndDragDropTarget();
     }
 
-    // End the scrolling child region before handling window-level interactions
     ImGui::EndChild();
 
-    // Also accept prefab drops on the remaining window area (outside the child)
+    // Fallback drop target for the whole window (outside the child) to reparent to root
     if (ImGui::BeginDragDropTarget()) {
-        // Now accept prefab drops on the remaining window area (outside the child)
+        // Allow dropping an entity anywhere in the window to reparent to root
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
+            EntityId draggedId = *(EntityId*)payload->Data;
+            if (m_editorCore) {
+                m_editorCore->ReparentEntity(draggedId, ECS::Entity::NPOS32);
+            }
+        }
+        // Also allow dropping a prefab anywhere in the window to instantiate at root
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
-            // Cast payload data to string
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
-            // Only accept .prefab files
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
-                _instantiatePrefabAsChild(droppedPath, 0); // 0 parent means root
+                _instantiatePrefabAsChild(droppedPath, ECS::Entity::NPOS32);
             }
         }
         ImGui::EndDragDropTarget();
     }
 
-    // Clicking empty space deselects any entity (regardless of current ID)
-    // !IsAnyItemHovered ensures clicks on buttons or text don't deselect
+    // Click on empty space clears selection: only when window is hovered and no item is under cursor
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
         && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
         && !ImGui::IsAnyItemHovered()) {
-        m_selectedEntityId = 0;                          // Clear selected entity
-        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32); // Notify inspector to clear
+        m_selectedEntityId = 0;
+        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
     }
 
-    // Clear all entities button
     if (ImGui::Button("Clear All")) {
         if (m_editorCore) {
             m_editorCore->ClearAllEntities();
         }
-        m_selectedEntityId = 0;                             // Clear selection
-        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);    // Notify inspector
+        m_selectedEntityId = 0;
+        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
     }
 
     ImGui::End();
 }
 
-// Render a single entity node and its children recursively
 void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
-    // Convert EntityId to ECS::Entity
-    ECS::Entity entity{ entityId, 0 }; // You may need to get proper generation
+    ECS::Entity entity{ entityId, 0 };
 
-    // Skip invalid entity
     if (!m_world->IsAlive(entity)) return;
 
-    auto children = _getChildren(entityId); // Get children for this entity
-    bool hasChildren = !children.empty();   // Check if node should be expandable
+    auto children = _getChildren(entityId);
+    bool hasChildren = !children.empty();
 
-    // Build display label - get name from Name component if it exists
     std::stringstream oss;
     if (m_world->Has<ECS::Components::Name>(entity)) {
         const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
         oss << nameComp.Value << " (" << entityId << ")";
     }
     else {
-        oss << "Entity (" << entityId << ")"; // Show name and ID
+        oss << "Entity (" << entityId << ")";
     }
 
     if (m_world->Has<ECS::Components::PrefabLink>(entity)) {
-        // PrefabLink exists -> append prefab filename
         const auto& link = m_world->Get<ECS::Components::PrefabLink>(entity);
         std::string prefabName = std::filesystem::path(link.getPath()).stem().string();
         oss << " [" << prefabName << "]";
     }
     std::string label = oss.str();
 
-    // Setup ImGui tree node flags
+    // Tree node flags:
+    // - OpenOnArrow: clicking the arrow toggles, clicking label selects
+    // - SpanAvailWidth: make the selectable area span the full row
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
-    if (!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;                       // Leaf nodes can't be expanded
-    if (m_selectedEntityId == entityId) flags |= ImGuiTreeNodeFlags_Selected; // Highlight selected
+    if (!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;
+    if (m_selectedEntityId == entityId) flags |= ImGuiTreeNodeFlags_Selected;
 
     bool nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)entityId, flags, "%s", label.c_str());
 
-    // Clicking selects this entity
+    // Clicking the node label selects the entity
     if (ImGui::IsItemClicked()) {
-        m_selectedEntityId = entityId;                          // Update selection
-        if (m_selectionCallback) m_selectionCallback(entityId); // Notify inspector
+        m_selectedEntityId = entityId;
+        if (m_selectionCallback) m_selectionCallback(entityId);
     }
 
-    // Drag source for reparenting
+    // Begin drag source: we drag an entity ID to reparent under another node
     if (ImGui::BeginDragDropSource()) {
-        ImGui::SetDragDropPayload("ENTITY_ID", &entityId, sizeof(EntityId)); // Pass entity ID
+        ImGui::SetDragDropPayload("ENTITY_ID", &entityId, sizeof(EntityId));
         if (m_world->Has<ECS::Components::Name>(entity)) {
             const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
             ImGui::Text("Reparent %s", nameComp.Value);
@@ -208,24 +192,24 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
         ImGui::EndDragDropSource();
     }
 
-    // Drag drop target for both entities and prefab files
+    // Accept drops on this node: reparent entities or instantiate prefabs as children
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
-            EntityId draggedId = *(EntityId*)payload->Data;       // Cast payload to entity ID
+            EntityId draggedId = *(EntityId*)payload->Data;
             if (m_editorCore) {
-                m_editorCore->ReparentEntity(draggedId, entityId); // Delegate to EditorCore
+                m_editorCore->ReparentEntity(draggedId, entityId);
             }
         }
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
-                _instantiatePrefabAsChild(droppedPath, entityId); // Prefab becomes child
+                _instantiatePrefabAsChild(droppedPath, entityId);
             }
         }
         ImGui::EndDragDropTarget();
     }
 
-    // Right-click context menu
+    // Right-click context menu on node for quick actions
     if (ImGui::BeginPopupContextItem()) {
         if (ImGui::Selectable("Add Child")) {
             if (m_editorCore) {
@@ -239,16 +223,15 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
         }
         if (ImGui::Selectable("Delete")) {
             if (m_editorCore) {
-                m_editorCore->RemoveEntity(entityId, true); // Recursive delete
+                m_editorCore->RemoveEntity(entityId, true);
             }
             ImGui::EndPopup();
-            if (nodeOpen) ImGui::TreePop(); // TreePop needed if node was opened
+            if (nodeOpen) ImGui::TreePop();
             return;
         }
         ImGui::EndPopup();
     }
 
-    // Render children recursively if node is open
     if (nodeOpen) {
         for (auto childId : children) {
             _renderEntityNode(childId, depth + 1);
@@ -257,13 +240,10 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
     }
 }
 
-// Get all root entities (entities without Parent component or with null parent)
 std::vector<EntityId> HierarchyWindow::_getRootEntities() {
     std::vector<EntityId> roots;
 
-    // Iterate through all entities
     m_world->Each([&](ECS::Entity e) {
-        // Check if entity has no parent or parent is null
         if (!m_world->Has<ECS::Parent>(e)) {
             roots.push_back(e.Index);
         }
@@ -278,12 +258,11 @@ std::vector<EntityId> HierarchyWindow::_getRootEntities() {
     return roots;
 }
 
-// Get all children of a given parent
 std::vector<EntityId> HierarchyWindow::_getChildren(EntityId parentId) {
     std::vector<EntityId> children;
-    ECS::Entity parentEntity{ parentId, 0 };
+    ECS::Entity parentEntity = m_world->Resolve(parentId);
+    if (parentEntity.IsNull()) return children;
 
-    // Use World's ForChildren method to get all children
     m_world->ForChildren(parentEntity, [&](ECS::Entity child) {
         children.push_back(child.Index);
         });
@@ -291,7 +270,6 @@ std::vector<EntityId> HierarchyWindow::_getChildren(EntityId parentId) {
     return children;
 }
 
-// Instantiate a prefab as child of a given entity
 void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId) {
     if (!m_world || prefabPath.empty()) return;
 
@@ -303,39 +281,92 @@ void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, E
         }
 
         nlohmann::json prefabJson;
-        // Load JSON data
         file >> prefabJson;
-
-        // Use prefab JSON as-is; do not remap TypeId from TypeName
         file.close();
 
-        // Deserialize creates a new entity with all prefab components
-        ECS::Entity instance = Serialization::EntitySerializer::DeserializeEntity(*m_world, prefabJson);
+        if (!prefabJson.contains("Components") || !prefabJson["Components"].is_array()) {
+            LOG_ERROR("Invalid prefab format: missing Components array");
+            return;
+        }
 
-        // Set parent using the Parent component
-        ECS::Entity parentEntity{ parentId, 0 };
-        if (parentId == 0 || parentEntity.IsNull()) {
-            // Root entity - ensure no parent or remove parent component
+        // Create entity first
+        ECS::Entity instance = m_world->Create();
+
+        // Add Name component separately if it exists in prefab
+        bool hasName = false;
+        for (const auto& comp : prefabJson["Components"]) {
+            // Defensive checks on prefab JSON entries
+            if (!comp.contains("TypeName") || !comp["TypeName"].is_string())
+                continue;
+
+            if (comp["TypeName"] == "ECS::Components::Name") {
+                hasName = true;
+                auto& nameComp = m_world->Add<ECS::Components::Name>(instance);
+                if (comp.contains("Data") && comp["Data"].is_object() &&
+                    comp["Data"].contains("Value") && comp["Data"]["Value"].is_string()) {
+                    std::string nameStr = comp["Data"]["Value"].get<std::string>();
+                    std::strncpy(nameComp.Value, nameStr.c_str(), sizeof(nameComp.Value) - 1);
+                    nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
+                }
+                break;
+            }
+        }
+
+        // Deserialize remaining components
+        for (const auto& comp : prefabJson["Components"]) {
+            // Defensive checks
+            if (!comp.contains("TypeName") || !comp["TypeName"].is_string())
+                continue;
+            if (comp["TypeName"] == "ECS::Components::Name") continue; // Already handled
+
+            std::string typeName = comp["TypeName"].get<std::string>();
+            auto compData = (comp.contains("Data") && comp["Data"].is_object())
+                ? comp["Data"]
+                : nlohmann::json::object();
+
+            // Prefab JSON -> components (on instance, via ADL `from_json`)
+            // Keys/types must match EntitySerializer.h macros
+            // Type matched by `TypeName`; call `from_json(Data, component)`
+            // Adds component if missing; otherwise updates existing fields
+            auto addComp = [&]<typename T>(const std::string & name) -> bool {
+                if (typeName != name) return false;
+                if (!m_world->Has<T>(instance)) {
+                    auto& c = m_world->Add<T>(instance);
+                    from_json(compData, c);
+                }
+                return true;
+            };
+
+            if (addComp.operator() < ECS::Components::LocalTransform > ("ECS::Components::LocalTransform")) continue;
+            if (addComp.operator() < ECS::Components::SpriteRenderer2D > ("ECS::Components::SpriteRenderer2D")) continue;
+            if (addComp.operator() < ECS::Components::Rigidbody2D > ("ECS::Components::Rigidbody2D")) continue;
+            if (addComp.operator() < ECS::Components::CircleCollider2D > ("ECS::Components::CircleCollider2D")) continue;
+            if (addComp.operator() < ECS::Components::BoxCollider2D > ("ECS::Components::BoxCollider2D")) continue;
+            if (addComp.operator() < ECS::Components::ShapeCircle2D > ("ECS::Components::ShapeCircle2D")) continue;
+            if (addComp.operator() < ECS::Components::ShapeBox2D > ("ECS::Components::ShapeBox2D")) continue;
+            if (addComp.operator() < ECS::Components::ShapeLine2D > ("ECS::Components::ShapeLine2D")) continue;
+        }
+
+        ECS::Entity parentEntity = m_world->Resolve(parentId);
+        if (parentId == ECS::Entity::NPOS32 || parentEntity.IsNull()) {
             if (m_world->Has<ECS::Parent>(instance)) {
                 m_world->Remove<ECS::Parent>(instance);
             }
         }
         else {
-            // Set parent
+            // Directly assign parent without Set/Add
             if (m_world->Has<ECS::Parent>(instance)) {
-                auto& parent = m_world->Get<ECS::Parent>(instance);
-                parent.ParentEntity = parentEntity;
+                auto& parentComp = m_world->Get<ECS::Parent>(instance);
+                parentComp.ParentEntity = parentEntity;
             }
             else {
                 m_world->Add<ECS::Parent>(instance, parentEntity);
             }
         }
 
-        // Add PrefabLink component to mark as instance
         std::filesystem::path p(prefabPath);
         std::string normalizedPath = p.lexically_normal().string();
 
-        // lexically_normal ensures path uses consistent separators and format
         if (m_world->Has<ECS::Components::PrefabLink>(instance)) {
             auto& link = m_world->Get<ECS::Components::PrefabLink>(instance);
             link.setPath(normalizedPath);

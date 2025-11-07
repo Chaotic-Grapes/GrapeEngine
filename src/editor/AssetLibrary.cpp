@@ -41,7 +41,7 @@ void AssetLibrary::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
     m_symbolsFont = symbolsFont;
 }
 
-// Display clickable breadcrumb trail (e.g., assets > Audio > Music)
+// Display clickable breadcrumb trail (e.g. assets > Audio > Music)
 void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::string& selectedAsset, std::string& outNewPath) {
     std::filesystem::path pathObj(currentPath);
     std::vector<std::filesystem::path> pathParts;
@@ -57,7 +57,7 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
     // Display each part as clickable button with separators
     std::string accumulatedPath;
     for (size_t i = 0; i < pathParts.size(); i++) {
-        // Build accumulated path up to this part (e.g., "assets", "assets\Audio", etc.)
+        // Build accumulated path up to this part (e.g. "assets", "assets\Audio", etc.)
         if (i > 0) accumulatedPath += "\\";
         accumulatedPath += pathParts[i].string();
 
@@ -77,11 +77,12 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
             // Previous parts: display as clickable blue buttons
             ImGui::PushID(static_cast<int>(i));  // Unique ID so ImGui can distinguish buttons
 
-            // Style buttons to look like clickable links (blue text, transparent background)
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));           // Blue text
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));                     // Transparent
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.4f, 0.8f, 0.3f));  // Subtle hover
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.4f, 0.8f, 0.5f));   // Subtle click
+            // Style overrides: make SmallButton look like a link
+            // Text: blue; Button: fully transparent; Hover/Active: subtle tinted backgrounds
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.4f, 0.8f, 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.4f, 0.8f, 0.5f));
 
             // When clicked, navigate to that folder level
             if (ImGui::SmallButton(pathParts[i].string().c_str())) {
@@ -92,7 +93,8 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
                 }
             }
 
-            ImGui::PopStyleColor(4);  // Pop all 4 color style overrides (Text, Button, ButtonHovered, ButtonActive)
+            // Restore the four color overrides (Text, Button, ButtonHovered, ButtonActive)
+            ImGui::PopStyleColor(4);
             ImGui::PopID();           // Pop the unique ID for this button
         }
     }
@@ -171,13 +173,13 @@ void AssetLibrary::_displayFile(const std::filesystem::path& filePath, std::stri
     }
 
     // Enable file dragging
+    // Enable drag-and-drop of this file entry
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-        // Store the file path as payload
+        // Set payload with type tag "ASSET_PATH"; buffer length includes null terminator
         std::string path = filePath.string();
-        // ASSET_PATH is data's type name; size includes null terminator (hence +1)
         ImGui::SetDragDropPayload("ASSET_PATH", path.c_str(), path.size() + 1);
 
-        // Show preview while dragging
+        // Optional drag preview: icon + filename
         ImGui::PushFont(m_symbolsFont);
         ImGui::Text("\xEF\x8E\xB2");
         ImGui::PopFont();
@@ -327,6 +329,17 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
         return;
     }
 
+    // Disallow replacing folders
+    {
+        std::error_code ec;
+        if (std::filesystem::is_directory(selectedAsset, ec) && !ec) {
+            LOG_WARNING("Cannot replace a folder: " << selectedAsset);
+            statusMessage = "Replace failed: selected item is a folder";
+            statusTimer = 3.0f;
+            return;
+        }
+    }
+
 #ifdef _WIN32
     // Same as above (import textures)
     char filename[512] = "";
@@ -336,15 +349,31 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
     ofn.hwndOwner = nullptr;
     ofn.lpstrFile = filename;
     ofn.nMaxFile = sizeof(filename);
-    ofn.lpstrFilter = "PNG Files\0*.png\0All Files\0*.*\0";
+    // Match selected asset extension in file dialog filter
+    std::filesystem::path destPathBuild(selectedAsset);
+    std::string ext = destPathBuild.extension().string();
+    std::string upperExt = ext;
+    for (auto& c : upperExt) c = (char)std::toupper((unsigned char)c);
+
+    std::string filterDesc = upperExt.empty() ? std::string("All Files") : (upperExt.substr(1) + " Files");
+    std::string filterPattern = ext.empty() ? std::string("*.*") : ("*" + ext);
+    std::string filter = filterDesc + "\0" + filterPattern + "\0All Files\0*.*\0";
+    ofn.lpstrFilter = filter.c_str();
     ofn.nFilterIndex = 1;
-    ofn.lpstrTitle = "Select PNG to Replace With";
+    std::string title = ext.empty() ? std::string("Select file to replace with") : ("Select " + upperExt + " to replace with");
+    ofn.lpstrTitle = title.c_str();
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
 
     // Show file dialog
     if (GetOpenFileNameA(&ofn)) {
         std::filesystem::path sourcePath(filename);
-        std::filesystem::path destPathBuild(selectedAsset);  // Use selected file's path
+        // Extension must match
+        if (sourcePath.extension() != destPathBuild.extension()) {
+            LOG_WARNING("Extension mismatch: selected " << destPathBuild.extension().string() << ", replacement " << sourcePath.extension().string());
+            statusMessage = "Replace failed: extension mismatch";
+            statusTimer = 3.0f;
+            return;
+        }
 
         // Also replace in source assets folder
         std::string sourceAssetsPath = selectedAsset;
@@ -368,13 +397,13 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
                 RM.UnloadAsset(selectedAsset);   // Remove old cached version
                 RM.Get<Texture>(selectedAsset);  // Load new version into cache
 
-                LOG_INFO("Successfully replaced texture in both locations: " << destPathBuild.filename().string());
-                statusMessage = "Texture replaced successfully";
+                LOG_INFO("Successfully replaced asset in both locations: " << destPathBuild.filename().string());
+                statusMessage = "File replaced successfully";
                 statusTimer = 3.0f; // Show for 3 seconds
             }
             catch (const std::exception& e) {
                 LOG_ERROR("Failed to replace texture: " << e.what());
-                statusMessage = "Failed to replace texture";
+                statusMessage = "Failed to replace file";
                 statusTimer = 3.0f;
             }
         }

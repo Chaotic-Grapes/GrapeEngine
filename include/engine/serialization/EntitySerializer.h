@@ -29,21 +29,24 @@ using json = nlohmann::json;
 
 #pragma region nlohmann_adl_helpers
 // ADL helpers: call unqualified to_json/from_json with 'using' to enable ADL
-namespace Serialization {
-	template<typename U>
-	inline void to_json_adl(nlohmann::json& j, const U& v) {
-		using nlohmann::to_json;
-		to_json(j, v);
-	}
+	namespace Serialization {
+		template<typename U>
+		inline void to_json_adl(nlohmann::json& j, const U& v) {
+			using nlohmann::to_json;
+			to_json(j, v);
+		}
 
-	template<typename U>
-	inline U from_json_adl(const nlohmann::json& j) {
-		U tmp;
-		using nlohmann::from_json;
-		from_json(j, tmp);
-		return tmp;
+		template<typename U>
+		inline U from_json_adl(const nlohmann::json& j) {
+			U tmp{};
+			using nlohmann::from_json;
+			// Avoid json.at() type errors when j is not an object
+			if (j.is_object()) {
+				from_json(j, tmp);
+			}
+			return tmp;
+		}
 	}
-}
 #pragma endregion
 
 #define REGISTER_COMPONENT_SERIALIZER(VAR, TYPE) \
@@ -89,7 +92,7 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeBox2D, HalfExtents, Offset, Color, Thickness, Filled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeLine2D, A, B, Color, Thickness)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ZIndex2D, ZOrder)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
+        NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio, Active)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScriptId, Id)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop)
@@ -132,6 +135,19 @@ namespace Serialization {
 				},
 				// Deserialize
 				[](ECS::World& world, ECS::Entity e, const json& j) {
+					// Guard legacy shapes for specific components where Data may be a bare value
+					if constexpr (std::is_same_v<T, ECS::Components::Name>) {
+						if (j.is_string()) {
+							json jj = json{ {"Value", j.get<std::string>()} };
+							if (world.Has<T>(e)) {
+								world.template Set<T>(e, Serialization::from_json_adl<T>(jj));
+							}
+							else {
+								world.template Add<T>(e, Serialization::from_json_adl<T>(jj));
+							}
+							return;
+						}
+					}
 					if (world.Has<T>(e)) {
 						world.template Set<T>(e, Serialization::from_json_adl<T>(j));
 					}
@@ -165,15 +181,154 @@ namespace Serialization {
 		// Deserialize a single entity
 		static ECS::Entity DeserializeEntity(ECS::World& world, const json& entityJson) {
 			ECS::Entity e = world.Create();
-			if (entityJson.contains("Components")) {
-				for (const auto& comp : entityJson["Components"]) {
-					TypeId tid = comp["TypeId"];
-					auto it = Registry().find(tid);
-					if (it != Registry().end()) {
-						it->second.Deserialize(world, e, comp["Data"]);
+
+			if (!entityJson.is_object()) {
+				return e;
+			}
+
+			// Prefer robust iteration over components, handling both modern and legacy schemas
+			const bool hasComponents = entityJson.contains("Components") && entityJson["Components"].is_array();
+			if (!hasComponents) {
+				return e;
+			}
+
+			// Build a reverse lookup for TypeName -> TypeId for convenience
+			std::unordered_map<std::string, TypeId> nameToId;
+			for (const auto& [tid, info] : Registry()) {
+				nameToId.emplace(info.Name, tid);
+			}
+
+			for (const auto& comp : entityJson["Components"]) {
+				// Safely read type identification
+				TypeId tid = 0;
+				std::string typeName;
+
+				if (comp.contains("TypeId") && comp["TypeId"].is_number_unsigned()) {
+					// Modern TypeId path
+					tid = comp["TypeId"].get<TypeId>();
+				}
+				else if (comp.contains("TypeName") && comp["TypeName"].is_string()) {
+					// Modern TypeName path
+					typeName = comp["TypeName"].get<std::string>();
+					auto itName = nameToId.find(typeName);
+					if (itName != nameToId.end()) tid = itName->second;
+				}
+				else if (comp.contains("Type") && comp["Type"].is_string()) {
+					// Legacy field "Type" (e.g., "Transform", "SpriteRenderer")
+					const std::string legacy = comp["Type"].get<std::string>();
+					// Map legacy short names to fully-qualified names in our registry
+					if (legacy == "Transform") typeName = "ECS::Components::LocalTransform";
+					else if (legacy == "SpriteRenderer") typeName = "ECS::Components::SpriteRenderer2D";
+					else if (legacy == "Name") typeName = "ECS::Components::Name";
+					else if (legacy == "ZIndex2D") typeName = "ECS::Components::ZIndex2D";
+					// Resolve mapped name if available
+					if (!typeName.empty()) {
+						auto itName = nameToId.find(typeName);
+						if (itName != nameToId.end()) tid = itName->second;
 					}
 				}
+
+				// If we still couldn't resolve tid, skip this component gracefully
+				auto it = Registry().find(tid);
+				if (it == Registry().end()) {
+					continue;
+				}
+
+                // Safely extract component data; default to empty object
+                json data = json::object();
+                if (comp.contains("Data")) {
+                    data = comp["Data"];
+                }
+
+                // Coerce non-object data into expected object shapes to avoid json.at() errors
+                const std::string compTypeName = it->second.Name;
+                if (!data.is_object()) {
+                    if (compTypeName == "ECS::Components::Name" && data.is_string()) {
+                        data = json{ {"Value", data.get<std::string>()} };
+                    }
+                    else if (compTypeName == "ECS::Components::TagMask" && data.is_number_unsigned()) {
+                        data = json{ {"Mask", data.get<unsigned int>()} };
+                    }
+                    else if (compTypeName == "ECS::Components::Active" && data.is_boolean()) {
+                        data = json{ {"Enabled", data.get<bool>()} };
+                    }
+                    else if (compTypeName == "ECS::Components::Layer" && data.is_number()) {
+                        data = json{ {"Id", data.get<int>()} };
+                    }
+                    else if (compTypeName == "ECS::Components::ScriptId" && data.is_number_unsigned()) {
+                        data = json{ {"Id", data.get<unsigned int>()} };
+                    }
+                    else if (compTypeName == "ECS::Components::ZIndex2D" && data.is_number()) {
+                        data = json{ {"ZOrder", data.get<int>()} };
+                    }
+                    else if (compTypeName == "ECS::Components::PrefabLink" && data.is_string()) {
+                        data = json{ {"prefabPath", data.get<std::string>()} };
+                    }
+                    else {
+                        // Fallback to empty object if type doesn't match expected shape
+                        data = json::object();
+                    }
+                }
+
+                // Ensure LocalTransform fields exist regardless of legacy or modern naming
+                if (compTypeName == "ECS::Components::LocalTransform") {
+                    // Create defaults if missing
+                    if (!data.contains("Position")) data["Position"] = json{{"X",0.0f},{"Y",0.0f},{"Z",0.0f}};
+                    if (!data.contains("Rotation")) data["Rotation"] = json{{"X",0.0f},{"Y",0.0f},{"Z",0.0f},{"W",1.0f}};
+                    if (!data.contains("Scale")) data["Scale"] = json{{"X",1.0f},{"Y",1.0f},{"Z",1.0f}};
+                }
+
+                // Ensure vector-valued components have a proper Value object
+                auto ensure_vec2 = [&](json& v){
+                    if (!v.is_object()) v = json::object();
+                    if (!v.contains("X")) v["X"] = 0.0f;
+                    if (!v.contains("Y")) v["Y"] = 0.0f;
+                };
+                auto ensure_vec3 = [&](json& v){
+                    if (!v.is_object()) v = json::object();
+                    if (!v.contains("X")) v["X"] = 0.0f;
+                    if (!v.contains("Y")) v["Y"] = 0.0f;
+                    if (!v.contains("Z")) v["Z"] = 0.0f;
+                };
+                auto ensure_quat = [&](json& v){
+                    if (!v.is_object()) v = json::object();
+                    if (!v.contains("X")) v["X"] = 0.0f;
+                    if (!v.contains("Y")) v["Y"] = 0.0f;
+                    if (!v.contains("Z")) v["Z"] = 0.0f;
+                    if (!v.contains("W")) v["W"] = 1.0f;
+                };
+
+                // 2D vector wrappers
+                if (compTypeName == "ECS::Components::LinearVelocity2D"
+                    || compTypeName == "ECS::Components::Acceleration2D"
+                    || compTypeName == "ECS::Components::AngularVelocity2D") {
+                    json& v = data["Value"]; // creates if missing
+                    ensure_vec2(v);
+                }
+
+                // 3D vector wrappers
+                if (compTypeName == "ECS::Components::Velocity"
+                    || compTypeName == "ECS::Components::Acceleration"
+                    || compTypeName == "ECS::Components::AngularVelocity") {
+                    json& v = data["Value"]; // creates if missing
+                    ensure_vec3(v);
+                }
+
+				// Delegate to registered deserializer with safety guard
+				try {
+					it->second.Deserialize(world, e, data);
+				}
+				catch (const nlohmann::json::type_error& te) {
+					LOG_ERROR("JSON type error in component '" << compTypeName << "': " << te.what());
+					// Skip this component on type mismatch to avoid hard crash
+					continue;
+				}
+				catch (const std::exception& ex) {
+					LOG_ERROR("Error deserializing component '" << compTypeName << "': " << ex.what());
+					continue;
+				}
 			}
+
 			return e;
 		}
 

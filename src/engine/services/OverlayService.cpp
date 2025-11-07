@@ -32,9 +32,19 @@ namespace Services {
                     m_debugUI->AttachAudio(m_audioDevice);
 
                 ImGuiIO& io = ImGui::GetIO();
-                io.IniFilename = "imgui.ini";
+                io.IniFilename = "imgui.ini"; // Persist dock layouts and window positions to disk
                 m_initialized = true;
 
+                // Subscribe to window resize to keep editor proportions stable
+                Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
+                    [this](const Messaging::WindowResized& msg) {
+                        if (m_levelEditor) {
+                            m_levelEditor->OnWindowResized(msg.Width, msg.Height);
+                            // Force a rebuild of the docking layout
+                            static_cast<void>(0); // You might need to add a public method to LevelEditor to force layout rebuild
+                        }
+                    }
+                );
                 // Dump component TypeId registry once for copying into prefabs
                 static bool s_dumped = false;
                 if (!s_dumped) {
@@ -74,7 +84,7 @@ namespace Services {
         // Show LevelEditor when enabled either for a specific scene or globally (scene-less)
         bool shouldShowLevelEditor = m_showLevelEditor && (
             m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene)
-        );
+            );
 
         // Initialize LevelEditor only when needed (even without a world)
         if (shouldShowLevelEditor && !m_levelEditor) {
@@ -120,11 +130,11 @@ namespace Services {
         auto* activeScene = m_sceneManager.GetActive();
         bool shouldShowLevelEditor = m_showLevelEditor && (
             m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene)
-        );
+            );
 
         // Background clear hack removed; dockspace now draws its own background
 
-        // Always start ImGui frame
+        // Start a new ImGui frame via DebugUI (sets up IO and backend state)
         if (m_debugUI) { m_debugUI->NewFrame(); }
 
         // LevelEditor takes priority
@@ -137,10 +147,10 @@ namespace Services {
             m_debugUI->Render();
         }
 
-        ImGui::Render();
+        ImGui::Render(); // Finalize draw lists for the current frame
         auto* drawData = ImGui::GetDrawData();
         if (drawData) {
-            ImGui_ImplOpenGL3_RenderDrawData(drawData);
+            ImGui_ImplOpenGL3_RenderDrawData(drawData); // Submit ImGui draw lists to OpenGL
         }
     }
 

@@ -42,7 +42,7 @@ double Input::m_scrollY{ 0 };
 void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;
     // Get initial window size
-    glfwGetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
+    glfwGetWindowSize(m_window, &m_windowWidth, &m_windowHeight); // Prime cached window dimensions
 }
 
 void Input::Shutdown() {
@@ -57,7 +57,7 @@ bool Input::IsKeyPressed(const int key) { return m_keyPressed[key]; }
 bool Input::IsKeyDown(const int key) {
     // Guard against nullptr or shutdown
     if (!m_window) return false;
-    return glfwGetKey(m_window, key) == PRESS;
+    return glfwGetKey(m_window, key) == PRESS; // Direct poll of current key state from GLFW
 }
 
 // Check if a specific key was just released this frame
@@ -66,7 +66,7 @@ bool Input::IsKeyUp(const int key) { return m_keyUp[key]; }
 // Check if a specific mouse button is currently pressed  
 bool Input::IsMousePressed(const int button) {
     if (!m_window) return false;
-    return glfwGetMouseButton(m_window, button) == PRESS;
+    return glfwGetMouseButton(m_window, button) == PRESS; // Direct poll of current mouse button state
 }
 
 // Check if a mouse button was just pressed this frame
@@ -99,13 +99,14 @@ double Input::GetMouseY() {
 
 // Sets up all GLFW event callbacks (keyboard, mouse, resize)
 void Input::SetupEventCallbacks() {
-    glfwSetKeyCallback(m_window, _keyCallback);
-    glfwSetMouseButtonCallback(m_window, _mouseButtonCallback);
-    glfwSetCursorPosCallback(m_window, _mousePosCallback);
-    glfwSetScrollCallback(m_window, _mouseScrollCallback);
-    glfwSetWindowSizeCallback(m_window, _windowSizeCallback);
-    glfwSetDropCallback(m_window, _fileDropCallback);
-    glfwSetWindowFocusCallback(m_window, _windowFocusCallback);
+    // Register GLFW callbacks to update per-frame state and broadcast messages
+    glfwSetKeyCallback(m_window, _keyCallback);               // Keyboard press/release
+    glfwSetMouseButtonCallback(m_window, _mouseButtonCallback); // Mouse buttons
+    glfwSetCursorPosCallback(m_window, _mousePosCallback);    // Mouse move
+    glfwSetScrollCallback(m_window, _mouseScrollCallback);    // Mouse wheel
+    glfwSetWindowSizeCallback(m_window, _windowSizeCallback); // Window size changes
+    glfwSetDropCallback(m_window, _fileDropCallback);         // OS file drag-drop
+    glfwSetWindowFocusCallback(m_window, _windowFocusCallback); // Focus gained/lost
 }
 
 // Called when GLFW encounters an error 
@@ -139,7 +140,7 @@ void Input::_processInput() {
 
     // Avoid polling after shutdown
     if (!m_window) return;
-    glfwPollEvents();
+    glfwPollEvents(); // Pump GLFW event queue and invoke registered callbacks
 }
 
 // Called on keyboard key press/release
@@ -150,12 +151,12 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
     if (action == GLFW_PRESS) {
         m_keyDown[key] = true;
         m_keyPressed[key] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::KeyPressed{ key, false, mod });
+        Messaging::MessageSystem::Broadcast(Messaging::KeyPressed{ key, false, mod }); // 'repeat' field false here
     }
     else if (action == GLFW_RELEASE) {
         m_keyDown[key] = false;
         m_keyUp[key] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key, mod });
+        Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key, mod }); // Release event with modifier mask
     }
 }
 
@@ -171,14 +172,14 @@ void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int m
         m_mouseDown[button] = true;
         m_mousePressed[button] = true;
         Messaging::MessageSystem::Broadcast(Messaging::MouseButtonPressed{ button, 
-            static_cast<float>(xPos), static_cast<float>(yPos) });
+            static_cast<float>(xPos), static_cast<float>(yPos) }); // Include cursor position at press time
     }
     else if (action == GLFW_RELEASE) {
         m_mouseDown[button] = false;
         m_mouseUp[button] = true;
         m_mousePressed[button] = false;
         Messaging::MessageSystem::Broadcast(Messaging::MouseButtonReleased{ button, 
-            static_cast<float>(xPos), static_cast<float>(yPos) });
+            static_cast<float>(xPos), static_cast<float>(yPos) }); // Include cursor position at release time
     }
 }
 
@@ -212,7 +213,7 @@ void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffse
 
     // Broadcast scroll event
     Messaging::MessageSystem::Broadcast(Messaging::MouseScrolled{ static_cast<float>(xOffset), 
-        static_cast<float>(yOffset) });
+        static_cast<float>(yOffset) }); // One-shot deltas; cleared at start of each frame
 }
 
 void Input::_fileDropCallback(GLFWwindow* pWin, int count, const char** paths) {

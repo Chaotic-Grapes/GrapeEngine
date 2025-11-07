@@ -1,3 +1,5 @@
+// how-note: This file contains a disabled test scene scaffold for ResourceManager.
+// how-note: Uncomment and integrate into the sandbox to run caching/error-handling tests.
 // #include "ResourceManagerTest.h"
 // #include "services/ResourceManager.h"
 // #include "graphics/texture.hpp"
@@ -27,6 +29,7 @@
 //         LOG_INFO("ResourceManagerTestScene: Cleanup complete");
 //     }
 
+//     // how-note: Entry point for test suite; invokes individual cache/error tests
 //     void ResourceManagerTestScene::RunTests() {
 //         LOG_INFO("\nStarting ResourceManager Tests...\n");
 
@@ -39,6 +42,7 @@
 //         m_testsComplete = true;
 //     }
 
+//     // how-note: Verify same asset path returns identical shared_ptr (cache hit)
 //     void ResourceManagerTestScene::TestBasicCaching() {
 //         LOG_INFO("--- Test 1: Basic Caching ---");
 
@@ -49,6 +53,7 @@
 //         LOG_INFO("Cache hit (same object): " << (success ? "PASS" : "FAIL"));
 //     }
 
+//     // how-note: Load different asset types and print cache breakdown
 //     void ResourceManagerTestScene::TestMultipleAssets() {
 //         LOG_INFO("\n--- Test 2: Multiple Assets ---");
 
@@ -59,6 +64,7 @@
 //         LOG_INFO("Multiple asset types loaded: PASS");
 //     }
 
+//     // how-note: Request a nonexistent path; expect nullptr and graceful logging
 //     void ResourceManagerTestScene::TestErrorHandling() {
 //         LOG_INFO("\n--- Test 3: Error Handling ---");
 
@@ -67,6 +73,7 @@
 //         LOG_INFO("Invalid file handling: " << (success ? "PASS" : "FAIL"));
 //     }
 
+//     // how-note: Unload then reload asset; exercise ClearCache and size reporting
 //     void ResourceManagerTestScene::TestCacheManagement() {
 //         LOG_INFO("\n--- Test 4: Cache Management ---");
 

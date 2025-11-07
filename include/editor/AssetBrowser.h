@@ -37,13 +37,13 @@ class InspectorWindow;
 
 class AssetBrowser {
 public:
-    // Initialize with symbols font for icons and world reference
+    // Initialize fonts and world reference for browsing
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
 
     // Render the asset browser UI
     void Render();
 
-    // Wire unified Inspector for prefab editing
+    // Wire the unified Inspector for prefab editing
     void SetInspector(InspectorWindow* inspector);
 
     // Update world reference when scenes change

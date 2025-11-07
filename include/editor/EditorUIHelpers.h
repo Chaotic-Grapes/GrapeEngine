@@ -71,6 +71,9 @@ void RenderCheckboxRow(const std::string& label, nlohmann::json& data,
 // Get the current alignment offset (for custom rendering that needs to align with other properties)
 float GetCurrentLabelOffset();
 
+// Get the unified content start X (label column + axis label width + pad)
+float GetContentStartX();
+
 } // namespace EditorUI
 
-#endif // EDITOR_UI_HELPERS_H
+#endif

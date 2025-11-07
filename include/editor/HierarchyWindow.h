@@ -35,7 +35,7 @@ public:
     // Callback types for when selection changes
     using SelectionCallback = std::function<void(EntityId)>;
 
-    // Initialize with fonts, world reference, and EditorCore for entity operations
+    // Initialize fonts world and EditorCore for entity operations
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, EditorCore* editorCore);
 
     // Render the hierarchy window
@@ -47,7 +47,7 @@ public:
     // Get currently selected entity
     EntityId GetSelectedEntity() const { return m_selectedEntityId; }
 
-    // Set selected entity (called from other windows)
+    // Set selected entity called from other windows
     void SetSelectedEntity(EntityId id) { m_selectedEntityId = id; }
 
     // Register callback for when selection changes
@@ -57,13 +57,13 @@ private:
     // Render a single entity node in the tree
     void _renderEntityNode(EntityId entityId, int depth);
 
-    // Get all root entities (no parent)
+    // Get all root entities with no parent
     std::vector<EntityId> _getRootEntities();
 
-    // Get all children of an entity (UI helper for tree rendering)
+    // Get all children of an entity for tree rendering
     std::vector<EntityId> _getChildren(EntityId parentId);
 
-    // Instantiate a prefab as a child of the specified parent entity (UI-specific)
+    // Instantiate a prefab as a child of specified parent entity
     void _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
 
     // References
@@ -81,4 +81,4 @@ private:
     std::vector<EntityId> m_expandedNodes;  // Which parent nodes are expanded
 };
 
-#endif // HIERARCHY_WINDOW_H
+#endif

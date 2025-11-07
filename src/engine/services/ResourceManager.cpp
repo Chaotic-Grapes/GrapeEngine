@@ -40,10 +40,12 @@ ResourceManager::GetCacheMap<Font>() { return m_fonts; }
 // Generic Get function: handles caching logic for all asset types
 template <typename T>
 std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
+    // how-note: Resolve the cache map for T via GetCacheMap<T>() specializations
     // Get reference to appropriate cache (m_textures or m_audioFiles)
     auto& cache = GetCacheMap<T>();
 
     // Check cache first
+    // how-note: Prefer cached asset; return shared_ptr immediately on cache hit
     // typeid(T).name() returns the type name as a string (e.g. "Texture", "AudioData")
     auto it = cache.find(name);
     if (it != cache.end()) {
@@ -53,9 +55,11 @@ std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
 
     // Not in cache: try to load
     LOG_DEBUG("[CACHE MISS] Loading " << typeid(T).name() << ": " << name);
+    // how-note: Delegate to type-specific loader specialization: Load<Texture/AudioData/Font>
     auto resource = Load<T>(name);
 
     if (resource) {
+        // how-note: On successful load, insert into cache for future requests
         cache[name] = resource;
         LOG_DEBUG("Cached " << typeid(T).name() << ": " << name);
     }
@@ -71,6 +75,7 @@ std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
 template std::shared_ptr<Texture> ResourceManager::Get<Texture>(const std::string&);
 template std::shared_ptr<AudioData> ResourceManager::Get<AudioData>(const std::string&);
 template std::shared_ptr<Font> ResourceManager::Get<Font>(const std::string&);
+// how-note: Explicit instantiations ensure the linker finds Get<T>() implementations used elsewhere
 
 // Loading function for textures
 template<>
@@ -138,12 +143,14 @@ std::shared_ptr<AudioData> ResourceManager::Load<AudioData>(const std::string& f
         file.seekg(0, std::ios::beg);
 
         // Create audio object
+        // how-note: Read entire file into memory buffer (Data) for decoder/players downstream
         // make_shared is safer and won't leak memory
         auto audio = std::make_shared<AudioData>();
         audio->Path = filePath;
         audio->Format = extension;
 
         // Prepare vector for file data then read file into memory
+        // how-note: Use binary read to preserve raw bytes; size determined via tellg()
         audio->Data.resize(fileSize);
         file.read(reinterpret_cast<char*>(audio->Data.data()), fileSize);
 
@@ -195,6 +202,7 @@ std::shared_ptr<Font> ResourceManager::Load<Font>(const std::string& filePath) {
 std::shared_ptr<Font> ResourceManager::GetFont(const std::string& name, int pixelSize) {
     // Create unique cache key that includes size (same font, different sizes cached separately)
     std::string cacheKey = name + ":" + std::to_string(pixelSize);
+    // how-note: Cache key includes pixel size so same font at different sizes are distinct
 
     // Check cache first
     auto it = m_fonts.find(cacheKey);
@@ -255,6 +263,7 @@ void ResourceManager::UnloadAsset(const std::string& name) {
 
     // Try to remove from font cache
     removed |= m_fonts.erase(name) > 0;
+    // how-note: Bitwise-or assignment accumulates any removal; once true it stays true
 
     if (removed) {
         LOG_INFO("Unloaded asset: " << name);
@@ -286,4 +295,5 @@ bool ResourceManager::IsAssetCached(const std::string& name) const {
 }
 
 // Define the global ResourceManager instance
+// how-note: Global singleton-like instance used by scenes/services to request assets
 ResourceManager RM;

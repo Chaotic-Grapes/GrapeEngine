@@ -48,22 +48,24 @@ public:
     // Render the inspector window
     void Render(float fontScale);
 
-    // Set what to inspect (called by Hierarchy or Asset Browser)
+    // Select an entity for inspection
     void InspectEntity(EntityId id);
+    // Select a prefab for inspection
     void InspectPrefab(const std::string& prefabPath);
+    // Clear the current selection
     void ClearSelection();
 
     // Update world reference and clear selection on scene change
     void SetWorld(ECS::World* world) { m_world = world; ClearSelection(); }
 
-    // Check if currently inspecting something
+    // Check if we are currently inspecting something
     InspectionMode GetMode() const { return m_mode; }
 
 private:
-    // Render entity inspection UI (shows all components on entity)
+    // Render entity inspection UI showing all components
     void _renderEntityCore();
 
-    // Render prefab inspection UI (shows components in prefab file)
+    // Render prefab inspection UI showing components in file
     void _renderPrefabInspector();
 
     // Add a component to the selected entity
@@ -78,17 +80,17 @@ private:
     // Remove a component from the prefab JSON
     void _removeComponentFromPrefab(const std::string& componentType);
 
-    // Check if entity has a specific component
+    // Check if an entity has a specific component
     bool _entityHasComponent(EntityId id, const std::string& componentType);
 
-    // Check if prefab JSON has a specific component
+    // Check if the prefab JSON has a specific component
     bool _prefabHasComponent(const std::string& componentType);
 
     // Get default JSON data when adding a new component
     nlohmann::json _getDefaultComponentData(const std::string& componentType);
 
     // Render a component section with collapsible header and delete button
-    // (Used by both entity and prefab inspection)
+    // Used by both entity and prefab inspection
     template <typename T>
     void _renderComponentSection(const std::string& headerName, const std::string& componentType,
         nlohmann::json& data, T renderContent, bool canDelete = true);
@@ -96,11 +98,7 @@ private:
     // Render a single menu item in the add component popup
     void _renderComponentMenuItem(const char* displayName, const char* componentType);
 
-    // Save prefab changes to disk and update all instances in the scene
-    void _savePrefab();
-
-    // Save the currently selected entity as a prefab asset
-    void _saveEntityAsPrefab();
+    // Removed: template saving capabilities
 
     // Font references
     ImFont* m_mainFont = nullptr;
@@ -122,4 +120,4 @@ private:
     float m_statusTimer = 0.0f;                      // How long to show status
 };
 
-#endif // INSPECTOR_WINDOW_H
+#endif

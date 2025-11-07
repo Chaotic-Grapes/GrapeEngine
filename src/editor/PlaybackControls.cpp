@@ -86,7 +86,7 @@ void Playback::ProcessInput() {
 
 // Render the playback control UI using ImGui
 void Playback::Render() {
-    // Show title bar, allow moving; keep non-resizable and keep docking enabled
+    // Window flags: NoResize prevents manual resizing; docking stays enabled by default
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize;
     // Use default ImGui tab styling; no local overrides
     ImGui::Begin("Game Controls", nullptr, flags);
@@ -114,8 +114,7 @@ void Playback::Render() {
     auto button = [&](const char* icon, bool shouldBeEnabled, GameState newState, const char* logMsg,
         bool isStepButton = false, ImVec2 size = ImVec2(100, 40))
         {
-            // If the button should not be enabled (e.g. Stop button while already stopped), wrap 
-            // the button in ImGui's BeginDisabled/EndDisabled to gray it out and prevent clicks
+            // Disabled scope: gray-out and block clicks when the control shouldn't be active
             if (!shouldBeEnabled) ImGui::BeginDisabled();
 
             // ImGui::Button returns true if the user clicks it during this frame.

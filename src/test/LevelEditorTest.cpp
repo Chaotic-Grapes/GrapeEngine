@@ -26,10 +26,12 @@ void LevelEditorTest::OnLoad() {
     const int windowWidth = config.WindowConfig.Width;
     const int windowHeight = config.WindowConfig.Height;
 
+    // how-note: Create engine window using configured resolution for the test scene
     CREATE_WINDOW("Level Editor", windowWidth, windowHeight);
 
     Services::OverlayService* overlay = Services::OverlayService::Get();
     if (overlay) {
+        // how-note: Hook ImGui-based LevelEditor overlay to this scene for UI rendering
         overlay->EnableLevelEditorForScene(this);
     }
 
@@ -37,12 +39,14 @@ void LevelEditorTest::OnLoad() {
 }
 
 void LevelEditorTest::OnUpdate() {
-    // OverlayService handles all rendering
+    // how-note: OverlayService owns the LevelEditor UI and draws it each frame
+    // Scene update can remain empty; input/rendering is managed by the overlay
 }
 
 void LevelEditorTest::OnUnload() {
     Services::OverlayService* overlay = Services::OverlayService::Get();
     if (overlay) {
+        // how-note: Unregister LevelEditor overlay to avoid dangling ImGui state/resources
         overlay->DisableLevelEditor();
     }
 

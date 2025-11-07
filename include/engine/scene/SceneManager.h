@@ -202,7 +202,14 @@ namespace Scenes {
                 sceneJson["Entities"] = std::move(entities);
                 sceneJson["EntityCount"] = entityCount;
 
-                if (!Serialization::Serializer::SaveJson(filename, "scn", sceneJson)) {
+                // Allow saving to either .json or .scn based on the filename extension
+                std::string ext = std::filesystem::path(filename).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (!ext.empty() && ext[0] == '.') ext = ext.substr(1);
+
+                const std::string expectedExt = (ext == "json" || ext == "scn") ? ext : std::string("json");
+
+                if (!Serialization::Serializer::SaveJson(filename, expectedExt, sceneJson)) {
                     LOG_ERROR("Error: Could not open file for writing: " << filename);
                     return false;
                 }
@@ -233,7 +240,14 @@ namespace Scenes {
 
             try {
                 json sceneJson;
-                if (!Serialization::Serializer::LoadJson(filename, "scn", sceneJson)) {
+                // Accept either .json or .scn scene files depending on the filename extension
+                std::string ext = std::filesystem::path(filename).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (!ext.empty() && ext[0] == '.') ext = ext.substr(1);
+
+                const std::string expectedExt = (ext == "json" || ext == "scn") ? ext : std::string("json");
+
+                if (!Serialization::Serializer::LoadJson(filename, expectedExt, sceneJson)) {
                     LOG_ERROR("Error: Cannot open file: " << filename);
                     return false;
                 }

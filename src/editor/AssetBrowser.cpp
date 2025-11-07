@@ -58,7 +58,8 @@ void AssetBrowser::SetInspector(InspectorWindow* inspector) {
 // Render the asset browser UI window
 void AssetBrowser::Render() {
     ImGui::PushFont(m_mainFont);
-    ImGui::Begin("Asset Browser");
+    // Window flags: NoScrollbar removes the vertical scrollbar; child regions handle scrolling
+    ImGui::Begin("Asset Browser", nullptr, ImGuiWindowFlags_NoScrollbar);
 
 
     // Display clickable breadcrumb navigation
@@ -73,6 +74,7 @@ void AssetBrowser::Render() {
     }
 
     // Import button (upload icon)
+    // Push symbols font so the button renders an icon glyph
     ImGui::PushFont(m_symbolsFont);
     if (ImGui::Button("\xEF\x82\x9B")) {
         m_assetLibrary._importAsset(m_currentPath, m_selectedAsset, m_statusMessage, m_statusTimer);
@@ -85,31 +87,44 @@ void AssetBrowser::Render() {
 
     ImGui::SameLine();
 
-    // Replace button (only enabled if a file is selected)
+    // Replace button (enabled only if a file is selected, not a folder)
     bool hasSelection = !m_selectedAsset.empty();
-    if (!hasSelection) ImGui::BeginDisabled();
+    bool isFolderSelection = false;
+    if (hasSelection) {
+        std::error_code ec;
+        isFolderSelection = std::filesystem::is_directory(m_selectedAsset, ec) && !ec;
+    }
+    bool enableReplace = hasSelection && !isFolderSelection;
+    // Wrap controls in BeginDisabled/EndDisabled to gray-out and block interaction when not applicable
+    if (!enableReplace) ImGui::BeginDisabled();
 
+    // Use symbols font for the replace icon button
     ImGui::PushFont(m_symbolsFont);
     if (ImGui::Button("\xEE\xA3\x94")) {
         m_assetLibrary._replaceTexture(m_selectedAsset, m_statusMessage, m_statusTimer);
     }
 
     ImGui::PopFont();
-    if (!hasSelection) ImGui::EndDisabled();
+    if (!enableReplace) ImGui::EndDisabled();
 
     // Show tooltip even when disabled
+    // Allow tooltips even when the button is disabled to explain why
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        if (hasSelection) {
-            ImGui::SetTooltip("Replace the selected texture with a new file while keeping the original name");
+        if (enableReplace) {
+            ImGui::SetTooltip("Replace the selected file with another of the same extension");
+        }
+        else if (hasSelection && isFolderSelection) {
+            ImGui::SetTooltip("Replace is disabled for folders");
         }
         else {
-            ImGui::SetTooltip("Replace selected texture with a new file (disabled)");
+            ImGui::SetTooltip("Replace (disabled)");
         }
     }
 
     ImGui::SameLine();
 
     // Prefab button (only enabled if a prefab is selected)
+    // Only enable prefab popup when a .prefab file is selected
     bool isPrefab = !m_selectedAsset.empty() && std::filesystem::path(m_selectedAsset).extension() == ".prefab";
     if (!isPrefab) ImGui::BeginDisabled();
 
@@ -133,6 +148,7 @@ void AssetBrowser::Render() {
     }
 
     // Open ImGui popup named "Prefabs"
+    // Begin a modal-style popup to choose prefab actions
     if (ImGui::BeginPopup("Prefabs")) {
         // Display selectable option "Load Prefab" in the popup
         if (ImGui::Selectable("Load Prefab")) {
@@ -225,10 +241,12 @@ void AssetBrowser::Render() {
     float windowWidth = ImGui::GetContentRegionAvail().x;
     float statusBarHeight = 26.0f;
 
-    // Content region above status bar
+    // Content region above status bar (fills remaining height; docking preserves split ratios)
+    // Child fills remaining height; negative height reserves space for the fixed status bar
     ImGui::BeginChild("ContentRegion", ImVec2(0, -statusBarHeight), false);
 
     // Left side: File/folder list (65% width)
+    // Left list child; third arg 'true' draws a frame (border) around the child
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
     m_assetLibrary._displayFolder(m_currentPath, m_selectedAsset, m_currentPath);
 
@@ -277,6 +295,7 @@ void AssetBrowser::Render() {
 
             // Style the delete button: icon font + transparent background + red text
             ImGui::PushFont(m_symbolsFont);
+            // Button: fully transparent; Hover/Active: subtle grays; Text: red to indicate destructive action
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
@@ -287,7 +306,7 @@ void AssetBrowser::Render() {
                 m_assetLibrary._deleteSelectedAsset(m_selectedAsset, m_statusMessage, m_statusTimer);
             }
 
-            // Restore style and font state
+            // Restore style overrides and font state
             ImGui::PopStyleColor(4);
             ImGui::PopFont();
 
@@ -304,6 +323,7 @@ void AssetBrowser::Render() {
     ImGui::EndChild();
 
     // Status bar (fixed at bottom; does not overlap content)
+    // Fixed-height status bar; NoScrollbar removes the vertical bar from this child
     ImGui::BeginChild("StatusBar", ImVec2(0, statusBarHeight), false, ImGuiWindowFlags_NoScrollbar);
     if (m_statusTimer > 0.0f) {
         ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
