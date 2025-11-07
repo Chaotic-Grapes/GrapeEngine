@@ -57,8 +57,6 @@ public:
     // Default destructor
     ~ResourceManager() = default;
 
-     // Storage vector for cached string paths
-    std::vector<std::string> ListCachedAudioPaths() const;
     // Template function to retrieve assets with automatic caching
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
