@@ -10,6 +10,7 @@
 #include <memory>
 #include "ECSTest.hpp"
 #include "ScriptingTest.hpp"
+#include "PhysicsTest.h"
 
 
 void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
@@ -24,6 +25,7 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     std::cout << "3. Memory Tracking Test" << '\n';
 	std::cout << "4. Entity Component System Test" << '\n';
 	std::cout << "5. C# Scripting System Test" << '\n';
+    std::cout << "6. Physics & Collision System Test" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -61,6 +63,13 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
             LOG_INFO("Starting C# Scripting System Test...");
             size_t scriptingTest = sceneManager.AddScene(new Sandbox::ScriptingTestScene());
             sceneManager.SetActive(scriptingTest);
+
+            break;
+        }
+        case 6: { 
+            LOG_INFO("Starting Physics & Collision System Test...");
+            size_t PCTest = sceneManager.AddScene(new Sandbox::PhysicsTestScene());
+            sceneManager.SetActive(PCTest);
 
             break;
         }

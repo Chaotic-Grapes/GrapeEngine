@@ -1,125 +1,112 @@
-using GrapeEngine;
-using GrapeEngine.Scripting;
-using GrapeEngine.Numerics;
+/**
+* @Name:
+* @email:
+* @file 
+* @brief 
+*
+* @details
+* to be used code for the future. nothing implemented that is used for grading just yet.
+* 
+* 
+*/
 
-namespace MyGame;
+// using GrapeEngine;
+// using GrapeEngine.Scripting;
+// using GrapeEngine.Numerics;
 
-/// <summary>
-/// Collectible item to demonstrate another unique behavior.
-/// </summary>
-public class CollectibleItem : ScriptBehaviour
-{
-    private readonly float m_bobSpeed = 2.0f;
-    private readonly float m_bobHeight = 10.0f;
-    private Vector3 m_originalPosition;
+// namespace MyGame;
 
-    // Visual entity
-    private Entity? m_visualEntity;
+// /// <summary>
+// /// Collectible item to demonstrate another unique behavior.
+// /// </summary>
+// public class CollectibleItem : ScriptBehaviour
+// {
+//     private readonly float m_bobSpeed = 2.0f;
+//     private readonly float m_bobHeight = 10.0f;
+//     private Vector3 m_originalPosition;
 
-    public override void OnStart()
-    {
-        Log("Collectible item spawned!", LogLevel.Info);
+//     // Visual entity
+//     private Entity m_visualEntity;
 
-        // Create the visual entity
-        m_visualEntity = CreateEntity();
+//     public override void OnStart()
+//     {
+//         Log("Collectible item spawned!", LogLevel.Info);
 
-        // Set up initial position
-        m_originalPosition = new Vector3(400.0f, 360.0f, 0.0f);
+//         // Create the visual entity
+//         m_visualEntity = CreateEntity(
+//             new ComponentData<LocalTransform>(new()
+//             {
+//                 Position = Vector3.Zero,
+//                 Rotation = Quaternion.Identity,
+//                 Scale = new Vector3(1, 1, 1)
+//             }),
+//             new ComponentData<ShapeCircle2D>(new()
+//             {
+//                 Radius = 12.0f,
+//                 Color = new Color { R = 1.0f, G = 0.84f, B = 0.0f, A = 1.0f }, // Gold color
+//                 Filled = true
+//             }),
+//             new ComponentData<Layer>(new() { Id = 0 }),
+//             new ComponentData<Active>(new() { Enabled = true })
+//         );
 
-        var transform = new LocalTransform
-        {
-            Position = m_originalPosition,
-            Rotation = Quaternion.Identity,
-            Scale = new Vector3(1, 1, 1)
-        };
-        m_visualEntity.SetComponent(transform);
+//         Log($"Collectible visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
+//     }
 
-        // Add yellow/gold circle visual
-        var circle = new ShapeCircle2D
-        {
-            Radius = 12.0f,
-            Color = new Color { R = 1.0f, G = 0.84f, B = 0.0f, A = 1.0f }, // Gold
-            Filled = true
-        };
-        m_visualEntity.SetComponent(circle);
-        m_visualEntity.SetComponent(new Layer { Id = 0 });
-        m_visualEntity.SetComponent(new Active { Enabled = true });
+//     public override void OnUpdate()
+//     {
+//         ref var visualTransform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var Transform);
+//         if (!Transform) return;
 
-        Log($"Collectible visual entity created: {m_visualEntity.EntityId}", LogLevel.Info);
-    }
+//         // Bob up and down
+//         var bobOffset = MathF.Sin((float)Time.ElapsedTime * m_bobSpeed) * m_bobHeight;
+//         visualTransform.Position.Y = m_originalPosition.Y + bobOffset;
 
-    public override void OnUpdate()
-    {
-        if (m_visualEntity == null || !m_visualEntity.IsAlive())
-        {
-            Log("Item entity is not alive", LogLevel.Warning);
-            return;
-        }
+//         // Rotate
+//         // Note: Simplified rotation - would use quaternions properly in full implementation
 
-        ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (!hasTransform)
-            return;
+//         // Update visual
+//         UpdateCollectibleVisual();
+//     }
 
-        // Bob up and down
-        var bobOffset = MathF.Sin((float)Time.ElapsedTime * m_bobSpeed) * m_bobHeight;
-        transform.Position.Y = m_originalPosition.Y + bobOffset;
+//     private void UpdateCollectibleVisual()
+//     {
+//         ref var shapeVisual = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var circle);
+//         if (!circle) return;
 
-        // Rotate
-        // Note: Simplified rotation - would use quaternions properly in full implementation
+//         // Rainbow color cycle
+//         var hue = ((float)Time.ElapsedTime * 0.5f) % 1.0f;
+//         var (r, g, b) = HSVToRGB(hue, 1.0f, 1.0f);
+//         // Since hue is being used, we need to convert HSV to RGB
+//         // More details below in HSVToRGB method
 
-        m_visualEntity.SetComponent(transform);
+//         shapeVisual.Color.R = r;
+//         shapeVisual.Color.G = g;
+//         shapeVisual.Color.B = b;
+//         shapeVisual.Color.A = 1.0f;
+//     }
 
-        // Update visual
-        UpdateCollectibleVisual();
-    }
+//     // Note: This is only a sample method for the sake of the demo.
+//     // Method adapted from https://gist.github.com/mjackson/5311256
+//     private (float r, float g, float b) HSVToRGB(float h, float s, float v)
+//     {
+//         var hi = (int)(h * 6.0f) % 6;
+//         var f = h * 6.0f - hi;
+//         var p = v * (1.0f - s);
+//         var q = v * (1.0f - f * s);
+//         var t = v * (1.0f - (1.0f - f) * s);
 
-    private void UpdateCollectibleVisual()
-    {
-        if (m_visualEntity == null || !m_visualEntity.IsAlive())
-        {
-            Log("Item entity is not alive", LogLevel.Warning);
-            return;
-        }
+//         float r, g, b;
+//         switch (hi)
+//         {
+//             case 0: r = v; g = t; b = p; break;
+//             case 1: r = q; g = v; b = p; break;
+//             case 2: r = p; g = v; b = t; break;
+//             case 3: r = p; g = q; b = v; break;
+//             case 4: r = t; g = p; b = v; break;
+//             default: r = v; g = p; b = q; break;
+//         }
 
-        ref var circle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var hasCircle);
-        if (!hasCircle)
-            return;
-
-        // Rainbow color cycle
-        var hue = ((float)Time.ElapsedTime * 0.5f) % 1.0f;
-        var (r, g, b) = HSVToRGB(hue, 1.0f, 1.0f);
-        // Since hue is being used, we need to convert HSV to RGB
-        // More details below in HSVToRGB method
-
-        circle.Color.R = r;
-        circle.Color.G = g;
-        circle.Color.B = b;
-        circle.Color.A = 1.0f;
-
-        m_visualEntity.SetComponent(circle);
-    }
-
-    // Note: This is only a sample method for the sake of the demo.
-    // Method adapted from https://gist.github.com/mjackson/5311256
-    private (float r, float g, float b) HSVToRGB(float h, float s, float v)
-    {
-        var hi = (int)(h * 6.0f) % 6;
-        var f = h * 6.0f - hi;
-        var p = v * (1.0f - s);
-        var q = v * (1.0f - f * s);
-        var t = v * (1.0f - (1.0f - f) * s);
-
-        float r, g, b;
-        switch (hi)
-        {
-            case 0: r = v; g = t; b = p; break;
-            case 1: r = q; g = v; b = p; break;
-            case 2: r = p; g = v; b = t; break;
-            case 3: r = p; g = q; b = v; break;
-            case 4: r = t; g = p; b = v; break;
-            default: r = v; g = p; b = q; break;
-        }
-
-        return (r, g, b);
-    }
-}
+//         return (r, g, b);
+//     }
+// }

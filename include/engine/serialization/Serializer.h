@@ -74,6 +74,7 @@ namespace Serialization {
                 LOG_ERROR("Error: File extension must be " << expectedExt);
                 return false;
             }
+
             std::ofstream file(filename);
 
             if (!file.is_open()) {

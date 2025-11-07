@@ -1,3 +1,38 @@
+/* Start Header *****************************************************************/
+/*!
+\file   ScriptBehaviour.cs
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   25th October 2025
+\brief
+Base class for all entity scripts in GrapeEngine. Inherit from this class to
+create custom behaviors for entities.
+
+\details
+Provides lifecycle methods (OnStart, OnUpdate, etc.) and convenient access to
+entity components and management functions.
+
+\code
+public class MyScript : ScriptBehaviour
+{
+    public override void OnStart()
+    {
+        Log("MyScript started!");
+    }
+
+    public override void OnUpdate()
+    {
+        // Custom update logic here
+    }
+}
+\endcode
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 using GrapeEngine.ScriptAPI.Unsafe;
 
 namespace GrapeEngine.Scripting;

@@ -1,3 +1,26 @@
+/**
+* @Name: Dalton koh, 2403250
+* @email: d.koh@digipen.edu
+* @file PlayerController.cs
+* @brief Keyboard-controlled green circle with rotation and pulsing visuals.
+*
+* @details
+* Demonstrates basic input-driven movement in GrapeEngine:
+* - WASD for movement, Q/E for rotation around Z (if we going to make it underwwater like but not just yet)
+* - Clamps motion inside world boundaries
+* - Pulsing radius/brightness for active visual feedback
+* Provides a static Instance getter so other scripts (EnemyAI) can query the
+* player's visual entity.
+*
+* @dependencies
+* - GrapeEngine (Log, World, Time, Input)
+* - GrapeEngine.Numerics (Vector2/3, Quaternion, Color)
+* - GrapeEngine.Scripting (ScriptBehaviour, Entity, ComponentData<>)
+* 
+* Copyright (C) 2025 DigiPen Institute of Technology.
+* Reproduction or disclosure of this file or its contents without the
+*/
+
 using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
@@ -9,19 +32,26 @@ namespace MyGame;
 /// </summary>
 public class PlayerController : ScriptBehaviour
 {
+    //create static instance container to be get by other class 
+    public static PlayerController Instance { get; private set; }
+
     // Movement settings
     private readonly float m_moveSpeed = 200.0f;
     private float m_rotationSpeed = 180.0f;
 
     // Visual entity that represents the player
-    private Entity? m_visualEntity;
+    private Entity m_visualEntity;
 
     public override void OnStart()
     {
+        // Set the static Instance property to point to this specific PlayerController object
+        // This allows other classes to access this PlayerController via PlayerController.Instance
+        Instance = this;
+        
         Log("PlayerController initialized!", LogLevel.Info);
         Log("Use WASD to move, Q/E to rotate", LogLevel.Info);
 
-        // Create the visual entity for the player
+        // Create the entity for the player
         m_visualEntity = CreateEntity(
             new ComponentData<LocalTransform>(new()
             {
@@ -44,19 +74,16 @@ public class PlayerController : ScriptBehaviour
 
     public override void OnUpdate()
     {
-        if (m_visualEntity == null || !m_visualEntity.IsAlive())
-        {
-            Log("PlayerController entity is not alive", LogLevel.Warning);
+        // get transform of player
+        ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var Transform);
+
+        // player has no transform log problem
+        if (!Transform)
+        { 
+            Log("PlayerController: No LocalTransform component on visual entity!", LogLevel.Warning);
             return;
         }
 
-        if (!m_visualEntity.HasComponent<LocalTransform>())
-        {
-            Log("PlayerController entity missing LocalTransform component", LogLevel.Warning);
-            return;
-        }
-
-        ref var transform = ref m_visualEntity.GetComponent<LocalTransform>();
 
         // WASD movement with keyboard input
         var movement = Vector2.Zero;
@@ -98,16 +125,9 @@ public class PlayerController : ScriptBehaviour
             transform.Rotation.Z = MathF.Sin(newAngle / 2.0f);
         }
 
-        var oldPosition = transform.Position;
-
         // Clamp to world bounds
         transform.Position.X = Math.Clamp(transform.Position.X, World.WallThickness, World.Width - World.WallThickness);
         transform.Position.Y = Math.Clamp(transform.Position.Y, World.WallThickness, World.Height - World.WallThickness);
-
-        if (!oldPosition.Equals(transform.Position))
-        {
-            Log($"Player position clamped to: {transform.Position}", LogLevel.Info);
-        }
 
         // Update visual feedback
         UpdateVisual();
@@ -115,32 +135,39 @@ public class PlayerController : ScriptBehaviour
 
     private void UpdateVisual()
     {
-        if (m_visualEntity == null || !m_visualEntity.IsAlive())
-        {
-            Log("PlayerController entity is not alive", LogLevel.Warning);
-            return;
-        }
+        // Make the player pulse to show it's active
+        ref var shapeCircle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var Circle);
+        if (!Circle) return;
 
-        if (!m_visualEntity.HasComponent<ShapeCircle2D>())
-        {
-            Log("PlayerController entity missing ShapeCircle2D component", LogLevel.Warning);
-            return;
-        }
-
-        ref var circle = ref m_visualEntity.GetComponent<ShapeCircle2D>();
 
         var pulse = 0.9f + 0.1f * MathF.Sin((float)Time.ElapsedTime * 5.0f);
-        circle.Radius = 20.0f * pulse;
+        shapeCircle.Radius = 20.0f * pulse;
 
         // Keep green color but change brightness
-        circle.Color.R = 0.0f;
-        circle.Color.G = pulse;
-        circle.Color.B = 0.0f;
-        circle.Color.A = 1.0f;
+        shapeCircle.Color.R = 0.0f;
+        shapeCircle.Color.G = pulse;
+        shapeCircle.Color.B = 0.0f;
+        shapeCircle.Color.A = 1.0f;
+    }
+
+    //getter for visual entity (so EnemyAI can access it)
+    public Entity GetVisualEntity()
+    {
+        return m_visualEntity;
     }
 
     public override void OnFixedUpdate()
     {
         // Physics-based updates would go here if needed but not used in this demo
+    }
+
+    //kill character
+    public override void OnDestroy()
+    {
+        // Clear static instance when destroyed
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 }

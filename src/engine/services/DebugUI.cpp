@@ -18,6 +18,7 @@
 #include "audio/SoundTypes.h"
 #include "helpers/EntityUtils.h"
 #include "scene/Scene.h"
+#include "services/ResourceManager.h"
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
@@ -65,6 +66,21 @@
 // Standard constructor and destructor
 // raw ptr: DebugUI doesn't own the scene
 DebugUI::DebugUI(const DebugUIConfig& config) : m_config(config) {}
+
+// input text to string helper
+static bool InputTextStdString(const char* label, std::string& str, ImGuiInputTextFlags flags = 0)
+{
+    char buf[256];
+    // Initialize buffer with current string
+    if (!str.empty())
+        std::snprintf(buf, sizeof(buf), "%s", str.c_str());
+    else
+        buf[0] = '\0';
+
+    bool changed = ImGui::InputText(label, buf, sizeof(buf), flags);
+    if (changed) str = buf; // write result back
+    return changed;
+}
 
 DebugUI::~DebugUI() {
     // Clean up resources only if UI was initialized
@@ -299,103 +315,191 @@ void DebugUI::_showPerformanceWindow() const {
     ImGui::End();
 }
 
-void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device) {
-    if (!device) return;
 
-    ImGui::SetNextWindowPos(ImVec2(10, 300), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(320, 240), ImGuiCond_Once);
-    ImGui::Begin("Audio Monitor");
 
-    // Master volume
-    float masterVol = device->GetMasterVolume();
-    if (ImGui::SliderFloat("Master Volume", &masterVol, 0.0f, 1.0f)) {
-        device->SetMasterVolume(masterVol);
+    // ----------------------------------------------------------------------
+   // Cached Library: quick-click lists for cached assets and loaded cues
+   // ----------------------------------------------------------------------
+void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
+{
+    if (!ImGui::Begin("Audio Monitor / Library")) { ImGui::End(); return; }
+
+    ImGui::Text("Device Status: %s", device ? "Attached" : "NULL (No Audio Device)");
+    ImGui::Separator();
+
+    if (!device) {
+        ImGui::TextWrapped("No audio device available.\n"
+            "Call DebugUI::AttachAudio(audioService.Device()) "
+            "AFTER AudioService::Initialize().");
+        ImGui::End();
+        return;
     }
 
-    // Toggle library window
-    static bool showLibrary = false;
-    if (ImGui::Button("Open Audio Library")) showLibrary = true;
+    // Master volume
+    {
+        float master = device->GetMasterVolume();
+        if (ImGui::SliderFloat("Master Volume", &master, 0.0f, 1.0f))
+            device->SetMasterVolume(master);
+    }
 
-    ImGui::End();
+    ImGui::Separator();
 
-    if (!showLibrary) return;
+    // Manual loader (first-time by path)
+    if (ImGui::CollapsingHeader("Manual Load / Play (Path + Cue)", ImGuiTreeNodeFlags_DefaultOpen)) {
+        static std::string cueName{};
+        static std::string filePath{};
+        static bool loop = false;
 
-    ImGui::SetNextWindowSize(ImVec2(560, 440), ImGuiCond_Once);
-    if (ImGui::Begin("Audio Library", &showLibrary)) {
-        struct Row {
-            std::string CueId;
-            std::string Path;
-            Audio::PlaySettings Settings{};
-            Audio::PlaybackHandle Handle{};
-        };
-        static std::vector<Row> rows;
+        ImGui::SetNextItemWidth(260.f);
+        InputTextStdString("Cue Name", cueName);
 
-        // Inputs to add a new cue
-        static char cueBuf[128] = {};
-        static char pathBuf[512] = {};
-        ImGui::InputTextWithHint("Cue ID", "Identifier to reference this sound", cueBuf, sizeof(cueBuf));
-        ImGui::InputTextWithHint("Path", "Path to audio file (wav/mp3/ogg/flac...)", pathBuf, sizeof(pathBuf));
+        ImGui::SetNextItemWidth(520.f);
+        InputTextStdString("Audio File Path", filePath);
         ImGui::SameLine();
-        if (ImGui::Button("Load")) {
-            std::string cue = cueBuf, path = pathBuf;
-            if (!cue.empty() && !path.empty()) {
-                Audio::SoundParams params{};
-                params.stream = false;
-                params.defaultVolume = 1.0f;
-                params.is3D = false;
-
-                if (device->LoadCue(cue, path, params)) {
-                    rows.push_back(Row{ cue, path, Audio::PlaySettings{}, {} });
-                    cueBuf[0] = '\0';
-                    pathBuf[0] = '\0';
-                } else {
-                    ImGui::OpenPopup("Audio Load Error");
-                }
-            }
-        }
-        if (ImGui::BeginPopupModal("Audio Load Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted("Failed to load audio cue.");
-            if (ImGui::Button("OK"))
-                ImGui::CloseCurrentPopup();
+        if (ImGui::Button("Tip")) ImGui::OpenPopup("path_tip");
+        if (ImGui::BeginPopup("path_tip")) {
+            ImGui::TextWrapped("Use a full path once:\n"
+                "  C:/project/assets/audio/bgm1.ogg\n"
+                "Then switch to relative.");
             ImGui::EndPopup();
         }
 
-        ImGui::Separator();
+        ImGui::Checkbox("Loop", &loop);
 
-        // Rows for loaded cues
-        for (size_t i = 0; i < rows.size(); ++i) {
-            auto& r = rows[i];
-            ImGui::PushID(static_cast<int>(i));
+        ImGui::BeginDisabled(cueName.empty() || filePath.empty());
 
-            ImGui::Text("Cue: %s", r.CueId.c_str());
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Play")) {
-                if (r.Handle)
-					device->Stop(r.Handle, Audio::StopMode::Immediate);
-                r.Handle = device->Play(r.CueId, r.Settings);
+        if (ImGui::Button("Load Cue")) {
+            Audio::SoundParams p{}; p.stream = true; p.is3D = false; // music
+            if (!device->LoadCue(cueName, filePath, p)) {
+                LOG_ERROR("LoadCue failed. Path='%s' Cue='%s'", filePath.c_str(), cueName.c_str());
             }
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Stop")) {
-                if (r.Handle)
-                    device->Stop(r.Handle, Audio::StopMode::Immediate);
-                r.Handle = {};
+            else {
+                LOG_INFO("Loaded Cue='%s' from Path='%s'", cueName.c_str(), filePath.c_str());
             }
+        }
 
-            // Per-instance controls for next Play; if you want live editing, apply to handle as well
-            ImGui::SliderFloat("Volume", &r.Settings.volume, 0.0f, 1.0f);
-            ImGui::SliderFloat("Pitch", &r.Settings.pitch, 0.25f, 4.0f);
-            ImGui::Checkbox("Loop", &r.Settings.loop);
+        ImGui::SameLine();
 
-            // If a handle is active, allow live volume tweak
-            if (r.Handle) {
-                float liveVol = r.Settings.volume;
-                if (ImGui::SliderFloat("Instance Volume", &liveVol, 0.0f, 1.0f)) {
-                    device->SetInstanceVolume(r.Handle, liveVol);
+        if (ImGui::Button("Play")) {
+            Audio::PlaySettings s{}; s.loop = loop; s.volume = 1.0f; s.pitch = 1.0f;
+            auto h = device->PlaySingle(cueName, s, Audio::PlayPolicy::SingleInstanceRestart);
+            if (!h) LOG_ERROR("Play failed. Cue may not be loaded. Cue='%s'", cueName.c_str());
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Stop")) {
+            device->StopCue(cueName, Audio::StopMode::Immediate);
+        }
+
+        ImGui::EndDisabled();
+    }
+
+    ImGui::Separator();
+
+    // Cached Library
+    if (ImGui::CollapsingHeader("Cached Library", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        // A) FMOD-loaded cues
+        {
+            ImGui::TextUnformatted("Loaded Cues (FMOD)");
+            if (ImGui::BeginTable("loaded_cues", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+                ImGui::TableSetupColumn("Cue Id");
+                ImGui::TableSetupColumn("Source Path");
+                ImGui::TableSetupColumn("Actions");
+                ImGui::TableHeadersRow();
+
+                static std::vector<std::pair<std::string, std::string>> s_cues;
+                s_cues.clear();
+                device->GetLoadedCues(s_cues);
+
+                for (const auto& [cueId, path] : s_cues) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(cueId.c_str());
+                    ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(path.c_str());
+                    ImGui::TableSetColumnIndex(2);
+
+                    std::string playLbl = "Play##" + cueId;
+                    std::string stopLbl = "Stop##" + cueId;
+
+                    if (ImGui::SmallButton(playLbl.c_str())) {
+                        Audio::PlaySettings s{}; s.loop = false; s.volume = 1.0f; s.pitch = 1.0f;
+                        device->PlaySingle(cueId, s, Audio::PlayPolicy::SingleInstanceRestart);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton(stopLbl.c_str())) {
+                        device->StopCue(cueId, Audio::StopMode::Immediate);
+                    }
                 }
+                ImGui::EndTable();
             }
+        }
 
-            ImGui::Separator();
-            ImGui::PopID();
+        ImGui::Spacing();
+
+        // B) ResourceManager cached files (bytes cached -> Load/Play by path)
+        {
+            ImGui::TextUnformatted("Cached Files (ResourceManager)");
+            if (ImGui::BeginTable("cached_files", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+                ImGui::TableSetupColumn("Path");
+                ImGui::TableSetupColumn("Cue Id");
+                ImGui::TableSetupColumn("Actions");
+                ImGui::TableHeadersRow();
+
+                const auto cached = RM.ListCachedAudioPaths(); // requires your small RM helper
+                static std::unordered_map<size_t, std::string> s_rowCueId;
+
+                for (size_t i = 0; i < cached.size(); ++i) {
+                    const std::string& path = cached[i];
+                    ImGui::TableNextRow();
+
+                    // path
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(path.c_str());
+
+                    // derived default cue
+                    ImGui::TableSetColumnIndex(1);
+                    std::string defaultCue = path;
+                    if (auto pos = defaultCue.find_last_of("/\\"); pos != std::string::npos)
+                        defaultCue = defaultCue.substr(pos + 1);
+                    if (auto dot = defaultCue.find_last_of('.'); dot != std::string::npos)
+                        defaultCue = defaultCue.substr(0, dot);
+
+                    auto& editCue = s_rowCueId[i];
+                    if (editCue.empty()) editCue = defaultCue;
+
+                    std::string inputId = "##cue_" + std::to_string(i);
+                    ImGui::SetNextItemWidth(200.0f);
+                    InputTextStdString(inputId.c_str(), editCue);
+
+                    // actions
+                    ImGui::TableSetColumnIndex(2);
+                    std::string loadLbl = "Load##" + std::to_string(i);
+                    std::string playLbl = "Load+Play##" + std::to_string(i);
+
+                    if (ImGui::SmallButton(loadLbl.c_str())) {
+                        Audio::SoundParams p{}; p.stream = true; p.is3D = false;
+                        if (!device->LoadCue(editCue, path, p)) {
+                            LOG_ERROR("LoadCue failed for cached path: %s", path.c_str());
+                        }
+                        else {
+                            LOG_INFO("Loaded cue: %s from cached path: %s", editCue.c_str(), path.c_str());
+                        }
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton(playLbl.c_str())) {
+                        Audio::SoundParams p{}; p.stream = true; p.is3D = false;
+                        if (!device->LoadCue(editCue, path, p)) {
+                            LOG_ERROR("LoadCue failed for cached path: %s", path.c_str());
+                        }
+                        else {
+                            Audio::PlaySettings s{}; s.loop = false; s.volume = 1.0f; s.pitch = 1.0f;
+                            device->PlaySingle(editCue, s, Audio::PlayPolicy::SingleInstanceRestart);
+                        }
+                    }
+                }
+                ImGui::EndTable();
+            }
         }
     }
 

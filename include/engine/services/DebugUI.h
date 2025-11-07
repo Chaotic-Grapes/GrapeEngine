@@ -228,7 +228,7 @@ public:
      * from the world and updating the UI cache.
      */
     void RemoveGameObject(PackedEntityId id) const;
-    
+
     /**
      * @brief Clone an existing game object
      * @param entity Entity to clone

@@ -1,3 +1,11 @@
+/**
+ * @Name: Dalton koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file    Collision.h
+ * 
+ * @brief   contain's defintiions of structs and function declarations used
+ * in collision.cpp
+ */
 #ifndef COLLISION_H
 #define COLLISION_H
 
@@ -34,25 +42,23 @@ namespace Engine {
         };
 
         struct Manifold {
-            Vector2D Normal;  // points from B -> A
+            Vector2D Normal;  
             float Penetration = 0.0f;
-            Vector2D Contact; // optional representative point
+            Vector2D Contact; 
             bool Valid = false;
         };
 
         struct SweepHit {
-            float TimeOfImpact = 1.0f; // time of impact in [0,1]
-            Vector2D Normal;           // unit normal from B -> A at impact
-            Vector2D ContactA;         // optional
-            Vector2D ContactB;         // optional
+            float TimeOfImpact = 1.0f; 
+            Vector2D Normal;           
+            Vector2D ContactA;         
+            Vector2D ContactB;        
             bool Hit = false;
         };
 
         // Builders
         static LineSegment MakeSegment(const Vector2D& p0, const Vector2D& p1);
-        static AABB MakeAABBMinMax(const Vector2D& minPt, const Vector2D& maxPt);
         static AABB MakeAABBCenterSize(const Vector2D& center, const Vector2D& size);
-        static Triangle MakeEquilateral(const Vector2D& c, float side, float angleRad);
 
         // Queries / Intersections
         static bool CircleVsSegmentSweep(

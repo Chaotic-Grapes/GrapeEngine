@@ -1,3 +1,23 @@
+/**
+* @Name: Muhammad Nur Fadzly Bin Zulkifli
+* @email: muhammadnurfadzly.b@digipen.edu
+* @file: EntityManager.cs
+* @brief: Scene bootstrap script: walls, player/enemy/collectible controllers.
+*
+* @details
+* Creates a simple test world fully from script:
+* - Four boundary walls sized to World.* constants
+* - Controller entities for Player, two Enemies, two Collectibles
+* The visual entities are spawned by their respective controllers.
+*
+* @dependencies
+* - GrapeEngine scripting API and Numerics
+*
+* Copyright (C) 2025 DigiPen Institute of Technology.
+* Reproduction or disclosure of this file or its contents without the
+* prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+
 using GrapeEngine;
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
@@ -14,11 +34,11 @@ public class EntityManager : ScriptBehaviour
 // Could consider changing to something more standard and not specific to American/British English.
 {
     // Entity references for spawned objects
-    private Entity m_player;
-    private Entity m_enemy1;
-    private Entity m_enemy2;
-    private Entity m_collectible1;
-    private Entity m_collectible2;
+    //private Entity m_player;
+    //private Entity m_enemy1;
+    //private Entity m_enemy2;
+    //private Entity m_collectible1;
+    //private Entity m_collectible2;
 
     // Controller entities (separate from visuals)
     private Entity m_playerController;
@@ -151,8 +171,8 @@ public class EntityManager : ScriptBehaviour
 
         // Create a controller entity for the PlayerController script
         m_playerController = CreateEntity(
-            new ComponentData<Active>(new() { Enabled = true }
-        ));
+            new ComponentData<Active>(new() { Enabled = true })
+        );
         
         // The PlayerController script will create its own visual entity
         // We just need to attach the script component

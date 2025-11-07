@@ -1,4 +1,20 @@
-﻿#ifndef WINDOW_H
+﻿/* Start Header *****************************************************************/
+/*!
+\file   Window.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   14th September 2025
+\brief
+Window management utilities for the engine. Provides functions to create,
+destroy, and manage windows.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#ifndef WINDOW_H
 #define WINDOW_H
 
 #include <string>

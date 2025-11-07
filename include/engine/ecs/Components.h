@@ -271,6 +271,7 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<CircleCollider2D>, "CircleCollider2D must be trivially copyable");
 
+
         // ---------------------------------- Rendering ----------------------------------
 
         // 2D sprite renderer (for UI/2D layers)
@@ -285,6 +286,7 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
+
         // Optional: sprite flipping flags for atlases
         struct SpriteFlip2D {
         public:
