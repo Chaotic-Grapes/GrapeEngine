@@ -8,7 +8,7 @@ if "%JOBS%"=="" set JOBS=%NUMBER_OF_PROCESSORS%
 
 echo.
 echo ===============================================
-echo           Building Project (%CONFIG)
+echo           Building Project (%CONFIG%)
 echo ===============================================
 
 REM Create build folder if it doesn't exist

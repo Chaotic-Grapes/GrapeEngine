@@ -21,9 +21,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Input.h"
 
 // CoreCLR hosting headers
-#include <nethost.h>
-#include <hostfxr.h>
-#include <coreclr_delegates.h>
+#include <coreclr/nethost.h>
+#include <coreclr/hostfxr.h>
+#include <coreclr/coreclr_delegates.h>
 
 // Standard headers
 #include <iostream>
