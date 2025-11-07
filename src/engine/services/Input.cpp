@@ -119,12 +119,12 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
     if (action == GLFW_PRESS) {
         m_keyDown[key] = true;
         m_keyPressed[key] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::KeyPressed{ key });
+        Messaging::MessageSystem::Notify(Messaging::KeyPressed{ key });
     }
     else if (action == GLFW_RELEASE) {
         m_keyDown[key] = false;
         m_keyUp[key] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key });
+        Messaging::MessageSystem::Notify(Messaging::KeyReleased{ key });
     }
 }
 

@@ -19,8 +19,8 @@ static void FramebufferSizeCallback(GLFWwindow* window, const int width, const i
         self->Resize(width, height);
     }
 
-    // Broadcast resize message
-    Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
+	// Notify resize message
+	Messaging::MessageSystem::Notify(Messaging::WindowResized{ width, height });
 }
 
 Window::~Window() { Destroy(); }
