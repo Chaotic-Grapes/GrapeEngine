@@ -280,6 +280,8 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                 float yPos = startY + row * spacing;
 
                 Entity e = CreateOnLayer(m_testLayer,
+
+                    // Attach components
                     Components::LocalTransform{
                         Vector3D(xPos, yPos, 0.0f),
                         Quaternion(0.0f, 0.0f, 0.0f, 1.0f),
@@ -332,6 +334,8 @@ void PhysicsTestScene::PhysicsForces() {
 
         // Create ground platform
         Entity ground = CreateOnLayer(m_testLayer,
+
+            // Attach components 
             Components::LocalTransform{
                 Vector3D(worldWidth / 2.0f, 100.0f, 0.0f),
                 Quaternion(0.0f, 0.0f, 0.0f, 1.0f),
@@ -366,6 +370,7 @@ void PhysicsTestScene::PhysicsForces() {
 
            // create boxe entities
             Entity box = CreateOnLayer(m_testLayer,
+                // Attach components
                 Components::LocalTransform{
                     Vector3D(xPos, 500.0f, 0.0f),
                     Quaternion(0.0f, 0.0f, 0.0f, 1.0f),
@@ -400,6 +405,8 @@ void PhysicsTestScene::PhysicsForces() {
 
             //create ball entities
             Entity ball = CreateOnLayer(m_testLayer,
+
+                // Attach components
                 Components::LocalTransform{
                     Vector3D(RandomFloat(200.0f, worldWidth - 200.0f), 700.0f, 0.0f),
                     Quaternion(0.0f, 0.0f, 0.0f, 1.0f),
@@ -490,6 +497,8 @@ void PhysicsTestScene::BroadNarrowPhaseCollision() {
         // Add static obstacles
         for (int i = 0; i < 10; ++i) {
             Entity obstacle = CreateOnLayer(m_testLayer,
+
+                // Attach components
                 Components::LocalTransform{
                     Vector3D(
                         RandomFloat(200.0f, worldWidth - 200.0f),
