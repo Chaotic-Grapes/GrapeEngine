@@ -286,7 +286,7 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                         Vector3D(1.0f, 1.0f, 1.0f)
                     },
                     Components::Rigidbody2D{
-                        1.5f, 1.0f / 1.5f, 0.1f, 0.1f, 1.0f, 0
+                       2.0f, 0.5f, 0.0f , 0.3f, 1.0f, 2
                     },
                     // with high initial velocity to seem like an explosion
                     Components::LinearVelocity2D{
@@ -295,7 +295,7 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                     Components::AngularVelocity2D{ RandomFloat(-500.0f, 500.0f) },
                     Components::PhysicsMaterial2D{
                         0.2f,           // Friction
-                        restitution,    // Restitution (varies by row)
+                        restitution,    // Restitution (varies by row) -> diff restitution
                         0.5f            // PositionCorrectPercent
                     },
                     Components::CircleCollider2D{
@@ -303,7 +303,7 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                     },
                     Components::ShapeCircle2D{
                         25.0f, Vector2D(0.0f, 0.0f),
-                        Color(1.0f - restitution, restitution, 0.5f, 1.0f),
+                        Color(1.0f - restitution, restitution, 0.5f, 1.0f), // Just to give random colour
                         1.0f, true
                     },
                     Components::Active{ true }
@@ -463,12 +463,12 @@ void PhysicsTestScene::BroadNarrowPhaseCollision() {
                     Vector3D(1.0f, 1.0f, 1.0f)
                 },
                 Components::Rigidbody2D{
-                    1.5f, 1.0f / 1.5f, 0.1f, 0.1f, 0.5f, 0
+                 // default values
                 },
                 Components::LinearVelocity2D{
-                    Vector2D(RandomFloat(-200.0f, 200.0f), RandomFloat(-200.0f, 200.0f))
+                    Vector2D(RandomFloat(-700.0f, 700.0f), RandomFloat(-500.0f, 500.0f))
                 },
-                Components::AngularVelocity2D{ RandomFloat(-180.0f, 180.0f) },
+                Components::AngularVelocity2D{ RandomFloat(-480.0f, 480.0f) },
                 Components::CircleCollider2D{
                     12.0f, Vector2D(0.0f, 0.0f), 0xFFFFFFFF, 0
                 },
