@@ -468,7 +468,6 @@ void EditorCore::_createNewScene() {
         }
     }
 
-    ClearAllEntities();
     m_currentScenePath.clear();
     m_currentSceneName = "Untitled";
 }

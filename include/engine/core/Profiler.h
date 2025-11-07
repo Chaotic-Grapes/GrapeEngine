@@ -1,3 +1,15 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Profiler.h
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+\date   7th November 2025
+\brief
+Declares the Profiler for FPS/frame time tracking and scoped performance measurement,
+plus RAII ProfileScope helper.
+*/
+/* End Header *******************************************************************/
+
 #ifndef PROFILER_H
 #define PROFILER_H
 
@@ -25,38 +37,39 @@ public:
     // Define the map type for clarity
     using ScopeDataMap = std::map<std::string, ScopeData>;
 
-    /**
-     * @brief Get the singleton instance of the Profiler
-     * @return Reference to the Profiler instance
-     */
+    // Get the singleton instance of the Profiler.
     static Profiler& Get() {
         static Profiler instance;
         return instance;
     }
 
+    // Update FPS and frame time; call once per frame.
     static void UpdateTime(double fpsCalcInt = 1.0);
 
     // Static member declarations
+    // Latest FPS computed by UpdateTime.
     static double Fps;
+    // Latest frame time (ms) computed by UpdateTime.
     static double FrameTimeMs;
 
-    /// Gets a const reference to the map of all profiling scopes.
-    /// This allows other systems (like the DebugUI) to read the data.
-    //const std::unordered_map<std::string, ScopeData>& GetScopes() const { return m_scopes; }
+    // Read-only access to all profiling scopes (e.g., for Debug UI).
     const ScopeDataMap& GetScopes() const { return m_scopes; }
 
+    // Returns current frames-per-second.
     static float GetFPS();
+    // Returns current frame time in milliseconds.
     static float GetFrameTimeMs();
+    // Read-only access to all scope timing data.
     static const ScopeDataMap& GetAllScopeData();
+    // Accumulated total of all scope times measured in the last frame.
     static double GetTotalScopeTimes();
+    // Clears timing history for all scopes.
     static void ClearHistory();
 
-    /// Starts a timing scope. This is a public method but is
-    /// intended to be used by the ProfileScope class.
+    // Begin a timing scope (used by ProfileScope).
     void BeginScope(const std::string& scopeName);
 
-    /// Ends a timing scope and logs the elapsed time. This is a public method but is
-    /// intended to be used by the ProfileScope class.
+    // End a timing scope and record elapsed time.
     void EndScope(const std::string& scopeName);
 
 private:
@@ -67,8 +80,10 @@ private:
     std::map<std::string, std::chrono::steady_clock::time_point> m_startTimes;
     std::map<std::string, ScopeData> m_scopes;
 
+    // Cached sum of all scope timings from the last frame.
     static double m_lastTotalScopeTime;
 
+    // Number of recent frames retained per scope.
     static const int MAX_HISTORY_FRAMES = 120;
 };
 
@@ -77,11 +92,13 @@ private:
 // Uses the RAII (Resource Acquisition Is Initialization) pattern.
 class ProfileScope {
 public:
+    // Begins a profiling scope upon construction.
     explicit ProfileScope(const std::string& scopeName)
         : m_scopeName(scopeName) {
         Profiler::Get().BeginScope(m_scopeName);
     }
 
+    // Ends the profiling scope upon destruction.
     ~ProfileScope() {
         Profiler::Get().EndScope(m_scopeName);
     }

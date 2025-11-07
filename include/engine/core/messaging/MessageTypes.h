@@ -1,42 +1,20 @@
-/*****************************************************************************/
+/* Start Header *****************************************************************/
 /*!
-\file       GameObjectManagement.cpp
-\author     Samantha Leong (s.leong@digipen.edu)
-\par        DigiPen login: 2403088
-\date       2025-11-03
+\file   MessageTypes.h
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+\date   3rd November 2025
 \brief
- * Defines a collection of message/event types used across the engine to allow
- * decoupled communication between systems. Each struct represents a specific
- * type of event (window, input, gameplay, audio, debug, etc.) that can be
- * broadcast via the MessageBus system.
- *
- * @Usage:
- * Each system can subscribe to a specific message type and receive it when
- * broadcast:
- * @code{.cpp}
- * // Example: subscribing to a collision event
- * auto handle = Messaging::MessageSystem::Subscribe<Messaging::CollisionDetected>(
- *     [](const Messaging::CollisionDetected& e) {
- *         std::cout << "Collision between " << e.EntityA << " and " << e.EntityB
- *                   << " with impact " << e.ImpactForce << std::endl;
- *     }
- * );
- *
- * // Broadcast example
- * Messaging::CollisionDetected collision{ playerID, wallID, 9.8f };
- * Messaging::MessageSystem::Notify(collision);
- * @endcode
- *
-Copyright (C) 2025 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without prior
-written consent of DigiPen Institute of Technology is prohibited.
+Defines message/event types used across the engine to enable decoupled
+communication between systems (window, input, gameplay, audio, debug, etc.).
 */
-/*****************************************************************************/
+/* End Header *******************************************************************/
 
 #ifndef MESSAGETYPES_H
 #define MESSAGETYPES_H
 
 #include <string>
+#include <functional>
 
 
 namespace Messaging {
@@ -44,37 +22,24 @@ namespace Messaging {
     // Window Events
     // -------------------------------
 
-    /**
-    * @struct WindowResized
-    * @brief Sent when the window is resized.
-    */
+    // Sent when the window is resized.
     struct WindowResized {
         int Width;
         int Height;
         float AspectRatio;
         
-        /**
-         * @brief Constructs a WindowResized event
-         * @param w New width
-         * @param h New height
-         */
+        // Construct with new width/height; computes aspect ratio.
         WindowResized(int w, int h)
             : Width(w), Height(h), AspectRatio(static_cast<float>(w) / h) {
         }
     };
 
-    /**
-     * @struct WindowClosed
-     * @brief Sent when the window is requested to close.
-     */
+    // Sent when the window is requested to close.
     struct WindowClosed {
         bool UserInitiated; // True if the user closed the window
     };
 
-    /**
-     * @struct WindowFocusChanged
-     * @brief Sent when window focus changes.
-     */
+    // Sent when window focus changes.
     struct WindowFocusChanged {
         bool HasFocus;
     };
@@ -83,10 +48,7 @@ namespace Messaging {
     // Input Events
     // -------------------------------
 
-    /**
-     * @struct KeyPressed
-     * @brief Sent when a key is pressed.
-     */
+    // Sent when a key is pressed.
     struct KeyPressed {
         int Key;
         bool Repeat;
@@ -97,10 +59,7 @@ namespace Messaging {
         }
     };
 
-    /**
-     * @struct KeyReleased
-     * @brief Sent when a key is released.
-     */
+    // Sent when a key is released.
     struct KeyReleased {
         int Key;
         int Modifiers; // Modifier flags 
@@ -110,10 +69,7 @@ namespace Messaging {
         }
     };
 
-    /**
-     * @struct MouseMoved
-     * @brief Sent when the mouse moves.
-     */
+    // Sent when the mouse moves.
     struct MouseMoved {
         float X;        // Current x position
         float Y;        // Current y position
@@ -121,30 +77,21 @@ namespace Messaging {
         float DeltaY; // Change in y since last event
     };
 
-    /**
-     * @struct MouseButtonPressed
-     * @brief Sent when a mouse button is pressed.
-     */
+    // Sent when a mouse button is pressed.
     struct MouseButtonPressed {
         int Button;
         float X; // Mouse x position 
         float Y; // Mouse y position
     };
 
-    /**
-     * @struct MouseButtonReleased
-     * @brief Sent when a mouse button is released.
-     */
+    // Sent when a mouse button is released.
     struct MouseButtonReleased {
         int Button;
         float X; // Mouse x position 
         float Y; // Mouse y position
     };
 
-    /**
-     * @struct MouseScrolled
-     * @brief Sent when mouse wheel is scrolled.
-     */
+    // Sent when mouse wheel is scrolled.
     struct MouseScrolled {
         float XOffset; // Horizontal scroll amount
         float YOffset; // Vertical scroll amount
@@ -154,37 +101,25 @@ namespace Messaging {
     // Game/Entity Events
     // -------------------------------
 
-    /**
-     * @struct EntityCreated
-     * @brief Sent when an entity is created.
-     */
+    // Sent when an entity is created.
     struct EntityCreated {
         unsigned int EntityId; // ID of the new entity
         std::string EntityType; // Optional type name
     };
 
-    /**
-     * @struct EntityDestroyed
-     * @brief Sent when an entity is destroyed.
-     */
+    // Sent when an entity is destroyed.
     struct EntityDestroyed {
         unsigned int EntityId; // ID of destroyed entity
     };
 
-    /**
-     * @struct CollisionDetected
-     * @brief Sent when a collision between two entities occurs.
-     */
+    // Sent when a collision between two entities occurs.
     struct CollisionDetected {
         unsigned int EntityA; // First entity involved
         unsigned int EntityB; // Second entity involved
         float ImpactForce; // Magnitude of impact
     };
 
-    /**
-     * @struct HealthChanged
-     * @brief Sent when an entity's health changes.
-     */
+    // Sent when an entity's health changes.
     struct HealthChanged {
         unsigned int EntityId; // ID of affected entity
         float OldHealth; // Health before change
@@ -196,21 +131,25 @@ namespace Messaging {
     // System Events
     // -------------------------------
 
+    // Sent when the active scene changes.
     struct SceneChanged {
         std::string OldScene; // Previous scene name
         std::string NewScene; // New scene name
     };
 
+    // Sent when the game is paused/unpaused.
     struct GamePaused {
         bool IsPaused; // True if the game is paused
     };
 
+    // Sent when a resource is loaded.
     struct ResourceLoaded {
         std::string ResourcePath; // Path of loaded resource
         std::string ResourceType; // Type of resource
         bool Success; // True if load succeeded
     };
 
+    // Generic audio control event.
     struct AudioEvent {
         enum class Type { Play, Stop, Pause, Resume };
         Type EventType; //Action to perform
@@ -224,12 +163,14 @@ namespace Messaging {
     // -------------------------------
 
 
+    // Performance warning issued by a system.
     struct PerformanceWarning {
         std::string System; // System reporting warning
         float DeltaTime; // Time elapsed this frame
         std::string Message; // Warning message
     };
 
+    // Debug message for logging.
     struct DebugMessage {
         enum class Level { Info, Warning, Error };
         Level LogLevel; // Severity of message
@@ -242,11 +183,13 @@ namespace Messaging {
     // ========================================
 
     // IMGUI Panel Management
+    // Request to add an IMGUI panel.
     struct AddIMGUIPanelEvent {
         std::string Name; //Panel name
         std::function<void()> DrawFunction; // Function to draw panel
         std::function<void(int)> OnAddedCallback; // Optional callback after adding panel
 
+        // Construct with panel name, draw function, and optional callback.
         explicit AddIMGUIPanelEvent(
             std::string panelName,
             std::function<void()> drawFn,
@@ -258,6 +201,7 @@ namespace Messaging {
     };
 
     // Gameplay Events
+    // Example gameplay event with three integer values.
     struct GamePlayHappenEvent {
         int ValueA;
         int ValueB;
@@ -269,6 +213,7 @@ namespace Messaging {
     };
 
     // Audio Control Events
+    // Play a sound by name with volume.
     struct PlaySoundEvent {
         std::string SoundName;
         float Volume;
@@ -278,6 +223,7 @@ namespace Messaging {
         }
     };
 
+    // Pause a sound by name.
     struct PauseSoundEvent {
         std::string SoundName;
 
@@ -286,6 +232,7 @@ namespace Messaging {
         }
     };
 
+    // Stop a sound by name.
     struct StopSoundEvent {
         std::string SoundName;
 
@@ -294,6 +241,7 @@ namespace Messaging {
         }
     };
 
+    // Change playback speed for a sound.
     struct SetSoundSpeedEvent {
         std::string SoundName;
         float Speed;
@@ -303,6 +251,7 @@ namespace Messaging {
         }
     };
 
+    // Change volume for a sound.
     struct SetSoundVolumeEvent {
         std::string SoundName;
         float Volume;
@@ -326,6 +275,7 @@ namespace Messaging {
     };
     */
 
+    // File path dropped onto the application/window.
     struct FileDropped {
         std::string filePath;
     };

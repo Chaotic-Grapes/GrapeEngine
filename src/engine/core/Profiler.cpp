@@ -1,40 +1,39 @@
-/**
- * @Name: Samantha Leong, 2403088
- * @email: s.leong@digipen.edu
- * @file Profiler.cpp
- * @brief Implements the profiling system for performance measurement.
- *
- * This file defines the Profiler class, which tracks system performance
- * and execution times for debugging and optimization purposes. It can
- * measure global metrics (FPS, frame time) and scoped timings of specific
- * systems or functions.
- *
- * Features:
- *   - Calculates FPS (frames per second) and frame time (ms).
- *   - Tracks scoped timing via BeginScope() / EndScope().
- *   - Stores history of frame times for each scope (up to MAX_HISTORY_FRAMES).
- *   - Provides average and maximum times for each scope.
- *   - Supports clearing performance history during runtime.
- *   - Integrates with DebugUI (e.g., ImGui) for live display.
- *
- * Dependencies:
- *   - Logger system for reporting warnings and status.
- *   - C++ standard library (chrono, numeric, algorithm).
- *
- * Usage:
- *   // Update each frame
- *   Profiler::UpdateTime(1.0);   // Update every 1 second
- *
- *   // Scoped profiling
- *   Profiler::BeginScope("Physics");
- *   RunPhysicsStep();
- *   Profiler::EndScope("Physics");
- *
- *   // Query data
- *   float fps = Profiler::GetFPS();
- *   float frameTime = Profiler::GetFrameTimeMs();
- *   auto& scopes = Profiler::GetAllScopeData();
- */
+/* Start Header *****************************************************************/
+/*!
+\file   Profiler.cpp
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+\date   7th November 2025
+\brief
+Implements runtime performance profiling: per‑frame FPS and frame time tracking,
+plus scoped timings with bounded history, averages, and maxima. Integrates with
+DebugUI for live visualization.
+
+Responsibilities:
+- Update FPS and frame time each frame via `UpdateTime()`.
+- Measure code sections using `BeginScope()` / `EndScope()` or RAII `ProfileScope`.
+- Provide accessors to current metrics, scope histories, and aggregated totals.
+
+Features:
+- Bounded history per scope (up to `MAX_HISTORY_FRAMES`).
+- Average and maximum time computation for quick trend analysis.
+- Simple total scope time aggregation for frame budget overview.
+- ClearHistory() at runtime for fresh profiling sessions.
+
+Usage:
+- `Profiler::UpdateTime(1.0);` // call once per frame, recompute FPS every 1s
+- `ProfileScope physicsScope("Physics");` // RAII scope measurement
+- Or manual pairing: `BeginScope("Render"); ...; EndScope("Render");`
+
+Notes:
+- Overhead is low; when disabled, functions short‑circuit quickly.
+- Not thread‑safe by design; use on main thread or guard externally.
+
+Dependencies:
+- `services/Time` for timing, `<chrono>`, `<numeric>`, `<algorithm>` for math utilities.
+- `Logger` for warnings/status.
+*/
+/* End Header *******************************************************************/
 
 
 #include "core/Profiler.h"
@@ -51,43 +50,28 @@ double Profiler::FrameTimeMs = 0.0;
 // std::unordered_map<std::string, std::chrono::steady_clock::time_point> Profiler::m_startTimes;
 
 
-/**
- * @brief Updates FPS and frame time calculations.
- *
- * Uses Time::UnscaledDeltaTime() to measure frame duration in ms.
- * FPS is recalculated at intervals (default every 1s, max 10s).
- *
- * @param fpsCalcInt Interval in seconds between FPS updates.
- */
+// Update FPS and frame time; uses Time service and interval-based recalculation.
 void Profiler::UpdateTime(double fpsCalcInt) {
-    // get elapsed time (in seconds) between previous and current frames
-    /*static double prev_time = glfwGetTime();
-    double curr_time = glfwGetTime();
-    Profiler::delta_time = curr_time - prev_time;
-    prev_time = curr_time;*/
-    //double delta_time = Time::UnscaledDeltaTime();
+    // Compute total frame time (ms): Time::UnscaledDeltaTime() returns seconds.
     
-    // 1. Calculate and store total frame time (in milliseconds)
-    // Time::UnscaledDeltaTime() returns seconds, so multiply by 1000
     Profiler::FrameTimeMs = Time::UnscaledDeltaTime() * 1000.0;
 
-    // fps calculations
-    static double count = 0.0; // number of game loop iterations
-    //static double start_time = glfwGetTime();
-    // get elapsed time since very beginning (in seconds) ...
-    //double elapsed_time = curr_time - start_time;
+    // Maintain frame counter and start time of current FPS window.
+    static double count = 0.0;
     static double startTime = Time::ElapsedTime(); // Use Time's elapsed time
 
     ++count;
 
-    // Get elapsed time since the last FPS update
+    // Seconds elapsed since last FPS update window.
     const double elapsedTime = Time::ElapsedTime() - startTime;
 
-    // update fps at least every 10 seconds ...
+    // Clamp update interval to [0, 10] seconds to avoid extreme values.
     fpsCalcInt = (fpsCalcInt < 0.0) ? 0.0 : fpsCalcInt;
     fpsCalcInt = (fpsCalcInt > 10.0) ? 10.0 : fpsCalcInt;
     if (elapsedTime > fpsCalcInt) {
+        // Recalculate FPS: frames counted divided by seconds elapsed.
         Profiler::Fps = count / elapsedTime;
+        // Reset window start and frame counter.
         startTime = Time::ElapsedTime();
         count = 0.0;
     }
@@ -96,40 +80,25 @@ void Profiler::UpdateTime(double fpsCalcInt) {
 // =========================================================================
 // PUBLIC ACCESSORS FOR DEBUGUI
 // =========================================================================
-/**
- * @brief Returns the current FPS as a float.
- * @return Frames per second.
- */
+// Return current frames-per-second as float for UI display.
 float Profiler::GetFPS() {
     // Cast to float for ImGui (which uses float for display)
     return static_cast<float>(Profiler::Fps);
 }
 
-/**
- * @brief Returns the current frame time in milliseconds.
- * @return Frame time in ms.
- */
+// Return current frame time in milliseconds as float for UI display.
 float Profiler::GetFrameTimeMs() {
     // Cast to float for ImGui
     return static_cast<float>(Profiler::FrameTimeMs);
 }
 
-/**
- * @brief Retrieves all scope timing data.
- *
- * @return const reference to ScopeDataMap containing
- *         last, average, and max times per scope.
- */
+// Retrieve const reference to all scope timing data (last/avg/max per scope).
 const Profiler::ScopeDataMap& Profiler::GetAllScopeData() {
     // Returns the map containing all system times
     return Profiler::Get().m_scopes;
 }
 
-/**
- * @brief Returns the total execution time of all scopes combined.
- *
- * @return Total scope time in milliseconds.
- */
+// Return total of all scope times measured in the last frame (ms).
 double Profiler::GetTotalScopeTimes() {
 	double total = 0.0;
     for (const auto& [_, data] : Profiler::Get().m_scopes) {
@@ -138,12 +107,7 @@ double Profiler::GetTotalScopeTimes() {
 	return total;
 }
 
-/**
- * @brief Clears performance history for all scopes.
- *
- * Resets frame time history, average, and maximum values.
- * Useful when user presses "Clear Performance History".
- */
+// Clear performance history for all scopes; resets history, avg, and max.
 void Profiler::ClearHistory() {
     // Clears the history for the 'Clear Performance History' button
     for (auto& [name, data] : Profiler::Get().m_scopes) {
@@ -157,29 +121,16 @@ void Profiler::ClearHistory() {
 // =========================================================================
 // SCOPE-LEVEL TIME TRACKING
 // =========================================================================
-/**
- * @brief Marks the beginning of a profiling scope.
- *
- * Records the current time for later duration calculation.
- *
- * @param scopeName Unique identifier of the scope (e.g., "Physics").
- */
+// Begin a profiling scope: record start time for later duration calculation.
 void Profiler::BeginScope(const std::string& scopeName) {
     m_startTimes[scopeName] = std::chrono::steady_clock::now();
 }
 
-/**
- * @brief Marks the end of a profiling scope and stores its duration.
- *
- * - Calculates elapsed time since BeginScope().
- * - Updates scope's frame history, last time, average, and max.
- * - Logs a warning if EndScope() is called without BeginScope().
- *
- * @param scopeName Unique identifier of the scope.
- */
+// End a profiling scope: compute duration, update history, and summaries.
 void Profiler::EndScope(const std::string& scopeName) {
     const auto it = m_startTimes.find(scopeName);
     if (it == m_startTimes.end()) {
+        // Guard against missing BeginScope() calls.
         Logger::Get().Log(LogLevel::WARNING, "Profiler scope '" + scopeName + "' not found. Ignoring.");
         return;
     }
@@ -187,17 +138,18 @@ void Profiler::EndScope(const std::string& scopeName) {
     const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - it->second);
     m_startTimes.erase(it);
 
-    // Get the current scope data, or create it if it doesn't exist
+    // Get or create scope data record.
     auto& [FrameTimes, LastTimeMs, AverageTimeMs, MaxTimeMs] = m_scopes[scopeName];
+    // Convert microseconds to milliseconds for storage.
     LastTimeMs = static_cast<float>(duration.count()) / 1000.0f;
 
-    // Maintain a history of frame times
+    // Maintain bounded history of recent frame times.
     FrameTimes.push_back(LastTimeMs);
     if (FrameTimes.size() > MAX_HISTORY_FRAMES) {
         FrameTimes.erase(FrameTimes.begin());
     }
 
-    // Update avg and max
+    // Update average and maximum over history window.
     const float sum = std::accumulate(FrameTimes.begin(), FrameTimes.end(), 0.0f);
     AverageTimeMs = sum / static_cast<float>(FrameTimes.size());
     MaxTimeMs = *std::max_element(FrameTimes.begin(), FrameTimes.end());

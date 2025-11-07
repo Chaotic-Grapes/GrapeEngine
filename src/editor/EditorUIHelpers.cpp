@@ -16,9 +16,10 @@ JSON-backed properties in the editor.
 namespace EditorUI {
 
     static float currentLabelOffset = 0.0f;
-    // Keep label-to-content padding modest; vector rows add axis column on top
-    static constexpr float LABEL_PADDING = 12.0f;
-    static constexpr float CONTENT_LABEL_PAD = 12.0f;
+    // Increase label-to-content padding so axis label (e.g., "X") sits further from main label
+    // Increase spacing between component label and field label/content
+    static constexpr float LABEL_PADDING = 28.0f;
+    static constexpr float CONTENT_LABEL_PAD = 18.0f; // widen baseline space between axis label and control
 
     // Unified content start: end of label column + axis label column + pad
     static float _axisColWidth() {
@@ -65,8 +66,8 @@ namespace EditorUI {
 
         // Layout constants - block-based positioning to avoid overlap
         const float fieldWidth = 100.0f;
-        const float gap = 12.0f;        // space between adjacent fields
-        const float labelPad = 12.0f;   // label-to-field padding
+        const float gap = 10.0f;        // space between adjacent fields
+        const float labelPad = 12.0f;   // more generous label-to-field padding
         const float rowStartX = currentLabelOffset;
 
         // Use a fixed axis label column width (match widest axis label 'W')
@@ -114,8 +115,8 @@ namespace EditorUI {
 
         // Layout constants - block-based positioning
         const float fieldWidth = 100.0f;
-        const float gap = 24.0f;        // space between adjacent fields
-        const float labelPad = 12.0f;   // label-to-field padding
+        const float gap = 14.0f;        // space between adjacent fields
+        const float labelPad = 12.0f;   // more generous label-to-field padding
         const float rowStartX = currentLabelOffset;
 
         // Use a fixed axis label column width (match widest axis label 'W')
@@ -172,8 +173,8 @@ namespace EditorUI {
 
         // Layout constants - block-based positioning
         const float fieldWidth = 100.0f;
-        const float gap = 24.0f;        // space between adjacent fields
-        const float labelPad = 12.0f;   // label-to-field padding
+        const float gap = 14.0f;        // space between adjacent fields
+        const float labelPad = 12.0f;   // more generous label-to-field padding
         const float rowStartX = currentLabelOffset;
 
         // Use a fixed axis label column width (match widest axis label 'W')

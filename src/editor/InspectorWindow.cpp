@@ -41,7 +41,8 @@ void InspectorWindow::Render(float fontScale) {
     // "Prefab Editor" when editing the template file, "Property Editor" for entity instances
     const char* windowTitle = (m_mode == InspectionMode::Prefab) ? "Prefab Editor" : "Property Editor";
     ImGui::Begin(windowTitle);
-    // Use global FontGlobalScale; no local scaling applied here
+    // Follow global ImGui::GetIO().FontGlobalScale for consistent font sizing across all windows
+    // Do not apply per-window font scaling here to avoid inconsistencies
 
     // Render different content based on inspection mode
     if (m_mode == InspectionMode::None) {
@@ -244,7 +245,9 @@ void InspectorWindow::_renderEntityCore() {
         }
 
         // Render remaining components vertically, one section per line
+        // Place Camera3D near the top (right after Transform) for quick access
         const std::vector<std::string> orderedTypes = {
+            "ECS::Components::Camera3D",
             "ECS::Components::SpriteRenderer2D",
             "ECS::Components::Rigidbody2D",
             "ECS::Components::CircleCollider2D",
@@ -368,6 +371,7 @@ void InspectorWindow::_renderEntityCore() {
         _renderComponentMenuItem("ShapeCircle2D", "ShapeCircle2D");
         _renderComponentMenuItem("ShapeBox2D", "ShapeBox2D");
         _renderComponentMenuItem("ShapeLine2D", "ShapeLine2D");
+        _renderComponentMenuItem("Camera 3D", "Camera3D");
         ImGui::EndPopup();
     }
 
@@ -424,15 +428,16 @@ void InspectorWindow::_renderPrefabInspector() {
         }
 
         // Render remaining prefab components vertically, one section per line
+        // Move Camera3D near the top (just after Transform) for better visibility
         const std::vector<std::string> orderedTypes = {
+            "ECS::Components::Camera3D",
             "ECS::Components::SpriteRenderer2D",
             "ECS::Components::Rigidbody2D",
             "ECS::Components::CircleCollider2D",
             "ECS::Components::BoxCollider2D",
             "ECS::Components::ShapeCircle2D",
             "ECS::Components::ShapeBox2D",
-            "ECS::Components::ShapeLine2D",
-            "ECS::Components::Camera3D"
+            "ECS::Components::ShapeLine2D"
         };
 
         for (const auto& type : orderedTypes) {
@@ -820,7 +825,9 @@ void InspectorWindow::_renderComponentSection(const std::string& headerName, con
 
         // Restore cursor so component content renders at the original position
         ImGui::SetCursorPos(contentCursorPos);
-        // Render component content directly under the header without shifting vertically
+        // Add a small vertical gap between the header and the first field label
+    ImGui::Dummy(ImVec2(0.0f, 10.0f));
+        // Render component content directly under the header after the spacer
         renderContent(data);
     }
     // Note: Avoid double-rendering to prevent duplicated UI rows

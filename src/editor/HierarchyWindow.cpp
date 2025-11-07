@@ -171,7 +171,9 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
     if (!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;
     if (m_selectedEntityId == entityId) flags |= ImGuiTreeNodeFlags_Selected;
 
-    bool nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)entityId, flags, "%s", label.c_str());
+    // Avoid passing a null pointer as ImGui ID when entityId == 0
+    // Offset by +1 to ensure a non-zero pointer-based ID for the first entity
+    bool nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)(entityId + 1), flags, "%s", label.c_str());
 
     // Clicking the node label selects the entity
     if (ImGui::IsItemClicked()) {

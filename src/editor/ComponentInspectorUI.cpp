@@ -53,8 +53,8 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
     ImGui::Text("Sprite");
     // Place the filename on the same row
     ImGui::SameLine();
-    // Align content to unified label offset
-    ImGui::SetCursorPosX(EditorUI::GetCurrentLabelOffset());
+    // Align filename text to start where input boxes begin
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX());
     // Show filename when a path exists
     if (!texPath.empty()) {
         ImGui::TextDisabled("%s", std::filesystem::path(texPath).filename().string().c_str());

@@ -1,3 +1,15 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Logger.h
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+\date   7th November 2025
+\brief
+Declares the Logger interface and log level enums for structured console and file
+logging with timestamped entries.
+*/
+/* End Header *******************************************************************/
+
 #ifndef LOGGER_H
 #define LOGGER_H
 
@@ -40,43 +52,25 @@ enum class LogLevel {
 
 class Logger {
 public:
-	Logger();
+    Logger();
 	~Logger();
 
-	/**
-	 * @brief Get the singleton instance of the Logger
-	 * @return Reference to the Logger instance
-	 */
+	// Get the singleton instance of the Logger.
 	static Logger& Get() {
 		static Logger instance;
 		return instance;
 	}
 
-	/**
-	 * @brief Log a message with a specific log level
-	 * @param level The severity level of the log
-	 * @param message The message to log
-	 */
+	// Log a message with a specific log level.
 	void Log(LogLevel level, const std::string& message);
 
-	/**
-	 * @brief Log a message from a stringstream with a specific log level
-	 * @param level The severity level of the log
-	 * @param oss The stringstream containing the message to log
-	 */
+	// Log a message from a stringstream with a specific log level.
 	void Log(LogLevel level, const std::stringstream& oss);
 
-	/**
-	 * @brief Set the log file name
-	 * @param level The log level for which to set the file
-	 * @param filename The name of the log file
-	 */
+	// Set the log file name for a given log level.
 	void SetLogFile(LogLevel level, const std::string& filename);
 
-	/**
-	 * @brief Enable or disable logging to console
-	 * @param enable True to enable console logging, false to disable
-	 */
+	// Enable or disable logging to the console.
 	void SetLogConsole(bool enable);
 
 private:

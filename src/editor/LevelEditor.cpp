@@ -222,7 +222,8 @@ void LevelEditor::Render() {
         m_assetBrowser.Render(); // Draw asset browser
         m_editorCore.ShowEditorWindows(); // Draw core editor windows
         m_hierarchyWindow.Render(); // Draw hierarchy tree
-        m_inspector.Render(1.0f); // Draw inspector for selection
+        // Inspector follows global FontGlobalScale; pass 1.0f (no local override)
+        m_inspector.Render(1.0f);
     }
     else {
         m_playback.Render(); // Keep controls visible

@@ -1,29 +1,39 @@
-/**
- * @Name: Samantha Leong, 2403088
- * @email: s.leong@digipen.edu
- * @file CrashDumping.cpp
- * @brief Implements the crash handling and logging system for Grape_Engine.
- *
- * This file sets up a global crash handler that catches unhandled exceptions
- * (on Windows via Structured Exception Handling). When a crash occurs,
- * the system:
- *   - Collects crash information such as exception code, address, and reason.
- *   - Appends a call stack trace for easier debugging.
- *   - Writes all details into a timestamped `.txt` crash log file.
- *   - Optionally creates a `.dmp` minidump file for deeper analysis in debuggers.
- *   - Displays a popup message to notify the user of the crash.
- *
- * Platform-specific handling:
- *   - Windows: Uses `SetUnhandledExceptionFilter`, DbgHelp APIs, and minidump writing.
- *   - Linux: (TODO) placeholder for signal-based crash handling.
- *
- * Dependencies:
- *   - Logger system (optional, currently commented out).
- *   - Windows DbgHelp / Shlwapi libraries for stack walking and dump creation.
- *
- * Usage:
- *   Call `CrashDumping::Initialize()` once at program startup to enable crash logging.
- */
+/* Start Header *****************************************************************/
+/*!
+\file   CrashDumping.cpp
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+\date   7th November 2025
+\brief
+Provides robust crash handling that captures exception details, composes a
+human‑readable report, optionally writes a Windows minidump, and notifies the
+user via a popup.
+
+Responsibilities:
+- Initialize platform crash handling at startup (SEH filter on Windows).
+- Detect unhandled exceptions, derive human‑friendly reason, and capture call stack.
+- Persist a timestamped crash report (.txt) and optional minidump (.dmp) in the
+  executable directory.
+
+Usage:
+- Call `CrashDumping::Initialize()` during application startup.
+- Configure program name and dump creation: `SetProgramName("GrapeEngine");`
+  `SetDumpCreateState(true);`
+- On crash, files will be named `<timestamp>.txt` and `<timestamp>.dmp` beside the exe.
+
+Platform Notes:
+- Windows: Uses `SetUnhandledExceptionFilter`, `DbgHelp` (`MiniDumpWriteDump`, `StackWalk64`),
+  and `Shlwapi` for path manipulation.
+- Linux: Placeholder for signal‑based handling if parity is desired.
+
+Dependencies:
+- C++ standard library (`chrono`, `filesystem`, `sstream`, etc.).
+- Windows: `DbgHelp.lib`, `Shlwapi.lib`.
+
+Performance:
+- No runtime overhead in normal operation; work only occurs on crash paths.
+*/
+/* End Header *******************************************************************/
 
 
 #include "core/CrashDumping.h"
@@ -66,43 +76,28 @@ using std::filesystem::path;
 
 namespace Grape_Engine
 {
-    /**
-    * @brief Initializes the crash handler system.
-    *
-    * On Windows, reserves emergency stack space and sets a global
-    * unhandled exception filter that redirects crashes to HandleCrash().
-    * On Linux, a TODO placeholder exists for a signal-based handler.
-    */
+    // Initialize global crash handler and platform-specific setup.
     void CrashDumping::Initialize()
     {
 #ifdef _WIN32
-        // reserve emergency stack space (for stack overflow handling)
+        // Reserve emergency stack space (for stack overflow handling).
         ULONG stackSize = 32768; // 32KB
         SetThreadStackGuarantee(&stackSize);
-
+        // Register SEH unhandled exception filter.
         SetUnhandledExceptionFilter(HandleCrash);
 #else
-        // TODO: Linux handler (signal-based) if you want parity
+        // TODO: Linux handler (signal-based) if you want parity.
 #endif
-
+        // Inform via logger that crash handling is initialized.
        // Logger::Get().Log(LogLevel::INFO, "CrashHandler initialized.");
         LOG_INFO("[CrashHandler] Initialized.");
     }
 
 #ifdef _WIN32
-    /**
-    * @brief Windows callback for unhandled exceptions.
-    *
-    * Gathers crash details (exception code, address, reason),
-    * appends a call stack trace, and handles logging.
-    * Optionally writes a minidump file, then saves details
-    * to a timestamped .txt log and shows a popup to the user.
-    *
-    * @param info Pointer to the exception context.
-    * @return LONG Exception handler return code (EXCEPTION_EXECUTE_HANDLER).
-    */
+    // Windows SEH callback for unhandled exceptions; composes report and handles output.
     LONG WINAPI CrashDumping::HandleCrash(EXCEPTION_POINTERS* info)
     {
+        // Capture exception code and address.
         DWORD code = info->ExceptionRecord->ExceptionCode;
 
         ostringstream oss;
@@ -111,6 +106,7 @@ namespace Grape_Engine
         oss << "Address: 0x" << std::hex
             << (uintptr_t)info->ExceptionRecord->ExceptionAddress << "\n\n";
 
+        // Map common exception codes to human-readable reasons.
         switch (code)
         {
         case EXCEPTION_ACCESS_VIOLATION:
@@ -163,13 +159,16 @@ namespace Grape_Engine
             break;
         }
 
+        // Append stack trace to the report.
         AppendCallStackToStream(oss, info->ContextRecord);
 
+        // Resolve paths and timestamp used for file naming.
         string exePath = GetExePath();
         string timeStamp = GetCurrentTimeStamp();
 
         if (createDump)
         {
+            // Write minidump file to executable directory.
             WriteMiniDump(info, exePath, timeStamp);
             oss << "A dump file '" << timeStamp
                 << ".dmp' was created at exe root folder.\n";
@@ -180,24 +179,20 @@ namespace Grape_Engine
            // LOG_INFO("[CrashHandler] Dump creation disabled.");
         }
 
+        // Persist the crash report and notify user.
         WriteLog(oss.str(), exePath, timeStamp);
         CreateErrorPopup(oss.str());
 
         return EXCEPTION_EXECUTE_HANDLER;
     }
 #endif // _WIN32
-    /**
-    * @brief Writes the crash details into a timestamped .txt file.
-    *
-    * @param message   Crash report contents to write.
-    * @param exePath   Path of the executable (used to build log path).
-    * @param timeStamp Time label used for unique file naming.
-    */
+    // Write crash details into a timestamped .txt file at exe directory.
     void CrashDumping::WriteLog(
         const string& message,
         const string& exePath,
         const string& timeStamp)
     {
+        // Compose crash log file path.
         string filePath = timeStamp + ".txt";
         string fullPath = (path(exePath) / filePath).string();
         ofstream logFile(fullPath);
@@ -209,6 +204,7 @@ namespace Grape_Engine
             return;
         }
 
+        // Write report and close file.
         logFile << message;
         logFile.close();
 
@@ -218,23 +214,16 @@ namespace Grape_Engine
     }
 
 #ifdef _WIN32
-    /**
-    * @brief Creates a minidump (.dmp) file containing crash details.
-    *
-    * Uses Windows DbgHelp API to write a minidump, which can be loaded
-    * into Visual Studio or WinDbg for deep debugging.
-    *
-    * @param info      Exception pointers captured from the crash.
-    * @param exePath   Path of the executable.
-    * @param timeStamp Time label used for file naming.
-    */
+    // Create a minidump (.dmp) file containing crash details using DbgHelp.
     void CrashDumping::WriteMiniDump(
         EXCEPTION_POINTERS* info,
         const string& exePath,
         const string& timeStamp)
     {
+        // Dump filename (timestamp-based).
         string filePath = timeStamp + ".dmp";
 
+        // Convert exe path to wide-char and build full dump path.
         int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, exePath.c_str(), -1, nullptr, 0);
         std::wstring widePath(sizeNeeded - 1, 0);
         MultiByteToWideChar(CP_UTF8, 0, exePath.c_str(), -1, &widePath[0], sizeNeeded);
@@ -242,6 +231,7 @@ namespace Grape_Engine
         // build full path
         widePath += L"\\" + std::wstring(filePath.begin(), filePath.end());
 
+        // Create the .dmp file.
         HANDLE hFile = CreateFileW(
             widePath.c_str(),
             GENERIC_WRITE,
@@ -253,6 +243,7 @@ namespace Grape_Engine
 
         if (hFile != INVALID_HANDLE_VALUE)
         {
+            // Populate dump info and write minidump.
             MINIDUMP_EXCEPTION_INFORMATION dumpInfo{};
             dumpInfo.ThreadId = GetThreadId(GetCurrentThread());
             dumpInfo.ExceptionPointers = info;
@@ -273,6 +264,7 @@ namespace Grape_Engine
                 nullptr,
                 nullptr);
 
+            // Close handle and report success.
             CloseHandle(hFile);
            // Logger::Get().Log(LogLevel::INFO, "Minidump file created.");
             std::cout << "[CrashHandler] Minidump file created.\n"; // need the full file path
@@ -284,16 +276,10 @@ namespace Grape_Engine
         }
     }
 #endif // _WIN32
-
-    /**
-    * @brief Returns a formatted timestamp string for crash logs.
-    *
-    * Example: "crash_02_14_15_23"
-    *
-    * @return std::string with the current date/time.
-    */
+    // Return formatted timestamp string for crash logs (e.g., "crash_02_14_15_23").
     string CrashDumping::GetCurrentTimeStamp()
     {
+        // Get local time now.
         time_t now = time(nullptr);
         tm localTime{};
 #ifdef _WIN32
@@ -302,6 +288,7 @@ namespace Grape_Engine
         localtime_r(&now, &localTime);
 #endif
 
+        // Format day_hour_min_sec into crash_ prefix.
         ostringstream oss;
         oss << setfill('0')
             << localTime.tm_mday << "_"
@@ -311,25 +298,20 @@ namespace Grape_Engine
 
         string timeStamp = "crash_" + oss.str();
 
+        // Replace any colon with dash (defensive; not expected in this format).
         replace(timeStamp.begin(), timeStamp.end(), ':', '-');
         return timeStamp;
     }
-    /**
-    * @brief Retrieves the directory path of the executable.
-    *
-    * Platform-specific:
-    *   - Windows: Uses GetModuleFileNameW and PathRemoveFileSpecW.
-    *   - Linux: Reads /proc/self/exe and strips file name.
-    *
-    * @return Executable directory path as a string.
-    */
+    // Retrieve the directory path of the executable (platform-specific).
     string CrashDumping::GetExePath()
     {
 #ifdef _WIN32
+        // Query executable path and strip filename.
         WCHAR exePath[MAX_PATH];
         GetModuleFileNameW(nullptr, exePath, MAX_PATH);
         PathRemoveFileSpecW(exePath);
 
+        // Convert wide-char path to UTF-8 string.
         int sizeNeeded = WideCharToMultiByte(
             CP_UTF8,
             0,
@@ -353,6 +335,7 @@ namespace Grape_Engine
 
         return exePathStr;
 #else
+        // Read /proc/self/exe symlink and return directory name.
         char exePath[PATH_MAX];
         ssize_t count = readlink("/proc/self/exe", exePath, PATH_MAX);
         if (count == -1) return "";
@@ -363,17 +346,10 @@ namespace Grape_Engine
     }
 
 #ifdef _WIN32
-    /**
-    * @brief Appends a stack trace to the crash report stream.
-    *
-    * Walks up to 10 stack frames using DbgHelp StackWalk64 API,
-    * resolves symbols and line numbers where possible.
-    *
-    * @param oss     Output stream to append stack trace info.
-    * @param context Processor context captured at crash time.
-    */
+    // Append a stack trace to the crash report stream using DbgHelp.
     void CrashDumping::AppendCallStackToStream(ostringstream& oss, CONTEXT* context)
     {
+        // Initialize symbol handler for the current process.
         HANDLE process = GetCurrentProcess();
         HANDLE thread = GetCurrentThread();
 
@@ -400,6 +376,7 @@ namespace Grape_Engine
         oss << "\n========================================\n";
         oss << "Call stack:\n";
 
+        // Walk up to 10 frames, resolving symbols and line info.
         for (int i = 0; i < 10; ++i)
         {
             if (!StackWalk64(
@@ -449,26 +426,21 @@ namespace Grape_Engine
         oss << "========================================\n\n";
     }
 #endif // _WIN32
-    /**
-    * @brief Creates a popup to notify the user of the crash.
-    *
-    * On Windows: Uses MessageBoxA.
-    * On Linux: Uses zenity to display an error dialog.
-    * Also prints the crash message to console.
-    *
-    * @param message Crash details to display in popup.
-    */
+    // Create a popup to notify the user of the crash and then shutdown.
     void CrashDumping::CreateErrorPopup(const string& message)
     {
+        // Compose popup title and log to console.
         string title = name + " has shut down";
 
        // Logger::Get().Log(LogLevel::ERR, "Program crashed:\n" + message);
         std::cout << "[CrashHandler] Program crashed:\n" << message << "\n";
 
 #ifdef _WIN32
+        // Windows native popup.
         MessageBoxA(nullptr, message.c_str(), title.c_str(), MB_ICONERROR | MB_OK);
         Shutdown();
 #elif __linux__
+        // Linux popup via zenity.
         string command = "zenity --error --text=\"" + message + "\" --title=\"" + title + "\"";
         system(command.c_str());
         Shutdown();
