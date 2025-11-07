@@ -2,131 +2,109 @@
   "Name": "EnemyTest",
   "Components": [
     {
-      "Type": "Transform",
+      "TypeName": "ECS::Components::LocalTransform",
+      "TypeId": 10,
       "Data": {
         "Position": {
-          "X": 800,
-          "Y": 600
+          "X": 800.0,
+          "Y": 600.0,
+          "Z": 0.0
         },
-        "Rotation": 0,
+        "Rotation": {
+          "X": 0.0,
+          "Y": 0.0,
+          "Z": 0.0,
+          "W": 1.0
+        },
         "Scale": {
-          "X": 1,
-          "Y": 1
+          "X": 1.0,
+          "Y": 1.0,
+          "Z": 1.0
         }
       }
     },
     {
-      "Type": "SpriteRenderer",
+      "TypeName": "ECS::Components::SpriteRenderer2D",
+      "TypeId": 21,
       "Data": {
-        "Color": {
-          "A": 255,
-          "B": 0,
-          "G": 0,
-          "R": 255
-        },
-        "FlipX": false,
-        "FlipY": false,
-        "Height": 449,
-        "SortingLayerName": "Enemies",
-        "SortingOrder": 5, 
-        "Sprite": "assets/textures/test/player.png",
         "TextureId": 2,
-        "TexturePath": "assets/textures/test/player.png",
-        "Width": 224
-      }
-    },
-    {
-      "Type": "Rigidbody2D",
-      "Data": {
-        "AngularDamping": 0.05,
-        "AngularVelocity": 0,
-        "BodyType": 0,
-        "CenterOfMass": {
-          "X": 0,
-          "Y": 0
-        },
-        "FreezeRotation": false,
-        "GravityScale": 1,
-        "Inertia": 0,
-        "LinearDamping": 0,
-        "LinearVelocity": {
-          "X": 0,
-          "Y": 0
-        },
-        "Mass": 1
-      }
-    },
-    {
-      "Type": "CircleCollider2D",
-      "Data": {
-        "IsTrigger": false,
-        "Layer": 0,
-        "Offset": {
-          "X": 0,
-          "Y": 0
-        },
-        "Radius": 50
-      }
-    },
-    {
-      "Type": "BoxCollider2D",
-      "Data": {
-        "IsTrigger": false,
-        "Layer": 0,
-        "Offset": {
-          "X": 0,
-          "Y": 0
-        },
-        "Size": {
-          "X": 64,
-          "Y": 64
-        }
-      }
-    },
-    {
-      "Type": "LineRenderer",
-      "Data": {
-        "Start": {
-          "X": -50,
-          "Y": 0
-        },
-        "End": {
-          "X": 50,
-          "Y": 0
-        },
-        "Thickness": 2,
         "Color": {
-          "A": 255,
-          "B": 255,
-          "G": 0,
-          "R": 0
+          "R": 1.0,
+          "G": 0.0,
+          "B": 0.0,
+          "A": 1.0
+        },
+        "Tiling": {
+          "X": 1.0,
+          "Y": 1.0
+        },
+        "Offset": {
+          "X": 0.0,
+          "Y": 0.0
         }
       }
     },
     {
-      "Type": "ShapeRenderer2D",
+      "TypeName": "ECS::Components::Rigidbody2D",
+      "TypeId": 18,
       "Data": {
-        "Closed": true,
-        "FillColor": {
-          "A": 255,
-          "B": 0,
-          "G": 255,
-          "R": 0
+        "Mass": 1.0,
+        "InverseMass": 1.0,
+        "LinearDamping": 0.0,
+        "AngularDamping": 0.05,
+        "GravityScale": 1.0,
+        "Flags": 0
+      }
+    },
+    {
+      "TypeName": "ECS::Components::CircleCollider2D",
+      "TypeId": 20,
+      "Data": {
+        "Radius": 50.0,
+        "Offset": {
+          "X": 0.0,
+          "Y": 0.0
         },
-        "OutlineColor": {
-          "A": 255,
-          "B": 255,
-          "G": 255,
-          "R": 255
+        "LayerMask": 4294967295,
+        "Flags": 0
+      }
+    },
+    {
+      "TypeName": "ECS::Components::BoxCollider2D",
+      "TypeId": 19,
+      "Data": {
+        "HalfExtents": {
+          "X": 32.0,
+          "Y": 32.0
         },
-        "OutlineThickness": 1,
-        "Points": [],
-        "Radius": 50,
-        "Size": {
-          "X": 100,
-          "Y": 100
+        "Offset": {
+          "X": 0.0,
+          "Y": 0.0
         },
-        "Type": 1
+        "Rotation": 0.0,
+        "LayerMask": 4294967295,
+        "Flags": 0
+      }
+    },
+    {
+      "TypeName": "ECS::Components::ShapeLine2D",
+      "TypeId": 24,
+      "Data": {
+        "A": {
+          "X": -50.0,
+          "Y": 0.0
+        },
+        "B": {
+          "X": 50.0,
+          "Y": 0.0
+        },
+        "Color": {
+          "R": 1.0,
+          "G": 0.0,
+          "B": 0.0,
+          "A": 1.0
+        },
+        "Thickness": 2.0
       }
     }
   ]

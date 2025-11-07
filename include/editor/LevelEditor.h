@@ -51,6 +51,9 @@ public:
     // Render all editor panels
     void Render();
 
+    // Update world reference and propagate to all panels
+    void SetWorld(ECS::World* world);
+
     // Expose game state for physics system
     Playback::GameState GetGameState() const { return m_playback.GetGameState(); }
     bool IsPlaying() const { return m_playback.IsPlaying(); }

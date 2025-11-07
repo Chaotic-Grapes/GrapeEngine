@@ -2,37 +2,22 @@
   "Name": "PrefabSample",
   "Components": [
     {
-      "Type": "Transform",
+      "TypeName": "ECS::Components::LocalTransform",
+      "TypeId": <LocalTransform TypeId>,
       "Data": {
-        "Position": {
-          "X": 650,
-          "Y": 750
-        },
-        "Rotation": 0,
-        "Scale": {
-          "X": 256,
-          "Y": 256
-        }
+        "Position": { "X": 650.0, "Y": 750.0, "Z": 0.0 },
+        "Rotation": { "X": 0.0, "Y": 0.0, "Z": 0.0, "W": 1.0 },
+        "Scale":    { "X": 128.0, "Y": 128.0, "Z": 1.0 }
       }
     },
     {
-      "Type": "SpriteRenderer",
+      "TypeName": "ECS::Components::SpriteRenderer2D",
+      "TypeId": <SpriteRenderer2D TypeId>,
       "Data": {
-        "Color": {
-          "A": 255,
-          "B": 127,
-          "G": 127,
-          "R": 255
-        },
-        "FlipX": false,
-        "FlipY": false,
-        "Height": 449,
-        "SortingLayerName": "Default",
-        "SortingOrder": 0,
-        "Sprite": "assets/textures/test/player.png",
         "TextureId": 1,
-        "TexturePath": "assets/textures/test/player.png",
-        "Width": 224
+        "Color":  { "R": 1.0, "G": 0.5, "B": 0.5, "A": 1.0 },
+        "Tiling": { "X": 1.0, "Y": 1.0 },
+        "Offset": { "X": 0.0, "Y": 0.0 }
       }
     }
   ]

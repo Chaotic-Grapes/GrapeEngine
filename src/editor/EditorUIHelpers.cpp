@@ -88,6 +88,105 @@ void RenderVector2DRow(const std::string& label, nlohmann::json& data,
     }
 }
 
+// Render a row with draggable float fields for a 3D vector (X, Y, Z)
+void RenderVector3DRow(const std::string& label, nlohmann::json& data,
+    const std::string& xKey, const std::string& yKey, const std::string& zKey, float dragSpeed)
+{
+    std::string displayLabel = _displayLabel(label);
+    ImGui::Text("%s", displayLabel.c_str());
+
+    float x = data.contains(xKey) && data[xKey].is_number() ? data[xKey].get<float>() : 0.0f;
+    float y = data.contains(yKey) && data[yKey].is_number() ? data[yKey].get<float>() : 0.0f;
+    float z = data.contains(zKey) && data[zKey].is_number() ? data[zKey].get<float>() : 0.0f;
+
+    // X label and field
+    ImGui::SameLine();
+    float xLabelWidth = ImGui::CalcTextSize("X").x;
+    ImGui::SetCursorPosX(currentLabelOffset - xLabelWidth - 10.0f);
+    ImGui::Text("X");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(currentLabelOffset);
+    ImGui::SetNextItemWidth(80);
+    if (ImGui::DragFloat(("##" + label + "X").c_str(), &x, dragSpeed, 0.0f, 0.0f, "%.2f")) {
+        data[xKey] = x;
+    }
+
+    // Y label and field
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10.0f);
+    ImGui::Text("Y");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(80);
+    if (ImGui::DragFloat(("##" + label + "Y").c_str(), &y, dragSpeed, 0.0f, 0.0f, "%.2f")) {
+        data[yKey] = y;
+    }
+
+    // Z label and field
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10.0f);
+    ImGui::Text("Z");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(80);
+    if (ImGui::DragFloat(("##" + label + "Z").c_str(), &z, dragSpeed, 0.0f, 0.0f, "%.2f")) {
+        data[zKey] = z;
+    }
+}
+
+// Render a row with draggable float fields for a quaternion (X, Y, Z, W)
+void RenderQuaternionRow(const std::string& label, nlohmann::json& data,
+    const std::string& xKey, const std::string& yKey, const std::string& zKey, const std::string& wKey, float dragSpeed)
+{
+    std::string displayLabel = _displayLabel(label);
+    ImGui::Text("%s", displayLabel.c_str());
+
+    float x = data.contains(xKey) && data[xKey].is_number() ? data[xKey].get<float>() : 0.0f;
+    float y = data.contains(yKey) && data[yKey].is_number() ? data[yKey].get<float>() : 0.0f;
+    float z = data.contains(zKey) && data[zKey].is_number() ? data[zKey].get<float>() : 0.0f;
+    float w = data.contains(wKey) && data[wKey].is_number() ? data[wKey].get<float>() : 1.0f;
+
+    // X
+    ImGui::SameLine();
+    float xLabelWidth = ImGui::CalcTextSize("X").x;
+    ImGui::SetCursorPosX(currentLabelOffset - xLabelWidth - 10.0f);
+    ImGui::Text("X");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(currentLabelOffset);
+    ImGui::SetNextItemWidth(70);
+    if (ImGui::DragFloat(("##" + label + "X").c_str(), &x, dragSpeed, 0.0f, 0.0f, "%.2f")) {
+        data[xKey] = x;
+    }
+
+    // Y
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 8.0f);
+    ImGui::Text("Y");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(70);
+    if (ImGui::DragFloat(("##" + label + "Y").c_str(), &y, dragSpeed, 0.0f, 0.0f, "%.2f")) {
+        data[yKey] = y;
+    }
+
+    // Z
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 8.0f);
+    ImGui::Text("Z");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(70);
+    if (ImGui::DragFloat(("##" + label + "Z").c_str(), &z, dragSpeed, 0.0f, 0.0f, "%.2f")) {
+        data[zKey] = z;
+    }
+
+    // W
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 8.0f);
+    ImGui::Text("W");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(70);
+    if (ImGui::DragFloat(("##" + label + "W").c_str(), &w, dragSpeed, 0.0f, 0.0f, "%.2f")) {
+        data[wKey] = w;
+    }
+}
+
 // Render a draggable float field with an optional unit label (e.g. "m", "kg")
 void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
     nlohmann::json& data, const std::string& key, float dragSpeed)

@@ -1,4 +1,4 @@
-﻿#include "services/Time.h"
+#include "services/Time.h"
 #include <algorithm>
 #include <string>
 #include <GLFW/glfw3.h>

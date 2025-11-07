@@ -37,6 +37,14 @@ void EndPropertySection();
 void RenderVector2DRow(const std::string& label, nlohmann::json& data,
     const std::string& xKey, const std::string& yKey, float dragSpeed = 1.0f);
 
+// Render a property with X, Y and Z fields (3D vectors)
+void RenderVector3DRow(const std::string& label, nlohmann::json& data,
+    const std::string& xKey, const std::string& yKey, const std::string& zKey, float dragSpeed = 1.0f);
+
+// Render a quaternion with X, Y, Z, W fields
+void RenderQuaternionRow(const std::string& label, nlohmann::json& data,
+    const std::string& xKey, const std::string& yKey, const std::string& zKey, const std::string& wKey, float dragSpeed = 0.1f);
+
 // Render a single float property with custom field label (Mass, Rotation, Volume, etc.)
 void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
     nlohmann::json& data, const std::string& key, float dragSpeed = 1.0f);

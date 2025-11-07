@@ -11,15 +11,10 @@
 #include <memory>
 #include "ECSTest.hpp"
 #include "LevelEditorTest.h"
+#include "services/OverlayService.h"
 
 void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
-    // Get configuration from the application
-    // const auto& config = Engine::CORE->GetConfig();
-    // const int windowWidth = config.WindowConfig.Width;
-    // const int windowHeight = config.WindowConfig.Height;
-
     std::cout << "Select test scene: \n";
-    //std::cout << "1. Physics & Collision 2D Test" << '\n';
     std::cout << "2. Graphics & Art Pipeline Test" << '\n';
     std::cout << "3. Serialization Check Test" << '\n';
     std::cout << "4. Memory Tracking Test" << '\n';
@@ -29,31 +24,15 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     int choice;
     std::cin >> choice;
 
-    // Clear console
     printf("\033[H\033[J");
 
     switch (choice) {
-    // case 1: { // PhysicsCollision
-    //     std::cout << "Starting Physics & Collision 2D Test..." << '\n';
-
-    //     sceneManager.AddScene(new Sandbox::PhysicsCollision2DTestScene(windowWidth, windowHeight, 7.0f));
-    //     sceneManager.LoadScene("PhysicsCollision2DTestScene");
-    //     break;
-    // }
     case 2: {
         LOG_INFO("Starting Graphics & Art Pipeline Test...");
         size_t graphicsTest = sceneManager.AddScene(new Sandbox::GraphicsTestScene());
         sceneManager.SetActive(graphicsTest);
-
         break;
     }
-    // case 3: {
-    //     std::cout << "Starting Serialization Integrity Test..." << '\n';
-
-    //     sceneManager.AddScene(new Sandbox::SerializationTestScene());
-    //     sceneManager.LoadScene("SerializationTestScene");
-    //     break;
-    // }
     case 4: {
         LOG_INFO("Starting Memory Tracking Test...");
         RunMemoryTests();
@@ -63,14 +42,15 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
         LOG_INFO("Starting Entity Component System Test...");
         size_t ecsTest = sceneManager.AddScene(new Sandbox::ECSTestScene());
         sceneManager.SetActive(ecsTest);
-
         break;
 	}
     case 6: {
-        LOG_INFO("Starting Level Editor Test...");
-        size_t levelEditorTest = sceneManager.AddScene(new Sandbox::LevelEditorTest());
-        sceneManager.SetActive(levelEditorTest);
-
+        LOG_INFO("Starting Level Editor (scene-less startup)...");
+        const auto& config = Engine::CORE->GetConfig();
+        CREATE_WINDOW("Level Editor", config.WindowConfig.Width, config.WindowConfig.Height);
+        if (auto* overlay = Services::OverlayService::Get()) {
+            overlay->EnableLevelEditorForScene(nullptr);
+        }
         break;
     }
     default:
@@ -80,8 +60,6 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
 }
 
 void SandboxGame::OnUpdate(Scenes::SceneManager& sceneManager) {
-    // Optionally do per-frame global logic here
-    // Like checking input to switch scenes
     Scenes::Scene* activeScene = sceneManager.GetActive();
     if (activeScene) {
         // activeScene->GetWorld() or scene-level logic
@@ -90,7 +68,5 @@ void SandboxGame::OnUpdate(Scenes::SceneManager& sceneManager) {
 
 void SandboxGame::OnShutdown(Scenes::SceneManager& sceneManager) {
     (void)sceneManager;
-    // Any global cleanup if needed
-    // sceneManager.RemoveAllScenes();
     DESTROY_ALL_WINDOWS();
 }

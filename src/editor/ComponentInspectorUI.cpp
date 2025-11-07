@@ -27,6 +27,8 @@ References:
 #include <filesystem>
 #include "ecs/Components.h"
 #include "serialization/EntitySerializer.h"
+#include "services/ResourceManager.h"
+#include <algorithm>
 
 // Set up fonts for UI rendering
 void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
@@ -39,26 +41,32 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
 // Allows editing of rotation, position and scale
 void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Local Rotation", "Local Position", "Local Scale" });
-    EditorUI::RenderFloatRow("Local Rotation", "R", data, "Rotation", 1.0f);         // Single float row
-    EditorUI::RenderVector2DRow("Local Position", data["Position"], "X", "Y", 1.0f); // 2D vector row
-    EditorUI::RenderVector2DRow("Local Scale", data["Scale"], "X", "Y", 0.01f);      // 2D vector row with small increment
+    // Match serializer schema: Position/Scale are 3D vectors; Rotation is quaternion
+    EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
+    EditorUI::RenderVector3DRow("Local Position", data["Position"], "X", "Y", "Z", 1.0f);
+    EditorUI::RenderVector3DRow("Local Scale", data["Scale"], "X", "Y", "Z", 0.01f);
     EditorUI::EndPropertySection();
 }
 
 // Render SpriteRenderer2D component UI (was RenderSpriteRenderer)
 // Includes sprite texture, color tint, flip options and sorting info
 void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Sprite", "Color", "Flip", "Sorting Layer", "Order in Layer" });
+    EditorUI::BeginPropertySection({ "Sprite", "Color", "Tiling", "Offset" });
 
-    // Sprite texture path display with drag-and-drop support
+    // Sprite texture display with drag-and-drop support; stores TextureId per serializer schema
     std::string texPath = data.value("TexturePath", "");
     ImGui::Text("Sprite");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetCurrentLabelOffset());
 
-    // Display current texture filename or "None"
-    ImGui::TextDisabled("%s", texPath.empty() ? "None"
-        : std::filesystem::path(texPath).filename().string().c_str());
+    // Display current texture filename if known, otherwise show TextureId
+    if (!texPath.empty()) {
+        ImGui::TextDisabled("%s", std::filesystem::path(texPath).filename().string().c_str());
+    }
+    else {
+        uint32_t tid = data.value("TextureId", 0);
+        ImGui::TextDisabled("TextureId: %u", tid);
+    }
 
     // Make the text a drop target for dragging textures from asset browser
     if (ImGui::BeginDragDropTarget()) {
@@ -66,44 +74,31 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
         if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
             std::string droppedPath = static_cast<const char*>(payLoad->Data);
 
-            // Only accept .png files for sprites
-            if (std::filesystem::path(droppedPath).extension() == ".png") {
-                data["TexturePath"] = droppedPath;
-                data["Sprite"] = droppedPath;
-                LOG_INFO("Dropped texture: " << droppedPath);
+            // Accept common image extensions
+            auto ext = std::filesystem::path(droppedPath).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                auto tex = RM.Get<Texture>(droppedPath);
+                if (tex) {
+                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["TexturePath"] = droppedPath; // UI convenience only
+                    data["Width"] = tex->Width();       // optional, ignored by serializer
+                    data["Height"] = tex->Height();     // optional, ignored by serializer
+                    LOG_INFO("Dropped texture: " << droppedPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped texture: " << droppedPath);
+                }
             }
         }
         ImGui::EndDragDropTarget();
     }
 
-    // Color tint picker
+    // Color tint picker per serializer
     EditorUI::RenderColorProperty("Color##Sprite", data["Color"]);
-
-    // Flip X/Y checkboxes
-    EditorUI::RenderCheckboxRow("Flip", data, "FlipX", "X", "FlipY", "Y");
-
-    // Additional settings (sorting) in collapsible section
-    ImGui::Separator();
-    ImGui::PushFont(m_boldFont);
-
-    // Make header transparent for cleaner look
-    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));        // Transparent when not hovered
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0)); // Transparent when hovered
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));  // Transparent when active
-
-    if (ImGui::CollapsingHeader("Additional Settings")) {
-        ImGui::PopStyleColor(3); // Pop all 3 color styles
-        ImGui::PopFont();
-        // Sorting layer name (for render order grouping)
-        EditorUI::RenderTextProperty("Sorting Layer", data, "SortingLayerName");
-        // Order in layer (fine-grained sorting within a layer)
-        EditorUI::RenderIntProperty("Order in Layer", data, "SortingOrder");
-    }
-    else {
-        // Also pop if header is collapsed
-        ImGui::PopStyleColor(3);
-        ImGui::PopFont();
-    }
+    // Tiling and Offset per serializer
+    EditorUI::RenderVector2DRow("Tiling##Sprite", data["Tiling"], "X", "Y", 0.1f);
+    EditorUI::RenderVector2DRow("Offset##Sprite", data["Offset"], "X", "Y", 0.1f);
 
     EditorUI::EndPropertySection();
 }
@@ -111,98 +106,37 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
 // Render Rigidbody2D component UI
 // Shows body type, mass, damping, velocities, constraints and inertia
 void ComponentUI::RenderRigidbody2D(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Body Type", "Mass", "Linear Damping", "Angular Damping",
-        "Gravity Scale", "Freeze Rotation", "Linear Velocity",
-        "Angular Velocity", "Inertia", "Center of Mass" });
-
-    // Body Type dropdown (Dynamic, Kinematic, Static)
-    ImGui::Text("Body Type");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetCurrentLabelOffset());
-    ImGui::SetNextItemWidth(100);
-
-    // Stored as an integer index (0 = Dynamic, 1 = Kinematic, 2 = Static)
-    const char* bodyTypes[] = { "Dynamic", "Kinematic", "Static" };
-
-    // Retrieve the current body type from JSON data
-    // Render a combo box (dropdown) with the body type options
-    int currentType = data["BodyType"];
-    // "##BodyType" hides the label visually but keeps it unique for ImGui
-    if (ImGui::Combo("##BodyType", &currentType, bodyTypes, 3)) {
-        // If the user selects a different option, update the JSON data
-        data["BodyType"] = currentType;
-    }
-
-    // Mass and damping properties
+    EditorUI::BeginPropertySection({ "Mass", "Inverse Mass", "Linear Damping", "Angular Damping", "Gravity Scale", "Flags" });
     EditorUI::RenderFloatRow("Mass", "kg", data, "Mass", 0.1f);
+    EditorUI::RenderFloatRow("Inverse Mass", "1/kg", data, "InverseMass", 0.1f);
     EditorUI::RenderFloatRow("Linear Damping", "", data, "LinearDamping", 0.01f);
     EditorUI::RenderFloatRow("Angular Damping", "", data, "AngularDamping", 0.01f);
     EditorUI::RenderFloatRow("Gravity Scale", "", data, "GravityScale", 0.1f);
 
-    // Freeze rotation constraint
-    ImGui::Text("Freeze Rotation");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetCurrentLabelOffset());
-
-    // Retrieve the "FreezeRotation" flag from JSON; default to false if missing
-    bool freezeRot = data.value("FreezeRotation", false);
-
-    // Render a checkbox for "Freeze Rotation" (hidden label "##FreezeRotation" for ImGui ID)
-    if (ImGui::Checkbox("##FreezeRotation", &freezeRot)) {
-        // If the user toggles the checkbox, update the JSON data
-        data["FreezeRotation"] = freezeRot;
-    }
-    ImGui::SameLine();
-    ImGui::Text("Z");
-
-    // Runtime info (velocity, inertia, etc.) in collapsible section
-    ImGui::Separator();
-    ImGui::PushFont(m_boldFont);
-    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
-
-    // Render the "Info" collapsing header
-    if (ImGui::CollapsingHeader("Info")) {
-        ImGui::PopStyleColor(3);
-        ImGui::PopFont();
-
-        // Render runtime physics info as read-only or editable properties
-        EditorUI::RenderVector2DRow("Linear Velocity", data["LinearVelocity"], "X", "Y", 1.0f);
-        EditorUI::RenderFloatRow("Angular Velocity", "", data, "AngularVelocity", 1.0f);
-        EditorUI::RenderFloatRow("Inertia", "", data, "Inertia", 0.1f);
-        EditorUI::RenderVector2DRow("Center of Mass", data["CenterOfMass"], "X", "Y", 0.1f);
-    }
-    else {
-        // Pop colors and font even if header is collapsed to maintain UI state consistency
-        ImGui::PopStyleColor(3);
-        ImGui::PopFont();
-    }
-
+    // Flags as integer; future: expose common bits via checkboxes if needed
+    EditorUI::RenderIntProperty("Flags", data, "Flags");
     EditorUI::EndPropertySection();
 }
 
 // Render CircleCollider2D component UI
 // Allows editing trigger flag, offset, radius and collision layer
 void ComponentUI::RenderCircleCollider2D(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Radius", "Layer" });
+    EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Radius", "Layer Mask" });
 
-    // Is Trigger checkbox
+    // Map IsTrigger to Flags bit 0 while still showing a simple checkbox
     ImGui::Text("Is Trigger");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetCurrentLabelOffset());
-
-    // Retrieve value from JSON; default to false if missing
-    bool isTrigger = data.value("IsTrigger", false);
+    int flags = data.value("Flags", 0);
+    bool isTrigger = (flags & 0x1) != 0;
     if (ImGui::Checkbox("##IsTriggerCircle", &isTrigger)) {
-        // Update JSON if user toggled the checkbox
-        data["IsTrigger"] = isTrigger;
+        flags = isTrigger ? (flags | 0x1) : (flags & ~0x1);
+        data["Flags"] = flags;
     }
 
-    // It's always the same thing man
     EditorUI::RenderVector2DRow("Offset##Circle", data["Offset"], "X", "Y", 1.0f);
     EditorUI::RenderFloatRow("Radius##Circle", "px", data, "Radius", 1.0f);
-    EditorUI::RenderIntProperty("Layer##Circle", data, "Layer");
+    EditorUI::RenderIntProperty("Layer Mask##Circle", data, "LayerMask");
 
     EditorUI::EndPropertySection();
 }
@@ -210,22 +144,23 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data) {
 // Render BoxCollider2D component UI
 // Allows editing trigger flag, offset, size and collision layer
 void ComponentUI::RenderBoxCollider2D(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Size", "Layer" });
+    EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Half Extents", "Rotation", "Layer Mask" });
 
-    // Is Trigger checkbox
+    // Map IsTrigger to Flags bit 0
     ImGui::Text("Is Trigger");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetCurrentLabelOffset());
-
-    // Same as above
-    bool isTrigger = data.value("IsTrigger", false);
+    int flags = data.value("Flags", 0);
+    bool isTrigger = (flags & 0x1) != 0;
     if (ImGui::Checkbox("##IsTriggerBox", &isTrigger)) {
-        data["IsTrigger"] = isTrigger;
+        flags = isTrigger ? (flags | 0x1) : (flags & ~0x1);
+        data["Flags"] = flags;
     }
 
     EditorUI::RenderVector2DRow("Offset##Box", data["Offset"], "X", "Y", 1.0f);
-    EditorUI::RenderVector2DRow("Size##Box", data["Size"], "X", "Y", 1.0f);
-    EditorUI::RenderIntProperty("Layer##Box", data, "Layer");
+    EditorUI::RenderVector2DRow("Half Extents##Box", data["HalfExtents"], "X", "Y", 1.0f);
+    EditorUI::RenderFloatRow("Rotation##Box", "deg", data, "Rotation", 1.0f);
+    EditorUI::RenderIntProperty("Layer Mask##Box", data, "LayerMask");
 
     EditorUI::EndPropertySection();
 }

@@ -48,6 +48,9 @@ public:
     */
     static void Initialize(GLFWwindow* pWin);
 
+    // Gracefully detach from GLFW window; guards will avoid further GLFW calls
+    static void Shutdown();
+
     /*!
     \brief Check if a key is currently being pressed.
     \param key The key code to check (use KEY_* constants).

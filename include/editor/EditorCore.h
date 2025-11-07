@@ -54,6 +54,13 @@ public:
     // Check if world is valid before operations
     bool HasValidWorld() const;
 
+    // Update the world reference and clear any stale UI state
+    void SetWorld(ECS::World* world);
+
+    // Current scene metadata for Save/Load flows
+    std::string m_currentScenePath;
+    std::string m_currentSceneName = "Untitled";
+
 private:
     // Render main menu bar with File menu
     void _showMainMenu();
@@ -75,6 +82,20 @@ private:
     const std::string& _getCloneLabel(EntityId id) const;
     const bool& _getCollapsedHeaderBool(EntityId id) const;
 
+    // Scene Save/Load helpers
+    bool _saveActiveScene(const std::string& path) const;
+    bool _loadSceneFromPath(const std::string& path);
+
+    // Scene creation and file dialogs
+    void _createNewScene();
+    void _openSceneDialog();
+    void _saveScene();
+    void _saveSceneAsDialog(bool isTemplate);
+
+    // Persist and restore editor session state
+    void _saveEditorState() const;
+    void _loadEditorState();
+
     // Core state
     ECS::World* m_world = nullptr;
     EntityId m_selectedEntityId = 0;
@@ -83,6 +104,9 @@ private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
+
+    // Global UI scale for editor (applies to all fonts except playback)
+    float m_uiScale = 1.35f;
 
     // Cached UI labels to avoid string allocations every frame
     mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;

@@ -106,11 +106,12 @@ bool Window::Create(const std::string& title, const int width, const int height,
 }
 
 void Window::Destroy() {
-	if (m_windowHandle) {
-		glfwDestroyWindow(m_windowHandle);
-		m_windowHandle = nullptr;
-		glfwTerminate();
-	}
+    if (m_windowHandle) {
+        // Detach input first so subsequent frames don’t poll GLFW after termination
+        Input::Shutdown();
+        glfwDestroyWindow(m_windowHandle);
+        m_windowHandle = nullptr;
+    }
 }
 
 void Window::Mode(const WindowMode::Flags mode, GLFWmonitor* monitor) {

@@ -46,9 +46,11 @@ public:
     // Wire unified Inspector for prefab editing
     void SetInspector(InspectorWindow* inspector);
 
+    // Update world reference when scenes change
+    void SetWorld(ECS::World* world) { m_world = world; }
+
 private:
     // References to external systems
-    float m_fontScale = 1.0f;
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;

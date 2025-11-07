@@ -91,6 +91,8 @@ void Playback::Render() {
     // Use default ImGui tab styling; no local overrides
     ImGui::Begin("Game Controls", nullptr, flags);
 
+    // Follow global FontGlobalScale (no local override)
+
     // If mouse is over window then show tooltips (with keyboard shortcuts)
     if (ImGui::IsWindowHovered()) {
         ImGui::BeginTooltip();
@@ -247,4 +249,12 @@ bool Playback::IsStepRequested() const {
 // Clear the step request flag
 void Playback::ClearStepRequest() {
     m_stepRequested = false;
+}
+
+// Update the world reference safely when scenes change
+void Playback::SetWorld(ECS::World* world) {
+    m_world = world;
+    m_gameState = GameState::Stopped;
+    m_stepRequested = false;
+    m_savedWorldState.clear();
 }

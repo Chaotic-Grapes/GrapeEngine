@@ -8,6 +8,7 @@
 #include "services/WindowManager.h"
 #include "services/OverlayService.h"
 #include <thread>
+#include <GLFW/glfw3.h>
 
 namespace Engine {
     // Global pointer to the core engine
@@ -16,7 +17,6 @@ namespace Engine {
 
     void Application::Run(Game& game, const bool consoleFlag) {
         Time::_initialize();
-
         // Set global pointer to this application instance
         CORE = this;
 
@@ -97,9 +97,7 @@ namespace Engine {
             if (Time::FpsCap() > 0) {
                 const double targetFrameTime = 1.0 / Time::FpsCap();
                 if (frameDuration < targetFrameTime) {
-                    std::this_thread::sleep_for(
-                        std::chrono::duration<double>(targetFrameTime - frameDuration)
-                    );
+                    std::this_thread::sleep_for(std::chrono::duration<double>(targetFrameTime - frameDuration));
                 }
             }
         }
@@ -107,8 +105,17 @@ namespace Engine {
         game.OnShutdown(m_sceneManager);
 
         // Clean up services
-        delete m_audio;
-        delete m_overlay;
+        if (m_overlay) {
+            m_overlay->Terminate();
+            delete m_overlay;
+            m_overlay = nullptr;
+        }
+
+        if (m_audio) {
+            // AudioService destructor calls Terminate(), so deletion is sufficient
+            delete m_audio;
+            m_audio = nullptr;
+        }
 
         WindowManager::DestroyAll();
     }

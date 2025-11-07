@@ -29,7 +29,6 @@
 #include "core/CrashDumping.h"
 #include "core/Logger.h"
 
-
 #include <iostream>
 #include <algorithm>
 #include <ctime>

@@ -88,11 +88,13 @@ foreach(header IN LISTS ENGINE_HEADERS)
     source_group("${group_path}" FILES "${header}")
 endforeach()
 
-# Compiler warnings
+# Compiler warnings and MSVC PDB concurrency
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(GrapeEngine PRIVATE -Wall -Wextra -Wpedantic -Werror)
 elseif (MSVC)
-    target_compile_options(GrapeEngine PRIVATE /W4)
+    # /W4: warnings level, /FS: force synchronous PDB writes to avoid contention
+    # /MP: enable parallel compilation (safe with /FS)
+    target_compile_options(GrapeEngine PRIVATE /W4 /FS /MP)
 endif()
 
 # ======================= Copy files and assets =========================

@@ -41,6 +41,9 @@ public:
     // Render the hierarchy window
     void Render();
 
+    // Update world and clear selection when scenes change
+    void SetWorld(ECS::World* world);
+
     // Get currently selected entity
     EntityId GetSelectedEntity() const { return m_selectedEntityId; }
 

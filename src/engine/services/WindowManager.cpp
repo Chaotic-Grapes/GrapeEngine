@@ -30,11 +30,15 @@ void WindowManager::DestroyWindow(const Window* window) {
 }
 
 void WindowManager::DestroyAll() {
-    for (auto* window : m_windows) {
-        window->Destroy();
-        delete window;
+    if (!m_windows.empty()) {
+        for (auto* window : m_windows) {
+            window->Destroy();
+            delete window;
+        }
+        m_windows.clear();
+        // Terminate GLFW once after all windows are destroyed
+        glfwTerminate();
     }
-    m_windows.clear();
 }
 
 const std::vector<Window*>& WindowManager::GetWindows()       { return m_windows; }

@@ -45,12 +45,18 @@ void Input::Initialize(GLFWwindow* pWin) {
     glfwGetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
 }
 
+void Input::Shutdown() {
+    // Detach window so subsequent input calls short-circuit
+    m_window = nullptr;
+}
+
 // Check if a specific key is currently pressed
 bool Input::IsKeyPressed(const int key) { return m_keyPressed[key]; }
 
 // Check if a specific key was just pressed this frame
 bool Input::IsKeyDown(const int key) {
-    //quick fix
+    // Guard against nullptr or shutdown
+    if (!m_window) return false;
     return glfwGetKey(m_window, key) == PRESS;
 }
 
@@ -59,6 +65,7 @@ bool Input::IsKeyUp(const int key) { return m_keyUp[key]; }
 
 // Check if a specific mouse button is currently pressed  
 bool Input::IsMousePressed(const int button) {
+    if (!m_window) return false;
     return glfwGetMouseButton(m_window, button) == PRESS;
 }
 
@@ -70,12 +77,14 @@ bool Input::IsMouseUp(const int button) { return m_mouseUp[button]; }
 
 // Get current mouse position
 void Input::GetMousePosition(double& xPos, double& yPos) {
+    if (!m_window) { xPos = 0.0; yPos = 0.0; return; }
     glfwGetCursorPos(m_window, &xPos, &yPos);
 }
 
 // Get mouse X position
 double Input::GetMouseX() {
     double xPos, yPos;
+    if (!m_window) return 0.0;
     glfwGetCursorPos(m_window, &xPos, &yPos);
     return xPos;
 }
@@ -83,6 +92,7 @@ double Input::GetMouseX() {
 // Get mouse Y position
 double Input::GetMouseY() {
     double xPos, yPos;
+    if (!m_window) return 0.0;
     glfwGetCursorPos(m_window, &xPos, &yPos);
     return yPos;
 }
@@ -127,6 +137,8 @@ void Input::_processInput() {
     m_scrollX = 0.0;
     m_scrollY = 0.0;
 
+    // Avoid polling after shutdown
+    if (!m_window) return;
     glfwPollEvents();
 }
 

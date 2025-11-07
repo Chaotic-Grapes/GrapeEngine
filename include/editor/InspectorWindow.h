@@ -53,6 +53,9 @@ public:
     void InspectPrefab(const std::string& prefabPath);
     void ClearSelection();
 
+    // Update world reference and clear selection on scene change
+    void SetWorld(ECS::World* world) { m_world = world; ClearSelection(); }
+
     // Check if currently inspecting something
     InspectionMode GetMode() const { return m_mode; }
 

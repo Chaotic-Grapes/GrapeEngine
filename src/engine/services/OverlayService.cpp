@@ -7,75 +7,98 @@
 #include <imgui_internal.h>
 #include "core/messaging/MessageTypes.h"
 #include "core/messaging/MessageSystem.h"
+#include "../editor/LevelEditor.h"
+#include "serialization/EntitySerializer.h"
 
 #ifdef USE_IMGUI
 
 namespace Services {
-    void OverlayService::_onWindowResize(int width, int height) {
-        m_dockLayoutBuilt = false; // Force layout to rebuild
-        m_lastWindowSize = Vector2D(static_cast<float>(width), static_cast<float>(height));
-    }
-
     void OverlayService::Initialize() {
+        // Initialize DebugUI (always available)
         if (m_world) {
             m_debugUI = std::make_unique<DebugUI>(m_world);
-            m_levelEditor = std::make_unique<LevelEditor>(m_world);
             UICommon::InitializeDefaultLayouts();
         }
-        
-        // Fallback if no world but still need debugUI
+
         if (!m_debugUI)
-            m_debugUI = std::make_unique<DebugUI>(nullptr); // Pass nullptr
+            m_debugUI = std::make_unique<DebugUI>(nullptr);
 
         if (!m_initialized) {
-            // Get main window handle and set up ImGUI
-            Window* mainWindow = WindowManager::GetMainWindow();
-            if (mainWindow) {
-                if (m_debugUI) 
-                    m_debugUI->Initialize(mainWindow->Handle());
-                if (m_levelEditor)
-                    m_levelEditor->Initialize(mainWindow->Handle());
-                if (m_audioDevice && m_debugUI)
-                    m_debugUI->AttachAudio(m_audioDevice);
-
-                // Save layout to file (docking purposes)
-                ImGuiIO& io = ImGui::GetIO();
-                io.IniFilename = "imgui.ini";
-                m_initialized = true;
-            }
-        }
-        // Subscribe to window resize events
-        Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
-            [this](const Messaging::WindowResized& msg) {
-                _onWindowResize(msg.Width, msg.Height);
-            });
-    }
-
-    void OverlayService::Update() {
-        if (Input::IsKeyDown(KEY_F1))
-            SetEnabled(!IsEnabled());
-
-        if (!IsEnabled()) return;
-
-        // If we don't have instances yet, try to create them
-        if (!m_debugUI && m_world) {
-            m_debugUI = std::make_unique<DebugUI>(m_world);
-        }
-        if (!m_levelEditor && m_world) {
-            m_levelEditor = std::make_unique<LevelEditor>(m_world);
-        }
-
-        // If still no instances, then return
-        if (!m_debugUI) return;
-
-        // Try to initialize ImGui if not done yet
-        if (!m_initialized) {
-            // Get main window handle and set up ImGUI
             Window* mainWindow = WindowManager::GetMainWindow();
             if (mainWindow) {
                 if (m_debugUI)
                     m_debugUI->Initialize(mainWindow->Handle());
-                if (m_levelEditor)
+                if (m_audioDevice && m_debugUI)
+                    m_debugUI->AttachAudio(m_audioDevice);
+
+                ImGuiIO& io = ImGui::GetIO();
+                io.IniFilename = "imgui.ini";
+                m_initialized = true;
+
+                // Dump component TypeId registry once for copying into prefabs
+                static bool s_dumped = false;
+                if (!s_dumped) {
+                    auto& reg = Serialization::EntitySerializer::Registry();
+                    for (const auto& [tid, info] : reg) {
+                        LOG_DEBUG(std::string("TypeId dump: ") + info.Name + " -> " + std::to_string(tid));
+                    }
+                    s_dumped = true;
+                }
+            }
+        }
+    }
+
+    void OverlayService::Update() {
+        // Handle deferred LevelEditor rebuild at the start of the frame
+        if (m_pendingLevelEditorRebuild && m_levelEditor) {
+            LevelEditorConfig config;
+            m_levelEditor.reset();
+            m_levelEditor = std::make_unique<LevelEditor>(m_world, config);
+            Window* mainWindow = WindowManager::GetMainWindow();
+            if (mainWindow && m_initialized) {
+                m_levelEditor->Initialize(mainWindow->Handle());
+            }
+            m_pendingLevelEditorRebuild = false;
+        }
+
+        if (Input::IsKeyPressed(KEY_F1) && m_debugUI)
+            m_debugUI->SetEnabled(!m_debugUI->IsEnabled());
+
+        auto* activeScene = m_sceneManager.GetActive();
+
+        // Disable LevelEditor if scene changes (only when targeted to a specific scene)
+        if (m_showLevelEditor && m_levelEditorForScene && activeScene != m_levelEditorForScene) {
+            DisableLevelEditor();
+        }
+
+        // Show LevelEditor when enabled either for a specific scene or globally (scene-less)
+        bool shouldShowLevelEditor = m_showLevelEditor && (
+            m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene)
+        );
+
+        // Initialize LevelEditor only when needed (even without a world)
+        if (shouldShowLevelEditor && !m_levelEditor) {
+            LevelEditorConfig config;
+            m_levelEditor = std::make_unique<LevelEditor>(m_world, config);
+
+            Window* mainWindow = WindowManager::GetMainWindow();
+            if (mainWindow && m_initialized) {
+                m_levelEditor->Initialize(mainWindow->Handle());
+            }
+        }
+
+        if (!m_debugUI && m_world) {
+            m_debugUI = std::make_unique<DebugUI>(m_world);
+        }
+
+        if (!m_debugUI) return;
+
+        if (!m_initialized) {
+            Window* mainWindow = WindowManager::GetMainWindow();
+            if (mainWindow) {
+                if (m_debugUI)
+                    m_debugUI->Initialize(mainWindow->Handle());
+                if (m_levelEditor && shouldShowLevelEditor)
                     m_levelEditor->Initialize(mainWindow->Handle());
                 if (m_audioDevice && m_debugUI)
                     m_debugUI->AttachAudio(m_audioDevice);
@@ -84,78 +107,78 @@ namespace Services {
             else return;
         }
 
-        // Audio and scene attachment
         if (m_audioDevice && m_debugUI && !m_debugUI->HasValidAudio())
             m_debugUI->AttachAudio(m_audioDevice);
 
-        // Attach/detach scene as needed
-        auto* scene = m_sceneManager.GetActive();
-        if (scene && m_debugUI && !m_debugUI->HasValidScene(scene))
-            m_debugUI->AttachScene(scene);
-        else if (m_debugUI && m_debugUI->HasValidScene() && !scene)
+        if (activeScene && m_debugUI && !m_debugUI->HasValidScene(activeScene))
+            m_debugUI->AttachScene(activeScene);
+        else if (m_debugUI && m_debugUI->HasValidScene() && !activeScene)
             m_debugUI->DetachScene();
     }
 
     void OverlayService::Render() {
-        if (!IsEnabled() || !m_debugUI || !m_levelEditor) return;
+        auto* activeScene = m_sceneManager.GetActive();
+        bool shouldShowLevelEditor = m_showLevelEditor && (
+            m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene)
+        );
 
-        // Update UI every frame
+        // Background clear hack removed; dockspace now draws its own background
+
+        // Always start ImGui frame
         if (m_debugUI) { m_debugUI->NewFrame(); }
 
-        // LevelEditor handles its own docking
-        if (m_levelEditor) {
+        // LevelEditor takes priority
+        if (m_levelEditor && shouldShowLevelEditor && m_initialized) {
             m_levelEditor->Update();
-            m_levelEditor->Render();  // This now includes docking
+            m_levelEditor->Render();
+        }
+        // DebugUI only when LevelEditor isn't showing
+        else if (m_debugUI && m_debugUI->IsEnabled()) {
+            m_debugUI->Render();
         }
 
-        // DebugUI renders freely (no docking)
-        if (m_debugUI) { m_debugUI->Render(); }
-
-        // Finalize and draw everything at once
         ImGui::Render();
         auto* drawData = ImGui::GetDrawData();
         if (drawData) {
-            // Submit to OpenGL for GPU execution
             ImGui_ImplOpenGL3_RenderDrawData(drawData);
         }
     }
 
-    // Prevent memory leaks
     void OverlayService::Terminate() {
-        if (m_debugUI) 
+        if (m_debugUI) {
             m_debugUI->Shutdown();
             m_debugUI->DetachAudio();
+        }
+        if (m_levelEditor) {
+            m_levelEditor.reset();
+        }
     }
 
     void OverlayService::EnableLevelEditorForScene(Scenes::Scene* scene) {
 #ifdef USE_IMGUI
-        if (scene && scene == m_sceneManager.GetActive()) {
-            m_showLevelEditor = true;
-
-            // Create LevelEditor if it doesn't exist
-            if (!m_levelEditor && m_world) {
-                m_levelEditor = std::make_unique<LevelEditor>(m_world);
-
-                // Initialize if we have a window
-                Window* mainWindow = WindowManager::GetMainWindow();
-                if (mainWindow && m_initialized) {
-                    m_levelEditor->Initialize(mainWindow->Handle());
-                }
-            }
-
-            LOG_DEBUG("LevelEditor enabled for scene");
-        }
+        // Enable for the specified scene; nullptr enables scene-less mode
+        m_showLevelEditor = true;
+        m_levelEditorForScene = scene; // nullptr means scene-less mode
+        LOG_DEBUG(scene ? "LevelEditor enabled for scene" : "LevelEditor enabled (scene-less)");
 #endif
     }
 
-#else
-    // Non-ImGui implementations
-    void OverlayService::Update() {
-        // Empty implementation when ImGui is not available
+    void OverlayService::DisableLevelEditor() {
+        m_showLevelEditor = false;
+        m_levelEditorForScene = nullptr;
+
+        if (m_levelEditor) {
+            m_levelEditor.reset();
+        }
+
+        LOG_DEBUG("LevelEditor disabled");
     }
 
-    void OverlayService::Terminate() {
-        // Empty implementation when ImGui is not available
-    }
+#else
+void OverlayService::Update() {}
+void OverlayService::Render() {}
+void OverlayService::Terminate() {}
+void OverlayService::EnableLevelEditorForScene(Scenes::Scene* scene) {}
+void OverlayService::DisableLevelEditor() {}
 #endif
 }

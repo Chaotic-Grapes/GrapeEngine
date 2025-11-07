@@ -60,8 +60,6 @@ void AssetBrowser::Render() {
     ImGui::PushFont(m_mainFont);
     ImGui::Begin("Asset Browser");
 
-    // Apply font scale to this window
-    ImGui::SetWindowFontScale(m_fontScale);
 
     // Display clickable breadcrumb navigation
     std::string newPath;
@@ -221,25 +219,7 @@ void AssetBrowser::Render() {
         ImGui::EndPopup();
     }
 
-    // Font scale controls
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 207);
-
-    // Standard stuff
-    ImGui::SetNextItemWidth(120);
-    if (ImGui::SliderFloat("##Scale", &m_fontScale, 0.5f, 1.5f, "%.1fx")) {
-        m_fontScale = std::clamp(m_fontScale, 0.5f, 1.5f);
-    }
-
-    // Show tooltip on hover
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Asset Browser UI Scale");
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Reset##Scale")) {
-        m_fontScale = 1.0f;
-    }
+    // Global UI scale now controlled via View menu; remove local controls
 
     // Reserve space for status bar at bottom
     float windowWidth = ImGui::GetContentRegionAvail().x;
@@ -250,7 +230,6 @@ void AssetBrowser::Render() {
 
     // Left side: File/folder list (65% width)
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
-    ImGui::SetWindowFontScale(m_fontScale);
     m_assetLibrary._displayFolder(m_currentPath, m_selectedAsset, m_currentPath);
 
     // Clicking empty space in file list clears EVERYTHING (File/folder list)
@@ -271,7 +250,6 @@ void AssetBrowser::Render() {
 
     // Right side: File info panel (35% width)
     ImGui::BeginChild("FileInfo", ImVec2(0, 0), true);
-    ImGui::SetWindowFontScale(m_fontScale);
     m_assetLibrary._displaySelectedFileInfo(m_selectedAsset);
 
     // Clicking empty space in file info clears EVERYTHING (File info)

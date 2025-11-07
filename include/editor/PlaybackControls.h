@@ -55,6 +55,9 @@ public:
     bool IsStepRequested() const; // Returns true if user requested a single physics step
     void ClearStepRequest();      // Resets step request flag
 
+    // Update the world reference safely when scenes change
+    void SetWorld(ECS::World* world);
+
 private:
     ECS::World* m_world;                        // Pointer to the game world being edited
     ImFont* m_mainFont = nullptr;               // Font for UI text

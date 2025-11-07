@@ -41,7 +41,7 @@ void InspectorWindow::Render(float fontScale) {
     // "Prefab Editor" when editing the template file, "Property Editor" for entity instances
     const char* windowTitle = (m_mode == InspectionMode::Prefab) ? "Prefab Editor" : "Property Editor";
     ImGui::Begin(windowTitle);
-    ImGui::SetWindowFontScale(fontScale);
+    // Use global FontGlobalScale; no local scaling applied here
 
     // Render different content based on inspection mode
     if (m_mode == InspectionMode::None) {
@@ -137,7 +137,7 @@ void InspectorWindow::ClearSelection() {
 // Shows all components of a selected entity instance
 void InspectorWindow::_renderEntityCore() {
     // Nothing to render if no entity selected
-    if (!m_world || m_inspectedEntityId == 0) {
+    if (!m_world) {
         ImGui::TextDisabled("No entity selected");
         return;
     }
@@ -310,9 +310,10 @@ void InspectorWindow::_renderEntityCore() {
 
         // Write modified JSON data back to the actual live entity components
         // This is where UI changes actually get applied to the game state
-        // The UI modifies the JSON, then we deserialize that JSON back into the real components
-        for (const auto& componentEntry : entityJson["Components"]) {
-            std::string typeName = componentEntry["TypeName"];
+    // The UI modifies the JSON, then we deserialize that JSON back into the real components
+    for (const auto& componentEntry : entityJson["Components"]) {
+        std::string typeName = componentEntry["TypeName"];
+
 
             // Lambda helper to apply JSON data to the correct component type
             // Returns true if this was the right type, false to keep trying other types
@@ -338,6 +339,10 @@ void InspectorWindow::_renderEntityCore() {
             if (applyComponent.operator()<ECS::Components::ShapeLine2D>("ECS::Components::ShapeLine2D")) continue;
         }
     }
+
+    // Do not clear selection on generic clicks inside the inspector.
+    // This prevents accidental deselection when clicking labels or whitespace
+    // near interactive widgets (e.g., checkboxes, drags) and improves usability.
 
     // Capture scroll extent for stable overlay positioning next frame
     ImGui::EndChild();
@@ -480,6 +485,13 @@ void InspectorWindow::_renderPrefabInspector() {
         m_componentsToDelete.clear();
     }
 
+    // Clicking empty space in the PrefabComponents child clears current selection
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
+        && !ImGui::IsAnyItemHovered()) {
+        ClearSelection();
+    }
+
     // Capture scroll extent for stable overlay positioning next frame
     ImGui::EndChild();
     ImGui::PopStyleVar();
@@ -523,8 +535,9 @@ void InspectorWindow::_renderPrefabInspector() {
 
 // Add component to an entity instance
 void InspectorWindow::_addComponentToEntity(const std::string& componentType) {
-    if (!m_world || m_inspectedEntityId == 0) return;
+    if (!m_world) return;
     ECS::Entity entity{ m_inspectedEntityId, 0 };
+    if (!m_world->IsAlive(entity)) return;
 
     // Transform is special, every entity has one by default and it has no configurable defaults
     if (componentType == "LocalTransform") {
@@ -566,8 +579,9 @@ void InspectorWindow::_addComponentToEntity(const std::string& componentType) {
 
 // Remove component from entity instance
 void InspectorWindow::_removeComponentFromEntity(const std::string& componentType) {
-    if (!m_world || m_inspectedEntityId == 0) return;
+    if (!m_world) return;
     ECS::Entity entity{ m_inspectedEntityId, 0 };
+    if (!m_world->IsAlive(entity)) return;
 
     // Generic lambda to remove component T if type matches
     auto remove = [&]<typename T>(const std::string & name) {

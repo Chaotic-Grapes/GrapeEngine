@@ -104,7 +104,7 @@ void LevelEditor::_renderDockSpace() {
     ImGui::PopStyleVar(3);
 
     m_dockspaceId = ImGui::GetID("MainDockSpace");
-    ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Show scene through central node
+    ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Allow scene to render in central node
     ImGui::DockSpace(m_dockspaceId, ImVec2(0.0f, 0.0f), dockFlags);
 
     _buildDockLayout();
@@ -123,16 +123,21 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     // Only tune child window borders for cleaner nested panels
     style.ChildBorderSize = 0.75f;  // Thin borders on BeginChild regions
 
-    // Clear existing fonts (important for hot-reload scenarios)
-    io.Fonts->Clear();
+    // Do NOT clear global fonts here; keep atlas stable across frames/scene switches
 
-    // Load three fonts: regular text, bold headers, and Material Symbols icons
+    // Load fonts once; on subsequent LevelEditor rebuilds, reuse existing atlas fonts
     // 1. REGULAR FONT: Inter Medium for body text
     float textFontSize = m_config.FontSize;
-    m_mainFont = io.Fonts->AddFontFromFileTTF(
-        "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
-        textFontSize
-    );
+    if (!m_mainFont) {
+        if (io.Fonts->Fonts.size() >= 1) {
+            m_mainFont = io.Fonts->Fonts[0];
+        } else {
+            m_mainFont = io.Fonts->AddFontFromFileTTF(
+                "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
+                textFontSize
+            );
+        }
+    }
 
     if (!m_mainFont) {
         LOG_ERROR("Failed to load regular Inter font, using default");
@@ -140,10 +145,16 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     }
 
     // 2. BOLD FONT: Inter ExtraBold for headers and emphasis
-    m_boldFont = io.Fonts->AddFontFromFileTTF(
-        "assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf",
-        textFontSize
-    );
+    if (!m_boldFont) {
+        if (io.Fonts->Fonts.size() >= 2) {
+            m_boldFont = io.Fonts->Fonts[1];
+        } else {
+            m_boldFont = io.Fonts->AddFontFromFileTTF(
+                "assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf",
+                textFontSize
+            );
+        }
+    }
 
     if (!m_boldFont) {
         LOG_ERROR("Failed to load bold Inter font");
@@ -161,15 +172,20 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     iconsConfig.GlyphOffset = ImVec2(0, 0);  // No vertical offset needed
 
     float iconFontSize = 18.0f;  // Slightly smaller than text
-    m_symbolsFont = io.Fonts->AddFontFromFileTTF(
-        "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
-        iconFontSize,
-        &iconsConfig,
-        iconRanges
-    );
+    if (!m_symbolsFont) {
+        if (io.Fonts->Fonts.size() >= 3) {
+            m_symbolsFont = io.Fonts->Fonts[2];
+        } else {
+            m_symbolsFont = io.Fonts->AddFontFromFileTTF(
+                "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
+                iconFontSize,
+                &iconsConfig,
+                iconRanges
+            );
+        }
+    }
 
-    // Build font atlas (required after adding fonts)
-    io.Fonts->Build();
+    // Avoid rebuilding the atlas here; backend will manage font texture lifecycle
 
     // Pass fonts to each panel for consistent styling
     m_playback.Initialize(m_mainFont, m_symbolsFont);
@@ -185,14 +201,12 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     // 2. Hierarchy -> Inspector connection
     // When user selects entity in hierarchy, show its components in inspector
     m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
-        if (id) {
-            // Entity selected: show entity inspector mode
-            m_inspector.InspectEntity(id);
-        }
-        else {
-            // Nothing selected: clear inspector
-            m_inspector.ClearSelection();
-        }
+        // Clear selection sentinel from hierarchy uses NPOS32; ID 0 can be a valid entity
+        if (!m_world) { m_inspector.ClearSelection(); return; }
+        if (id == ECS::Entity::NPOS32) { m_inspector.ClearSelection(); return; }
+        ECS::Entity e{ id, 0 };
+        if (m_world->IsAlive(e)) m_inspector.InspectEntity(id);
+        else m_inspector.ClearSelection();
         });
 }
 
@@ -207,15 +221,40 @@ void LevelEditor::Update() {
 
 // Render all editor panels each frame
 void LevelEditor::Render() {
-    if (!m_world) return;
-
-    // Render dockspace first
+    // Render dockspace first (always show editor frame)
     _renderDockSpace();
 
-    // Render panels in order
-    m_playback.Render();                 // Top toolbar with play controls
-    m_assetBrowser.Render();             // Left panel: file browser
-    m_editorCore.ShowEditorWindows();    // Viewport tools
-    m_hierarchyWindow.Render();          // Left panel: entity tree
-    m_inspector.Render(1.0f);            // Right panel: component editor (unified entity/prefab)
+    // Render panels in order; when no scene attached, show guidance and keep panels visible
+    if (m_world) {
+        m_playback.Render();                 // Top toolbar with play controls
+        m_assetBrowser.Render();             // Left panel: file browser
+        m_editorCore.ShowEditorWindows();    // Viewport tools
+        m_hierarchyWindow.Render();          // Left panel: entity tree
+        m_inspector.Render(1.0f);            // Right panel: component editor (unified entity/prefab)
+    }
+    else {
+        // Scene-less UI: keep the frame and panels present with disabled guidance
+        m_playback.Render();                 // Show controls UI; actions are naturally disabled without a world
+        m_assetBrowser.Render();             // Asset Browser is independent of world; keep it visible
+        m_editorCore.ShowEditorWindows();    // Viewport shows disabled guidance
+        m_hierarchyWindow.Render();          // Hierarchy shows disabled message
+
+        // Placeholder Property Editor window to maintain layout and avoid missing panel
+        ImGui::PushFont(m_mainFont);
+        ImGui::Begin("Property Editor");
+        ImGui::TextDisabled("No scene attached");
+        ImGui::End();
+        ImGui::PopFont();
+    }
+}
+
+// Update world reference and propagate to all subpanels
+void LevelEditor::SetWorld(ECS::World* world) {
+    m_world = world;
+    // Propagate to panels to avoid stale references
+    m_playback.SetWorld(world);
+    m_editorCore.SetWorld(world);
+    m_hierarchyWindow.SetWorld(world);
+    m_inspector.SetWorld(world);
+    m_assetBrowser.SetWorld(world);
 }

@@ -27,6 +27,7 @@ HOW TO USE:
 #include "helpers/MathHelper.h"
 #include "services/Input.h"
 #include "serialization/EntitySerializer.h"
+#include "core/Application.h"
 #include <imgui.h>
 #include <sstream>
 #include <algorithm>
@@ -42,12 +43,28 @@ void HierarchyWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* sym
     m_editorCore = editorCore; // Save reference to EditorCore for entity operations
 }
 
+// Update world reference and clear selection/expanded nodes to avoid stale IDs
+void HierarchyWindow::SetWorld(ECS::World* world) {
+    m_world = world;
+    m_selectedEntityId = 0;
+    m_expandedNodes.clear();
+}
+
 // Render the full hierarchy window and handle all interactions
 void HierarchyWindow::Render() {
-    // If world is null, we can't render anything
-    if (!m_world) return;
-
     ImGui::Begin("Hierarchy");
+
+    // If no active scene, show a simple disabled message
+    bool noScene = true;
+    if (Engine::CORE) {
+        auto& sm = Engine::CORE->GetSceneManager();
+        noScene = (sm.GetActive() == nullptr);
+    }
+    if (noScene) {
+        ImGui::TextDisabled("No scene attached");
+        ImGui::End();
+        return;
+    }
 
     // Input field for creating a new entity
     ImGui::Text("Create New Object");
@@ -121,7 +138,7 @@ void HierarchyWindow::Render() {
         && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
         && !ImGui::IsAnyItemHovered()) {
         m_selectedEntityId = 0;                          // Clear selected entity
-        if (m_selectionCallback) m_selectionCallback(0); // Notify inspector to clear
+        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32); // Notify inspector to clear
     }
 
     // Clear all entities button
@@ -130,7 +147,7 @@ void HierarchyWindow::Render() {
             m_editorCore->ClearAllEntities();
         }
         m_selectedEntityId = 0;                             // Clear selection
-        if (m_selectionCallback) m_selectionCallback(0);    // Notify inspector
+        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);    // Notify inspector
     }
 
     ImGui::End();
@@ -288,6 +305,8 @@ void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, E
         nlohmann::json prefabJson;
         // Load JSON data
         file >> prefabJson;
+
+        // Use prefab JSON as-is; do not remap TypeId from TypeName
         file.close();
 
         // Deserialize creates a new entity with all prefab components
