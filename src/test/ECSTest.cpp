@@ -121,6 +121,41 @@ void ECSTestScene::OnLoad() {
         m_testTitleEntity = EntityUtils::Pack(titleEnt);
     }
 
+    // ------------------------------------------------------------
+    // Create persistent scene camera (centered on viewport)
+    // This camera is NOT added to m_testEntities so it will persist when
+    // individual test entities are cleared.
+    {
+        ECS::World& world = GetWorld();
+        ECS::Entity cam = world.Create();
+
+        auto& camTr = world.Add<ECS::Components::LocalTransform>(cam);
+        camTr.Position = Vector3D{ m_worldWidth * 0.5f, m_worldHeight * 0.5f, 10.f };
+        camTr.Rotation = Quaternion::Identity();
+        camTr.Scale = Vector3D{ 1.f, 1.f, 1.f };
+
+        auto& camera = world.Add<ECS::Components::Camera3D>(cam);
+        camera.Active = true;
+        camera.UsePerspective = false;
+        // Set orthographic size to cover the world height so the camera is
+        // effectively centered on the viewport. This uses the same units as
+        // m_worldHeight which is set from the window size above.
+        camera.OrthoSize = m_worldHeight;
+        camera.NearPlane = 0.1f;
+        camera.FarPlane = 100.f;
+
+        const auto window = WindowManager::GetMainWindow();
+        if (window) {
+            camera.AspectRatio = static_cast<float>(window->Width()) / static_cast<float>(window->Height());
+        }
+
+        // Optional name for debugging
+        world.Add<Components::Name>(cam).Value[0] = '\0';
+        strncpy_s(world.Get<Components::Name>(cam).Value, "Scene_Camera", 63);
+
+        m_cameraEntity = EntityUtils::Pack(cam);
+    }
+
     m_currentTest = TestType::LocalTransformTest;
     LOG_INFO("ECSTestScene initialized with " << GetSystemCount() << " systems");
     _logTestInfo("LocalTransformTest");

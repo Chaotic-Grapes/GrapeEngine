@@ -65,6 +65,10 @@ namespace Sandbox {
         uint32_t m_enemyLayer;
         uint32_t m_propsLayer;
 
+        // Persistent scene camera (packed id). Kept separate from scripted
+        // controller entities so it survives any scene spawn/clears.
+        uint64_t m_cameraEntity = 0;
+
         // Helper methods
         void _initializeScriptSystem();
         void _createScriptedEntities();

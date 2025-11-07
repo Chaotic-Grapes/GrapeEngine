@@ -115,6 +115,8 @@ namespace Sandbox {
         int m_spawnCount = 0;
         // Title text entity (packed id)
         uint64_t m_testTitleEntity = 0;
+        // Persistent scene camera (packed id)
+        uint64_t m_cameraEntity = 0;
         
         // ------------------------------------
         // Test case implementations

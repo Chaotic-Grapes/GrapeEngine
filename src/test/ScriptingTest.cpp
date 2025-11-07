@@ -50,6 +50,39 @@ void ScriptingTestScene::OnLoad() {
         m_rendererSystem->Update(s.GetWorld(), dt);
     }, "Renderer System");
 
+    // ------------------------------------------------------------
+    // Create persistent scene camera (centered on viewport)
+    // This camera is NOT added to the scripted controller entities so it
+    // will remain alive throughout the scene lifetime.
+    {
+        ECS::World& world = GetWorld();
+        ECS::Entity cam = world.Create();
+
+        auto& camTr = world.Add<ECS::Components::LocalTransform>(cam);
+        camTr.Position = Vector3D{ m_worldWidth * 0.5f, m_worldHeight * 0.5f, 10.f };
+        camTr.Rotation = Quaternion::Identity();
+        camTr.Scale = Vector3D{ 1.f, 1.f, 1.f };
+
+        auto& camera = world.Add<ECS::Components::Camera3D>(cam);
+        camera.Active = true;
+        camera.UsePerspective = false;
+        camera.OrthoSize = m_worldHeight;
+        camera.NearPlane = 0.1f;
+        camera.FarPlane = 100.f;
+
+        const auto window = WindowManager::GetMainWindow();
+        if (window) {
+            camera.AspectRatio = static_cast<float>(window->Width()) / static_cast<float>(window->Height());
+        }
+
+        // Optional debug name
+        world.Add<Components::Name>(cam).Value[0] = '\0';
+        strncpy_s(world.Get<Components::Name>(cam).Value, "Scripting_Scene_Camera", 63);
+
+        m_cameraEntity = EntityUtils::Pack(cam);
+        LOG_DEBUG("Created persistent scripting scene camera at (" << camTr.Position.X << ", " << camTr.Position.Y << ")");
+    }
+
     // AddSystem([](Scenes::Scene& s, const float dt) {
     //     ECS::PhysicsSystem::Update(s.GetWorld(), dt);
     // }, "Physics System");

@@ -58,6 +58,10 @@ namespace Sandbox {
 		// Layer for rendering
 		uint16_t m_testLayer = 0;
 
+		// Persistent scene camera (packed id). Kept separate from testEntities so
+		// it survives test clears.
+		uint64_t m_cameraEntity = 0;
+
 		// tests cases
 		void PhysicsCollisionResponse();
 		void PhysicsForces();
