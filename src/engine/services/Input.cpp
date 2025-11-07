@@ -70,7 +70,7 @@ bool Input::IsMousePressed(const int button) {
 
 // Check if a mouse button was just pressed this frame
 bool Input::IsMouseDown(const int button) {
-    return m_mouseDown[button];
+    return glfwGetMouseButton(m_window, button) == GLFW_PRESS;
 }
 
 // Check if a mouse button was just released this frame
