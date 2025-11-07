@@ -3,7 +3,7 @@
 \file   EditorCamera.cpp
 \author Choi Meng Yew
 \par    choi.m@digipen.edu
-\date   24th October 2025
+\date   31st October 2025
 \brief
 Implements a simplified EditorCamera for panning and zooming within the
 editor viewport. Left-click drag pans the view, right-click drag orbits,
@@ -116,7 +116,6 @@ namespace Engine {
     void EditorCamera::OnWindowResize(int newWidth, int newHeight) {
         const float screenWidth = static_cast<float>(newWidth);
         const float screenHeight = static_cast<float>(newHeight);
-        const float worldHeight = graphicsConfig::PixelsToWorld(screenHeight);
 
         m_camera->AspectRatio = kDefaultAspectRatio;
     }
@@ -157,7 +156,7 @@ namespace Engine {
         // ------------------------------
         // PANNING (LMB drag)
         // ------------------------------
-        if (Input::IsMouseDown(MOUSE_LEFT)) {
+        if (Input::IsMouseDown(MOUSE_MIDDLE)) {
             if (!m_panning) {
                 m_panning = true;
                 double px, py;

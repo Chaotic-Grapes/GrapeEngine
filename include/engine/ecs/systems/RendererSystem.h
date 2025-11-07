@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   RendererSystem.h
-\author Your Name
+\author Choi Meng Yew
 \date   27th October 2025
 \brief
 High-level rendering system for the ECS. Manages shaders, camera, and
@@ -102,6 +102,8 @@ namespace ECS {
         /*! \brief Get the current projection matrix. */
         const glm::mat4& GetProjection() const { return m_projection; }
 
+        void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
+
     private:
         // ====================================================================
         // Conversion Helpers
@@ -131,6 +133,7 @@ namespace ECS {
         bool m_useEditorCamera = true;                              ///< Use editor vs ECS cameras
         int m_activeCameraIndex = 0;                                ///< Active ECS camera (future use)
         glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();    ///< Projection matrix
+        uint16_t m_uiLayerId = 0xFFFF;  // Default invalid value
 
         /*!
         \brief Cached current camera orthographic size (world units).
@@ -178,6 +181,11 @@ namespace ECS {
         PixelBufferObject m_pbos[2];
         int m_currentPBO = 0;
         uint32_t m_selectedEntityID = 0;  // Currently selected entity
+
+        // Drag-to-move state
+        bool m_isDragging = false;
+        glm::vec2 m_dragStartMouseWorld = {0, 0};
+        glm::vec3 m_dragStartEntityPos = { 0, 0, 0};
 
         // ====================================================================
         // Member Variables - UI Scaling

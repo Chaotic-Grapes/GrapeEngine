@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file    Components.h
-\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par     muhammadnurfadzly.b@digipen.edu
+\author  Muhammad Nur Fadzly Bin Zulkifli (~90%), Choi Meng Yew (~10%)
+\par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
 \brief
 This file contains the declaration of various ECS components used in the engine.
 These components are plain data structures that can be attached to entities
@@ -431,14 +431,14 @@ namespace ECS {
 
             void setContent(const char* str) {
                 if (str) {
-                    strncpy(Content, str, MaxTextLength - 1);
+                    strncpy_s(Content, str, MaxTextLength - 1);
                     Content[MaxTextLength - 1] = '\0';
                 }
             }
 
             void setFontPath(const char* path) {
                 if (path) {
-                    strncpy(FontPath, path, 127);
+                    strncpy_s(FontPath, path, 127);
                     FontPath[127] = '\0';
                 }
             }
@@ -447,6 +447,15 @@ namespace ECS {
             std::string_view getFontPath() const { return std::string_view(FontPath); }
         };
         static_assert(std::is_trivially_copyable_v<Text>, "Text must be trivially copyable");
+
+        struct UIButton {
+            int ID;                     // Unique button identifier
+            float X, Y, W, H;          // Screen-space coordinates (pixels)
+            bool Hovered;
+            bool Pressed;
+            uint32_t ActionID;         // Maps to action in registry
+        };
+        static_assert(std::is_trivially_copyable_v<UIButton>, "UIButton must be trivially copyable");
 
         // ---------- Scripting / Audio (kept minimal) ----------
 

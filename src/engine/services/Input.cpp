@@ -31,10 +31,16 @@ GLFWwindow* Input::m_window = nullptr;
 std::unordered_map<int, bool> Input::m_keyDown{ 0 };
 std::unordered_map<int, bool> Input::m_keyPressed{ 0 };
 std::unordered_map<int, bool> Input::m_keyUp{ 0 };
+
+std::unordered_map<int, bool> Input::m_mouseDown{ 0 };
+std::unordered_map<int, bool> Input::m_mousePressed{ 0 };
+std::unordered_map<int, bool> Input::m_mouseUp{ 0 };
+
 int Input::m_windowWidth{ 0 };
 int Input::m_windowHeight{ 0 };
 double Input::m_scrollX{ 0 };
 double Input::m_scrollY{ 0 };
+
 
 void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;
@@ -108,6 +114,9 @@ void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
 
 void Input::_processInput() {
     m_keyDown.clear();
+    m_mouseDown.clear();
+    m_mousePressed.clear();
+    m_mouseUp.clear();
     m_keyUp.clear();
     m_keyPressed.clear();
 
@@ -118,6 +127,9 @@ void Input::_processInput() {
     glfwPollEvents();
 }
 
+bool Input::IsMouseReleased(const int button) {
+    return m_mouseUp[button];
+}
 
 // Called on keyboard key press/release
 void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
@@ -140,9 +152,18 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
 // Called on mouse button press/release
 void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod) {
     (void)pWin;
-    (void)button;
-    (void)action;
     (void)mod;
+
+    if (action == GLFW_PRESS) {
+        m_mouseDown[button] = true;
+        m_mousePressed[button] = true;
+        Messaging::MessageSystem::Broadcast(Messaging::MousePressed{ button });
+    }
+    else if (action == GLFW_RELEASE) {
+        m_mouseDown[button] = false;
+        m_mouseUp[button] = true;
+        Messaging::MessageSystem::Broadcast(Messaging::MouseReleased{ button });
+    }
 }
 
 // Called when mouse cursor moves

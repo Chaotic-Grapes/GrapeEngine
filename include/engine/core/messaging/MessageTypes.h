@@ -30,6 +30,16 @@ namespace Messaging {
     struct KeyReleased {
         int Key;
     };
+
+    struct MousePressed
+    {
+        int Button;
+    };
+
+    struct MouseReleased
+    {
+        int Button;
+    };
 }
 
 #endif // MESSAGETYPES_H

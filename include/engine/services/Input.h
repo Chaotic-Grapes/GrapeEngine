@@ -94,6 +94,8 @@ public:
     */
     static bool IsMouseDown(int button);
 
+    static bool IsMouseReleased(const int button);
+
     /*!
     \brief Get the current mouse cursor position.
     \param xPos Reference to store the X coordinate.
@@ -174,6 +176,10 @@ private:
     static std::unordered_map<int, bool> m_keyDown;    ///< Tracks keys currently held down
     static std::unordered_map<int, bool> m_keyPressed; ///< Tracks keys pressed this frame
     static std::unordered_map<int, bool> m_keyUp;      ///< Tracks keys released this frame
+
+    static std::unordered_map<int, bool> m_mouseDown;
+    static std::unordered_map<int, bool> m_mousePressed;
+    static std::unordered_map<int, bool> m_mouseUp;
 
     static int m_windowWidth;  ///< Current window width in pixels
     static int m_windowHeight; ///< Current window height in pixels
@@ -280,6 +286,7 @@ constexpr int KEY_T     = GLFW_KEY_T;     ///< T key
 //! @{
 constexpr int MOUSE_LEFT    = GLFW_MOUSE_BUTTON_LEFT;  ///< Left mouse button
 constexpr int MOUSE_RIGHT   = GLFW_MOUSE_BUTTON_RIGHT; ///< Right mouse button
+constexpr int MOUSE_MIDDLE = GLFW_MOUSE_BUTTON_MIDDLE;
 //! @}
 
 /*! @} */ // end of InputConstants group

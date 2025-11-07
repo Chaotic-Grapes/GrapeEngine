@@ -3,7 +3,7 @@
 \file   texture.cpp
 \author Choi Meng Yew (100%)
 \par    choi.m@digipen.edu
-\date   24th September 2025
+\date   31st October 2025
 \brief
 Implements the Texture class, a lightweight RAII wrapper around an OpenGL
 texture object. It loads images via stb_image, creates and configures the
