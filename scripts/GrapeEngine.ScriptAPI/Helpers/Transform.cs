@@ -1,3 +1,41 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Transform.cs
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   30th October 2025
+\brief
+Defines the Transform helper class for manipulating entity transforms.
+
+\details
+This static class provides convenient methods for working with LocalTransform
+components of entities, including position, rotation, and scale operations.
+
+\code
+Transform.Translate(entity, new Vector3(1, 0, 0));
+Transform.SetPosition(entity, new Vector3(0, 5, 0));
+
+Vector3 pos = Transform.GetPosition(entity);
+
+Transform.SetScale(entity, 2.0f);
+
+Quaternion rot = Transform.GetRotation(entity);
+
+float dist = Transform.Distance(entityA, entityB);
+
+Vector3 dir = Transform.DirectionTo(entityA, entityB);
+
+Transform.LookAt2D(entity, new Vector3(10, 10, 0));
+Transform.LerpPosition(entity, new Vector3(5, 5, 0), 0.1f);
+Transform.SmoothMove(entity, new Vector3(0, 0, 0), 0.5f, deltaTime);
+\endcode
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 using GrapeEngine.Numerics;
 
 namespace GrapeEngine.Scripting;

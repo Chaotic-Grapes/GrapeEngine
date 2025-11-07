@@ -1,12 +1,16 @@
 ﻿/**
-* @Name: 
-* @email:
-* @file 
-* @brief
+* @Name: Muhammad Nur Fadzly Bin Zulkifli
+* @email: muhammadnurfadzly.b@digipen.edu
+* @file: World.cs
+* @brief: Defines the world dimensions and constants.
 *
 * @details
+* This class contains constants that define the dimensions of the game world,
+* including the width, height, and wall thickness.
 *
-* @dependencies
+* Copyright (C) 2025 DigiPen Institute of Technology.
+* Reproduction or disclosure of this file or its contents without the
+* prior written consent of DigiPen Institute of Technology is prohibited.
 */
 
 namespace MyGame;

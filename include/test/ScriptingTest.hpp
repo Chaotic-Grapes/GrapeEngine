@@ -14,11 +14,6 @@ RUBRIC REQUIREMENTS:
 - At least 2 different objects with unique logic/behaviour each
 - Proven to work in demo
 
-Scripts Used:
-- MyGame.PlayerController (figure-8 movement, green)
-- MyGame.EnemyAI (patrol behavior, red)
-- MyGame.CollectibleItem (bobbing + rainbow colors)
-
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
@@ -37,13 +32,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Sandbox {    
     /**
      * @brief Test scene demonstrating C# scripting with multiple unique behaviors.
-     * 
-     * This scene creates 5 entities with 3 different C# script types:
-     * 1. Player - figure-8 movement (MyGame.PlayerController)
-     * 2. Enemy 1 - patrol behavior (MyGame.EnemyAI)
-     * 3. Enemy 2 - patrol behavior (MyGame.EnemyAI, separate instance)
-     * 4. Collectible 1 - bobbing + rainbow (MyGame.CollectibleItem)
-     * 5. Collectible 2 - bobbing + rainbow (MyGame.CollectibleItem, separate instance)
      * 
      * Each object demonstrates independent script execution with unique state.
      */

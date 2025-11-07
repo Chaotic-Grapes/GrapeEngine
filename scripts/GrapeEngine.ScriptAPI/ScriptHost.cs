@@ -1,3 +1,24 @@
+/* Start Header *****************************************************************/
+/*!
+\file   ScriptHost.cs
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   25th October 2025
+\brief
+The entry point for C++ to interact with the managed scripting system.
+This class manages script instance lifecycle and dispatches calls.
+
+\details
+This class is responsible for creating, updating, and destroying script instances.
+It also handles communication between C++ and C# scripts, allowing for seamless 
+integration of managed code into the game engine.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
