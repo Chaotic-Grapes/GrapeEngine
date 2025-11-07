@@ -3,34 +3,48 @@
 \file   debugDraw2D.cpp
 \author Choi Meng Yew (100%)
 \par    choi.m@digipen.edu
-\date   3rd October 2025
+\date   31st October 2025
 \brief
-Implements the DebugDraw2D namespace, providing helper functions for drawing
-basic 2D primitives using the Renderer. These utilities are intended for
-visual debugging, such as displaying colliders, bounding boxes, or guides
-during development.
+Implements the DebugDraw2D namespace, which provides lightweight utilities
+for rendering simple 2D primitives through the Renderer for visualization
+and debugging purposes during development.
 
-Functions:
-- Circle: Renders a filled circle using triangle fan.
-- Line: Renders a thick line as a quad between two points.
-- Point: Marks a position with a square marker.
-- RectStroke: Draws a rectangle outline with thick edges.
-- RectFill: Draws a solid filled rectangle.
-- Polygon: Renders a filled polygon (convex or concave) by triangulating
-  the input vertices with the ear clipping algorithm.
+This system allows developers to draw shapes such as rectangles, lines,
+circles, and polygons directly onto the scene to inspect collider bounds,
+object positions, or other gameplay elements.
+
+Responsibilities:
+- Render filled and stroked rectangles, circles, and lines.
+- Visualize points and polygon shapes using CPU-side vertex generation.
+- Support anti-aliased circle rendering via fragment shader masking.
+- Assist in debugging gameplay and physics systems through real-time
+  visual overlays.
 */
 /* End Header *******************************************************************/
 
+// ============================================================================
+// Graphics
+// ============================================================================
 #include "graphics/debugDraw2D.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/vertex.hpp"
 #include "graphics/polygon-utils.hpp"
 
+// ============================================================================
+// Third-Party Libraries
+// ============================================================================
 #include <glm/gtc/constants.hpp>
+
+// ============================================================================
+// Standard Library
+// ============================================================================
 #include <cmath>
 #include <cstdint>
 
 namespace {
+    // ============================================================================
+    // Helper: Constructs a vertex with position, color, and optional stroke width.
+    // ============================================================================
     inline Vertex V(const glm::vec2& p, const glm::vec4& c, float strokePx = 0.0f) {
         Vertex v;
         v.position = glm::vec3(p, 0.0f); // promote 2D to 3D
@@ -41,6 +55,9 @@ namespace {
         return v;
     }
 
+    // ============================================================================
+    // Helper: Constructs a vertex with explicit UV coordinates.
+    // ============================================================================
     inline Vertex V(const glm::vec2& p, const glm::vec4& c, const glm::vec2& uv, float strokePx = 0.0f)
     {
         Vertex v;
@@ -52,6 +69,9 @@ namespace {
         return v;
     }
 
+    // ============================================================================
+    // Helper: Appends a quad (two triangles) to a vertex and index buffer.
+    // ============================================================================
     inline void PushQuad(std::vector<Vertex>& outV, std::vector<uint32_t>& outI,
         const glm::vec2& a, const glm::vec2& b,
         const glm::vec2& c, const glm::vec2& d,
@@ -68,6 +88,10 @@ namespace {
 
 namespace DebugDraw2D {
 
+    // ============================================================================
+    // Draws a filled or stroked circle using a single quad and shader-based masking.
+    // The stroke width is passed per-vertex and handled in the fragment shader.
+    // ============================================================================
     void Circle(Renderer& r,
         const glm::vec2& center,
         float radius,
@@ -90,10 +114,13 @@ namespace DebugDraw2D {
         const uint32_t idx[] = { 0, 1, 2, 2, 3, 0 };
         const Vertex   vb[] = { v0, v1, v2, v3 };
 
-        // Send to renderer - the fragment shader will compute the actual circular mask
+        // Send to renderer; the fragment shader will compute the actual circular mask
         r.submitTriangles(vb, 4, idx, 6, textureId);
     }
 
+    // ============================================================================
+    // Draws a thick line between two points by generating a quad aligned to the line.
+    // ============================================================================
     void Line(Renderer& r,
         const glm::vec2& p1,
         const glm::vec2& p2,
@@ -119,6 +146,9 @@ namespace DebugDraw2D {
         r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
+    // ============================================================================
+    // Draws a square marker at a given position, useful for visualizing points.
+    // ============================================================================
     void Point(Renderer& r,
         const glm::vec2& pos,
         float size,
@@ -138,6 +168,9 @@ namespace DebugDraw2D {
         r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
+    // ============================================================================
+    // Draws the outline of a rectangle using four thick-edged quads.
+    // ============================================================================
     void RectStroke(Renderer& r,
         const glm::vec2& min,
         const glm::vec2& max,
@@ -179,6 +212,9 @@ namespace DebugDraw2D {
         r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
+    // ============================================================================
+    // Draws a solid filled rectangle using two triangles.
+    // ============================================================================
     void RectFill(Renderer& r,
         const glm::vec2& min,
         const glm::vec2& max,
@@ -199,6 +235,10 @@ namespace DebugDraw2D {
         r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
+    // ============================================================================
+    // Draws a filled polygon by triangulating the provided vertices
+    // using the ear clipping algorithm on the CPU.
+    // ============================================================================
     void Polygon(Renderer& r,
         const std::vector<glm::vec2>& points,
         const glm::vec4& color,

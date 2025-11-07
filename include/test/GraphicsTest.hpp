@@ -22,6 +22,7 @@ requirements while also experimenting with advanced rendering features.
 #include "Game.h"
 #include "ecs/Entity.h"
 #include "ecs/World.h"
+#include "ecs/systems/UISystem.h"
 #include <vector>
 #include <memory>
 #include "ecs/systems/RendererSystem.h"
@@ -50,22 +51,16 @@ namespace Sandbox {
             FontSystem          = 1210,
 
             // Required M2 rubric tests (re-indexed for milestone continuity)
-            GameGUI             = 1211,    // was 1106
             FontSys             = 1212,    // was 1107
             ViewportCamera      = 1213,    // was 1108
-            TransformationSys   = 1214,    // was 1109
-            SpriteAnim          = 1215,    // was 1110
-            MultipleShaders     = 1216,    // was 1115
-            Batching            = 1217,    // was 1121
-            EditorCamera        = 1218,    // was 1208
-            ObjectPicking       = 1219,    // was 1210
+            MultipleShaders     = 1214,    // was 1115
+            Batching            = 1215,    // was 1121
+            ObjectPicking       = 1216,    // was 1210
 
             // Extra experimental tests (outside rubric)
             LightingTest        = 2004,
             NormalMaps          = 2005,
             ParticleSystem      = 2006,
-            SpriteAtlas         = 2007,
-            ShaderPlayground    = 2008,
 
             // PERFORMANCE / PROFILING DEBUG TESTS
             DebugPerformance    = 3001,
@@ -78,6 +73,7 @@ namespace Sandbox {
         bool m_gHandled = false;
         uint16_t m_gameplayLayer = 0;
         std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
+        std::shared_ptr<ECS::UISystem> m_uiSystem;
 
         // Background, sprites, debugObjects
         std::vector<PackedEntityId> m_testEntities;
@@ -108,14 +104,10 @@ namespace Sandbox {
         // ------------------------------------
         // Private test runners (M2 rubric tests)
         // ------------------------------------
-        void runGameGUI();
         void runFontSys();
         void runViewportCamera();
-        void runTransformationSys();
-        void runSpriteAnim();
         void runMultipleShaders();
         void runBatching();
-        void runEditorCamera();
         void runObjectPicking();
 
         // ===================================================
@@ -133,5 +125,7 @@ namespace Sandbox {
 
         //! Test small batch baseline (100 sprites only)
         void testSmallBatch();
+
+        void CreateUIButtons(ECS::World& world, uint16_t uiLayer);
     };
 }
