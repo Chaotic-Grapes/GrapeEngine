@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
+#include <cstring>
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 #include "core/Profiler.h"
@@ -278,16 +279,16 @@ void DebugUI::_showPerformanceWindow() const {
         ImGui::BulletText("Max:  %.3f ms", data.MaxTimeMs);
         ImGui::BulletText("Usage: %.1f%%", data.LastTimeMs / Profiler::GetTotalScopeTimes() * 100.f);
 
-        if (!data.FrameTimes.empty()) {
-            ImGui::PlotLines(("##" + name).c_str(),
-                data.FrameTimes.data(),
-                static_cast<int>(data.FrameTimes.size()),
-                0,
-                nullptr,
-                0.0f,
-                data.MaxTimeMs,
-                ImVec2(0, 50));
-        }
+        // if (!data.FrameTimes.empty()) {
+        //     ImGui::PlotLines(("##" + name).c_str(),
+        //         data.FrameTimes.data(),
+        //         static_cast<int>(data.FrameTimes.size()),
+        //         0,
+        //         nullptr,
+        //         0.0f,
+        //         data.MaxTimeMs,
+        //         ImVec2(0, 50));
+        // }
     }
 
     ImGui::Separator();
@@ -613,7 +614,7 @@ void DebugUI::_showGameObjectEditor() {
     if (HasValidScene()) {
         auto& world = m_scenePtr->GetWorld();
 
-        world.Each<>([&](const ECS::Entity entity) {
+        world.Each([&](const ECS::Entity entity) {
             // Explanations for different Id usage in this block:
             // EntityId is for display only, to show unique entity index
             // PackedEntityId is for unique ImGui labels (delete/clone buttons, collapsing headers)
@@ -749,10 +750,18 @@ ECS::Entity DebugUI::_createGameEntity(const std::string& name) const {
         color = Color(1.0f, 1.0f, 1.0f, 1.0f);
 
     // Create new entity in ECS
-    auto& world = m_scenePtr->GetWorld();
+    // auto& world = m_scenePtr->GetWorld();
 
-	// Copy elision should happen here
-    return world.Create(
+    // Fill a Name component from the runtime `name` string and pass it to CreateOnLayer
+    ECS::Components::Name nameComp{};
+    if (!name.empty()) {
+        // safe copy and ensure null-termination
+        strncpy_s(nameComp.Value, name.c_str(), sizeof(nameComp.Value) - 1);
+        nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
+    }
+
+    return m_scenePtr->CreateOnLayer(
+        0,
         ECS::Components::LocalTransform{},
         ECS::Components::WorldTransform{},
         ECS::Components::ShapeCircle2D{
@@ -761,7 +770,7 @@ ECS::Entity DebugUI::_createGameEntity(const std::string& name) const {
             color
         },
         ECS::Components::CircleCollider2D{ 35.f },
-        ECS::Components::Name{ *name.c_str() }
+        nameComp
     );
 }
 

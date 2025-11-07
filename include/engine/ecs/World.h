@@ -399,12 +399,26 @@ namespace ECS {
             // Get number of components at compile-time (optimization effort but unsure if it helps)
             constexpr size_t numComponents = sizeof...(Ts);
 
-            // If no components specified, returning nothing
-            // use constexpr as if numComponents is 0, then the rest of the code is not needed
-            // This is for optimization to avoid unnecessary work at runtime
-            // (Unsure if it helps too, but worth trying)
-            if constexpr (numComponents == 0)
+            // If no components specified, iterate all entities in all archetypes
+            // This allows calls like world.Each(fn) to visit every entity.
+            if constexpr (numComponents == 0) {
+                for (const auto& kv : m_archetypes) {
+                    const auto& archPtr = kv.second;
+                    if (!archPtr) continue;
+                    Archetype* arch = archPtr.get();
+
+                    const uint32_t chunkCount = arch->GetChunkCount();
+                    for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                        Chunk* ch = arch->GetChunk(ci);
+                        const uint32_t count = ch->Count();
+                        for (uint32_t i = 0; i < count; ++i) {
+                            const Entity ent = ch->GetEntity(i);
+                            if (!ent.IsNull()) fn(ent);
+                        }
+                    }
+                }
                 return;
+            }
             else { // Need to add `else` to suppress "unreachable code" warning (https://stackoverflow.com/questions/52244640/if-constexpr-and-c4702-and-c4100-and-c4715)
                 // Some optimization efforts:
                 // Use compile-time query ID to cache archetype list pointer per unique component set
@@ -499,7 +513,26 @@ namespace ECS {
             // Similar to non-const Each(), but operates on const components
 
             constexpr size_t numComponents = sizeof...(Ts);
-            if constexpr (numComponents == 0) return;
+
+            if constexpr (numComponents == 0) {
+                // Iterate all entities across all archetypes
+                for (const auto& kv : m_archetypes) {
+                    const auto& archPtr = kv.second;
+                    if (!archPtr) continue;
+                    const Archetype* arch = archPtr.get();
+
+                    const uint32_t chunkCount = arch->GetChunkCount();
+                    for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                        const Chunk* ch = arch->GetChunk(ci);
+                        const uint32_t count = ch->Count();
+                        for (uint32_t i = 0; i < count; ++i) {
+                            const Entity ent = ch->GetEntity(i);
+                            if (!ent.IsNull()) fn(ent);
+                        }
+                    }
+                }
+                return;
+            }
             else {
                 using QueryTag = std::tuple<std::decay_t<Ts>...>;
                 static const std::vector<Archetype*>* cached = nullptr;
