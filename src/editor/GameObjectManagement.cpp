@@ -108,7 +108,7 @@ static constexpr const char* LEVEL_DIR = "assets/levels/";
  */
 void GameObjectEditor::HandleInWorldInteraction() {
 	if (!HasValidWorld()) return;
-
+	/*
 	// State for dragging
 	static bool isDragging = false;
 
@@ -151,7 +151,7 @@ void GameObjectEditor::HandleInWorldInteraction() {
 	}
 
 	// --- 2. Dragging ---
-	if (isDragging && m_selectedEntityId != 0 && Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
+	if (isDragging && m_selectedEntityId != 0 && Input::IsMouseDown(GLFW_MOUSE_BUTTON_LEFT)) {
 		auto selectedEntity = m_world->GetEntityManager().GetEntity(m_selectedEntityId);
 		if (selectedEntity.GetId() != 0) {
 			// Directly set position to mouse world position
@@ -160,9 +160,9 @@ void GameObjectEditor::HandleInWorldInteraction() {
 	}
 
 	// --- 3. Drop (Stop Dragging) ---
-	if (isDragging && !Input::IsMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
+	if (isDragging && !Input::IsMouseDown(GLFW_MOUSE_BUTTON_LEFT)) {
 		isDragging = false;
-	}
+	}*/
 }
 
 

@@ -8,6 +8,7 @@
 #include "Scene.h"
 #include "services/Time.h"
 
+
 namespace Engine {
     // Global pointer to the core engine
     Application* CORE = nullptr;
@@ -26,6 +27,20 @@ namespace Engine {
 
         // Load configuration first
         Serialization::ConfigLoader::LoadConfig("../config.json", m_config);
+
+        // Initialize the message system here
+        // Subscribe to Events
+        //auto& bus = EventBus::Get();
+
+        // Subscribe to action events
+        /*bus.subscribe<ActionPressed>([this](const ActionPressed& e) {
+            auto& busRef = EventBus::Get();
+            if (e.action == "ActiveCameraSwitch") {
+            std::cout << 'event action pressed';
+
+            }
+        }*/
+
 
 #if !_DEBUG
         if (consoleFlag)
@@ -48,6 +63,11 @@ namespace Engine {
             Time::_update(frameStart - m_lastFrameTime, frameStart);
             Profiler::UpdateTime();
             m_lastFrameTime = glfwGetTime();
+
+            // if (5 second passed ){
+               // publish the event
+                //bus.publish(ActionPressed{ actionName });
+            //}
 
             // --- Input & Game Update ---
             Input::_processInput();
