@@ -50,6 +50,10 @@ void ScriptingTestScene::OnLoad() {
         m_rendererSystem->Update(s.GetWorld(), dt);
     }, "Renderer System");
 
+    // AddSystem([](Scenes::Scene& s, const float dt) {
+    //     ECS::PhysicsSystem::Update(s.GetWorld(), dt);
+    // }, "Physics System");
+
     // Initialize ScriptSystem
     _initializeScriptSystem();
 
@@ -166,14 +170,13 @@ void ScriptingTestScene::_initializeScriptSystem() {
 void ScriptingTestScene::_createScriptedEntities() {
     LOG_INFO("Creating scripted controller entities...");
 
-    // All visual creation is now handled by the scripts themselves!
     // We just create minimal controller entities and attach scripts.
 
     _createPlayer();
     _createEnemy(1);
     _createEnemy(2);
-    _createCollectible(1);
-    _createCollectible(2);
+    // _createCollectible(1);
+    // _createCollectible(2);
 
     LOG_INFO("All scripted controller entities created");
 }
@@ -217,24 +220,24 @@ void ScriptingTestScene::_createEnemy(int enemyNumber) {
         m_enemy2Entity = enemyEntity;
 }
 
-void ScriptingTestScene::_createCollectible(int collectibleNumber) {
-    LOG_INFO("Creating Collectible " << collectibleNumber << " entity with C# script...");
+// void ScriptingTestScene::_createCollectible(int collectibleNumber) {
+//     LOG_INFO("Creating Collectible " << collectibleNumber << " entity with C# script...");
 
-    Entity collectibleEntity = GetWorld().Create();
+//     Entity collectibleEntity = GetWorld().Create();
 
-    // Add active component
-    GetWorld().Add<Components::Active>(collectibleEntity, Components::Active{ true });
+//     // Add active component
+//     GetWorld().Add<Components::Active>(collectibleEntity, Components::Active{ true });
 
-    // ATTACH COLLECTIBLE C# SCRIPT (bobbing + rainbow colors)
-    // The script will create its own visual entity
-    if (!m_scriptSystem->AttachScript(GetWorld(), collectibleEntity, "MyGame.CollectibleItem"))
-        LOG_ERROR("Failed to attach CollectibleItem script " << collectibleNumber);
-    else
-        LOG_INFO("CollectibleItem script " << collectibleNumber << " attached successfully");
+//     // ATTACH COLLECTIBLE C# SCRIPT (bobbing + rainbow colors)
+//     // The script will create its own visual entity
+//     if (!m_scriptSystem->AttachScript(GetWorld(), collectibleEntity, "MyGame.CollectibleItem"))
+//         LOG_ERROR("Failed to attach CollectibleItem script " << collectibleNumber);
+//     else
+//         LOG_INFO("CollectibleItem script " << collectibleNumber << " attached successfully");
 
-    // Store references
-    if (collectibleNumber == 1)
-        m_rotatingEntity = collectibleEntity;
-    else
-        m_oscillatingEntity = collectibleEntity;
-}
+//     // Store references
+//     if (collectibleNumber == 1)
+//         m_rotatingEntity = collectibleEntity;
+//     else
+//         m_oscillatingEntity = collectibleEntity;
+// }

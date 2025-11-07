@@ -70,7 +70,7 @@ namespace Sandbox {
         void _createScriptedEntities();
         void _createPlayer();
         void _createEnemy(int enemyNumber);
-        void _createCollectible(int collectibleNumber);
+        //void _createCollectible(int collectibleNumber);
     };
 }
 
