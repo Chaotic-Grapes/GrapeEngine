@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Quaternion.cs
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   26th October 2025
+\brief
+Defines the Quaternion struct for 3D rotations.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Numerics;

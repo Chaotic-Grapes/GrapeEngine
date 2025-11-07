@@ -1,3 +1,22 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Components.cs
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   26th October 2025
+\brief
+Definitions for ECS component types used in the engine scripting API.
+
+\details
+This file contains the definitions for the various component types used in the ECS system.
+These structs are used for marshaling data between managed and unmanaged code.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 using GrapeEngine.Numerics;
 using System.Runtime.InteropServices;
 using System.Diagnostics;

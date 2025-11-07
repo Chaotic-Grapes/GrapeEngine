@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file   WindowManager.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   14th September 2025
+\brief
+Implements the WindowManager service which manages multiple application windows.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "services/WindowManager.h"
 #include <iostream>
 

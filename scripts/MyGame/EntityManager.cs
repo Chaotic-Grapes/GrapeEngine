@@ -1,8 +1,8 @@
 /**
-* @Name: Fad ( to be added )
-* @email: TBA
-* @file EntityManager.cs
-* @brief Scene bootstrap script: walls, player/enemy/collectible controllers.
+* @Name: Muhammad Nur Fadzly Bin Zulkifli
+* @email: muhammadnurfadzly.b@digipen.edu
+* @file: EntityManager.cs
+* @brief: Scene bootstrap script: walls, player/enemy/collectible controllers.
 *
 * @details
 * Creates a simple test world fully from script:
@@ -12,8 +12,10 @@
 *
 * @dependencies
 * - GrapeEngine scripting API and Numerics
+*
 * Copyright (C) 2025 DigiPen Institute of Technology.
 * Reproduction or disclosure of this file or its contents without the
+* prior written consent of DigiPen Institute of Technology is prohibited.
 */
 
 using GrapeEngine;

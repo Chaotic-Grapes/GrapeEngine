@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file    Color.h
+\authors Muhammad Nur Fadzly Bin Zulkifli (85%), Choi Meng Yew (15%)
+\par     muhammadnurfadzly.b@digipen.edu, choimengyew.c@digipen.edu
+\date    18th September 2025
+\brief
+Defines a Color struct for representing RGBA colors in both LDR and HDR formats.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef COLOR_H
 #define COLOR_H
 

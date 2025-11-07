@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Input.cs
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   28th October 2025
+\brief
+P/Invoke declarations for the Input API used in scripting. Internal use only.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 using GrapeEngine.ScriptAPI.Unsafe;
 using System.Runtime.InteropServices;
 

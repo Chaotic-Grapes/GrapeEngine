@@ -1,4 +1,19 @@
-﻿using System.Runtime.InteropServices;
+﻿/* Start Header *****************************************************************/
+/*!
+\file   TimeAPI.cs
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   27th October 2025
+\brief
+P/Invoke declarations for the Time API used in scripting. Internal use only.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+using System.Runtime.InteropServices;
 
 namespace GrapeEngine.ScriptAPI.Unsafe;
 

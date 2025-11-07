@@ -8,18 +8,6 @@
 Implementation of ScriptingTestScene - demonstrates C# scripting integration
 with multiple unique game object behaviors.
 
-RUBRIC DEMONSTRATION:
-- Creates at least 5 different game objects
-- Each runs unique C# script logic
-- Player: PlayerController script (figure-8 movement)
-- Enemy1, Enemy2: EnemyAI script (patrol behavior, unique instances)
-- Collectible1, Collectible2: CollectibleItem script (bobbing + rainbow, unique instances)
-
-This proves that:
-1. Multiple objects can run scripts simultaneously
-2. Each object has unique behavior
-3. Scripts execute independently per object
-
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
