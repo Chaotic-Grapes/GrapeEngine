@@ -59,6 +59,13 @@ public:
     static bool IsMouseDown(int button);
 
     /*!
+    \brief Check if a mouse button was just released this frame.
+    \param button The mouse button to check (use MOUSE_* constants).
+    \return True if the button was just released, false otherwise.
+    */
+    static bool IsMouseUp(int button);
+
+    /*!
     \brief Get the current mouse cursor position.
     \param xPos Reference to store the X coordinate.
     \param yPos Reference to store the Y coordinate.
