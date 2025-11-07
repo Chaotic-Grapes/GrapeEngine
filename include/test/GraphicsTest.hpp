@@ -22,12 +22,13 @@ requirements while also experimenting with advanced rendering features.
 #include "Game.h"
 #include "ecs/Entity.h"
 #include "ecs/World.h"
+#include "scene/TestScene.h"
 #include <vector>
 #include <memory>
 #include "ecs/systems/RendererSystem.h"
 
 namespace Sandbox {
-    class GraphicsTestScene : public Scenes::Scene {
+    class GraphicsTestScene : public Scenes::TestScene {
     public:
         void OnLoad() override;
         void OnUpdate() override;
