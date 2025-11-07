@@ -41,17 +41,17 @@ public class EntityManager : ScriptBehaviour
     //private Entity m_collectible2;
 
     // Controller entities (separate from visuals)
-    private Entity m_playerController;
-    private Entity m_enemy1Controller;
-    private Entity m_enemy2Controller;
-    private Entity m_collectible1Controller;
-    private Entity m_collectible2Controller;
+    private Entity? m_playerController;
+    private Entity? m_enemy1Controller;
+    private Entity? m_enemy2Controller;
+    private Entity? m_collectible1Controller;
+    private Entity? m_collectible2Controller;
 
     // World boundary entities
-    private Entity m_boundaryTop;
-    private Entity m_boundaryBottom;
-    private Entity m_boundaryLeft;
-    private Entity m_boundaryRight;
+    private Entity? m_boundaryTop;
+    private Entity? m_boundaryBottom;
+    private Entity? m_boundaryLeft;
+    private Entity? m_boundaryRight;
 
     // Note: The multiple declaration of entities above is for clarity in this example.
 

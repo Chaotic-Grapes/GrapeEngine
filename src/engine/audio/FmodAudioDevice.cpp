@@ -84,7 +84,7 @@ namespace Audio {
                     return true;
                 }
                 else {
-                    LOG_WARNING("FMOD memory-load failed for '%s', falling back to file path.", filePath.c_str());
+                    LOG_WARNING("FMOD memory-load failed for " << filePath.c_str() << ", falling back to file path.");
                 }
             }
         }
@@ -271,6 +271,8 @@ namespace Audio {
         const std::string& path,
         const SoundParams& params)
     {
+        (void)cueId;
+
         auto audioBytes = RM.Get<AudioData>(path);
         if (!audioBytes || !audioBytes->IsValid || audioBytes->Data.empty())
             return nullptr;

@@ -116,6 +116,8 @@ namespace Engine {
     void EditorCamera::OnWindowResize(int newWidth, int newHeight) {
         const float screenWidth = static_cast<float>(newWidth);
         const float screenHeight = static_cast<float>(newHeight);
+        (void)screenWidth;
+        (void)screenHeight;
 
         m_camera->AspectRatio = kDefaultAspectRatio;
     }

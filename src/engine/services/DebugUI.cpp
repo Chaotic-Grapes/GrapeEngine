@@ -371,10 +371,10 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
         if (ImGui::Button("Load Cue")) {
             Audio::SoundParams p{}; p.stream = true; p.is3D = false; // music
             if (!device->LoadCue(cueName, filePath, p)) {
-                LOG_ERROR("LoadCue failed. Path='%s' Cue='%s'", filePath.c_str(), cueName.c_str());
+                LOG_ERROR("LoadCue failed. Path=" << filePath.c_str() << " Cue=" << cueName.c_str());
             }
             else {
-                LOG_INFO("Loaded Cue='%s' from Path='%s'", cueName.c_str(), filePath.c_str());
+				LOG_INFO("Loaded Cue=" << cueName.c_str() << " from Path=" << filePath.c_str());
             }
         }
 
@@ -383,7 +383,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
         if (ImGui::Button("Play")) {
             Audio::PlaySettings s{}; s.loop = loop; s.volume = 1.0f; s.pitch = 1.0f;
             auto h = device->PlaySingle(cueName, s, Audio::PlayPolicy::SingleInstanceRestart);
-            if (!h) LOG_ERROR("Play failed. Cue may not be loaded. Cue='%s'", cueName.c_str());
+            if (!h) LOG_ERROR("Play failed. Cue may not be loaded. Cue=" << cueName.c_str());
         }
 
         ImGui::SameLine();
@@ -480,17 +480,17 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
                     if (ImGui::SmallButton(loadLbl.c_str())) {
                         Audio::SoundParams p{}; p.stream = true; p.is3D = false;
                         if (!device->LoadCue(editCue, path, p)) {
-                            LOG_ERROR("LoadCue failed for cached path: %s", path.c_str());
+                            LOG_ERROR("LoadCue failed for cached path: " << path.c_str());
                         }
                         else {
-                            LOG_INFO("Loaded cue: %s from cached path: %s", editCue.c_str(), path.c_str());
+                            LOG_INFO("Loaded cue: " << editCue.c_str() << " from cached path: " << path.c_str());
                         }
                     }
                     ImGui::SameLine();
                     if (ImGui::SmallButton(playLbl.c_str())) {
                         Audio::SoundParams p{}; p.stream = true; p.is3D = false;
                         if (!device->LoadCue(editCue, path, p)) {
-                            LOG_ERROR("LoadCue failed for cached path: %s", path.c_str());
+                            LOG_ERROR("LoadCue failed for cached path: " << path.c_str());
                         }
                         else {
                             Audio::PlaySettings s{}; s.loop = false; s.volume = 1.0f; s.pitch = 1.0f;

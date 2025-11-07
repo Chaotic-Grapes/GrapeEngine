@@ -178,6 +178,9 @@ namespace Engine {
         const float depth,
         const ECS::Components::PhysicsMaterial2D& physics
     ) {
+        (void)transformA;
+		(void)transformB;
+
         // Create a result structure to store collision outcome
         CollisionResult result{};
         result.Collided = true;          // Mark collision as valid

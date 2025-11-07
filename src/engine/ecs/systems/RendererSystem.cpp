@@ -282,6 +282,7 @@ namespace ECS {
             bool hasSceneCamera = false;
 
             world.Each<ECS::Components::Camera3D>([&](ECS::Entity e, ECS::Components::Camera3D& cam) {
+                (void)cam;
                 // Exclude editor camera entity from count
                 if (m_editorCamera && e != m_editorCamera->GetEntity()) {
                     hasSceneCamera = true;
@@ -752,6 +753,7 @@ namespace ECS {
         m_renderGraph->AddPass("Picking", {}, {},
             [this, &world, &viewProj, &buckets](ResourceAccessor& res)
             {
+                (void)res;
                 // Dont pick while dragging.
                 if (m_isDragging) return;
 

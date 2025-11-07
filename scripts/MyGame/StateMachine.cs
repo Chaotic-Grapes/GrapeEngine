@@ -34,13 +34,13 @@ namespace MyGame
     public abstract class State
     {
         // parent state
-        public State Parent { get; set; }
+        public State? Parent { get; set; }
 
         // child state
         public List<State> Children { get; set; } = new List<State>();
 
         // currently active child states if any
-        public State ActiveChild { get; set; }
+        public State? ActiveChild { get; set; }
 
         //called once if any enter this state
         public abstract void OnEnter();
@@ -64,10 +64,10 @@ namespace MyGame
     public class HFSM
     {
         // the state currently active
-        public State CurrentState { get; private set; }
+        public State? CurrentState { get; private set; }
 
         // root top level state
-        public State RootState { get; private set; }
+        public State? RootState { get; private set; }
 
         // to track state history
         public Stack<State> StateHistory { get; private set; } = new Stack<State>();
@@ -89,7 +89,7 @@ namespace MyGame
             CurrentState.OnUpdate(deltaTime);
 
             // Check for transitions
-            State newState = CheckHierarchyTransitions(CurrentState);
+            State? newState = CheckHierarchyTransitions(CurrentState);
 
             if (newState != null && newState != CurrentState)
             {
@@ -98,7 +98,7 @@ namespace MyGame
         }
 
         // check transitions up the hierarchy 
-        private State CheckHierarchyTransitions(State fromState)
+        private State? CheckHierarchyTransitions(State fromState)
         {
             // Check current state first
             State targetState = fromState.CheckTransitions();

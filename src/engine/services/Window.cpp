@@ -25,13 +25,13 @@ namespace {
 	}
 }
 
-static void FramebufferSizeCallback(GLFWwindow* window, const int width, const int height) {
-	(void)window;
-	glViewport(0, 0, width, height);
-
-	// Broadcast resize message
-	Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
-}
+//static void FramebufferSizeCallback(GLFWwindow* window, const int width, const int height) {
+//	(void)window;
+//	glViewport(0, 0, width, height);
+//
+//	// Broadcast resize message
+//	Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
+//}
 
 Window::~Window() { Destroy(); }
 
