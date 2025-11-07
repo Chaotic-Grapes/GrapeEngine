@@ -339,6 +339,7 @@ void InspectorWindow::_renderEntityCore() {
             if (applyComponent.operator() < ECS::Components::ShapeCircle2D > ("ECS::Components::ShapeCircle2D")) continue;
             if (applyComponent.operator() < ECS::Components::ShapeBox2D > ("ECS::Components::ShapeBox2D")) continue;
             if (applyComponent.operator() < ECS::Components::ShapeLine2D > ("ECS::Components::ShapeLine2D")) continue;
+            if (applyComponent.operator() < ECS::Components::Camera3D > ("ECS::Components::Camera3D")) continue;
         }
     }
 
@@ -574,6 +575,7 @@ void InspectorWindow::_addComponentToEntity(const std::string& componentType) {
     if (applyDefault.operator() < ECS::Components::ShapeCircle2D > ("ShapeCircle2D")) return;
     if (applyDefault.operator() < ECS::Components::ShapeBox2D > ("ShapeBox2D")) return;
     if (applyDefault.operator() < ECS::Components::ShapeLine2D > ("ShapeLine2D")) return;
+    if (applyDefault.operator() < ECS::Components::Camera3D > ("Camera3D")) return;
 }
 
 // Remove component from entity instance
@@ -606,6 +608,7 @@ void InspectorWindow::_removeComponentFromEntity(const std::string& componentTyp
     if (remove.operator() < ECS::Components::ShapeCircle2D > ("ShapeCircle2D")) return;
     if (remove.operator() < ECS::Components::ShapeBox2D > ("ShapeBox2D")) return;
     if (remove.operator() < ECS::Components::ShapeLine2D > ("ShapeLine2D")) return;
+    if (remove.operator() < ECS::Components::Camera3D > ("Camera3D")) return;
 }
 
 // Add component to prefab template JSON
@@ -659,6 +662,7 @@ bool InspectorWindow::_entityHasComponent(EntityId id, const std::string& compon
     if (has.operator() < ECS::Components::BoxCollider2D > ("BoxCollider2D")) return true;
     if (has.operator() < ECS::Components::ShapeCircle2D > ("ShapeCircle2D")) return true;
     if (has.operator() < ECS::Components::ShapeLine2D > ("ShapeLine2D")) return true;
+    if (has.operator() < ECS::Components::Camera3D > ("Camera3D")) return true;
 
     return false;
 }
