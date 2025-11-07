@@ -45,10 +45,7 @@ void PhysicsTestScene::OnLoad() {
     {
         // File paths
         const std::string cue = "bgm_physics";
-        const std::string path =
-            std::filesystem::absolute(
-                "C:/Users/dalto/Documents/GitHub/GrapeEngine/assets/Audio/BGMs/Obelisk_Chapter_1&2_BGM_Loop.wav"
-            ).string();
+        const std::string path = std::filesystem::absolute("assets/Audio/BGMs/Obelisk_Chapter_1&2_BGM_Loop.wav").string();
 
         // Set file parameters
         Audio::SoundParams sp;
@@ -98,6 +95,39 @@ void PhysicsTestScene::OnLoad() {
 
     LOG_DEBUG("=== Physics Test Scene Loaded ===");
     LOG_DEBUG("Press 'C' to cycle through tests");
+
+    // ------------------------------------------------------------
+    // Create persistent scene camera (centered on viewport)
+    // This camera is NOT added to testEntities so it will persist when
+    // individual test entities are cleared.
+    {
+        ECS::World& world = GetWorld();
+        ECS::Entity cam = world.Create();
+
+        auto& camTr = world.Add<ECS::Components::LocalTransform>(cam);
+        camTr.Position = Vector3D{ worldWidth * 0.5f, worldHeight * 0.5f, 10.f };
+        camTr.Rotation = Quaternion::Identity();
+        camTr.Scale = Vector3D{ 1.f, 1.f, 1.f };
+
+        auto& camera = world.Add<ECS::Components::Camera3D>(cam);
+        camera.Active = true;
+        camera.UsePerspective = false;
+        camera.OrthoSize = worldHeight;
+        camera.NearPlane = 0.1f;
+        camera.FarPlane = 100.f;
+
+        const auto window = WindowManager::GetMainWindow();
+        if (window) {
+            camera.AspectRatio = static_cast<float>(window->Width()) / static_cast<float>(window->Height());
+        }
+
+        // Optional name for debugging
+        world.Add<Components::Name>(cam).Value[0] = '\0';
+        strncpy_s(world.Get<Components::Name>(cam).Value, "Physics_Scene_Camera", 63);
+
+        m_cameraEntity = EntityUtils::Pack(cam);
+        LOG_DEBUG("Created persistent physics scene camera at (" << camTr.Position.X << ", " << camTr.Position.Y << ")");
+    }
 }
 
 void PhysicsTestScene::OnUpdate() {
@@ -143,8 +173,7 @@ void PhysicsTestScene::OnUpdate() {
     if (Input::IsKeyPressed(KEY_A))
     {
         const std::string cue = "sfx_cashling";
-        const std::string path =
-            std::filesystem::absolute("C:/Users/dalto/Documents/GitHub/GrapeEngine/assets/Audio/SFX/Underwater-Cashling_SFX.wav").string();
+        const std::string path = std::filesystem::absolute("assets/Audio/SFX/Underwater-Cashling_SFX.wav").string();
 
         Audio::SoundParams sp; sp.stream = false; sp.is3D = false;
         gAudioDevice->LoadCue(cue, path, sp);
@@ -156,8 +185,7 @@ void PhysicsTestScene::OnUpdate() {
     if (Input::IsKeyPressed(KEY_D))
     {
         const std::string cue = "sfx_splash";
-        const std::string path =
-            std::filesystem::absolute("C:/Users/dalto/Documents/GitHub/GrapeEngine/assets/Audio/SFX/under-Water-Splash_1.wav").string();
+        const std::string path = std::filesystem::absolute("assets/Audio/SFX/under-Water-Splash_1.wav").string();
 
         Audio::SoundParams sp; sp.stream = false; sp.is3D = false;
         gAudioDevice->LoadCue(cue, path, sp);
@@ -280,6 +308,8 @@ void PhysicsTestScene::PhysicsCollisionResponse() {
                 float yPos = startY + row * spacing;
 
                 Entity e = CreateOnLayer(m_testLayer,
+
+                    // Attach components
                     Components::LocalTransform{
                         Vector3D(xPos, yPos, 0.0f),
                         Quaternion(0.0f, 0.0f, 0.0f, 1.0f),
@@ -332,6 +362,8 @@ void PhysicsTestScene::PhysicsForces() {
 
         // Create ground platform
         Entity ground = CreateOnLayer(m_testLayer,
+
+            // Attach components 
             Components::LocalTransform{
                 Vector3D(worldWidth / 2.0f, 100.0f, 0.0f),
                 Quaternion(0.0f, 0.0f, 0.0f, 1.0f),
@@ -366,6 +398,7 @@ void PhysicsTestScene::PhysicsForces() {
 
            // create boxe entities
             Entity box = CreateOnLayer(m_testLayer,
+                // Attach components
                 Components::LocalTransform{
                     Vector3D(xPos, 500.0f, 0.0f),
                     Quaternion(0.0f, 0.0f, 0.0f, 1.0f),
@@ -400,6 +433,8 @@ void PhysicsTestScene::PhysicsForces() {
 
             //create ball entities
             Entity ball = CreateOnLayer(m_testLayer,
+
+                // Attach components
                 Components::LocalTransform{
                     Vector3D(RandomFloat(200.0f, worldWidth - 200.0f), 700.0f, 0.0f),
                     Quaternion(0.0f, 0.0f, 0.0f, 1.0f),
@@ -490,6 +525,8 @@ void PhysicsTestScene::BroadNarrowPhaseCollision() {
         // Add static obstacles
         for (int i = 0; i < 10; ++i) {
             Entity obstacle = CreateOnLayer(m_testLayer,
+
+                // Attach components
                 Components::LocalTransform{
                     Vector3D(
                         RandomFloat(200.0f, worldWidth - 200.0f),

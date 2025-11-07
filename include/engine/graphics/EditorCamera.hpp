@@ -3,9 +3,9 @@
 \file   EditorCamera.hpp
 \author Choi Meng Yew
 \par    choi.m@digipen.edu
-\date   24th October 2025
+\date   31st October 2025
 \brief
-Defines the EditorCamera class — a protected ECS camera wrapper designed
+Defines the EditorCamera class, a protected ECS camera wrapper designed
 for editor viewports. It supports orbit, pan, and zoom interactions around a
 target point and prevents external modification of its underlying entity.
 

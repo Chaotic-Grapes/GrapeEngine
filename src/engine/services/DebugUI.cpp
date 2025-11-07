@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
+#include <cstring>
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 #include "core/Profiler.h"
@@ -278,16 +279,16 @@ void DebugUI::_showPerformanceWindow() const {
         ImGui::BulletText("Max:  %.3f ms", data.MaxTimeMs);
         ImGui::BulletText("Usage: %.1f%%", data.LastTimeMs / Profiler::GetTotalScopeTimes() * 100.f);
 
-        if (!data.FrameTimes.empty()) {
-            ImGui::PlotLines(("##" + name).c_str(),
-                data.FrameTimes.data(),
-                static_cast<int>(data.FrameTimes.size()),
-                0,
-                nullptr,
-                0.0f,
-                data.MaxTimeMs,
-                ImVec2(0, 50));
-        }
+        // if (!data.FrameTimes.empty()) {
+        //     ImGui::PlotLines(("##" + name).c_str(),
+        //         data.FrameTimes.data(),
+        //         static_cast<int>(data.FrameTimes.size()),
+        //         0,
+        //         nullptr,
+        //         0.0f,
+        //         data.MaxTimeMs,
+        //         ImVec2(0, 50));
+        // }
     }
 
     ImGui::Separator();
@@ -371,10 +372,10 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
         if (ImGui::Button("Load Cue")) {
             Audio::SoundParams p{}; p.stream = true; p.is3D = false; // music
             if (!device->LoadCue(cueName, filePath, p)) {
-                LOG_ERROR("LoadCue failed. Path='%s' Cue='%s'", filePath.c_str(), cueName.c_str());
+                LOG_ERROR("LoadCue failed. Path=" << filePath.c_str() << " Cue=" << cueName.c_str());
             }
             else {
-                LOG_INFO("Loaded Cue='%s' from Path='%s'", cueName.c_str(), filePath.c_str());
+				LOG_INFO("Loaded Cue=" << cueName.c_str() << " from Path=" << filePath.c_str());
             }
         }
 
@@ -383,7 +384,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
         if (ImGui::Button("Play")) {
             Audio::PlaySettings s{}; s.loop = loop; s.volume = 1.0f; s.pitch = 1.0f;
             auto h = device->PlaySingle(cueName, s, Audio::PlayPolicy::SingleInstanceRestart);
-            if (!h) LOG_ERROR("Play failed. Cue may not be loaded. Cue='%s'", cueName.c_str());
+            if (!h) LOG_ERROR("Play failed. Cue may not be loaded. Cue=" << cueName.c_str());
         }
 
         ImGui::SameLine();
@@ -480,17 +481,17 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
                     if (ImGui::SmallButton(loadLbl.c_str())) {
                         Audio::SoundParams p{}; p.stream = true; p.is3D = false;
                         if (!device->LoadCue(editCue, path, p)) {
-                            LOG_ERROR("LoadCue failed for cached path: %s", path.c_str());
+                            LOG_ERROR("LoadCue failed for cached path: " << path.c_str());
                         }
                         else {
-                            LOG_INFO("Loaded cue: %s from cached path: %s", editCue.c_str(), path.c_str());
+                            LOG_INFO("Loaded cue: " << editCue.c_str() << " from cached path: " << path.c_str());
                         }
                     }
                     ImGui::SameLine();
                     if (ImGui::SmallButton(playLbl.c_str())) {
                         Audio::SoundParams p{}; p.stream = true; p.is3D = false;
                         if (!device->LoadCue(editCue, path, p)) {
-                            LOG_ERROR("LoadCue failed for cached path: %s", path.c_str());
+                            LOG_ERROR("LoadCue failed for cached path: " << path.c_str());
                         }
                         else {
                             Audio::PlaySettings s{}; s.loop = false; s.volume = 1.0f; s.pitch = 1.0f;
@@ -613,7 +614,7 @@ void DebugUI::_showGameObjectEditor() {
     if (HasValidScene()) {
         auto& world = m_scenePtr->GetWorld();
 
-        world.Each<>([&](const ECS::Entity entity) {
+        world.Each([&](const ECS::Entity entity) {
             // Explanations for different Id usage in this block:
             // EntityId is for display only, to show unique entity index
             // PackedEntityId is for unique ImGui labels (delete/clone buttons, collapsing headers)
@@ -749,10 +750,18 @@ ECS::Entity DebugUI::_createGameEntity(const std::string& name) const {
         color = Color(1.0f, 1.0f, 1.0f, 1.0f);
 
     // Create new entity in ECS
-    auto& world = m_scenePtr->GetWorld();
+    // auto& world = m_scenePtr->GetWorld();
 
-	// Copy elision should happen here
-    return world.Create(
+    // Fill a Name component from the runtime `name` string and pass it to CreateOnLayer
+    ECS::Components::Name nameComp{};
+    if (!name.empty()) {
+        // safe copy and ensure null-termination
+        strncpy_s(nameComp.Value, name.c_str(), sizeof(nameComp.Value) - 1);
+        nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
+    }
+
+    return m_scenePtr->CreateOnLayer(
+        0,
         ECS::Components::LocalTransform{},
         ECS::Components::WorldTransform{},
         ECS::Components::ShapeCircle2D{
@@ -761,7 +770,7 @@ ECS::Entity DebugUI::_createGameEntity(const std::string& name) const {
             color
         },
         ECS::Components::CircleCollider2D{ 35.f },
-        ECS::Components::Name{ *name.c_str() }
+        nameComp
     );
 }
 
