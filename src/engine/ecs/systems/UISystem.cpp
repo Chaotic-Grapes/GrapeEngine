@@ -69,10 +69,11 @@ namespace ECS {
         // Mouse button state
         const bool isMouseDown = Input::IsMouseDown(MOUSE_LEFT);
         const bool mouseJustPressed = Input::IsMousePressed(MOUSE_LEFT);
-        const bool mouseJustReleased = Input::IsMouseReleased(MOUSE_LEFT);
+        const bool mouseJustReleased = Input::IsMouseUp(MOUSE_LEFT);
 
         // Process all buttons
         world.Each<Components::UIButton>([&](Entity e, Components::UIButton& btn) {
+            (void)e;
             // Check if mouse is over button
             const bool isInside = IsMouseInButton(mouseX, mouseY, btn.X, btn.Y, btn.W, btn.H);
 
