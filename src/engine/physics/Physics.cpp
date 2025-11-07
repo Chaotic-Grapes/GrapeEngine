@@ -7,7 +7,7 @@ namespace Engine {
     Vector2D Physics::m_gravity = Vector2D(0.0f, -981.f);
     bool Physics::m_enabled = true;
     bool Physics::m_worldBoundsEnabled = false;
-    Physics::BoundaryConstraint Physics::m_worldBounds = {0.0f, 1600.0f, 0.0f, 900.0f, false, 0.8f};
+    Physics::BoundaryConstraint Physics::m_worldBounds = { 0.0f, 1600.0f, 0.0f, 900.0f, false, 0.8f };
 
     Vector2D Physics::CalculateAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::LinearVelocity2D& vel) {
         Vector2D acceleration(0.f, 0.f);
@@ -53,7 +53,7 @@ namespace Engine {
     // ============================================================================
 
     void Physics::ApplyVelocityDamping(ECS::Components::LinearVelocity2D& vel, const float dampingFactor) {
-		vel.Value *= dampingFactor;
+        vel.Value *= dampingFactor;
     }
 
     void Physics::ReflectVelocity(ECS::Components::LinearVelocity2D& vel, const Vector2D& normal) {
@@ -68,11 +68,20 @@ namespace Engine {
             if ((isPositive && vel.Value.X > 0.0f) || (!isPositive && vel.Value.X < 0.0f)) {
                 vel.Value.X = 0.0f;
             }
-        } else {
+        }
+        else {
             if ((isPositive && vel.Value.Y > 0.0f) || (!isPositive && vel.Value.Y < 0.0f)) {
                 vel.Value.Y = 0.0f;
             }
         }
+    }
+
+    // ============================================================================
+    // Angular Damping
+    // ============================================================================
+
+    float Physics::CalculateAngularAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::AngularVelocity2D& angVel) {
+        return -angVel.Value * rb.AngularDamping;
     }
 
     // ============================================================================
@@ -87,7 +96,7 @@ namespace Engine {
         const float entityRestitution
     ) {
         bool collided = false;
-        
+
         // Use entity restitution if provided, otherwise use bounds restitution
         const float restitution = (entityRestitution >= 0.0f) ? entityRestitution : bounds.Restitution;
 
@@ -96,16 +105,19 @@ namespace Engine {
             position.X = bounds.MinX + radius;
             if (bounds.KillVelocity) {
                 velocity.X = 0.0f;
-            } else if (velocity.X < 0.0f) {
+            }
+            else if (velocity.X < 0.0f) {
                 // Bounce with restitution
                 velocity.X = -velocity.X * restitution;
             }
             collided = true;
-        } else if (position.X + radius >= bounds.MaxX) {
+        }
+        else if (position.X + radius >= bounds.MaxX) {
             position.X = bounds.MaxX - radius;
             if (bounds.KillVelocity) {
                 velocity.X = 0.0f;
-            } else if (velocity.X > 0.0f) {
+            }
+            else if (velocity.X > 0.0f) {
                 // Bounce with restitution
                 velocity.X = -velocity.X * restitution;
             }
@@ -117,16 +129,19 @@ namespace Engine {
             position.Y = bounds.MinY + radius;
             if (bounds.KillVelocity) {
                 velocity.Y = 0.0f;
-            } else if (velocity.Y < 0.0f) {
+            }
+            else if (velocity.Y < 0.0f) {
                 // Bounce with restitution
                 velocity.Y = -velocity.Y * restitution;
             }
             collided = true;
-        } else if (position.Y + radius >= bounds.MaxY) {
+        }
+        else if (position.Y + radius >= bounds.MaxY) {
             position.Y = bounds.MaxY - radius;
             if (bounds.KillVelocity) {
                 velocity.Y = 0.0f;
-            } else if (velocity.Y > 0.0f) {
+            }
+            else if (velocity.Y > 0.0f) {
                 // Bounce with restitution
                 velocity.Y = -velocity.Y * restitution;
             }
@@ -137,165 +152,117 @@ namespace Engine {
     }
 
     // ============================================================================
-    // Circle-AABB Collision Resolution
+    // Generic resolve Collision
     // ============================================================================
-
-    Physics::CircleAABBResult Physics::ResolveCircleAABBCollision(
-        ECS::Components::LocalTransform& circleTransform,
-        ECS::Components::LinearVelocity2D& circleVelocity,
-        const Vector2D& boxMin,
-        const Vector2D& boxMax,
-        const float circleRadius,
-        const float epsilon
-    ) {
-        CircleAABBResult result{};
-        result.Collided = false;
-
-        const Vector2D closestPoint(
-            std::clamp(circleTransform.Position.X, boxMin.X, boxMax.X),
-            std::clamp(circleTransform.Position.Y, boxMin.Y, boxMax.Y)
-        );
-
-        const Vector2D difference = MathUtils::ToVector2D(circleTransform.Position) - closestPoint;
-        const float distanceSquared = Dot(difference, difference);
-
-        if (distanceSquared >= circleRadius * circleRadius) {
-            return result;
-        }
-
-        Vector2D normal;
-        float penetration;
-
-        if (distanceSquared > MIN_DISTANCE_SQUARED) {
-            const float distance = std::sqrt(distanceSquared);
-            normal = difference / distance;
-            penetration = circleRadius - distance;
-        } else {
-            // Circle center inside box - push along smallest axis
-            const float distances[] = {
-                circleTransform.Position.X - boxMin.X,  // left
-                boxMax.X - circleTransform.Position.X,  // right
-                circleTransform.Position.Y - boxMin.Y,  // down
-                boxMax.Y - circleTransform.Position.Y   // up
-            };
-
-            const auto minIt = std::min_element(std::begin(distances), std::end(distances));
-            const size_t minIndex = std::distance(std::begin(distances), minIt);
-
-            const Vector2D normals[] = {
-                {-1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, -1.0f}, {0.0f, 1.0f}
-            };
-
-            normal = normals[minIndex];
-            penetration = *minIt;
-        }
-
-        // Apply position correction
-        circleTransform.Position += MathUtils::ToVector3D(normal * (penetration + epsilon));
-
-        // Reflect velocity if moving into the collision
-        ReflectVelocity(circleVelocity, normal);
-
-        result.Collided = true;
-        result.PenetrationNormal = normal;
-        result.Penetration = penetration;
-
-        return result;
-    }
-
-    // ============================================================================
-    // Circle-Circle Collision Resolution
-    // ============================================================================
-
-    Physics::CircleCollisionResult Physics::ResolveCircleCircleCollision(
+    Physics::CollisionResult Physics::ResolveCollision(
         const ECS::Components::Rigidbody2D& rbA,
         const ECS::Components::Rigidbody2D& rbB,
         ECS::Components::LinearVelocity2D& velA,
         ECS::Components::LinearVelocity2D& velB,
         ECS::Components::LocalTransform& transformA,
         ECS::Components::LocalTransform& transformB,
-        const float radiusA,
-        const float radiusB,
-        const Vector2D& offsetA,
-        const Vector2D& offsetB,
+        const Vector2D& normal,
+        const float depth,
         const ECS::Components::PhysicsMaterial2D& physics
     ) {
-        CircleCollisionResult result{};
-        result.Collided = false;
-
-        // Calculate actual circle centers with offsets
-        const Vector2D centerA = MathUtils::ToVector2D(transformA.Position) + offsetA;
-        const Vector2D centerB = MathUtils::ToVector2D(transformB.Position) + offsetB;
-
-        // Calculate collision normal and depth
-        const Vector2D delta = centerB - centerA;
-        const float distanceSquared = Dot(delta, delta);
-        const float radiusSum = radiusA + radiusB;
-
-        if (distanceSquared >= radiusSum * radiusSum || distanceSquared < MIN_DISTANCE_SQUARED) {
-            return result;
-        }
-
-        const float distance = std::sqrt(distanceSquared);
-        const Vector2D normal = delta / distance;
-        const float depth = radiusSum - distance;
-
-        // Calculate relative velocity
-        const Vector2D relativeVelocity = velB.Value - velA.Value;
-        const float normalVelocity = Dot(relativeVelocity, normal);
-
-        // Skip if objects are separating
-        if (normalVelocity > 0.0f) {
-            return result;
-        }
-
+        CollisionResult result{};
         result.Collided = true;
         result.Normal = normal;
         result.Depth = depth;
-        result.RelativeNormalVelocity = normalVelocity;
 
-        // Calculate inverse masses
         const float invMassA = GetInverseMass(rbA.Mass);
         const float invMassB = GetInverseMass(rbB.Mass);
         const float invMassSum = invMassA + invMassB;
 
-        if (invMassSum == 0.0f) {
-            return result;
-        }
+        if (invMassSum == 0.0f) return result;
 
-        // Apply restitution impulse
-        const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
-        const float j = -(1.0f + restitution) * normalVelocity / invMassSum;
-        const Vector2D impulse = normal * j;
+        const Vector2D relativeVelocity = velB.Value - velA.Value;
+        const float normalVelocity = Dot(relativeVelocity, normal);
+        result.RelativeNormalVelocity = normalVelocity;
 
-        velA.Value -= impulse * invMassA;
-        velB.Value += impulse * invMassB;
+        // ========================================================================
+        // IMPULSE RESOLUTION (velocity changes)
+        // ========================================================================
+        if (normalVelocity < 0.0f) {
+            const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
+            const float j = -(1.0f + restitution) * normalVelocity / invMassSum;
+            const Vector2D impulse = normal * j;
 
-        // Apply friction
-        if (physics.Friction > 0.0f) {
-            const Vector2D newRelativeVelocity = velB.Value - velA.Value;
-            const float newNormalVelocity = Dot(newRelativeVelocity, normal);
-            Vector2D tangent = newRelativeVelocity - normal * newNormalVelocity;
-            const float tangentLengthSquared = Dot(tangent, tangent);
+            velA.Value -= impulse * invMassA;
+            velB.Value += impulse * invMassB;
 
-            if (tangentLengthSquared > MIN_TANGENT_LENGTH_SQUARED) {
-                tangent = tangent / std::sqrt(tangentLengthSquared);
-                const float jt = -Dot(newRelativeVelocity, tangent) / invMassSum;
-                const float frictionImpulse = std::clamp(jt, -j * physics.Friction, j * physics.Friction);
-                const Vector2D frictionVector = tangent * frictionImpulse;
+            // Friction
+            if (physics.Friction > 0.0f) {
+                const Vector2D newRelativeVelocity = velB.Value - velA.Value;
+                const float newNormalVelocity = Dot(newRelativeVelocity, normal);
+                Vector2D tangent = newRelativeVelocity - normal * newNormalVelocity;
 
-                velA.Value -= frictionVector * invMassA;
-                velB.Value += frictionVector * invMassB;
+                const float tangentLengthSquared = Dot(tangent, tangent);
+                if (tangentLengthSquared > MIN_TANGENT_LENGTH_SQUARED) {
+                    tangent = tangent / std::sqrt(tangentLengthSquared);
+                    const float jt = -Dot(newRelativeVelocity, tangent) / invMassSum;
+                    const float frictionImpulse = std::clamp(jt, -j * physics.Friction, j * physics.Friction);
+                    const Vector2D frictionVector = tangent * frictionImpulse;
+
+                    velA.Value -= frictionVector * invMassA;
+                    velB.Value += frictionVector * invMassB;
+                }
             }
         }
 
-        // Position correction
-        const Vector2D correction = normal * (depth * physics.PositionCorrectPercent / invMassSum);
-        transformA.Position.X -= correction.X * invMassA;
-        transformA.Position.Y -= correction.Y * invMassA;
-        transformB.Position.X += correction.X * invMassB;
-        transformB.Position.Y += correction.Y * invMassB;
+        // ========================================================================
+        // POSITION CORRECTION (push objects apart)
+        // IMPROVED FOR THIN RECTANGLES
+        // ========================================================================
+        {
+            // Use smaller slop for thin objects to prevent tunneling
+            const float slop = 0.1f;  // Increased from 0.01f
+
+            // Use higher percentage for aggressive correction
+            const float percent = std::min(physics.PositionCorrectPercent, 0.95f);
+
+            // Calculate base correction
+            float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
+
+            // CRITICAL FIX: For deep penetrations, use more aggressive correction
+            // This prevents balls from getting stuck in thin walls
+            if (depth > slop * 2.0f) {
+                // Deep penetration - likely tunneled through thin wall
+                // Use even more aggressive correction
+                const float deepPenetrationBoost = 1.5f;
+                correctionMagnitude = std::max(depth - slop, 0.0f) * percent * deepPenetrationBoost;
+            }
+
+            const Vector2D correction = normal * (correctionMagnitude / invMassSum);
+
+            // Apply position correction
+            transformA.Position.X -= correction.X * invMassA;
+            transformA.Position.Y -= correction.Y * invMassA;
+            transformB.Position.X += correction.X * invMassB;
+            transformB.Position.Y += correction.Y * invMassB;
+
+            // ADDITIONAL FIX: Kill velocity toward wall for deeply penetrated objects
+            // This prevents infinite bouncing inside thin walls
+            if (depth > slop * 3.0f) {
+                // Check velocity toward collision normal
+                const float vNormalA = Dot(velA.Value, normal);
+                const float vNormalB = Dot(velB.Value, normal);
+
+                // If object A is moving toward B (negative normal velocity), dampen it
+                if (vNormalA < 0.0f && invMassA > 0.0f) {
+                    velA.Value -= normal * vNormalA * 0.5f;  // Remove 50% of inward velocity
+                }
+
+                // If object B is moving toward A (positive normal velocity), dampen it
+                if (vNormalB > 0.0f && invMassB > 0.0f) {
+                    velB.Value -= normal * vNormalB * 0.5f;  // Remove 50% of inward velocity
+                }
+            }
+        }
 
         return result;
     }
 }
+
+    
+

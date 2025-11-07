@@ -1,3 +1,19 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Application.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   14th September 2025
+\brief
+Implements the Application class which serves as the core of the engine,
+managing the main loop, services, and scene management.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "core/Application.h"
 #include "core/CrashDumping.h"
 #include "core/Profiler.h"
@@ -26,7 +42,7 @@ namespace Engine {
         Grape_Engine::CrashDumping::SetDumpCreateState(true);
 
         // Load configuration first
-        Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_config);
+        Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
 
 #if !_DEBUG
         if (consoleFlag)
@@ -45,9 +61,11 @@ namespace Engine {
         m_lastFrameTime = glfwGetTime();
         while (!m_shouldStop) {
             const double frameStart = glfwGetTime();
-            Time::_update(frameStart - m_lastFrameTime, frameStart);
+            const double rawDelta = frameStart - m_lastFrameTime;
+            m_lastFrameTime = frameStart;
+            
+            Time::_update(rawDelta, frameStart);
             Profiler::UpdateTime();
-            m_lastFrameTime = glfwGetTime();
 
             // --- Input & Game Update ---
             Input::_processInput();
@@ -59,10 +77,18 @@ namespace Engine {
             m_sceneManager.Update();
             auto* currentScene = m_sceneManager.GetActive();
             if (currentScene) {
+                // Use unscaled delta time for the accumulator
+                m_accumulator += Time::UnscaledDeltaTime();
+                
+                // Prevent accumulator from growing too large
+                // Use FixedDeltaTime * 5 as threshold
+                const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
+                if (m_accumulator > maxAccumulator)
+                    m_accumulator = maxAccumulator;
 
-                while (m_accumulator >= Time::FixedDeltaTime()) {
+                while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
                     currentScene->OnFixedUpdate();
-                    m_accumulator -= Time::FixedDeltaTime();
+                    m_accumulator -= Time::UnscaledFixedDeltaTime();
                 }
 
                 currentScene->OnUpdate();
@@ -81,13 +107,12 @@ namespace Engine {
                     m_shouldStop = true;
                     break;
                 }
-                glfwSwapBuffers(win->Handle());
+                win->SwapBuffers();
             }
-
-            const double frameDuration = m_lastFrameTime - frameStart;
 
             // --- FPS Controller ---
             if (Time::FpsCap() > 0) {
+                const double frameDuration = glfwGetTime() - frameStart;
                 const double targetFrameTime = 1.0 / Time::FpsCap();
                 if (frameDuration < targetFrameTime) {
                     std::this_thread::sleep_for(

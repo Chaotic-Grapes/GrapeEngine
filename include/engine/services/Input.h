@@ -48,13 +48,23 @@ public:
     // Check if a mouse button is currently pressed
     static bool IsMousePressed(int button);
 
-    // Check if a mouse button was just pressed this frame
+    /*!
+    \brief Check if a mouse button is currently held down.
+    \param button The mouse button to check (use MOUSE_* constants).
+    \return True if the button is currently held down, false otherwise.
+
+    This is equivalent to IsMousePressed(), but is intended for continuous
+    checks such as dragging or camera movement.
+    */
     static bool IsMouseDown(int button);
 
-    // Check if a mouse button was just released this frame
-    static bool IsMouseUp(int button);
-
-    // Get the current mouse cursor position
+    /*!
+    \brief Get the current mouse cursor position.
+    \param xPos Reference to store the X coordinate.
+    \param yPos Reference to store the Y coordinate.
+    
+    Retrieves the current mouse position in window coordinates.
+    */
     static void GetMousePosition(double& xPos, double& yPos);
 
     // Get the current mouse X coordinate

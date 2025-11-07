@@ -17,6 +17,10 @@ systems, components, and their interactions. This test scene covers:
 
 The scene provides structured test cases that can be cycled through using
 keyboard input (T key), with each test validating specific ECS functionality.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -28,6 +32,7 @@ keyboard input (T key), with each test validating specific ECS functionality.
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/LifetimeSystem.h"
 #include "ecs/systems/TransformSystem.h"
+#include "ecs/systems/AnimationSystem.h"
 #include "physics/Physics.h"
 #include "helpers/EntityUtils.h"
 #include "helpers/MathUtils.h"
@@ -42,7 +47,7 @@ keyboard input (T key), with each test validating specific ECS functionality.
 using namespace Sandbox;
 using namespace ECS;
 
-extern ResourceManager RM;
+// extern ResourceManager RM;
 
 // ================================================================================================
 // SCENE LIFECYCLE
@@ -58,21 +63,10 @@ void ECSTestScene::OnLoad() {
     m_worldHeight = static_cast<float>(windowHeight);
 
     // Create test layers
+    m_boundaryLayer = GetLayers().CreateOrGetLayer("boundary");
     m_testLayer = GetLayers().CreateOrGetLayer("test");
     m_physicsLayer = GetLayers().CreateOrGetLayer("physics");
     m_renderLayer = GetLayers().CreateOrGetLayer("render");
-
-    // Initialize transform system (must run before renderer)
-    AddSystem([](Scenes::Scene& s, const float dt) {
-        ECS::TransformSystem::Update(s.GetWorld(), dt);
-    }, "Transform System");
-
-    // Initialize renderer system
-    m_rendererSystem = std::make_shared<ECS::RendererSystem>();
-    m_rendererSystem->Initialize();
-    AddSystem([this](Scenes::Scene& s, const float dt) {
-        m_rendererSystem->Update(s.GetWorld(), dt);
-    }, "Renderer System");
 
     // Initialize physics system
     AddSystem([](Scenes::Scene& s, const float dt) {
@@ -83,6 +77,18 @@ void ECSTestScene::OnLoad() {
     AddSystem([](Scenes::Scene& s, const float dt) {
         ECS::LifetimeSystem::Update(s.GetWorld(), dt);
     }, "Lifetime System");
+
+    // Initialize animation system
+    AddSystem([](Scenes::Scene& s, const float dt) {
+        ECS::AnimationSystem::Update(s.GetWorld(), dt);
+    }, "Animation System");
+
+    // Initialize renderer system
+    m_rendererSystem = std::make_shared<ECS::RendererSystem>();
+    m_rendererSystem->Initialize(GetWorld());
+    AddSystem([this](Scenes::Scene& s, const float dt) {
+        m_rendererSystem->Update(s.GetWorld(), dt);
+    }, "Renderer System");
 
     // Configure physics world boundaries (account for wall thickness)
     const float wallThickness = 20.0f;
@@ -151,8 +157,14 @@ void ECSTestScene::OnUpdate() {
         
         // Advanced Tests
         case TestType::EntityPooling:           _testEntityPooling(); break;
-        case TestType::ComponentIteration:      _testComponentIteration(); break;
+        case TestType::SpriteAnimation:         _testSpriteAnimation(); break;
         case TestType::ArchetypeChanges:        _testArchetypeChanges(); break;
+    }
+
+    if (Time::FrameCount() % 120 == 0) {
+        // Log renderer flush count every 120 frames and FPS
+        LOG_INFO("Renderer flushes this frame: " << m_rendererSystem->GetFlushCount()
+                 << " | FPS: " << static_cast<int>(1.0f / Time::DeltaTime()));
     }
 }
 
@@ -206,7 +218,7 @@ void ECSTestScene::_cycleTests() {
         "RenderShapes", "RenderSprites", "RenderLayers", "RenderStressTest",
         "LifetimeBasic", "LifetimeWithPhysics", "LifetimeSpawner",
         "PhysicsRenderCombo", "AllSystemsTest", "StressTestAll",
-        "EntityPooling", "ComponentIteration", "ArchetypeChanges"
+        "EntityPooling", "SpriteAnimation", "ArchetypeChanges"
     };
     
     int index = current - 1001;
@@ -220,7 +232,7 @@ void ECSTestScene::_createWorldBoundaries() {
     const Color wallColor{0.3f, 0.3f, 0.3f, 1.0f};
 
     // Bottom wall
-    CreateOnLayer(m_testLayer,
+    CreateOnLayer(m_boundaryLayer,
         Components::LocalTransform{ 
             Vector3D{m_worldWidth * 0.5f, wallThickness * 0.5f, 0}, 
             Quaternion{0,0,0,1}, 
@@ -237,7 +249,7 @@ void ECSTestScene::_createWorldBoundaries() {
     );
 
     // Top wall
-    CreateOnLayer(m_testLayer,
+    CreateOnLayer(m_boundaryLayer,
         Components::LocalTransform{ 
             Vector3D{m_worldWidth * 0.5f, m_worldHeight - wallThickness * 0.5f, 0}, 
             Quaternion{0,0,0,1}, 
@@ -254,7 +266,7 @@ void ECSTestScene::_createWorldBoundaries() {
     );
 
     // Left wall
-    CreateOnLayer(m_testLayer,
+    CreateOnLayer(m_boundaryLayer,
         Components::LocalTransform{ 
             Vector3D{wallThickness * 0.5f, m_worldHeight * 0.5f, 0}, 
             Quaternion{0,0,0,1}, 
@@ -271,7 +283,7 @@ void ECSTestScene::_createWorldBoundaries() {
     );
 
     // Right wall
-    CreateOnLayer(m_testLayer,
+    CreateOnLayer(m_boundaryLayer,
         Components::LocalTransform{ 
             Vector3D{m_worldWidth - wallThickness * 0.5f, m_worldHeight * 0.5f, 0}, 
             Quaternion{0,0,0,1}, 
@@ -297,19 +309,25 @@ void ECSTestScene::_createWorldBoundaries() {
 void ECSTestScene::_testBasicEntityCreation() {
     if (m_testEntities.empty()) {
         // Create 5 entities with different component configurations
+        // Centered horizontally on screen
+        const float spacing = 100.f;
+        const float totalWidth = 3 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+        const float yPos = m_worldHeight * 0.5f;
+        
         const Entity e1 = CreateOnLayer(m_testLayer, 
-            Components::LocalTransform{ Vector3D{100, 100, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::Name{"Entity_1"}
         );
         
         const Entity e2 = CreateOnLayer(m_testLayer,
-            Components::LocalTransform{ Vector3D{200, 100, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX + spacing, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::Active{true},
             Components::Name{"Entity_2"}
         );
         
         const Entity e3 = CreateOnLayer(m_testLayer,
-            Components::LocalTransform{ Vector3D{300, 100, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX + 2 * spacing, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::TagMask{0x01},
             Components::Name{"Entity_3"}
         );
@@ -324,7 +342,7 @@ void ECSTestScene::_testBasicEntityCreation() {
 
         // Create another entity - should reuse the destroyed entity's slot
         const Entity e4 = CreateOnLayer(m_testLayer,
-            Components::LocalTransform{ Vector3D{400, 100, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX + 3 * spacing, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::Name{"Entity_4_Reused"}
         );
         m_testEntities.push_back(EntityUtils::Pack(e4));
@@ -365,29 +383,35 @@ void ECSTestScene::_testComponentModification() {
         // Pulse the circle radius and color
         const float pulse = 0.5f + 0.5f * std::sin(m_testTimer * 2.0f);
         circle.Radius = 30.f + 40.f * pulse;
-        circle.Color.R = static_cast<HexValue>(pulse);
-        circle.Color.G = static_cast<HexValue>(1.0f - pulse);
-        circle.Color.B = static_cast<HexValue>(0.5f);
+        circle.Color.R = pulse;
+        circle.Color.G = 1.f - pulse;
+        circle.Color.B = 200.f / 255.f;
+        circle.Color.A = pulse;
     }
 }
 
 void ECSTestScene::_testLayerSystem() {
     if (m_testEntities.empty()) {
-        // Create entities on different layers
+        // Create entities on different layers, centered horizontally
+        constexpr float spacing = 150.f;
+        constexpr float totalWidth = 2 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+        const float yPos = m_worldHeight * 0.5f;
+        
         const Entity e1 = CreateOnLayer(m_testLayer,
-            Components::LocalTransform{ Vector3D{200, 300, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::ShapeBox2D{ Vector2D{40, 40}, Vector2D{0,0}, Color{1.f,0.f,0.f,1.f}, 0.f, true },
             Components::Name{"Layer_Test"}
         );
 
         const Entity e2 = CreateOnLayer(m_physicsLayer,
-            Components::LocalTransform{ Vector3D{400, 300, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX + spacing, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::ShapeBox2D{ Vector2D{40, 40}, Vector2D{0,0}, Color{0.f,1.f,0.f,1.f}, 0.f, true },
             Components::Name{"Layer_Physics"}
         );
 
         const Entity e3 = CreateOnLayer(m_renderLayer,
-            Components::LocalTransform{ Vector3D{600, 300, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX + 2 * spacing, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::ShapeBox2D{ Vector2D{40, 40}, Vector2D{0,0}, Color{0.f,0.f,1.f,1.f}, 0.f, true },
             Components::Name{"Layer_Render"}
         );
@@ -418,11 +442,16 @@ void ECSTestScene::_testActiveAndTags() {
     ECS::World& world = GetWorld();
 
     if (m_testEntities.empty()) {
-        // Create entities with Active and TagMask components
+        // Create entities with Active and TagMask components, centered horizontally
+        const float spacing = 100.f;
+        const float totalWidth = 4 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+        const float yPos = m_worldHeight * 0.5f;
+        
         for (int i = 0; i < 5; ++i) {
             const Entity e = CreateOnLayer(m_testLayer,
                 Components::LocalTransform{ 
-                    Vector3D{100.f + i * 100.f, 200.f, 0}, 
+                    Vector3D{startX + i * spacing, yPos, 0}, 
                     Quaternion{0,0,0,1}, 
                     Vector3D{1,1,1} 
                 },
@@ -467,6 +496,7 @@ void ECSTestScene::_testLocalTransform() {
     ECS::World& world = GetWorld();
 
     if (m_testEntities.empty()) {
+        // Center entity that rotates and scales
         const Entity e = CreateOnLayer(m_testLayer,
             Components::LocalTransform{ 
                 Vector3D{m_worldWidth * 0.5f, m_worldHeight * 0.5f, 0}, 
@@ -474,24 +504,60 @@ void ECSTestScene::_testLocalTransform() {
                 Vector3D{1,1,1} 
             },
             Components::ShapeBox2D{ Vector2D{50, 50}, Vector2D{0,0}, Color{1.f,1.f,0.f,1.f}, 2.f, false },
-            Components::Name{"LocalTransform_Test"}
+            Components::Name{"LocalTransform_Center"}
         );
         m_testEntities.push_back(EntityUtils::Pack(e));
+        
+        // Entity moving along X axis from left
+        const Entity eLeft = CreateOnLayer(m_testLayer,
+            Components::LocalTransform{ 
+                Vector3D{m_worldWidth * 0.15f, m_worldHeight * 0.25f, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{1,1,1} 
+            },
+            Components::ShapeBox2D{ Vector2D{50, 50}, Vector2D{0,0}, Color{0.f,1.f,1.f,1.f}, 2.f, false },
+            Components::Name{"LocalTransform_Left"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(eLeft));
+        
+        // Entity moving along X axis from right
+        const Entity eRight = CreateOnLayer(m_testLayer,
+            Components::LocalTransform{ 
+                Vector3D{m_worldWidth * 0.85f, m_worldHeight * 0.75f, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{1,1,1} 
+            },
+            Components::ShapeBox2D{ Vector2D{50, 50}, Vector2D{0,0}, Color{1.f,0.f,1.f,1.f}, 2.f, false },
+            Components::Name{"LocalTransform_Right"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(eRight));
     }
 
-    // Animate transform
-    const Entity e = EntityUtils::Unpack(m_testEntities[0]);
-    if (world.IsAlive(e)) {
+    // Animate center transform - rotate and scale
+    for (int i = 0; i < m_testEntities.size(); ++i) {
+        const Entity e = EntityUtils::Unpack(m_testEntities[i]);
+        if (!world.IsAlive(e)) continue;
         auto& tr = world.Get<Components::LocalTransform>(e);
-        
+
         // Rotate
         const auto deltaRotation = Quaternion::FromAxisAngle(Vector3D::Forward, 90.f * Time::DeltaTime());
         tr.Rotation = deltaRotation * tr.Rotation;
         tr.Rotation.Normalize();
-        
+
         // Scale pulse
         const float scale = 0.8f + 0.4f * std::sin(m_testTimer * 3.0f);
-        tr.Scale = Vector3D{scale, scale, 1.f};
+        tr.Scale = Vector3D{ scale, scale, 1.f };
+
+        if (i == 1) {
+            // Move left entity from left to right
+            const float t = (std::sin(m_testTimer * 1.5f) + 1.0f) * 0.5f; // 0 to 1
+            tr.Position.X = m_worldWidth * 0.15f + t * (m_worldWidth * 0.75f);
+        }
+        else if (i == 2) {
+            // Move right entity from right to left
+            const float t = (std::sin(m_testTimer * 1.5f) + 1.0f) * 0.5f; // 0 to 1
+            tr.Position.X = m_worldWidth * 0.85f - t * (m_worldWidth * 0.75f);
+        }
     }
 }
 
@@ -499,7 +565,7 @@ void ECSTestScene::_testWorldTransform() {
     ECS::World& world = GetWorld();
 
     if (m_testEntities.empty()) {
-        // Create parent
+        // Create parent at center
         const Entity parent = CreateOnLayer(m_testLayer,
             Components::LocalTransform{ 
                 Vector3D{m_worldWidth * 0.5f, m_worldHeight * 0.5f, 0}, 
@@ -534,13 +600,26 @@ void ECSTestScene::_testWorldTransform() {
             Components::Name{"Child_2"}
         );
 
+        const Entity child3 = CreateOnLayer(m_testLayer,
+            Components::LocalTransform{
+                Vector3D{-350, 0, 0}, // Offset from parent
+                Quaternion{0,0,0,1},
+                Vector3D{0.25f, 0.25f, 1.f}
+            },
+            Components::WorldTransform{},
+            Components::ShapeCircle2D{ 20.f, Vector2D{0,0}, Color{1.f,1.f,1.f,1.f}, 0.f, true },
+            Components::Name{ "Child_3" }
+        );
+
         // Establish hierarchy
         world.Attach(child1, parent);
         world.Attach(child2, parent);
+        world.Attach(child3, parent);
 
         m_testEntities.push_back(EntityUtils::Pack(parent));
         m_testEntities.push_back(EntityUtils::Pack(child1));
         m_testEntities.push_back(EntityUtils::Pack(child2));
+        m_testEntities.push_back(EntityUtils::Pack(child3));
 
         LOG_DEBUG("Created parent-child hierarchy");
     }
@@ -637,7 +716,7 @@ void ECSTestScene::_testPhysicsGravity() {
 }
 
 void ECSTestScene::_testPhysicsCollision() {
-    ECS::World& world = GetWorld();
+    // ECS::World& world = GetWorld();
 
     if (m_testEntities.empty()) {
         // Create two moving circles that will collide
@@ -670,23 +749,27 @@ void ECSTestScene::_testPhysicsCollision() {
 
 void ECSTestScene::_testPhysicsMaterial() {
     if (m_testEntities.empty()) {
-        // Create bouncy balls with different restitution
+        // Create bouncy balls with different restitution, centered horizontally
+        const float spacing = 120.f;
+        const float totalWidth = 3 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+
         for (int i = 0; i < 4; ++i) {
             const float restitution = static_cast<float>(i) * 0.25f; // 0, 0.25, 0.5, 0.75
             const Entity e = CreateOnLayer(m_physicsLayer,
-                Components::LocalTransform{ 
-                    Vector3D{150.f + static_cast<float>(i) * 120.f, m_worldHeight - 150.f, 0},
-                    Quaternion{0,0,0,1}, 
-                    Vector3D{1,1,1} 
+                Components::LocalTransform{
+                    Vector3D{startX + static_cast<float>(i) * spacing, m_worldHeight - 150.f, 0},
+                    Quaternion{0,0,0,1},
+                    Vector3D{1,1,1}
                 },
                 Components::Rigidbody2D{ 1.f, 1.f, 0.0f, 0.0f, 1.0f, 0x02 },
                 Components::LinearVelocity2D{ Vector2D{0.f, 0.f} },
                 Components::AngularVelocity2D{ 0.f },
                 Components::CircleCollider2D{ 20.f, Vector2D{0,0}, 0xFFFFFFFF, 0 },
                 Components::PhysicsMaterial2D{ 1.f - restitution, restitution, 0.2f },
-                Components::ShapeCircle2D{ 20.f, Vector2D{0,0}, 
+                Components::ShapeCircle2D{ 20.f, Vector2D{0,0},
                     Color{restitution, 1.f - restitution, 0.5f, 1.f}, 0.f, true },
-                Components::Name{"Bouncy_Ball"}
+                Components::Name{ "Bouncy_Ball" }
             );
             m_testEntities.push_back(EntityUtils::Pack(e));
         }
@@ -695,21 +778,25 @@ void ECSTestScene::_testPhysicsMaterial() {
 
 void ECSTestScene::_testPhysicsAngular() {
     if (m_testEntities.empty()) {
-        // Create spinning boxes
+        // Create spinning boxes, centered horizontally
+        const float spacing = 200.f;
+        const float totalWidth = 2 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+
         for (int i = 0; i < 3; ++i) {
             const Entity e = CreateOnLayer(m_physicsLayer,
-                Components::LocalTransform{ 
-                    Vector3D{200.f + static_cast<float>(i) * 200.f, m_worldHeight * 0.5f, 0}, 
-                    Quaternion{0,0,0,1}, 
-                    Vector3D{1,1,1} 
+                Components::LocalTransform{
+                    Vector3D{startX + static_cast<float>(i) * spacing, m_worldHeight * 0.5f, 0},
+                    Quaternion{0,0,0,1},
+                    Vector3D{1,1,1}
                 },
                 Components::Rigidbody2D{ 1.f, 1.f, 0.0f, 0.1f, 0.0f, 0 },
                 Components::LinearVelocity2D{ Vector2D{0.f, 0.f} },
                 Components::AngularVelocity2D{ 90.f * static_cast<float>(i + 1) }, // Different spin speeds
                 Components::BoxCollider2D{ Vector2D{40,40}, Vector2D{0,0}, 0.f, 0xFFFFFFFF, 0 },
-                Components::ShapeBox2D{ Vector2D{40,40}, Vector2D{0,0}, 
+                Components::ShapeBox2D{ Vector2D{40,40}, Vector2D{0,0},
                     Color{0.f, 1.f, static_cast<float>(i) * 0.3f, 1.f}, 2.f, false },
-                Components::Name{"Spinning_Box"}
+                Components::Name{ "Spinning_Box" }
             );
             m_testEntities.push_back(EntityUtils::Pack(e));
         }
@@ -756,32 +843,38 @@ void ECSTestScene::_testPhysicsComplex() {
 
 void ECSTestScene::_testRenderShapes() {
     if (m_testEntities.empty()) {
-        // Circles
+        // Create shapes centered horizontally
+        const float spacing = 150.f;
+        const float totalWidth = 3 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+        const float yPos = m_worldHeight * 0.5f;
+
+        // Circle
         const Entity circle = CreateOnLayer(m_renderLayer,
-            Components::LocalTransform{ Vector3D{200, 300, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::ShapeCircle2D{ 40.f, Vector2D{0,0}, Color{1.f,0.f,0.f,1.f}, 0.f, true },
-            Components::Name{"Circle"}
+            Components::Name{ "Circle" }
         );
 
         // Box (filled)
         const Entity box1 = CreateOnLayer(m_renderLayer,
-            Components::LocalTransform{ Vector3D{400, 300, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX + spacing, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::ShapeBox2D{ Vector2D{50,50}, Vector2D{0,0}, Color{0.f,1.f,0.f,1.f}, 0.f, true },
-            Components::Name{"Box_Filled"}
+            Components::Name{ "Box_Filled" }
         );
 
         // Box (outline)
         const Entity box2 = CreateOnLayer(m_renderLayer,
-            Components::LocalTransform{ Vector3D{600, 300, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX + 2 * spacing, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::ShapeBox2D{ Vector2D{50,50}, Vector2D{0,0}, Color{0.f,0.f,1.f,1.f}, 3.f, false },
-            Components::Name{"Box_Outline"}
+            Components::Name{ "Box_Outline" }
         );
 
         // Line
         const Entity line = CreateOnLayer(m_renderLayer,
-            Components::LocalTransform{ Vector3D{800, 300, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+            Components::LocalTransform{ Vector3D{startX + 3 * spacing, yPos, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
             Components::ShapeLine2D{ Vector2D{-50,-50}, Vector2D{50,50}, Color{1.f,1.f,0.f,1.f}, 2.f },
-            Components::Name{"Line"}
+            Components::Name{ "Line" }
         );
 
         m_testEntities.push_back(EntityUtils::Pack(circle));
@@ -870,7 +963,7 @@ void ECSTestScene::_testRenderLayers() {
 void ECSTestScene::_testRenderStressTest() {
     if (m_testEntities.empty()) {
         // Create many entities to stress test the renderer
-        const int count = 2500;
+        const int count = 10;
         for (int i = 0; i < count; ++i) {
             const Entity e = CreateOnLayer(m_renderLayer,
                 Components::LocalTransform{ 
@@ -886,9 +979,9 @@ void ECSTestScene::_testRenderStressTest() {
                     MathUtils::Randomize(5.f, 20.f), 
                     Vector2D{0,0}, 
                     Color{
-                        MathUtils::Randomize(0.f, 1.f),
-                        MathUtils::Randomize(0.f, 1.f),
-                        MathUtils::Randomize(0.f, 1.f),
+                        MathUtils::Randomize(0.f, 2.f),
+                        MathUtils::Randomize(0.f, 2.f),
+                        MathUtils::Randomize(0.f, 2.f),
                         1.f
                     }, 
                     0.f, true 
@@ -930,7 +1023,17 @@ void ECSTestScene::_testLifetimeBasic() {
                 Vector3D{1,1,1} 
             },
             Components::Lifetime{ 2.0f }, // Live for 2 seconds
-            Components::ShapeCircle2D{ 20.f, Vector2D{0,0}, Color{1.f,1.f,1.f,1.f}, 0.f, true },
+            Components::ShapeCircle2D{
+            	20.f,
+            	Vector2D{0,0},
+            	Color{
+            		MathUtils::Randomize(0.f, 1.f),
+            		MathUtils::Randomize(0.f, 1.f),
+            		MathUtils::Randomize(0.f, 1.f),
+            		MathUtils::Randomize(0.25f, 1.f)
+            	},
+            	0.f,
+            	true },
             Components::Name{"Timed_Entity"}
         );
         m_testEntities.push_back(EntityUtils::Pack(e));
@@ -1019,22 +1122,26 @@ void ECSTestScene::_testLifetimeSpawner() {
 
 void ECSTestScene::_testPhysicsRenderCombo() {
     if (m_testEntities.empty()) {
-        // Create entities with both physics and rendering
+        // Create entities with both physics and rendering, centered horizontally
+        const float spacing = 120.f;
+        const float totalWidth = 4 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+
         for (int i = 0; i < 5; ++i) {
             const Entity e = CreateOnLayer(m_physicsLayer,
-                Components::LocalTransform{ 
-                    Vector3D{200.f + static_cast<float>(i) * 120.f, 150.f, 0},
-                    Quaternion{0,0,0,1}, 
-                    Vector3D{1,1,1} 
+                Components::LocalTransform{
+                    Vector3D{startX + static_cast<float>(i) * spacing, 150.f, 0},
+                    Quaternion{0,0,0,1},
+                    Vector3D{1,1,1}
                 },
                 Components::Rigidbody2D{ 1.f, 1.f, 0.05f, 0.05f, 1.0f, 0x02 },
                 Components::LinearVelocity2D{ Vector2D{0.f, 0.f} },
                 Components::AngularVelocity2D{ 0.f },
                 Components::CircleCollider2D{ 25.f, Vector2D{0,0}, 0xFFFFFFFF, 0 },
                 Components::PhysicsMaterial2D{ 0.3f, 0.7f, 0.2f },
-                Components::ShapeCircle2D{ 25.f, Vector2D{0,0}, 
+                Components::ShapeCircle2D{ 25.f, Vector2D{0,0},
                     Color{static_cast<float>(i) * 0.2f, 1.f - static_cast<float>(i) * 0.2f, 0.5f, 1.f}, 0.f, true },
-                Components::Name{"PhysicsRender_Combo"}
+                Components::Name{ "PhysicsRender_Combo" }
             );
             m_testEntities.push_back(EntityUtils::Pack(e));
         }
@@ -1076,10 +1183,9 @@ void ECSTestScene::_testAllSystems() {
     }
 }
 
-// TODO: Fix FPS issue
 void ECSTestScene::_testStressTestAll() {
     if (m_testEntities.empty()) {
-        const int count = 250;
+        const int count = 1000;
         for (int i = 0; i < count; ++i) {
             const Entity e = CreateOnLayer(m_testLayer,
                 Components::LocalTransform{ 
@@ -1091,11 +1197,11 @@ void ECSTestScene::_testStressTestAll() {
                     Quaternion{0,0,0,1}, 
                     Vector3D{1,1,1} 
                 },
-                Components::Rigidbody2D{ 0.5f, 2.f, 0.1f, 0.1f, 0.5f, 0x02 },
+                Components::Rigidbody2D{ 1.5f, 2.f, 0.1f, 0.1f, 0.5f, 0 },
                 Components::LinearVelocity2D{ 
                     Vector2D{
-                        MathUtils::Randomize(-100.f, 100.f),
-                        MathUtils::Randomize(-100.f, 100.f)
+                        MathUtils::Randomize(-250.f, 250.f),
+                        MathUtils::Randomize(-250.f, 250.f)
                     }
                 },
                 Components::AngularVelocity2D{ MathUtils::Randomize(-180.f, 180.f) },
@@ -1119,14 +1225,18 @@ void ECSTestScene::_testStressTestAll() {
 void ECSTestScene::_testEntityPooling() {
     // Test entity reuse and generation incrementing
     static int phase = 0;
-    
+
+    const float spacing = 80.f;
+    const float totalWidth = 9 * spacing;
+    const float startX = (m_worldWidth - totalWidth) * 0.5f;
+
     if (phase == 0 && m_testTimer > 1.0f) {
-        // Phase 1: Create entities
+        // Phase 1: Create entities, centered
         for (int i = 0; i < 10; ++i) {
             const Entity e = CreateOnLayer(m_testLayer,
-                Components::LocalTransform{ Vector3D{100.f + static_cast<float>(i) * 80.f, 200.f, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+                Components::LocalTransform{ Vector3D{startX + static_cast<float>(i) * spacing, 200.f, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
                 Components::ShapeCircle2D{ 20.f, Vector2D{0,0}, Color{1.f,1.f,0.f,1.f}, 0.f, true },
-                Components::Name{"Pooled_Entity"}
+                Components::Name{ "Pooled_Entity" }
             );
             m_testEntities.push_back(EntityUtils::Pack(e));
         }
@@ -1140,12 +1250,12 @@ void ECSTestScene::_testEntityPooling() {
         phase = 2;
     }
     else if (phase == 2 && m_testTimer > 3.0f) {
-        // Phase 3: Create new entities (should reuse slots)
+        // Phase 3: Create new entities (should reuse slots), centered
         for (int i = 0; i < 10; ++i) {
             const Entity e = CreateOnLayer(m_testLayer,
-                Components::LocalTransform{ Vector3D{100.f + static_cast<float>(i) * 80.f, 400.f, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
+                Components::LocalTransform{ Vector3D{startX + static_cast<float>(i) * spacing, 400.f, 0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
                 Components::ShapeCircle2D{ 20.f, Vector2D{0,0}, Color{0.f,1.f,1.f,1.f}, 0.f, true },
-                Components::Name{"Reused_Entity"}
+                Components::Name{ "Reused_Entity" }
             );
             m_testEntities.push_back(EntityUtils::Pack(e));
         }
@@ -1154,70 +1264,261 @@ void ECSTestScene::_testEntityPooling() {
     }
 }
 
-// TODO: Need fixing
-void ECSTestScene::_testComponentIteration() {
+void ECSTestScene::_testSpriteAnimation() {
+    ECS::World& world = GetWorld();
+
     if (m_testEntities.empty()) {
-        // Create entities with various component combinations
-        const int count = 100;
-        for (int i = 0; i < count; ++i) {
-            if (i % 3 == 0) {
-                // Type A: Transform + Circle
-                const Entity e = CreateOnLayer(m_testLayer,
-                    Components::LocalTransform{ Vector3D{0,0,0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
-                    Components::ShapeCircle2D{ 10.f, Vector2D{0,0}, Color{1.f,0.f,0.f,1.f}, 0.f, true }
-                );
-                m_testEntities.push_back(EntityUtils::Pack(e));
-            }
-            else if (i % 3 == 1) {
-                // Type B: Transform + Box + Active
-                const Entity e = CreateOnLayer(m_testLayer,
-                    Components::LocalTransform{ Vector3D{0,0,0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
-                    Components::ShapeBox2D{ Vector2D{10,10}, Vector2D{0,0}, Color{0.f,1.f,0.f,1.f}, 0.f, true },
-                    Components::Active{ true }
-                );
-                m_testEntities.push_back(EntityUtils::Pack(e));
-            }
-            else {
-                // Type C: Transform + Circle + Active + TagMask
-                const Entity e = CreateOnLayer(m_testLayer,
-                    Components::LocalTransform{ Vector3D{0,0,0}, Quaternion{0,0,0,1}, Vector3D{1,1,1} },
-                    Components::ShapeCircle2D{ 10.f, Vector2D{0,0}, Color{0.f,0.f,1.f,1.f}, 0.f, true },
-                    Components::Active{ true },
-                    Components::TagMask{ static_cast<uint32_t>(i) }
-                );
-                m_testEntities.push_back(EntityUtils::Pack(e));
-            }
+        // Load the sprite sheet texture
+        const std::string spritePath = "assets/textures/test/FishfolkSheet.png";
+        auto spriteSheet = RM.Get<Texture>(spritePath);
+
+        if (!spriteSheet) {
+            LOG_ERROR("Failed to load sprite sheet: " << spritePath);
+            return;
         }
-        LOG_DEBUG("Created " << count << " entities with different archetypes");
+
+        const uint32_t textureId = spriteSheet->ID();
+        const int sheetWidth = spriteSheet->Width();
+        const int sheetHeight = spriteSheet->Height();
+        const int frameWidth = 32;
+        const int frameHeight = 32;
+        
+        LOG_DEBUG("Loaded sprite sheet: " << sheetWidth << "x" << sheetHeight);
+        LOG_DEBUG("Frame size: " << frameWidth << "x" << frameHeight);
+
+        // Create multiple animated entities with different animation settings
+        const float spacing = 200.f;
+        const float totalWidth = 3 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+        const float yPos = m_worldHeight * 0.5f;
+
+        // Entity 1: Slow animation, first row, looping
+        const Entity e1 = CreateOnLayer(m_renderLayer,
+            Components::LocalTransform{ 
+                Vector3D{startX, yPos + 150, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{128, 128, 1} 
+            },
+            Components::SpriteRenderer2D{ 
+                textureId,
+                Color{1.f, 1.f, 1.f, 1.f},
+                Vector2D{1, 1},
+                Vector2D{0, 0},
+                frameWidth,
+                frameHeight
+            },
+            Components::SpriteSheetAnimation2D{
+                textureId,
+                frameWidth,
+                frameHeight,
+                sheetWidth,
+                sheetHeight,
+                0,      // Start at frame 0 (row 0)
+                16,     // First row has 16 frames
+                6.0f,   // 6 FPS (slow)
+                true,   // Loop
+                true    // Playing
+            },
+            Components::AnimationState2D{ 0, 0.0f, false },
+            Components::Name{"Anim_Slow_Loop"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(e1));
+
+        // Entity 2: Medium speed, second row, looping
+        const int cols = sheetWidth / frameWidth;
+        const Entity e2 = CreateOnLayer(m_renderLayer,
+            Components::LocalTransform{ 
+                Vector3D{startX + spacing, yPos + 150, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{128, 128, 1} 
+            },
+            Components::SpriteRenderer2D{ 
+                textureId,
+                Color{1.f, 0.8f, 0.8f, 1.f},
+                Vector2D{1, 1},
+                Vector2D{0, 0},
+                frameWidth,
+                frameHeight
+            },
+            Components::SpriteSheetAnimation2D{
+                textureId,
+                frameWidth,
+                frameHeight,
+                sheetWidth,
+                sheetHeight,
+                cols,   // Start at frame 16 (row 1)
+                8,      // 8 frames
+                12.0f,  // 12 FPS (medium)
+                true,   // Loop
+                true    // Playing
+            },
+            Components::AnimationState2D{ 0, 0.0f, false },
+            Components::Name{"Anim_Medium_Loop"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(e2));
+
+        // Entity 3: Fast animation, third row, looping
+        const Entity e3 = CreateOnLayer(m_renderLayer,
+            Components::LocalTransform{ 
+                Vector3D{startX + 2 * spacing, yPos + 150, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{128, 128, 1} 
+            },
+            Components::SpriteRenderer2D{ 
+                textureId,
+                Color{0.8f, 0.8f, 1.f, 1.f},
+                Vector2D{1, 1},
+                Vector2D{0, 0},
+                frameWidth,
+                frameHeight
+            },
+            Components::SpriteSheetAnimation2D{
+                textureId,
+                frameWidth,
+                frameHeight,
+                sheetWidth,
+                sheetHeight,
+                cols * 2,  // Start at frame 32 (row 2)
+                8,         // 8 frames
+                20.0f,     // 20 FPS (fast)
+                true,      // Loop
+                true       // Playing
+            },
+            Components::AnimationState2D{ 0, 0.0f, false },
+            Components::Name{"Anim_Fast_Loop"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(e3));
+
+        // Entity 4: One-shot animation (non-looping) that expires
+        const Entity e4 = CreateOnLayer(m_renderLayer,
+            Components::LocalTransform{ 
+                Vector3D{startX + spacing, yPos - 150, 0}, 
+                Quaternion{0,0,0,1}, 
+                Vector3D{128, 128, 1} 
+            },
+            Components::SpriteRenderer2D{ 
+                textureId,
+                Color{1.f, 1.f, 0.5f, 1.f},
+                Vector2D{1, 1},
+                Vector2D{0, 0},
+                frameWidth,
+                frameHeight
+            },
+            Components::SpriteSheetAnimation2D{
+                textureId,
+                frameWidth,
+                frameHeight,
+                sheetWidth,
+                sheetHeight,
+                cols * 3,  // Start at frame 48 (row 3)
+                8,         // 8 frames
+                10.0f,     // 10 FPS
+                false,     // Don't loop
+                true       // Playing
+            },
+            Components::AnimationState2D{ 0, 0.0f, false },
+            Components::Lifetime{ 0.8f },  // Destroy after animation completes
+            Components::Name{"Anim_OneShot"}
+        );
+        m_testEntities.push_back(EntityUtils::Pack(e4));
+
+        LOG_DEBUG("Created 4 animated sprite entities");
+        LOG_DEBUG("Top row: 3 looping animations at different speeds");
+        LOG_DEBUG("Bottom center: One-shot animation that expires");
     }
 
-    // Measure iteration performance
-    static float perfTimer = 0.f;
-    perfTimer += Time::DeltaTime();
-    if (perfTimer >= 1.0f) {
-        int count = 0;
-        GetWorld().Each<Components::LocalTransform>([&count](Entity, const Components::LocalTransform&) {
-            count++;
-        });
-        LOG_DEBUG("Iterated over " << count << " entities with LocalTransform");
-        perfTimer = 0.f;
+    // Respawn the one-shot animation periodically
+    static float respawnTimer = 0.f;
+    respawnTimer += Time::DeltaTime();
+    
+    if (respawnTimer >= 2.0f) {
+        respawnTimer = 0.f;
+        
+        // Check if the one-shot entity still exists
+        bool needsRespawn = true;
+        if (m_testEntities.size() >= 4) {
+            const Entity e4 = EntityUtils::Unpack(m_testEntities[3]);
+            if (world.IsAlive(e4)) {
+                needsRespawn = false;
+            }
+        }
+        
+        if (needsRespawn) {
+            // Respawn the one-shot animation
+            const std::string spritePath = "assets/textures/test/FishfolkSheet.png";
+            auto spriteSheet = RM.Get<Texture>(spritePath);
+            if (spriteSheet) {
+                const uint32_t textureId = spriteSheet->ID();
+                const int sheetWidth = spriteSheet->Width();
+                const int sheetHeight = spriteSheet->Height();
+                const int frameWidth = 32;
+                const int frameHeight = 32;
+                const int cols = sheetWidth / frameWidth;
+                const float spacing = 200.f;
+                const float totalWidth = 3 * spacing;
+                const float startX = (m_worldWidth - totalWidth) * 0.5f;
+                const float yPos = m_worldHeight * 0.5f;
+
+                const Entity e4 = CreateOnLayer(m_renderLayer,
+                    Components::LocalTransform{ 
+                        Vector3D{startX + spacing, yPos - 150, 0}, 
+                        Quaternion{0,0,0,1}, 
+                        Vector3D{128, 128, 1} 
+                    },
+                    Components::SpriteRenderer2D{ 
+                        textureId,
+                        Color{1.f, 1.f, 0.5f, 1.f},
+                        Vector2D{1, 1},
+                        Vector2D{0, 0},
+                        frameWidth,
+                        frameHeight
+                    },
+                    Components::SpriteSheetAnimation2D{
+                        textureId,
+                        frameWidth,
+                        frameHeight,
+                        sheetWidth,
+                        sheetHeight,
+                        cols * 3,
+                        8,
+                        10.0f,
+                        false,
+                        true
+                    },
+                    Components::AnimationState2D{ 0, 0.0f, false },
+                    Components::Lifetime{ 0.8f },
+                    Components::Name{"Anim_OneShot"}
+                );
+                
+                if (m_testEntities.size() >= 4) {
+                    m_testEntities[3] = EntityUtils::Pack(e4);
+                }
+                else {
+                    m_testEntities.push_back(EntityUtils::Pack(e4));
+                }
+            }
+        }
     }
 }
 
 void ECSTestScene::_testArchetypeChanges() {
     ECS::World& world = GetWorld();
-    
+
     if (m_testEntities.empty()) {
-        // Create base entities
+        // Create base entities, centered horizontally
+        const float spacing = 150.f;
+        const float totalWidth = 4 * spacing;
+        const float startX = (m_worldWidth - totalWidth) * 0.5f;
+
         for (int i = 0; i < 5; ++i) {
             const Entity e = CreateOnLayer(m_testLayer,
-                Components::LocalTransform{ 
-                    Vector3D{100.f + static_cast<float>(i) * 150.f, m_worldHeight * 0.5f, 0}, 
-                    Quaternion{0,0,0,1}, 
-                    Vector3D{1,1,1} 
+                Components::LocalTransform{
+                    Vector3D{startX + static_cast<float>(i) * spacing, m_worldHeight * 0.5f, 0},
+                    Quaternion{0,0,0,1},
+                    Vector3D{1,1,1}
                 },
                 Components::ShapeCircle2D{ 30.f, Vector2D{0,0}, Color{1.f,1.f,1.f,1.f}, 0.f, true },
-                Components::Name{"Archetype_Test"}
+                Components::Name{ "Archetype_Test" }
             );
             m_testEntities.push_back(EntityUtils::Pack(e));
         }
@@ -1225,52 +1526,52 @@ void ECSTestScene::_testArchetypeChanges() {
 
     // Dynamically add/remove components over time
     const int cycle = static_cast<int>(m_testTimer) % 4;
-    
+
     for (const uint64_t id : m_testEntities) {
         const Entity e = EntityUtils::Unpack(id);
         if (!world.IsAlive(e)) continue;
 
         switch (cycle) {
-            case 0:
-                // Add Active component
-                if (!world.Has<Components::Active>(e)) {
-                    world.Add<Components::Active>(e, Components::Active{true});
-                    if (world.Has<Components::ShapeCircle2D>(e)) {
-                        auto& circle = world.Get<Components::ShapeCircle2D>(e);
-                        circle.Color = Color{1.f, 0.f, 0.f, 1.f};
-                    }
+        case 0:
+            // Add Active component
+            if (!world.Has<Components::Active>(e)) {
+                world.Add<Components::Active>(e, Components::Active{ true });
+                if (world.Has<Components::ShapeCircle2D>(e)) {
+                    auto& circle = world.Get<Components::ShapeCircle2D>(e);
+                    circle.Color = Color{ 1.f, 0.f, 0.f, 1.f };
                 }
-                break;
-            case 1:
-                // Add TagMask component
-                if (!world.Has<Components::TagMask>(e)) {
-                    world.Add<Components::TagMask>(e, Components::TagMask{0xFF});
-                    if (world.Has<Components::ShapeCircle2D>(e)) {
-                        auto& circle = world.Get<Components::ShapeCircle2D>(e);
-                        circle.Color = Color{0.f, 1.f, 0.f, 1.f};
-                    }
+            }
+            break;
+        case 1:
+            // Add TagMask component
+            if (!world.Has<Components::TagMask>(e)) {
+                world.Add<Components::TagMask>(e, Components::TagMask{ 0xFF });
+                if (world.Has<Components::ShapeCircle2D>(e)) {
+                    auto& circle = world.Get<Components::ShapeCircle2D>(e);
+                    circle.Color = Color{ 0.f, 1.f, 0.f, 1.f };
                 }
-                break;
-            case 2:
-                // Remove Active component
-                if (world.Has<Components::Active>(e)) {
-                    world.Remove<Components::Active>(e);
-                    if (world.Has<Components::ShapeCircle2D>(e)) {
-                        auto& circle = world.Get<Components::ShapeCircle2D>(e);
-                        circle.Color = Color{0.f, 0.f, 1.f, 1.f};
-                    }
+            }
+            break;
+        case 2:
+            // Remove Active component
+            if (world.Has<Components::Active>(e)) {
+                world.Remove<Components::Active>(e);
+                if (world.Has<Components::ShapeCircle2D>(e)) {
+                    auto& circle = world.Get<Components::ShapeCircle2D>(e);
+                    circle.Color = Color{ 0.f, 0.f, 1.f, 1.f };
                 }
-                break;
-            case 3:
-                // Remove TagMask component
-                if (world.Has<Components::TagMask>(e)) {
-                    world.Remove<Components::TagMask>(e);
-                    if (world.Has<Components::ShapeCircle2D>(e)) {
-                        auto& circle = world.Get<Components::ShapeCircle2D>(e);
-                        circle.Color = Color{1.f, 1.f, 0.f, 1.f};
-                    }
+            }
+            break;
+        case 3:
+            // Remove TagMask component
+            if (world.Has<Components::TagMask>(e)) {
+                world.Remove<Components::TagMask>(e);
+                if (world.Has<Components::ShapeCircle2D>(e)) {
+                    auto& circle = world.Get<Components::ShapeCircle2D>(e);
+                    circle.Color = Color{ 1.f, 1.f, 0.f, 1.f };
                 }
-                break;
+            }
+            break;
         }
     }
 }

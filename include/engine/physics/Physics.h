@@ -14,6 +14,14 @@ namespace Engine {
             float Restitution; // Bounciness when hitting boundaries (0 = no bounce, 1 = perfect bounce)
         };
 
+        //Generic Collision 
+        struct CollisionResult {
+            bool Collided; //flag to show collision
+            Vector2D Normal;
+            float Depth;
+            float RelativeNormalVelocity;
+        };
+
         // Gravity management
         static void SetGravity(const Vector2D& gravity) { m_gravity = gravity; }
         static Vector2D GetGravity() { return m_gravity; }
@@ -42,6 +50,9 @@ namespace Engine {
         static void ReflectVelocity(ECS::Components::LinearVelocity2D& vel, const Vector2D& normal);
         static void ZeroVelocityComponent(ECS::Components::LinearVelocity2D& vel, bool isXAxis, bool isPositive);
 
+        // Angular Damping
+        static float CalculateAngularAcceleration(const ECS::Components::Rigidbody2D& rb, const ECS::Components::AngularVelocity2D& angVel);
+
         static bool ApplyBoundaryConstraint(
             Vector2D& position, 
             Vector2D& velocity, 
@@ -50,40 +61,15 @@ namespace Engine {
             float entityRestitution = -1.0f  // -1 means use bounds.Restitution
         );
 
-        // Circle-AABB collision resolution
-        struct CircleAABBResult {
-            bool Collided;
-            Vector2D PenetrationNormal;
-            float Penetration;
-        };
-
-        static CircleAABBResult ResolveCircleAABBCollision(
-            ECS::Components::LocalTransform& circleTransform,
-            ECS::Components::LinearVelocity2D& circleVelocity,
-            const Vector2D& boxMin,
-            const Vector2D& boxMax,
-            float circleRadius,
-            float epsilon = 0.001f
-        );
-
-        struct CircleCollisionResult {
-            bool Collided;
-            Vector2D Normal;
-            float Depth;
-            float RelativeNormalVelocity;
-        };
-
-        static CircleCollisionResult ResolveCircleCircleCollision(
+        static CollisionResult ResolveCollision(
             const ECS::Components::Rigidbody2D& rbA,
-            const ECS::Components::Rigidbody2D& rbB,
+            const ECS::Components::Rigidbody2D& RbB,
             ECS::Components::LinearVelocity2D& velA,
-            ECS::Components::LinearVelocity2D& velB,
+            ECS::Components::LinearVelocity2D& VelB,
             ECS::Components::LocalTransform& transformA,
             ECS::Components::LocalTransform& transformB,
-            float radiusA,
-            float radiusB,
-            const Vector2D& offsetA,
-            const Vector2D& offsetB,
+            const Vector2D& normal,
+            float depth,
             const ECS::Components::PhysicsMaterial2D& physics
         );
 

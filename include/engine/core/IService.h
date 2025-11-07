@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file   IService.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   5th October 2025
+\brief
+Declares the IService interface for engine services.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef ISERVICE_H
 #define ISERVICE_H
 

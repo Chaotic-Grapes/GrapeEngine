@@ -127,6 +127,11 @@ void Input::_processInput() {
     m_keyPressed.clear();
     m_mouseDown.clear();
     m_mouseUp.clear();
+
+    // Reset scroll deltas so scroll input only lasts one frame
+    m_scrollX = 0.0;
+    m_scrollY = 0.0;
+
     glfwPollEvents();
 }
 

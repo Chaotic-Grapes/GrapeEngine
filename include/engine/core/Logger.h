@@ -5,11 +5,11 @@
 #undef ERROR
 #endif
 
-#define LOG_STREAM(level, msg)                 \
-    do {                                       \
-        std::ostringstream oss;                \
-        oss << msg;                            \
-        Logger::Get().Log(level, oss.str());   \
+#define LOG_STREAM(level, msg)						\
+    do {											\
+        std::ostringstream ossMacro;				\
+        ossMacro << msg;                            \
+        Logger::Get().Log(level, ossMacro.str());   \
     } while(0)
 
 #define LOG_TRACE(msg)    LOG_STREAM(LogLevel::TRACE, msg)

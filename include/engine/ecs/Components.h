@@ -117,9 +117,6 @@ namespace ECS {
         struct Active {
         public:
             bool Enabled = true;
-            // padding explicit to keep trivially copyable and predictable size
-            // !!!! These are not meant to be used. !!!!
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
 
@@ -137,6 +134,12 @@ namespace ECS {
             uint16_t Id = 0; 
         };
         static_assert(std::is_trivially_copyable_v<Layer>, "Layer must be trivially copyable");
+
+        struct Rotator {
+            float RotationSpeed;   // degrees per second
+            float RotationOffset;  // starting phase
+        };
+        static_assert(std::is_trivially_copyable_v<Rotator>, "LocalTransform must be trivially copyable");
 
         // Local transform is relative to parent entity (if any)
         struct LocalTransform { 
@@ -185,7 +188,6 @@ namespace ECS {
             float LinearDrag = 0.0f;
             float AngularDrag = 0.0f;
             uint32_t Flags = 0;      // bit 0: UseGravity, bit 1: Kinematic, etc.
-            uint32_t _Pad = 0;
         };
         static_assert(std::is_trivially_copyable_v<Rigidbody>, "Rigidbody must be trivially copyable");
 
@@ -194,7 +196,6 @@ namespace ECS {
             float Friction = 0.2f;               // 0..1
             float Restitution = 0.0f;            // 0..1 (bounciness)
 			float PositionCorrectPercent = 0.2f; // 0..1
-            float _Pad0 = 0.0f;
         };
         static_assert(std::is_trivially_copyable_v<PhysicsMaterial2D>, "PhysicsMaterial2D must be trivially copyable");
 
@@ -202,16 +203,13 @@ namespace ECS {
         public:
             Vector3D HalfExtents{0.5f, 0.5f, 0.5f};
             uint32_t LayerMask = 0xFFFFFFFFu;
-            uint32_t _Pad = 0;
         };
         static_assert(std::is_trivially_copyable_v<BoxCollider>, "BoxCollider must be trivially copyable");
 
         struct SphereCollider {
         public:
             float Radius = 0.5f;
-            float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f;
             uint32_t LayerMask = 0xFFFFFFFFu;
-            uint32_t _Pad3 = 0;
         };
         static_assert(std::is_trivially_copyable_v<SphereCollider>, "SphereCollider must be trivially copyable");
 
@@ -237,7 +235,6 @@ namespace ECS {
         struct AngularVelocity2D {
         public:
             float Value = 0.0f;
-            float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f; // keep 16B size/alignment simple
         };
         static_assert(std::is_trivially_copyable_v<AngularVelocity2D>, "AngularVelocity2D must be trivially copyable");
 
@@ -261,7 +258,6 @@ namespace ECS {
             float Rotation = 0.0f;            // local rotation in radians (around Z)
             uint32_t LayerMask = 0xFFFFFFFFu; // collision layer mask
             uint32_t Flags = 0;               // bit 0: IsTrigger
-            uint32_t _Pad = 0;
         };
         static_assert(std::is_trivially_copyable_v<BoxCollider2D>, "BoxCollider2D must be trivially copyable");
 
@@ -275,29 +271,64 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<CircleCollider2D>, "CircleCollider2D must be trivially copyable");
 
+
         // ---------------------------------- Rendering ----------------------------------
 
         // 2D sprite renderer (for UI/2D layers)
-        struct SpriteRenderer2D {
+        struct SpriteRenderer2D {   
         public:
             uint32_t TextureId = 0;
             Color Color{1.0f, 1.0f, 1.0f, 1.0f};
             Vector2D Tiling{1.0f, 1.0f};
             Vector2D Offset{0.0f, 0.0f};
-            uint32_t _Pad = 0;          // keep 8-byte alignment
+            int Width = 0;
+            int Height = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
+        
 
         // Optional: sprite flipping flags for atlases
         struct SpriteFlip2D {
         public:
             bool FlipX = false;
             bool FlipY = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteFlip2D>, "SpriteFlip2D must be trivially copyable");
 
+        // Optional: sprite shader options
+        struct SpriteShader2D {
+        public:
+            bool Bloom = false;
+        };
+
         // TODO: Add Shader components
+
+        // ---------------------------------- Animation ----------------------------------
+
+        // Sprite sheet animation configuration (POD)
+        struct SpriteSheetAnimation2D {
+        public:
+            uint32_t TextureId = 0;           // Texture containing the sprite sheet
+            int FrameWidth = 0;               // Width of a single frame in pixels
+            int FrameHeight = 0;              // Height of a single frame in pixels
+            int SheetWidth = 0;               // Total width of the sprite sheet
+            int SheetHeight = 0;              // Total height of the sprite sheet
+            int StartFrame = 0;               // First frame index in the animation
+            int FrameCount = 0;               // Number of frames in the animation
+            float FramesPerSecond = 10.0f;    // Animation speed (FPS)
+            bool Loop = true;                 // Whether animation loops
+            bool Playing = true;              // Whether animation is currently playing
+        };
+        static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
+
+        // Animation state (runtime data, updated by AnimationSystem)
+        struct AnimationState2D {
+        public:
+            int CurrentFrame = 0;             // Current frame index (relative to StartFrame)
+            float TimeAccumulator = 0.0f;     // Time accumulated since last frame change
+            bool Finished = false;            // True if non-looping animation completed
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationState2D>, "AnimationState2D must be trivially copyable");
 
         // ---------- Minimal 2D shape data for debug rendering ----------
         // Keep these POD to be fast and compatible with archetype moves.
@@ -309,7 +340,6 @@ namespace ECS {
             Color Color{1.f,1.f,1.f,1.f};
             float Thickness = 1.0f;      // for wireframe; ignored if Filled
             bool Filled = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<ShapeCircle2D>, "ShapeCircle2D must be trivially copyable");
 
@@ -320,7 +350,6 @@ namespace ECS {
             Color Color{1.f,1.f,1.f,1.f};
             float Thickness = 1.0f;
             bool Filled = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<ShapeBox2D>, "ShapeBox2D must be trivially copyable");
 
@@ -330,11 +359,11 @@ namespace ECS {
             Vector2D B{ 1.0f, 0.0f };
             Color Color{ 1.f,1.f,1.f,1.f };
             float Thickness = 1.0f;
-            float _Pad0 = 0.0f, _Pad1 = 0.0f, _Pad2 = 0.0f;
         };
         static_assert(std::is_trivially_copyable_v<ShapeLine2D>, "ShapeLine2D must be trivially copyable");
 
         // Fixed-capacity polyline/polygon for debug; avoids heap
+        // TODO: Change this to something more flexible AND without class template
         template<size_t TCapacity = 16>
         struct ShapePolygon2D {
         public:
@@ -343,33 +372,30 @@ namespace ECS {
             Color FillColor{ 1.f, 1.f, 1.f, 1.f };
             Color OutlineColor{ 1.f, 1.f, 1.f, 1.f };
             float OutlineThickness = 1.f;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<ShapePolygon2D<>>, "ShapePolygon2D must be trivially copyable");
 
-        // Optional: simple 2D sorting hint for renderer (e.g. painter's algorithm)
+        // This is the Z-order for 2D rendering; lower values drawn first
+        // Can be used with Layer component
         struct ZIndex2D {
         public:
             int16_t ZOrder = 0;  // smaller drawn first
-            int16_t _Pad0 = 0;
-            int32_t _Pad1 = 0;
         };
         static_assert(std::is_trivially_copyable_v<ZIndex2D>, "ZIndex2D must be trivially copyable");
-
+        
         // ---------- Cameras ----------
 
-        struct Camera {
-        public:
-            bool IsOrthographic = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
-
-            float FovY = 60.0f;         // degrees (used when IsOrthographic == false)
-            float OrthoHeight = 10.0f;  // world units half-height (used when IsOrthographic == true)
-            float Near = 0.1f;
-            float Far = 1000.0f;
-            float Aspect = 16.0f / 9.0f; // width / height
+        struct Camera3D {
+        public: 
+            bool UsePerspective = false;
+            float FOV           = 45.f; // Don't use glm functions outside of graphics
+            float NearPlane     = 0.1f;
+            float FarPlane      = 100.f;
+            float OrthoSize     = 10.f;
+            float AspectRatio   = 16.f / 9.f; // width / height
+            bool  Active        = false;
         };
-        static_assert(std::is_trivially_copyable_v<Camera>, "Camera must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<Camera3D>, "Camera3D must be trivially copyable");
 
         // Optional matrices output for cameras (computed by CameraSystem)
         struct CameraMatrices {
@@ -380,22 +406,95 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<CameraMatrices>, "CameraMatrices must be trivially copyable");
 
+        struct Light2D {
+        public:
+            enum class Type : uint8_t {
+                Directional = 0,
+                Point = 1
+            };
+
+            Type      LightType = Type::Directional;    // defaults to directional
+            Vector3D  Position{ 0.f, 0.f, 0.f };        // used if Point
+            Vector3D  Direction{ 0.f, -1.f, 0.f };      // used if Directional
+            Color     Color{ 1.f, 1.f, 1.f, 1.f };      // RGB intensity
+            float     Intensity = 1.0f;                 // brightness scalar
+            float     Range = 10.0f;                    // used if Point
+            bool      CastsShadows = false;             // for later extensions
+        };
+        static_assert(std::is_trivially_copyable_v<Light2D>, "Light2D must be trivially copyable");
+
+        enum class TextAnchor : uint8_t {
+            Absolute = 0,    ///< Position is absolute pixels (no anchoring)
+            TopLeft,         ///< Offset from top-left corner
+            TopRight,        ///< Offset from top-right corner
+            BottomLeft,      ///< Offset from bottom-left corner
+            BottomRight,     ///< Offset from bottom-right corner
+            Center           ///< Offset from screen center
+        };
+
+        struct Text {
+            static constexpr size_t MaxTextLength = 256;
+            char Content[MaxTextLength] = {};   // Text to display
+            char FontPath[128] = {};            // Initialize to empty, not with default path
+            float PixelSize = 24.0f;
+            Color Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+            TextAnchor Anchor = TextAnchor::Absolute;
+
+            Text() {
+                // Default constructor sets default font
+                setFontPath("assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf");
+            }
+
+            Text(const char* content,
+                float pixelSize = 24.0f,
+                const ::Color& color = { 1.0f, 1.0f, 1.0f, 1.0f },
+                TextAnchor anchor = TextAnchor::Absolute,
+                const char* fontPath = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf")
+                : PixelSize(pixelSize)
+                , Color(color)
+                , Anchor(anchor)
+            {
+                setContent(content);
+                setFontPath(fontPath);  // this initializes the empty array
+            }
+
+            void setContent(const char* str) {
+                if (str) {
+                    strncpy_s(Content, str, MaxTextLength - 1);
+                    Content[MaxTextLength - 1] = '\0';
+                }
+            }
+
+            void setFontPath(const char* path) {
+                if (path) {
+                    strncpy_s(FontPath, path, 127);
+                    FontPath[127] = '\0';
+                }
+            }
+
+            std::string_view getContent() const { return { Content }; }
+            std::string_view getFontPath() const { return { FontPath }; }
+        };
+        static_assert(std::is_trivially_copyable_v<Text>, "Text must be trivially copyable");
+
         // ---------- Scripting / Audio (kept minimal) ----------
 
-        struct ScriptId {
+        // C# Script instance component for CoreCLR hosting
+        struct ScriptInstance {
         public:
-            uint32_t Id = 0;
+            uint64_t ManagedHandle = 0;   // Handle to C# object instance
+            uint32_t TypeHash = 0;        // Hash of script type name
+            bool Initialized = false;     // Whether OnStart() has been called
+            char TypeName[128] = {0};     // Script class name (e.g., "MyGame.PlayerController")
         };
-        static_assert(std::is_trivially_copyable_v<ScriptId>, "ScriptId must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<ScriptInstance>, "ScriptInstance must be trivially copyable");
 
         struct AudioSource {
         public:
             uint32_t CueId = 0;
-            uint32_t _Pad = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
     }

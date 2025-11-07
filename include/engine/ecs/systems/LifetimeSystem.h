@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file   LifetimeSystem.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   20th October 2025
+\brief
+Declares the LifetimeSystem which manages entity lifetimes in the ECS framework.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef LIFETIMESYSTEM_H
 #define LIFETIMESYSTEM_H
 

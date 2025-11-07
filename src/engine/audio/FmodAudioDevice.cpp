@@ -1,5 +1,6 @@
 #include "audio/FmodAudioDevice.h"
 #include "core/Logger.h"
+#include "services/ResourceManager.h"
 
 namespace {
     bool FMOD_OK_OR_LOG(const FMOD_RESULT r, const char* ctx = nullptr) {
@@ -9,47 +10,54 @@ namespace {
             : "") + ": " + std::to_string(r));
         return false;
     }
+    inline bool _is_playing(FMOD::Channel* ch) {
+        if (!ch) return false;
+        bool playing = false;
+        if (ch->isPlaying(&playing) != FMOD_OK) return false;
+        return playing;
+    }
 }
 
 namespace Audio {
+
     bool FmodAudioDevice::Initialize() {
         if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
             return false;
-
         if (!FMOD_OK_OR_LOG(m_system->init(512, FMOD_INIT_NORMAL, nullptr), "init"))
             return false;
-
         if (!FMOD_OK_OR_LOG(m_system->getMasterChannelGroup(&m_master), "getMasterChannelGroup")) {
-            // close/release if partially created
             if (m_system) { m_system->release(); m_system = nullptr; }
             return false;
         }
-
         SetMasterVolume(m_masterVolume);
         return true;
     }
 
     void FmodAudioDevice::Update() {
-        // Update FMOD system
-        if (m_system)
-            m_system->update();
+        if (m_system) m_system->update();
+
+        // prune finished singletons
+        for (auto it = m_activeByCue.begin(); it != m_activeByCue.end(); ) {
+            FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second });
+            if (!ch || !_is_playing(ch)) it = m_activeByCue.erase(it);
+            else ++it;
+        }
     }
 
     void FmodAudioDevice::Shutdown() {
-        // release channels map pointers
-        for (const auto& entry : m_channels) {
+        // free channel user data
+        for (const auto& [id, ch] : m_channels) {
             void* data = nullptr;
-            if (entry.second && entry.second->getUserData(&data) == FMOD_OK && data) {
+            if (ch && ch->getUserData(&data) == FMOD_OK && data) {
                 delete static_cast<uint64_t*>(data);
             }
         }
         m_channels.clear();
+        m_activeByCue.clear();
 
-        for (auto& [id, entry] : m_cues) {
-            if (entry.Sound) {
-                entry.Sound->release();
-                entry.Sound = nullptr;
-            }
+        // release sounds
+        for (auto& [cid, entry] : m_cues) {
+            if (entry.Sound) { entry.Sound->release(); entry.Sound = nullptr; }
         }
         m_cues.clear();
 
@@ -61,40 +69,59 @@ namespace Audio {
         m_master = nullptr;
     }
 
-    bool FmodAudioDevice::LoadCue(const std::string& cueId, const std::string& filePath, const SoundParams& params) {
-        if (!m_system)
+    bool FmodAudioDevice::LoadCue(const std::string& cueId,
+        const std::string& filePath,
+        const SoundParams& params)
+    {
+        if (!m_system) return false;
+        if (m_cues.count(cueId)) return true; // already loaded
+
+        // Try ResourceManager memory path
+        if (auto audioBytes = RM.Get<AudioData>(filePath)) {
+            if (audioBytes->IsValid && !audioBytes->Data.empty()) {
+                if (FMOD::Sound* s = _createSoundFromMemory(cueId, filePath, params)) {
+                    m_cues.emplace(cueId, CueEntry{ s, params, filePath });
+                    return true;
+                }
+                else {
+                    LOG_WARNING("FMOD memory-load failed for '%s', falling back to file path.", filePath.c_str());
+                }
+            }
+        }
+
+        // Fallback: create from file path
+        FMOD::Sound* s = nullptr;
+        auto mode = params.stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
+        mode |= params.is3D ? FMOD_3D : FMOD_2D;
+        if (m_system->createSound(filePath.c_str(), mode, nullptr, &s) != FMOD_OK || !s)
             return false;
-        if (m_cues.count(cueId))
-            return true;
 
-        const auto* snd = _getOrCreateSound(cueId, filePath, params);
-
-        return snd != nullptr;
+        m_cues.emplace(cueId, CueEntry{ s, params, filePath });
+        return true;
     }
 
     void FmodAudioDevice::UnloadCue(const std::string& cueId) {
         if (const auto it = m_cues.find(cueId); it != m_cues.end()) {
-            if (it->second.Sound)
-                it->second.Sound->release();
+            if (it->second.Sound) it->second.Sound->release();
             m_cues.erase(it);
         }
+        m_activeByCue.erase(cueId);
     }
 
     bool FmodAudioDevice::HasCue(const std::string& cueId) const {
         return m_cues.count(cueId) > 0;
     }
 
-    PlaybackHandle FmodAudioDevice::Play(const std::string& cueId, const PlaySettings& s) {
-        if (!m_system) 
-            return {};
+    PlaybackHandle FmodAudioDevice::Play(const std::string& cueId,
+        const PlaySettings& s)
+    {
         const auto it = m_cues.find(cueId);
-        if (it == m_cues.end()) 
-            return {};
-        FMOD::Sound* snd = it->second.Sound;
-        if (!snd)
-            return {};
+        if (it == m_cues.end()) return {};
 
-        // Set looping on the sound itself (and channel)
+        FMOD::Sound* snd = it->second.Sound;
+        if (!snd) return {};
+
+        // Configure looping on the sound
         snd->setMode(s.loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
         snd->setLoopCount(s.loop ? -1 : 0);
 
@@ -103,67 +130,103 @@ namespace Audio {
             return {};
 
         ch->setVolume(s.volume);
-        // FMOD pitch is frequency ratio; using setPitch if Extension present, otherwise setFrequency
         ch->setPitch(s.pitch);
         ch->setPaused(false);
 
         PlaybackHandle h{ m_nextId++ };
-
-        // store channel in map
         m_channels.emplace(h.Id, ch);
-
-        // set user data to a pointer to the key
-        const auto storedId = new uint64_t(h.Id);
+        auto* storedId = new uint64_t(h.Id);
         ch->setUserData(storedId);
-
         return h;
     }
 
-    void FmodAudioDevice::Stop(const PlaybackHandle handle, const StopMode mode) {
+    void FmodAudioDevice::Stop(PlaybackHandle handle, StopMode mode) {
         if (auto* ch = _channelFromHandle(handle)) {
-            if (mode == StopMode::Immediate) {
-                ch->stop();
-            } 
-            else {
-                // Simple fade-out example: reduce volume and stop. Real impl should schedule.
-                float v = 0.f;
-                ch->getVolume(&v);
-                ch->setVolume(v * 0.0f);
-                ch->stop();
-            }
+            if (mode == StopMode::Immediate) ch->stop();
+            else { ch->setVolume(0.0f); ch->stop(); }
         }
     }
 
-    void FmodAudioDevice::SetInstanceVolume(const PlaybackHandle handle, const float volume) {
-        if (auto* ch = _channelFromHandle(handle))
-            ch->setVolume(volume);
+    PlaybackHandle FmodAudioDevice::PlaySingle(const std::string& cueId,
+        const PlaySettings& s,
+        PlayPolicy policy)
+    {
+        if (auto it = m_activeByCue.find(cueId); it != m_activeByCue.end()) {
+            if (FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second })) {
+                const bool playing = _is_playing(ch);
+                switch (policy) {
+                case PlayPolicy::SingleInstanceRestart:
+                    ch->setPosition(0, FMOD_TIMEUNIT_MS);
+                    ch->setPaused(false);
+                    ch->setVolume(s.volume);
+                    ch->setPitch(s.pitch);
+                    return PlaybackHandle{ it->second };
+                case PlayPolicy::SingleInstanceResume:
+                    if (!playing) ch->setPaused(false);
+                    ch->setVolume(s.volume);
+                    ch->setPitch(s.pitch);
+                    return PlaybackHandle{ it->second };
+                case PlayPolicy::SingleInstanceIgnore:
+                    if (playing) return PlaybackHandle{ it->second };
+                    break;
+                case PlayPolicy::NewInstance:
+                    break;
+                }
+            }
+            else {
+                m_activeByCue.erase(it);
+            }
+        }
+        auto h = Play(cueId, s);
+        if (h) m_activeByCue[cueId] = h.Id;
+        return h;
     }
 
-    void FmodAudioDevice::SetInstancePitch(const PlaybackHandle handle, const float pitch) {
-        if (auto* ch = _channelFromHandle(handle))
-            ch->setPitch(pitch);
+    void FmodAudioDevice::StopCue(const std::string& cueId, StopMode mode) {
+        auto it = m_activeByCue.find(cueId);
+        if (it == m_activeByCue.end()) return;
+        if (FMOD::Channel* ch = _channelFromHandle(PlaybackHandle{ it->second })) {
+            if (mode == StopMode::Immediate) ch->stop();
+            else { ch->setVolume(0.0f); ch->stop(); }
+        }
+        m_activeByCue.erase(it);
     }
 
-    void FmodAudioDevice::SetListener(const ListenerParams& l) {
-        if (!m_system) 
-            return;
-
-        const FMOD_VECTOR   pos{ l.position.x, l.position.y, l.position.z },
-    						vel{ l.velocity.x, l.velocity.y, l.velocity.z },
-							fwd{ l.forward.x,  l.forward.y,  l.forward.z },
-							up { l.up.x,       l.up.y,       l.up.z };
-        m_system->set3DListenerAttributes(0, &pos, &vel, &fwd, &up);
+    bool FmodAudioDevice::IsCuePlaying(const std::string& cueId) const {
+        auto it = m_activeByCue.find(cueId);
+        if (it == m_activeByCue.end()) return false;
+        auto* self = const_cast<FmodAudioDevice*>(this);
+        if (FMOD::Channel* ch = self->_channelFromHandle(PlaybackHandle{ it->second }))
+            return _is_playing(ch);
+        return false;
     }
 
-    void FmodAudioDevice::SetInstancePosition(const PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
+    void FmodAudioDevice::SetInstanceVolume(PlaybackHandle handle, float volume) {
+        if (auto* ch = _channelFromHandle(handle)) ch->setVolume(volume);
+    }
+
+    void FmodAudioDevice::SetInstancePitch(PlaybackHandle handle, float pitch) {
+        if (auto* ch = _channelFromHandle(handle)) ch->setPitch(pitch);
+    }
+
+    void FmodAudioDevice::SetInstancePosition(PlaybackHandle handle, const Vec3& pos, const Vec3& vel) {
         if (auto* ch = _channelFromHandle(handle)) {
-            const FMOD_VECTOR p{ pos.x, pos.y, pos.z },
-        					  v{ vel.x, vel.y, vel.z };
+            const FMOD_VECTOR p{ pos.x, pos.y, pos.z };
+            const FMOD_VECTOR v{ vel.x, vel.y, vel.z };
             ch->set3DAttributes(&p, &v);
         }
     }
 
-    void FmodAudioDevice::SetMasterVolume(const float volume) {
+    void FmodAudioDevice::SetListener(const ListenerParams& l) {
+        if (!m_system) return;
+        const FMOD_VECTOR pos{ l.position.x, l.position.y, l.position.z };
+        const FMOD_VECTOR vel{ l.velocity.x, l.velocity.y, l.velocity.z };
+        const FMOD_VECTOR fwd{ l.forward.x, l.forward.y, l.forward.z };
+        const FMOD_VECTOR up{ l.up.x,      l.up.y,      l.up.z };
+        m_system->set3DListenerAttributes(0, &pos, &vel, &fwd, &up);
+    }
+
+    void FmodAudioDevice::SetMasterVolume(float volume) {
         m_masterVolume = (volume < 0.f) ? 0.f : (volume > 1.f ? 1.f : volume);
         if (m_master) m_master->setVolume(m_masterVolume);
     }
@@ -172,33 +235,58 @@ namespace Audio {
         return m_masterVolume;
     }
 
-    FMOD::Sound* FmodAudioDevice::_getOrCreateSound(const std::string& cueId, const std::string& path, const SoundParams& params) {
-        if (!m_system) 
-            return nullptr;
+    void FmodAudioDevice::GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const {
+        out.clear();
+        out.reserve(m_cues.size());
+        for (const auto& [id, entry] : m_cues)
+            out.emplace_back(id, entry.SourcePath);
+    }
+
+    FMOD::Sound* FmodAudioDevice::_getOrCreateSound(const std::string& cueId,
+        const std::string& path,
+        const SoundParams& params)
+    {
+        if (!m_system) return nullptr;
         if (const auto it = m_cues.find(cueId); it != m_cues.end())
             return it->second.Sound;
 
         FMOD::Sound* s = nullptr;
         auto mode = params.stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
         mode |= params.is3D ? FMOD_3D : FMOD_2D;
-        const FMOD_RESULT r = m_system->createSound(path.c_str(), mode, nullptr, &s);
-        
-        if (r != FMOD_OK) 
+        if (m_system->createSound(path.c_str(), mode, nullptr, &s) != FMOD_OK || !s)
             return nullptr;
 
-        m_cues.emplace(cueId, CueEntry{ s, params });
+        m_cues.emplace(cueId, CueEntry{ s, params, path });
         return s;
     }
 
-    FMOD::Channel* FmodAudioDevice::_channelFromHandle(const PlaybackHandle h) {
-        if (h.Id == 0)
-            return nullptr;
-
+    FMOD::Channel* FmodAudioDevice::_channelFromHandle(PlaybackHandle h) {
+        if (!h) return nullptr;
         const auto it = m_channels.find(h.Id);
-        if (it == m_channels.end())
-            return nullptr;
-
+        if (it == m_channels.end()) return nullptr;
         return it->second;
     }
 
-}
+    FMOD::Sound* FmodAudioDevice::_createSoundFromMemory(const std::string& cueId,
+        const std::string& path,
+        const SoundParams& params)
+    {
+        auto audioBytes = RM.Get<AudioData>(path);
+        if (!audioBytes || !audioBytes->IsValid || audioBytes->Data.empty())
+            return nullptr;
+
+        FMOD_CREATESOUNDEXINFO exinfo{};
+        exinfo.cbsize = sizeof(FMOD_CREATESOUNDEXINFO);
+        exinfo.length = static_cast<unsigned int>(audioBytes->Data.size());
+
+        unsigned int mode = FMOD_OPENMEMORY | (params.is3D ? FMOD_3D : FMOD_2D);
+
+        FMOD::Sound* s = nullptr;
+        const FMOD_RESULT r = m_system->createSound(
+            reinterpret_cast<const char*>(audioBytes->Data.data()), mode, &exinfo, &s);
+        if (r != FMOD_OK || !s) return nullptr;
+
+        return s;
+    }
+
+} // namespace Audio
