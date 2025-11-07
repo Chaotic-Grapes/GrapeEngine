@@ -74,27 +74,35 @@ namespace Engine {
             m_audio->Update();
 
             // --- Scene Update ---
-            m_sceneManager.Update();
             auto* currentScene = m_sceneManager.GetActive();
+            
+            // Fixed timestep accumulator for physics
             if (currentScene) {
-                // Use unscaled delta time for the accumulator
                 m_accumulator += Time::UnscaledDeltaTime();
                 
-                // Prevent accumulator from growing too large
-                // Use FixedDeltaTime * 5 as threshold
+                // Prevent fixed delta time from deadlocking(?)
                 const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
                 if (m_accumulator > maxAccumulator)
                     m_accumulator = maxAccumulator;
 
+                // Run physics at fixed timestep
                 while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
-                    currentScene->OnFixedUpdate();
+                    auto& world = currentScene->GetWorld();
+                    auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
+                    
+                    if (physicsSystem) {
+                        (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+                    }
+
                     m_accumulator -= Time::UnscaledFixedDeltaTime();
                 }
-
-                currentScene->OnUpdate();
-                game.OnUpdate(m_sceneManager);
-                currentScene->OnLateUpdate();
             }
+            
+            // Run all non-physics systems at variable timestep
+            m_sceneManager.Update();
+            
+            // Game-level update hook
+            game.OnUpdate(m_sceneManager);
 
             // --- Update Overlay Service ---
             // This here because it depends on current scene
