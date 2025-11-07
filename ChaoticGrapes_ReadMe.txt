@@ -8,8 +8,9 @@ GrapeEngine is a custom game engine developed for academic and personal projects
 
 ### Prerequisites
 
-- **C++ Compiler**
-- **CMake:** Version 3.15 or later
+- **C++ Compiler** (Visual Studio 2022 or equivalent)
+- **CMake:** Version 3.13 or later
+- **.NET SDK:** Version 9.0 or later (for C# scripting support)
 - **Git:** (for cloning the repository)
 
 ### Cloning the Repository
@@ -30,10 +31,42 @@ cd GrapeEngine
 
 GrapeEngine is a 2D game engine built for educational purposes at DigiPen. Core features include:
 - Entity Component System (ECS) architecture
+- **C# CoreCLR Scripting** - Write game logic in C#
 - 2D Physics with collision detection
 - OpenGL rendering pipeline
 - FMOD audio integration
 - Scene management and serialization
+
+---
+
+## C# Scripting
+
+GrapeEngine supports C# scripting through CoreCLR integration. Game scripts are **separate C# projects** in the `scripts/` folder, for now.
+
+### Quick Start
+
+1. **Create a game script project:**
+   ```powershell
+   cd scripts
+   dotnet new classlib -n MyGame -f net9.0
+   cd MyGame
+   dotnet add reference ../GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj
+   ```
+
+2. **Write scripts:**
+   ```csharp
+   using GrapeEngine.ScriptAPI;
+   
+   namespace MyGame;
+   
+   public class PlayerController : ScriptBehaviour
+   {
+       protected override void OnUpdate()
+       {
+            // Code here
+       }
+   }
+   ```
 
 ---
 
@@ -117,6 +150,9 @@ Run the engine and select a test scene from the menu.
 
 **FMOD Sound System** - Copyright (C) Firelight Technologies Pty Ltd.  
 Licensed under FMOD Engine License.
+
+**.NET CoreCLR** - Copyright (C) .NET Foundation and Contributors.  
+Licensed under the MIT License.
 
 **GLM (OpenGL Mathematics)** - Copyright (C) 2005 - 2014 G-Truc Creation.  
 Licensed under the MIT License.
