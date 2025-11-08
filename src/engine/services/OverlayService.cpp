@@ -1,117 +1,194 @@
-/**
- * @file Overlay.cpp
- * @author Foo Rui Qin
- * @date 2024
- * @brief Implementation of the Overlay system for debug UI management
- * 
- * This file implements the OverlayService class which serves as a system-level wrapper
- * for managing debug UI functionality within the engine's ECS architecture.
- * The implementation provides:
- * 
- * Core Functionality:
- * - ImGui initialization and integration with GLFW/OpenGL backends
- * - DebugUI instance lifecycle management (creation, updates, cleanup)
- * - Audio system integration for real-time debug monitoring
- * - Window management integration for UI rendering context
- * - Conditional compilation support for ImGui features
- * 
- * System Integration:
- * - ECS system interface implementation (OnCreate, OnUpdate)
- * - World reference management for entity debugging
- * - Window manager integration for main window access
- * - Audio system attachment for debug monitoring
- * - Proper resource cleanup and memory management
- * 
- * Conditional Compilation:
- * - Full ImGui implementation when USE_IMGUI is defined
- * - Empty stub implementations when ImGui is not available
- * - Proper destructor handling for ImGui-specific resources
- * - Compile-time feature toggling for different build configurations
- * 
- * The OverlayService system acts as a bridge between the engine's core systems
- * and the debug interface, ensuring proper initialization order and
- * resource management while maintaining clean separation of concerns.
- */
-
 #include "services/OverlayService.h"
-
-#ifdef USE_IMGUI
+#include "services/WindowManager.h"
 #include "services/DebugUI.h"
 #include "services/Input.h"
-#include "services/Window.h"
-#include "services/WindowManager.h"
-#include "scene/SceneManager.h"
-#include <iostream>
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_internal.h>
+#include "core/messaging/MessageTypes.h"
+#include "core/messaging/MessageSystem.h"
+#include "../editor/LevelEditor.h"
+#include "serialization/EntitySerializer.h"
+
+#ifdef USE_IMGUI
 
 namespace Services {
     void OverlayService::Initialize() {
+        // Initialize DebugUI (always available)
+        if (m_world) {
+            m_debugUI = std::make_unique<DebugUI>(m_world);
+            UICommon::InitializeDefaultLayouts();
+        }
+
         if (!m_debugUI)
-            m_debugUI = std::make_unique<DebugUI>();
+            m_debugUI = std::make_unique<DebugUI>(nullptr);
 
         if (!m_initialized) {
-            // Get main window handle and set up ImGUI
             Window* mainWindow = WindowManager::GetMainWindow();
             if (mainWindow) {
-                m_debugUI->Initialize(mainWindow->Handle());
-                if (m_audioDevice)
+                if (m_debugUI)
+                    m_debugUI->Initialize(mainWindow->Handle());
+                if (m_audioDevice && m_debugUI)
                     m_debugUI->AttachAudio(m_audioDevice);
+
+                ImGuiIO& io = ImGui::GetIO();
+                io.IniFilename = "imgui.ini"; // Persist dock layouts and window positions to disk
                 m_initialized = true;
+
+                // Subscribe to window resize to keep editor proportions stable
+                Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
+                    [this](const Messaging::WindowResized& msg) {
+                        if (m_levelEditor) {
+                            m_levelEditor->OnWindowResized(msg.Width, msg.Height);
+                            // Force a rebuild of the docking layout
+                            static_cast<void>(0); // You might need to add a public method to LevelEditor to force layout rebuild
+                        }
+                    }
+                );
+                // Dump component TypeId registry once for copying into prefabs
+                static bool s_dumped = false;
+                if (!s_dumped) {
+                    auto& reg = Serialization::EntitySerializer::Registry();
+                    for (const auto& [tid, info] : reg) {
+                        LOG_DEBUG(std::string("TypeId dump: ") + info.Name + " -> " + std::to_string(tid));
+                    }
+                    s_dumped = true;
+                }
             }
         }
     }
 
     void OverlayService::Update() {
-        // TODO: Still using GLFW KEYS so replace it later
-        if (Input::IsKeyDown(GLFW_KEY_F1))
-            SetEnabled(!IsEnabled());
-        if (!IsEnabled()) return;
+        // Handle deferred LevelEditor rebuild at the start of the frame
+        if (m_pendingLevelEditorRebuild && m_levelEditor) {
+            LevelEditorConfig config;
+            m_levelEditor.reset();
+            m_levelEditor = std::make_unique<LevelEditor>(m_world, config);
+            Window* mainWindow = WindowManager::GetMainWindow();
+            if (mainWindow && m_initialized) {
+                m_levelEditor->Initialize(mainWindow->Handle());
+            }
+            m_pendingLevelEditorRebuild = false;
+        }
 
-		// Ensure DebugUI instance exists
-        if (!m_debugUI)
-            return;
+        if (Input::IsKeyPressed(KEY_F1) && m_debugUI)
+            m_debugUI->SetEnabled(!m_debugUI->IsEnabled());
 
-        // Try to initialize ImGui if not done yet
+        auto* activeScene = m_sceneManager.GetActive();
+
+        // Disable LevelEditor if scene changes (only when targeted to a specific scene)
+        if (m_showLevelEditor && m_levelEditorForScene && activeScene != m_levelEditorForScene) {
+            DisableLevelEditor();
+        }
+
+        // Show LevelEditor when enabled either for a specific scene or globally (scene-less)
+        bool shouldShowLevelEditor = m_showLevelEditor && (
+            m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene)
+            );
+
+        // Initialize LevelEditor only when needed (even without a world)
+        if (shouldShowLevelEditor && !m_levelEditor) {
+            LevelEditorConfig config;
+            m_levelEditor = std::make_unique<LevelEditor>(m_world, config);
+
+            Window* mainWindow = WindowManager::GetMainWindow();
+            if (mainWindow && m_initialized) {
+                m_levelEditor->Initialize(mainWindow->Handle());
+            }
+        }
+
+        if (!m_debugUI && m_world) {
+            m_debugUI = std::make_unique<DebugUI>(m_world);
+        }
+
+        if (!m_debugUI) return;
+
         if (!m_initialized) {
-            // Get main window handle and set up ImGUI
             Window* mainWindow = WindowManager::GetMainWindow();
             if (mainWindow) {
-                m_debugUI->Initialize(mainWindow->Handle());
+                if (m_debugUI)
+                    m_debugUI->Initialize(mainWindow->Handle());
+                if (m_levelEditor && shouldShowLevelEditor)
+                    m_levelEditor->Initialize(mainWindow->Handle());
+                if (m_audioDevice && m_debugUI)
+                    m_debugUI->AttachAudio(m_audioDevice);
                 m_initialized = true;
             }
             else return;
         }
 
-        if (m_audioDevice && !m_debugUI->HasValidAudio())
-			m_debugUI->AttachAudio(m_audioDevice);
+        if (m_audioDevice && m_debugUI && !m_debugUI->HasValidAudio())
+            m_debugUI->AttachAudio(m_audioDevice);
 
-        // Attach/detach scene as needed
-        auto* scene = m_sceneManager.GetActive();
-        if (scene && !m_debugUI->HasValidScene(scene))
-            m_debugUI->AttachScene(scene);
-        else if (m_debugUI->HasValidScene() && !scene)
+        if (activeScene && m_debugUI && !m_debugUI->HasValidScene(activeScene))
+            m_debugUI->AttachScene(activeScene);
+        else if (m_debugUI && m_debugUI->HasValidScene() && !activeScene)
             m_debugUI->DetachScene();
     }
 
     void OverlayService::Render() {
-        // Update UI every frame
-        m_debugUI->NewFrame();
-        m_debugUI->Render();
+        auto* activeScene = m_sceneManager.GetActive();
+        bool shouldShowLevelEditor = m_showLevelEditor && (
+            m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene)
+            );
+
+        // Background clear hack removed; dockspace now draws its own background
+
+        // Start a new ImGui frame via DebugUI (sets up IO and backend state)
+        if (m_debugUI) { m_debugUI->NewFrame(); }
+
+        // LevelEditor takes priority
+        if (m_levelEditor && shouldShowLevelEditor && m_initialized) {
+            m_levelEditor->Update();
+            m_levelEditor->Render();
+        }
+        // DebugUI only when LevelEditor isn't showing
+        else if (m_debugUI && m_debugUI->IsEnabled()) {
+            m_debugUI->Render();
+        }
+
+        ImGui::Render(); // Finalize draw lists for the current frame
+        auto* drawData = ImGui::GetDrawData();
+        if (drawData) {
+            ImGui_ImplOpenGL3_RenderDrawData(drawData); // Submit ImGui draw lists to OpenGL
+        }
     }
 
-    // Prevent memory leaks
     void OverlayService::Terminate() {
-        if (m_debugUI)
+        if (m_debugUI) {
             m_debugUI->Shutdown();
+            m_debugUI->DetachAudio();
+        }
+        if (m_levelEditor) {
+            m_levelEditor.reset();
+        }
+    }
+
+    void OverlayService::EnableLevelEditorForScene(Scenes::Scene* scene) {
+#ifdef USE_IMGUI
+        // Enable for the specified scene; nullptr enables scene-less mode
+        m_showLevelEditor = true;
+        m_levelEditorForScene = scene; // nullptr means scene-less mode
+        LOG_DEBUG(scene ? "LevelEditor enabled for scene" : "LevelEditor enabled (scene-less)");
+#endif
+    }
+
+    void OverlayService::DisableLevelEditor() {
+        m_showLevelEditor = false;
+        m_levelEditorForScene = nullptr;
+
+        if (m_levelEditor) {
+            m_levelEditor.reset();
+        }
+
+        LOG_DEBUG("LevelEditor disabled");
     }
 
 #else
-	 // Non-ImGui implementations
-	void OverlayService::Update() {
-	    // Empty implementation when ImGui is not available
-	}
-
-	void OverlayService::Terminate() {
-	    // Empty implementation when ImGui is not available
-	}
+void OverlayService::Update() {}
+void OverlayService::Render() {}
+void OverlayService::Terminate() {}
+void OverlayService::EnableLevelEditorForScene(Scenes::Scene* scene) {}
+void OverlayService::DisableLevelEditor() {}
 #endif
 }

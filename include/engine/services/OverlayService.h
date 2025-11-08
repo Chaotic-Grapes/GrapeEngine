@@ -65,7 +65,10 @@ namespace Services {
         /**
          * @brief Constructor for Overlay system
          */
-    OverlayService(Scenes::SceneManager& sceneManager) : IService("Overlay Service"), m_sceneManager(sceneManager) { SetEnabled(false); }
+    explicit OverlayService(Scenes::SceneManager& sceneManager) : IService("Overlay Service"), m_sceneManager(sceneManager) { 
+        m_sceneManager(sceneManager);
+        SetEnabled(false); 
+    }
 
 #ifdef USE_IMGUI
         /**
@@ -75,7 +78,7 @@ namespace Services {
          * to prevent memory leaks and ensure clean resource cleanup.
          * Only defined when ImGui is available to avoid linking issues.
          */
-        ~OverlayService() override { Terminate(); }
+        ~OverlayService() override { m_overlayInstance = nullptr; }
 #endif
 
         /**
@@ -116,14 +119,38 @@ namespace Services {
          * real-time monitoring and control.
          */
         void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
+        void SetWorld(ECS::World* world) {
+            if (m_world == world) return;
+            m_world = world;
+#ifdef USE_IMGUI
+            // Propagate world update directly to avoid stale references
+            if (m_levelEditor) {
+                m_levelEditor->SetWorld(m_world);
+            }
+            if (m_debugUI) {
+                m_debugUI->SetWorld(m_world);
+            }
+#endif
+        }
+
+        bool IsGamePlaying() const { return m_levelEditor && m_levelEditor->IsPlaying(); }
+        bool IsStepRequested() const { return m_levelEditor && m_levelEditor->IsStepRequested(); }
+        void ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
+
+        static inline OverlayService* Get() { return m_overlayInstance; }
 
     private:
         Audio::FmodAudioDevice* m_audioDevice = nullptr;  ///< Pointer to audio system for debug monitoring
 		Scenes::SceneManager& m_sceneManager; 		      ///< Reference to the scene manager for world access
+        ECS::World* m_world = nullptr;
 
 #ifdef USE_IMGUI
-        std::unique_ptr<DebugUI> m_debugUI;  ///< Unique pointer to DebugUI instance for memory management
-        bool m_initialized = false;          ///< Flag indicating if ImGui has been initialized
+        std::unique_ptr<DebugUI> m_debugUI;
+        std::unique_ptr<LevelEditor> m_levelEditor;
+        bool m_initialized = false;
+        bool m_showLevelEditor = false;
+        Scenes::Scene* m_levelEditorForScene = nullptr; // nullptr means scene-less mode
+        bool m_pendingLevelEditorRebuild = false;
 #endif
     };
 }

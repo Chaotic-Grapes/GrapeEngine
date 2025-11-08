@@ -1,7 +1,6 @@
 #include "Game.h"
 #include "GraphicsTest.hpp"
 #include "MemoryTest.h"
-#include "ResourceManagerTest.h"
 #include "SandboxGame.h"
 #include "SerializationTest.h"
 #include "core/Application.h"
@@ -12,6 +11,7 @@
 #include "ECSTest.hpp"
 #include "ScriptingTest.hpp"
 #include "PhysicsTest.h"
+#include "EditorTest.h"
 
 // Static test scene manager for engine tests
 static Scenes::TestSceneManager g_testSceneManager;
@@ -26,10 +26,10 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
     std::cout << "Select test scene: \n";
     std::cout << "1. Graphics & Art Pipeline Test" << '\n';
     std::cout << "2. Serialization Check Test" << '\n';
-    std::cout << "3. Memory Tracking Test" << '\n';
-	std::cout << "4. Entity Component System Test" << '\n';
-	std::cout << "5. C# Scripting System Test" << '\n';
-    std::cout << "6. Physics & Collision System Test" << '\n';
+	std::cout << "3. Entity Component System Test" << '\n';
+	std::cout << "4. C# Scripting System Test" << '\n';
+    std::cout << "5. Physics & Collision System Test" << '\n';
+    std::cout << "6. Open Level Editor" << '\n';
 
     int choice;
     std::cin >> choice;
@@ -52,29 +52,33 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
             break;
         }
         case 3: {
-            LOG_INFO("Starting Memory Tracking Test...");
-            RunMemoryTests();
-            break;
-        }
-        case 4: {
             LOG_INFO("Starting Entity Component System Test...");
             size_t ecsTest = g_testSceneManager.AddScene(new Sandbox::ECSTestScene());
             g_testSceneManager.SetActive(ecsTest);
 
             break;
         }
-        case 5: {
+        case 4: {
             LOG_INFO("Starting C# Scripting System Test...");
             size_t scriptingTest = g_testSceneManager.AddScene(new Sandbox::ScriptingTestScene());
             g_testSceneManager.SetActive(scriptingTest);
 
             break;
         }
-        case 6: { 
+        case 5: { 
             LOG_INFO("Starting Physics & Collision System Test...");
             size_t PCTest = g_testSceneManager.AddScene(new Sandbox::PhysicsTestScene());
             g_testSceneManager.SetActive(PCTest);
 
+            break;
+        }
+        case 6: {
+            LOG_INFO("Starting Level Editor (scene-less startup)...");
+            const auto& config = Engine::CORE->GetConfig();
+            CREATE_WINDOW("Level Editor", config.WindowConfig.Width, config.WindowConfig.Height);
+            if (auto* overlay = Services::OverlayService::Get()) {
+                overlay->EnableLevelEditorForScene(nullptr);
+            }
             break;
         }
         default: {
