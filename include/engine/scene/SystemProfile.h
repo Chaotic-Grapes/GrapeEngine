@@ -41,11 +41,11 @@ namespace Scenes {
      * Example JSON representation:
      * @code{.json}
      * {
-     *   "systems": [
-     *     { "name": "Physics", "enabled": true },
-     *     { "name": "Animation", "enabled": true },
-     *     { "name": "Render", "enabled": true },
-     *     { "name": "Debug", "enabled": false }
+     *   "Systems": [
+     *     { "Name": "Physics", "Enabled": true },
+     *     { "Name": "Animation", "Enabled": true },
+     *     { "Name": "Render", "Enabled": true },
+     *     { "Name": "Debug", "Enabled": false }
      *   ]
      * }
      * @endcode
