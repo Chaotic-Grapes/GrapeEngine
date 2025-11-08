@@ -19,6 +19,7 @@ Implements the LevelEditor class which orchestrates all editor panels.
 // Include internal ImGui for docking builder
 #include <imgui_internal.h>
 #include <core/Application.h>
+#include "services/Time.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
@@ -62,7 +63,7 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &centerTopSection); // Hierarchy strip
 
     ImGuiID centerControlsNode, centerViewportNode;
-    // Split center area vertically: thin controls bar (15.4%), viewport below
+    // Split center area vertically: controls bar (~15.4%), viewport below
     ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Up, 0.154f, &centerControlsNode, &centerViewportNode); // Controls above viewport
 
     // Map panels to target nodes to realize the layout
@@ -245,30 +246,31 @@ void LevelEditor::Update() {
                         m_convertedBoxes.insert(e.Index);
                     });
                 }
+                // Ensure simulation runs normally when stopped
+                Time::TimeScale(1.0f);
+            } else if (current == Playback::GameState::Paused) {
+                // Pause simulation by zeroing time scale
+                Time::TimeScale(0.0f);
+            } else if (current == Playback::GameState::Playing) {
+                // Resume simulation at normal speed
+                Time::TimeScale(1.0f);
             }
             // Playing/Paused: keep existing camera behavior; no toggling here
             m_lastGameState = current;
         }
     }
 
-    // Convert newly added 2D shape sizes from pixels to world units
-    // This runs only during editing (not playing) and converts once per entity
+    // Restore automatic pixel->world conversion so newly added entities
+    // use world units consistent with renderer/camera.
     if (!IsPlaying() && m_world) {
-        // Positions: convert LocalTransform X/Y if they look like pixels (heuristic)
         m_world->Each<ECS::Components::LocalTransform>([&](ECS::Entity e, ECS::Components::LocalTransform& tr) {
             if (m_convertedPositions.find(e.Index) == m_convertedPositions.end()) {
-                const float absX = std::abs(tr.Position.X);
-                const float absY = std::abs(tr.Position.Y);
-                // If position seems like pixel coordinates, convert once
-                if (absX > 50.0f || absY > 50.0f) {
-                    tr.Position.X = graphicsConfig::PixelsToWorld(tr.Position.X);
-                    tr.Position.Y = graphicsConfig::PixelsToWorld(tr.Position.Y);
-                }
+                tr.Position.X = graphicsConfig::PixelsToWorld(tr.Position.X);
+                tr.Position.Y = graphicsConfig::PixelsToWorld(tr.Position.Y);
                 m_convertedPositions.insert(e.Index);
             }
         });
 
-        // Circles: radius
         m_world->Each<ECS::Components::ShapeCircle2D>([&](ECS::Entity e, ECS::Components::ShapeCircle2D& circle) {
             if (m_convertedCircles.find(e.Index) == m_convertedCircles.end()) {
                 circle.Radius = graphicsConfig::PixelsToWorld(circle.Radius);
@@ -276,7 +278,6 @@ void LevelEditor::Update() {
             }
         });
 
-        // Boxes: half extents (x and y)
         m_world->Each<ECS::Components::ShapeBox2D>([&](ECS::Entity e, ECS::Components::ShapeBox2D& box) {
             if (m_convertedBoxes.find(e.Index) == m_convertedBoxes.end()) {
                 box.HalfExtents.X = graphicsConfig::PixelsToWorld(box.HalfExtents.X);
@@ -324,8 +325,8 @@ void LevelEditor::Render() {
         ImGui::PushFont(m_mainFont);
         ImGui::Begin("Property Editor");
         ImGui::TextDisabled("No scene attached"); // Inform user about missing scene
-        ImGui::End();
         ImGui::PopFont();
+        ImGui::End();
     }
 }
 

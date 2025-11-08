@@ -212,6 +212,22 @@ namespace ECS {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
+    void RendererSystem::BindWorld(World& world) {
+        // Maintain a single EditorCamera instance; rebind to the new world instead of recreating
+        if (!m_editorCamera) {
+            m_editorCamera = std::make_unique<Engine::EditorCamera>(world);
+        }
+        else {
+            m_editorCamera->BindWorld(world);
+        }
+
+        if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
+            // Keep editor camera usage consistent across scenes
+            m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
+            m_cameraOrthoSize = m_editorCamera->GetCameraComponent()->OrthoSize;
+        }
+    }
+
     glm::vec2 RendererSystem::CalculateAnchoredPosition(
         const Components::LocalTransform& transform,
         Components::TextAnchor anchor,
@@ -277,7 +293,7 @@ namespace ECS {
         // ============================================================
         // 1. Toggle or cycle camera
         // ============================================================
-        if (Input::IsKeyPressed(KEY_C)) {
+        if (!m_lockEditorCamera && Input::IsKeyPressed(KEY_C)) {
             // Count available cameras
             bool hasSceneCamera = false;
 
@@ -317,7 +333,17 @@ namespace ECS {
         // ============================================================
         // 2. Use EditorCamera if active, otherwise ECS camera
         // ============================================================
+        if (m_lockEditorCamera) {
+            // Hard-lock: always use editor camera
+            m_useEditorCamera = true;
+            if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
+                m_editorCamera->GetCameraComponent()->Active = true;
+            }
+        }
+
         if (m_useEditorCamera && m_editorCamera) {
+            // Respect editor UI hover: only process input when viewport is hovered
+            m_editorCamera->SetAllowInput(m_editorInputEnabled);
             m_editorCamera->Update(Time::DeltaTime());
             view = m_editorCamera->GetViewMatrix();
             projection = m_editorCamera->GetProjectionMatrix();
@@ -885,12 +911,12 @@ namespace ECS {
 
                 m_renderer->endFrame();
 
-                // Read pixel at mouse position (async)
+                // Read pixel at mouse position (async) using window coordinates
                 glm::dvec2 mousePos;
                 Input::GetMousePosition(mousePos.x, mousePos.y);
-
+                const auto& win = WindowManager::GetMainWindow();
                 int x = static_cast<int>(mousePos.x);
-                int y = m_pickingFBO.height - static_cast<int>(mousePos.y); // Flip Y
+                int y = static_cast<int>(static_cast<double>(win->Height()) - mousePos.y); // Flip Y to GL origin
 
                 static bool firstFrame = true;
                 if (!firstFrame) {

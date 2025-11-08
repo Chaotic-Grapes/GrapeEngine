@@ -212,7 +212,7 @@ namespace Engine {
             const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
 
             // Calculate impulse scalar using standard impulse equation:
-            // j = -(1 + e) * (Vr • n) / (1/mA + 1/mB)
+            // j = -(1 + e) * (Vr ï¿½ n) / (1/mA + 1/mB)
             const float j = -(1.0f + restitution) * normalVelocity / invMassSum;
 
             // Impulse vector in direction of collision normal
@@ -240,7 +240,7 @@ namespace Engine {
                     tangent = tangent / std::sqrt(tangentLengthSquared);
 
                     // Compute friction impulse magnitude:
-                    // jt = -(Vr • t) / (1/mA + 1/mB)
+                    // jt = -(Vr ï¿½ t) / (1/mA + 1/mB)
                     const float jt = -Dot(newRelativeVelocity, tangent) / invMassSum;
 
                     // Clamp friction impulse to the Coulomb friction cone

@@ -188,49 +188,49 @@ void Playback::Render() {
 void Playback::_saveWorldState() {
     if (!HasValidWorld()) return;
 
-    LOG_INFO("Saving world state...");
+    LOG_INFO("Saving world state.");
 
-    // Collect all entities and serialize them
     nlohmann::json worldJson = nlohmann::json::array();
     size_t entityCount = 0;
 
-    // Use World's Each() to iterate all entities
     m_world->Each([&](ECS::Entity entity) {
-        // Skip internal editor camera entity to avoid duplication and preserve editor state
         if (m_world->Has<ECS::Components::Name>(entity)) {
             const auto& name = m_world->Get<ECS::Components::Name>(entity);
-            if (std::strcmp(name.Value, "Editor Camera") == 0) {
-                return; // do not include in saved snapshot
+
+            // --- FIX: skip both variants of the editor camera name ---
+            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
+                std::strcmp(name.Value, "Editor Camera") == 0)
+            {
+                return;
             }
         }
 
-        // Serialize the entity (including all components and their data)
         auto entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
-        // Add serialized entity to the world snapshot
         worldJson.push_back(entityJson);
-        entityCount++;
+        ++entityCount;
         });
 
-    // Store the snapshot in a member variable for later restoration
     m_savedWorldState = worldJson;
     LOG_INFO("Saved " << entityCount << " entities");
 }
 
-// Restore the world state to previously saved snapshot
 void Playback::_restoreWorldState() {
     if (!HasValidWorld() || m_savedWorldState.empty()) {
         LOG_WARNING("No saved state to restore");
         return;
     }
 
-    LOG_INFO("Restoring world state...");
+    LOG_INFO("Restoring world state.");
 
-    // Delete all current entities except the internal editor camera
     std::vector<ECS::Entity> allEntities;
     m_world->Each([&](ECS::Entity e) {
         if (m_world->Has<ECS::Components::Name>(e)) {
             const auto& name = m_world->Get<ECS::Components::Name>(e);
-            if (std::strcmp(name.Value, "Editor Camera") == 0) {
+
+            // --- FIX: keep the editor camera, whichever way it's named ---
+            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
+                std::strcmp(name.Value, "Editor Camera") == 0)
+            {
                 return; // keep editor camera
             }
         }
@@ -241,13 +241,13 @@ void Playback::_restoreWorldState() {
         m_world->Destroy(e);
     }
 
-    // Recreate from saved JSON (editor camera was intentionally excluded from saved snapshot)
     for (const auto& entityJson : m_savedWorldState) {
         Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
     }
 
     LOG_INFO("World restored");
 }
+
 
 // Query if the game is currently playing
 bool Playback::IsPlaying() const {

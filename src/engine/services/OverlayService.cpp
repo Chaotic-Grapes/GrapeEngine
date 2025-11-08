@@ -63,12 +63,14 @@ namespace Services {
         }
     }
 
+    // Playback state helpers
+    // Revert to requiring an active LevelEditor for playback queries.
     bool OverlayService::IsGamePlaying() const {
-        return m_levelEditor && m_levelEditor->IsPlaying();
+        return (m_levelEditor) && m_levelEditor->IsPlaying();
     }
 
     bool OverlayService::IsStepRequested() const {
-        return m_levelEditor && m_levelEditor->IsStepRequested();
+        return (m_levelEditor) && m_levelEditor->IsStepRequested();
     }
 
     void OverlayService::ClearStepRequest() const {
@@ -219,6 +221,7 @@ void OverlayService::Render() {}
 void OverlayService::Terminate() {}
 void OverlayService::EnableLevelEditorForScene(Scenes::Scene* scene) {}
 void OverlayService::DisableLevelEditor() {}
+// In non-IMGUI builds, no playback UI is available; report not playing.
 bool OverlayService::IsGamePlaying() const { return false; }
 bool OverlayService::IsStepRequested() const { return false; }
 void OverlayService::ClearStepRequest() const {}

@@ -47,6 +47,7 @@
 #include "helpers/EntityUtils.h"
 #include <iostream>
 #include "../engine/audio/FmodAudioDevice.h"
+#include "services/OverlayService.h"
 
     extern Audio::FmodAudioDevice* gAudioDevice;    
 
@@ -303,6 +304,20 @@ namespace ECS {
     void PhysicsSystem::Update(World& world, const float dt) {
         if (!Engine::Physics::IsEnabled()) return;
         if (dt <= 0.0f) return;
+
+        // Integrate playback controls: honor Play/Pause/Step from the overlay
+        // If the overlay is present and the game is paused with no step request, skip physics
+        {
+            using Services::OverlayService;
+            OverlayService* overlay = OverlayService::Get();
+            if (overlay) {
+                const bool isPlaying = overlay->IsGamePlaying();
+                const bool stepRequested = overlay->IsStepRequested();
+                if (!isPlaying && !stepRequested) {
+                    return; // paused/stopped with no step: do not advance physics
+                }
+            }
+        }
 
         // 0) Choose substep count; make it a tunable or cvar if you like.
         const int   substeps = 3;                         //higher = more stable, slower
@@ -567,6 +582,19 @@ namespace ECS {
             }
 
             // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
+        }
+
+        // If we ran a single-step while paused, clear the request so it doesn't repeat
+        {
+            using Services::OverlayService;
+            OverlayService* overlay = OverlayService::Get();
+            if (overlay) {
+                const bool isPlaying = overlay->IsGamePlaying();
+                const bool stepRequested = overlay->IsStepRequested();
+                if (!isPlaying && stepRequested) {
+                    overlay->ClearStepRequest();
+                }
+            }
         }
     }
 }// namespace ECS

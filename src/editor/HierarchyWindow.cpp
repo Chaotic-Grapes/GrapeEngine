@@ -55,6 +55,7 @@ void HierarchyWindow::SetWorld(ECS::World* world) {
 
 void HierarchyWindow::Render() {
     ImGui::Begin("Hierarchy");
+    if (m_mainFont) ImGui::PushFont(m_mainFont);
 
     bool noScene = true;
     if (Engine::CORE) {
@@ -63,14 +64,15 @@ void HierarchyWindow::Render() {
     }
     if (noScene) {
         ImGui::TextDisabled("No scene attached");
+        if (m_mainFont) ImGui::PopFont();
         ImGui::End();
         return;
     }
 
-    ImGui::Text("Create New Object");
-    static char nameBuffer[128] = "NewObject";
+    ImGui::Text("Create New Entity");
+    static char nameBuffer[128] = "NewEntity";
     ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.5f);
-    ImGui::InputText("##NewObjectName", nameBuffer, sizeof(nameBuffer));
+    ImGui::InputText("##NewEntityName", nameBuffer, sizeof(nameBuffer));
 
     ImGui::SameLine();
     if (ImGui::Button("Add") && strlen(nameBuffer) > 0) {
@@ -98,8 +100,9 @@ void HierarchyWindow::Render() {
         entityCount++;
         });
 
-    ImGui::Text("Objects (%zu)", entityCount);
+    ImGui::Text("Entities (%zu)", entityCount);
 
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 3));
     ImGui::BeginChild("HierarchyTree", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2), true);
 
     // Get fresh root entities list every frame
@@ -128,6 +131,7 @@ void HierarchyWindow::Render() {
     }
 
     ImGui::EndChild();
+    ImGui::PopStyleVar();
 
     if (ImGui::BeginDragDropTarget()) {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
@@ -160,6 +164,7 @@ void HierarchyWindow::Render() {
         if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
     }
 
+    if (m_mainFont) ImGui::PopFont();
     ImGui::End();
 }
 
@@ -188,7 +193,7 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
     }
     std::string label = oss.str();
 
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding;
     if (!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;
     if (m_selectedEntityId == entityId) flags |= ImGuiTreeNodeFlags_Selected;
 
@@ -310,7 +315,9 @@ std::vector<EntityId> HierarchyWindow::_getChildren(EntityId parentId) {
     if (parentEntity.IsNull()) return children;
 
     m_world->ForChildren(parentEntity, [&](ECS::Entity child) {
-        children.push_back(child.Index);
+        if (m_world->IsAlive(child)) {
+            children.push_back(child.Index);
+        }
         });
     // Children come in newest-first from the ECS; reverse to show oldest-first
     std::reverse(children.begin(), children.end());
@@ -340,11 +347,26 @@ void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, E
 
         bool hasName = false;
         bool hasLocalTransform = false;
-        for (const auto& comp : prefabJson["Components"]) {
-            if (!comp.contains("TypeName") || !comp["TypeName"].is_string())
-                continue;
 
-            if (comp["TypeName"] == "ECS::Components::Name") {
+        // First pass: handle Name component (supports TypeName or legacy Type, short or fully-qualified)
+        for (const auto& comp : prefabJson["Components"]) {
+            // Read type using either "TypeName" or legacy "Type"
+            std::string typeRaw;
+            if (comp.contains("TypeName") && comp["TypeName"].is_string()) {
+                typeRaw = comp["TypeName"].get<std::string>();
+            } else if (comp.contains("Type") && comp["Type"].is_string()) {
+                typeRaw = comp["Type"].get<std::string>();
+            } else {
+                continue;
+            }
+
+            // Normalize to fully-qualified ECS component name
+            std::string typeName = typeRaw;
+            if (typeName.rfind("ECS::Components::", 0) != 0) {
+                typeName = std::string("ECS::Components::") + typeName;
+            }
+
+            if (typeName == "ECS::Components::Name") {
                 hasName = true;
                 auto& nameComp = m_world->Add<ECS::Components::Name>(instance);
                 if (comp.contains("Data") && comp["Data"].is_object() &&
@@ -357,18 +379,31 @@ void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, E
             }
         }
 
+        // Second pass: add other components (supports TypeName or legacy Type, short or fully-qualified)
         for (const auto& comp : prefabJson["Components"]) {
-            if (!comp.contains("TypeName") || !comp["TypeName"].is_string())
+            // Read type using either "TypeName" or legacy "Type"
+            std::string typeRaw;
+            if (comp.contains("TypeName") && comp["TypeName"].is_string()) {
+                typeRaw = comp["TypeName"].get<std::string>();
+            } else if (comp.contains("Type") && comp["Type"].is_string()) {
+                typeRaw = comp["Type"].get<std::string>();
+            } else {
                 continue;
-            if (comp["TypeName"] == "ECS::Components::Name") continue;
+            }
 
-            std::string typeName = comp["TypeName"].get<std::string>();
+            // Normalize to fully-qualified ECS component name
+            std::string typeName = typeRaw;
+            if (typeName.rfind("ECS::Components::", 0) != 0) {
+                typeName = std::string("ECS::Components::") + typeName;
+            }
+
+            if (typeName == "ECS::Components::Name") continue;
+
             auto compData = (comp.contains("Data") && comp["Data"].is_object())
                 ? comp["Data"]
                 : nlohmann::json::object();
 
             // Use a file-scope templated helper to avoid MSVC restriction on local class templates
-
             if (AddComponentIfMatch<ECS::Components::LocalTransform>(m_world, instance, typeName, "ECS::Components::LocalTransform", compData)) { hasLocalTransform = true; continue; }
             if (AddComponentIfMatch<ECS::Components::SpriteRenderer2D>(m_world, instance, typeName, "ECS::Components::SpriteRenderer2D", compData)) continue;
             if (AddComponentIfMatch<ECS::Components::Rigidbody2D>(m_world, instance, typeName, "ECS::Components::Rigidbody2D", compData)) continue;

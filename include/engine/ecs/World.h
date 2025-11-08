@@ -123,10 +123,13 @@ namespace ECS {
 		 * @return bool True if the entity is alive; false otherwise
          */
         bool IsAlive(const Entity e) const {
-            // How to check if an entity is alive:
-            // An entity is considered alive if its index is within the valid range
-            // and its generation number matches the current generation.
-            return e.Index < m_generations.size() && m_generations[e.Index] == e.Generation;
+            // An entity is considered alive if:
+            // - its index is within the valid range,
+            // - its generation number matches the current generation, and
+            // - it currently resides in an archetype (i.e., has a valid location).
+            if (e.Index >= m_generations.size()) return false;
+            if (m_generations[e.Index] != e.Generation) return false;
+            return m_locations[e.Index].ArchetypePtr != nullptr;
         }
 
         /**
@@ -147,7 +150,11 @@ namespace ECS {
          * @note Assumes the entity is alive, behavior is undefined for dead entities.
          */
         void Destroy(const Entity e) {
-			// Assume entity is alive
+            // Assume entity is alive
+            // If entity participates in hierarchy, unlink it first
+            if (Has<Parent>(e)) {
+                _onComponentRemoving(e, TypeIdOf<Parent>());
+            }
 
             // Lookup location and remove from archetype if present
             auto &loc = m_locations[e.Index];

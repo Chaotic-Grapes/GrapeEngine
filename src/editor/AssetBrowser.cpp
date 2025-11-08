@@ -239,7 +239,8 @@ void AssetBrowser::Render() {
 
     // Reserve space for status bar at bottom
     float windowWidth = ImGui::GetContentRegionAvail().x;
-    float statusBarHeight = 26.0f;
+    // Slightly shorten the status bar to give the content area a bit more height
+    float statusBarHeight = 24.0f;
 
     // Content region above status bar (fills remaining height; docking preserves split ratios)
     // Child fills remaining height; negative height reserves space for the fixed status bar

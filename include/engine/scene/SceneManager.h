@@ -303,6 +303,10 @@ namespace Scenes {
                 if (!entry.Enabled)
                     continue;
 
+                // Physics runs on a fixed timestep in Application; skip here to avoid double updates
+                if (entry.Name == "Physics")
+                    continue;
+
                 auto* systemFunc = SystemRegistry::Get(entry.Name);
                 if (systemFunc) {
                     Profiler::Get().BeginScope(entry.Name.c_str());

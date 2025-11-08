@@ -18,7 +18,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/CrashDumping.h"
 #include "core/Profiler.h"
 #include "ecs/systems/PhysicsSystem.h"
+#include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/AnimationSystem.h"
 #include "scene/Scene.h"
+#include "scene/SystemRegistry.h"
 #include "services/Input.h"
 #include "services/Time.h"
 #include "services/WindowManager.h"
@@ -61,6 +64,23 @@ namespace Engine {
 		// Initialize services
 		_initializeServices();
 
+        // Register core ECS systems once (Physics at fixed step, others variable)
+        // Physics
+        Scenes::SystemRegistry::Register("Physics", [](ECS::World& w, float dt) {
+            ECS::PhysicsSystem::Update(w, dt);
+        });
+        // Animation
+        Scenes::SystemRegistry::Register("Animation", [](ECS::World& w, float dt) {
+            ECS::AnimationSystem::Update(w, dt);
+        });
+        // Render (non-static system): use a persistent instance
+        Scenes::SystemRegistry::Register("Render", [](ECS::World& w, float dt) {
+            static ECS::RendererSystem s_renderer;
+            s_renderer.Initialize(w);
+            s_renderer.BindWorld(w);
+            s_renderer.Update(w, dt);
+        });
+
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
 
@@ -82,25 +102,37 @@ namespace Engine {
             // --- Scene Update ---
             auto* currentScene = m_sceneManager.GetActive();
             
-            // Fixed timestep accumulator for physics
+            // Fixed timestep accumulator for physics, gated by playback controls
             if (currentScene) {
-                m_accumulator += Time::UnscaledDeltaTime();
-                
-                // Prevent fixed delta time from deadlocking(?)
-                const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
-                if (m_accumulator > maxAccumulator)
-                    m_accumulator = maxAccumulator;
+                const bool isPlaying = (m_overlay && m_overlay->IsGamePlaying());
+                const bool stepRequested = (m_overlay && m_overlay->IsStepRequested());
 
-                // Run physics at fixed timestep
-                while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
-                    auto& world = currentScene->GetWorld();
-                    auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
-                    
-                    if (physicsSystem) {
-                        (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+                auto& world = currentScene->GetWorld();
+                auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
+
+                if (physicsSystem) {
+                    if (isPlaying) {
+                        m_accumulator += Time::UnscaledDeltaTime();
+
+                        // Prevent fixed delta time from deadlocking(?)
+                        const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
+                        if (m_accumulator > maxAccumulator)
+                            m_accumulator = maxAccumulator;
+
+                        // Run physics at fixed timestep while playing
+                        while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
+                            (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+                            m_accumulator -= Time::UnscaledFixedDeltaTime();
+                        }
                     }
-
-                    m_accumulator -= Time::UnscaledFixedDeltaTime();
+                    else if (stepRequested) {
+                        // Run exactly one fixed-step when paused and step requested
+                        (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+                        if (m_overlay) m_overlay->ClearStepRequest();
+                    }
+                    else {
+                        // Not playing and no step: do not accumulate or run physics
+                    }
                 }
             }
             

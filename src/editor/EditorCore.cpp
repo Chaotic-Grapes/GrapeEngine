@@ -56,69 +56,20 @@ void EditorCore::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsF
         m_rendererSystem = std::make_shared<ECS::RendererSystem>();
         m_rendererSystem->Initialize(*m_world);
         m_rendererSystem->BindWorld(*m_world);
+        // Level Editor: start with the EditorCamera active in the viewport,
+        // and lock it so 'C' toggle is disabled.
+        m_rendererSystem->ForceUseEditorCamera(true);
+        m_rendererSystem->SetEditorCameraLocked(true);
     }
-
-    // Subscribe to DebugMessage to surface transient warnings in the viewport toolbar
-    m_debugMsgSubscription = Messaging::MessageSystem::Subscribe<Messaging::DebugMessage>(
-        [this](const Messaging::DebugMessage& msg) {
-            if (msg.Source == std::string("RendererSystem") &&
-                msg.LogLevel == Messaging::DebugMessage::Level::Warning) {
-                // Show warning for a short duration
-                m_cameraToggleWarning = msg.Message;
-                m_cameraWarningExpiry = Time::ElapsedTime() + 3.0;
-            }
-        }
-    );
+    // Camera warnings removed - editor always uses editor camera
 }
 
 void EditorCore::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
 
-    static bool isDragging = false;
-    static double lastMouseX = 0.0;
-    static double lastMouseY = 0.0;
-
     // Keep selection in sync with renderer picking only when hovering the viewport
     if (m_rendererSystem && m_isViewportHovered) {
         m_selectedEntityId = m_rendererSystem->GetSelectedEntityID();
-    }
-
-    // Drag when hovering viewport and holding LMB on a selected entity
-    if (m_isViewportHovered && Input::IsMouseDown(GLFW_MOUSE_BUTTON_LEFT) && m_selectedEntityId != 0) {
-        double xPos, yPos;
-        Input::GetMousePosition(xPos, yPos);
-
-        if (!isDragging) {
-            isDragging = true;
-            lastMouseX = xPos;
-            lastMouseY = yPos;
-        } else {
-            const double dx = xPos - lastMouseX;
-            const double dy = yPos - lastMouseY;
-            lastMouseX = xPos;
-            lastMouseY = yPos;
-
-            const auto window = WindowManager::GetMainWindow();
-            if (window && m_rendererSystem) {
-                const float screenW = static_cast<float>(window->Width());
-                const float screenH = static_cast<float>(window->Height());
-                const float aspect = screenW / screenH;
-                const float worldHeight = m_rendererSystem->GetCameraOrthoSize();
-                const float worldWidth = worldHeight * aspect;
-
-                const float worldDeltaX = static_cast<float>(-(dx / screenW) * worldWidth);
-                const float worldDeltaY = static_cast<float>((dy / screenH) * worldHeight);
-
-                ECS::Entity selectedEntity{ m_selectedEntityId, 0 };
-                if (m_world->IsAlive(selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(selectedEntity)) {
-                    auto& transform = m_world->Get<ECS::Components::LocalTransform>(selectedEntity);
-                    transform.Position.X += worldDeltaX;
-                    transform.Position.Y += worldDeltaY;
-                }
-            }
-        }
-    } else {
-        isDragging = false;
     }
 }
 
@@ -153,11 +104,12 @@ void EditorCore::ShowEditorWindows() {
     if (m_world && m_rendererSystem) {
         m_rendererSystem->Update(*m_world, static_cast<float>(Time::DeltaTime()));
     }
+
     _showViewport();
 }
 
 void EditorCore::_showMainMenu() {
-    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ImVec4(0.10f, 0.10f, 0.10f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ImVec4(0.12f, 0.12f, 0.13f, 1.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
     if (ImGui::BeginMainMenuBar()) {
@@ -225,54 +177,8 @@ void EditorCore::_showViewport() {
         auto* activeScene = sm.GetActive();
 
         if (activeScene) {
-            // Toolbar: basic viewport controls and camera toggle hint
-            {
-                ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.12f, 0.12f, 1.0f));
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
-                ImGui::BeginChild("ViewportToolbar", ImVec2(-1, 28), false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-                // Runtime indicator: show which camera is driving the viewport
-                if (m_rendererSystem) {
-                    const bool usingEditor = m_rendererSystem->IsUsingEditorCamera();
-                    ImVec4 camColor = usingEditor ? ImVec4(0.40f, 0.70f, 1.00f, 1.0f) : ImVec4(0.25f, 0.85f, 0.45f, 1.0f);
-                    const char* camLabel = usingEditor ? "Camera: Editor" : "Camera: Scene";
-                    ImGui::TextColored(camColor, "%s", camLabel);
-                    ImGui::SameLine();
-                }
-                ImGui::TextDisabled("Press C to toggle Editor/Scene camera | LMB: Pan | RMB: Orbit | Scroll: Zoom");
-                ImGui::EndChild();
-                ImGui::PopStyleVar();
-                ImGui::PopStyleColor();
-            }
 
-            // Small floating popup for transient warnings (e.g., no active Camera3D)
-            if (m_cameraWarningExpiry > 0.0) {
-                if (Time::ElapsedTime() >= m_cameraWarningExpiry) {
-                    m_cameraWarningExpiry = 0.0;
-                    m_cameraToggleWarning.clear();
-                } else {
-                    // Center the popup inside the viewport window
-                    ImVec2 winPos = ImGui::GetWindowPos();
-                    ImVec2 contentMin = ImGui::GetWindowContentRegionMin();
-                    ImVec2 contentMax = ImGui::GetWindowContentRegionMax();
-                    ImVec2 center = ImVec2(
-                        winPos.x + (contentMin.x + contentMax.x) * 0.5f,
-                        winPos.y + (contentMin.y + contentMax.y) * 0.5f
-                    );
-
-                    ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-                    ImGui::SetNextWindowBgAlpha(0.95f);
-                    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
-                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing;
-                    ImGui::Begin("Camera Warning##Popup", nullptr, flags);
-                    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f), "%s", m_cameraToggleWarning.c_str());
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Dismiss##CameraWarn")) {
-                        m_cameraWarningExpiry = 0.0;
-                        m_cameraToggleWarning.clear();
-                    }
-                    ImGui::End();
-                }
-            }
+            // Camera warning popup removed - editor always uses editor camera
 
             ImVec2 viewportSize = ImGui::GetContentRegionAvail();
             GLuint sceneTexture = 0;
@@ -287,14 +193,21 @@ void EditorCore::_showViewport() {
                 // Track hover and absolute rect for picking/dragging
                 m_isViewportHovered = ImGui::IsItemHovered();
                 if (m_rendererSystem) {
-                    const ImVec2 min = ImGui::GetItemRectMin();
-                    const ImVec2 max = ImGui::GetItemRectMax();
-                    const float x = min.x;
-                    const float y = min.y;
-                    const float w = max.x - min.x;
-                    const float h = max.y - min.y;
+                    // Ensure editor camera and picking only process input when hovered
+                    m_rendererSystem->SetEditorInputEnabled(m_isViewportHovered);
                 }
-            } else {
+
+                // Overlay interaction help text on top-left of the viewport image
+                // Use the disabled text color to keep the hint subtle
+                const ImVec2 imgMin = ImGui::GetItemRectMin();
+                ImU32 hintCol = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+                ImGui::GetWindowDrawList()->AddText(
+                    ImVec2(imgMin.x + 8.0f, imgMin.y + 8.0f),
+                    hintCol,
+                    "LMB Drag: Pan | RMB Drag: Orbit | Scroll Wheel: Zoom"
+                );
+            }
+            else {
                 ImGui::TextDisabled("Renderer not initialized or HDR texture missing");
             }
 
@@ -305,8 +218,8 @@ void EditorCore::_showViewport() {
         }
     }
 
-    ImGui::End();
     ImGui::PopFont();
+    ImGui::End();
 }
 
 void EditorCore::AddEntity(const std::string& name, EntityId parentId) {
@@ -414,7 +327,8 @@ void EditorCore::CloneEntity(EntityId id) {
                 std::string typeName;
                 if (comp.contains("TypeName") && comp["TypeName"].is_string()) {
                     typeName = comp["TypeName"].get<std::string>();
-                } else if (comp.contains("Type") && comp["Type"].is_string()) {
+                }
+                else if (comp.contains("Type") && comp["Type"].is_string()) {
                     typeName = comp["Type"].get<std::string>();
                 }
                 if (typeName == "ECS::Components::Name" || typeName == "Name") {
@@ -431,7 +345,7 @@ void EditorCore::CloneEntity(EntityId id) {
                 sanitizeEntityJson(child);
             }
         }
-    };
+        };
     sanitizeEntityJson(sourceHierarchy);
 
     std::function<ECS::Entity(const nlohmann::json&, ECS::Entity)> deserializeHierarchy =
@@ -502,7 +416,12 @@ void EditorCore::SetWorld(ECS::World* world) {
         }
         // Bind the current world every time (creates/activates editor camera exactly once)
         m_rendererSystem->BindWorld(*m_world);
-    } else {
+        // Level Editor: ensure editor camera is the default on new/open scenes,
+        // and keep it locked so 'C' toggle is disabled.
+        m_rendererSystem->ForceUseEditorCamera(true);
+        m_rendererSystem->SetEditorCameraLocked(true);
+    }
+    else {
         m_rendererSystem.reset();
     }
 }
@@ -565,7 +484,9 @@ std::vector<EntityId> EditorCore::_getChildren(EntityId parentId) const {
     if (parentEntity.IsNull()) return children;
 
     m_world->ForChildren(parentEntity, [&](ECS::Entity child) {
-        children.push_back(child.Index);
+        if (m_world->IsAlive(child)) {
+            children.push_back(child.Index);
+        }
         });
 
     return children;
@@ -584,6 +505,9 @@ void EditorCore::_createNewScene() {
         if (auto* overlay = Services::OverlayService::Get()) {
             auto* active = sm.GetActive();
             if (active) overlay->SetWorld(&active->GetWorld());
+            // Ensure the LevelEditor UI is enabled for the new scene,
+            // so the editor camera and viewport are active immediately.
+            if (active) overlay->EnableLevelEditorForScene(active);
         }
 
         // Do not create a default scene camera; rely on the internal Editor Camera.
@@ -604,7 +528,7 @@ void EditorCore::_openSceneDialog() {
     ofn.hwndOwner = nullptr;
     ofn.lpstrFile = filename;
     ofn.nMaxFile = sizeof(filename);
-    ofn.lpstrFilter = "Scene Files\0*.json\0All Files\0*.*\0";
+    ofn.lpstrFilter = "Scene Files\0*.scn\0All Files\0*.*\0";
     ofn.nFilterIndex = 1;
     ofn.lpstrTitle = "Open Scene";
     ofn.lpstrInitialDir = SCENE_DIR;
@@ -630,7 +554,7 @@ void EditorCore::_saveScene() {
         std::filesystem::path dir = std::filesystem::path(SCENE_DIR);
         std::error_code ec;
         std::filesystem::create_directories(dir, ec);
-        std::filesystem::path path = dir / (defaultName + ".json");
+        std::filesystem::path path = dir / (defaultName + ".scn");
 
         if (_saveActiveScene(path.string())) {
             m_currentScenePath = path.string();
@@ -657,11 +581,11 @@ void EditorCore::_saveSceneAsDialog(bool isTemplate) {
     ofn.hwndOwner = nullptr;
     ofn.lpstrFile = filename;
     ofn.nMaxFile = sizeof(filename);
-    ofn.lpstrFilter = "Scene Files\0*.json\0All Files\0*.*\0";
+    ofn.lpstrFilter = "Scene Files\0*.scn\0All Files\0*.*\0";
     ofn.nFilterIndex = 1;
     ofn.lpstrTitle = isTemplate ? "Save Scene Template" : "Save Scene As";
     ofn.lpstrInitialDir = isTemplate ? SCENE_TEMPLATE_DIR : SCENE_DIR;
-    ofn.lpstrDefExt = "json";
+    ofn.lpstrDefExt = "scn";
     ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 
     if (GetSaveFileNameA(&ofn)) {
@@ -767,6 +691,9 @@ bool EditorCore::_loadSceneFromPath(const std::string& path) {
         if (auto* overlay = Services::OverlayService::Get()) {
             auto* active = sm.GetActive();
             if (active) overlay->SetWorld(&active->GetWorld());
+            // Ensure the LevelEditor is visible for the loaded scene,
+            // guaranteeing the editor camera is created and active.
+            if (active) overlay->EnableLevelEditorForScene(active);
         }
         // Do not bind world here; LevelEditor::Update will detect active change
         // and call LevelEditor::SetWorld -> EditorCore::SetWorld once.
