@@ -8,8 +8,9 @@
 #include <imgui_internal.h>
 #include "core/messaging/MessageTypes.h"
 #include "core/messaging/MessageSystem.h"
-#include "../../include/editor/LevelEditor.h"
+#include "../editor/LevelEditor.h"
 #include "serialization/EntitySerializer.h"
+#include "services/UICommon.h"
 
 #ifdef USE_IMGUI
 
@@ -21,6 +22,7 @@ namespace Services {
         // Initialize DebugUI (always available)
         if (m_world) {
             m_debugUI = std::make_unique<DebugUI>(m_world);
+            UICommon::InitializeDefaultLayouts();
         }
 
         if (!m_debugUI)

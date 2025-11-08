@@ -108,9 +108,8 @@ void DebugUI::NewFrame() {
         SetEnabled(!IsEnabled());
     }
 
-    if (!m_enabled) return;  // Early exit if UI is toggled off
-
-    // Begin a new ImGui frame: backend new-frame calls, then core NewFrame
+    // Always begin a new ImGui frame even if UI is toggled off.
+    // Rendering of debug panels remains conditional in Render().
     ImGui_ImplOpenGL3_NewFrame();  // Prepare OpenGL renderer state for this frame
     ImGui_ImplGlfw_NewFrame();     // Poll GLFW inputs and update ImGui IO
     ImGui::NewFrame();             // Reset ImGui frame state and begin UI building

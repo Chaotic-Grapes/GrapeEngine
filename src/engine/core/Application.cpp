@@ -41,8 +41,14 @@ namespace Engine {
         Grape_Engine::CrashDumping::SetProgramName("GrapeEngine");
         Grape_Engine::CrashDumping::SetDumpCreateState(true);
 
-        // Load configuration first
-        Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
+        // Load configuration first (try working dir, then parent dir fallback)
+        bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
+        if (!configLoaded) {
+            // Fallback: common scenario when running from build directory
+            if (Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_config)) {
+                LOG_INFO("Loaded configuration from parent directory: ../config.json");
+            }
+        }
 
 #if !_DEBUG
         if (consoleFlag)
