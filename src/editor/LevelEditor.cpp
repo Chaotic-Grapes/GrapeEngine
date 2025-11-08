@@ -5,18 +5,17 @@
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
 \brief
-Implements the LevelEditor class which orchestrates all editor panels.
+Implements the LevelEditor class - main orchestrator for the game editor interface.
+Manages docking layout, panel coordination, entity selection, and playback controls.
+Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 */
 /* End Header *******************************************************************/
 
 #include "../../include/editor/LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
-// Graphics unit conversion helpers (pixels <-> world)
 #include "graphics/graphicsConfig.hpp"
-// Renderer system API (for camera toggling)
 #include "ecs/systems/RendererSystem.h"
-// Include internal ImGui for docking builder
 #include <imgui_internal.h>
 #include <core/Application.h>
 #include "services/Time.h"

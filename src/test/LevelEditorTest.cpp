@@ -5,8 +5,10 @@
 \par    ruiqin.foo@digipen.edu
 \date   6th November 2025
 \brief
-Implements the LevelEditorTest scene which provides a test environment for the
-level editor. The LevelEditor itself is managed by OverlayService.
+Implements a minimal test scene used to exercise the ImGui-based LevelEditor.
+OverlayService owns and renders the LevelEditor UI; this scene wires it up
+and guarantees there is at least one ECS camera so viewport toggles work.
+Scene update remains empty; the overlay owns input and UI rendering.
 */
 /* End Header *******************************************************************/
 

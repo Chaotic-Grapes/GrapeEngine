@@ -40,24 +40,31 @@ struct LevelEditorConfig {
 // Level editor orchestrates all editor panels and manages editor state
 class LevelEditor {
 public:
-    // Create editor and keep world reference
+    // This creates the level editor with a world
+    // It stores config and sets up panels
     explicit LevelEditor(ECS::World* world, const LevelEditorConfig& config = {});
-    // Destroy editor instance and release owned resources
+    // This tears down editor resources
+    // It releases owned pointers cleanly
     ~LevelEditor();
 
-    // Initialize ImGui fonts and editor panels
+    // This initializes ImGui fonts and panels
+    // It sets up docking and window state
     void Initialize(GLFWwindow* pWin);
 
-    // Process input for all editor panels
+    // This handles input and per frame updates
+    // It drives state for all panels
     void Update();
 
-    // Render all editor panels
+    // This draws all editor panels
+    // It builds the layout and windows
     void Render();
 
-    // Update world reference and propagate to all panels
+    // This updates the world reference for all panels
+    // It propagates the change to keep everything synced
     void SetWorld(ECS::World* world);
 
-    // Respond to window resize to keep proportions stable without changing layout structure
+    // This handles window resize
+    // It rebuilds docking layout if needed
     void OnWindowResized(int width, int height);
 
     // Expose game state for physics system
@@ -71,9 +78,11 @@ public:
     void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
-    // Build docking layout for editor panels
+    // This builds the docking layout once
+    // It positions panels in a friendly arrangement
     void _buildDockLayout();
-    // Render dock host window and central dock space
+    // This renders the dock host and space
+    // It manages central docking area
     void _renderDockSpace();
     bool m_dockLayoutBuilt = false;
     ImGuiID m_dockspaceId = 0;

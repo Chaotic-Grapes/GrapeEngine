@@ -2,16 +2,16 @@
  * @file OverlayService.h
  * @author Foo Rui Qin
  * @date 2024
- * @brief Overlay system for managing debug UI and ImGui integration
+ * @brief Overlay system bridging DebugUI and the ImGui-based LevelEditor
  * 
  * This file defines the OverlayService class which serves as a system-level wrapper
- * for the debug UI functionality. The OverlayService system manages:
- * - ImGui initialization and integration with the engine
- * - Debug UI lifecycle management (creation, updates, cleanup)
+ * for editor and debug UI functionality. OverlayService manages:
+ * - DebugUI lifecycle and ImGui backend integration
+ * - LevelEditor creation/update/render gating per active scene
  * - Audio system integration for debug monitoring
  * - Conditional compilation support for ImGui features
  * - Window management integration for UI rendering
- * - World reference management for entity debugging
+ * - World reference propagation to keep editor/debug views in sync
  * 
  * The OverlayService system inherits from Engine::ISystem and follows the ECS pattern,
  * providing a clean interface between the engine's system architecture and
@@ -34,7 +34,7 @@ namespace Scenes { class SceneManager; class Scene; }
 
 namespace Services {
     /**
-     * @brief Overlay system for managing debug UI and ImGui integration
+     * @brief Overlay system bridging DebugUI and the LevelEditor overlay
      *
      * The OverlayService class serves as a system-level wrapper that manages the debug UI
      * functionality within the engine's ECS architecture. It handles the lifecycle
@@ -42,11 +42,12 @@ namespace Services {
      * between the engine systems and the debug interface.
      *
      * Key responsibilities:
-     * - Initialize and manage ImGui context and backends
-     * - Create and manage DebugUI instance lifecycle
+     * - Initialize and manage ImGui context and backends via DebugUI
+     * - Create and manage LevelEditor and DebugUI lifecycles
      * - Handle audio system integration for debug monitoring
      * - Manage window references for UI rendering
      * - Provide conditional compilation support for ImGui features
+     * - Expose playback state helpers to systems (playing/step)
      * - Ensure proper cleanup and resource management
      *
      * The system follows the Engine::ISystem interface pattern and integrates

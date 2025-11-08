@@ -1,3 +1,22 @@
+/* Start Header *****************************************************************/
+/*!
+\file   UICommon.h
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   26th October 2025
+\brief
+Common UI helpers and a minimal layout registry for editor/debug windows.
+Defines canonical window IDs and APIs to register/apply persistent layouts.
+Used by DebugUI and LevelEditor to keep window positions/sizes consistent
+across runs and to initialize sensible defaults for panels.
+
+Features:
+- Canonical `WindowId` enum for consistent window identification
+- Register/apply/clear per-window position and size presets
+- Initialize default layouts for DebugUI and LevelEditor panels
+*/
+/* End Header *******************************************************************/
+
 #ifndef UICOMMON_H
 #define UICOMMON_H
 

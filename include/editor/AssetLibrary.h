@@ -36,37 +36,47 @@ class AssetLibrary {
     friend class AssetBrowser; // Only AssetBrowser can access private members
 
 public:
-    // Initialize with fonts for rendering
+    // This stores fonts used by the asset library UI
+    // It prepares helpers for drawing labels and icons
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
 
-    // Wire the unified Inspector to enable double-click open for prefabs
+    // This connects the inspector window
+    // It enables opening prefabs from file entries
     void SetInspector(InspectorWindow* inspector) { m_inspector = inspector; }
 
 private:
-    // Display clickable breadcrumb navigation trail
+    // This shows the breadcrumb path bar
+    // It lets you click to navigate and updates selection
     void _displayBreadcrumbs(const std::string& currentPath, std::string& selectedAsset, std::string& outNewPath);
 
-    // Display folder contents (files and subfolders)
+    // This lists subfolders and files inside a folder
+    // It handles selection and allows entering directories
     void _displayFolder(const std::filesystem::path& folderPath, std::string& selectedAsset, std::string& currentPath);
 
-    // Display a single file entry as selectable item
+    // This draws one file entry
+    // It lets you select and view info for that file
     void _displayFile(const std::filesystem::path& filePath, std::string& selectedAsset);
 
-    // Display info about selected file in right panel
+    // This shows details for the chosen file
+    // It displays type size and quick actions
     void _displaySelectedFileInfo(const std::string& selectedAsset);
 
-    // Import new asset file into current folder
+    // This brings a new file into the current folder
+    // It sets status text and updates selection
     void _importAsset(const std::string& currentPath, std::string& selectedAsset,
         std::string& statusMessage, float& statusTimer);
 
-    // Replace the currently selected texture file (with hot reload)
+    // This swaps the selected texture with a new one
+    // It triggers hot reload and shows status
     void _replaceTexture(const std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
-    // Handle file dropped from OS
+    // This handles a file dropped from the operating system
+    // It copies or moves it into the project and updates status
     void _handleFileDrop(const std::string& sourcePath, const std::string& currentPath,
         std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
-    // Delete the currently selected file or folder
+    // This removes the chosen file or folder
+    // It updates status and clears selection
     void _deleteSelectedAsset(std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
     // Member variables

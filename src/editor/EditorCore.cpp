@@ -492,6 +492,8 @@ std::vector<EntityId> EditorCore::_getChildren(EntityId parentId) const {
     return children;
 }
 
+// Create a new empty scene and make it active in the SceneManager.
+// Ensures the LevelEditor overlay is enabled for editor camera/viewport.
 void EditorCore::_createNewScene() {
     LOG_INFO("New Scene requested");
 
@@ -519,6 +521,8 @@ void EditorCore::_createNewScene() {
     // Do not change camera mode on new scene; keep previous behavior
 }
 
+// Open a file dialog to select and load a `.scn` scene file.
+// On success, updates current scene path/name and binds overlay world.
 void EditorCore::_openSceneDialog() {
 #ifdef _WIN32
     char filename[512] = "";
@@ -547,6 +551,8 @@ void EditorCore::_openSceneDialog() {
 #endif
 }
 
+// Save the active scene to its path or a default location.
+// Creates the scenes directory if needed and logs the outcome.
 void EditorCore::_saveScene() {
     if (m_currentScenePath.empty()) {
         // Save to default path without opening a dialog
@@ -569,6 +575,8 @@ void EditorCore::_saveScene() {
     }
 }
 
+// Open a Save As dialog to write the scene to a new path.
+// Supports saving templates by switching to the templates directory.
 void EditorCore::_saveSceneAsDialog(bool isTemplate) {
 #ifdef _WIN32
     char filename[512] = "";
@@ -604,6 +612,8 @@ void EditorCore::_saveSceneAsDialog(bool isTemplate) {
 #endif
 }
 
+// Persist editor state (last scene path/name) to `editor_state.json`.
+// Uses a simple JSON file and catches IO exceptions.
 void EditorCore::_saveEditorState() {
     try {
         nlohmann::json state;
@@ -621,6 +631,8 @@ void EditorCore::_saveEditorState() {
     }
 }
 
+// Load editor state from `editor_state.json` and try to restore scene.
+// Validates file existence and logs errors on failure.
 void EditorCore::_loadEditorState() {
     try {
         if (!std::filesystem::exists("editor_state.json"))
@@ -650,6 +662,8 @@ void EditorCore::_loadEditorState() {
     }
 }
 
+// Save the active scene by delegating to the SceneManager.
+// Ensures an active scene exists before attempting to save.
 bool EditorCore::_saveActiveScene(const std::string& path) {
     if (!Engine::CORE) {
         LOG_ERROR("Engine CORE is null; cannot save scene.");
@@ -668,6 +682,8 @@ bool EditorCore::_saveActiveScene(const std::string& path) {
     return sm.SaveScene(idx, path, m_currentSceneName, "1.0");
 }
 
+// Load a scene from disk into the active slot via SceneManager.
+// Rebinds overlay to the world and enables LevelEditor UI.
 bool EditorCore::_loadSceneFromPath(const std::string& path) {
     if (!Engine::CORE) {
         LOG_ERROR("Engine CORE is null; cannot load scene.");

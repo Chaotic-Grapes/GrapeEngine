@@ -17,57 +17,74 @@ JSON-backed properties in the editor.
 
 namespace EditorUI {
 
-    // Section management: Call BeginPropertySection with all labels before rendering rows
+    // This starts a property section with given labels
+    // It sets up alignment and spacing
     void BeginPropertySection(const std::vector<std::string>& labels);
+    // This closes the opened property section
+    // It flushes layout and spacing
     void EndPropertySection();
 
-    // Static value display (non-editable)
+    // This shows a read only value row
+    // It does not change the JSON data
     void RenderStaticValueRow(const std::string& label, const std::string& value);
 
-    // Single float with optional unit label
+    // This edits a single float with a label
+    // It writes value to the JSON key
     void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
         nlohmann::json& data, const std::string& key, float dragSpeed);
 
-    // Vector2D (X Y on one line)
+    // This edits a two component vector
+    // It writes X and Y to JSON
     void RenderVector2DRow(const std::string& label, nlohmann::json& data,
         const std::string& xKey, const std::string& yKey, float dragSpeed);
 
-    // Vector3D (X Y Z on one line)
+    // This edits a three component vector
+    // It writes X Y and Z to JSON
     void RenderVector3DRow(const std::string& label, nlohmann::json& data,
         const std::string& xKey, const std::string& yKey,
         const std::string& zKey, float dragSpeed);
 
-    // Quaternion (X Y Z W on one line)
+    // This edits a four component quaternion
+    // It writes X Y Z and W to JSON
     void RenderQuaternionRow(const std::string& label, nlohmann::json& data,
         const std::string& xKey, const std::string& yKey,
         const std::string& zKey, const std::string& wKey, float dragSpeed);
 
-    // Color picker
+    // This edits a color value
+    // It writes rgba to the JSON data
     void RenderColorProperty(const std::string& label, nlohmann::json& colorData);
 
-    // Text input
+    // This edits a text value
+    // It writes it to the JSON key
     void RenderTextProperty(const std::string& label, nlohmann::json& data, const std::string& key);
 
-    // Integer drag
+    // This edits an integer value
+    // It writes it to the JSON key
     void RenderIntProperty(const std::string& label, nlohmann::json& data, const std::string& key);
 
-    // Single checkbox (writes directly to JSON)
+    // This edits a single checkbox
+    // It writes the boolean to JSON
     void RenderCheckboxProperty(const std::string& label, nlohmann::json& data, const std::string& key);
 
-    // Single checkbox (returns if changed, caller handles JSON write)
-    // Use this when you need to manipulate bitflags or do custom processing
+    // This shows a checkbox and returns if changed
+    // It lets caller handle JSON write
     bool RenderCheckboxPropertyReturn(const std::string& label, bool& value);
 
-    // Two checkboxes on one row
+    // This shows two checkboxes in one row
+    // It writes both values to JSON
     void RenderCheckboxRow(const std::string& label, nlohmann::json& data,
         const std::string& key1, const std::string& label1,
         const std::string& key2, const std::string& label2);
 
-    // Accessors for alignment (used internally)
+    // This returns current label offset
+    // It helps align content neatly
     float GetCurrentLabelOffset();
+    // This returns the X position where content starts
+    // It keeps layout consistent
     float GetContentStartX();
 
-    // Content width for scrolling (hardcoded for now)
+    // This returns the content width constant
+    // It helps set up scrolling area
     constexpr float GetContentWidth() { return 700.0f; }
 
 } // namespace EditorUI

@@ -1,3 +1,24 @@
+/* Start Header *****************************************************************/
+/*!
+\file   OverlayService.cpp
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   26th October 2025
+\brief
+Implements the OverlayService which bridges DebugUI and the ImGui-based
+LevelEditor overlay. Manages ImGui frame lifecycle, scene targeting,
+and world propagation so editor and debug views stay synchronized.
+
+Features:
+- DebugUI lifecycle and ImGui backend integration
+- LevelEditor creation, update, and render gating per active scene
+- World reference updates propagated to both editor and debug views
+- Playback state proxies (playing, step request) exposed to systems
+- Window resize subscription to keep editor proportions/layout stable
+- Scene attach/detach handling and minimal scene-less editor support
+*/
+/* End Header *******************************************************************/
+
 #include "services/OverlayService.h"
 #include "scene/SceneManager.h"
 #include "services/WindowManager.h"

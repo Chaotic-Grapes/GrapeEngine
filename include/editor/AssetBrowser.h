@@ -37,16 +37,20 @@ class InspectorWindow;
 
 class AssetBrowser {
 public:
-    // Initialize fonts and world reference for browsing
+    // This sets up the fonts and world reference
+    // It gets the asset browser ready to render and interact
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
 
-    // Render the asset browser UI
+    // This draws the asset browser panel
+    // It shows folders files and basic actions
     void Render();
 
-    // Wire the unified Inspector for prefab editing
+    // This connects the inspector window
+    // It lets double clicks open and edit prefabs
     void SetInspector(InspectorWindow* inspector);
 
-    // Update world reference when scenes change
+    // This updates which world the browser uses
+    // It keeps things in sync when scenes change
     void SetWorld(ECS::World* world) { m_world = world; }
 
 private:

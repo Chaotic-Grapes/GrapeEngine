@@ -28,20 +28,23 @@ Reference:
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
-// Constructor: stores pointer to the world
+// Constructor: stores pointer to the world for playback operations.
+// Starts with default stopped state and no saved snapshot.
 Playback::Playback(ECS::World* world)
     : m_world(world) {
 }
 
 Playback::~Playback() {}
 
-// Initialize the fonts for UI and icons
+// Initialize fonts used by the playback UI and Material Symbols.
+// Keeps pointers for drawing icons on control buttons.
 void Playback::Initialize(ImFont* mainFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_symbolsFont = symbolsFont;
 }
 
-// Process keyboard input for playback shortcuts
+// Process keyboard input for play/stop, pause/resume, and step.
+// Maps Ctrl+P, Ctrl+Shift+P, and Alt+P into state changes/flags.
 void Playback::ProcessInput() {
     // Play/Stop: Ctrl + P
     if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
@@ -84,7 +87,8 @@ void Playback::ProcessInput() {
     }
 }
 
-// Render the playback control UI using ImGui
+// Render the playback toolbar UI using ImGui.
+// Centers buttons and shows tooltips with current state.
 void Playback::Render() {
     // Window flags: NoResize prevents manual resizing; docking stays enabled by default
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize;
@@ -184,7 +188,8 @@ void Playback::Render() {
     ImGui::End();
 }
 
-// Save current world state for restoring later
+// Save the current world into a JSON snapshot.
+// Skips editor camera entities to keep the restore clean.
 void Playback::_saveWorldState() {
     if (!HasValidWorld()) return;
 
@@ -215,6 +220,8 @@ void Playback::_saveWorldState() {
 }
 
 void Playback::_restoreWorldState() {
+    // Restore the world from the previously saved snapshot.
+    // Keeps editor cameras and rebuilds runtime entities.
     if (!HasValidWorld() || m_savedWorldState.empty()) {
         LOG_WARNING("No saved state to restore");
         return;
@@ -249,22 +256,25 @@ void Playback::_restoreWorldState() {
 }
 
 
-// Query if the game is currently playing
+// Query: Is the game currently in the Playing state?
 bool Playback::IsPlaying() const {
     return m_gameState == GameState::Playing;
 }
 
-// Query if a step-frame request was made
+// Query: Was a single-step frame requested while paused?
 bool Playback::IsStepRequested() const {
     return m_stepRequested;
 }
 
 // Clear the step request flag
+// Clear any outstanding step request flag.
 void Playback::ClearStepRequest() {
     m_stepRequested = false;
 }
 
 // Update the world reference safely when scenes change
+// Update the bound world reference used by playback operations.
+// Clears saved snapshot since it no longer matches the world.
 void Playback::SetWorld(ECS::World* world) {
     m_world = world;
     m_gameState = GameState::Stopped;

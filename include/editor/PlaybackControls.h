@@ -37,25 +37,40 @@ public:
         Paused     // Freeze
     };
 
+    // This creates playback controls bound to a world
+    // It initializes default state and storage
     explicit Playback(ECS::World* world);
+    // This cleans up any playback resources
+    // It resets state if needed
     ~Playback();
 
-    // Initialize with symbols font for icons
+    // This sets fonts for playback controls
+    // It gets icons and text ready for UI
     void Initialize(ImFont* mainFont, ImFont* symbolsFont);
 
-    // Handle keyboard shortcuts
+    // This handles keyboard shortcuts for playback
+    // It toggles play pause stop and step
     void ProcessInput();
 
-    // Render playback controls UI
+    // This draws the playback toolbar
+    // It shows buttons and state feedback
     void Render();
 
-    // Expose game state
+    // This returns the current game state
+    // It can be polled by other systems
     GameState GetGameState() const { return m_gameState; }
-    bool IsPlaying() const;       // Returns true if game is running
-    bool IsStepRequested() const; // Returns true if user requested a single physics step
-    void ClearStepRequest();      // Resets step request flag
+    // This returns true when the game is running
+    // It is handy for gating updates
+    bool IsPlaying() const;
+    // This returns true if a single step is requested
+    // It lets physics run one frame
+    bool IsStepRequested() const;
+    // This clears the single step request
+    // It resets the flag for next time
+    void ClearStepRequest();
 
-    // Update the world reference safely when scenes change
+    // This updates the world reference
+    // It is safe to call when scenes change
     void SetWorld(ECS::World* world);
 
 private:
@@ -66,13 +81,16 @@ private:
     bool m_stepRequested = false;               // Flag for single-step execution
     nlohmann::json m_savedWorldState;           // Stores world state snapshot for restore on stop
 
-    // Save current world state before playing
+    // This saves current world state to JSON
+    // It is used before starting play
     void _saveWorldState();
 
-    // Restore world state when stopping
+    // This restores world state after stopping
+    // It brings the editor back to how it was
     void _restoreWorldState();
 
-    // Convenience check for valid world pointer
+    // This returns whether the world pointer is valid
+    // It helps guard operations
     bool HasValidWorld() const { return m_world != nullptr; }
 };
 

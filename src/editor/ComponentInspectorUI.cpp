@@ -19,12 +19,16 @@ Implements unified component rendering UI for both entity inspection and prefab 
 #include "services/ResourceManager.h"
 #include <algorithm>
 
+// Initialize the component UI with editor fonts for consistent styling.
+// Stores font pointers so sections can mix text and iconography.
 void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
 }
 
+// Render the LocalTransform component with rotation, position, and scale.
+// Uses compact single-line rows for vectors and quaternions.
 void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Local Rotation", "Local Position", "Local Scale" });
     EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
@@ -33,6 +37,8 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Render the SpriteRenderer2D component and allow texture drag-and-drop.
+// Shows color, tiling, and offset alongside the current texture info.
 void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Sprite", "Color", "Tiling", "Offset" });
 
@@ -82,6 +88,8 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Render basic Rigidbody2D properties with units where applicable.
+// Keeps damping and gravity scale intuitive and easy to tweak.
 void ComponentUI::RenderRigidbody2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Mass", "Inverse Mass", "Linear Damping", "Angular Damping", "Gravity Scale", "Flags" });
     EditorUI::RenderFloatRow("Mass", "kg", data, "Mass", 0.1f);
@@ -93,18 +101,24 @@ void ComponentUI::RenderRigidbody2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Render the LinearVelocity2D component in world units per second.
+// Keeps controls on a single row for quick adjustments.
 void ComponentUI::RenderLinearVelocity2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Velocity" });
     EditorUI::RenderVector2DRow("Velocity##Linear", data["Value"], "X", "Y", 1.0f);
     EditorUI::EndPropertySection();
 }
 
+// Render the AngularVelocity2D component expressed in degrees per second.
+// Uses a drag control with a reasonable default step.
 void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Angular Velocity" });
     EditorUI::RenderFloatRow("Angular Velocity##Angular", "deg/s", data, "Value", 0.5f);
     EditorUI::EndPropertySection();
 }
 
+// Render a CircleCollider2D with trigger flag and geometric properties.
+// Writes flag updates back to JSON when the checkbox changes.
 void ComponentUI::RenderCircleCollider2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Radius", "Layer Mask" });
 
@@ -125,6 +139,8 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Render a BoxCollider2D including offset, half extents, and rotation.
+// Supports a trigger flag and layer mask editing.
 void ComponentUI::RenderBoxCollider2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Half Extents", "Rotation", "Layer Mask" });
 
@@ -147,6 +163,8 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Render a simple 2D circle shape for debug drawing.
+// Includes thickness and filled options for visualization.
 void ComponentUI::RenderShapeCircle2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Radius", "Offset", "Color", "Thickness", "Filled" });
 
@@ -159,6 +177,8 @@ void ComponentUI::RenderShapeCircle2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Render a simple 2D box shape for debug drawing.
+// Matches the property layout used in collider components.
 void ComponentUI::RenderShapeBox2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Half Extents", "Offset", "Color", "Thickness", "Filled" });
 
@@ -171,6 +191,8 @@ void ComponentUI::RenderShapeBox2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Render a 2D line segment with endpoints and thickness.
+// Uses color editing helper for consistent RGBA handling.
 void ComponentUI::RenderShapeLine2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Point A", "Point B", "Thickness", "Color" });
 
@@ -182,6 +204,8 @@ void ComponentUI::RenderShapeLine2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Render the Camera3D component with mode and clip settings.
+// Toggles between perspective FOV or ortho size controls.
 void ComponentUI::RenderCamera3D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Mode", "Near Plane", "Far Plane", "Aspect Ratio", "FOV", "Ortho Size" });
 

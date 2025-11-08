@@ -37,6 +37,8 @@ namespace EditorUI {
     // -------------------------------------------------------------------------
     // Section Management
     // -------------------------------------------------------------------------
+    // Begin a property section and compute aligned label/value columns.
+    // Uses the widest label to set a stable content start X.
     void BeginPropertySection(const std::vector<std::string>& labels) {
         float maxWidth = 0.0f;
         for (const auto& label : labels)
@@ -47,6 +49,8 @@ namespace EditorUI {
         valueStartOffset = baseX + maxWidth + LABEL_PADDING;
     }
 
+    // End a property section and reset alignment tracking.
+    // Emits dummy items to ensure horizontal scroll ranges are correct.
     void EndPropertySection() {
         // defines total horizontal scroll extent
         ImGui::Dummy(ImVec2(GetContentWidth(), 0.0f));

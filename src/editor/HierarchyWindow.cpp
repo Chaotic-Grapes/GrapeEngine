@@ -39,6 +39,8 @@ namespace {
     }
 }
 
+// Initialize the hierarchy panel with fonts and world/editor references.
+// Sets up local state used for selection and expanded nodes.
 void HierarchyWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, EditorCore* editorCore) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
@@ -47,12 +49,16 @@ void HierarchyWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* sym
     m_editorCore = editorCore;
 }
 
+// Update the world reference and reset selection/expanded tree state.
+// Clears caches so the tree reflects the new world on the next render.
 void HierarchyWindow::SetWorld(ECS::World* world) {
     m_world = world;
     m_selectedEntityId = 0;
     m_expandedNodes.clear();
 }
 
+// Render the hierarchy window listing root entities and children.
+// Supports drag-and-drop reparenting and prefab instantiation.
 void HierarchyWindow::Render() {
     ImGui::Begin("Hierarchy");
     if (m_mainFont) ImGui::PushFont(m_mainFont);
@@ -168,6 +174,8 @@ void HierarchyWindow::Render() {
     ImGui::End();
 }
 
+// Render a single entity tree node and its children recursively.
+// Handles selection, drag source, and drop target logic.
 void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
     ECS::Entity entity = m_world->Resolve(entityId);
     if (entity.IsNull() || !m_world->IsAlive(entity)) return;
@@ -289,6 +297,8 @@ void HierarchyWindow::_renderEntityNode(EntityId entityId, int depth) {
     }
 }
 
+// Collect all root entities (without parents) for the top-level tree.
+// Returns IDs sorted so older entities appear above newer ones.
 std::vector<EntityId> HierarchyWindow::_getRootEntities() {
     std::vector<EntityId> roots;
 
@@ -309,6 +319,8 @@ std::vector<EntityId> HierarchyWindow::_getRootEntities() {
     return roots;
 }
 
+// Collect direct children of a given parent ID using the Parent component.
+// Returns a simple flat list used by the tree renderer.
 std::vector<EntityId> HierarchyWindow::_getChildren(EntityId parentId) {
     std::vector<EntityId> children;
     ECS::Entity parentEntity = m_world->Resolve(parentId);
@@ -324,6 +336,8 @@ std::vector<EntityId> HierarchyWindow::_getChildren(EntityId parentId) {
     return children;
 }
 
+// Instantiate a prefab JSON under the given parent entity.
+// Adds missing components and applies serialized data to each.
 void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId) {
     if (!m_world || prefabPath.empty()) return;
 

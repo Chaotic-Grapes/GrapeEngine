@@ -35,35 +35,45 @@ public:
     // Callback types for when selection changes
     using SelectionCallback = std::function<void(EntityId)>;
 
-    // Initialize fonts world and EditorCore for entity operations
+    // This sets up fonts the world and editor core
+    // It prepares the tree view for entities
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, EditorCore* editorCore);
 
-    // Render the hierarchy window
+    // This draws the hierarchy window
+    // It shows entities and supports selection
     void Render();
 
-    // Update world and clear selection when scenes change
+    // This updates the world and clears selection
+    // It keeps the tree synced with scenes
     void SetWorld(ECS::World* world);
 
-    // Get currently selected entity
+    // This returns the currently selected entity
+    // It is used by other panels
     EntityId GetSelectedEntity() const { return m_selectedEntityId; }
 
-    // Set selected entity called from other windows
+    // This sets the selected entity
+    // It updates internal state
     void SetSelectedEntity(EntityId id) { m_selectedEntityId = id; }
 
-    // Register callback for when selection changes
+    // This registers a callback for selection changes
+    // It calls it whenever user picks a new entity
     void OnSelectionChanged(SelectionCallback callback) { m_selectionCallback = callback; }
 
 private:
-    // Render a single entity node in the tree
+    // This draws one entity node in the tree
+    // It handles expand select and context actions
     void _renderEntityNode(EntityId entityId, int depth);
 
-    // Get all root entities with no parent
+    // This returns all root entities
+    // It filters those without a parent
     std::vector<EntityId> _getRootEntities();
 
-    // Get all children of an entity for tree rendering
+    // This returns children of an entity
+    // It looks up hierarchy links
     std::vector<EntityId> _getChildren(EntityId parentId);
 
-    // Instantiate a prefab as a child of specified parent entity
+    // This creates a prefab as a child
+    // It adds the new entity under the parent
     void _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
 
     // References

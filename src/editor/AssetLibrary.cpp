@@ -34,14 +34,16 @@ References:
 #include <vector>
 #include <services/ResourceManager.h>
 
-// Initialize the asset library with fonts for rendering
+// Initialize the asset library with the fonts used across the editor.
+// Stores font pointers so entries can mix icon and text styling.
 void AssetLibrary::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
 }
 
-// Display clickable breadcrumb trail (e.g. assets > Audio > Music)
+// Display a clickable breadcrumb trail for folder navigation.
+// Shows each path segment as a lightweight link-style button.
 void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::string& selectedAsset, std::string& outNewPath) {
     std::filesystem::path pathObj(currentPath);
     std::vector<std::filesystem::path> pathParts;
@@ -100,7 +102,8 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
     }
 }
 
-// Display all files and folders in the given directory
+// Display all files and folders in the active directory.
+// Supports single-click select and double-click to enter folders.
 void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::string& selectedAsset, std::string& currentPath) {
     ImGui::PushFont(m_mainFont);
 
@@ -146,7 +149,8 @@ void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::
     ImGui::PopFont();
 }
 
-// Display a single file as a selectable entry
+// Display a single file as a selectable entry with an icon.
+// Keeps selection state so the info panel can reflect details.
 void AssetLibrary::_displayFile(const std::filesystem::path& filePath, std::string& selectedAsset) {
     // Extract just the filename and then check if THIS file is the currently selected one
     std::string filename = filePath.filename().string();
@@ -254,7 +258,8 @@ void AssetLibrary::_displaySelectedFileInfo(const std::string& selectedAsset) {
     ImGui::Unindent();
 }
 
-// Import a new asset file into the current folder using Windows file dialog
+// Import a new asset into the current folder via a file dialog.
+// Copies to both build/assets and ../assets for runtime and source sync.
 void AssetLibrary::_importAsset(const std::string& currentPath, std::string& selectedAsset,
     std::string& statusMessage, float& statusTimer) {
 #ifdef _WIN32  // Only compile this code on Windows
@@ -322,7 +327,8 @@ void AssetLibrary::_importAsset(const std::string& currentPath, std::string& sel
 #endif
 }
 
-// Replace the currently selected texture file with a new one (hot reload support)
+// Replace the currently selected file with a new one of the same type.
+// Performs hot-reload by refreshing the ResourceManager cache.
 void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string& statusMessage, float& statusTimer) {
     if (selectedAsset.empty()) {
         LOG_WARNING("No file selected to replace");
@@ -417,7 +423,8 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
 #endif
 }
 
-// Handle file dropped from OS (uses current folder path)
+// Handle a file dropped from the OS into the asset browser.
+// Mirrors the import flow and selects the newly copied file.
 void AssetLibrary::_handleFileDrop(const std::string& sourcePathStr, const std::string& currentPath,
     std::string& selectedAsset, std::string& statusMessage, float& statusTimer) {
     std::filesystem::path sourcePath(sourcePathStr);
@@ -454,7 +461,8 @@ void AssetLibrary::_handleFileDrop(const std::string& sourcePathStr, const std::
     }
 }
 
-// Delete the currently selected file or folder
+// Delete the currently selected file or folder safely in both locations.
+// Removes from build/assets and mirrors the deletion in ../assets.
 void AssetLibrary::_deleteSelectedAsset(std::string& selectedAsset, std::string& statusMessage, float& statusTimer) {
     if (selectedAsset.empty()) {
         LOG_WARNING("No file or folder selected to delete");

@@ -29,7 +29,8 @@ References:
 #include "../editor/InspectorWindow.h"
 #include <fstream>
 
-// Initialize the AssetBrowser with editor fonts, world reference and event subscriptions
+// Initialize the Asset Browser with fonts and a world reference.
+// Also hook file-drop messages so imports work from the OS.
 void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
@@ -55,7 +56,8 @@ void AssetBrowser::SetInspector(InspectorWindow* inspector) {
     m_assetLibrary.SetInspector(inspector);
 }
 
-// Render the asset browser UI window
+// Render the Asset Browser window with breadcrumbs, actions, and panels.
+// Uses child regions to split file list and file info side-by-side.
 void AssetBrowser::Render() {
     ImGui::PushFont(m_mainFont);
     // Window flags: NoScrollbar removes the vertical scrollbar; child regions handle scrolling

@@ -33,27 +33,37 @@ public:
     EditorCore() = default;
     ~EditorCore() = default;
 
-    // Initialize core editor with fonts and world
+    // This sets up fonts and binds the world
+    // It prepares editor subsystems and panels
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
-    // Render editor auxiliary windows and menus
+    // This draws auxiliary editor windows and menus
+    // It handles layout and quick tools
     void ShowEditorWindows();
-    // Handle interactions inside the game viewport
+    // This handles picking dragging and hotkeys in the viewport
+    // It talks to the renderer for selection updates
     void HandleInWorldInteraction();
 
-    // Add a new entity under optional parent
+    // This creates a new entity optionally under a parent
+    // It adds default components and tracks it
     void AddEntity(const std::string& name, EntityId parentId = 0);
-    // Remove an entity optionally including children
+    // This deletes an entity and optionally its children
+    // It updates caches and selection state
     void RemoveEntity(EntityId id, bool recursive = true);
-    // Clone an entity and its hierarchy
+    // This duplicates an entity hierarchy
+    // It creates a copy with the same components
     void CloneEntity(EntityId id);
-    // Reparent an entity under a new parent
+    // This moves an entity under a new parent
+    // It updates hierarchy links cleanly
     void ReparentEntity(EntityId childId, EntityId newParentId);
-    // Clear all entities from the scene
+    // This removes every entity from the world
+    // It resets selection and caches
     void ClearAllEntities();
 
-    // Check if we have a valid world bound
+    // This checks if the world pointer is set
+    // It guards operations that need a world
     bool HasValidWorld() const;
-    // Update the world reference for editor operations
+    // This updates the world reference
+    // It resets caches and keeps panels in sync
     void SetWorld(ECS::World* world);
 
     // Get the currently selected entity ID (synced with renderer picking)
@@ -68,38 +78,54 @@ public:
     std::string m_currentSceneName = "Untitled";
 
 private:
-    // Show the main menu bar with file and tools
+    // This renders the main menu bar
+    // It provides file and tools actions
     void _showMainMenu();
-    // Show the viewport window and render scene
+    // This draws the game viewport
+    // It handles camera controls and overlays
     void _showViewport();
-    // Create a new entity with default components
+    // This creates an entity with default setup
+    // It returns a ready to use entity
     ECS::Entity _createGameEntity(const std::string& name);
-    // Invalidate cached labels and states
+    // This clears cached labels and states
+    // It forces a fresh rebuild next frame
     void _invalidateCache();
-    // Get direct children of a parent entity
+    // This returns direct children of a parent
+    // It reads the hierarchy graph
     std::vector<EntityId> _getChildren(EntityId parentId) const;
-    // Get cached delete label for an entity
+    // This returns a cached delete label
+    // It generates one if missing
     const std::string& _getDeleteLabel(EntityId id);
-    // Get cached clone label for an entity
+    // This returns a cached clone label
+    // It creates and stores if needed
     const std::string& _getCloneLabel(EntityId id);
-    // Get cached collapsed header state for an entity
+    // This returns whether a header is collapsed
+    // It retrieves stored UI state
     const bool& _getCollapsedHeaderBool(EntityId id);
 
-    // Save the active scene to a path
+    // This writes the active scene to disk
+    // It returns true on success
     bool _saveActiveScene(const std::string& path);
-    // Load a scene from a path into the world
+    // This loads a scene file into the world
+    // It returns true on success
     bool _loadSceneFromPath(const std::string& path);
-    // Create a new empty scene file and world
+    // This creates a new empty scene
+    // It resets world and files
     void _createNewScene();
-    // Open a file dialog for loading scenes
+    // This opens a dialog to pick a scene
+    // It lets you browse and select a file
     void _openSceneDialog();
-    // Save the current scene
+    // This saves the current scene
+    // It writes data to the path
     void _saveScene();
-    // Save the scene using a dialog optionally as template
+    // This opens a dialog to save the scene
+    // It supports templates if requested
     void _saveSceneAsDialog(bool isTemplate);
-    // Persist editor UI state to disk
+    // This saves editor UI state to disk
+    // It remembers layout and selections
     void _saveEditorState();
-    // Load editor UI state from disk
+    // This loads editor UI state from disk
+    // It restores layout and selections
     void _loadEditorState();
 
     // World pointer for scene operations
@@ -139,7 +165,8 @@ private:
     double m_cameraWarningExpiry = 0.0;
     Messaging::SubscriptionHandle m_debugMsgSubscription;
 public:
-    // Query whether the ImGui viewport image is hovered
+    // This returns whether the ImGui viewport image is hovered
+    // It helps coordinate picking and drag operations
     bool IsViewportHovered() const { return m_isViewportHovered; }
 };
 
