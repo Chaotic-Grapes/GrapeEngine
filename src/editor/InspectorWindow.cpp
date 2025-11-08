@@ -25,6 +25,24 @@ Implements the unified InspectorWindow that adapts to selection context:
 #include <fstream>
 #include <algorithm>
 
+namespace {
+    template <typename T>
+    bool ApplyComponentIfMatch(ECS::World* world,
+                               ECS::Entity entity,
+                               const std::string& typeName,
+                               const std::string& expectedName,
+                               nlohmann::json& componentEntry) {
+        if (typeName == expectedName) {
+            if (world->Has<T>(entity)) {
+                auto& comp = world->Get<T>(entity);
+                from_json(componentEntry["Data"], comp);
+            }
+            return true;
+        }
+        return false;
+    }
+}
+
 void InspectorWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
@@ -275,32 +293,23 @@ void InspectorWindow::_renderEntityCore() {
         m_componentsToDelete.clear();
 
         // Write changes back into actual components
-        for (const auto& componentEntry : entityJson["Components"]) {
+        for (auto& componentEntry : entityJson["Components"]) {
             std::string typeName = componentEntry["TypeName"];
 
-            auto applyComponent = [&]<typename T>(const std::string & name) {
-                if (typeName == name) {
-                    if (m_world->Has<T>(entity)) {
-                        auto& comp = m_world->Get<T>(entity);
-                        from_json(componentEntry["Data"], comp);
-                    }
-                    return true;
-                }
-                return false;
-            };
+            // Use a file-scope templated helper to avoid MSVC restriction on local class templates
 
-            if (applyComponent.operator() < ECS::Components::LocalTransform > ("ECS::Components::LocalTransform")) continue;
-            if (applyComponent.operator() < ECS::Components::SpriteRenderer2D > ("ECS::Components::SpriteRenderer2D")) continue;
-            if (applyComponent.operator() < ECS::Components::Rigidbody2D > ("ECS::Components::Rigidbody2D")) continue;
+            if (ApplyComponentIfMatch<ECS::Components::LocalTransform>(m_world, entity, typeName, "ECS::Components::LocalTransform", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::SpriteRenderer2D>(m_world, entity, typeName, "ECS::Components::SpriteRenderer2D", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::Rigidbody2D>(m_world, entity, typeName, "ECS::Components::Rigidbody2D", componentEntry)) continue;
             // Ensure velocity component edits are persisted to the world
-            if (applyComponent.operator() < ECS::Components::LinearVelocity2D > ("ECS::Components::LinearVelocity2D")) continue;
-            if (applyComponent.operator() < ECS::Components::AngularVelocity2D > ("ECS::Components::AngularVelocity2D")) continue;
-            if (applyComponent.operator() < ECS::Components::CircleCollider2D > ("ECS::Components::CircleCollider2D")) continue;
-            if (applyComponent.operator() < ECS::Components::BoxCollider2D > ("ECS::Components::BoxCollider2D")) continue;
-            if (applyComponent.operator() < ECS::Components::ShapeCircle2D > ("ECS::Components::ShapeCircle2D")) continue;
-            if (applyComponent.operator() < ECS::Components::ShapeBox2D > ("ECS::Components::ShapeBox2D")) continue;
-            if (applyComponent.operator() < ECS::Components::ShapeLine2D > ("ECS::Components::ShapeLine2D")) continue;
-            if (applyComponent.operator() < ECS::Components::Camera3D > ("ECS::Components::Camera3D")) continue;
+            if (ApplyComponentIfMatch<ECS::Components::LinearVelocity2D>(m_world, entity, typeName, "ECS::Components::LinearVelocity2D", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::AngularVelocity2D>(m_world, entity, typeName, "ECS::Components::AngularVelocity2D", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::CircleCollider2D>(m_world, entity, typeName, "ECS::Components::CircleCollider2D", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::BoxCollider2D>(m_world, entity, typeName, "ECS::Components::BoxCollider2D", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::ShapeCircle2D>(m_world, entity, typeName, "ECS::Components::ShapeCircle2D", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::ShapeBox2D>(m_world, entity, typeName, "ECS::Components::ShapeBox2D", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::ShapeLine2D>(m_world, entity, typeName, "ECS::Components::ShapeLine2D", componentEntry)) continue;
+            if (ApplyComponentIfMatch<ECS::Components::Camera3D>(m_world, entity, typeName, "ECS::Components::Camera3D", componentEntry)) continue;
         }
     }
 

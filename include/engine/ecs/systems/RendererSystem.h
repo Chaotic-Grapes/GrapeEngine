@@ -87,6 +87,14 @@ namespace ECS {
             return m_renderer ? m_renderer->flushCountThisFrame : -1;
         }
 
+        // Compatibility accessors for editor integration
+        float GetCameraOrthoSize() const { return m_cameraOrthoSize; }
+        bool IsUsingEditorCamera() const { return m_useEditorCamera; }
+        RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
+        uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
+        // Legacy no-op to satisfy older editor code paths
+        void BindWorld(World& /*world*/) {}
+
         // ====================================================================
         // Temporary Accessors (For Stress Testing - Remove Later)
         // ====================================================================

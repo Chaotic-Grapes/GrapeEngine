@@ -24,7 +24,6 @@ Implements the EditorCore class for core editor functionality and entity managem
 #include "services/Input.h"
 #include <imgui.h>
 #include <algorithm>
-#include "helpers/MathHelper.h"
 #include "services/OverlayService.h"
 #include "core/Application.h"
 #include "scene/Scene.h"
@@ -328,7 +327,7 @@ void EditorCore::AddEntity(const std::string& name, EntityId parentId) {
     if (parentId != ECS::Entity::NPOS32) {
         ECS::Entity parent = m_world->Resolve(parentId);
         if (!parent.IsNull()) {
-            m_world->Add<ECS::Parent>(newEntity, parent);
+            m_world->Add<ECS::Parent>(newEntity, ECS::Parent{ parent });
         }
     }
 
@@ -354,7 +353,7 @@ void EditorCore::ReparentEntity(EntityId childId, EntityId newParentId) {
             m_world->Set<ECS::Parent>(child, ECS::Parent{ newParent });
         }
         else {
-            m_world->Add<ECS::Parent>(child, newParent);
+            m_world->Add<ECS::Parent>(child, ECS::Parent{ newParent });
         }
     }
 }
@@ -440,7 +439,7 @@ void EditorCore::CloneEntity(EntityId id) {
         ECS::Entity clonedEntity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
 
         if (!parent.IsNull()) {
-            m_world->Add<ECS::Parent>(clonedEntity, parent);
+            m_world->Add<ECS::Parent>(clonedEntity, ECS::Parent{ parent });
         }
 
         if (entityJson.contains("Children") && entityJson["Children"].is_array()) {

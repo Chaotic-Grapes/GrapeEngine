@@ -13,7 +13,7 @@ Implements a Unity-like hierarchy window UI for managing entities in a tree stru
 
 #include "../editor/HierarchyWindow.h"
 #include "core/Logger.h"
-#include "helpers/MathHelper.h"
+#include "helpers/MathUtils.h"
 #include "services/Input.h"
 #include "serialization/EntitySerializer.h"
 #include "core/Application.h"
@@ -22,6 +22,22 @@ Implements a Unity-like hierarchy window UI for managing entities in a tree stru
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
+
+namespace {
+    template <typename T>
+    bool AddComponentIfMatch(ECS::World* world,
+                             ECS::Entity instance,
+                             const std::string& typeName,
+                             const std::string& expectedName,
+                             nlohmann::json& compData) {
+        if (typeName != expectedName) return false;
+        if (!world->Has<T>(instance)) {
+            auto& c = world->Add<T>(instance);
+            from_json(compData, c);
+        }
+        return true;
+    }
+}
 
 void HierarchyWindow::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, EditorCore* editorCore) {
     m_mainFont = mainFont;
@@ -351,23 +367,16 @@ void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, E
                 ? comp["Data"]
                 : nlohmann::json::object();
 
-            auto addComp = [&]<typename T>(const std::string & name) -> bool {
-                if (typeName != name) return false;
-                if (!m_world->Has<T>(instance)) {
-                    auto& c = m_world->Add<T>(instance);
-                    from_json(compData, c);
-                }
-                return true;
-            };
+            // Use a file-scope templated helper to avoid MSVC restriction on local class templates
 
-            if (addComp.operator() < ECS::Components::LocalTransform > ("ECS::Components::LocalTransform")) { hasLocalTransform = true; continue; }
-            if (addComp.operator() < ECS::Components::SpriteRenderer2D > ("ECS::Components::SpriteRenderer2D")) continue;
-            if (addComp.operator() < ECS::Components::Rigidbody2D > ("ECS::Components::Rigidbody2D")) continue;
-            if (addComp.operator() < ECS::Components::CircleCollider2D > ("ECS::Components::CircleCollider2D")) continue;
-            if (addComp.operator() < ECS::Components::BoxCollider2D > ("ECS::Components::BoxCollider2D")) continue;
-            if (addComp.operator() < ECS::Components::ShapeCircle2D > ("ECS::Components::ShapeCircle2D")) continue;
-            if (addComp.operator() < ECS::Components::ShapeBox2D > ("ECS::Components::ShapeBox2D")) continue;
-            if (addComp.operator() < ECS::Components::ShapeLine2D > ("ECS::Components::ShapeLine2D")) continue;
+            if (AddComponentIfMatch<ECS::Components::LocalTransform>(m_world, instance, typeName, "ECS::Components::LocalTransform", compData)) { hasLocalTransform = true; continue; }
+            if (AddComponentIfMatch<ECS::Components::SpriteRenderer2D>(m_world, instance, typeName, "ECS::Components::SpriteRenderer2D", compData)) continue;
+            if (AddComponentIfMatch<ECS::Components::Rigidbody2D>(m_world, instance, typeName, "ECS::Components::Rigidbody2D", compData)) continue;
+            if (AddComponentIfMatch<ECS::Components::CircleCollider2D>(m_world, instance, typeName, "ECS::Components::CircleCollider2D", compData)) continue;
+            if (AddComponentIfMatch<ECS::Components::BoxCollider2D>(m_world, instance, typeName, "ECS::Components::BoxCollider2D", compData)) continue;
+            if (AddComponentIfMatch<ECS::Components::ShapeCircle2D>(m_world, instance, typeName, "ECS::Components::ShapeCircle2D", compData)) continue;
+            if (AddComponentIfMatch<ECS::Components::ShapeBox2D>(m_world, instance, typeName, "ECS::Components::ShapeBox2D", compData)) continue;
+            if (AddComponentIfMatch<ECS::Components::ShapeLine2D>(m_world, instance, typeName, "ECS::Components::ShapeLine2D", compData)) continue;
         }
 
         // Ensure sensible defaults if missing from prefab
@@ -393,7 +402,7 @@ void HierarchyWindow::_instantiatePrefabAsChild(const std::string& prefabPath, E
                 parentComp.ParentEntity = parentEntity;
             }
             else {
-                m_world->Add<ECS::Parent>(instance, parentEntity);
+                m_world->Add<ECS::Parent>(instance, ECS::Parent{ parentEntity });
             }
         }
 

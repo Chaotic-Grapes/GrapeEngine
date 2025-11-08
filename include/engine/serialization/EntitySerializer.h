@@ -116,6 +116,7 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ZIndex2D, ZOrder)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PrefabLink, prefabPath)
 		
 		// Custom serialization for ScriptInstance component (char array needs special handling)
 		inline void to_json(nlohmann::json& j, const ScriptInstance& s) {
@@ -301,6 +302,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices, "CameraMatrices")
 	REGISTER_COMPONENT_SERIALIZER(ScriptInstance, ECS::Components::ScriptInstance, "ScriptInstance")
 	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource, "AudioSource")
+	REGISTER_COMPONENT_SERIALIZER(PrefabLink, ECS::Components::PrefabLink, "PrefabLink")
 }
 
 #endif

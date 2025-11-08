@@ -104,7 +104,7 @@ void Input::SetupEventCallbacks() {
     glfwSetCursorPosCallback(m_window, _mousePosCallback);
     glfwSetScrollCallback(m_window, _mouseScrollCallback);
     glfwSetWindowSizeCallback(m_window, _windowSizeCallback);
-    glfwSetWindowSizeCallback(m_window, _fileDropCallback);
+    glfwSetDropCallback(m_window, _fileDropCallback);
 }
 
 // Called when GLFW encounters an error
@@ -164,15 +164,23 @@ void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int m
     (void)mod;
 
     if (action == GLFW_PRESS) {
+        double xPos = 0.0, yPos = 0.0;
+        if (Input::m_window) {
+            glfwGetCursorPos(Input::m_window, &xPos, &yPos);
+        }
         m_mouseDown[button] = true;
         m_mousePressed[button] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::MousePressed{ button,
+        Messaging::MessageSystem::Broadcast(Messaging::MouseButtonPressed{ button,
             static_cast<float>(xPos), static_cast<float>(yPos) });
     }
     else if (action == GLFW_RELEASE) {
+        double xPos = 0.0, yPos = 0.0;
+        if (Input::m_window) {
+            glfwGetCursorPos(Input::m_window, &xPos, &yPos);
+        }
         m_mouseDown[button] = false;
         m_mouseUp[button] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::MouseReleased{ button,
+        Messaging::MessageSystem::Broadcast(Messaging::MouseButtonReleased{ button,
             static_cast<float>(xPos), static_cast<float>(yPos) });
     }
 }

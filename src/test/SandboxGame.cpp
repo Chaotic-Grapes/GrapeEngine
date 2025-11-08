@@ -6,12 +6,13 @@
 #include "core/Application.h"
 #include "scene/TestSceneManager.h"
 #include "services/WindowManager.h"
+#include "services/OverlayService.h"
 #include <iostream>
 #include <memory>
 #include "ECSTest.hpp"
 #include "ScriptingTest.hpp"
 #include "PhysicsTest.h"
-#include "EditorTest.h"
+#include "LevelEditorTest.h"
 
 // Static test scene manager for engine tests
 static Scenes::TestSceneManager g_testSceneManager;
@@ -73,6 +74,7 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
             break;
         }
         case 6: {
+            // I want it to start sceneless
             LOG_INFO("Starting Level Editor (scene-less startup)...");
             const auto& config = Engine::CORE->GetConfig();
             CREATE_WINDOW("Level Editor", config.WindowConfig.Width, config.WindowConfig.Height);

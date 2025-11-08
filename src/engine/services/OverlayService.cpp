@@ -1,4 +1,5 @@
 #include "services/OverlayService.h"
+#include "scene/SceneManager.h"
 #include "services/WindowManager.h"
 #include "services/DebugUI.h"
 #include "services/Input.h"
@@ -7,17 +8,19 @@
 #include <imgui_internal.h>
 #include "core/messaging/MessageTypes.h"
 #include "core/messaging/MessageSystem.h"
-#include "../editor/LevelEditor.h"
+#include "../../include/editor/LevelEditor.h"
 #include "serialization/EntitySerializer.h"
 
 #ifdef USE_IMGUI
 
 namespace Services {
+    #ifdef USE_IMGUI
+    OverlayService::~OverlayService() { m_overlayInstance = nullptr; }
+    #endif
     void OverlayService::Initialize() {
         // Initialize DebugUI (always available)
         if (m_world) {
             m_debugUI = std::make_unique<DebugUI>(m_world);
-            UICommon::InitializeDefaultLayouts();
         }
 
         if (!m_debugUI)
@@ -55,6 +58,30 @@ namespace Services {
                     s_dumped = true;
                 }
             }
+        }
+    }
+
+    bool OverlayService::IsGamePlaying() const {
+        return m_levelEditor && m_levelEditor->IsPlaying();
+    }
+
+    bool OverlayService::IsStepRequested() const {
+        return m_levelEditor && m_levelEditor->IsStepRequested();
+    }
+
+    void OverlayService::ClearStepRequest() const {
+        if (m_levelEditor) m_levelEditor->ClearStepRequest();
+    }
+
+    void OverlayService::SetWorld(ECS::World* world) {
+        if (m_world == world) return;
+        m_world = world;
+        // Propagate world update directly to avoid stale references
+        if (m_levelEditor != nullptr) {
+            m_levelEditor->SetWorld(m_world);
+        }
+        if (m_debugUI != nullptr) {
+            m_debugUI->SetWorld(m_world);
         }
     }
 
@@ -190,5 +217,9 @@ void OverlayService::Render() {}
 void OverlayService::Terminate() {}
 void OverlayService::EnableLevelEditorForScene(Scenes::Scene* scene) {}
 void OverlayService::DisableLevelEditor() {}
+bool OverlayService::IsGamePlaying() const { return false; }
+bool OverlayService::IsStepRequested() const { return false; }
+void OverlayService::ClearStepRequest() const {}
+void OverlayService::SetWorld(ECS::World* world) { m_world = world; }
 #endif
 }

@@ -20,7 +20,6 @@ Features:
 #pragma once
 
 #include "scene/Scene.h"
-#include "../editor/LevelEditor.h"
 #include <memory>
 
 struct ImGuiContext;
@@ -30,7 +29,7 @@ namespace Sandbox {
     class LevelEditorTest : public Scenes::Scene {
     public:
         LevelEditorTest() = default;
-        ~LevelEditorTest() override = default;
+        ~LevelEditorTest() = default;
 
         /*!
         \brief Initialize the level editor scene.
@@ -38,7 +37,7 @@ namespace Sandbox {
         Creates the editor window, sets up ImGui, and initializes the LevelEditor
         with this scene's ECS world.
         */
-        void OnLoad() override;
+        void OnLoad();
 
         /*!
         \brief Update the level editor each frame.
@@ -46,17 +45,16 @@ namespace Sandbox {
         Processes editor input and updates all editor panels.
         Also handles rendering since Scene doesn't have separate OnRender.
         */
-        void OnUpdate() override;
+        void OnUpdate();
 
         /*!
         \brief Clean up level editor resources.
 
         Destroys the level editor and shuts down ImGui systems.
         */
-        void OnUnload() override;
+        void OnUnload();
 
     private:
-        std::unique_ptr<LevelEditor> m_levelEditor;  ///< The level editor instance
         ImGuiContext* m_imguiContext = nullptr;      ///< ImGui context for this scene
     };
 

@@ -24,14 +24,13 @@
 #include "core/IService.h"
 #include <memory>
 #include "audio/FmodAudioDevice.h"
+#include <memory>
 
 // Forward declarations
-namespace Scenes { class SceneManager; }
+namespace Scenes { class SceneManager; class Scene; }
 
-#ifdef USE_IMGUI
 #include "services/DebugUI.h"
-class DebugUI;
-#endif
+#include "../editor/LevelEditor.h"
 
 namespace Services {
     /**
@@ -66,19 +65,15 @@ namespace Services {
          * @brief Constructor for Overlay system
          */
     explicit OverlayService(Scenes::SceneManager& sceneManager) : IService("Overlay Service"), m_sceneManager(sceneManager) { 
-        m_sceneManager(sceneManager);
+        m_overlayInstance = this;
         SetEnabled(false); 
     }
 
 #ifdef USE_IMGUI
         /**
          * @brief Destructor for Overlay system
-         *
-         * Properly shuts down the debug UI and detaches the audio system
-         * to prevent memory leaks and ensure clean resource cleanup.
-         * Only defined when ImGui is available to avoid linking issues.
          */
-        ~OverlayService() override { m_overlayInstance = nullptr; }
+        ~OverlayService() override;
 #endif
 
         /**
@@ -111,6 +106,17 @@ namespace Services {
         void Terminate() override;
 
         /**
+         * @brief Enable the LevelEditor UI targeting a specific scene or globally
+         * @param scene Scene to attach the LevelEditor to; nullptr for scene-less mode
+         */
+        void EnableLevelEditorForScene(Scenes::Scene* scene);
+
+        /**
+         * @brief Disable the LevelEditor UI and release its resources
+         */
+        void DisableLevelEditor();
+
+        /**
          * @brief Set the audio system for debug monitoring
          * @param device Pointer to the audio system to monitor
          *
@@ -119,23 +125,11 @@ namespace Services {
          * real-time monitoring and control.
          */
         void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
-        void SetWorld(ECS::World* world) {
-            if (m_world == world) return;
-            m_world = world;
-#ifdef USE_IMGUI
-            // Propagate world update directly to avoid stale references
-            if (m_levelEditor) {
-                m_levelEditor->SetWorld(m_world);
-            }
-            if (m_debugUI) {
-                m_debugUI->SetWorld(m_world);
-            }
-#endif
-        }
+        void SetWorld(ECS::World* world);
 
-        bool IsGamePlaying() const { return m_levelEditor && m_levelEditor->IsPlaying(); }
-        bool IsStepRequested() const { return m_levelEditor && m_levelEditor->IsStepRequested(); }
-        void ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
+        bool IsGamePlaying() const;
+        bool IsStepRequested() const;
+        void ClearStepRequest() const;
 
         static inline OverlayService* Get() { return m_overlayInstance; }
 
@@ -143,6 +137,9 @@ namespace Services {
         Audio::FmodAudioDevice* m_audioDevice = nullptr;  ///< Pointer to audio system for debug monitoring
 		Scenes::SceneManager& m_sceneManager; 		      ///< Reference to the scene manager for world access
         ECS::World* m_world = nullptr;
+
+        // Global access helper for test harness and sandbox
+        static inline OverlayService* m_overlayInstance = nullptr;
 
 #ifdef USE_IMGUI
         std::unique_ptr<DebugUI> m_debugUI;

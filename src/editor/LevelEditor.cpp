@@ -9,7 +9,7 @@ Implements the LevelEditor class which orchestrates all editor panels.
 */
 /* End Header *******************************************************************/
 
-#include "../editor/LevelEditor.h"
+#include "../../include/editor/LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
 // Graphics unit conversion helpers (pixels <-> world)

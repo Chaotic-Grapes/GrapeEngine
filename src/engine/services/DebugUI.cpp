@@ -44,6 +44,7 @@ Features:
 #include "helpers/EntityUtils.h"
 #include "scene/Scene.h"
 #include "services/ResourceManager.h"
+#include "services/UICommon.h"
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
@@ -122,7 +123,7 @@ void DebugUI::Render() {
     _showEngineDebugWindow(); // Pass demo control to debug window
     _showPerformanceWindow();  // Show FPS and performance stats
     _showInputDebugWindow();   // Input debugging
-    _showGameObjectEditor();   // Game object editor
+    // _showGameObjectEditor();   // Game object editor (disabled: handled by LevelEditor)
     _showAudioWindow(m_audioPtr);
 
     // Show ImGUI's built-in demo window

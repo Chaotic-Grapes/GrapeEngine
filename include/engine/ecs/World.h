@@ -130,6 +130,18 @@ namespace ECS {
         }
 
         /**
+         * @brief Resolve an entity id to a valid Entity handle with current generation.
+         * @param id The entity index/id.
+         * @return ECS::Entity with up-to-date generation, or NULL_ENTITY if out of range.
+         */
+        Entity Resolve(const EntityId id) const {
+            if (id >= m_generations.size()) {
+                return NULL_ENTITY;
+            }
+            return Entity{ id, m_generations[id] };
+        }
+
+        /**
 		 * @brief Destroy the specified entity, removing it from the world.
 		 * @param e The entity to destroy
          * @note Assumes the entity is alive, behavior is undefined for dead entities.

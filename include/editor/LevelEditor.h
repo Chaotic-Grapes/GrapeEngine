@@ -25,11 +25,11 @@ Features:
 #include "../editor/HierarchyWindow.h"
 #include "../editor/InspectorWindow.h"
 #include <unordered_set>
+#include <imgui.h>
 
 // Forward declarations
 struct GLFWwindow;
 struct ImFont;
-struct ImVec2;
 
 // Configuration structure for level editor UI settings
 struct LevelEditorConfig {
