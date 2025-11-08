@@ -497,7 +497,15 @@ void EditorCore::_createNewScene() {
 
     if (Engine::CORE) {
         auto& sm = Engine::CORE->GetSceneManager();
-        size_t newIdx = sm.AddScene(new Scenes::Scene());
+        auto* newScene = new Scenes::Scene();
+        
+        // Set up default systems for new scenes in the editor
+        // May need to add more in the future though!
+        auto& profile = newScene->GetSystemProfile();
+        profile.AddSystem("Physics", true);
+        profile.AddSystem("Animation", true);
+        
+        size_t newIdx = sm.AddScene(newScene);
         sm.SetActiveImmediate(newIdx);
         // Do not bind world here; LevelEditor::Update will detect active change
         // and call LevelEditor::SetWorld -> EditorCore::SetWorld once.
@@ -660,7 +668,14 @@ bool EditorCore::_saveActiveScene(const std::string& path) {
     size_t idx = sm.GetActiveIndex();
 
     if (!sm.GetActive()) {
-        size_t newIdx = sm.AddScene(new Scenes::Scene());
+        auto* newScene = new Scenes::Scene();
+        
+        // Set up default systems for new scenes in the editor
+        auto& profile = newScene->GetSystemProfile();
+        profile.AddSystem("Physics", true);
+        profile.AddSystem("Animation", true);
+        
+        size_t newIdx = sm.AddScene(newScene);
         sm.SetActiveImmediate(newIdx);
         idx = newIdx;
     }
@@ -678,7 +693,14 @@ bool EditorCore::_loadSceneFromPath(const std::string& path) {
     size_t idx = sm.GetActiveIndex();
 
     if (!sm.GetActive()) {
-        size_t newIdx = sm.AddScene(new Scenes::Scene());
+        auto* newScene = new Scenes::Scene();
+        
+        // Set up default systems for new scenes in the editor
+        auto& profile = newScene->GetSystemProfile();
+        profile.AddSystem("Physics", true);
+        profile.AddSystem("Animation", true);
+        
+        size_t newIdx = sm.AddScene(newScene);
         sm.SetActiveImmediate(newIdx);
         idx = newIdx;
     }

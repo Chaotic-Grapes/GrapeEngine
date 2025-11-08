@@ -118,8 +118,6 @@ namespace Scenes {
 
         // ********************** Entity Management ********************** //
 
-        // ********************** Entity Management ********************** //
-
         /**
          * @brief Creates an empty entity in the scene with an optional parent.
          * @param parent Optional parent entity to establish hierarchy.

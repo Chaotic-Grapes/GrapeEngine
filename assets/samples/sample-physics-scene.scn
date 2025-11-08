@@ -188,5 +188,11 @@
         }}
       ]
     }
-  ]
+  ],
+  "SystemProfile": {
+    "Systems": [
+      { "Name": "Physics", "Enabled": true },
+      { "Name": "Animation", "Enabled": true }
+    ]
+  }
 }
