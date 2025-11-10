@@ -1,3 +1,26 @@
+/* Start Header *****************************************************************/
+/*!
+\file   PixelBufferObject.hpp
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
+\date   31st October 2025
+\brief
+Declares the PixelBufferObject (PBO) class, which encapsulates an OpenGL
+pixel buffer object used for asynchronous pixel transfers between the GPU
+and CPU.
+
+The PixelBufferObject class provides functions to:
+- Create, bind, and unbind GPU buffer objects for pixel data operations.
+- Map and unmap buffer memory for CPU-side access to GPU data.
+- Efficiently read back color or picking data without stalling the GPU.
+- Manage buffer lifetime through move semantics and explicit destruction.
+
+This class is primarily used in the engine’s object picking system, enabling
+non-blocking entity ID readbacks from off-screen framebuffers via double-buffered
+asynchronous PBOs.
+*/
+/* End Header *******************************************************************/
+
 #pragma once
 
 #include <glad/glad.h>

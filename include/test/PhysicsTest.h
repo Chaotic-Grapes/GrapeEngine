@@ -16,6 +16,7 @@
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/LifetimeSystem.h"
+#include "scene/TestScene.h"
 #include <vector>
 #include <memory>
 
@@ -24,7 +25,7 @@
 * @brief  sandbox scene to drive physics demonstrations.
 */
 namespace Sandbox {
-	class PhysicsTestScene : public Scenes::Scene {
+	class PhysicsTestScene : public Scenes::TestScene {
 	public:
 		
 		//store test iteration vars in enum
@@ -57,6 +58,10 @@ namespace Sandbox {
 
 		// Layer for rendering
 		uint16_t m_testLayer = 0;
+
+		// Persistent scene camera (packed id). Kept separate from testEntities so
+		// it survives test clears.
+		uint64_t m_cameraEntity = 0;
 
 		// tests cases
 		void PhysicsCollisionResponse();

@@ -51,211 +51,148 @@ void SerializationTestScene::OnLoad() {
 }
 
 void SerializationTestScene::RunAutomatedTest() {
-    LOG_DEBUG("PHASE 1: Creating Test Entities");
-    CreateTestEntities();
+    LOG_DEBUG("PHASE 1: Loading Prefab from assets/samples/sample-enemy-prefab.prefab");
+    LoadPrefabAndVerify();
     
-    LOG_DEBUG("PHASE 2: Saving Scene");
-    SaveScene();
-    if (!m_testPassed) {
-        LOG_ERROR("TEST STOPPED: Scene save failed"); 
-        return;
+    LOG_DEBUG("PHASE 2: Verifying Prefab Data");
+    if (m_testPassed && GetWorld().IsAlive(m_loadedEntity)) {
+        VerifyPrefabData(m_loadedEntity);
     }
-
-    LOG_DEBUG("PHASE 3: Loading Scene");
-    LoadScene();
-    if (!m_testPassed) {
-        LOG_ERROR("TEST STOPPED: Scene load failed"); 
-        return;
+    else {
+        LOG_ERROR("TEST STOPPED: Prefab load failed");
+        m_testPassed = false;
     }
-
-    LOG_DEBUG("PHASE 4: Verifying Loaded Data");
-    VerifyLoadedEntities();
+    
     PrintTestResults();
-
     LOG_DEBUG("Test complete. Check above for any failures.");
 }
 
-void SerializationTestScene::CreateTestEntities() {
+void SerializationTestScene::LoadPrefabAndVerify() {
     ECS::World& world = GetWorld();
-    
-    // Test 1: Entity with LocalTransform + SpriteRenderer2D + Name + Layer
-    ECS::Entity sprite = world.Create();
-    
-    // Add Layer component
-    world.Add<ECS::Components::Layer>(sprite, ECS::Components::Layer{ 0 });
-    
-    world.Add<ECS::Components::Name>(sprite);
-    auto& spriteName = world.Get<ECS::Components::Name>(sprite); // This assumes entity has Name component
-    strncpy_s(spriteName.Value, "TestSprite", sizeof(spriteName.Value) - 1);
-    
-    world.Add<ECS::Components::LocalTransform>(sprite);
-    auto& spriteTransform = world.Get<ECS::Components::LocalTransform>(sprite);
-    spriteTransform.Position = Vector3D{400.0f, 450.0f, 0.0f};
-    spriteTransform.Scale = Vector3D{128.0f, 128.0f, 1.0f};
-    spriteTransform.Rotation = Quaternion{0.0f, 0.0f, 0.382683f, 0.923880f};
-    
-    world.Add<ECS::Components::SpriteRenderer2D>(sprite);
-    auto& spriteRenderer = world.Get<ECS::Components::SpriteRenderer2D>(sprite);
-    spriteRenderer.TextureId = 1;
-    spriteRenderer.Color = Color{1.0f, 0.5f, 0.5f, 1.0f};
-    
-    m_originalEntities.push_back(sprite);
-    m_expectedData.push_back({"TestSprite", Vector3D{400.0f, 450.0f, 0.0f},  
-        Vector3D{128.0f, 128.0f, 1.0f}, Quaternion{0.0f, 0.0f, 0.382683f, 0.923880f}, 1, 0.0f, 0.0f});
-    
-    // Test 2: Entity with LocalTransform + LinearVelocity2D + Layer
-    ECS::Entity movingEntity = world.Create();
-    
-    // Add Layer component
-    world.Add<ECS::Components::Layer>(movingEntity, ECS::Components::Layer{ 0 });
-    
-    world.Add<ECS::Components::Name>(movingEntity);
-    auto& movingName = world.Get<ECS::Components::Name>(movingEntity);
-    strncpy_s(movingName.Value, "MovingEntity", sizeof(movingName.Value) - 1);
-    
-    world.Add<ECS::Components::LocalTransform>(movingEntity);
-    auto& movingTransform = world.Get<ECS::Components::LocalTransform>(movingEntity);
-    movingTransform.Position = Vector3D{100.0f, 100.0f, 0.0f};
-    movingTransform.Scale = Vector3D{50.0f, 50.0f, 1.0f};
-    
-    world.Add<ECS::Components::LinearVelocity2D>(movingEntity);
-    auto& velocity = world.Get<ECS::Components::LinearVelocity2D>(movingEntity);
-    velocity.Value = Vector2D{10.0f, 5.0f};
-    
-    m_originalEntities.push_back(movingEntity);
-    m_expectedData.push_back({"MovingEntity", Vector3D{100.0f, 100.0f, 0.0f},
-        Vector3D{50.0f, 50.0f, 1.0f}, Quaternion{0.0f, 0.0f, 0.0f, 1.0f}, 0, 10.0f, 5.0f});
-    
-    LOG_DEBUG("Created " << m_originalEntities.size() << " test entities");
-}
-
-void SerializationTestScene::SaveScene() {
-    ECS::World& world = GetWorld();
-    std::filesystem::create_directories("assets/samples");
     
     try {
-        json sceneJson;
-        sceneJson["Version"] = "1.0";
-        sceneJson["SceneName"] = "SerializationTest";
-        sceneJson["EntityCount"] = m_originalEntities.size();
-        
-        json entities = json::array();
-        for (const auto& entity : m_originalEntities) {
-            entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
-        }
-        sceneJson["Entities"] = std::move(entities);
-        
-        if (!Serialization::Serializer::SaveJson("assets/samples/sample-scene.scn", "scn", sceneJson)) {
-            LOG_ERROR("[FAIL] Scene save failed");
+        json prefabJson;
+        if (!Serialization::Serializer::LoadJson("assets/samples/sample-enemy-prefab.prefab", "prefab", prefabJson)) {
+            LOG_ERROR("[FAIL] Cannot load prefab JSON");
             m_testPassed = false;
             return;
         }
-        LOG_INFO("[PASS] Scene saved successfully");
+        
+        // Deserialize the prefab entity
+        m_loadedEntity = Serialization::EntitySerializer::DeserializeEntity(world, prefabJson);
+        
+        if (!world.IsAlive(m_loadedEntity)) {
+            LOG_ERROR("[FAIL] Loaded entity is not alive");
+            m_testPassed = false;
+            return;
+        }
+        
+        LOG_INFO("[PASS] Prefab loaded successfully");
     }
     catch (const std::exception& e) {
-        LOG_ERROR("[FAIL] Error during save: " << e.what());
+        LOG_ERROR("[FAIL] Error during prefab load: " << e.what());
         m_testPassed = false;
     }
 }
 
-void SerializationTestScene::LoadScene() {
-    ECS::World& world = GetWorld();
-    
-    for (auto& entity : m_originalEntities) {
-        if (world.IsAlive(entity)) {
-            world.Destroy(entity);
-        }
-    }
-    m_originalEntities.clear();
-    
-    try {
-        json sceneJson;
-        if (!Serialization::Serializer::LoadJson("assets/samples/sample-scene.scn", "scn", sceneJson)) {
-            LOG_ERROR("[FAIL] Cannot load scene JSON");
-            m_testPassed = false;
-            return;
-        }
-        
-        int loadedCount = 0;
-        if (sceneJson.contains("Entities")) {
-            for (const auto& entityJson : sceneJson["Entities"]) {
-                ECS::Entity newEntity = Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
-                m_originalEntities.push_back(newEntity);
-                loadedCount++;
-            }
-        }
-        
-        if (loadedCount == 0) {
-            LOG_ERROR("[FAIL] No entities were loaded");
-            m_testPassed = false;
-            return;
-        }
-        LOG_INFO("[PASS] Loaded " << loadedCount << " entities");
-    }
-    catch (const std::exception& e) {
-        LOG_ERROR("[FAIL] Error during load: " << e.what());
-        m_testPassed = false;
-    }
-}
-
-void SerializationTestScene::VerifyLoadedEntities() {
+void SerializationTestScene::VerifyPrefabData(ECS::Entity entity) {
     ECS::World& world = GetWorld();
     bool allTestsPassed = true;
     
-    for (const auto& entity : m_originalEntities) {
-        if (!world.IsAlive(entity)) {
-            LOG_ERROR("[FAIL] Entity is not alive");
-            allTestsPassed = false;
-            continue;
-        }
+    // Expected data from sample-enemy-prefab.prefab
+    const std::string expectedName = "EnemyPrefab";
+    const Vector3D expectedPosition = {650.0f, 750.0f, 0.0f};
+    const Vector3D expectedScale = {256.0f, 256.0f, 1.0f};
+    const Quaternion expectedRotation = {0.0f, 0.0f, 0.0f, 1.0f};
+    const uint32_t expectedTextureId = 1;
+    const Color expectedColor = {1.0f, 0.498039f, 0.498039f, 1.0f};
+    const uint16_t expectedLayerId = 0;
+    
+    // Verify Name component
+    if (world.Has<ECS::Components::Name>(entity)) {
+        const auto& nameComp = world.Get<ECS::Components::Name>(entity);
+        bool nameMatch = (std::strcmp(nameComp.Value, expectedName.c_str()) == 0);
+        LOG_DEBUG("  Name: " << (nameMatch ? "[PASS]" : "[FAIL]") 
+                  << " (Expected: '" << expectedName << "', Got: '" << nameComp.Value << "')");
+        if (!nameMatch) allTestsPassed = false;
+    }
+    else {
+        LOG_ERROR("[FAIL] Entity missing Name component");
+        allTestsPassed = false;
+    }
+    
+    // Verify Layer component
+    if (world.Has<ECS::Components::Layer>(entity)) {
+        const auto& layerComp = world.Get<ECS::Components::Layer>(entity);
+        bool layerMatch = (layerComp.Id == expectedLayerId);
+        LOG_DEBUG("  Layer: " << (layerMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: " << expectedLayerId << ", Got: " << layerComp.Id << ")");
+        if (!layerMatch) allTestsPassed = false;
+    }
+    else {
+        LOG_ERROR("[FAIL] Entity missing Layer component");
+        allTestsPassed = false;
+    }
+    
+    // Verify LocalTransform component
+    if (world.Has<ECS::Components::LocalTransform>(entity)) {
+        const auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
         
-        std::string name = "Unknown";
-        if (world.Has<ECS::Components::Name>(entity)) {
-            const auto& nameComp = world.Get<ECS::Components::Name>(entity);
-            name = nameComp.Value;
-        }
+        bool posMatch = (std::abs(transform.Position.X - expectedPosition.X) < 0.01f &&
+                       std::abs(transform.Position.Y - expectedPosition.Y) < 0.01f &&
+                       std::abs(transform.Position.Z - expectedPosition.Z) < 0.01f);
+        LOG_DEBUG("  Position: " << (posMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: [" << expectedPosition.X << ", " << expectedPosition.Y << ", " << expectedPosition.Z << "], "
+                  << "Got: [" << transform.Position.X << ", " << transform.Position.Y << ", " << transform.Position.Z << "])");
+        if (!posMatch) allTestsPassed = false;
         
-        const ExpectedData* expected = nullptr;
-        for (auto& exp : m_expectedData) {
-            if (exp.name == name) {
-                expected = &exp;
-                break;
-            }
-        }
+        bool scaleMatch = (std::abs(transform.Scale.X - expectedScale.X) < 0.01f &&
+                         std::abs(transform.Scale.Y - expectedScale.Y) < 0.01f &&
+                         std::abs(transform.Scale.Z - expectedScale.Z) < 0.01f);
+        LOG_DEBUG("  Scale: " << (scaleMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: [" << expectedScale.X << ", " << expectedScale.Y << ", " << expectedScale.Z << "], "
+                  << "Got: [" << transform.Scale.X << ", " << transform.Scale.Y << ", " << transform.Scale.Z << "])");
+        if (!scaleMatch) allTestsPassed = false;
         
-        if (!expected) continue;
+        bool rotMatch = (std::abs(transform.Rotation.W - expectedRotation.W) < 0.01f &&
+                       std::abs(transform.Rotation.X - expectedRotation.X) < 0.01f &&
+                       std::abs(transform.Rotation.Y - expectedRotation.Y) < 0.01f &&
+                       std::abs(transform.Rotation.Z - expectedRotation.Z) < 0.01f);
+        LOG_DEBUG("  Rotation: " << (rotMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: [" << expectedRotation.W << ", " << expectedRotation.X << ", " 
+                  << expectedRotation.Y << ", " << expectedRotation.Z << "], "
+                  << "Got: [" << transform.Rotation.W << ", " << transform.Rotation.X << ", " 
+                  << transform.Rotation.Y << ", " << transform.Rotation.Z << "])");
+        if (!rotMatch) allTestsPassed = false;
+    }
+    else {
+        LOG_ERROR("[FAIL] Entity missing LocalTransform component");
+        allTestsPassed = false;
+    }
+    
+    // Verify SpriteRenderer2D component
+    if (world.Has<ECS::Components::SpriteRenderer2D>(entity)) {
+        const auto& sprite = world.Get<ECS::Components::SpriteRenderer2D>(entity);
         
-        if (world.Has<ECS::Components::LocalTransform>(entity)) {
-            const auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
-            bool posMatch = (std::abs(transform.Position.X - expected->position.X) < 0.01f &&
-                           std::abs(transform.Position.Y - expected->position.Y) < 0.01f &&
-                           std::abs(transform.Position.Z - expected->position.Z) < 0.01f);
-            bool scaleMatch = (std::abs(transform.Scale.X - expected->scale.X) < 0.01f &&
-                             std::abs(transform.Scale.Y - expected->scale.Y) < 0.01f &&
-                             std::abs(transform.Scale.Z - expected->scale.Z) < 0.01f);
-            
-            LOG_DEBUG("  " << name << " - Position: " << (posMatch ? "[PASS]" : "[FAIL]"));
-            LOG_DEBUG("  " << name << " - Scale: " << (scaleMatch ? "[PASS]" : "[FAIL]"));
-            
-            if (!posMatch || !scaleMatch) allTestsPassed = false;
-        }
+        bool texMatch = (sprite.TextureId == expectedTextureId);
+        LOG_DEBUG("  TextureId: " << (texMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: " << expectedTextureId << ", Got: " << sprite.TextureId << ")");
+        if (!texMatch) allTestsPassed = false;
         
-        if (name == "TestSprite" && world.Has<ECS::Components::SpriteRenderer2D>(entity)) {
-            const auto& sprite = world.Get<ECS::Components::SpriteRenderer2D>(entity);
-            bool texMatch = sprite.TextureId == expected->textureId;
-            LOG_DEBUG("  " << name << " - TextureId: " << (texMatch ? "[PASS]" : "[FAIL]"));
-            if (!texMatch)
-                allTestsPassed = false;
-        }
-        
-        if (name == "MovingEntity" && world.Has<ECS::Components::LinearVelocity2D>(entity)) {
-            const auto& vel = world.Get<ECS::Components::LinearVelocity2D>(entity);
-            bool velMatch = (std::abs(vel.Value.X - expected->linearVelocityX) < 0.01f &&
-                           std::abs(vel.Value.Y - expected->linearVelocityY) < 0.01f);
-            LOG_DEBUG("  " << name << " - Velocity: " << (velMatch ? "[PASS]" : "[FAIL]"));
-            if (!velMatch)
-                allTestsPassed = false;
-        }
+        bool colorMatch = (std::abs(sprite.Color.R - expectedColor.R) < 0.01f &&
+                         std::abs(sprite.Color.G - expectedColor.G) < 0.01f &&
+                         std::abs(sprite.Color.B - expectedColor.B) < 0.01f &&
+                         std::abs(sprite.Color.A - expectedColor.A) < 0.01f);
+        LOG_DEBUG("  Color: " << (colorMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: [" << expectedColor.R << ", " << expectedColor.G << ", " 
+                  << expectedColor.B << ", " << expectedColor.A << "], "
+                  << "Got: [" << sprite.Color.R << ", " << sprite.Color.G << ", " 
+                  << sprite.Color.B << ", " << sprite.Color.A << "])");
+        if (!colorMatch) allTestsPassed = false;
+    }
+    else {
+        LOG_ERROR("[FAIL] Entity missing SpriteRenderer2D component");
+        allTestsPassed = false;
     }
     
     m_testPassed = allTestsPassed;
@@ -274,7 +211,9 @@ void SerializationTestScene::PrintTestResults() {
 }
 
 void SerializationTestScene::OnUpdate() {}
+
 void SerializationTestScene::OnUnload() {
-    m_originalEntities.clear();
-    m_expectedData.clear();
+    if (GetWorld().IsAlive(m_loadedEntity)) {
+        GetWorld().Destroy(m_loadedEntity);
+    }
 }

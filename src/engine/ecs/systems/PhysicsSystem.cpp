@@ -14,18 +14,18 @@
 * - Iterative position correction and velocity resolution using Physics helpers
 *
 * The implementation favors clarity and robustness with early-outs and explicit
-* checks. It relies on plain ECS components and engine physics helpers for 
+* checks. It relies on plain ECS components and engine physics helpers for
 * reusable math and manifold building.
 *
 * @sources
 * https://saeed1262.github.io/blog/2025/spatial-hashing-collision/
 * break down of implementing of spatial hashing method
 * linking it to broadphase collisions checking
-* finishing off with quick speed narrow phase checking 
-* overall optimise collision checks to a low amount 
+* finishing off with quick speed narrow phase checking
+* overall optimise collision checks to a low amount
 * making this a systematic autonomous approach to collision
 * systems
-* 
+*
 * @dependencies
 * - ecs/systems/PhysicsSystem.h, services/Time.h
 * - physics/Collision.h, physics/Physics.h, ecs/Components.h
@@ -48,17 +48,17 @@
 #include <iostream>
 #include "../engine/audio/FmodAudioDevice.h"
 
-    extern Audio::FmodAudioDevice* gAudioDevice;    
+extern Audio::FmodAudioDevice* gAudioDevice;
 
 
 #ifndef PHYSICS_AUDIO_DEVICE
 #define PHYSICS_AUDIO_DEVICE (gAudioDevice)
 #endif
 
- /**
- * @brief: Class that divides active world into a grid to quickly find entities. Application of this
- * in relation to the broad-narrow phase collision detection
- */
+/**
+* @brief: Class that divides active world into a grid to quickly find entities. Application of this
+* in relation to the broad-narrow phase collision detection
+*/
 class SpatialPartitioning {
 public:
     // cell sizes in float to determine the space size 
@@ -69,14 +69,14 @@ public:
     struct CellCoord {
         int x, y;
 
-    // operator to help this = other object cords
+        // operator to help this = other object cords
         bool operator==(const CellCoord& other) const { return x == other.x && y == other.y; }
     };
 
     // Hash function for CellCord so it can be used as unoredered_map key
     struct CellHash {
         size_t operator()(const CellCoord& c) const noexcept {
-            
+
             // combine x and y cords into single hash
             // the XOR with shifted Y prevents collisions
             return std::hash<int>{}(c.x) ^ (std::hash<int>{}(c.y) << 1);
@@ -85,14 +85,14 @@ public:
 
 
 
- /**
- * @brief: Inserts entity into spatial grid where we calculate which grid cells
- * the entity overlaps.
- * 
- * example: Entity at (100,100) with radius 50 and Cellsize previously declared as 64
- * - overlaps cells: (0,0), (1,0),(0,1),(1,1)
- * - gets inserted into all those 4 cells 
- */
+    /**
+    * @brief: Inserts entity into spatial grid where we calculate which grid cells
+    * the entity overlaps.
+    *
+    * example: Entity at (100,100) with radius 50 and Cellsize previously declared as 64
+    * - overlaps cells: (0,0), (1,0),(0,1),(1,1)
+    * - gets inserted into all those 4 cells
+    */
     void Insert(const ECS::Entity entity, const Vector3D& position, float radius) {
         //std::floor calculates the minimum value from float to int when you convert so basically
         // 15.75 -> becomes 15 instead of 16 so basically count down. 
@@ -111,7 +111,7 @@ public:
         // to be accessed later for grid check into collision checks.
         for (int cx = minX; cx <= maxX; ++cx) {
             for (int cy = minY; cy <= maxY; ++cy) {
-                m_grid[CellCoord{cx, cy}].push_back(entity);
+                m_grid[CellCoord{ cx, cy }].push_back(entity);
             }
         }
     }
@@ -152,7 +152,7 @@ private:
  * 1. integrate velocities
  * 2. build spatial grid
  * 3. generate collision pairs
- * 4. resolve collisions 
+ * 4. resolve collisions
  */
 
 namespace ECS {

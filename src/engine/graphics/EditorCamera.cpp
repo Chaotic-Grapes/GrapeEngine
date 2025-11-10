@@ -3,7 +3,7 @@
 \file   EditorCamera.cpp
 \author Choi Meng Yew
 \par    choi.m@digipen.edu
-\date   24th October 2025
+\date   31st October 2025
 \brief
 Implements a simplified EditorCamera for panning and zooming within the
 editor viewport. Left-click drag pans the view, right-click drag orbits,
@@ -34,7 +34,6 @@ namespace {
     constexpr float kDefaultDistance = 10.0f;
     constexpr float kDefaultNearPlane = 0.1f;
     constexpr float kDefaultFarPlane = 1000.0f;
-    constexpr float kDefaultAspectRatio = 16.0f / 9.0f;
 
     // Return to ortho constants
     constexpr float kReturnToOrthoSpeed = 5.0f;
@@ -74,8 +73,16 @@ namespace Engine {
     EditorCamera::EditorCamera(ECS::World& world)
         : m_cameraEntity(world.Create())
     {
+        // Keep reference to the world so we can clean up the camera entity later
+        m_world = &world;
+
         m_transform = &world.Add<ECS::Components::LocalTransform>(m_cameraEntity);
         m_camera = &world.Add<ECS::Components::Camera3D>(m_cameraEntity);
+
+        // Ensure the editor camera shows up with a clear name in the hierarchy
+        auto& nameComp = world.Add<ECS::Components::Name>(m_cameraEntity);
+        std::strncpy(nameComp.Value, "EditorCamera", sizeof(nameComp.Value) - 1);
+        nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
 
         m_camera->UsePerspective = false;
 
@@ -102,7 +109,7 @@ namespace Engine {
             << "  World viewport: " << kDefaultWorldViewHeight << " units tall\n";
 
         // Subscribe to window resize events
-        Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
+        m_windowResizedSub = Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
             [this](const Messaging::WindowResized& msg)
             {
                 OnWindowResize(msg.Width, msg.Height);
@@ -110,21 +117,72 @@ namespace Engine {
     }
 
     EditorCamera::~EditorCamera() {
-        std::cout << "[EditorCamera] Destroyed\n";
+        // Unsubscribe from window resize to prevent callbacks on a destroyed object
+        if (m_windowResizedSub.IsValid()) {
+            Messaging::MessageSystem::Unsubscribe<Messaging::WindowResized>(m_windowResizedSub);
+        }
+
+        // Proactively destroy the internal camera entity from its world to avoid duplicates
+        if (m_world && m_world->IsAlive(m_cameraEntity)) {
+            m_world->Destroy(m_cameraEntity);
+        }
+
+        // Camera destroyed cleanly
+    }
+
+    void EditorCamera::BindWorld(ECS::World& world) {
+        // No-op if binding to the same world
+        if (m_world == &world) return;
+
+        // Clean up previous entity if it exists
+        if (m_world && m_world->IsAlive(m_cameraEntity)) {
+            m_world->Destroy(m_cameraEntity);
+        }
+
+        // Rebind to the new world and recreate components
+        m_world = &world;
+        m_cameraEntity = world.Create();
+        m_transform = &world.Add<ECS::Components::LocalTransform>(m_cameraEntity);
+        m_camera = &world.Add<ECS::Components::Camera3D>(m_cameraEntity);
+
+        auto& nameComp = world.Add<ECS::Components::Name>(m_cameraEntity);
+        std::strncpy(nameComp.Value, "EditorCamera", sizeof(nameComp.Value) - 1);
+        nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
+
+        m_camera->UsePerspective = false;
+
+        auto* window = WindowManager::GetMainWindow();
+        const float screenWidth = static_cast<float>(window->Width());
+        const float screenHeight = static_cast<float>(window->Height());
+
+        // Preserve current ortho size target across binds
+        m_camera->OrthoSize = m_targetOrthoSize;
+
+        // Guard against zero height
+        if (screenHeight > 0.0f)
+            m_camera->AspectRatio = screenWidth / screenHeight;
+
+        m_camera->NearPlane = kDefaultNearPlane;
+        m_camera->FarPlane = kDefaultFarPlane;
+        m_camera->Active = true;
+
+        // Ensure transform reflects current internal state
+        UpdateTransform();
     }
 
     void EditorCamera::OnWindowResize(int newWidth, int newHeight) {
-        const float screenWidth = static_cast<float>(newWidth);
-        const float screenHeight = static_cast<float>(newHeight);
-        const float worldHeight = graphicsConfig::PixelsToWorld(screenHeight);
-        (void)screenWidth;
-        (void)worldHeight;
-
-        m_camera->AspectRatio = kDefaultAspectRatio;
+        if (!m_camera) return;
+        if (newHeight == 0) {
+            // Avoid division by zero; keep current aspect ratio
+            return;
+        }
+        m_camera->AspectRatio = static_cast<float>(newWidth) / static_cast<float>(newHeight);
     }
 
     void EditorCamera::Update(float dt) {
-        HandleInput(dt);
+        if (m_allowInput) {
+            HandleInput(dt);
+        }
     }
 
     // ============================================================================
@@ -159,7 +217,7 @@ namespace Engine {
         // ------------------------------
         // PANNING (LMB drag)
         // ------------------------------
-        if (Input::IsMouseDown(MOUSE_LEFT)) {
+        if (Input::IsMouseDown(MOUSE_MIDDLE)) {
             if (!m_panning) {
                 m_panning = true;
                 double px, py;
@@ -364,14 +422,6 @@ namespace Engine {
             }
             return result;
         }
-    }
-
-    glm::vec3 EditorCamera::GetPosition() const {
-        return {
-            m_transform->Position.X,
-            m_transform->Position.Y,
-            m_transform->Position.Z
-        };
     }
 
     void EditorCamera::Focus(const glm::vec3& target) {

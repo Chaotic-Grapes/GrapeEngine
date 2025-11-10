@@ -58,6 +58,8 @@ public:
     */
     static bool IsMouseDown(int button);
 
+    static bool IsMouseReleased(const int button);
+
     /*!
     \brief Check if a mouse button was just released this frame.
     \param button The mouse button to check (use MOUSE_* constants).
@@ -129,6 +131,7 @@ private:
     static void _mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod);
     static void _mousePosCallback(GLFWwindow* pWin, double xPos, double yPos);
     static void _mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffset);
+    static void _fileDropCallback(GLFWwindow* pWin, int count, const char** paths);
 
     // Process input events and update internal state (called once per frame)
     static void _processInput();

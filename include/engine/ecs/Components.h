@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file    Components.h
-\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par     muhammadnurfadzly.b@digipen.edu
+\author  Muhammad Nur Fadzly Bin Zulkifli (~90%), Choi Meng Yew (~10%)
+\par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
 \brief
 This file contains the declaration of various ECS components used in the engine.
 These components are plain data structures that can be attached to entities
@@ -119,6 +119,28 @@ namespace ECS {
             bool Enabled = true;
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
+
+        // Tracks source prefab asset for entity instantiation and editor re-import workflows
+        struct PrefabLink {
+        public:
+            // Fixed size buffer for prefab asset path to maintain 
+            // trivially copyable status for ECS performance
+            static constexpr size_t MaxPathLength = 256;
+            char prefabPath[MaxPathLength] = { 0 };     // Path to the prefab file this entity was created from
+            PrefabLink() = default;
+
+            // Construct from std::string
+            PrefabLink(const std::string& path) { setPath(path); }
+
+            // Safe string copy with null termination guarantee
+            void setPath(const std::string& path) {
+                strncpy_s(prefabPath, path.c_str(), MaxPathLength - 1);
+                prefabPath[MaxPathLength - 1] = '\0'; // Always null-terminate
+            }
+            // Convert back to std::string for convenience
+            std::string getPath() const { return std::string(prefabPath); }
+        };
+        static_assert(std::is_trivially_copyable_v<PrefabLink>, "PrefabLink must be trivially copyable");
 
         // Lifetime in seconds; entities with Time <= 0 can be culled by a system.
         struct Lifetime {
@@ -476,6 +498,15 @@ namespace ECS {
             std::string_view getFontPath() const { return { FontPath }; }
         };
         static_assert(std::is_trivially_copyable_v<Text>, "Text must be trivially copyable");
+
+        struct UIButton {
+            int ID;                     // Unique button identifier
+            float X, Y, W, H;          // Screen-space coordinates (pixels)
+            bool Hovered;
+            bool Pressed;
+            uint32_t ActionID;         // Maps to action in registry
+        };
+        static_assert(std::is_trivially_copyable_v<UIButton>, "UIButton must be trivially copyable");
 
         // ---------- Scripting / Audio (kept minimal) ----------
 

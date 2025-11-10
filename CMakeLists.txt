@@ -82,7 +82,6 @@ target_include_directories(GrapeEngine PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include/engine
     ${CMAKE_CURRENT_LIST_DIR}/include/test
     ${CMAKE_CURRENT_LIST_DIR}/include/externals
-    ${CMAKE_CURRENT_LIST_DIR}/include/engine/scripting # For CoreCLR hosting
 )
 
 # Link libraries

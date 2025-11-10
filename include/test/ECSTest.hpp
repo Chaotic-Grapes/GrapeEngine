@@ -32,11 +32,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/LifetimeSystem.h"
+#include "scene/TestScene.h"
 #include <vector>
 #include <memory>
 
 namespace Sandbox {
-    class ECSTestScene : public Scenes::Scene {
+    class ECSTestScene : public Scenes::TestScene {
     public:
         void OnLoad() override;
         void OnUpdate() override;
@@ -115,6 +116,8 @@ namespace Sandbox {
         int m_spawnCount = 0;
         // Title text entity (packed id)
         uint64_t m_testTitleEntity = 0;
+        // Persistent scene camera (packed id)
+        uint64_t m_cameraEntity = 0;
         
         // ------------------------------------
         // Test case implementations

@@ -68,7 +68,7 @@ public class EnemyAI : ScriptBehaviour
     private List<Entity> m_pathDebugEntities = new List<Entity>();
 
     // Player reference (need to read game manager probably info there)
-    private Entity m_playerEntity = null!;
+    private Entity? m_playerEntity = null;
     //bool flag for playerset
     private bool m_linkedToPlayer = false;
 
@@ -289,7 +289,6 @@ public class EnemyAI : ScriptBehaviour
             SetPlayerEntity(PlayerController.Instance.GetVisualEntity());
             // set bool to true 
             m_linkedToPlayer = true;
-
         }
 
     }
@@ -533,7 +532,7 @@ public class EnemyAI : ScriptBehaviour
     }
 
     // this helps enemy know who the player is 
-    public void SetPlayerEntity(Entity player)
+    public void SetPlayerEntity(Entity? player)
     {
         m_playerEntity = player;
     }

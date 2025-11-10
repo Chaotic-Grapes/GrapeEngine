@@ -20,6 +20,9 @@ Features:
 */
 /* End Header *******************************************************************/
 
+// Test
+#include "GraphicsTest.hpp"
+
 // Core
 #include "core/Application.h"
 #include "core/Logger.h"
@@ -27,6 +30,7 @@ Features:
 // ECS
 #include "ecs/Components.h"
 #include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/UISystem.h"
 
 // Graphics
 #include "graphics/font.hpp"
@@ -45,9 +49,6 @@ Features:
 #include "services/Window.h"
 #include "services/WindowManager.h"
 
-// Test
-#include "GraphicsTest.hpp"
-
 // External
 #include <glm/glm.hpp>
 #include <iostream>
@@ -55,7 +56,7 @@ Features:
 using namespace Sandbox;
 using namespace ECS;
 
-constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::BasicGraphics;
+constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::FontSys;
 constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::ObjectPicking;
 
 // extern ResourceManager RM;
@@ -105,11 +106,57 @@ void GraphicsTestScene::OnLoad() {
 
     m_gameplayLayer = GetLayers().CreateOrGetLayer("gameplay");
 
+
     m_rendererSystem = std::make_shared<ECS::RendererSystem>();
     m_rendererSystem->Initialize(GetWorld());
     AddSystem([this](Scenes::Scene& s, const float dt){
         m_rendererSystem->Update(s.GetWorld(), dt);
     }, "Renderer System");
+
+    // Create UI layer (render on top of everything)
+    uint16_t uiLayer = GetLayers().CreateOrGetLayer("ui");
+    m_rendererSystem->SetUILayer(uiLayer);
+
+    m_uiSystem = std::make_shared<ECS::UISystem>();
+    m_uiSystem->Initialize(GetWorld());
+
+    // Register button actions
+    // Action 1: Cycle to next test
+    m_uiSystem->RegisterAction(1, [this](ECS::World& world) {
+        LOG_INFO("Next Test button clicked!");
+
+        // Cycle to next test
+        int current = static_cast<int>(m_currentTest);
+        current++;
+        if (current > static_cast<int>(LAST_TEST)) {
+            current = static_cast<int>(DEFAULT_TEST);
+        }
+
+        // Clear old entities
+        for (const uint64_t id : m_testEntities) {
+            const ECS::Entity e = EntityUtils::Unpack(id);
+            if (world.IsAlive(e))
+                DestroyEntity(e);
+        }
+        m_testEntities.clear();
+
+        m_currentTest = static_cast<TestType>(current);
+        LOG_INFO("Switched to test " << current);
+        });
+
+    // Action 2: Quit application
+    m_uiSystem->RegisterAction(2, [](ECS::World& /*world*/) {
+        LOG_INFO("Quit button clicked! Closing application...");
+        Engine::CORE->Close();
+        });
+
+    // Add UISystem to scene update loop (BEFORE renderer so buttons update before drawing)
+    AddSystem([this](Scenes::Scene& s, const float dt) {
+        m_uiSystem->Update(s.GetWorld(), dt);
+        }, "UI System");
+
+    // ========== Create UI Buttons ==========
+    CreateUIButtons(GetWorld(), uiLayer);
 
     LOG_INFO("GraphicsTestScene initialized");
 }
@@ -163,14 +210,10 @@ void GraphicsTestScene::OnUpdate() {
     // ============================================================
     // M2 RUBRIC TESTS
     // ============================================================
-    case TestType::GameGUI:           runGameGUI();          break;
     case TestType::FontSys:           runFontSys();          break;
     case TestType::ViewportCamera:    runViewportCamera();   break;
-    case TestType::TransformationSys: runTransformationSys(); break;
-    case TestType::SpriteAnim:        runSpriteAnim();       break;
     case TestType::MultipleShaders:   runMultipleShaders();  break;
     case TestType::Batching:          runBatching();         break;
-    case TestType::EditorCamera:      runEditorCamera();     break;
     case TestType::ObjectPicking:     runObjectPicking();    break;
 
     // ============================================================
@@ -267,8 +310,8 @@ void GraphicsTestScene::runBasicGraphics() {
             ECS::Components::ShapeCircle2D{
                 0.5f,                          // radius
                 Vector2D{0.f, 0.f},            // offset
-                Color{0.f, 4.f, 0.f, 1.f},     // green outline
-                graphicsConfig::PixelsToWorld(50.f)                         // strokePx > 0 = outline
+                Color{0.f, 1.f, 0.f, 1.f},     // green outline
+                graphicsConfig::PixelsToWorld(200.f)                         // strokePx > 0 = outline
             },
             ECS::Components::Name{ "Outlined_Circle" }
         );
@@ -292,7 +335,7 @@ void GraphicsTestScene::runBasicGraphics() {
             },
             ECS::Components::Name{ "Collider_Circle" }
         );
-
+       
         // Track created entities
         m_testEntities.push_back(EntityUtils::Pack(square));
         m_testEntities.push_back(EntityUtils::Pack(filledCircle));
@@ -305,7 +348,6 @@ void GraphicsTestScene::runBasicGraphics() {
 
 void GraphicsTestScene::runDebugDrawing() {
     if (m_testEntities.empty()) {
-        // ECS::World& world = GetWorld();
         const std::string spritePath = "assets/textures/test/player.png";
 
         // Load texture (if valid)
@@ -371,7 +413,7 @@ void GraphicsTestScene::runDebugDrawing() {
     GL_LINEAR may still be appropriate.
 
 \test
-    Expected outcome: Two 256�256 sprites appear centered at 40% and 60% of the
+    Expected outcome: Two 256x256 sprites appear centered at 40% and 60% of the
     screen width, showing their PNG textures accurately without color distortion
     at the edges.
 */
@@ -560,8 +602,6 @@ void GraphicsTestScene::runSpriteRotation() {
 }
 
 void GraphicsTestScene::runAnimation() {
-    // ECS::World& world = GetWorld();
-
     if (!m_rendererSystem) return;
     auto* renderer = m_rendererSystem->GetRenderer();
     auto* shader = m_rendererSystem->GetShader();
@@ -635,8 +675,6 @@ void GraphicsTestScene::runAnimation() {
 }
 
 void GraphicsTestScene::runMultiAnimation() {
-    // ECS::World& world = GetWorld();
-
     if (!m_rendererSystem) return;
     auto* renderer = m_rendererSystem->GetRenderer();
     auto* shader = m_rendererSystem->GetShader();
@@ -843,6 +881,7 @@ void GraphicsTestScene::runFontSystem() {
                 Vector3D{ 1.0f, 1.0f, 1.0f }
             },
             ECS::Components::WorldTransform{},
+            ECS::Components::Layer{ 0 },
             ECS::Components::Text{
                 "Do not go gentle into that good night,\n"
                 "Old age should burn and rave at close of day;",
@@ -862,6 +901,7 @@ void GraphicsTestScene::runFontSystem() {
                 Vector3D{ 1.0f, 1.0f, 1.0f }
             },
             ECS::Components::WorldTransform{},
+            ECS::Components::Layer{ 0 },
             ECS::Components::Text{
                 "AV AW To Yo Wa Fo\n"
                 "if fi fl fj fk yj yp\n"
@@ -878,11 +918,12 @@ void GraphicsTestScene::runFontSystem() {
         ECS::Entity text3 = CreateOnLayer(
             m_gameplayLayer,
             ECS::Components::LocalTransform{
-                Vector3D{ 100.f, 100.f, 0.0f },
+                Vector3D{ 300.f, 100.f, 0.0f },
                 Quaternion::Identity(),
                 Vector3D{ 1.0f, 1.0f, 1.0f }
             },
             ECS::Components::WorldTransform{},
+            ECS::Components::Layer{ 0 },
             ECS::Components::Text{
                 "Men at some time are masters of their fates.\n"
                 "The fault, dear Brutus, is not in our stars,\n"
@@ -904,6 +945,7 @@ void GraphicsTestScene::runFontSystem() {
                 Vector3D{ 1.0f, 1.0f, 1.0f }
             },
             ECS::Components::WorldTransform{},
+            ECS::Components::Layer{ 0 },
             ECS::Components::Text{
                 "FPS: 0",
                 32.0f,
@@ -943,11 +985,6 @@ void GraphicsTestScene::runFontSystem() {
 // ============================================================
 // M2 TEST RUNNERS
 // ============================================================
-
-void Sandbox::GraphicsTestScene::runGameGUI() {
-    // TODO: Implement M2 Game GUI test
-}
-
 void Sandbox::GraphicsTestScene::runFontSys() {
     runFontSystem();
 }
@@ -965,7 +1002,7 @@ void GraphicsTestScene::runViewportCamera() {
         ECS::Entity player = world.Create();
 
         auto& playerTr = world.Add<ECS::Components::LocalTransform>(player);
-        playerTr.Position = { 0.f, 0.f, 0.f };
+        playerTr.Position = { 2.f, 0.f, 0.f };
         playerTr.Scale = { 1.f, 1.f, 1.f };
         playerTr.Rotation = Quaternion::Identity();
 
@@ -1035,8 +1072,6 @@ void GraphicsTestScene::runViewportCamera() {
 
     auto& playerTr = world.Get<ECS::Components::LocalTransform>(playerEntity);
     auto& camTr = world.Get<ECS::Components::LocalTransform>(camEntity);
-    auto& camComp = world.Get<ECS::Components::Camera3D>(camEntity); // if you need params
-	(void)camComp; // Remove this if camComp is needed
 
     // Movement input (keep your units the same)
     const float dt = Time::DeltaTime();
@@ -1058,112 +1093,16 @@ void GraphicsTestScene::runViewportCamera() {
     // camTr.Position.Z stays as is (e.g., 10.f)
 }
 
-
-void Sandbox::GraphicsTestScene::runTransformationSys() {
-    // TODO: Implement M2 Transformation System test
-}
-
-void Sandbox::GraphicsTestScene::runSpriteAnim() {
-    runAnimation();
-}
-
 void GraphicsTestScene::runMultipleShaders() {
-    if (m_testEntities.empty()) {
-        const float midX = m_worldWidth * 0.5f;
-        const float midY = m_worldHeight * 0.5f;
-
-        // ---------------------------------------------
-        // Player: controllable yellow circle (filled)
-        // ---------------------------------------------
-        ECS::Entity player = CreateOnLayer(
-            m_gameplayLayer,
-            ECS::Components::LocalTransform{
-                Vector3D{ midX, midY, 0.f },
-                Quaternion::Identity(),
-                Vector3D{ 1.f, 1.f, 1.f }
-            },
-            ECS::Components::WorldTransform{},
-            ECS::Components::ShapeCircle2D{
-                60.f,
-                Vector2D{ 0.f, 0.f },
-                Color{ 9.f, 3.f, 0.f, 1.f }, // brighter yellow
-                0.f                          // filled
-            },
-            ECS::Components::Name{ "Player" }
-        );
-
-        // ---------------------------------------------
-        // Static red circle (left side)
-        // ---------------------------------------------
-        ECS::Entity redCircle = CreateOnLayer(
-            m_gameplayLayer,
-            ECS::Components::LocalTransform{
-                Vector3D{ midX - 250.f, midY, 0.f },
-                Quaternion::Identity(),
-                Vector3D{ 1.f, 1.f, 1.f }
-            },
-            ECS::Components::WorldTransform{},
-            ECS::Components::ShapeCircle2D{
-                50.f,
-                Vector2D{ 0.f, 0.f },
-                Color{ 1.f, 0.f, 0.f, 1.f },
-                0.f
-            },
-            ECS::Components::Name{ "RedCircle" }
-        );
-
-        // ---------------------------------------------
-        // Static green outlined circle (right side)
-        // ---------------------------------------------
-        ECS::Entity greenOutline = CreateOnLayer(
-            m_gameplayLayer,
-            ECS::Components::LocalTransform{
-                Vector3D{ midX + 250.f, midY, 0.f },
-                Quaternion::Identity(),
-                Vector3D{ 1.f, 1.f, 1.f }
-            },
-            ECS::Components::WorldTransform{},
-            ECS::Components::ShapeCircle2D{
-                60.f,
-                Vector2D{ 0.f, 0.f },
-                Color{ 0.f, 1.f, 0.f, 1.f },
-                3.f // outline stroke
-            },
-            ECS::Components::Name{ "GreenOutlinedCircle" }
-        );
-
-        // Track entities
-        m_testEntities.push_back(EntityUtils::Pack(player));
-        m_testEntities.push_back(EntityUtils::Pack(redCircle));
-        m_testEntities.push_back(EntityUtils::Pack(greenOutline));
-
-        LOG_DEBUG("Spawned player and test circles for MultipleShaders test");
-    }
-
-    // ---------------------------------------------
-    // Simple player movement logic
-    // ---------------------------------------------
-    ECS::World& world = GetWorld();
-    ECS::Entity playerEntity = EntityUtils::Unpack(m_testEntities[0]);
-    auto& playerTr = world.Get<ECS::Components::LocalTransform>(playerEntity);
-
-    const float moveSpeed = 400.f * Time::DeltaTime();
-    if (Input::IsKeyDown(KEY_A)) playerTr.Position.X -= moveSpeed;
-    if (Input::IsKeyDown(KEY_D)) playerTr.Position.X += moveSpeed;
-    if (Input::IsKeyDown(KEY_W)) playerTr.Position.Y += moveSpeed;
-    if (Input::IsKeyDown(KEY_S)) playerTr.Position.Y -= moveSpeed;
+    GraphicsTestScene::runBasicGraphics();
 }
 
 void Sandbox::GraphicsTestScene::runBatching() {
-    // TODO: Implement M2 Batching / draw-call reduction test
-}
-
-void Sandbox::GraphicsTestScene::runEditorCamera() {
-    // TODO: Implement M2 Editor Camera test
+    GraphicsTestScene::runBatchStress();
 }
 
 void Sandbox::GraphicsTestScene::runObjectPicking() {
-    // TODO: Implement M2 Object Picking test
+    GraphicsTestScene::runBasicGraphics();
 }
 
 // ============================================================
@@ -1225,8 +1164,6 @@ void GraphicsTestScene::testSingleTexture() {
 }
 
 void GraphicsTestScene::analyzeRenderer() {
-    // ECS::World& world = GetWorld();
-
     if (!m_rendererSystem) {
         LOG_ERROR("RendererSystem system not found!");
         return;
@@ -1289,4 +1226,110 @@ void GraphicsTestScene::testSmallBatch() {
             LOG_DEBUG("Even 100 sprites are slow, that means the bottleneck is NOT batch size!!!");
         }
     }
+}
+
+void GraphicsTestScene::CreateUIButtons(ECS::World& world, uint16_t uiLayer) {
+    // Button dimensions (pixels)
+    constexpr float buttonWidth = 200.0f;
+    constexpr float buttonHeight = 60.0f;
+    constexpr float padding = 20.0f;
+
+    constexpr float worldButtonW = graphicsConfig::PixelsToWorld(buttonWidth);
+    constexpr float worldButtonH = graphicsConfig::PixelsToWorld(buttonHeight);
+    constexpr float worldPadding = graphicsConfig::PixelsToWorld(padding);
+
+    // ========== Button 1: Next Test (bottom-left) ==========
+    ECS::Entity nextTestBtn = world.Create();
+
+    // Position in world space (bottom-left corner)
+    auto& btn1Transform = world.Add<ECS::Components::LocalTransform>(nextTestBtn);
+    btn1Transform.Position = {
+        -m_worldWidth * 0.5f + worldPadding + worldButtonW * 0.5f,  // Left edge + padding + half button
+        -m_worldHeight * 0.5f + worldPadding + worldButtonH * 0.5f, // Bottom edge + padding + half button
+        0.0f
+    };
+    btn1Transform.Rotation = Quaternion::Identity();
+    btn1Transform.Scale = { 1.0f, 1.0f, 1.0f };
+
+    world.Add<ECS::Components::WorldTransform>(nextTestBtn);
+
+    auto& btn1UI = world.Add<ECS::Components::UIButton>(nextTestBtn);
+    btn1UI.ID = 1;
+    btn1UI.X = padding;
+    btn1UI.Y = padding;
+    btn1UI.W = buttonWidth;
+    btn1UI.H = buttonHeight;
+    btn1UI.Hovered = false;
+    btn1UI.Pressed = false;
+    btn1UI.ActionID = 1;
+
+    world.Add<ECS::Components::Layer>(nextTestBtn).Id = uiLayer;
+    world.Add<ECS::Components::Name>(nextTestBtn).Value[0] = '\0';
+    strncpy_s(world.Get<ECS::Components::Name>(nextTestBtn).Value, "UI_Button_NextTest", 63);
+
+    // Add text label for button 1
+    ECS::Entity btn1Label = world.Create();
+
+    auto& label1Transform = world.Add<ECS::Components::LocalTransform>(btn1Label);
+    label1Transform.Position = { padding + buttonWidth * 0.5f - 50.0f, padding + buttonHeight * 0.5f + 5.0f, 0.0f };
+    label1Transform.Rotation = Quaternion::Identity();
+    label1Transform.Scale = { 1.0f, 1.0f, 1.0f };
+
+    auto& label1Text = world.Add<ECS::Components::Text>(btn1Label);
+    label1Text.setContent("Next Test (G)");
+    label1Text.PixelSize = 18.0f;
+    label1Text.Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    label1Text.Anchor = ECS::Components::TextAnchor::Absolute;
+
+    world.Add<ECS::Components::Layer>(btn1Label).Id = uiLayer;
+
+    // ========== Button 2: Quit (stacked above button 1) ==========
+    ECS::Entity quitBtn = world.Create();
+
+    auto& btn2Transform = world.Add<ECS::Components::LocalTransform>(quitBtn);
+    btn2Transform.Position = {
+        -m_worldWidth * 0.5f + worldPadding + worldButtonW * 0.5f,
+        -m_worldHeight * 0.5f + worldPadding * 2.0f + worldButtonH * 1.5f,  // Stack above
+        0.0f
+    };
+    btn2Transform.Rotation = Quaternion::Identity();
+    btn2Transform.Scale = { 1.0f, 1.0f, 1.0f };
+
+    world.Add<ECS::Components::WorldTransform>(quitBtn);
+
+    auto& btn2UI = world.Add<ECS::Components::UIButton>(quitBtn);
+    btn2UI.ID = 2;
+    btn2UI.X = padding;
+    btn2UI.Y = padding + buttonHeight + padding;
+    btn2UI.W = buttonWidth;
+    btn2UI.H = buttonHeight;
+    btn2UI.Hovered = false;
+    btn2UI.Pressed = false;
+    btn2UI.ActionID = 2;
+
+    world.Add<ECS::Components::Layer>(quitBtn).Id = uiLayer;
+    world.Add<ECS::Components::Name>(quitBtn).Value[0] = '\0';
+    strncpy_s(world.Get<ECS::Components::Name>(quitBtn).Value, "UI_Button_Quit", 63);
+
+    // Add text label for button 2
+    ECS::Entity btn2Label = world.Create();
+
+    auto& label2Transform = world.Add<ECS::Components::LocalTransform>(btn2Label);
+    label2Transform.Position = {
+        padding + buttonWidth * 0.5f - 40.0f,
+        padding + buttonHeight + padding + buttonHeight * 0.5f + 5.0f,
+        0.0f
+    };
+    label2Transform.Rotation = Quaternion::Identity();
+    label2Transform.Scale = { 1.0f, 1.0f, 1.0f };
+
+    auto& label2Text = world.Add<ECS::Components::Text>(btn2Label);
+    label2Text.setContent("Quit (ESC)");
+    label2Text.PixelSize = 18.0f;
+    label2Text.Color = { 1.0f, 0.8f, 0.8f, 1.0f };
+    label2Text.Anchor = ECS::Components::TextAnchor::Absolute;
+
+    world.Add<ECS::Components::Layer>(btn2Label).Id = uiLayer;
+
+    LOG_DEBUG("Created 2 UI buttons with text labels");
 }

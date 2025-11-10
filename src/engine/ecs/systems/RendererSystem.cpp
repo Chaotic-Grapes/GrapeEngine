@@ -1,11 +1,24 @@
 /* Start Header *****************************************************************/
 /*!
-\file    RendererSystem.cpp
-\authors Muhammad Nur Fadzly Bin Zulkifli (15%), Choi Meng Yew (85%)
-\par     muhammadnurfadzly.b@digipen.edu, choi.m@digipen.edu
-\date    20th October 2025
+\file   RendererSystem.cpp
+\author Choi Meng Yew
+\date   31st October 2025
 \brief
-Implements the RendererSystem.
+Implementation of the RendererSystem, the high-level rendering pipeline
+for the ECS. Manages shader programs, framebuffers, and the RenderGraph
+to orchestrate a multi-pass pipeline including scene rendering, HDR,
+bloom extraction, two-pass Gaussian blur, and final tone-mapped composite.
+
+Responsibilities:
+- Initialize and manage rendering resources (shaders, render targets, framebuffers)
+- Execute a RenderGraph-based pipeline for HDR and post-processing effects
+- Render ECS entities by layer with support for SDF primitives, sprites, and text
+- Handle object picking and selection highlighting via ID-encoded FBO
+- Provide editor camera controls and entity drag-to-move functionality
+
+The RendererSystem acts as the bridge between ECS data and GPU rendering,
+handling batching, shader bindings, and visual effects in a modular,
+pass-based architecture.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -78,6 +91,26 @@ namespace ECS {
             outRotation = lt.Rotation;
             outScale = lt.Scale;
         }
+    }
+
+    // Helper function to convert screen coordinates to world coordinates
+    static glm::vec2 ScreenToWorld(const glm::dvec2& screenPos, const glm::mat4& view, const glm::mat4& projection) {
+        const auto& mainWindow = WindowManager::GetMainWindow();
+        const float screenWidth = static_cast<float>(mainWindow->Width());
+        const float screenHeight = static_cast<float>(mainWindow->Height());
+
+        // Normalize device coordinates (-1 to 1)
+        glm::vec4 ndc;
+        ndc.x = (2.0f * static_cast<float>(screenPos.x)) / screenWidth - 1.0f;  // explicit cast
+        ndc.y = 1.0f - (2.0f * static_cast<float>(screenPos.y)) / screenHeight; // explicit cast
+        ndc.z = 0.0f;
+        ndc.w = 1.0f;
+
+        // Inverse projection and view
+        glm::mat4 invViewProj = glm::inverse(projection * view);
+        glm::vec4 worldPos = invViewProj * ndc;
+
+        return glm::vec2(worldPos.x, worldPos.y);
     }
 
     void RendererSystem::Initialize(World& world) {
@@ -179,6 +212,22 @@ namespace ECS {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
+    void RendererSystem::BindWorld(World& world) {
+        // Maintain a single EditorCamera instance; rebind to the new world instead of recreating
+        if (!m_editorCamera) {
+            m_editorCamera = std::make_unique<Engine::EditorCamera>(world);
+        }
+        else {
+            m_editorCamera->BindWorld(world);
+        }
+
+        if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
+            // Keep editor camera usage consistent across scenes
+            m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
+            m_cameraOrthoSize = m_editorCamera->GetCameraComponent()->OrthoSize;
+        }
+    }
+
     glm::vec2 RendererSystem::CalculateAnchoredPosition(
         const Components::LocalTransform& transform,
         Components::TextAnchor anchor,
@@ -244,11 +293,37 @@ namespace ECS {
         // ============================================================
         // 1. Toggle or cycle camera
         // ============================================================
-        if (Input::IsKeyPressed(KEY_C)) {
-            m_useEditorCamera = !m_useEditorCamera;
-            std::cout << "[RendererSystem] "
-                << (m_useEditorCamera ? "Using Editor Camera" : "Using Scene Camera")
-                << std::endl;
+        if (!m_lockEditorCamera && Input::IsKeyPressed(KEY_C)) {
+            // Count available cameras
+            bool hasSceneCamera = false;
+
+            world.Each<ECS::Components::Camera3D>([&](ECS::Entity e, ECS::Components::Camera3D& cam) {
+                (void)cam;
+                // Exclude editor camera entity from count
+                if (m_editorCamera && e != m_editorCamera->GetEntity()) {
+                    hasSceneCamera = true;
+                }
+                });
+
+            // Determine what to do based on camera availability
+            if (!hasSceneCamera && !m_useEditorCamera) {
+                // We're on scene camera but there isn't one - shouldn't happen, but stay safe
+                std::cout << "[RendererSystem] Warning: No scene camera exists, switching to editor camera"
+                    << std::endl;
+                m_useEditorCamera = true;
+            }
+            else if (hasSceneCamera) {
+                // Normal toggle; we have a scene camera to toggle to/from
+                m_useEditorCamera = !m_useEditorCamera;
+                std::cout << "[RendererSystem] "
+                    << (m_useEditorCamera ? "Using Editor Camera" : "Using Scene Camera")
+                    << std::endl;
+            }
+            else {
+                // We're on editor camera and there's no scene camera so don't toggle
+                std::cout << "[RendererSystem] No scene camera available - staying on editor camera"
+                    << std::endl;
+            }
 
             if (m_editorCamera) {
                 m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
@@ -258,7 +333,17 @@ namespace ECS {
         // ============================================================
         // 2. Use EditorCamera if active, otherwise ECS camera
         // ============================================================
+        if (m_lockEditorCamera) {
+            // Hard-lock: always use editor camera
+            m_useEditorCamera = true;
+            if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
+                m_editorCamera->GetCameraComponent()->Active = true;
+            }
+        }
+
         if (m_useEditorCamera && m_editorCamera) {
+            // Respect editor UI hover: only process input when viewport is hovered
+            m_editorCamera->SetAllowInput(m_editorInputEnabled);
             m_editorCamera->Update(Time::DeltaTime());
             view = m_editorCamera->GetViewMatrix();
             projection = m_editorCamera->GetProjectionMatrix();
@@ -388,6 +473,37 @@ namespace ECS {
                 for (int layer = 0; layer <= maxLayerId; ++layer) {
                     if (layer >= static_cast<int>(buckets.size())) continue;
                     const auto& list = buckets[layer];
+
+                    // ========== CHECK IF THIS IS THE UI LAYER ==========
+                    // UI should use fixed screen-space projection, not camera projection
+                    bool isUILayer = false;
+                    glm::mat4 layerViewProj = viewProj;  // Default: use camera projection
+
+                    // Check if any entity in this layer is marked as UI
+                    // (You can optimize this by caching the UI layer ID)
+                    for (const auto& entity : list) {
+                        if (world.Has<Components::Layer>(entity)) {
+                            // const auto& layerComp = world.Get<Components::Layer>(entity);
+                            // Check if this layer is the "ui" layer (we may need to adjust this check)
+                            // For now, we'll assume layer IDs > maxLayerId-1 are UI, or check by name
+                            // A better way: check if entity has UIButton component
+                            if (world.Has<Components::UIButton>(entity)) {
+                                isUILayer = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // If this is UI layer, use fixed screen-space projection
+                    if (isUILayer) {
+                        const auto& win = WindowManager::GetMainWindow();
+                        glm::mat4 uiProjection = glm::ortho(
+                            0.0f, static_cast<float>(win->Width()),
+                            0.0f, static_cast<float>(win->Height()),
+                            -1.0f, 1.0f
+                        );
+                        layerViewProj = uiProjection;  // No view matrix, just screen-space projection
+                    }
 
                     // --- Sub-pass 1: SDF circles on this layer ---
                     m_sdfCircleShader->use();
@@ -663,6 +779,10 @@ namespace ECS {
         m_renderGraph->AddPass("Picking", {}, {},
             [this, &world, &viewProj, &buckets](ResourceAccessor& res)
             {
+                (void)res;
+                // Dont pick while dragging.
+                if (m_isDragging) return;
+
                 // single-click detection
                 if (!Input::IsMousePressed(MOUSE_LEFT)) return;
 
@@ -766,7 +886,7 @@ namespace ECS {
                             // Use -1 so the shader treats this as a solid-color shape (no texture sampling).
                             // In the picking shader, texIndex >= 0 samples a texture and may alpha-discard.
                             // Negative indices skip sampling and always write the ID color.
-                            DebugDraw2D::RectFill(*m_renderer, min, max, idColor, -1);
+                            DebugDraw2D::RectFill(*m_renderer, min, max, idColor, static_cast<GLuint>(-1));
                         }
 
                         // Render SPRITES with ID color
@@ -791,12 +911,12 @@ namespace ECS {
 
                 m_renderer->endFrame();
 
-                // Read pixel at mouse position (async)
+                // Read pixel at mouse position (async) using window coordinates
                 glm::dvec2 mousePos;
                 Input::GetMousePosition(mousePos.x, mousePos.y);
-
+                const auto& win = WindowManager::GetMainWindow();
                 int x = static_cast<int>(mousePos.x);
-                int y = m_pickingFBO.height - static_cast<int>(mousePos.y); // Flip Y
+                int y = static_cast<int>(static_cast<double>(win->Height()) - mousePos.y); // Flip Y to GL origin
 
                 static bool firstFrame = true;
                 if (!firstFrame) {
@@ -805,9 +925,9 @@ namespace ECS {
                     uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF; // Mask to 24-bit
 
                     if (pickedID > 0) {
-                        m_selectedEntityID = pickedID; // Store for outline rendering and doing property updates etc.
+                        m_selectedEntityID = pickedID;
                         std::cout << "Picked entity index: " << pickedID << std::endl;
-                        // ... handle picked ID
+
                     } else {
                         m_selectedEntityID = 0; // Clear selection if clicking empty space
                     }
@@ -1190,6 +1310,90 @@ namespace ECS {
         // EXECUTE RENDER GRAPH
         // ============================================================
         m_renderGraph->Execute();
+
+        // ============================================================
+        // DRAG-TO-MOVE SELECTED ENTITY
+        // ============================================================
+        static bool wasMouseDownLastFrame = false;
+        static uint32_t lastSelectedEntityID = 0;  // Track previous selection
+
+        if (m_selectedEntityID != 0) {
+            glm::dvec2 mousePos;
+            Input::GetMousePosition(mousePos.x, mousePos.y);
+            glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection);
+
+            bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
+            bool mouseJustPressed = isMouseDownThisFrame && !wasMouseDownLastFrame;
+
+            // Check if selection changed
+            bool selectionChanged = (m_selectedEntityID != lastSelectedEntityID);
+            if (selectionChanged) {
+                std::cout << "[DRAG] Selection changed from " << lastSelectedEntityID
+                    << " to " << m_selectedEntityID << std::endl;
+                // Cancel any ongoing drag
+                m_isDragging = false;
+                lastSelectedEntityID = m_selectedEntityID;
+            }
+
+            // Capture entity position on initial press OR when selection changes
+            if ((mouseJustPressed || selectionChanged) && !m_isDragging) {
+                // Store the entity's starting position
+                world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+                    if (e.Index == m_selectedEntityID) {
+                        m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
+                        std::cout << "[DRAG] Captured entity pos: " << lt.Position.X << ", " << lt.Position.Y << std::endl;
+                    }
+                    });
+
+                // Capture INITIAL mouse position (for threshold check)
+                m_dragStartMouseWorld = mouseWorld;
+            }
+
+            // During mouse hold - check if we should start dragging
+            if (isMouseDownThisFrame && !m_isDragging) {
+                glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
+                float dragDistance = glm::length(dragDelta);
+
+                // Calculate drag threshold in world space (5 pixels)
+                const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->Height())) * 5.0f;
+
+                // Start dragging if moved beyond threshold
+                if (dragDistance > dragThreshold) {
+                    LOG_DEBUG("[DRAG] Starting drag! Distance: " << dragDistance);
+                    m_isDragging = true;
+
+                    // CRITICAL: Reset drag start to CURRENT position when drag actually begins
+                    m_dragStartMouseWorld = mouseWorld;
+                    LOG_DEBUG("[DRAG] Reset drag start to: " << mouseWorld.x << ", " << mouseWorld.y);
+                }
+            }
+
+            // Update position while dragging
+            if (m_isDragging && isMouseDownThisFrame) {
+                glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
+
+                // Update entity position
+                world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+                    if (e.Index == m_selectedEntityID) {
+                        lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
+                        lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
+                    }
+                    });
+            }
+
+            // End drag when mouse released
+            if (m_isDragging && !isMouseDownThisFrame) {\
+                LOG_DEBUG("[DRAG] Drag ended");
+                m_isDragging = false;
+            }
+
+            wasMouseDownLastFrame = isMouseDownThisFrame;
+        }
+        else {
+            // Nothing selected, reset tracking
+            lastSelectedEntityID = 0;
+            wasMouseDownLastFrame = false;
+        }
 
         // Performance logging
         if (Time::FrameCount() % 60 == 0)

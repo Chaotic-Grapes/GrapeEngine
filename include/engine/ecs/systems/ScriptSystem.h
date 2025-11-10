@@ -17,7 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef SCRIPTSYSTEM_H
 #define SCRIPTSYSTEM_H
 
-#include "hostfxr.h"
+#include <coreclr/hostfxr.h>
 #include "ecs/World.h"
 #include "scene/Scene.h"
 #include <string>

@@ -32,15 +32,16 @@ GLFWwindow* Input::m_window = nullptr;
 std::unordered_map<int, bool> Input::m_keyDown{ 0 };
 std::unordered_map<int, bool> Input::m_keyPressed{ 0 };
 std::unordered_map<int, bool> Input::m_keyUp{ 0 };
+
 std::unordered_map<int, bool> Input::m_mouseDown{ 0 };
 std::unordered_map<int, bool> Input::m_mousePressed{ 0 };
 std::unordered_map<int, bool> Input::m_mouseUp{ 0 };
+
 int Input::m_windowWidth{ 0 };
 int Input::m_windowHeight{ 0 };
 double Input::m_scrollX{ 0 };
 double Input::m_scrollY{ 0 };
 
-// Initialize input system with GLFW window
 void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;
     // Get initial window size
@@ -69,7 +70,7 @@ bool Input::IsMousePressed(const int button) {
 
 // Check if a mouse button was just pressed this frame
 bool Input::IsMouseDown(const int button) {
-    return m_mouseDown[button];
+    return glfwGetMouseButton(m_window, button) == GLFW_PRESS;
 }
 
 // Check if a mouse button was just released this frame
@@ -103,6 +104,7 @@ void Input::SetupEventCallbacks() {
     glfwSetCursorPosCallback(m_window, _mousePosCallback);
     glfwSetScrollCallback(m_window, _mouseScrollCallback);
     glfwSetWindowSizeCallback(m_window, _windowSizeCallback);
+    glfwSetDropCallback(m_window, _fileDropCallback);
 }
 
 // Called when GLFW encounters an error
@@ -123,6 +125,9 @@ void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
 // Clear frame-specific input state and poll GLFW events (called once per frame)
 void Input::_processInput() {
     m_keyDown.clear();
+    m_mouseDown.clear();
+    m_mousePressed.clear();
+    m_mouseUp.clear();
     m_keyUp.clear();
     m_keyPressed.clear();
     m_mouseDown.clear();
@@ -144,12 +149,12 @@ void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, in
     if (action == GLFW_PRESS) {
         m_keyDown[key] = true;
         m_keyPressed[key] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::KeyPressed{ key });
+        Messaging::MessageSystem::Broadcast(Messaging::KeyPressed{ key, false, mod });
     }
     else if (action == GLFW_RELEASE) {
         m_keyDown[key] = false;
         m_keyUp[key] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key });
+        Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key, mod });
     }
 }
 
@@ -159,34 +164,69 @@ void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int m
     (void)mod;
 
     if (action == GLFW_PRESS) {
+        double xPos = 0.0, yPos = 0.0;
+        if (Input::m_window) {
+            glfwGetCursorPos(Input::m_window, &xPos, &yPos);
+        }
         m_mouseDown[button] = true;
         m_mousePressed[button] = true;
-        Messaging::MessageSystem::Broadcast(Messaging::MousePressed{ button });
+        Messaging::MessageSystem::Broadcast(Messaging::MouseButtonPressed{ button,
+            static_cast<float>(xPos), static_cast<float>(yPos) });
     }
     else if (action == GLFW_RELEASE) {
+        double xPos = 0.0, yPos = 0.0;
+        if (Input::m_window) {
+            glfwGetCursorPos(Input::m_window, &xPos, &yPos);
+        }
         m_mouseDown[button] = false;
         m_mouseUp[button] = true;
-        m_mousePressed[button] = false;
-        Messaging::MessageSystem::Broadcast(Messaging::MouseReleased{ button });
+        Messaging::MessageSystem::Broadcast(Messaging::MouseButtonReleased{ button,
+            static_cast<float>(xPos), static_cast<float>(yPos) });
     }
 }
+
+// Enhanced mouse position callback with delta tracking
+static double lastMouseX = 0.0, lastMouseY = 0.0;
 
 // Called when mouse cursor moves
 void Input::_mousePosCallback(GLFWwindow* pWin, double xPos, double yPos) {
     (void)pWin;
-    (void)xPos;
-    (void)yPos;
+    
+    // Calculate delta from last position
+    double deltaX = xPos - lastMouseX;
+    double deltaY = yPos - lastMouseY;
+
+    // Broadcast mouse movement event
+    Messaging::MessageSystem::Broadcast(Messaging::MouseMoved{ static_cast<float>(xPos),
+        static_cast<float>(yPos), static_cast<float>(deltaX), static_cast<float>(deltaY) });
+
+    // Update last position
+    lastMouseX = xPos;
+    lastMouseY = yPos;
 }
 
 // Called when mouse wheel is scrolled
 void Input::_mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffset) {
     (void)pWin;
-    (void)xOffset;
-    (void)yOffset;
 
     // Store the scroll offsets
     m_scrollX = xOffset;
     m_scrollY = yOffset;
+
+    // Broadcast scroll event
+    Messaging::MessageSystem::Broadcast(Messaging::MouseScrolled{ static_cast<float>(xOffset),
+        static_cast<float>(yOffset) }); // One-shot deltas; cleared at start of each frame
+}
+
+void Input::_fileDropCallback(GLFWwindow* pWin, int count, const char** paths) {
+    (void)pWin;
+
+    if (count > 0) {
+        // Broadcast event for each dropped file
+        for (int i = 0; i < count; ++i) {
+            Messaging::MessageSystem::Broadcast(Messaging::FileDropped{ std::string(paths[i]) });
+        }
+    }
 }
 
 // Prints OpenGL system info (GPU, version, limits, etc.)

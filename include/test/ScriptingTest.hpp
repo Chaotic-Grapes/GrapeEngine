@@ -23,7 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef SCRIPTINGTEST_HPP
 #define SCRIPTINGTEST_HPP
 
-#include "scene/Scene.h"
+#include "scene/TestScene.h"
 #include "ecs/World.h"
 #include "ecs/systems/ScriptSystem.h"
 #include "ecs/systems/RendererSystem.h"
@@ -35,7 +35,7 @@ namespace Sandbox {
      * 
      * Each object demonstrates independent script execution with unique state.
      */
-    class ScriptingTestScene : public Scenes::Scene {
+    class ScriptingTestScene : public Scenes::TestScene {
     public:
         ScriptingTestScene() = default;
         ~ScriptingTestScene() override = default;
@@ -64,6 +64,10 @@ namespace Sandbox {
         uint32_t m_playerLayer;
         uint32_t m_enemyLayer;
         uint32_t m_propsLayer;
+
+        // Persistent scene camera (packed id). Kept separate from scripted
+        // controller entities so it survives any scene spawn/clears.
+        uint64_t m_cameraEntity = 0;
 
         // Helper methods
         void _initializeScriptSystem();

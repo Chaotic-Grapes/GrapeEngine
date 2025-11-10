@@ -1,5 +1,5 @@
 /**
- * @Name:  Daniel Kay Neo Zuo Feng 
+ * @Name:  Daniel Kay Neo Zuo Feng
  * @Email: k.danielneozuofeng@digipen.edu
  * @File: Physics.cpp
  * @Brief: Core 2D physics system implementing forces, damping, collisions, and world constraints.
@@ -17,6 +17,7 @@
 #include "helpers/MathUtils.h"
 
 namespace Engine {
+
     Vector2D Physics::m_gravity = Vector2D(0.0f, -981.f);
     bool Physics::m_enabled = true;
     bool Physics::m_worldBoundsEnabled = false;
@@ -179,6 +180,8 @@ namespace Engine {
         const float depth,
         const ECS::Components::PhysicsMaterial2D& physics
     ) {
+
+        // Create a result structure to store collision outcome
         CollisionResult result{};
         result.Collided = true;
         result.Normal = normal;
@@ -199,6 +202,9 @@ namespace Engine {
         // ========================================================================
         if (normalVelocity < 0.0f) {
             const float restitution = std::clamp(physics.Restitution, 0.0f, 1.0f);
+
+            // Calculate impulse scalar using standard impulse equation:
+            // j = -(1 + e) * (Vr � n) / (1/mA + 1/mB)
             const float j = -(1.0f + restitution) * normalVelocity / invMassSum;
             const Vector2D impulse = normal * j;
 
@@ -214,6 +220,9 @@ namespace Engine {
                 const float tangentLengthSquared = Dot(tangent, tangent);
                 if (tangentLengthSquared > MIN_TANGENT_LENGTH_SQUARED) {
                     tangent = tangent / std::sqrt(tangentLengthSquared);
+
+                    // Compute friction impulse magnitude:
+                    // jt = -(Vr � t) / (1/mA + 1/mB)
                     const float jt = -Dot(newRelativeVelocity, tangent) / invMassSum;
                     const float frictionImpulse = std::clamp(jt, -j * physics.Friction, j * physics.Friction);
                     const Vector2D frictionVector = tangent * frictionImpulse;
@@ -238,7 +247,6 @@ namespace Engine {
             // Calculate base correction
             float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
 
-            // CRITICAL FIX: For deep penetrations, use more aggressive correction
             // This prevents balls from getting stuck in thin walls
             if (depth > slop * 2.0f) {
                 // Deep penetration - likely tunneled through thin wall
@@ -255,8 +263,7 @@ namespace Engine {
             transformB.Position.X += correction.X * invMassB;
             transformB.Position.Y += correction.Y * invMassB;
 
-            // ADDITIONAL FIX: Kill velocity toward wall for deeply penetrated objects
-            // This prevents infinite bouncing inside thin walls
+            // Kill velocity toward wall for deeply penetrated objects
             if (depth > slop * 3.0f) {
                 // Check velocity toward collision normal
                 const float vNormalA = Dot(velA.Value, normal);

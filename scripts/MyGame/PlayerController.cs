@@ -33,14 +33,14 @@ namespace MyGame;
 public class PlayerController : ScriptBehaviour
 {
     //create static instance container to be get by other class 
-    public static PlayerController Instance { get; private set; }
+    public static PlayerController? Instance { get; private set; }
 
     // Movement settings
     private readonly float m_moveSpeed = 200.0f;
     private float m_rotationSpeed = 180.0f;
 
     // Visual entity that represents the player
-    private Entity m_visualEntity;
+    private Entity? m_visualEntity;
 
     public override void OnStart()
     {
@@ -75,7 +75,9 @@ public class PlayerController : ScriptBehaviour
     public override void OnUpdate()
     {
         // get transform of player
+#pragma warning disable CS8602 // Suppress dereference of a possibly null reference. This is checked with the if statement below.
         ref var transform = ref m_visualEntity.TryGetComponent<LocalTransform>(out var Transform);
+#pragma warning restore CS8602
 
         // player has no transform log problem
         if (!Transform)
@@ -136,9 +138,10 @@ public class PlayerController : ScriptBehaviour
     private void UpdateVisual()
     {
         // Make the player pulse to show it's active
-        ref var shapeCircle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var Circle);
+#pragma warning disable CS8602 // Suppress dereference of a possibly null reference. This is checked with the if statement below.
+        ref var shapeCircle = ref m_visualEntity.TryGetComponent<ShapeCircle2D>(out var Circle)!;
+#pragma warning restore CS8602
         if (!Circle) return;
-
 
         var pulse = 0.9f + 0.1f * MathF.Sin((float)Time.ElapsedTime * 5.0f);
         shapeCircle.Radius = 20.0f * pulse;
@@ -151,7 +154,7 @@ public class PlayerController : ScriptBehaviour
     }
 
     //getter for visual entity (so EnemyAI can access it)
-    public Entity GetVisualEntity()
+    public Entity? GetVisualEntity()
     {
         return m_visualEntity;
     }

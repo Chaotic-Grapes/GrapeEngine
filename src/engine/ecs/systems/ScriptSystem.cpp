@@ -21,9 +21,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Input.h"
 
 // CoreCLR hosting headers
-#include <nethost.h>
-#include <hostfxr.h>
-#include <coreclr_delegates.h>
+#include <coreclr/nethost.h>
+#include <coreclr/hostfxr.h>
+#include <coreclr/coreclr_delegates.h>
 
 // Standard headers
 #include <iostream>
@@ -1034,6 +1034,8 @@ SCRIPT_API uint64_t ScriptAPI_CreateEntity() {
     }
 
     ECS::Entity entity = world->Create();
+    // Ensure new entities always have a default transform
+    world->Add<ECS::Components::LocalTransform>(entity);
     return ECS::EntityUtils::Pack(entity);
 }
 

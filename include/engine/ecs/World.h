@@ -123,10 +123,25 @@ namespace ECS {
 		 * @return bool True if the entity is alive; false otherwise
          */
         bool IsAlive(const Entity e) const {
-            // How to check if an entity is alive:
-            // An entity is considered alive if its index is within the valid range
-            // and its generation number matches the current generation.
-            return e.Index < m_generations.size() && m_generations[e.Index] == e.Generation;
+            // An entity is considered alive if:
+            // - its index is within the valid range,
+            // - its generation number matches the current generation, and
+            // - it currently resides in an archetype (i.e., has a valid location).
+            if (e.Index >= m_generations.size()) return false;
+            if (m_generations[e.Index] != e.Generation) return false;
+            return m_locations[e.Index].ArchetypePtr != nullptr;
+        }
+
+        /**
+         * @brief Resolve an entity id to a valid Entity handle with current generation.
+         * @param id The entity index/id.
+         * @return ECS::Entity with up-to-date generation, or NULL_ENTITY if out of range.
+         */
+        Entity Resolve(const EntityId id) const {
+            if (id >= m_generations.size()) {
+                return NULL_ENTITY;
+            }
+            return Entity{ id, m_generations[id] };
         }
 
         /**
@@ -135,7 +150,11 @@ namespace ECS {
          * @note Assumes the entity is alive, behavior is undefined for dead entities.
          */
         void Destroy(const Entity e) {
-			// Assume entity is alive
+            // Assume entity is alive
+            // If entity participates in hierarchy, unlink it first
+            if (Has<Parent>(e)) {
+                _onComponentRemoving(e, TypeIdOf<Parent>());
+            }
 
             // Lookup location and remove from archetype if present
             auto &loc = m_locations[e.Index];
@@ -399,12 +418,26 @@ namespace ECS {
             // Get number of components at compile-time (optimization effort but unsure if it helps)
             constexpr size_t numComponents = sizeof...(Ts);
 
-            // If no components specified, returning nothing
-            // use constexpr as if numComponents is 0, then the rest of the code is not needed
-            // This is for optimization to avoid unnecessary work at runtime
-            // (Unsure if it helps too, but worth trying)
-            if constexpr (numComponents == 0)
+            // If no components specified, iterate all entities in all archetypes
+            // This allows calls like world.Each(fn) to visit every entity.
+            if constexpr (numComponents == 0) {
+                for (const auto& kv : m_archetypes) {
+                    const auto& archPtr = kv.second;
+                    if (!archPtr) continue;
+                    Archetype* arch = archPtr.get();
+
+                    const uint32_t chunkCount = arch->GetChunkCount();
+                    for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                        Chunk* ch = arch->GetChunk(ci);
+                        const uint32_t count = ch->Count();
+                        for (uint32_t i = 0; i < count; ++i) {
+                            const Entity ent = ch->GetEntity(i);
+                            if (!ent.IsNull()) fn(ent);
+                        }
+                    }
+                }
                 return;
+            }
             else { // Need to add `else` to suppress "unreachable code" warning (https://stackoverflow.com/questions/52244640/if-constexpr-and-c4702-and-c4100-and-c4715)
                 // Some optimization efforts:
                 // Use compile-time query ID to cache archetype list pointer per unique component set
@@ -499,7 +532,26 @@ namespace ECS {
             // Similar to non-const Each(), but operates on const components
 
             constexpr size_t numComponents = sizeof...(Ts);
-            if constexpr (numComponents == 0) return;
+
+            if constexpr (numComponents == 0) {
+                // Iterate all entities across all archetypes
+                for (const auto& kv : m_archetypes) {
+                    const auto& archPtr = kv.second;
+                    if (!archPtr) continue;
+                    const Archetype* arch = archPtr.get();
+
+                    const uint32_t chunkCount = arch->GetChunkCount();
+                    for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                        const Chunk* ch = arch->GetChunk(ci);
+                        const uint32_t count = ch->Count();
+                        for (uint32_t i = 0; i < count; ++i) {
+                            const Entity ent = ch->GetEntity(i);
+                            if (!ent.IsNull()) fn(ent);
+                        }
+                    }
+                }
+                return;
+            }
             else {
                 using QueryTag = std::tuple<std::decay_t<Ts>...>;
                 static const std::vector<Archetype*>* cached = nullptr;
