@@ -17,6 +17,7 @@
 #include "helpers/MathUtils.h"
 
 namespace Engine {
+
     Vector2D Physics::m_gravity = Vector2D(0.0f, -981.f);
     bool Physics::m_enabled = true;
     bool Physics::m_worldBoundsEnabled = false;
@@ -270,7 +271,7 @@ namespace Engine {
             // Calculate base correction
             float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
 
-            // CRITICAL FIX: For deep penetrations, use more aggressive correction
+         
             // This prevents balls from getting stuck in thin walls
             if (depth > slop * 2.0f) {
                 // Deep penetration - likely tunneled through thin wall
