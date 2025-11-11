@@ -2,7 +2,15 @@
  * @Name: Samantha Leong, 2403088
  * @email: s.leong@digipen.edu
  * @file GameObjectManagement.h
- * @brief 
+ * @brief Declares the GameObjectEditor class, which provides in-editor tools
+ *        for managing all game objects in the current world.
+ *
+ * This header defines the GameObjectEditor class used to manage entities 
+ * within the game editor. It provides functionality for creating, selecting, 
+ * cloning, and deleting game objects, as well as rendering hierarchy and 
+ * property editor windows using ImGui. The editor directly interfaces with 
+ * the ECS world to update entities in real time, supporting a full 
+ * in-game editing workflow for designers and developers.
  */
 
 
