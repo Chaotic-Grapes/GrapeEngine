@@ -27,6 +27,8 @@ References:
 #include <filesystem>
 #include <imgui.h>
 
+namespace ECS { class World; }
+
 // Forward declarations
 struct ImFont;
 class AssetBrowserPanel;            // Forward declare to use as friend
@@ -43,6 +45,7 @@ public:
     // This connects the inspector window
     // It enables opening prefabs from file entries
     void SetInspector(InspectorPanel* inspector) { m_inspector = inspector; }
+    void SetWorld(ECS::World* world) { m_world = world; }
 
 private:
     // This shows the breadcrumb path bar
@@ -84,6 +87,7 @@ private:
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
     InspectorPanel* m_inspector = nullptr;
+    ECS::World* m_world = nullptr;
 };
 
 #endif

@@ -70,11 +70,16 @@ void HierarchyPanel::OnSelectionChanged(SelectionCallback callback) {
 // -------------------------------------------------------------------------
 // Render the hierarchy window with entity tree and controls
 void HierarchyPanel::Render() {
-    if (!m_world) return;
-
     if (m_mainFont) ImGui::PushFont(m_mainFont);
 
     ImGui::Begin("Hierarchy");
+
+    if (!m_world) {
+        ImGui::TextDisabled("No scene attached");
+        if (m_mainFont) ImGui::PopFont();
+        ImGui::End();
+        return;
+    }
 
     _renderHeader();
     _renderEntityTree();

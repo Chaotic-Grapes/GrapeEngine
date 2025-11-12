@@ -22,6 +22,7 @@ Handles the main menu, viewport rendering, and entity operations.
 #include "../editor/Viewport.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 #include "services/Input.h"
 #include <imgui.h>
@@ -75,6 +76,7 @@ void Viewport::SetWorld(ECS::World* world) {
     }
 }
 
+
 // -------------------------------------------------------------------------
 // Update
 // -------------------------------------------------------------------------
@@ -98,6 +100,8 @@ void Viewport::ShowEditorWindows() {
 
     _renderMainMenu();
     _renderViewport();
+
+    
 }
 
 // -------------------------------------------------------------------------
@@ -147,16 +151,18 @@ void Viewport::_renderMainMenu() {
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {
-                // Trigger application exit
                 if (Engine::CORE) {
-                    Engine::CORE->Stop();
+                    Engine::CORE->Close();
                 }
             }
             ImGui::EndMenu();
         }
 
         if (ImGui::BeginMenu("View")) {
+            // UI Scale controls
+            ImGui::PushFont(m_boldFont);
             ImGui::Text("UI Scale: %.2f", m_uiScale);
+            ImGui::PopFont();
             if (ImGui::MenuItem("Zoom In", "Ctrl++")) {
                 m_uiScale += 0.10f;
             }
@@ -166,6 +172,7 @@ void Viewport::_renderMainMenu() {
             if (ImGui::MenuItem("Reset Scale")) {
                 m_uiScale = 1.0f;
             }
+
             ImGui::EndMenu();
         }
 
@@ -185,13 +192,17 @@ void Viewport::_renderViewport() {
         auto size = ImGui::GetContentRegionAvail();
         auto pos = ImGui::GetCursorScreenPos();
 
-        // Render the game view
-        m_rendererSystem->Render();
+        if (m_world) {
+            m_rendererSystem->Update(*m_world, Time::DeltaTime());
+        }
 
-        // Get the rendered texture
-        uint32_t textureId = m_rendererSystem->GetViewportTextureID();
-        if (textureId > 0) {
-            ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
+        auto* rg = m_rendererSystem->GetRenderGraph();
+        if (rg) {
+            ResourceAccessor acc(rg);
+            uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("HDR"));
+            if (textureId > 0) {
+                ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
+            }
         }
     }
     else {
@@ -209,7 +220,10 @@ void Viewport::AddEntity(const std::string& name, EntityId parentId) {
     if (!HasValidWorld()) return;
 
     auto entity = m_world->Create();
-    m_world->Set<ECS::Components::Name>(entity, ECS::Components::Name(name.c_str()));
+    ECS::Components::Name nm{};
+    strncpy_s(nm.Value, name.c_str(), sizeof(nm.Value) - 1);
+    nm.Value[sizeof(nm.Value) - 1] = '\0';
+    m_world->Set<ECS::Components::Name>(entity, nm);
     m_world->Set<ECS::Components::LocalTransform>(entity, ECS::Components::LocalTransform());
 
     if (parentId != ECS::Entity::NPOS32) {
@@ -333,7 +347,7 @@ void Viewport::ClearAllEntities() {
         allEntities.push_back(e);
         });
 
-    for (auto e : allEntities) {
+    for (const auto& e : allEntities) {
         m_world->Destroy(e);
     }
 
@@ -365,7 +379,8 @@ void Viewport::_createNewScene() {
     auto& sm = Engine::CORE->GetSceneManager();
     auto newScene = std::make_unique<Scenes::Scene>();
     newScene->SetName("New Scene");
-    sm.SetActive(std::move(newScene));
+    size_t idx = sm.AddScene(newScene.release());
+    sm.SetActive(idx);
 
     LOG_INFO("Created new scene");
 }
@@ -417,7 +432,8 @@ void Viewport::_openScene(const std::string& path) {
             }
         }
 
-        sm.SetActive(std::move(newScene));
+        size_t idx = sm.AddScene(newScene.release());
+        sm.SetActive(idx);
         LOG_INFO("Opened scene: " << path);
     }
     catch (const std::exception& e) {

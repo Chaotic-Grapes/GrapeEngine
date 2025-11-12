@@ -17,6 +17,7 @@ Declares the ViewportPanel class for core editor functionality and entity manage
 #include <imgui.h>
 #include <string>
 #include <memory>
+#include <functional>
 
 // Forward declarations
 namespace ECS { class RendererSystem; }

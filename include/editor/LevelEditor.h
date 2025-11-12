@@ -32,7 +32,8 @@ struct GLFWwindow;
 
 // Configuration for the level editor appearance and behavior
 struct LevelEditorConfig {
-    float FontSize = 16.0f; // Base font size for UI text
+    float TextFontSize = 23.0f;
+    float IconFontSize = 26.0f;
 };
 
 // Main editor coordinator class that manages all editor panels and their interactions.
@@ -57,6 +58,8 @@ public:
 
     // Playback state queries
     inline bool IsPlaying() const { return m_playback.IsPlaying(); }
+    inline bool IsStepRequested() const { return m_playback.IsStepRequested(); }
+    inline void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
     // -------------------------------------------------------------------------
@@ -80,12 +83,14 @@ private:
 
     // Initialize all registered panels in order.
     void _initializePanels();
-
+    
     // Render all registered panels in order.
     void _renderPanels();
 
     // Propagate world reference to all registered panels.
     void _updatePanelWorlds(ECS::World* world);
+
+    void _loadFonts();
 
     // -------------------------------------------------------------------------
     // Docking

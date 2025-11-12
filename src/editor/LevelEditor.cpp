@@ -23,7 +23,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
     : m_world(world), m_config(config), m_playback(world), m_symbolsFont(nullptr),
-    m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_editorCore(),
+    m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_viewport(),
     m_hierarchyWindow(), m_inspector() {
 // Defer panel initialization to Initialize to use loaded fonts
 }
@@ -188,66 +188,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     auto& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
-
-    float textFontSize = m_config.FontSize;
-
-    // Only load fonts if not already loaded
-    if (!m_mainFont && io.Fonts->Fonts.empty()) {
-        m_mainFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
-            textFontSize
-        );
-        if (!m_mainFont) {
-            LOG_ERROR("Failed to load Inter Medium font");
-            m_mainFont = io.Fonts->AddFontDefault(); // Fallback to default font
-        }
-    }
-    else if (!m_mainFont) {
-        m_mainFont = io.Fonts->Fonts[0]; // Reuse first font in atlas
-    }
-
-    if (!m_boldFont && io.Fonts->Fonts.size() < 2) {
-        m_boldFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf",
-            textFontSize
-        );
-        if (!m_boldFont) {
-            LOG_ERROR("Failed to load Inter ExtraBold font");
-            m_boldFont = io.Fonts->AddFontDefault(); // Fallback to default font
-        }
-    }
-    else if (!m_boldFont) {
-        m_boldFont = io.Fonts->Fonts[1]; // Reuse second font in atlas
-    }
-
-    float iconFontSize = textFontSize * 1.6f;
-    static const ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
-    ImFontConfig iconsConfig;
-    iconsConfig.MergeMode = false;
-    iconsConfig.PixelSnapH = true;
-    iconsConfig.OversampleH = 3;
-    iconsConfig.OversampleV = 3;
-
-    if (!m_symbolsFont && io.Fonts->Fonts.size() < 3) {
-        m_symbolsFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
-            iconFontSize,
-            &iconsConfig,
-            iconRanges
-        );
-        if (!m_symbolsFont) {
-            LOG_ERROR("Failed to load Material Symbols font");
-            m_symbolsFont = io.Fonts->AddFontDefault(); // Fallback to default font
-        }
-    }
-    else if (!m_symbolsFont) {
-        m_symbolsFont = io.Fonts->Fonts[2]; // Reuse third font in atlas
-    }
-
-    // Build font atlas if we added new fonts
-    if (io.Fonts->Fonts.size() > 0 && !io.Fonts->IsBuilt()) {
-        io.Fonts->Build(); // Prepare font textures for rendering
-    }
+    _loadFonts();
 
     // Register all panels with their initialization and render callbacks.
     // Centralizes panel lifecycle management and reduces code duplication.
@@ -267,7 +208,9 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     );
 
     _registerPanel("Editor Core",
-        [this]() { m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world); },
+        [this]() { 
+            m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+        },
         [this]() { m_viewport.ShowEditorWindows(); },
         [this](ECS::World* w) { m_viewport.SetWorld(w); }
     );
@@ -296,6 +239,67 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         if (m_world->IsAlive(e)) m_inspector.InspectEntity(id); // Inspect when valid
         else m_inspector.ClearSelection(); // Clear when entity is dead
     });
+}
+
+void LevelEditor::_loadFonts() {
+    auto& io = ImGui::GetIO();
+    float textFontSize = m_config.TextFontSize;
+
+    if (!m_mainFont && io.Fonts->Fonts.empty()) {
+        m_mainFont = io.Fonts->AddFontFromFileTTF(
+            "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
+            textFontSize
+        );
+        if (!m_mainFont) {
+            LOG_ERROR("Failed to load Inter Medium font");
+            m_mainFont = io.Fonts->AddFontDefault();
+        }
+    }
+    else if (!m_mainFont) {
+        m_mainFont = io.Fonts->Fonts[0];
+    }
+
+    if (!m_boldFont && io.Fonts->Fonts.size() < 2) {
+        m_boldFont = io.Fonts->AddFontFromFileTTF(
+            "assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf",
+            textFontSize
+        );
+        if (!m_boldFont) {
+            LOG_ERROR("Failed to load Inter ExtraBold font");
+            m_boldFont = io.Fonts->AddFontDefault();
+        }
+    }
+    else if (!m_boldFont) {
+        m_boldFont = io.Fonts->Fonts[1];
+    }
+
+    float iconFontSize = m_config.IconFontSize;
+    static const ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
+    ImFontConfig iconsConfig;
+    iconsConfig.MergeMode = false;
+    iconsConfig.PixelSnapH = true;
+    iconsConfig.OversampleH = 3;
+    iconsConfig.OversampleV = 3;
+
+    if (!m_symbolsFont && io.Fonts->Fonts.size() < 3) {
+        m_symbolsFont = io.Fonts->AddFontFromFileTTF(
+            "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
+            iconFontSize,
+            &iconsConfig,
+            iconRanges
+        );
+        if (!m_symbolsFont) {
+            LOG_ERROR("Failed to load Material Symbols font");
+            m_symbolsFont = io.Fonts->AddFontDefault();
+        }
+    }
+    else if (!m_symbolsFont) {
+        m_symbolsFont = io.Fonts->Fonts[2];
+    }
+
+    if (io.Fonts->Fonts.size() > 0 && !io.Fonts->IsBuilt()) {
+        io.Fonts->Build();
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -348,7 +352,7 @@ void LevelEditor::Update() {
     }
 
     // Restore automatic pixel->world conversion so newly added entities
-    // use world units consistent with renderer/camera.
+    // use world units consistent with renderer/camera
     if (!IsPlaying() && m_world) {
         m_world->Each<ECS::Components::LocalTransform>([&](ECS::Entity e, ECS::Components::LocalTransform& tr) {
             if (m_convertedPositions.find(e.Index) == m_convertedPositions.end()) {

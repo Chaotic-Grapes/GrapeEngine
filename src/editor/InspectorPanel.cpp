@@ -178,7 +178,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 
 // Render all components for the entity
 void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
-    ImGui::BeginChild("ComponentList", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
+    ImGui::BeginChild("ComponentList", ImVec2(0, 0), false, ImGuiWindowFlags_None);
 
     // Get the content width once for proper horizontal scrolling
     const float contentWidth = EditorUI::GetContentWidth();
@@ -367,19 +367,22 @@ void InspectorPanel::_renderPrefabComponents() {
         return;
     }
 
-    ImGui::BeginChild("PrefabComponentList", ImVec2(0, 0), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
+    ImGui::BeginChild("PrefabComponentList", ImVec2(0, 0), false, ImGuiWindowFlags_None);
 
     const float contentWidth = EditorUI::GetContentWidth();
 
+    size_t idx = 0;
     for (auto& compEntry : m_prefabData["Components"]) {
         std::string typeName = compEntry.value("Type", "Unknown");
         std::string shortName = ShortTypeName(typeName);
+        std::string headerLabel = shortName + "##comp_" + std::to_string(idx);
 
-        if (ImGui::CollapsingHeader(shortName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
             _renderPrefabComponent(typeName, compEntry["Data"]);
             ImGui::Dummy(ImVec2(contentWidth, 0.0f));
             ImGui::Spacing();
         }
+        ++idx;
     }
 
     ImGui::EndChild();
