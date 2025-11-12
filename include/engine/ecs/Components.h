@@ -98,11 +98,25 @@ namespace ECS {
     namespace Components {
         // ---------------------------------- Core utility/tag components ----------------------------------
 
-        // Lightweight name (fixed-size). Avoids std::string to remain trivially copyable.
+        // Lightweight name (fixed-size). User-provided constructors don't qualify trivial copyability.
         struct Name {
         public:
             // UTF-8 bytes, null-terminated if shorter than buffer. Keep small for cache.
             char Value[64] = {0};
+
+            // Default constructor
+            Name() = default;
+
+            // Constructor from C-string
+            Name(const char* name) {
+                if (name) {
+                    strncpy_s(Value, name, sizeof(Value) - 1);
+                    Value[sizeof(Value) - 1] = '\0';
+                }
+            }
+
+            // Constructor from std::string
+            Name(const std::string& name) : Name(name.c_str()) {}
         };
         static_assert(std::is_trivially_copyable_v<Name>, "Name must be trivially copyable");
 

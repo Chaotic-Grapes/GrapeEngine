@@ -29,7 +29,7 @@ References:
 #endif
 
 #include "../editor/AssetLibrary.h"
-#include "../editor/InspectorWindow.h"
+#include "../editor/InspectorPanel.h"
 #include "core/Logger.h"
 #include <vector>
 #include <services/ResourceManager.h>

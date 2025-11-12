@@ -1,11 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
-\file   AssetBrowser.cpp
+\file   AssetBrowserPanel.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
 \brief
-Implements the AssetBrowser class for browsing and managing game assets.
+Implements the AssetBrowserPanel class for browsing and managing game assets.
 
 Features:
 - File browser with breadcrumb navigation
@@ -20,18 +20,21 @@ References:
 */
 /* End Header *******************************************************************/
 
-#include "../editor/AssetBrowser.h"
+#include "../editor/AssetBrowserPanel.h"
 #include "core/Logger.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/Entity.h"
-#include "../editor/InspectorWindow.h"
+#include "../editor/InspectorPanel.h"
 #include <fstream>
 
+// -------------------------------------------------------------------------
+// Lifecycle
+// -------------------------------------------------------------------------
 // Initialize the Asset Browser with fonts and a world reference.
 // Also hook file-drop messages so imports work from the OS.
-void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
+void AssetBrowserPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
@@ -48,22 +51,59 @@ void AssetBrowser::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
     );
 }
 
-// Connect the InspectorWindow so prefab actions in Asset Browser
-// are inspected in the unified inspector UI
-void AssetBrowser::SetInspector(InspectorWindow* inspector) {
+// Update the world reference when scene changes
+void AssetBrowserPanel::SetWorld(ECS::World* world) {
+    m_world = world;
+    m_assetLibrary.SetWorld(world);
+}
+
+// Connect the InspectorPanel so prefab actions in Asset Browser
+// are inspected in the unified prefab editor UI
+void AssetBrowserPanel::SetInspector(InspectorPanel* inspector) {
     m_inspector = inspector;
     // Propagate to AssetLibrary for double-click open behavior
     m_assetLibrary.SetInspector(inspector);
 }
 
+// -------------------------------------------------------------------------
+// Rendering
+// -------------------------------------------------------------------------
 // Render the Asset Browser window with breadcrumbs, actions, and panels.
 // Uses child regions to split file list and file info side-by-side.
-void AssetBrowser::Render() {
+void AssetBrowserPanel::Render() {
     ImGui::PushFont(m_mainFont);
     // Window flags: NoScrollbar removes the vertical scrollbar; child regions handle scrolling
     ImGui::Begin("Asset Browser", nullptr, ImGuiWindowFlags_NoScrollbar);
 
+    _renderNavigationBar();
+    _renderActionButtons();
+    _renderContentArea();
+    _renderStatusBar();
 
+    // Click on empty space in parent Asset Browser window to clear everything
+    // !IsAnyItemHovered() prevents clearing when clicking breadcrumbs, buttons, sliders, etc.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
+        && !ImGui::IsAnyItemHovered()) {
+
+        m_selectedAsset.clear();
+
+        if (m_inspector) {
+            m_inspector->ClearSelection();
+        }
+    }
+
+    ImGui::End();
+    ImGui::PopFont();
+
+    // Prefab editing is absorbed by InspectorPanel; no separate window to render
+}
+
+// -------------------------------------------------------------------------
+// UI Sections
+// -------------------------------------------------------------------------
+// Render the breadcrumb navigation bar at the top
+void AssetBrowserPanel::_renderNavigationBar() {
     // Display clickable breadcrumb navigation
     std::string newPath;
     m_assetLibrary._displayBreadcrumbs(m_currentPath, m_selectedAsset, newPath);
@@ -74,7 +114,10 @@ void AssetBrowser::Render() {
             m_selectedAsset.clear();
         }
     }
+}
 
+// Render the action buttons (import, replace, prefab management)
+void AssetBrowserPanel::_renderActionButtons() {
     // Import button (upload icon)
     // Push symbols font so the button renders an icon glyph
     ImGui::PushFont(m_symbolsFont);
@@ -125,6 +168,11 @@ void AssetBrowser::Render() {
 
     ImGui::SameLine();
 
+    _renderPrefabButton();
+}
+
+// Render the prefab management button and popup
+void AssetBrowserPanel::_renderPrefabButton() {
     // Prefab button (only enabled if a prefab is selected)
     // Only enable prefab popup when a .prefab file is selected
     bool isPrefab = !m_selectedAsset.empty() && std::filesystem::path(m_selectedAsset).extension() == ".prefab";
@@ -149,96 +197,30 @@ void AssetBrowser::Render() {
         }
     }
 
+    _renderPrefabPopup();
+}
+
+// Render the prefab popup menu with load/edit options
+void AssetBrowserPanel::_renderPrefabPopup() {
     // Open ImGui popup named "Prefabs"
     // Begin a modal-style popup to choose prefab actions
     if (ImGui::BeginPopup("Prefabs")) {
         // Display selectable option "Load Prefab" in the popup
         if (ImGui::Selectable("Load Prefab")) {
-            // Only proceed if an asset is selected and world pointer is valid
-            if (!m_selectedAsset.empty() && m_world) {
-                try {
-                    // Open the selected prefab file
-                    std::ifstream file(m_selectedAsset);
-                    // Failure, log it
-                    if (!file.is_open()) {
-                        LOG_ERROR("Cannot open file: " << m_selectedAsset);
-                        m_statusMessage = "Failed to open prefab";
-                        m_statusTimer = 3.0f;
-                    }
-                    else {
-                        nlohmann::json entityJson;
-                        file >> entityJson; // Read JSON content
-                        file.close();       // Close file after reading
-
-                        // Deserialize JSON into an entity in the current world
-                        auto entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
-
-                        // Add PrefabLink component to store normalized path of prefab
-                        std::filesystem::path p(m_selectedAsset);
-                        std::string linkPath = p.lexically_normal().string();
-                        m_world->Set<ECS::Components::PrefabLink>(entity, ECS::Components::PrefabLink(linkPath));
-
-                        // Log info and update status message on successful load
-                        LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
-                        m_statusMessage = "Prefab loaded successfully";
-                        m_statusTimer = 3.0f;
-                    }
-                }
-                catch (const std::exception& e) {
-                    // Catch JSON parse or deserialization errors
-                    LOG_ERROR("Failed to parse prefab file: " << e.what());
-                    m_statusMessage = "Failed to load prefab";
-                    m_statusTimer = 3.0f;
-                }
-            }
+            _loadPrefab();
         }
 
         // Edit prefab option: open in unified Inspector
         if (ImGui::Selectable("Edit Prefab")) {
-            // Check if inspector instance is available
-            if (!m_inspector) {
-                LOG_WARNING("Inspector not available for prefab editing");
-                m_statusMessage = "Inspector not available";
-                m_statusTimer = 3.0f;
-            }
-            // Check if prefab is selected
-            else if (m_selectedAsset.empty()) {
-                m_statusMessage = "Failed to open prefab: none selected";
-                m_statusTimer = 3.0f;
-            }
-            else {
-                try {
-                    // Validate the prefab can be opened and parsed
-                    std::ifstream file(m_selectedAsset);
-                    if (!file.is_open()) {
-                        LOG_ERROR("Cannot open prefab file: " << m_selectedAsset);
-                        m_statusMessage = "Failed to open prefab";
-                        m_statusTimer = 3.0f;
-                    }
-                    else {
-                        nlohmann::json prefabJson;
-                        file >> prefabJson; // Parse JSON content
-                        file.close();       // Close file after reading
-
-                        // If parsing succeeded, open in inspector and report success
-                        m_inspector->InspectPrefab(m_selectedAsset);
-                        m_statusMessage = "Prefab opened";
-                        m_statusTimer = 3.0f;
-                    }
-                }
-                catch (const std::exception& e) {
-                    LOG_ERROR("Failed to parse prefab file: " << e.what());
-                    m_statusMessage = "Failed to open prefab";
-                    m_statusTimer = 3.0f;
-                }
-            }
+            _editPrefab();
         }
 
         ImGui::EndPopup();
     }
+}
 
-    // Global UI scale now controlled via View menu; remove local controls
-
+// Render the main content area (file list and file info panels)
+void AssetBrowserPanel::_renderContentArea() {
     // Reserve space for status bar at bottom
     float windowWidth = ImGui::GetContentRegionAvail().x;
     // Slightly shorten the status bar to give the content area a bit more height
@@ -248,6 +230,16 @@ void AssetBrowser::Render() {
     // Child fills remaining height; negative height reserves space for the fixed status bar
     ImGui::BeginChild("ContentRegion", ImVec2(0, -statusBarHeight), false);
 
+    _renderFileListPanel(windowWidth);
+    ImGui::SameLine();
+    _renderFileInfoPanel();
+
+    // End content region above status bar
+    ImGui::EndChild();
+}
+
+// Render the left file/folder list panel
+void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
     // Left side: File/folder list (65% width)
     // Left list child; third arg 'true' draws a frame (border) around the child
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
@@ -260,15 +252,16 @@ void AssetBrowser::Render() {
         // Clear currently selected asset
         m_selectedAsset.clear();
 
-        // Clear inspector if it exists
+        // Clear prefab editor if it exists (no need to clear property inspector here)
         if (m_inspector) {
             m_inspector->ClearSelection();
         }
     }
     ImGui::EndChild();
+}
 
-    ImGui::SameLine();
-
+// Render the right file info panel with delete button
+void AssetBrowserPanel::_renderFileInfoPanel() {
     // Right side: File info panel (35% width)
     ImGui::BeginChild("FileInfo", ImVec2(0, 0), true);
     m_assetLibrary._displaySelectedFileInfo(m_selectedAsset);
@@ -284,6 +277,13 @@ void AssetBrowser::Render() {
         }
     }
 
+    _renderDeleteButton();
+
+    ImGui::EndChild();
+}
+
+// Render the delete button for selected assets
+void AssetBrowserPanel::_renderDeleteButton() {
     // Only show delete button if something is selected
     if (!m_selectedAsset.empty()) {
         std::filesystem::path selectedPath(m_selectedAsset);
@@ -319,13 +319,12 @@ void AssetBrowser::Render() {
             }
         }
     }
+}
 
-    ImGui::EndChild();
-
-    // End content region above status bar
-    ImGui::EndChild();
-
+// Render the status bar at the bottom
+void AssetBrowserPanel::_renderStatusBar() {
     // Status bar (fixed at bottom; does not overlap content)
+    float statusBarHeight = 24.0f;
     // Fixed-height status bar; NoScrollbar removes the vertical bar from this child
     ImGui::BeginChild("StatusBar", ImVec2(0, statusBarHeight), false, ImGuiWindowFlags_NoScrollbar);
     if (m_statusTimer > 0.0f) {
@@ -337,22 +336,89 @@ void AssetBrowser::Render() {
         m_statusTimer -= ImGui::GetIO().DeltaTime;
     }
     ImGui::EndChild();
+}
 
-    // Click on empty space in parent Asset Browser window to clear everything
-    // !IsAnyItemHovered() prevents clearing when clicking breadcrumbs, buttons, sliders, etc.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
-        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered()) {
+// -------------------------------------------------------------------------
+// Prefab Operations
+// -------------------------------------------------------------------------
+// Load the selected prefab into the scene
+void AssetBrowserPanel::_loadPrefab() {
+    // Only proceed if an asset is selected and world pointer is valid
+    if (!m_selectedAsset.empty() && m_world) {
+        try {
+            // Open the selected prefab file
+            std::ifstream file(m_selectedAsset);
+            // Failure, log it
+            if (!file.is_open()) {
+                LOG_ERROR("Cannot open file: " << m_selectedAsset);
+                m_statusMessage = "Failed to open prefab";
+                m_statusTimer = 3.0f;
+            }
+            else {
+                nlohmann::json entityJson;
+                file >> entityJson; // Read JSON content
+                file.close();       // Close file after reading
 
-        m_selectedAsset.clear();
+                // Deserialize JSON into an entity in the current world
+                auto entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
 
-        if (m_inspector) {
-            m_inspector->ClearSelection();
+                // Add PrefabLink component to store normalized path of prefab
+                std::filesystem::path p(m_selectedAsset);
+                std::string linkPath = p.lexically_normal().string();
+                m_world->Set<ECS::Components::PrefabLink>(entity, ECS::Components::PrefabLink(linkPath));
+
+                // Log info and update status message on successful load
+                LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());
+                m_statusMessage = "Prefab loaded successfully";
+                m_statusTimer = 3.0f;
+            }
+        }
+        catch (const std::exception& e) {
+            // Catch JSON parse or deserialization errors
+            LOG_ERROR("Failed to parse prefab file: " << e.what());
+            m_statusMessage = "Failed to load prefab";
+            m_statusTimer = 3.0f;
         }
     }
+}
 
-    ImGui::End();
-    ImGui::PopFont();
+// Open the selected prefab in the prefab editor for editing
+void AssetBrowserPanel::_editPrefab() {
+    // Check if prefab editor instance is available
+    if (!m_inspector) {
+        LOG_WARNING("Prefab editor not available for prefab editing");
+        m_statusMessage = "Prefab editor not available";
+        m_statusTimer = 3.0f;
+    }
+    // Check if prefab is selected
+    else if (m_selectedAsset.empty()) {
+        m_statusMessage = "Failed to open prefab: none selected";
+        m_statusTimer = 3.0f;
+    }
+    else {
+        try {
+            // Validate the prefab can be opened and parsed
+            std::ifstream file(m_selectedAsset);
+            if (!file.is_open()) {
+                LOG_ERROR("Cannot open prefab file: " << m_selectedAsset);
+                m_statusMessage = "Failed to open prefab";
+                m_statusTimer = 3.0f;
+            }
+            else {
+                nlohmann::json prefabJson;
+                file >> prefabJson; // Parse JSON content
+                file.close();       // Close file after reading
 
-    // Prefab editing is absorbed by Inspector; no separate window to render
+                // If parsing succeeded, open in prefab editor and report success
+                m_inspector->InspectPrefab(m_selectedAsset);
+                m_statusMessage = "Prefab opened";
+                m_statusTimer = 3.0f;
+            }
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to parse prefab file: " << e.what());
+            m_statusMessage = "Failed to open prefab";
+            m_statusTimer = 3.0f;
+        }
+    }
 }
