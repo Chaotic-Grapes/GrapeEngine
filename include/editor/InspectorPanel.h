@@ -76,6 +76,12 @@ private:
     void _applyPrefabDataToEntity(ECS::Entity entity);
 
     // -------------------------------------------------------------------------
+    // Entity Property Management
+    // -------------------------------------------------------------------------
+    void _addComponentToEntity(const std::string& componentType);
+    void _removeComponentFromEntity(const std::string& componentType);
+
+    // -------------------------------------------------------------------------
     // Status Bar
     // -------------------------------------------------------------------------
     void _renderStatusBar();

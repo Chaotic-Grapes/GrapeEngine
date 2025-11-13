@@ -42,6 +42,7 @@ Handles the main menu, viewport rendering, and entity operations.
 // Messaging for editor warnings
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include <unordered_map>
 
 static constexpr const char* LEVEL_DIR = "assets/levels/";
 static constexpr const char* SCENE_DIR = "assets/scenes/";
@@ -100,8 +101,6 @@ void Viewport::ShowEditorWindows() {
 
     _renderMainMenu();
     _renderViewport();
-
-    
 }
 
 // -------------------------------------------------------------------------
@@ -140,14 +139,11 @@ void Viewport::_renderMainMenu() {
             if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
                 _createNewScene();
             }
-            if (ImGui::MenuItem("Open Scene...", "Ctrl+O")) {
+            if (ImGui::MenuItem("Open Scene", "Ctrl+O")) {
                 _openSceneDialog();
             }
             if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S")) {
                 _saveSceneAsDialog(false);
-            }
-            if (ImGui::MenuItem("Save Template As...")) {
-                _saveSceneAsDialog(true);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {
@@ -244,30 +240,37 @@ void Viewport::ReparentEntity(EntityId childId, EntityId newParentId) {
     ECS::Entity child = m_world->Resolve(childId);
     if (child.IsNull() || !m_world->IsAlive(child)) return;
 
-    // Prevent circular parenting
-    if (newParentId != ECS::Entity::NPOS32) {
-        EntityId current = newParentId;
-        while (current != ECS::Entity::NPOS32) {
-            if (current == childId) {
-                LOG_WARNING("Circular parenting detected, aborting");
-                return;
-            }
-            ECS::Entity e = m_world->Resolve(current);
-            if (m_world->Has<ECS::Parent>(e)) {
-                current = m_world->Get<ECS::Parent>(e).ParentEntity.Index;
-            }
-            else {
-                break;
-            }
-        }
-    }
-
-    if (newParentId == ECS::Entity::NPOS32) {
+    // Remove existing parent
+    if (m_world->Has<ECS::Parent>(child)) {
         m_world->Remove<ECS::Parent>(child);
     }
-    else {
-        ECS::Entity parent = m_world->Resolve(newParentId);
-        m_world->Set<ECS::Parent>(child, ECS::Parent{ parent });
+
+    // Set new parent if not root
+    if (newParentId != ECS::Entity::NPOS32) {
+        ECS::Entity newParent = m_world->Resolve(newParentId);
+        if (!newParent.IsNull() && m_world->IsAlive(newParent)) {
+            // Prevent parenting to self or descendants
+            bool isDescendant = false;
+            EntityId checkId = newParentId;
+            while (checkId != ECS::Entity::NPOS32) {
+                if (checkId == childId) {
+                    isDescendant = true;
+                    break;
+                }
+                ECS::Entity checkEntity = m_world->Resolve(checkId);
+                if (m_world->Has<ECS::Parent>(checkEntity)) {
+                    const auto& p = m_world->Get<ECS::Parent>(checkEntity);
+                    checkId = p.ParentEntity.Index;
+                }
+                else {
+                    break;
+                }
+            }
+
+            if (!isDescendant) {
+                m_world->Set<ECS::Parent>(child, ECS::Parent{ newParent });
+            }
+        }
     }
 
     _invalidateCache();
@@ -309,25 +312,80 @@ void Viewport::RemoveEntity(EntityId id, bool recursive) {
     _invalidateCache();
 }
 
-// Clone an entity
+// Clone an entity recursively with all its children
 void Viewport::CloneEntity(EntityId id) {
     if (!HasValidWorld()) return;
 
     ECS::Entity entity = m_world->Resolve(id);
     if (entity.IsNull() || !m_world->IsAlive(entity)) return;
 
-    auto entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
-    auto clone = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+    // Map from original entity ID to cloned entity
+    std::unordered_map<EntityId, ECS::Entity> cloneMap;
 
-    // Update name
-    if (m_world->Has<ECS::Components::Name>(clone)) {
-        auto& name = m_world->Get<ECS::Components::Name>(clone);
-        std::string newName = std::string(name.Value) + " (Clone)";
-        strncpy_s(name.Value, newName.c_str(), sizeof(name.Value) - 1);
+    // Helper function to recursively clone entity and its children
+    std::function<ECS::Entity(EntityId, EntityId)> cloneRecursive = [&](EntityId entityId, EntityId newParentId) -> ECS::Entity {
+        ECS::Entity original = m_world->Resolve(entityId);
+        if (original.IsNull() || !m_world->IsAlive(original)) {
+            return ECS::NULL_ENTITY;
+        }
+
+        // Serialize and deserialize to clone
+        auto entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, original);
+        auto clone = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+
+        // Update name with (Clone) suffix
+        if (m_world->Has<ECS::Components::Name>(clone)) {
+            auto& name = m_world->Get<ECS::Components::Name>(clone);
+            std::string newName = std::string(name.Value) + " (Clone)";
+            strncpy_s(name.Value, newName.c_str(), sizeof(name.Value) - 1);
+            name.Value[sizeof(name.Value) - 1] = '\0';
+        }
+
+        // Set parent relationship
+        if (newParentId != ECS::Entity::NPOS32) {
+            ECS::Entity newParent = m_world->Resolve(newParentId);
+            if (!newParent.IsNull() && m_world->IsAlive(newParent)) {
+                m_world->Set<ECS::Parent>(clone, ECS::Parent{ newParent });
+            }
+        }
+        else {
+            // Remove parent component if cloning as root
+            if (m_world->Has<ECS::Parent>(clone)) {
+                m_world->Remove<ECS::Parent>(clone);
+            }
+        }
+
+        // Store mapping
+        cloneMap[entityId] = clone;
+
+        // Find and clone all children
+        std::vector<EntityId> children;
+        m_world->Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
+            if (p.ParentEntity.Index == entityId) {
+                children.push_back(e.Index);
+            }
+            });
+
+        // Recursively clone children with this clone as their parent
+        for (auto childId : children) {
+            cloneRecursive(childId, clone.Index);
+        }
+
+        return clone;
+        };
+
+    // Get the parent of the original entity (if any)
+    EntityId originalParentId = ECS::Entity::NPOS32;
+    if (m_world->Has<ECS::Parent>(entity)) {
+        const auto& parent = m_world->Get<ECS::Parent>(entity);
+        originalParentId = parent.ParentEntity.Index;
     }
 
+    // Clone the entity hierarchy
+    cloneRecursive(id, originalParentId);
+
     _invalidateCache();
-    LOG_INFO("Cloned entity " << id);
+    LOG_INFO("Cloned entity " << id << " with all children");
 }
 
 // Clear all entities
@@ -514,12 +572,4 @@ void Viewport::_saveSceneToFile(const std::string& path) {
 // -------------------------------------------------------------------------
 void Viewport::_invalidateCache() {
     // Invalidate any cached entity data
-}
-
-void Viewport::_saveEditorState() {
-    // Editor state persistence disabled
-}
-
-void Viewport::_loadEditorState() {
-    // Editor state persistence disabled
 }

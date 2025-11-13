@@ -109,13 +109,10 @@ void InspectorPanel::ClearSelection() {
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
-void InspectorPanel::Render(float /*fontScale*/) {
+void InspectorPanel::Render(float) {
     ImGui::PushFont(m_mainFont);
 
     const char* windowTitle = (m_mode == InspectionMode::Prefab) ? "Prefab Editor" : "Property Editor";
-
-    // NOTE: removed fixed SetNextWindowContentSize(450, 0) because it caused the
-    // inspector content to look "narrow" while the child inside could scroll wider.
     ImGui::Begin(windowTitle);
 
     if (m_mode == InspectionMode::None) {
@@ -519,7 +516,7 @@ void InspectorPanel::_applyPrefabToInstances() {
             _applyPrefabDataToEntity(entity);
             updateCount++;
         }
-    });
+        });
 
     LOG_INFO("Applied prefab to " << updateCount << " instances");
     m_statusMessage = "Applied to " + std::to_string(updateCount) + " instances";
@@ -538,7 +535,6 @@ void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity) {
         ApplyComponentIfMatch<ECS::Components::LocalTransform>(m_world, entity, typeName, "ECS::Components::LocalTransform", compEntry);
         ApplyComponentIfMatch<ECS::Components::SpriteRenderer2D>(m_world, entity, typeName, "ECS::Components::SpriteRenderer2D", compEntry);
         ApplyComponentIfMatch<ECS::Components::Rigidbody2D>(m_world, entity, typeName, "ECS::Components::Rigidbody2D", compEntry);
-        // Add more component types as needed
     }
 }
 

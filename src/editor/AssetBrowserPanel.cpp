@@ -81,17 +81,7 @@ void AssetBrowserPanel::Render() {
     _renderStatusBar();
 
     // Click on empty space in parent Asset Browser window to clear everything
-    // !IsAnyItemHovered() prevents clearing when clicking breadcrumbs, buttons, sliders, etc.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
-        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered()) {
-
-        m_selectedAsset.clear();
-
-        if (m_inspector) {
-            m_inspector->ClearSelection();
-        }
-    }
+    AssetBrowserPanel::_selectEmptySpace();
 
     ImGui::End();
     ImGui::PopFont();
@@ -246,17 +236,7 @@ void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
     m_assetLibrary._displayFolder(m_currentPath, m_selectedAsset, m_currentPath);
 
     // Clicking empty space in file list clears EVERYTHING (File/folder list)
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered())
-    {
-        // Clear currently selected asset
-        m_selectedAsset.clear();
-
-        // Clear prefab editor if it exists (no need to clear property inspector here)
-        if (m_inspector) {
-            m_inspector->ClearSelection();
-        }
-    }
+    AssetBrowserPanel::_selectEmptySpace();
     ImGui::EndChild();
 }
 
@@ -267,18 +247,9 @@ void AssetBrowserPanel::_renderFileInfoPanel() {
     m_assetLibrary._displaySelectedFileInfo(m_selectedAsset);
 
     // Clicking empty space in file info clears EVERYTHING (File info)
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered()) {
-
-        // So it's just the same thing (repetitive?)
-        m_selectedAsset.clear();
-        if (m_inspector) {
-            m_inspector->ClearSelection();
-        }
-    }
+    AssetBrowserPanel::_selectEmptySpace();
 
     _renderDeleteButton();
-
     ImGui::EndChild();
 }
 
@@ -419,6 +390,23 @@ void AssetBrowserPanel::_editPrefab() {
             LOG_ERROR("Failed to parse prefab file: " << e.what());
             m_statusMessage = "Failed to open prefab";
             m_statusTimer = 3.0f;
+        }
+    }
+}
+
+void AssetBrowserPanel::_selectEmptySpace() {
+    // Click on empty space in parent Asset Browser window to clear everything
+    // !IsAnyItemHovered() prevents clearing when clicking breadcrumbs, buttons, sliders, etc.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+        && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
+        && !ImGui::IsAnyItemHovered()) {
+
+        // Clear currently selected asset
+        m_selectedAsset.clear();
+
+        // Clear prefab editor if it exists (no need to clear property inspector here)
+        if (m_inspector) {
+            m_inspector->ClearSelection();
         }
     }
 }

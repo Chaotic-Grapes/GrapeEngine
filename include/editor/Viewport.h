@@ -89,8 +89,6 @@ private:
     // Helper Methods
     // -------------------------------------------------------------------------
     void _invalidateCache();
-    void _saveEditorState();
-    void _loadEditorState();
 
     // -------------------------------------------------------------------------
     // State

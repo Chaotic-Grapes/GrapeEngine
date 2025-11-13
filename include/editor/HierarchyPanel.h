@@ -8,6 +8,8 @@
 \date   5th November 2025
 \brief
 Declares the HierarchyPanel class for Unity-like hierarchy window UI.
+Provides entity management, tree structure display, drag-drop parenting,
+prefab instantiation and selection handling for scene editing.
 */
 /* End Header *******************************************************************/
 
@@ -20,10 +22,14 @@ Declares the HierarchyPanel class for Unity-like hierarchy window UI.
 #include <unordered_set>
 #include <functional>
 
-// Forward declarations
+// Forward declarations to avoid circular dependencies
 class Viewport;
 
+// EntityId is a numeric identifier for entities in the ECS world
 using EntityId = uint32_t;
+
+// Callback function type for entity selection events
+// Other systems can register to be notified when selection changes
 using SelectionCallback = std::function<void(EntityId)>;
 
 // Hierarchy panel for displaying and managing entity tree structure
@@ -32,67 +38,119 @@ public:
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
+
+    // Initialize the hierarchy panel with required fonts and system references
+    // Fonts are used for consistent UI styling across the panel
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, Viewport* viewport);
+
+    // Update the world reference when switching between scenes
+    // Clears internal state like selection and expanded nodes
     void SetWorld(ECS::World* world);
+
+    // Register a callback function to be notified when entity selection changes
+    // Useful for synchronizing selection with other editor panels
     void OnSelectionChanged(SelectionCallback callback);
 
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
+
+    // Main rendering function called every frame to draw the hierarchy window
+    // Handles entity tree display, interactions and UI controls
     void Render();
 
 private:
     // -------------------------------------------------------------------------
     // UI Sections
     // -------------------------------------------------------------------------
+
+    // Render the header section with entity creation controls and entity count
     void _renderHeader();
+
+    // Render the main entity tree with scrollable area and drag-drop support
     void _renderEntityTree();
+
+    // Render footer buttons like Clear All for scene management
     void _renderFooterButtons();
 
     // -------------------------------------------------------------------------
     // Entity Tree Node Rendering
     // -------------------------------------------------------------------------
+
+    // Render a single entity node and its children recursively
+    // Depth parameter tracks indentation level for visual hierarchy
     void _renderEntityNode(EntityId entityId, int depth);
+
+    // Handle mouse interactions with entity nodes (clicks, right-click, double-click)
     void _handleNodeInteraction(EntityId entityId);
+
+    // Handle drag-drop operations for entity reparenting and prefab instantiation
     void _handleNodeDragDrop(EntityId entityId);
+
+    // Handle drag-drop for tree background (reparenting to root level)
     void _handleTreeDragDrop();
 
     // -------------------------------------------------------------------------
     // Context Menu
     // -------------------------------------------------------------------------
+
+    // Render the right-click context menu for entity operations
     void _renderEntityContextMenu();
 
     // -------------------------------------------------------------------------
     // Entity Operations
     // -------------------------------------------------------------------------
+
+    // Delete an entity and clean up selection state
     void _deleteEntity(EntityId entityId);
+
+    // Create a duplicate of an entity with same components and hierarchy
     void _cloneEntity(EntityId entityId);
+
+    // Add a new child entity to the specified parent
     void _addChildEntity(EntityId parentId);
+
+    // Add a new root entity (no parent)
+    void _addRootEntity();
 
     // -------------------------------------------------------------------------
     // Prefab Operations
     // -------------------------------------------------------------------------
+
+    // Instantiate a prefab file as a child of the specified parent entity
     void _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
-    void _updateFromPrefab(EntityId entityId);
-    void _saveToPrefab(EntityId entityId);
 
     // -------------------------------------------------------------------------
     // Helper Methods
     // -------------------------------------------------------------------------
+
+    // Get all root entities (entities without Parent component)
     std::vector<EntityId> _getRootEntities() const;
+
+    // Get all direct children of a parent entity
     std::vector<EntityId> _getChildren(EntityId parentId) const;
+
+    // Handle clicking empty space to clear selection
+    void _selectEmptySpace();
 
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
-    ImFont* m_mainFont = nullptr;
-    ImFont* m_boldFont = nullptr;
-    ImFont* m_symbolsFont = nullptr;
-    ECS::World* m_world = nullptr;
-    Viewport* m_viewport = nullptr;
 
-    EntityId m_selectedEntityId = 0;
-    EntityId m_contextMenuTarget = 0;
-    std::unordered_set<EntityId> m_expandedNodes;
-    SelectionCallback m_selectionCallback;
+    // Font references for UI styling
+    ImFont* m_mainFont = nullptr;      
+    ImFont* m_boldFont = nullptr;      
+    ImFont* m_symbolsFont = nullptr;   
+
+    // System references
+    ECS::World* m_world = nullptr;                // ECS world containing all entities and components
+    Viewport* m_viewport = nullptr;               // Viewport for entity operations and camera control
+
+    // Selection state
+    EntityId m_selectedEntityId = 0;              // Currently selected entity ID (0 = no selection)
+    EntityId m_contextMenuTarget = 0;             // Entity targeted for context menu operations
+
+    // UI state
+    std::unordered_set<EntityId> m_expandedNodes; // Track which tree nodes are expanded
+    SelectionCallback m_selectionCallback;        // Callback for selection change events
 };

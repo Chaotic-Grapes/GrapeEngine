@@ -49,10 +49,11 @@ private:
     void _renderStatusBar();
 
     // -------------------------------------------------------------------------
-    // Prefab Operations
+    // Prefab Operations & Selection Invalidation
     // -------------------------------------------------------------------------
     void _loadPrefab();
     void _editPrefab();
+    void _selectEmptySpace();
 
     // -------------------------------------------------------------------------
     // State
