@@ -5,106 +5,132 @@
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
 \brief
-Declares the LevelEditor class which orchestrates all editor panels including
-playback controls and asset browser.
+Declares the LevelEditor class - main orchestrator for the game editor interface.
+Manages docking layout, panel coordination, entity selection, and playback controls.
 
-Features:
-- Manages playback controls for game state (play/pause/stop)
-- Manages asset browser for file management
-- Font loading and configuration for editor UI
-- Exposes game state for physics system integration
+New Features:
+- Centralized panel registration system for easier integration
+- Simplified initialization and rendering through callbacks
+- Reduced boilerplate for adding new panels
 */
 /* End Header *******************************************************************/
 
-#ifndef LEVELEDITOR_H
-#define LEVELEDITOR_H
+#pragma once
 
+#include "ecs/World.h"
 #include "../editor/PlaybackControls.h"
-#include "../editor/AssetBrowser.h"
-#include "../editor/EditorCore.h"
-#include "../editor/HierarchyWindow.h"
-#include "../editor/InspectorWindow.h"
-#include <unordered_set>
+#include "../editor/AssetBrowserPanel.h"
+#include "../editor/HierarchyPanel.h"
+#include "../editor/InspectorPanel.h"
+#include "../editor/Viewport.h"
 #include <imgui.h>
+#include <unordered_set>
+#include <functional>
+#include <vector>
 
-// Forward declarations
 struct GLFWwindow;
-struct ImFont;
 
-// Configuration structure for level editor UI settings
+// Configuration for the level editor appearance and behavior
 struct LevelEditorConfig {
-    float FontSize = 16.0f;                                // Base font size in pixels
-    static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  // Maximum length for game object names
+    float TextFontSize = 23.0f;
+    float IconFontSize = 26.0f;
 };
 
-// Level editor orchestrates all editor panels and manages editor state
+// Main editor coordinator class that manages all editor panels and their interactions.
+// Uses a centralized panel registration system to reduce boilerplate when adding panels.
 class LevelEditor {
 public:
-    // This creates the level editor with a world
-    // It stores config and sets up panels
-    explicit LevelEditor(ECS::World* world, const LevelEditorConfig& config = {});
-    // This tears down editor resources
-    // It releases owned pointers cleanly
+    LevelEditor(ECS::World* world, const LevelEditorConfig& config);
     ~LevelEditor();
 
-    // This initializes ImGui fonts and panels
-    // It sets up docking and window state
+    // Core lifecycle methods
     void Initialize(GLFWwindow* pWin);
-
-    // This handles input and per frame updates
-    // It drives state for all panels
     void Update();
-
-    // This draws all editor panels
-    // It builds the layout and windows
     void Render();
-
-    // This updates the world reference for all panels
-    // It propagates the change to keep everything synced
-    void SetWorld(ECS::World* world);
-
-    // This handles window resize
-    // It rebuilds docking layout if needed
+    
+    // Window event handlers
     void OnWindowResized(int width, int height);
 
-    // Expose game state for physics system
-    // Get current game state for systems
-    Playback::GameState GetGameState() const { return m_playback.GetGameState(); }
-    // Check if the game is playing
-    bool IsPlaying() const { return m_playback.IsPlaying(); }
-    // Check if a single step is requested
-    bool IsStepRequested() const { return m_playback.IsStepRequested(); }
-    // Clear single step request
-    void ClearStepRequest() { m_playback.ClearStepRequest(); }
+    // World management
+    void SetWorld(ECS::World* world);
+    inline ECS::World* GetWorld() const { return m_world; }
+    inline bool HasValidWorld() const { return m_world != nullptr; }
+
+    // Playback state queries
+    inline bool IsPlaying() const { return m_playback.IsPlaying(); }
+    inline bool IsStepRequested() const { return m_playback.IsStepRequested(); }
+    inline void ClearStepRequest() { m_playback.ClearStepRequest(); }
 
 private:
-    // This builds the docking layout once
-    // It positions panels in a friendly arrangement
+    // -------------------------------------------------------------------------
+    // Panel Registration System
+    // -------------------------------------------------------------------------
+    // Represents a registered editor panel with its lifecycle callbacks.
+    // Centralizes panel management and eliminates repetitive initialization code.
+    struct PanelRegistration {
+        const char* Name;                                 // Display name for debugging
+        std::function<void()> InitializeCallback;         // Called once during editor startup
+        std::function<void()> RenderCallback;             // Called every frame
+        std::function<void(ECS::World*)> SetWorldCallback; // Called when world changes
+    };
+
+    // Register a panel with the editor system.
+    // Panels are initialized in registration order and rendered each frame.
+    void _registerPanel(const char* panelName, 
+                        std::function<void()> initFn, 
+                        std::function<void()> renderFn,
+                        std::function<void(ECS::World*)> setWorldFn);
+
+    // Initialize all registered panels in order.
+    void _initializePanels();
+    
+    // Render all registered panels in order.
+    void _renderPanels();
+
+    // Propagate world reference to all registered panels.
+    void _updatePanelWorlds(ECS::World* world);
+
+    void _loadFonts();
+
+    // -------------------------------------------------------------------------
+    // Docking
+    // -------------------------------------------------------------------------
     void _buildDockLayout();
-    // This renders the dock host and space
-    // It manages central docking area
     void _renderDockSpace();
-    bool m_dockLayoutBuilt = false;
+
+    // -------------------------------------------------------------------------
+    // Panel Instances
+    // -------------------------------------------------------------------------
+    Playback m_playback;              // Game controls (play/pause/stop/step)
+    AssetBrowserPanel m_assetBrowser;      // File browser and asset management
+    Viewport m_viewport;          // Viewport and core editor features
+    HierarchyPanel m_hierarchyWindow; // Entity tree view
+    InspectorPanel m_inspector;      // Component property editor
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+    ECS::World* m_world;              // Active scene world being edited
+    LevelEditorConfig m_config;        // Editor configuration
+
+    // Panel registration storage
+    std::vector<PanelRegistration> m_panelRegistry;
+
+    // Fonts
+    ImFont* m_mainFont;
+    ImFont* m_boldFont;
+    ImFont* m_symbolsFont;
+
+    // Docking state
     ImGuiID m_dockspaceId = 0;
-    ImVec2 m_lastViewportSize; // Tracks viewport size to trigger layout rebuild
+    bool m_dockLayoutBuilt = false;
+    ImVec2 m_lastViewportSize{ 0, 0 };
 
-    ECS::World* m_world;               // Reference to game world
-    LevelEditorConfig m_config;        // Editor configuration settings
-    Playback m_playback;               // Playback controls panel
-    ImFont* m_symbolsFont = nullptr;   // Material Symbols icon font
-    ImFont* m_mainFont = nullptr;      // Regular Inter font for text
-    ImFont* m_boldFont = nullptr;      // Bold Inter font
-    AssetBrowser m_assetBrowser;       // Asset browser panel
-    EditorCore m_editorCore;           // Entity editor panel
-    HierarchyWindow m_hierarchyWindow; // Hierarchy panel
-    InspectorWindow m_inspector;       // Unified inspector absorbing PrefabEditor
-
-    // Track last playback state to drive camera toggles
+    // Playback state tracking
     Playback::GameState m_lastGameState = Playback::GameState::Stopped;
-    // Track entities already converted from pixels to world units
+
+    // Unit conversion tracking (pixel to world space)
+    std::unordered_set<EntityId> m_convertedPositions;
     std::unordered_set<EntityId> m_convertedCircles;
     std::unordered_set<EntityId> m_convertedBoxes;
-    std::unordered_set<EntityId> m_convertedPositions;
 };
-
-#endif

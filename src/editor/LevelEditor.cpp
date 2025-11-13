@@ -23,7 +23,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
     : m_world(world), m_config(config), m_playback(world), m_symbolsFont(nullptr),
-    m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_editorCore(),
+    m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_viewport(),
     m_hierarchyWindow(), m_inspector() {
 // Defer panel initialization to Initialize to use loaded fonts
 }
@@ -31,27 +31,76 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
 // Destroy the editor instance without owning the world
 LevelEditor::~LevelEditor() {}
 
+// -------------------------------------------------------------------------
+// Panel Registration System
+// -------------------------------------------------------------------------
+// Register a panel with initialization and render callbacks.
+// Centralizes panel management and eliminates repetitive init/render boilerplate.
+void LevelEditor::_registerPanel(const char* panelName, 
+                                  std::function<void()> initFn, 
+                                  std::function<void()> renderFn,
+                                  std::function<void(ECS::World*)> setWorldFn) {
+    PanelRegistration reg;
+    reg.Name = panelName;
+    reg.InitializeCallback = initFn;
+    reg.RenderCallback = renderFn;
+    reg.SetWorldCallback = setWorldFn;
+    m_panelRegistry.push_back(reg);
+}
+
+// Initialize all registered panels.
+// Called after fonts are loaded to set up each panel's state.
+void LevelEditor::_initializePanels() {
+    for (auto& panel : m_panelRegistry) {
+        if (panel.InitializeCallback) {
+            panel.InitializeCallback();
+        }
+    }
+}
+
+// Render all registered panels.
+// Iterates through the registry and calls each panel's render function.
+void LevelEditor::_renderPanels() {
+    for (auto& panel : m_panelRegistry) {
+        if (panel.RenderCallback) {
+            panel.RenderCallback();
+        }
+    }
+}
+
+// Propagate world reference to all registered panels.
+// Updates each panel when the active scene changes.
+void LevelEditor::_updatePanelWorlds(ECS::World* world) {
+    for (auto& panel : m_panelRegistry) {
+        if (panel.SetWorldCallback) {
+            panel.SetWorldCallback(world);
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// Dock Layout
+// -------------------------------------------------------------------------
 // Build the dock layout once using split ratios and target windows
 void LevelEditor::_buildDockLayout() {
     // Rebuild only when flagged to avoid resetting panel positions
     if (m_dockLayoutBuilt) return;
 
     ImGuiViewport* vp = ImGui::GetMainViewport();
-    if (vp->Size.x <= 0 || vp->Size.y <= 0) return; // Guard against zero size
+    if (vp->Size.x <= 0 || vp->Size.y <= 0) return;         // Guard against zero size
 
     ImGui::DockBuilderRemoveNode(m_dockspaceId);
-    ImGui::DockBuilderAddNode(m_dockspaceId, ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
     // Flags: DockSpace creates a root docking container; PassthruCentralNode lets the central area render game content underneath
+    ImGui::DockBuilderAddNode(m_dockspaceId, ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::DockBuilderSetNodeSize(m_dockspaceId, vp->Size); // Match viewport size
-    // Target layout: left hierarchy, center viewport with controls on top,
-    // bottom asset browser; right strip for inspector/prefab editors.
-    // Target layout: left hierarchy, center viewport with controls on top,
-    // bottom asset browser; right strip for inspector/prefab editors.
 
+    // Target layout: left hierarchy, center viewport with controls on top,
+    // bottom asset browser, right strip for inspector/prefab editors
+            
     ImGuiID leftCenterNode, rightNode;
     // Split root: carve right strip (25% width) for inspectors
     // Params: (source_node, direction, size_ratio, out_id_primary, out_id_remaining)
-    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode); // Reserve right strip
+    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
 
     ImGuiID topSection, assetBrowserNode;
     // Split main area vertically: top work area (65%), bottom asset browser (35%)
@@ -74,7 +123,7 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
 
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
-m_dockLayoutBuilt = true; // Mark layout as built
+    m_dockLayoutBuilt = true;                // Mark layout as built
 }
 
 // Invalidate the layout so the next frame rebuilds it on new size
@@ -90,16 +139,17 @@ void LevelEditor::_renderDockSpace() {
     // Track viewport size changes and trigger layout rebuild when it changes
     if (m_lastViewportSize.x != vp->Size.x || m_lastViewportSize.y != vp->Size.y) {
         m_lastViewportSize = vp->Size;
-m_dockLayoutBuilt = false; // Force a rebuild on size change
+        m_dockLayoutBuilt = false; // Force a rebuild on size change
     }
 
     const float topOffset = ImGui::GetFrameHeight();
     ImVec2 safePos(vp->Pos.x, vp->Pos.y + topOffset);
+
     // Use raw viewport size and keep proportions stable via docking splits
     ImVec2 safeSize(vp->Size.x, std::max(1.0f, vp->Size.y - topOffset));
 
-    ImGui::SetNextWindowPos(safePos);  // Position dock host under main menu bar
-    ImGui::SetNextWindowSize(safeSize); // Size dock host to fill viewport
+    ImGui::SetNextWindowPos(safePos);     // Position dock host under main menu bar
+    ImGui::SetNextWindowSize(safeSize);   // Size dock host to fill viewport
     ImGui::SetNextWindowViewport(vp->ID); // Pin host to current viewport
 
     // Host window flags: prevent interactions and visuals on the host container
@@ -110,23 +160,27 @@ m_dockLayoutBuilt = false; // Force a rebuild on size change
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);   // Square corners for host
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f); // No border around host
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f)); // No padding; dockspace fills fully
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));     // No padding; dockspace fills fully
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent host background
 
-    ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags); // Begin invisible host window
+    // Begin invisible host window
+    ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);                    
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(3);
 
-    m_dockspaceId = ImGui::GetID("MainDockSpace"); // Stable ID for this dockspace
+    m_dockspaceId = ImGui::GetID("MainDockSpace");                         // Stable ID for this dockspace
     ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Let central node pass content
-    ImGui::DockSpace(m_dockspaceId, ImVec2(0.0f, 0.0f), dockFlags); // Create dockspace filling the host window
+    ImGui::DockSpace(m_dockspaceId, ImVec2(0.0f, 0.0f), dockFlags);        // Create dockspace filling the host window
 
     _buildDockLayout(); // Build once on first frame or after resize
-    ImGui::End(); // End host window
+    ImGui::End();       // End host window
 }
 
+// -------------------------------------------------------------------------
+// Initialization
+// -------------------------------------------------------------------------
 // Initialize fonts build atlas and set up editor panels and hooks
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
@@ -134,10 +188,63 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     auto& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
+    _loadFonts();
 
-    float textFontSize = m_config.FontSize;
+    // Register all panels with their initialization and render callbacks.
+    // Centralizes panel lifecycle management and reduces code duplication.
+    _registerPanel("Playback Controls",
+        [this]() { m_playback.Initialize(m_mainFont, m_symbolsFont); },
+        [this]() { m_playback.Render(); },
+        [this](ECS::World* w) { m_playback.SetWorld(w); }
+    );
 
-    // Only load fonts if not already loaded
+    _registerPanel("Asset Browser",
+        [this]() { 
+            m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+            m_assetBrowser.SetInspector(&m_inspector);
+        },
+        [this]() { m_assetBrowser.Render(); },
+        [this](ECS::World* w) { m_assetBrowser.SetWorld(w); }
+    );
+
+    _registerPanel("Editor Core",
+        [this]() { 
+            m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+        },
+        [this]() { m_viewport.ShowEditorWindows(); },
+        [this](ECS::World* w) { m_viewport.SetWorld(w); }
+    );
+
+    _registerPanel("Hierarchy",
+        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_viewport); },
+        [this]() { m_hierarchyWindow.Render(); },
+        [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
+    );
+
+    _registerPanel("Inspector",
+        [this]() { m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world); },
+        [this]() { m_inspector.Render(1.0f); },
+        [this](ECS::World* w) { m_inspector.SetWorld(w); }
+    );
+
+    // Initialize all registered panels
+    _initializePanels();
+
+    // Set up hierarchy selection callback to sync with inspector
+    m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
+        if (!m_world) { m_inspector.ClearSelection(); return; } // Clear when no world
+        if (id == ECS::Entity::NPOS32) { m_inspector.ClearSelection(); return; } // Clear when no entity
+        // Resolve the entity to the current generation before checking aliveness
+        ECS::Entity e = m_world->Resolve(id);
+        if (m_world->IsAlive(e)) m_inspector.InspectEntity(id); // Inspect when valid
+        else m_inspector.ClearSelection(); // Clear when entity is dead
+    });
+}
+
+void LevelEditor::_loadFonts() {
+    auto& io = ImGui::GetIO();
+    float textFontSize = m_config.TextFontSize;
+
     if (!m_mainFont && io.Fonts->Fonts.empty()) {
         m_mainFont = io.Fonts->AddFontFromFileTTF(
             "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
@@ -145,11 +252,11 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         );
         if (!m_mainFont) {
             LOG_ERROR("Failed to load Inter Medium font");
-            m_mainFont = io.Fonts->AddFontDefault(); // Fallback to default font
+            m_mainFont = io.Fonts->AddFontDefault();
         }
     }
     else if (!m_mainFont) {
-        m_mainFont = io.Fonts->Fonts[0]; // Reuse first font in atlas
+        m_mainFont = io.Fonts->Fonts[0];
     }
 
     if (!m_boldFont && io.Fonts->Fonts.size() < 2) {
@@ -159,21 +266,21 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         );
         if (!m_boldFont) {
             LOG_ERROR("Failed to load Inter ExtraBold font");
-            m_boldFont = io.Fonts->AddFontDefault(); // Fallback to default font
+            m_boldFont = io.Fonts->AddFontDefault();
         }
     }
     else if (!m_boldFont) {
-        m_boldFont = io.Fonts->Fonts[1]; // Reuse second font in atlas
+        m_boldFont = io.Fonts->Fonts[1];
     }
 
+    float iconFontSize = m_config.IconFontSize;
     static const ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
     ImFontConfig iconsConfig;
     iconsConfig.MergeMode = false;
     iconsConfig.PixelSnapH = true;
-    iconsConfig.GlyphMinAdvanceX = 24.0f;
-    iconsConfig.GlyphOffset = ImVec2(0, 0);
+    iconsConfig.OversampleH = 3;
+    iconsConfig.OversampleV = 3;
 
-    float iconFontSize = 18.0f;
     if (!m_symbolsFont && io.Fonts->Fonts.size() < 3) {
         m_symbolsFont = io.Fonts->AddFontFromFileTTF(
             "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
@@ -183,36 +290,21 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         );
         if (!m_symbolsFont) {
             LOG_ERROR("Failed to load Material Symbols font");
-            m_symbolsFont = io.Fonts->AddFontDefault(); // Fallback to default font
+            m_symbolsFont = io.Fonts->AddFontDefault();
         }
     }
     else if (!m_symbolsFont) {
-        m_symbolsFont = io.Fonts->Fonts[2]; // Reuse third font in atlas
+        m_symbolsFont = io.Fonts->Fonts[2];
     }
 
-    // Build font atlas if we added new fonts
     if (io.Fonts->Fonts.size() > 0 && !io.Fonts->IsBuilt()) {
-        io.Fonts->Build(); // Prepare font textures for rendering
+        io.Fonts->Build();
     }
-
-    m_playback.Initialize(m_mainFont, m_symbolsFont); // Set up playback panel
-    m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world); // Set up asset browser
-    m_editorCore.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world); // Set up core editor
-    m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_editorCore); // Set up hierarchy
-    m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world); // Set up inspector
-
-    m_assetBrowser.SetInspector(&m_inspector); // Link inspector for asset previews
-
-    m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
-        if (!m_world) { m_inspector.ClearSelection(); return; } // Clear when no world
-        if (id == ECS::Entity::NPOS32) { m_inspector.ClearSelection(); return; } // Clear when no entity
-        // Resolve the entity to the current generation before checking aliveness
-        ECS::Entity e = m_world->Resolve(id);
-        if (m_world->IsAlive(e)) m_inspector.InspectEntity(id); // Inspect when valid
-        else m_inspector.ClearSelection(); // Clear when entity is dead
-        });
 }
 
+// -------------------------------------------------------------------------
+// Update Loop
+// -------------------------------------------------------------------------
 // Process input and in world interactions for editor panels
 void LevelEditor::Update() {
     // Auto-sync to active scene world if it changed (e.g., via File > New Scene)
@@ -233,7 +325,7 @@ void LevelEditor::Update() {
         if (current != m_lastGameState) {
             if (current == Playback::GameState::Stopped) {
                 // Seed conversion tracking sets to avoid double pixel->world conversion
-                // on restored entities created during play.
+                // on restored entities created during play
                 if (m_world) {
                     m_world->Each<ECS::Components::LocalTransform>([&](ECS::Entity e, ECS::Components::LocalTransform& /*tr*/) {
                         m_convertedPositions.insert(e.Index);
@@ -260,7 +352,7 @@ void LevelEditor::Update() {
     }
 
     // Restore automatic pixel->world conversion so newly added entities
-    // use world units consistent with renderer/camera.
+    // use world units consistent with renderer/camera
     if (!IsPlaying() && m_world) {
         m_world->Each<ECS::Components::LocalTransform>([&](ECS::Entity e, ECS::Components::LocalTransform& tr) {
             if (m_convertedPositions.find(e.Index) == m_convertedPositions.end()) {
@@ -286,12 +378,12 @@ void LevelEditor::Update() {
         });
     }
 
-    m_editorCore.HandleInWorldInteraction(); // Handle viewport interactions
+    m_viewport.HandleInWorldInteraction(); // Handle viewport interactions
 
     // Synchronize inspector selection with viewport picking when hovering the viewport
-    if (m_editorCore.IsViewportHovered()) {
+    if (m_viewport.IsViewportHovered()) {
         static EntityId s_lastInspected = 0;
-        EntityId picked = m_editorCore.GetSelectedEntityId();
+        EntityId picked = m_viewport.GetSelectedEntityId();
         if (picked != s_lastInspected) {
             if (picked != 0) {
                 m_inspector.InspectEntity(picked);
@@ -303,24 +395,22 @@ void LevelEditor::Update() {
     }
 }
 
+// -------------------------------------------------------------------------
+// Render
+// -------------------------------------------------------------------------
 // Render dock space and editor panels with a fallback when world is missing
 void LevelEditor::Render() {
     _renderDockSpace();
 
     if (m_world) {
-        m_playback.Render(); // Draw playback controls
-        m_assetBrowser.Render(); // Draw asset browser
-        m_editorCore.ShowEditorWindows(); // Draw core editor windows
-        m_hierarchyWindow.Render(); // Draw hierarchy tree
-        // Inspector follows global FontGlobalScale; pass 1.0f (no local override)
-        m_inspector.Render(1.0f);
+        // Render all registered panels
+        _renderPanels();
     }
     else {
-        m_playback.Render(); // Keep controls visible
-        m_assetBrowser.Render(); // Keep assets visible
-        m_editorCore.ShowEditorWindows(); // Keep editor windows visible
-        m_hierarchyWindow.Render(); // Keep hierarchy visible
-
+        // Render all panels but show placeholder in inspector
+        _renderPanels();
+        
+        // Override inspector with placeholder message when no world attached
         ImGui::PushFont(m_mainFont);
         ImGui::Begin("Property Editor");
         ImGui::TextDisabled("No scene attached"); // Inform user about missing scene
@@ -329,14 +419,16 @@ void LevelEditor::Render() {
     }
 }
 
+// -------------------------------------------------------------------------
+// World Management
+// -------------------------------------------------------------------------
 // Update the world reference and propagate it to all editor panels
 void LevelEditor::SetWorld(ECS::World* world) {
     m_world = world; // Store new world
-    m_playback.SetWorld(world); // Update playback panel
-    m_editorCore.SetWorld(world); // Update core editor
-    m_hierarchyWindow.SetWorld(world); // Update hierarchy panel
-    m_inspector.SetWorld(world); // Update inspector panel
-    m_assetBrowser.SetWorld(world); // Update asset browser panel
+    
+    // Propagate world to all registered panels using centralized system
+    _updatePanelWorlds(world);
+
     // When binding a scene for editing, keep current camera; no toggling
     // Reset conversion tracking for the new world
     m_convertedCircles.clear();

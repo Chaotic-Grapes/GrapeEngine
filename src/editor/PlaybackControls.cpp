@@ -202,7 +202,7 @@ void Playback::_saveWorldState() {
         if (m_world->Has<ECS::Components::Name>(entity)) {
             const auto& name = m_world->Get<ECS::Components::Name>(entity);
 
-            // --- FIX: skip both variants of the editor camera name ---
+            // Skip both variants of the editor camera name
             if (std::strcmp(name.Value, "EditorCamera") == 0 ||
                 std::strcmp(name.Value, "Editor Camera") == 0)
             {
