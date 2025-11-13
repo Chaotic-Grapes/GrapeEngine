@@ -1,11 +1,29 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Application.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   14th September 2025
+\brief
+Main application class for the engine. Manages the game loop, input, and
+windowing.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
-#include <windows.h>
 #include "Game.h"
-#include "ecs/SceneManager.h"
-#include "serialization/Serialization.h"
+#include "scene/SceneManager.h"
+#include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
+
+// Forward declaration
+namespace Services { class OverlayService; }
 
 namespace Engine {
     class Application {
@@ -13,7 +31,7 @@ namespace Engine {
         /**
          * @brief Access the SceneManager for creating/loading/unloading scenes
          */
-        SceneManager& GetSceneManager() { return m_sceneManager; }
+        Scenes::SceneManager& GetSceneManager() { return m_sceneManager; }
 
         /**
          * @brief Get the application configuration
@@ -40,7 +58,7 @@ namespace Engine {
         static bool m_shouldStop;
 
         // Scene manager
-        SceneManager m_sceneManager;
+        Scenes::SceneManager m_sceneManager;
 
         // Application configuration
         ApplicationConfig m_config;
@@ -49,10 +67,14 @@ namespace Engine {
         static void _enableConsole();
         static void _disableConsole();
 
-        // Services
-        Services::AudioService* m_audio;
+        void _initializeServices();
 
-        double m_lastFrameTime;
+        // Services
+        Services::AudioService* m_audio = nullptr;
+		Services::OverlayService* m_overlay = nullptr;
+
+        double m_lastFrameTime{0};
+        float m_accumulator = 0.0f;
     };
 
     extern Application* CORE;

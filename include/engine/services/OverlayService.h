@@ -1,90 +1,156 @@
-/* Start Header *****************************************************************/
-/*!
-\file   OverlayService.h
-\author Foo Rui Qin (100%)
-\par    ruiqin.foo@digipen.edu
-\date   26th October 2025
-\brief
-Defines the Overlay class which serves as a system-level wrapper for managing
-debug UI and level editor functionality.
+/**
+ * @file OverlayService.h
+ * @author Foo Rui Qin
+ * @date 2024
+ * @brief Overlay system bridging DebugUI and the ImGui-based LevelEditor
+ * 
+ * This file defines the OverlayService class which serves as a system-level wrapper
+ * for editor and debug UI functionality. OverlayService manages:
+ * - DebugUI lifecycle and ImGui backend integration
+ * - LevelEditor creation/update/render gating per active scene
+ * - Audio system integration for debug monitoring
+ * - Conditional compilation support for ImGui features
+ * - Window management integration for UI rendering
+ * - World reference propagation to keep editor/debug views in sync
+ * 
+ * The OverlayService system inherits from Engine::ISystem and follows the ECS pattern,
+ * providing a clean interface between the engine's system architecture and
+ * the ImGui-based debug interface.
+ */
 
-Features:
-- ImGui initialization and integration with the engine
-- Debug UI and level editor lifecycle management
-- Audio system integration for debug monitoring
-- Conditional compilation support for ImGui features
-- Window management integration for UI rendering
-- Game playback state management (play/pause/stop/step)
+#ifndef OVERLAYSERVICE_H
+#define OVERLAYSERVICE_H
 
-References:
-- Engine system architecture (ISystem interface pattern)
-- ImGui integration with GLFW/OpenGL
-- ECS pattern for system lifecycle management
-*/
-/* End Header *******************************************************************/
-
-#ifndef OVERLAY_H
-#define OVERLAY_H
+#include "core/IService.h"
 #include <memory>
-#include "ecs/ISystem.h"
-#include "services/DebugUI.h"
-#include "core/Application.h"
 #include "audio/FmodAudioDevice.h"
-#include "../editor/LevelEditor.h"
+#include <memory>
 
 // Forward declarations
-class World;
-#ifdef USE_IMGUI
-class DebugUI;
-class LevelEditor;
-#endif
+namespace Scenes { class SceneManager; class Scene; }
 
-// Overlay system for managing debug UI, level editor, and ImGui integration
-class Overlay final : public Engine::ISystem {
-public:
-    // Constructor: initialize overlay with world reference
-    explicit Overlay(World* world) : m_world(world) {}
+#include "services/DebugUI.h"
+#include "../editor/LevelEditor.h"
 
-    // Initialize overlay system and create UI instances
-    void OnCreate() override;
-
-    // Update overlay system each frame (handles UI rendering and updates)
-    void OnUpdate() override;
-
-#ifdef USE_IMGUI
-    // Destructor: cleanup debug UI and detach audio system
-    ~Overlay() override;
-#endif
-
-    // Get system name for debugging and logging
-    std::string Name() const override { return "Overlay"; }
-
-    // Set audio system for debug monitoring
-    void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
-
-    // Check if game is currently playing (exposed for physics system)
-    bool IsGamePlaying() const { return m_levelEditor && m_levelEditor->IsPlaying(); }
-
-    // Check if physics step is requested
-    bool IsStepRequested() const { return m_levelEditor && m_levelEditor->IsStepRequested(); }
-
-    // Clear step request flag after processing
-    void ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
-
-private:
-    Audio::FmodAudioDevice* m_audioDevice = nullptr;  // Audio system for debug monitoring
-
-    // Set world reference for entity management
-    void SetWorld(World* world) { m_world = world; }
-
-    World* m_world = nullptr;  // World reference for entity management
+namespace Services {
+    /**
+     * @brief Overlay system bridging DebugUI and the LevelEditor overlay
+     *
+     * The OverlayService class serves as a system-level wrapper that manages the debug UI
+     * functionality within the engine's ECS architecture. It handles the lifecycle
+     * of ImGui integration, debug UI creation and updates, and provides a bridge
+     * between the engine systems and the debug interface.
+     *
+     * Key responsibilities:
+     * - Initialize and manage ImGui context and backends via DebugUI
+     * - Create and manage LevelEditor and DebugUI lifecycles
+     * - Handle audio system integration for debug monitoring
+     * - Manage window references for UI rendering
+     * - Provide conditional compilation support for ImGui features
+     * - Expose playback state helpers to systems (playing/step)
+     * - Ensure proper cleanup and resource management
+     *
+     * The system follows the Engine::ISystem interface pattern and integrates
+     * seamlessly with the engine's update loop and system management.
+     *
+     * Usage example:
+     * @code
+     * auto overlay = std::make_unique<Overlay>(&world);
+     * overlay->SetAudio(&audioSystem);
+     * systemManager.AddSystem(std::move(overlay));
+     * @endcode
+     */
+    class OverlayService final : public Engine::IService {
+    public:
+        /**
+         * @brief Constructor for Overlay system
+         */
+    explicit OverlayService(Scenes::SceneManager& sceneManager) : IService("Overlay Service"), m_sceneManager(sceneManager) { 
+        m_overlayInstance = this;
+        SetEnabled(false); 
+    }
 
 #ifdef USE_IMGUI
-    std::unique_ptr<DebugUI> m_debugUI;          // Debug UI instance
-    std::unique_ptr<LevelEditor> m_levelEditor;  // Level editor instance
-    bool m_initialized = false;                  // ImGui initialization flag
-    bool m_dockLayoutBuilt = false;              // Dock space layout built flag
+        /**
+         * @brief Destructor for Overlay system
+         */
+        ~OverlayService() override;
 #endif
-};
+
+        /**
+		 * @brief Initialize the overlay system
+         */
+        void Initialize() override;
+
+        /**
+         * @brief Update the overlay system each frame
+         *
+         * Called every frame to update the overlay system. Handles:
+         * - DebugUI instance creation if not already created
+         * - ImGui initialization when window becomes available
+         * - Audio system attachment for debug monitoring
+         * - Frame-by-frame UI rendering and updates
+         *
+         * This method manages the complete UI update cycle including
+         * ImGui frame setup, rendering, and finalization.
+         */
+        void Update() override;
+
+        /**
+		 * @brief Render the overlay UI
+		 */
+        void Render() override;
+
+        /**
+         * @brief Cleanup and terminate the overlay system
+         */
+        void Terminate() override;
+
+        /**
+         * @brief Enable the LevelEditor UI targeting a specific scene or globally
+         * @param scene Scene to attach the LevelEditor to; nullptr for scene-less mode
+         */
+        void EnableLevelEditorForScene(Scenes::Scene* scene);
+
+        /**
+         * @brief Disable the LevelEditor UI and release its resources
+         */
+        void DisableLevelEditor();
+
+        /**
+         * @brief Set the audio system for debug monitoring
+         * @param device Pointer to the audio system to monitor
+         *
+         * Attaches an audio system to the overlay for debug monitoring.
+         * The audio system will be accessible through the debug UI for
+         * real-time monitoring and control.
+         */
+        void SetAudio(Audio::FmodAudioDevice* device) { m_audioDevice = device; }
+        void SetWorld(ECS::World* world);
+
+        bool IsGamePlaying() const;
+        bool IsStepRequested() const;
+        void ClearStepRequest() const;
+
+        static inline OverlayService* Get() { return m_overlayInstance; }
+
+    private:
+        Audio::FmodAudioDevice* m_audioDevice = nullptr;  ///< Pointer to audio system for debug monitoring
+		Scenes::SceneManager& m_sceneManager; 		      ///< Reference to the scene manager for world access
+        ECS::World* m_world = nullptr;
+
+        // Global access helper for test harness and sandbox
+        static inline OverlayService* m_overlayInstance = nullptr;
+
+#ifdef USE_IMGUI
+        std::unique_ptr<DebugUI> m_debugUI;
+        std::unique_ptr<LevelEditor> m_levelEditor;
+        bool m_initialized = false;
+        bool m_showLevelEditor = false;
+        Scenes::Scene* m_levelEditorForScene = nullptr; // nullptr means scene-less mode
+        bool m_pendingLevelEditorRebuild = false;
+#endif
+    };
+}
 
 #endif

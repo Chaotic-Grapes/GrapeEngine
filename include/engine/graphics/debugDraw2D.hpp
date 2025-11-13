@@ -12,7 +12,7 @@ visual debugging (e.g., colliders, bounding boxes, paths) rather than
 production rendering.
 
 Functions:
-- Circle: Draws a filled circle with configurable segments.
+- Circle: Draws a filled or stroked circle using a single quad and shader-based masking.
 - Line: Renders a thick line as a quad.
 - Point: Marks a position using a small square.
 - RectStroke: Renders a rectangle outline with thick edges.
@@ -29,14 +29,13 @@ Functions:
 class Renderer;
 
 namespace DebugDraw2D {
-
-    // Filled circle
+    // Renders a filled circle when strokePx <= 0, or an outlined circle (of strokePx thickness in pixels) otherwise.
     void Circle(Renderer& r,
         const glm::vec2& center,
         float radius,
         const glm::vec4& color,
-        int segments,
-        GLuint textureId);
+        float strokePx,
+        GLuint textureId = 0);
 
     // Thick line as a quad
     void Line(Renderer& r,

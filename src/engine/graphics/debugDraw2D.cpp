@@ -3,43 +3,75 @@
 \file   debugDraw2D.cpp
 \author Choi Meng Yew (100%)
 \par    choi.m@digipen.edu
-\date   3rd October 2025
+\date   31st October 2025
 \brief
-Implements the DebugDraw2D namespace, providing helper functions for drawing
-basic 2D primitives using the Renderer. These utilities are intended for
-visual debugging, such as displaying colliders, bounding boxes, or guides
-during development.
+Implements the DebugDraw2D namespace, which provides lightweight utilities
+for rendering simple 2D primitives through the Renderer for visualization
+and debugging purposes during development.
 
-Functions:
-- Circle: Renders a filled circle using triangle fan.
-- Line: Renders a thick line as a quad between two points.
-- Point: Marks a position with a square marker.
-- RectStroke: Draws a rectangle outline with thick edges.
-- RectFill: Draws a solid filled rectangle.
-- Polygon: Renders a filled polygon (convex or concave) by triangulating
-  the input vertices with the ear clipping algorithm.
+This system allows developers to draw shapes such as rectangles, lines,
+circles, and polygons directly onto the scene to inspect collider bounds,
+object positions, or other gameplay elements.
+
+Responsibilities:
+- Render filled and stroked rectangles, circles, and lines.
+- Visualize points and polygon shapes using CPU-side vertex generation.
+- Support anti-aliased circle rendering via fragment shader masking.
+- Assist in debugging gameplay and physics systems through real-time
+  visual overlays.
 */
 /* End Header *******************************************************************/
 
+// ============================================================================
+// Graphics
+// ============================================================================
 #include "graphics/debugDraw2D.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/vertex.hpp"
 #include "graphics/polygon-utils.hpp"
 
+// ============================================================================
+// Third-Party Libraries
+// ============================================================================
 #include <glm/gtc/constants.hpp>
+
+// ============================================================================
+// Standard Library
+// ============================================================================
 #include <cmath>
 #include <cstdint>
 
 namespace {
-    inline Vertex V(const glm::vec2& p, const glm::vec4& c) {
+    // ============================================================================
+    // Helper: Constructs a vertex with position, color, and optional stroke width.
+    // ============================================================================
+    inline Vertex V(const glm::vec2& p, const glm::vec4& c, float strokePx = 0.0f) {
         Vertex v;
-        v.position = p;
+        v.position = glm::vec3(p, 0.0f); // promote 2D to 3D
         v.texCoord = { 0.f, 0.f }; // sample white
         v.color = c;
         v.texIndex = 0.f;        // Renderer overwrites with actual slot
+        v.strokePx = strokePx;
         return v;
     }
 
+    // ============================================================================
+    // Helper: Constructs a vertex with explicit UV coordinates.
+    // ============================================================================
+    inline Vertex V(const glm::vec2& p, const glm::vec4& c, const glm::vec2& uv, float strokePx = 0.0f)
+    {
+        Vertex v;
+        v.position = glm::vec3(p, 0.0f);
+        v.texCoord = uv;            // allow explicit UVs
+        v.color = c;
+        v.texIndex = 0.f;
+        v.strokePx = strokePx;
+        return v;
+    }
+
+    // ============================================================================
+    // Helper: Appends a quad (two triangles) to a vertex and index buffer.
+    // ============================================================================
     inline void PushQuad(std::vector<Vertex>& outV, std::vector<uint32_t>& outI,
         const glm::vec2& a, const glm::vec2& b,
         const glm::vec2& c, const glm::vec2& d,
@@ -56,39 +88,39 @@ namespace {
 
 namespace DebugDraw2D {
 
+    // ============================================================================
+    // Draws a filled or stroked circle using a single quad and shader-based masking.
+    // The stroke width is passed per-vertex and handled in the fragment shader.
+    // ============================================================================
     void Circle(Renderer& r,
         const glm::vec2& center,
         float radius,
         const glm::vec4& color,
-        int segments,
+        float strokePx,
         GLuint textureId)
     {
-        if (segments < 3) segments = 3;
+        // Slightly enlarge both geometry and UVs so the circle's edge (|vUV| = 1)
+        // stays comfortably inside the quad (prevents clipping during anti-aliasing)
+        const float pad = 1.10f; // 10% margin
+        const glm::vec2 half{ radius * pad, radius * pad };
 
-        std::vector<Vertex> verts;
-        std::vector<uint32_t> idx;
-        verts.reserve(static_cast<size_t>(segments) + 1);
-        idx.reserve(static_cast<size_t>(segments) * 3);
+        // Define quad corners (positions + matching UVs)
+        Vertex v0 = { glm::vec3(center + glm::vec2(-half.x, -half.y), 0.0f), {-pad, -pad}, color, 0.0f, strokePx };
+        Vertex v1 = { glm::vec3(center + glm::vec2(half.x, -half.y), 0.0f),  { pad, -pad}, color, 0.0f, strokePx };
+        Vertex v2 = { glm::vec3(center + glm::vec2(half.x,  half.y), 0.0f),  { pad,  pad}, color, 0.0f, strokePx };
+        Vertex v3 = { glm::vec3(center + glm::vec2(-half.x,  half.y), 0.0f), {-pad,  pad}, color, 0.0f, strokePx };
 
-        verts.push_back(V(center, color)); // center
-        const uint32_t cIdx = 0;
+        // 2 triangles forming the quad
+        const uint32_t idx[] = { 0, 1, 2, 2, 3, 0 };
+        const Vertex   vb[] = { v0, v1, v2, v3 };
 
-        float step = glm::two_pi<float>() / segments;
-        for (int i = 0; i < segments; ++i) {
-            float a = i * step;
-            glm::vec2 p = { center.x + std::cos(a) * radius,
-                            center.y + std::sin(a) * radius };
-            verts.push_back(V(p, color));
-        }
-        for (int i = 0; i < segments; ++i) {
-            uint32_t i1 = 1 + i;
-            uint32_t i2 = 1 + (i + 1) % segments;
-            idx.push_back(cIdx); idx.push_back(i1); idx.push_back(i2);
-        }
-
-        r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
+        // Send to renderer; the fragment shader will compute the actual circular mask
+        r.submitTriangles(vb, 4, idx, 6, textureId);
     }
 
+    // ============================================================================
+    // Draws a thick line between two points by generating a quad aligned to the line.
+    // ============================================================================
     void Line(Renderer& r,
         const glm::vec2& p1,
         const glm::vec2& p2,
@@ -96,10 +128,10 @@ namespace DebugDraw2D {
         const glm::vec4& color,
         GLuint textureId)
     {
-        glm::vec2 dir = p2 - p1;
+        glm::vec2 dir = p2 - p1; // edge vector
         float len = std::max(std::sqrt(dir.x * dir.x + dir.y * dir.y), 1e-6f);
         dir /= len;
-        glm::vec2 n = { -dir.y, dir.x }; // left normal
+        glm::vec2 n = { -dir.y, dir.x }; // outward normal
         glm::vec2 off = n * (thickness * 0.5f);
 
         glm::vec2 v0 = p1 - off; // BL
@@ -114,6 +146,9 @@ namespace DebugDraw2D {
         r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
+    // ============================================================================
+    // Draws a square marker at a given position, useful for visualizing points.
+    // ============================================================================
     void Point(Renderer& r,
         const glm::vec2& pos,
         float size,
@@ -133,6 +168,9 @@ namespace DebugDraw2D {
         r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
+    // ============================================================================
+    // Draws the outline of a rectangle using four thick-edged quads.
+    // ============================================================================
     void RectStroke(Renderer& r,
         const glm::vec2& min,
         const glm::vec2& max,
@@ -140,17 +178,43 @@ namespace DebugDraw2D {
         const glm::vec4& color,
         GLuint textureId)
     {
-        glm::vec2 v0 = { min.x, min.y };
-        glm::vec2 v1 = { max.x, min.y };
-        glm::vec2 v2 = { max.x, max.y };
-        glm::vec2 v3 = { min.x, max.y };
+        const float halfThick = thickness * 0.5f;
 
-        Line(r, v0, v1, thickness, color, textureId);
-        Line(r, v1, v2, thickness, color, textureId);
-        Line(r, v2, v3, thickness, color, textureId);
-        Line(r, v3, v0, thickness, color, textureId);
+        // Outer rectangle (expanded by half-thickness)
+        const glm::vec2 outerBL = min - glm::vec2(halfThick, halfThick);
+        const glm::vec2 outerBR = { max.x + halfThick, min.y - halfThick };
+        const glm::vec2 outerTR = max + glm::vec2(halfThick, halfThick);
+        const glm::vec2 outerTL = { min.x - halfThick, max.y + halfThick };
+
+        // Inner rectangle (shrunk by half-thickness)
+        const glm::vec2 innerBL = min + glm::vec2(halfThick, halfThick);
+        const glm::vec2 innerBR = { max.x - halfThick, min.y + halfThick };
+        const glm::vec2 innerTR = max - glm::vec2(halfThick, halfThick);
+        const glm::vec2 innerTL = { min.x + halfThick, max.y - halfThick };
+
+        std::vector<Vertex> verts;
+        std::vector<uint32_t> idx;
+        verts.reserve(16);
+        idx.reserve(24);
+
+        // Bottom edge (quad)
+        PushQuad(verts, idx, outerBL, outerBR, innerBR, innerBL, color);
+
+        // Right edge (quad)
+        PushQuad(verts, idx, outerBR, outerTR, innerTR, innerBR, color);
+
+        // Top edge (quad)
+        PushQuad(verts, idx, outerTR, outerTL, innerTL, innerTR, color);
+
+        // Left edge (quad)
+        PushQuad(verts, idx, outerTL, outerBL, innerBL, innerTL, color);
+
+        r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
+    // ============================================================================
+    // Draws a solid filled rectangle using two triangles.
+    // ============================================================================
     void RectFill(Renderer& r,
         const glm::vec2& min,
         const glm::vec2& max,
@@ -171,6 +235,10 @@ namespace DebugDraw2D {
         r.submitTriangles(verts.data(), verts.size(), idx.data(), idx.size(), textureId);
     }
 
+    // ============================================================================
+    // Draws a filled polygon by triangulating the provided vertices
+    // using the ear clipping algorithm on the CPU.
+    // ============================================================================
     void Polygon(Renderer& r,
         const std::vector<glm::vec2>& points,
         const glm::vec4& color,

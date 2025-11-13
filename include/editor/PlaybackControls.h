@@ -23,49 +23,74 @@ Features:
 #include "nlohmann/json.hpp"
 
 // Forward declarations
-class World;
+namespace ECS {
+    class World;
+}
 struct ImFont;
 
 class Playback {
 public:
+    // Enum representing the current playback state
     enum class GameState {
         Stopped,   // Editor mode
         Playing,   // Game running
         Paused     // Freeze
     };
 
-    explicit Playback(World* world);  
-    ~Playback();                  
+    // This creates playback controls bound to a world
+    // It initializes default state and storage
+    explicit Playback(ECS::World* world);
+    // This cleans up any playback resources
+    // It resets state if needed
+    ~Playback();
 
-    // Initialize with symbols font for icons
+    // This sets fonts for playback controls
+    // It gets icons and text ready for UI
     void Initialize(ImFont* mainFont, ImFont* symbolsFont);
 
-    // Handle keyboard shortcuts
+    // This handles keyboard shortcuts for playback
+    // It toggles play pause stop and step
     void ProcessInput();
 
-    // Render playback controls UI
+    // This draws the playback toolbar
+    // It shows buttons and state feedback
     void Render();
 
-    // Expose game state
+    // This returns the current game state
+    // It can be polled by other systems
     GameState GetGameState() const { return m_gameState; }
+    // This returns true when the game is running
+    // It is handy for gating updates
     bool IsPlaying() const;
+    // This returns true if a single step is requested
+    // It lets physics run one frame
     bool IsStepRequested() const;
+    // This clears the single step request
+    // It resets the flag for next time
     void ClearStepRequest();
 
-private:
-    World* m_world;
-    ImFont* m_mainFont = nullptr;
-    ImFont* m_symbolsFont = nullptr;
-    GameState m_gameState = GameState::Stopped;
-    bool m_stepRequested = false;
-    nlohmann::json m_savedWorldState;
+    // This updates the world reference
+    // It is safe to call when scenes change
+    void SetWorld(ECS::World* world);
 
-    // Save current world state before playing
+private:
+    ECS::World* m_world;                        // Pointer to the game world being edited
+    ImFont* m_mainFont = nullptr;               // Font for UI text
+    ImFont* m_symbolsFont = nullptr;            // Font for Material Symbols icons
+    GameState m_gameState = GameState::Stopped; // Current playback state
+    bool m_stepRequested = false;               // Flag for single-step execution
+    nlohmann::json m_savedWorldState;           // Stores world state snapshot for restore on stop
+
+    // This saves current world state to JSON
+    // It is used before starting play
     void _saveWorldState();
 
-    // Restore world state when stopping
+    // This restores world state after stopping
+    // It brings the editor back to how it was
     void _restoreWorldState();
 
+    // This returns whether the world pointer is valid
+    // It helps guard operations
     bool HasValidWorld() const { return m_world != nullptr; }
 };
 

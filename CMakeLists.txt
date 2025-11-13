@@ -7,7 +7,7 @@ cmake_policy(VERSION 3.13)
 project(GrapeEngine)
 
 # Set C++ standard globally
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the directory where custom CMake modules are stored
@@ -16,6 +16,36 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 # Include project-wide utility and dependency modules
 include(ImportDependencies)
 importDependencies()
+
+# Find .NET SDK
+find_program(DOTNET_EXECUTABLE dotnet REQUIRED)
+
+# ======================= CoreCLR / .NET Hosting Configuration =================
+# Set the path to the CoreCLR library directory
+set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/CoreCLR")
+
+# Find nethost library
+find_library(NETHOST_LIB 
+    NAMES nethost
+    PATHS ${CORECLR_LIB_DIR}
+    NO_DEFAULT_PATH
+    REQUIRED
+)
+
+if(NETHOST_LIB)
+    message(STATUS "Found nethost library: ${NETHOST_LIB}")
+else()
+    message(FATAL_ERROR "nethost.lib not found in ${CORECLR_LIB_DIR}")
+    message(FATAL_ERROR "Please place nethost.lib in lib/CoreCLR/")
+endif()
+
+# Verify nethost.dll exists for runtime
+if(EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
+    message(STATUS "Found nethost.dll: ${CORECLR_LIB_DIR}/nethost.dll")
+else()
+    message(WARNING "nethost.dll not found in ${CORECLR_LIB_DIR}")
+    message(WARNING "Runtime may fail - please place nethost.dll in lib/CoreCLR/")
+endif()
 
 # ======================= SINGLE PROJECT CONFIGURATION =========================
 # Since we have a single engine project, not using auto-discovery
@@ -41,7 +71,7 @@ add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 #endif()
 
 # Set C++ standard for the target
-set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 23)
+set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 17)
 set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD_REQUIRED ON)
 
 # Compile definitions
@@ -63,7 +93,16 @@ target_link_libraries(GrapeEngine
         glm
         freetype
         fmod
+        ${NETHOST_LIB}
 )
+
+# Export functions from executable for C# P/Invoke
+# Note: This is temporary until we refactor to a DLL!
+if(MSVC)
+    set_target_properties(GrapeEngine PROPERTIES
+        LINK_FLAGS "/EXPORT:ScriptAPI_GetComponent /EXPORT:ScriptAPI_SetComponent /EXPORT:ScriptAPI_HasComponent /EXPORT:ScriptAPI_RemoveComponent /EXPORT:ScriptAPI_DestroyEntity /EXPORT:ScriptAPI_SetWorld"
+    )
+endif()
 
 # Preserve folder structure in Visual Studio
 foreach(source IN LISTS ENGINE_SOURCES)
@@ -117,9 +156,88 @@ endif()
 add_custom_command(TARGET GrapeEngine POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_LIST_DIR}/lib/fmod/fmod.dll"
-        $<TARGET_FILE_DIR:GrapeEngine>
+        "$<TARGET_FILE_DIR:GrapeEngine>"
     COMMENT "Copying FMOD DLL to output directory"
 )
+
+# Copy nethost.dll for CoreCLR hosting (Windows)
+if(EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
+    add_custom_command(TARGET GrapeEngine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CORECLR_LIB_DIR}/nethost.dll"
+            "$<TARGET_FILE_DIR:GrapeEngine>"
+        COMMENT "Copying nethost.dll to output directory"
+    )
+endif()
+
+# ======================= C# Scripting API Build ===========================
+# Build the engine's scripting API AND any game scripts in scripts/ folder
+# This allows game scripts to be separate C# projects while being built automatically
+if(DOTNET_EXECUTABLE)
+    message(STATUS "Configuring C# Scripting Projects...")
+    
+    # Build GrapeEngine.ScriptAPI (engine's API)
+    add_custom_target(
+        BuildScriptAPI ALL
+        COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj" 
+            --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
+            --output "${CMAKE_BINARY_DIR}/$<CONFIG>" # Output to same directory as .exe file
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
+        COMMENT "Building GrapeEngine Scripting API..."
+        VERBATIM
+    )
+    
+    # Find all .csproj files in scripts/ folder (excluding the API itself)
+    file(GLOB GAME_SCRIPT_PROJECTS 
+        "${CMAKE_CURRENT_LIST_DIR}/scripts/*/*.csproj"
+    )
+    
+    # Build each game script project found
+    set(GAME_SCRIPT_TARGETS "")
+    foreach(CSPROJ_FILE ${GAME_SCRIPT_PROJECTS})
+        # Skip the ScriptAPI project (already built above)
+        get_filename_component(PROJ_NAME ${CSPROJ_FILE} NAME_WE)
+        if(NOT PROJ_NAME STREQUAL "GrapeEngine.ScriptAPI")
+            message(STATUS "  Found game script project: ${PROJ_NAME}")
+            
+            # Create a build target for this project
+            add_custom_target(
+                Build_${PROJ_NAME} ALL
+                COMMAND ${DOTNET_EXECUTABLE} build "${CSPROJ_FILE}"
+                    --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
+                    --output "${CMAKE_BINARY_DIR}/$<CONFIG>" # Output to same directory as .exe file
+                WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
+                COMMENT "Building ${PROJ_NAME}..."
+                DEPENDS BuildScriptAPI
+                VERBATIM
+            )
+            
+            list(APPEND GAME_SCRIPT_TARGETS Build_${PROJ_NAME})
+        endif()
+    endforeach()
+    
+    # Make GrapeEngine depend on all script builds
+    add_dependencies(GrapeEngine BuildScriptAPI ${GAME_SCRIPT_TARGETS})
+    
+    # Note: C# DLLs are already built directly to ${CMAKE_BINARY_DIR}/$<CONFIG>
+    # which is the same directory as the executable, so no copying is needed.
+
+    # Copy runtimeconfig.json for .NET hosting
+    if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")
+        add_custom_command(TARGET GrapeEngine POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json"
+                "$<TARGET_FILE_DIR:GrapeEngine>"
+            COMMENT "Copying runtimeconfig.json to output directory"
+        )
+    endif()
+    
+    message(STATUS "C# build output: ${CMAKE_BINARY_DIR}/$<CONFIG>")
+    message(STATUS "DLLs will be copied to: $<TARGET_FILE_DIR:GrapeEngine>")
+    #message(STATUS "Game scripts can be added as separate .csproj files in scripts/ folder")
+else()
+    message(WARNING ".NET SDK not found - Scripting will not be available")
+endif()
 
 message(STATUS "GrapeEngine configured successfully!")
 

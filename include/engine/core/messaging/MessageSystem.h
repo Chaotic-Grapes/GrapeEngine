@@ -1,60 +1,51 @@
-/*****************************************************************************/
+/* Start Header *****************************************************************/
 /*!
-\file       MessageSystem.h
-\author     Samantha Leong (s.leong@digipen.edu)
-\par        DigiPen login: 2403088
-\date       2025-11-03
+\file   MessageSystem.h
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+\date   3rd November 2025
 \brief
- * Implements a generic and type-safe publish–subscribe (observer) messaging system.
- * Systems or game objects can subscribe to messages of specific types and
- * be notified when messages are broadcast.
- *
- * The system supports:
- * - Priority-based message delivery (higher priority observers receive first)
- * - Optional message filtering
- * - Scoped subscriptions (auto-unsubscribe when out of scope)
- * - Enabling/disabling subscriptions without removal
- *
- * @date 2025-11-03
- * @copyright
- * DigiPen Institute of Technology. All rights reserved.
- *
- * @section usage How To Use
- *
- * @code{.cpp}
- * // Example: Define a message struct
- * struct CollisionEvent {
- *     EntityId entityA;
- *     EntityId entityB;
- * };
- *
- * // Example: Subscribing to a message in another system (e.g., PhysicsSystem.cpp)
- * auto handle = Messaging::MessageSystem::Subscribe<CollisionEvent>(
- *     [](const CollisionEvent& e) {
- *         std::cout << "Collision detected between: " << e.entityA << " and " << e.entityB << std::endl;
- *     },
- *     1 // priority (optional)
- * );
- *
- * // Example: Sending a message
- * CollisionEvent evt{playerId, wallId};
- * Messaging::MessageSystem::Notify(evt);
- *
- * // Example: Unsubscribing
- * Messaging::MessageSystem::Unsubscribe<CollisionEvent>(handle);
- *
- * // Example: Scoped subscription (auto unsubscribes on destruction)
- * Messaging::ScopedSubscription<CollisionEvent> scopedSub(
- *     Messaging::MessageSystem::Subscribe<CollisionEvent>(
- *         [](const CollisionEvent& e) { // handle event here }
- *     )
- * );
- * @endcode
- *
-Copyright (C) 2025 DigiPen Institute of Technology.
-Reproduction or disclosure of this file or its contents without prior
-written consent of DigiPen Institute of Technology is prohibited.
-/*****************************************************************************/
+Implements a generic and type-safe publish-subscribe (observer) messaging system.
+Supports:
+- Priority-based message delivery (higher priority observers receive first)
+- Optional message filtering
+- Scoped subscriptions (auto-unsubscribe when out of scope)
+- Enabling/disabling subscriptions without removal
+
+@section usage How To Use
+@code{.cpp}
+// Example: Define a message struct
+struct CollisionEvent {
+    EntityId entityA;
+    EntityId entityB;
+};
+
+// Example: Subscribing to a message in another system (e.g., PhysicsSystem.cpp)
+auto handle = Messaging::MessageSystem::Subscribe<CollisionEvent>(
+    [](const CollisionEvent& e) {
+        std::cout << "Collision detected between: " << e.entityA << " and " << e.entityB << std::endl;
+    },
+    1 // priority (optional)
+);
+
+// Example: Sending a message
+CollisionEvent evt{playerId, wallId};
+Messaging::MessageSystem::Notify(evt);
+
+// Example: Unsubscribing
+Messaging::MessageSystem::Unsubscribe<CollisionEvent>(handle);
+
+// Example: Scoped subscription (auto unsubscribes on destruction)
+Messaging::ScopedSubscription<CollisionEvent> scopedSub(
+    Messaging::MessageSystem::Subscribe<CollisionEvent>(
+        [](const CollisionEvent& e) {
+            // handle event here
+        }
+    )
+);
+@endcode
+*/
+/* End Header *******************************************************************/
 
 #ifndef MESSAGEBUS_H
 #define MESSAGEBUS_H
@@ -73,10 +64,7 @@ namespace Messaging {
     template<typename T>
     class Observable;
 
-    /**
-    * @brief
-    * Handle used to manage a subscription, allowing for unsubscription or disabling.
-    */
+    // Handle used to manage a subscription, allowing for unsubscription or disabling.
     // Subscription handle for managing subscriptions
     class SubscriptionHandle {
     public:
@@ -95,39 +83,28 @@ namespace Messaging {
         bool valid_;
     };
 
-    /**
-    * @brief
-    * Interface for an observer listening to messages of type T.
-    * Can be subclassed or wrapped in a FunctionObserver.
-    */
+    // Observer interface for messages of type T; can use FunctionObserver.
     // Observer interface - follows Observer pattern
     template<typename T>
     class IObserver {
     public:
         virtual ~IObserver() = default;
-        /// @brief Called when a message of type T is received.
+        // Handle incoming message of type T.
         virtual void OnNotify(const T& message) = 0;
-        /// @return The priority of this observer (higher = earlier notification).
+        // Observer priority (higher value notified earlier).
         virtual int GetPriority() const { return 0; }
-        /// @brief Allows selective reception based on message content.
+        // Whether this observer should receive the given message.
         virtual bool ShouldReceive(const T& message) const { return true; }
     };
 
-     /**
-     * @brief
-     * A wrapper class for lambda or std::function observers.
-     */
+    // Wrapper for lambda or std::function observers.
     // Concrete observer wrapper for lambda/function handlers
     template<typename T>
     class FunctionObserver : public IObserver<T> {
     public:
         using Handler = std::function<void(const T&)>;
         using Filter = std::function<bool(const T&)>;
-        /**
-        * @param handler The function to invoke on message receipt.
-        * @param priority The observer’s priority (higher = notified first).
-        * @param filter Optional lambda that returns true if this observer should receive a given message.
-        */
+        // Construct with handler; higher priority is notified first; optional filter.
         FunctionObserver(Handler handler, int priority = 0, Filter filter = nullptr)
             : handler_(handler), priority_(priority), filter_(filter) {
         }
@@ -148,10 +125,7 @@ namespace Messaging {
         Filter filter_;
     };
 
-    /**
-    * @brief
-    Observable class that manages a list of observers and notifies them.
-    */
+    // Observable class that manages a list of observers and notifies them.
     // Observable - manages observers and notifications
     template<typename T>
     class Observable {
@@ -166,14 +140,7 @@ namespace Messaging {
             }
         };
 
-        /**
-         * @brief Subscribes a new observer to messages of type T.
-         * @param handler The callback function to invoke.
-         * @param priority Observer priority (higher = first).
-         * @param filter Optional filter predicate to control which messages are received.
-         * @return A SubscriptionHandle representing this observer.
-         */
-        // Subscribe with priority and optional filter
+        // Subscribe handler; returns a subscription handle (higher priority first)
         SubscriptionHandle Subscribe(
             std::function<void(const T&)> handler,
             int priority = 0,
@@ -193,10 +160,7 @@ namespace Messaging {
             return SubscriptionHandle(id);
         }
 
-        /**
-         * @brief Unsubscribes an observer using its handle.
-         * @param handle Reference to the handle (invalidated after removal).
-         */
+        // Unsubscribe an observer using its handle (handle invalidated after removal).
         // Unsubscribe using handle
         void Unsubscribe(SubscriptionHandle& handle) {
             if (!handle.IsValid()) return;
@@ -212,11 +176,7 @@ namespace Messaging {
             }
         }
 
-        /**
-         * @brief Enables or disables a specific subscription without removing it.
-         * @param handle The subscription handle.
-         * @param enabled True to enable, false to disable.
-         */
+        // Enable or disable a subscription without removing it.
         // Temporarily disable/enable a subscription
         void SetEnabled(const SubscriptionHandle& handle, bool enabled) {
             auto it = std::find_if(observers_.begin(), observers_.end(),
@@ -229,10 +189,7 @@ namespace Messaging {
             }
         }
 
-        /**
-        * @brief Notifies all enabled observers of a message.
-        * @param message The message to broadcast.
-        */
+        // Notify all enabled observers of a message.
         // Notify all observers
         void Notify(const T& message) {
             // Copy vector to allow modifications during iteration
@@ -264,21 +221,11 @@ namespace Messaging {
         size_t next_id_ = 1;
     };
 
-    /**
-     * @brief
-     * Global messaging system managing all message types.
-     * Provides static methods to subscribe, unsubscribe, and broadcast messages.
-     */
+    // Global messaging system managing all message types.
     // Global MessageSystem using Observer pattern
     class MessageSystem {
     public:
-        /**
-         * @brief Subscribes to messages of type T.
-         * @param handler Function called when a message of type T is sent.
-         * @param priority Determines order of notification.
-         * @param filter Optional filter to selectively receive messages.
-         * @return A SubscriptionHandle to manage the subscription.
-         */
+        // Subscribe to messages of type T (supports priority and optional filter).
         // Subscribe to a message type with priority and filter
         template<typename T>
         static SubscriptionHandle Subscribe(

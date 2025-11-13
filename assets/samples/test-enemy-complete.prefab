@@ -1,133 +1,138 @@
 {
-  "Name": "EnemyTest",
   "Components": [
     {
-      "Type": "Transform",
       "Data": {
         "Position": {
-          "X": 800,
-          "Y": 600
+          "X": 800.0,
+          "Y": 600.0,
+          "Z": 0.0
         },
-        "Rotation": 0,
+        "Rotation": {
+          "W": 1.0,
+          "X": 0.0,
+          "Y": 0.0,
+          "Z": 0.0
+        },
         "Scale": {
-          "X": 1,
-          "Y": 1
+          "X": 1.0,
+          "Y": 1.0,
+          "Z": 1.0
         }
-      }
+      },
+      "TypeId": 10,
+      "TypeName": "ECS::Components::LocalTransform"
     },
     {
-      "Type": "SpriteRenderer",
       "Data": {
         "Color": {
-          "A": 255,
-          "B": 0,
-          "G": 0,
-          "R": 255
+          "A": 1.0,
+          "B": 0.906455934047699,
+          "G": 0.13733141124248505,
+          "R": 0.1296146661043167
         },
-        "FlipX": false,
-        "FlipY": false,
-        "Height": 449,
-        "SortingLayerName": "Enemies",
-        "SortingOrder": 5, 
-        "Sprite": "assets/textures/test/player.png",
+        "Offset": {
+          "X": 0.0,
+          "Y": 0.0
+        },
         "TextureId": 2,
-        "TexturePath": "assets/textures/test/player.png",
-        "Width": 224
-      }
+        "Tiling": {
+          "X": 1.0,
+          "Y": 1.0
+        }
+      },
+      "TypeId": 21,
+      "TypeName": "ECS::Components::SpriteRenderer2D"
     },
     {
-      "Type": "Rigidbody2D",
       "Data": {
         "AngularDamping": 0.05,
-        "AngularVelocity": 0,
-        "BodyType": 0,
-        "CenterOfMass": {
-          "X": 0,
-          "Y": 0
-        },
-        "FreezeRotation": false,
-        "GravityScale": 1,
-        "Inertia": 0,
-        "LinearDamping": 0,
-        "LinearVelocity": {
-          "X": 0,
-          "Y": 0
-        },
-        "Mass": 1
-      }
+        "Flags": 0,
+        "GravityScale": 1.0,
+        "InverseMass": 1.0,
+        "LinearDamping": 0.0,
+        "Mass": 1.0
+      },
+      "TypeId": 18,
+      "TypeName": "ECS::Components::Rigidbody2D"
     },
     {
-      "Type": "CircleCollider2D",
       "Data": {
-        "IsTrigger": false,
-        "Layer": 0,
+        "Flags": 1,
+        "LayerMask": 4294967295,
         "Offset": {
-          "X": 0,
-          "Y": 0
+          "X": 0.0,
+          "Y": 0.0
         },
-        "Radius": 50
-      }
+        "Radius": 50.0
+      },
+      "TypeId": 20,
+      "TypeName": "ECS::Components::CircleCollider2D"
     },
     {
-      "Type": "BoxCollider2D",
       "Data": {
-        "IsTrigger": false,
-        "Layer": 0,
+        "Flags": 1,
+        "HalfExtents": {
+          "X": 32.0,
+          "Y": 32.0
+        },
+        "LayerMask": 4294967295,
         "Offset": {
-          "X": 0,
-          "Y": 0
+          "X": 0.0,
+          "Y": 0.0
         },
-        "Size": {
-          "X": 64,
-          "Y": 64
-        }
-      }
+        "Rotation": 0.0
+      },
+      "TypeId": 19,
+      "TypeName": "ECS::Components::BoxCollider2D"
     },
     {
-      "Type": "LineRenderer",
       "Data": {
-        "Start": {
-          "X": -50,
-          "Y": 0
+        "A": {
+          "X": -50.0,
+          "Y": 0.0
         },
-        "End": {
-          "X": 50,
-          "Y": 0
+        "B": {
+          "X": 50.0,
+          "Y": 0.0
         },
-        "Thickness": 2,
         "Color": {
-          "A": 255,
-          "B": 255,
-          "G": 0,
-          "R": 0
-        }
-      }
+          "A": 1.0,
+          "B": 0.0,
+          "G": 0.0,
+          "R": 1.0
+        },
+        "Thickness": 2.0
+      },
+      "TypeId": 24,
+      "TypeName": "ECS::Components::ShapeLine2D"
     },
     {
-      "Type": "ShapeRenderer2D",
       "Data": {
-        "Closed": true,
-        "FillColor": {
-          "A": 255,
-          "B": 0,
-          "G": 255,
-          "R": 0
-        },
-        "OutlineColor": {
-          "A": 255,
-          "B": 255,
-          "G": 255,
-          "R": 255
-        },
-        "OutlineThickness": 1,
-        "Points": [],
-        "Radius": 50,
-        "Size": {
-          "X": 100,
-          "Y": 100
-        },
-        "Type": 1
-      }
+        "Value": {
+          "X": 0.0,
+          "Y": 0.0
+        }
+      },
+      "TypeName": "ECS::Components::LinearVelocity2D"
+    },
+    {
+      "Data": {
+        "Value": 0.0
+      },
+      "TypeName": "ECS::Components::AngularVelocity2D"
+    },
+    {
+      "Data": {
+        "Active": true,
+        "AspectRatio": 1.7769999504089355,
+        "FOV": 45.0,
+        "FarPlane": 100.0,
+        "NearPlane": 0.10000000149011612,
+        "OrthoSize": 16.0,
+        "UsePerspective": false
+      },
+      "TypeName": "ECS::Components::Camera3D"
     }
-  ]
+  ],
+  "Name": "EnemyTest"
 }

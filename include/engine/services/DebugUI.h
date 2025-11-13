@@ -31,13 +31,14 @@ Features:
 
 // Forward declarations (avoid unnecessary includes)
 struct GLFWwindow;
-class World;
+namespace ECS { class World; }
 namespace Audio { class IAudioDevice; }
+namespace Scenes { class Scene; }
 
 
 // Configuration structure for DebugUI appearance and layout
 struct DebugUIConfig {
-    float FontScale = 1.35f;  // Global font scaling factor
+    float FontScale = 1.35f;                               // Global font scaling factor
     static constexpr size_t MAX_OBJECT_NAME_LENGTH = 128;  // Max length for game object names
 };
 
@@ -45,7 +46,7 @@ struct DebugUIConfig {
 class DebugUI {
 public:
     // Constructor: initialize debug UI with world reference and config
-    explicit DebugUI(World* world, const DebugUIConfig& config = {});
+    explicit DebugUI(ECS::World* world, const DebugUIConfig& config = {});
 
     // Destructor: cleanup ImGui resources if initialized
     ~DebugUI();
@@ -68,78 +69,61 @@ public:
     // Check if debug UI is currently enabled
     bool IsEnabled() const { return m_enabled; }
 
+    void AttachScene(Scenes::Scene* scene) { m_scenePtr = scene; }
+    void DetachScene() { m_scenePtr = nullptr; }
+
+    bool HasValidScene(const Scenes::Scene* scene = nullptr) const {
+        // Check if member scene pointer is valid first
+        if (!m_scenePtr)
+            return false;
+
+        // If a specific scene is provided, check for equality
+        if (scene)
+            return m_scenePtr == scene;
+
+        // Otherwise, just confirm member pointer is valid
+        return m_scenePtr != nullptr;
+    }
+
     // Set world reference for entity management
-    void SetWorld(World* world) { m_world = world; }
+    void SetWorld(ECS::World* world) { m_world = world; }
 
     // Check if world pointer is valid
     bool HasValidWorld() const;
 
     // Attach audio system for monitoring
-    static void AttachAudio(Audio::FmodAudioDevice* device);
+    void AttachAudio(Audio::FmodAudioDevice* device) { m_audioPtr = device; }
 
     // Detach audio system
-    static void DetachAudio();
-
-    // Create and add new game entity with basic components
-    void AddGameObject(const std::string& name);
-
-    // Remove entity by ID
-    void RemoveGameObject(EntityId id);
-
-    // Clone entity with position offset
-    void CloneGameObject(const Entity& entity);
-
-    // Destroy all entities in the world
-    void ClearAllGameObjects();
+    void DetachAudio() { m_audioPtr = nullptr; }
+    bool HasValidAudio() const { return m_audioPtr != nullptr; }
 
 private:
     DebugUIConfig m_config;     // Configuration settings
-    World* m_world;             // Pointer to World for entity management
+    ECS::World* m_world;             // Pointer to World for entity management
+    Scenes::Scene* m_scenePtr = nullptr;
+    Audio::FmodAudioDevice* m_audioPtr = nullptr;
     bool m_enabled = false;     // Flag for UI enabled state
     bool m_initialized = false; // Flag for ImGui initialization state
 
-    // UI state
-    bool m_showDemo = false;                    // Show ImGui demo window
-    std::string m_newObjectName = "NewObject";  // Default name for new objects
+    // Show ImGui demo window
+    bool m_showDemo = false;
 
     // Input debugging counters
     int m_spacePressed = 0;   // Space key press event counter
     int m_spaceReleased = 0;  // Space key release event counter
 
-    // Cached UI elements to avoid string creation every frame
-    mutable std::unordered_map<EntityId, std::string> m_cachedDeleteLabels;
-    mutable std::unordered_map<EntityId, std::string> m_cachedCloneLabels;
-    mutable std::unordered_map<EntityId, bool> m_cachedCollapsedHeaders;
-
     // Display engine status and demo window toggle
     void _showEngineDebugWindow();
 
-    // Display FPS, frame times, and profiler scope data
-    void _showPerformanceWindow();
+    // Display FPS, frame times and profiler scope data
+    void _showPerformanceWindow() const;
 
-    // Display mouse, keyboard, and window input state
+    // Display mouse, keyboard and window input state
     void _showInputDebugWindow();
-
-    // Display entity list with creation, deletion, cloning, and component editing
-    //void _showGameObjectEditor();
 
     // Display audio system controls and library window
     void _showAudioWindow(Audio::FmodAudioDevice* audio);
-
-    // Create entity with Transform, ShapeRenderer2D, and CircleCollider2D components
-    Entity _createGameEntity(const std::string& name);
-
-    // Clear all cached UI button labels
-    void _invalidateCache();
-
-    // Get or create cached delete button label for entity
-    const std::string& _getDeleteLabel(EntityId id) const;
-
-    // Get or create cached clone button label for entity
-    const std::string& _getCloneLabel(EntityId id) const;
-
-    // Get or create collapsed header state for entity
-    const bool& _getCollapsedHeaderBool(EntityId id) const;
 };
 
 #endif

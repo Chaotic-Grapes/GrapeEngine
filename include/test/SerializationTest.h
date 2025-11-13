@@ -13,16 +13,16 @@
 #ifndef SERIALIZATIONTEST_H
 #define SERIALIZATIONTEST_H
 
-#include "Scene.h"
+#include "ecs/systems/RendererSystem.h"
+#include "scene/TestScene.h"
 #include "ecs/Entity.h"
 #include <vector>
+#include <string>
+#include <memory>
 
 namespace Sandbox {
-    class SerializationTestScene : public Scene {
+    class SerializationTestScene : public Scenes::TestScene {
     public:
-        SerializationTestScene();
-        ~SerializationTestScene() override = default;
-
         void OnLoad() override;
         void OnUpdate() override;
         void OnFixedUpdate() override {}
@@ -31,25 +31,13 @@ namespace Sandbox {
 
     private:
         void RunAutomatedTest();
-        void CreateTestEntities();
-        void SaveScene();
-        void LoadScene();
-        void VerifyLoadedEntities();
+        void LoadPrefabAndVerify();
+        void VerifyPrefabData(ECS::Entity entity);
         void PrintTestResults();
 
-        std::vector<Entity> m_originalEntities;
+        ECS::Entity m_loadedEntity;
         bool m_testPassed = true;
-
-        struct ExpectedData {
-            std::string name;
-            Vector2D position;
-            Vector2D scale;
-            float rotation;
-            std::string texturePath;
-            float mass;
-            float radius;
-        };
-        std::vector<ExpectedData> m_expectedData;
+        std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
     };
 }
 

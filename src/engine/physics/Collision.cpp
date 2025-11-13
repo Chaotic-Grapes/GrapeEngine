@@ -4,24 +4,25 @@
  * @file    Collision.cpp
  * @brief   Narrow-phase helpers for 2D collisions and simple sweep tests.
  *
- * @details Implements:
- *   � Line segment builder with outward unit normal (MakeSegment).
- *   � Robust quadratic solver used by sweep tests (solveQuadratic). 
- *   � Point-sweep hit against a circle (endpoint corner test). 
- *   � Moving circle vs static segment sweep, including optional endpoint checks.
- *   � Post-impact response: reflect remaining motion about contact normal. 
- *   � Point vs segment proximity test with tolerance. 
- *   � AABB vs AABB overlap test with separating normal & penetration. 
+ * @details
+ * This translation unit implements a small set of collision helper routines
+ * used by the physics/engine layer:
+ * - Primitive builders: LineSegment, AABB (min/max and center/size)
+ * - Quadratic solver for continuous collision detection (CCD) helpers
+ * - CCD: moving circle vs. static line segment (with optional edge checks)
+ * - Response: reflect remaining motion about a surface normal
+ * - Point vs. segment proximity test (with tolerance)
+ * - Discrete overlap tests: AABB vs AABB, Circle vs Circle, Circle vs AABB
+ * - SAT overlap: Triangle vs AABB
  *
- * @usage
- *   - Use CircleVsSegmentSweep() to detect the earliest TOI (time of impact) for a moving
- *     circle against a static segment; if it hits, call CircleSegmentResponse() to reflect
- *     your intended end position for simple sliding.
+ * The functions favor clarity and robustness (explicit clamping, epsilon
+ * checks, and early outs) and are suitable for both gameplay queries and 
+ * simple physics responses. All math is done in engine Vector2D.
  *
- * @note
- *   - Coordinates assume a standard 2D screen space with X right, Y up (adjust as needed).
- *   - EPS and BIGF constants are local helpers for numerical stability.
- *
+ * @sources
+ * Logics and formulaes derived from GIT trimester 2, with submissions Asteroids
+ * and balls/segment in mind.
+ * 
  * @dependencies
  *   - Math/Vector2D, Collision.h, <cmath>, <limits>, <algorithm>.
  *
@@ -32,246 +33,565 @@
 #include <cmath>      // std::sqrt, std::fabs
 #include <limits>     // std::numeric_limits
 #include <algorithm>  // std::min
-#include "Math/Vector2D.h"
+#include "Math/Vector2D.h" // vector usage
 
 namespace {
     constexpr float EPS = 1e-6f;
     constexpr float BIGF = std::numeric_limits<float>::max();
 }
 
+namespace Engine {
 
-//Builders
-Collision::LineSegment Collision::MakeSegment(const Vector2D& p0, const Vector2D& p1) {
-    LineSegment s;
-    s.p0 = p0;
-    s.p1 = p1;
-
-    Vector2D edge = p1 - p0;
-
-    // Legacy convention: outward normal from (edge.Y, -edge.X), then normalize
-    Vector2D n(edge.Y, -edge.X);
-    float L2 = n.SquareLength();
-    s.normal = (L2 > 0.0f) ? n * (1.0f / std::sqrt(L2)) : Vector2D(0.0f, 1.0f);
-    return s;
-}
+    /* =====================================================================
+    Helpers and primitive builders
+    ===================================================================== */
 
 
-//Quadratic solver
-bool Collision::solveQuadratic(float a, float b, float c, float& t0, float& t1) {
-    if (std::fabs(a) < EPS) {
-        if (std::fabs(b) < EPS) return false;
-        t0 = t1 = -c / b;
-        return true;
+    /**
+    * @brief Build a line segment and compute its outward unit normal.
+    */
+    Collision::LineSegment Collision::MakeSegment(const Vector2D& p0, const Vector2D& p1) {
+        LineSegment s;  // Output segment
+        s.P0 = p0;      // Start point
+        s.P1 = p1;      // End point
+
+        const Vector2D edge = p1 - p0; // Edge vector from P0 to P1
+
+        // Outward normal -> rotate edge by +90 degrees.
+        const Vector2D n(edge.Y, -edge.X);
+        const float l2 = n.SquareLength(); // Length squared of the unnormalized normal
+        // Normalize if possible, otherwise pick a default unit up vector.
+        s.Normal = (l2 > 0.0f) ? n * (1.0f / std::sqrt(l2)) : Vector2D(0.0f, 1.0f);
+        return s;
     }
-    float disc = b * b - 4.0f * a * c;
-    if (disc < 0.0f) return false;
 
-    float sqrtD = std::sqrt(disc);
-    float q = (b > 0.0f) ? -0.5f * (b + sqrtD) : -0.5f * (b - sqrtD);
-    t0 = q / a;
-    t1 = c / q;
-    if (t0 > t1) std::swap(t0, t1);
-    return true;
-}
+    /**
+    * @brief Construct an AABB from center and size (width, height).
+    */
+    Collision::AABB Collision::MakeAABBCenterSize(const Vector2D& center, const Vector2D& size) {
+        const Vector2D half = Vector2D(size.X * 0.5f, size.Y * 0.5f);// Half extents
+
+        // Convert center/size to min/max.
+        return { Vector2D(center.X - half.X, center.Y - half.Y),
+                 Vector2D(center.X + half.X, center.Y + half.Y) };
+    }
 
 
-// Swept point (circle center) vs point (segment endpoint)
-bool Collision::pointSweepHitCircle(const Vector2D& C0, const Vector2D& C1,
-    const Vector2D& P, float radius,
-    float& tHit, Vector2D& normalAtHit)
-{
-    Vector2D v = C1 - C0;  // motion
-    Vector2D w = C0 - P;   // from endpoint to start center
+    /**
+    * @brief Solve a t-quadratic: a t^2 + b t + c = 0. Returns sorted roots.
+    * @return true if real roots exist, false otherwise.
+    */
+    bool Collision::_solveQuadratic(const float a, const float b, const float c, float& t0, float& t1) {
+        // Handle near-linear case -> |a| ~ 0.
+        if (std::fabs(a) < EPS) {
+            // Degenerate further to constant if |b| ~ 0 -> then no solution.
+            if (std::fabs(b) < EPS)
+                return false;
+            // Linear solution t = -c/b.
+            t0 = t1 = -c / b;
+            return true;
+        }
+        // Discriminant.
+        const float disc = b * b - 4.0f * a * c;
+        if (disc < 0.0f)
+            return false;// No real roots.
 
-    float a = v.Dot(v);
-    float b = 2.0f * v.Dot(w);
-    float c = w.Dot(w) - radius * radius;
+        const float sqrtD = std::sqrt(disc); // Positive by definition
 
-    float t0, t1;
-    if (!solveQuadratic(a, b, c, t0, t1)) return false;
+        // Stable form for computing the roots.
+        const float q = (b > 0.0f)
+            ? -0.5f * (b + sqrtD)
+            : -0.5f * (b - sqrtD);
 
-    // earliest valid root in [0,1]
-    float tCandidate = BIGF;
-    if (t0 >= 0.0f && t0 <= 1.0f) tCandidate = t0;
-    if (t1 >= 0.0f && t1 <= 1.0f) tCandidate = std::min(tCandidate, t1);
-    if (tCandidate == BIGF) return false;
+        t0 = q / a; // One root
+        t1 = c / q; // The other
 
-    tHit = tCandidate;
-    Vector2D C = C0 + v * tHit;
-    Vector2D n = C - P; // outward from endpoint to circle center
-    // float L2 = n.SquareLength();
-    // normalAtHit = (L2 > 0.0f) ? n * (1.0f / std::sqrt(L2)) : Vector2D(0.0f, 1.0f);
-    normalAtHit = n.Normalized();
-    return true;
-}
+        if (t0 > t1) std::swap(t0, t1); // Ensure ascending order
 
-/* ================================================================
-   Moving Circle vs Static Segment (swept)
-   ================================================================ */
-bool Collision::CircleVsSegmentSweep(
-    const Circle& circle,
-    const Vector2D& intendedEnd,
-    const LineSegment& seg,
-    Vector2D& outContactPoint,
-    Vector2D& outNormal,
-    float& outTime,
-    bool checkEdges)
-{
-    const Vector2D C0 = circle.center;
-    const Vector2D C1 = intendedEnd;
-    const Vector2D v = C1 - C0;
+        return true; // real root exists
+    }
 
-    // Signed distances to line (plane) at start and end: n�(C - p0)
-    float d0 = seg.normal.Dot(C0 - seg.p0);
-    float d1 = seg.normal.Dot(C1 - seg.p0);
+    /* =====================================================================
+    Swept point (circle center) vs point (segment endpoint)
+    ===================================================================== */
 
-    // If both start and end are farther than radius on the outward side, no hit
-    if (d0 > circle.radius && d1 > circle.radius) return false;
 
-    // Motion parallel to plane?
-    float denom = seg.normal.Dot(v);
-    if (std::fabs(denom) > EPS) {
-        // Solve for t where the *inflated* plane is touched: d(t) = r
-        float t = (circle.radius - d0) / denom;
-        if (t >= 0.0f && t <= 1.0f) {
-            Vector2D C = C0 + v * t;                         // center at impact
-            Vector2D Q = C - seg.normal * circle.radius;     // contact point on the segment line
+    /**
+    * @brief Sweep a moving point (circle center) against a static point.
+    * 
+    * @return true if the swept center hits the point-expanded circle.
+    *
+    * This is used to handle corner hits when sweeping a circle against a
+    * segment: you test each endpoint as a circle of radius R (Minkowski sum).
+    */
 
-            // Check if Q projects inside segment extents
-            Vector2D ab = seg.p1 - seg.p0;
-            float abLen2 = ab.SquareLength();
-            float s = 0.0f;
-            if (abLen2 > 0.0f) s = (Q - seg.p0).Dot(ab) / abLen2;
+    bool Collision::_pointSweepHitCircle(const Vector2D& c0, const Vector2D& c1,
+        const Vector2D& p, const float radius, float& tHit, Vector2D& normalAtHit)
+    {
+        const Vector2D v = c1 - c0; // Motion vector of the center
+        const Vector2D w = c0 - p; // Vector from endpoint to start center
 
-            if (s >= 0.0f && s <= 1.0f) {
-                outContactPoint = Q;
-                outNormal = seg.normal;  // unit
-                outTime = t;
+        // Solve |w + v t|^2 = r^2 for t in [0,1].
+        const float a = v.Dot(v);
+        const float b = 2.0f * v.Dot(w);
+        const float c = w.Dot(w) - radius * radius;
+
+        float t0, t1;
+        if (!_solveQuadratic(a, b, c, t0, t1))
+            return false; // No intersection along the ray segment
+
+        // Choose earliest valid root in [0,1].
+        float tCandidate = BIGF;
+        if (t0 >= 0.0f && t0 <= 1.0f) tCandidate = t0;
+        if (t1 >= 0.0f && t1 <= 1.0f) tCandidate = std::min(tCandidate, t1);
+        if (tCandidate == BIGF)
+        return false; // Roots outside sweep interval
+
+        tHit = tCandidate;
+        const Vector2D cVec = c0 + v * tHit; // Center at impact
+        const Vector2D n = cVec - p; // Outward from endpoint to center
+        normalAtHit = n.Normalized(); // Unit normal
+
+        return true; // Hit
+    }
+
+    /* ================================================================
+       Moving Circle vs Static Segment (swept)
+       ================================================================ */
+    
+   /**
+   * @brief Continuous test: moving circle vs. static segment with plane hit
+   * and optional endpoint checks (corner hits).
+   * 
+   * @return true if a collision occurs during the sweep.
+   */
+
+    bool Collision::CircleVsSegmentSweep(
+        const Circle& circle,
+        const Vector2D& intendedEnd,
+        const LineSegment& segment,
+        Vector2D& outContactPoint,
+        Vector2D& outNormal,
+        float& outTime,
+        const bool checkEdges)
+    {
+        const Vector2D c0 = circle.Center; // Start center
+        const Vector2D c1 = intendedEnd;   // End center
+        const Vector2D v = c1 - c0;        // Motion vector
+
+        // Signed distances to the infinite line at start and end: n dot (C - P0)
+        const float d0 = segment.Normal.Dot(c0 - segment.P0);
+        const float d1 = segment.Normal.Dot(c1 - segment.P0);
+
+        // Early out -> if both are farther than radius on outward side, no hit.
+        if (d0 > circle.Radius && d1 > circle.Radius) return false;
+
+        // Check motion relative to the plane; denom is n dot v.
+        const float denom = segment.Normal.Dot(v);
+        if (std::fabs(denom) > EPS) {
+            // Solve for t where the inflated plane is touched -> d(t) = r.
+            const float t = (circle.Radius - d0) / denom;
+            if (t >= 0.0f && t <= 1.0f) {
+                const Vector2D c = c0 + v * t;                             // center at impact
+                const Vector2D q = c - segment.Normal * circle.Radius;     // contact point on the segment line
+
+                // Project q onto the segment to check if it lies within [P0,P1].
+                const Vector2D ab = segment.P1 - segment.P0; // Segment direction
+                const float abLen2 = ab.SquareLength(); // Length squared
+                float s = 0.0f; // Param along [0,1]
+                if (abLen2 > 0.0f)
+                    s = (q - segment.P0).Dot(ab) / abLen2; // Projection param
+
+                if (s >= 0.0f && s <= 1.0f) {
+                    // Valid face hit
+                    outContactPoint = q;
+                    outNormal = segment.Normal; // Unit normal from segment
+                    outTime = t;
+
+                    return true;
+                }
+            }
+        }
+
+        // If we get here, either moving parallel or plane hit fell outside the segment.
+        // Optionally test segment endpoints as circles of radius r (corner hits).
+        if (checkEdges) {
+            float bestT = BIGF;         // Track earliest hit time
+            Vector2D bestN(0.0f, 0.0f); // Normal at earliest hit
+            Vector2D bestQ(0.0f, 0.0f); // Contact point at earliest hit
+            float tHit; Vector2D nHit;  // Scratch outputs from helper
+
+            // Test P0 corner
+            if (_pointSweepHitCircle(c0, c1, segment.P0, circle.Radius, tHit, nHit)) {
+                if (tHit < bestT) {
+                    bestT = tHit;
+                    bestN = nHit;
+                    bestQ = c0 + v * tHit - nHit * circle.Radius; // Contact = C - n R
+                }
+            }
+
+            // Test P1 corner
+            if (_pointSweepHitCircle(c0, c1, segment.P1, circle.Radius, tHit, nHit)) {
+                if (tHit < bestT) {
+                    bestT = tHit;
+                    bestN = nHit;
+                    bestQ = c0 + v * tHit - nHit * circle.Radius; // Contact = C - n R
+                }
+            }
+            // If bestT was updated, report the corner hit.
+            if (bestT < BIGF || bestT > BIGF) { // Note -> mirrors the original test
+                outContactPoint = bestQ;
+                outNormal = bestN;
+                outTime = bestT;
                 return true;
             }
         }
+
+        return false; // No hit
     }
 
-    // If we get here, either moving parallel OR plane hit fell outside the segment.
-    // Optionally test segment endpoints as circles of radius r (corner hits).
-    if (checkEdges) {
-        float   bestT = BIGF;
-        Vector2D bestN(0.0f, 0.0f), bestQ(0.0f, 0.0f);
+    /* ================================================================
+       Response: reflect remaining motion about the normal
+       ================================================================ */
 
-        float tHit; Vector2D nHit;
+   /**
+   * @brief Reflect the remaining motion vector about a normal and update the
+   * intended end position accordingly.
+   */
 
-        if (pointSweepHitCircle(C0, C1, seg.p0, circle.radius, tHit, nHit)) {
-            if (tHit < bestT) {
-                bestT = tHit;
-                bestN = nHit;
-                bestQ = C0 + v * tHit - nHit * circle.radius;
+    void Collision::CircleSegmentResponse(
+        const Vector2D& contactPoint,
+        const Vector2D& normal,
+        Vector2D& inOutIntendedEnd,
+        Vector2D& outReflectedDirection)
+    {
+        const Vector2D leftOver = inOutIntendedEnd - contactPoint; // remaining motion
+        const float    along = leftOver.Dot(normal);               // Signed magnitude along normal
+        const Vector2D reflected = leftOver - normal * (2.0f * along); // Reflect across plane
+
+        // Mirror intended end about the surface using the reflected vector.
+        inOutIntendedEnd = contactPoint + reflected;
+
+        // Provide a unit reflected direction the caller can scale by its own speed.
+        const float l2 = reflected.SquareLength();
+        outReflectedDirection = (l2 > 0.0f)
+            ? reflected * (1.0f / std::sqrt(l2))
+            : Vector2D(0.0f, 1.0f);
+    }
+
+    /* ================================================================
+       Point vs Segment (closest point + tolerance test)
+       ================================================================ */
+
+   /**
+   * @brief Compute closest point on a segment to a query point and test if
+   * the distance is within a given tolerance.
+   * 
+   * @return true if the point is within tolerance of the segment.
+   */
+
+    bool Collision::PointVsSegment(
+        const Vector2D& p,
+        const Vector2D& s0,
+        const Vector2D& s1,
+        const float tolerance,
+        float* outTime,
+        Vector2D* outClosest)
+    {
+        const Vector2D v = s1 - s0;          // Segment direction
+        const float len2 = v.SquareLength(); // Squared length
+
+        float t = 0.0f;                 // Unclamped param 
+        if (len2 > 0.0f) {
+            t = (p - s0).Dot(v) / len2; // Projection onto the line
+        }
+
+        // Clamp t to [0,1] explicitly without external dependencies.
+        const float tc = Vector2D::ClampValue(t, 0.0f, 1.0f);
+        const Vector2D q = s0 + v * tc;
+
+        // Within tolerance if squared distance <= tol^2.
+        const bool hit = (p - q).SquareLength() <= (tolerance * tolerance);
+
+        if (outTime) *outTime = tc; // Optional outputs guarded
+        if (outClosest) *outClosest = q;
+        return hit;
+    }
+
+    /* ================================================================
+       AABB vs AABB
+       ================================================================ */
+
+   /**
+   * @brief Overlap test between two AABBs with optional manifold output.
+   * 
+   * @return true if overlapping, false otherwise.
+   */
+
+    bool Collision::AABBvsAABB(
+        const AABB& a,
+        const AABB& b,
+        Vector2D* outNormal,
+        float* outPenetration)
+    {
+        // Compute centers and half-extents.
+        const Vector2D cA = (a.Min + a.Max) * 0.5f;
+        const Vector2D cB = (b.Min + b.Max) * 0.5f;
+        const Vector2D hA = (a.Max - a.Min) * 0.5f;
+        const Vector2D hB = (b.Max - b.Min) * 0.5f;
+
+        // Overlap on X -> total half-width minus center distance.
+        const float dx = cB.X - cA.X;
+        const float px = (hA.X + hB.X) - std::fabs(dx);
+        if (px <= 0.0f)
+            return false; // no overlap X
+
+        // Overlap on Y
+        const float dy = cB.Y - cA.Y;
+        const float py = (hA.Y + hB.Y) - std::fabs(dy);
+        if (py <= 0.0f)
+            return false; // no overlap Y
+
+        Vector2D n(0.0f, 0.0f); // Output normal
+        float pen = 0.0f;       // Output penetration
+
+        // Choose the axis of least penetration as the contact axis.
+        if (px < py) {
+            n.X = (dx < 0.0f) ? -1.0f : 1.0f; // Normal points from A to B
+            pen = px;
+        }
+        else {
+            n.Y = (dy < 0.0f) ? -1.0f : 1.0f;
+            pen = py;
+        }
+
+        if (outNormal)      *outNormal = n;
+        if (outPenetration) *outPenetration = pen;
+        return true;
+    }
+
+    /* ================================================================
+       Overlap: Triangle vs AABB
+       ================================================================ */
+
+   /**
+   * @brief Separate Axis Theorem overlap between triangle and AABB.
+   * 
+   * @return true if overlapping, false if a separating axis exists.
+   */
+    bool Collision::Overlap(const Triangle& tri, const AABB& box) {
+
+        // Triangle vertices and edges.
+        const Vector2D triVerts[3] = { tri.V0, tri.V1, tri.V2 };
+        const Vector2D triEdges[3] = { tri.V1 - tri.V0, tri.V2 - tri.V1, tri.V0 - tri.V2 };
+
+        // Candidate separating axes -> triangle edge normals and AABB axes.
+        const Vector2D axes[5] = {
+            Vector2D(-triEdges[0].Y, triEdges[0].X), // Perpendicular to edge 0
+            Vector2D(-triEdges[1].Y, triEdges[1].X), // Perpendicular to edge 1
+            Vector2D(-triEdges[2].Y, triEdges[2].X), // Perpendicular to edge 2
+            Vector2D(1.0f, 0.0f),                    // AABB X-axis
+            Vector2D(0.0f, 1.0f)                     // AABB Y-axis
+        };
+
+        // AABB corners (min->top-left->max->bottom-right)
+        const Vector2D boxVerts[4] = {
+            box.Min,
+            Vector2D(box.Min.X, box.Max.Y),
+            box.Max,
+            Vector2D(box.Max.X, box.Min.Y)
+        };
+
+        // Project both shapes onto each axis and check for interval separation.
+        for (const auto& axis : axes) {
+            float triMin = BIGF, triMax = -BIGF;
+            for (const auto& vert : triVerts) {
+                float proj = axis.Dot(vert);
+                triMin = std::min(triMin, proj);
+                triMax = std::max(triMax, proj);
+            }
+
+            float boxMin = BIGF, boxMax = -BIGF;
+            for (const auto& vert : boxVerts) {
+                float proj = axis.Dot(vert);
+                boxMin = std::min(boxMin, proj);
+                boxMax = std::max(boxMax, proj);
+            }
+
+            if (triMax < boxMin || boxMax < triMin) {
+                return false; // Separating axis found
             }
         }
-        if (pointSweepHitCircle(C0, C1, seg.p1, circle.radius, tHit, nHit)) {
-            if (tHit < bestT) {
-                bestT = tHit;
-                bestN = nHit;
-                bestQ = C0 + v * tHit - nHit * circle.radius;
-            }
+
+        return true; // No separating axis found -> overlap = 1
+    }
+
+    /* ================================================================
+       Overlap: AABB vs AABB
+       ================================================================ */
+
+   /**
+   * @brief Overlap test for AABB vs AABB with manifold output.
+   */
+
+    bool Collision::Overlap(const AABB& a, const AABB& b, Manifold* m) {
+
+        // Early rejection using min/max comparisons.
+        const float dx1 = b.Min.X - a.Max.X;
+        const float dx2 = a.Min.X - b.Max.X;
+        const float dy1 = b.Min.Y - a.Max.Y;
+        const float dy2 = a.Min.Y - b.Max.Y;
+
+        if (dx1 > 0.f || dx2 > 0.f || dy1 > 0.f || dy2 > 0.f) return false;
+        if (!m) return true;// Overlap exists; caller does not need manifold
+
+        // Compute the minimal penetration along X and Y.
+        const float px = std::min(a.Max.X - b.Min.X, b.Max.X - a.Min.X);
+        const float py = std::min(a.Max.Y - b.Min.Y, b.Max.Y - a.Min.Y);
+
+        if (px < py) {
+            m->Normal = { (a.Max.X + a.Min.X < b.Max.X + b.Min.X) ? -1.f : 1.f, 0.f };
+            m->Penetration = px;
+        }
+        else {
+            m->Normal = { 0.f, (a.Max.Y + a.Min.Y < b.Max.Y + b.Min.Y) ? -1.f : 1.f };
+            m->Penetration = py;
         }
 
-        if (bestT != BIGF) {
-            outContactPoint = bestQ;
-            outNormal = bestN;
-            outTime = bestT;
-            return true;
+        m->Valid = true;
+        return true; //Overlap
+    }
+
+    /* ================================================================
+       Overlap: Circle vs Circle
+       ================================================================ */
+
+   /**
+   * @brief Overlap test for two circles with optional manifold output.
+   */
+
+    bool Collision::Overlap(const Circle& a, const Circle& b, Manifold* m) {
+
+        const Vector2D d = b.Center - a.Center; // Center-to-center delta
+        const float r = a.Radius + b.Radius; // Sum of radii
+        const float d2 = d.SquareLength(); // Squared separation
+
+
+        if (d2 > r * r) return false; // No overlap if distance > sum radii
+        if (!m) return true; // Overlap but manifold not requested
+
+        const float dLen = std::sqrt(std::max(d2, EPS));          // Avoid sqrt(0)
+        m->Normal = (dLen > 0.f) ? d / dLen : Vector2D(0.f, 1.f); // Unit normal A->B
+        m->Penetration = r - dLen;                                // Overlap depth
+        m->Contact = b.Center - m->Normal * b.Radius;             // Contact point on B
+        m->Valid = true;
+
+        return true;
+    }
+
+    /* ================================================================
+       Overlap: Circle vs AABB
+       ================================================================ */
+
+   /**
+   * @brief Overlap test between a circle and an AABB with manifold output.
+   */
+       
+    bool Collision::Overlap(const Circle& a, const AABB& b, Manifold* m)
+    {
+        // Clamp circle center to box to get closest point on AABB to the circle
+        const float left = b.Min.X;
+        const float right = b.Max.X;
+        const float bottom = b.Min.Y;
+        const float top = b.Max.Y;
+
+        const float closestX = std::max(left, std::min(a.Center.X, right));
+        const float closestY = std::max(bottom, std::min(a.Center.Y, top));
+
+        const Vector2D closest(closestX, closestY); // Closest point on box
+        const Vector2D toClosest = closest - a.Center; // From circle to closest
+        const float d2 = toClosest.SquareLength(); // Squared distance
+
+        // Quick reject -> if outside and farther than radius, no overlap
+        if (d2 > a.Radius * a.Radius) return false;
+        if (!m) return true; // Overlap exists but no manifold requested
+
+        Vector2D normal;          // A->B normal
+        float penetration = 0.0f; // Penetration depth
+
+        //  Two cases -> center outside (or on edge/corner) vs center inside box
+        if (d2 > 1e-6f) {
+            // Outside -> normal is towards closest point; penetration is R - d
+            const float d = std::sqrt(d2);
+            normal = toClosest / d;     // Unit normal A->B
+            penetration = a.Radius - d; // Overlap depth outside
         }
+        else {
+            // Inside -> push out along the nearest face (smallest exit distance)
+            const float leftDist = a.Center.X - left;
+            const float rightDist = right - a.Center.X;
+            const float downDist = a.Center.Y - bottom;
+            const float upDist = top - a.Center.Y;
+
+            float minDist = leftDist;         // Track smallest exit distance
+            normal = Vector2D(-1.0f, 0.0f);   // Assume left face initially
+
+            if (rightDist < minDist) { minDist = rightDist; normal = Vector2D(1.0f, 0.0f); }
+            if (downDist < minDist) { minDist = downDist;  normal = Vector2D(0.0f, -1.0f); }
+            if (upDist < minDist) { minDist = upDist;    normal = Vector2D(0.0f, 1.0f); }
+
+            // Keep normal pointing from circle to the chosen face; penetration
+            // equals circle radius plus distance from center to that face.
+            penetration = a.Radius + minDist;
+        }
+
+        // Contact from the invariant relation, equals 'closest' in the outside case
+        const Vector2D contact = a.Center + normal * (a.Radius - penetration);
+
+        m->Normal = normal;           // A -> B
+        m->Penetration = penetration; // Depth
+        m->Contact = contact;         // Contact point on the boundary
+        m->Valid = true;
+        return true;
     }
 
-    return false;
-}
 
-/* ================================================================
-   Response: reflect remaining motion about the normal
-   ================================================================ */
-void Collision::CircleSegmentResponse(
-    const Vector2D& contactPoint,
-    const Vector2D& normal,
-    Vector2D& inOutIntendedEnd,
-    Vector2D& outReflectedDir)
-{
-    Vector2D leftOver = inOutIntendedEnd - contactPoint; // remaining motion
-    float    along = leftOver.Dot(normal);
-    Vector2D reflected = leftOver - normal * (2.0f * along);
+     /* ================================================================
+       Future use
+       ================================================================ */
 
-    // Update intended end to be mirrored about the surface
-    inOutIntendedEnd = contactPoint + reflected;
+    ///* ================================================================
+    //   Overlap: ConvexPolygon vs ConvexPolygon
+    //   ================================================================ */
+    //bool Collision::Overlap(const ConvexPolygon& a, const ConvexPolygon& b, Manifold* m) {
+    //    // Implementation omitted for brevity
+    //    return false;
+    //}
 
-    // Unit reflected direction for caller to reuse with its own speed
-    float L2 = reflected.SquareLength();
-    outReflectedDir = (L2 > 0.0f) ? reflected * (1.0f / std::sqrt(L2)) : Vector2D(0.0f, 1.0f);
-}
+    ///* ================================================================
+    //   Sweep: AABB vs AABB
+    //   ================================================================ */
+    //Collision::SweepHit Collision::Sweep(const AABB& a, const Vector2D& aEnd,
+    //    const AABB& b, const Vector2D& bEnd) {
+    //    // Implementation omitted for brevity
+    //    return {};
+    //}
 
-/* ================================================================
-   Point vs Segment (closest point + tolerance test)
-   ================================================================ */
-bool Collision::PointVsSegment(
-    const Vector2D& P,
-    const Vector2D& S0,
-    const Vector2D& S1,
-    float tol,
-    float* outT,
-    Vector2D* outClosest)
-{
-    Vector2D V = S1 - S0;
-    float    len2 = V.SquareLength();
+    ///* ================================================================
+    //   Sweep: Circle vs Circle
+    //   ================================================================ */
+    //Collision::SweepHit Collision::Sweep(const Circle& a, const Vector2D& aEnd,
+    //    const Circle& b, const Vector2D& bEnd) {
+    //    // Implementation omitted for brevity
+    //    return {};
+    //}
 
-    float t = 0.0f;
-    if (len2 > 0.0f) {
-        t = (P - S0).Dot(V) / len2;
-    }
-    // clamp to [0,1] without relying on glm
-    float tc = Vector2D::ClampValue(t, 0.0f, 1.0f);
-    Vector2D Q = S0 + V * tc;
-
-    bool hit = (P - Q).SquareLength() <= (tol * tol);
-
-    if (outT)       *outT = tc;
-    if (outClosest) *outClosest = Q;
-    return hit;
-}
-
-/* ================================================================
-   AABB vs AABB 
-   ================================================================ */
-bool Collision::AABBvsAABB(
-    const AABB& A,
-    const AABB& B,
-    Vector2D* outNormal,
-    float* outPenetration)
-{
-    // Centers and half extents
-    Vector2D cA = (A.min + A.max) * 0.5f;
-    Vector2D cB = (B.min + B.max) * 0.5f;
-    Vector2D hA = (A.max - A.min) * 0.5f;
-    Vector2D hB = (B.max - B.min) * 0.5f;
-
-    float dx = cB.X - cA.X;
-    float px = (hA.X + hB.X) - std::fabs(dx);
-    if (px <= 0.0f) return false; // no overlap X
-
-    float dy = cB.Y - cA.Y;
-    float py = (hA.Y + hB.Y) - std::fabs(dy);
-    if (py <= 0.0f) return false; // no overlap Y
-
-    Vector2D n(0.0f, 0.0f);
-    float pen = 0.0f;
-
-    if (px < py) {
-        n.X = (dx < 0.0f) ? -1.0f : 1.0f;
-        pen = px;
-    }
-    else {
-        n.Y = (dy < 0.0f) ? -1.0f : 1.0f;
-        pen = py;
-    }
-
-    if (outNormal)      *outNormal = n;
-    if (outPenetration) *outPenetration = pen;
-    return true;
+    ///* ================================================================
+    //   Sweep: Circle vs AABB
+    //   ================================================================ */
+    //Collision::SweepHit Collision::Sweep(const Circle& a, const Vector2D& aEnd,
+    //    const AABB& b, const Vector2D& bEnd) {
+    //    // Implementation omitted for brevity
+    //    return {};
+    //}
 }

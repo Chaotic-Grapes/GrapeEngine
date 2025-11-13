@@ -1,3 +1,19 @@
+/* Start Header *****************************************************************/
+/*!
+\file   WindowManager.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   14th October 2025
+\brief
+Window management utilities for the engine. Provides functions to create,
+destroy, and manage windows.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef WINDOW_MANAGER_H
 #define WINDOW_MANAGER_H
 
@@ -8,15 +24,14 @@
 
 #include <vector>
 #include "Window.h"
-#include "ecs/ISystem.h"
 
 #ifdef CreateWindow
 #undef CreateWindow
 #endif
 
-class WindowManager final : public Engine::ISystem {
+class WindowManager final {
 public:
-    ~WindowManager() override;
+    ~WindowManager();
 
     // Create a new window, or a child window
     static Window* CreateWindow(const std::string& title, int width, int height, const Window* parent = nullptr);
@@ -29,11 +44,6 @@ public:
 
     static const std::vector<Window*>& GetWindows();
     static Window* GetMainWindow();
-
-    // System interface
-    void OnCreate() override;
-    void OnUpdate() override;
-    std::string Name() const override;
 
 private:
     static std::vector<Window*> m_windows;

@@ -1,37 +1,27 @@
+/**
+* @Name: Dalton koh, 2403250
+* @email: d.koh@digipen.edu
+* @file PhysicsSystem.h
+* @brief Broad/narrow-phase utilities and per-frame 2D physics update loop.
+*
+* @details
+* Might be edited later on if required to change structure of how physicSystem 
+* and a more foolproof version of broad-narrow phase collision is implemented 
+* with more specific shape handling or better optimisation.
+*/
 #ifndef PHYSICS2D_H
 #define PHYSICS2D_H
 
-#include "ecs/Components.h"
-#include "ecs/ISystem.h"
 #include "ecs/World.h"
+#include <vector>
+#include <unordered_map>
 
-class Entity;
-namespace Engine {
-    class PhysicsSystem : public ISystem {
+namespace ECS {
+    class PhysicsSystem {
     public:
-        PhysicsSystem(World* world) : m_world(world) {}
+        static void Update(World& world, float dt);
+    private: 
 
-        void OnCreate() override;
-        void OnUpdate() override;
-        void OnFixedUpdate() override {}
-        std::string Name() const override { return "Physics System"; }
-
-        static void SetGravity(const Vector2D& gravity) { m_gravity = gravity; }
-        static Vector2D GetGravity() { return m_gravity; }
-
-        static void SetEnabled(bool enabled) { m_enabled = enabled; }
-        static bool IsEnabled() { return m_enabled; }
-
-        static void AddForce(Component::Rigidbody2D& rb, const Vector2D& force);
-        static void AddImpulse(Component::Rigidbody2D& rb, const Vector2D& impulse);
-
-    private:
-        void UpdateRigidbody(Component::Rigidbody2D& rb, Component::Transform& t, Component::Collider2D* col);
-
-        World* m_world;
-        static Vector2D m_gravity;
-
-        static bool m_enabled;
     };
 }
 

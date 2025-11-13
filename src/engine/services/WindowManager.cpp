@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file   WindowManager.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   14th September 2025
+\brief
+Implements the WindowManager service which manages multiple application windows.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "services/WindowManager.h"
 #include <iostream>
 
@@ -37,25 +52,6 @@ void WindowManager::DestroyAll() {
     m_windows.clear();
 }
 
-void WindowManager::OnCreate() {
-    // Create main window
-    if (m_windows.empty()) {
-        CreateWindow("GrapeEngine", 1920, 1080);
-    }
-}
-
-void WindowManager::OnUpdate() {
-    // Poll events once (GLFW applies to all windows)
-    glfwPollEvents();
-
-    for (const auto* window : m_windows) {
-        if (!window->ShouldClose()) {
-            window->SwapBuffers();
-        }
-    }
-}
-
-std::string WindowManager::Name()                       const { return "WindowManager"; }
 const std::vector<Window*>& WindowManager::GetWindows()       { return m_windows; }
 Window* WindowManager::GetMainWindow()                        { return m_windows.empty() ? nullptr : m_windows.front(); }
 

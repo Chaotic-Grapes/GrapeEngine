@@ -1,3 +1,23 @@
+/* Start Header *****************************************************************/
+/*!
+\file   UICommon.cpp
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   26th October 2025
+\brief
+Common UI helpers and a minimal layout registry for editor/debug windows.
+Provides canonical window IDs and APIs to register/apply persistent layouts.
+Used by DebugUI and LevelEditor to keep window positions/sizes consistent
+across runs and to initialize sensible defaults for panels.
+
+Features:
+- Canonical `WindowId` enum for consistent window identification
+- Register/apply/clear per-window position and size presets
+- Initialize default layouts for DebugUI and LevelEditor panels
+*/
+/* End Header *******************************************************************/
+
+
 #include "services/UICommon.h"
 #include <unordered_map>
 
@@ -7,10 +27,14 @@ namespace {
     static std::unordered_map<WindowId, Rect> layouts;
 }
 
+// Register a layout rectangle (pos/size) for a specific window ID.
+// Stored in-memory; can be cleared/reset via ClearLayouts.
 void RegisterLayout(WindowId id, float x, float y, float w, float h) {
     layouts[id] = Rect{ x, y, w, h };
 }
 
+// Apply a previously registered layout for a window.
+// Returns false if the window ID has no stored layout.
 bool ApplyLayout(WindowId id, ImGuiCond cond) {
     const auto it = layouts.find(id);
     if (it == layouts.end()) return false;
@@ -21,10 +45,14 @@ bool ApplyLayout(WindowId id, ImGuiCond cond) {
     return true;
 }
 
+// Clear all stored layouts from the registry.
+// Use when resetting UI positions or switching profiles.
 void ClearLayouts() {
     layouts.clear();
 }
 
+// Initialize sensible default layouts for debug/editor panels.
+// Called during OverlayService initialization to seed positions/sizes.
 void InitializeDefaultLayouts() {
     layouts.clear();
     // DebugUI defaults 
