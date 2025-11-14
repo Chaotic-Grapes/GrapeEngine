@@ -104,6 +104,7 @@ void HierarchyPanel::Render() {
     // Early return if no world is attached to prevent crashes
     if (!m_world) {
         ImGui::TextDisabled("No scene attached");
+        ImGui::TextDisabled("Create a new scene or open one via File");
         if (m_mainFont) ImGui::PopFont();
         ImGui::End();
         return;
