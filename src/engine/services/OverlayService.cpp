@@ -236,7 +236,7 @@ namespace Services {
         LOG_DEBUG("LevelEditor disabled");
     }
 
-#else
+#else 
 void OverlayService::Update() {}
 void OverlayService::Render() {}
 void OverlayService::Terminate() {}
