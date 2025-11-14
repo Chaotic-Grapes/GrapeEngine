@@ -87,6 +87,41 @@ namespace ECS {
             return m_renderer ? m_renderer->flushCountThisFrame : -1;
         }
 
+        // Compatibility accessors for editor integration
+        float GetCameraOrthoSize() const { return m_cameraOrthoSize; }
+        bool IsUsingEditorCamera() const { return m_useEditorCamera; }
+        RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
+        uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
+        // Rebind the renderer to a new world (recreate editor camera)
+        void BindWorld(World& world);
+
+
+        // Enable/disable editor camera input (pan/orbit/zoom) based on viewport hover
+        void SetEditorInputEnabled(bool enabled) { m_editorInputEnabled = enabled; }
+
+        // Explicitly control whether the renderer uses the editor camera.
+        // Used by the Level Editor to ensure the viewport starts in editor camera mode
+        // without affecting non-editor contexts.
+        void ForceUseEditorCamera(bool enabled) {
+            m_useEditorCamera = enabled;
+            if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
+                m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
+            }
+        }
+
+        // Level Editor-only: lock renderer to the editor camera regardless of toggles.
+        // Other contexts should not enable this.
+        void SetEditorCameraLocked(bool locked) {
+            m_lockEditorCamera = locked;
+            if (locked) {
+                // Enforce editor camera immediately
+                m_useEditorCamera = true;
+                if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
+                    m_editorCamera->GetCameraComponent()->Active = true;
+                }
+            }
+        }
+
         // ====================================================================
         // Temporary Accessors (For Stress Testing - Remove Later)
         // ====================================================================
@@ -161,6 +196,13 @@ namespace ECS {
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         std::unique_ptr<Engine::EditorCamera> m_editorCamera;   ///< Editor camera
 
+        // Whether editor camera should process input this frame (set by editor viewport hover)
+        bool m_editorInputEnabled = true;
+
+        // When true, ignore toggles and always use the editor camera (Level Editor only)
+        bool m_lockEditorCamera = false;
+
+
         // ====================================================================
         // Member Variables - Shaders
         // ====================================================================
@@ -192,7 +234,7 @@ namespace ECS {
         // ====================================================================
 
         /*!
-        \brief Reference resolution for UI design (1920×1080).
+        \brief Reference resolution for UI design (1920ï¿½1080).
         All UI elements are designed at this resolution and scaled proportionally.
         */
         static constexpr float kReferenceWidth = 1920.0f;

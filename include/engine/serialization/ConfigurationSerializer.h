@@ -46,9 +46,10 @@ namespace Serialization {
         static bool LoadConfig(const std::string& configPath, ApplicationConfig& config) {
             json configJson;
             if (!Serializer::LoadJson(configPath, "json", configJson)) {
-                LOG_ERROR("Warning: Could not open config file: " << configPath);
-                LOG_ERROR("Using default configuration.");
+                LOG_WARNING("Warning: Could not open config file: " << configPath);
+                LOG_WARNING("Using default configuration.");
                 config = GetDefaultConfig();
+                SaveConfig(configPath, config); // Save default config
                 return false;
             }
 

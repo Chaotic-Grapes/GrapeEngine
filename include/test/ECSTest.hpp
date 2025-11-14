@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file   ECSTest.h
+\file   ECSTest.hpp
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \date   20th October 2025
@@ -17,6 +17,10 @@ systems, components, and their interactions. This test scene covers:
 
 The scene provides structured test cases that can be cycled through using
 keyboard input, with each test validating specific ECS functionality.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -28,67 +32,74 @@ keyboard input, with each test validating specific ECS functionality.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/LifetimeSystem.h"
+#include "scene/TestScene.h"
 #include <vector>
 #include <memory>
 
 namespace Sandbox {
-    class ECSTestScene : public Scenes::Scene {
+    class ECSTestScene : public Scenes::TestScene {
     public:
         void OnLoad() override;
         void OnUpdate() override;
         void OnUnload() override;
 
         enum class TestType {
+            // Transformation System
+            LocalTransformTest      = 1001,  // Position, rotation, scale
+            WorldTransformTest      = 1002,  // Hierarchy, parent-child relationships
+            TransformInterpolation  = 1003,  // Smooth position/rotation changes
+            ComponentModification   = 1004,  // Get/Set components, check Has()
+            RotateSquares           = 1005,  // Create 3 squares and rotate them
+
+            // Sprite Animation
+            SpriteAnimation         = 1006,  // Test AnimationSystem with sprite sheets
+
             // Core Component Tests
-            BasicEntityCreation     = 1001,  // Create/destroy entities, add/remove components
-            ComponentModification   = 1002,  // Get/Set components, check Has()
-            LayerSystem             = 1003,  // Layer assignment, filtering
-            ActiveAndTags           = 1004,  // Active flags, TagMask filtering
-            
-            // Transform Tests
-            LocalTransformTest      = 1005,  // Position, rotation, scale
-            WorldTransformTest      = 1006,  // Hierarchy, parent-child relationships
-            TransformInterpolation  = 1007,  // Smooth position/rotation changes
-            
+            BasicEntityCreation     = 1007,  // Create/destroy entities, add/remove components
+            LayerSystem             = 1008,  // Layer assignment, filtering
+            ActiveAndTags           = 1009,  // Active flags, TagMask filtering
+
             // Physics System Tests
-            PhysicsBasic            = 1008,  // Linear velocity, basic movement
-            PhysicsGravity          = 1009,  // Falling objects with gravity
-            PhysicsCollision        = 1010,  // Circle-circle collision detection
-            PhysicsMaterial         = 1011,  // Friction, restitution (bouncing)
-            PhysicsAngular          = 1012,  // Angular velocity, rotation
-            PhysicsComplex          = 1013,  // Multiple interacting bodies
-            
+            PhysicsBasic            = 1010,  // Linear velocity, basic movement
+            PhysicsGravity          = 1011,  // Falling objects with gravity
+            PhysicsCollision        = 1012,  // Circle-circle collision detection
+            PhysicsMaterial         = 1013,  // Friction, restitution (bouncing)
+            PhysicsAngular          = 1014,  // Angular velocity, rotation
+            PhysicsComplex          = 1015,  // Multiple interacting bodies
+
             // Renderer System Tests
-            RenderShapes            = 1014,  // Circles, boxes, lines, polygons
-            RenderSprites           = 1015,  // Sprite rendering with transforms
-            RenderLayers            = 1016,  // Multiple layers, z-ordering
-            RenderStressTest        = 1017,  // Many entities, batch performance
-            
+            RenderShapes            = 1016,  // Circles, boxes, lines, polygons
+            RenderSprites           = 1017,  // Sprite rendering with transforms
+            RenderLayers            = 1018,  // Multiple layers, z-ordering
+            RenderStressTest        = 1019,  // Many entities, batch performance
+
             // Lifetime System Tests
-            LifetimeBasic           = 1018,  // Entities expire after timeout
-            LifetimeWithPhysics     = 1019,  // Moving entities that expire
-            LifetimeSpawner         = 1020,  // Continuous spawning/destruction
-            
+            LifetimeBasic           = 1020,  // Entities expire after timeout
+            LifetimeWithPhysics     = 1021,  // Moving entities that expire
+            LifetimeSpawner         = 1022,  // Continuous spawning/destruction
+
             // Integration Tests
-            PhysicsRenderCombo      = 1021,  // Physics + Rendering together
-            AllSystemsTest          = 1022,  // All systems working together
-            StressTestAll           = 1023,  // Performance test with all systems
-            
+            PhysicsRenderCombo      = 1023,  // Physics + Rendering together
+            AllSystemsTest          = 1024,  // All systems working together
+            StressTestAll           = 1025,  // Performance test with all systems
+
             // Advanced Tests
-            EntityPooling           = 1024,  // Test entity reuse and generation
-            ComponentIteration      = 1025,  // Test World.Each() performance
-            ArchetypeChanges        = 1026,  // Adding/removing components dynamically
+            EntityPooling           = 1026,  // Test entity reuse and generation
+            ArchetypeChanges        = 1027,  // Adding/removing components dynamically
         };
 
     private:
         // Test state
         bool m_tHandled = false;  // Key press handler for test switching
-        TestType m_currentTest{ TestType::BasicEntityCreation };
+        TestType m_currentTest{ TestType::LocalTransformTest };
         
         // Layers
+        uint16_t m_boundaryLayer = 0;
         uint16_t m_testLayer = 0;
         uint16_t m_physicsLayer = 0;
         uint16_t m_renderLayer = 0;
+        // Layer for UI/text that should render last
+        uint16_t m_textLayer = 0;
         
         // Systems
         std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
@@ -103,6 +114,10 @@ namespace Sandbox {
         // Test-specific state
         float m_testTimer = 0.f;
         int m_spawnCount = 0;
+        // Title text entity (packed id)
+        uint64_t m_testTitleEntity = 0;
+        // Persistent scene camera (packed id)
+        uint64_t m_cameraEntity = 0;
         
         // ------------------------------------
         // Test case implementations
@@ -110,14 +125,15 @@ namespace Sandbox {
         
         // Core Component Tests
         void _testBasicEntityCreation();
-        void _testComponentModification();
         void _testLayerSystem();
         void _testActiveAndTags();
-        
+
         // Transform Tests
         void _testLocalTransform();
         void _testWorldTransform();
         void _testTransformInterpolation();
+        void _testComponentModification();
+        void _testRotateSquares();
         
         // Physics System Tests
         void _testPhysicsBasic();
@@ -145,7 +161,7 @@ namespace Sandbox {
         
         // Advanced Tests
         void _testEntityPooling();
-        void _testComponentIteration();
+        void _testSpriteAnimation();
         void _testArchetypeChanges();
         
         // ------------------------------------

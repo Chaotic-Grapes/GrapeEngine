@@ -26,6 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <optional>
 
 namespace ECS {
+    // Hierarchy class for managing entity transforms in a parent-child hierarchy
     class Hierarchy {
     public:
         /**
@@ -36,28 +37,49 @@ namespace ECS {
          * @param world The ECS world containing the entities and their components.
          */
         static void UpdateTransforms(World& world) {
-            std::vector<Entity> roots;
+            std::vector<Entity> roots; // Entities without parents
+
+            // Find all root entities
+            // Then recursively process their subtrees
             world.Each<Components::LocalTransform, Components::WorldTransform>([&](const Entity e, Components::LocalTransform&, Components::WorldTransform&) {
                 if (!world.Has<Parent>(e) || world.Get<Parent>(e).ParentEntity.IsNull()) {
-                    roots.push_back(e);
+                    roots.push_back(e); // No parent, it's a root
                 }
             });
             
+            // Recursively update each root entity and its subtree
+            // Starting with no parent world transform
+            // This will propagate down the hierarchy correctly
             for (Entity r : roots) {
                 _updateSubtree(world, r, std::nullopt);
             }
         }
 
     private:
+        // Recursive helper to update an entity and its children
+        // parentWorld is optional; if not provided, entity is root
+        // This function computes the world transform for the entity
+        // and then recurses for its children
         static void _updateSubtree(World& world, const Entity e, const std::optional<Matrix4x4>& parentWorld) {
+            // Get local and world transform components
             const auto &lt = world.Get<Components::LocalTransform>(e);
             auto &wt = world.Get<Components::WorldTransform>(e);
 
+            // Compute world transform
             const Matrix4x4 local = TransformUtils::MakeTRS(lt.Position, lt.Rotation, lt.Scale);
-            Matrix4x4 worldM = parentWorld.has_value() ? (parentWorld.value() * local) : local;
+            Matrix4x4 worldM = parentWorld.has_value()  // If we have a parent world transform
+                ? (parentWorld.value() * local)         // Combine parent world with local
+                : local;                                // No parent, local is world
 
-            wt.Matrix = worldM; wt.Dirty = false;
-            world.ForChildren(e, [&](const Entity c){
+            // Update world transform component
+            // Mark as clean so that the system knows it is unchanged
+            wt.Matrix = worldM; 
+            wt.Dirty = false;
+            
+            // Recurse for children
+            // For each child entity, call _updateSubtree with current world transform
+            // This propagates the transform down the hierarchy
+            world.ForChildren(e, [&](const Entity c) {
                 _updateSubtree(world, c, worldM);
             });
         }

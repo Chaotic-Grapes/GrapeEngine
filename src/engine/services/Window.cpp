@@ -1,3 +1,18 @@
+/* Start Header *****************************************************************/
+/*!
+\file   Window.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   14th September 2025
+\brief
+Implements the Window service which manages the application window using GLFW.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "services/Window.h"
 #include "services/Input.h"
 #include <iostream>
@@ -10,13 +25,13 @@ namespace {
 	}
 }
 
-static void FramebufferSizeCallback(GLFWwindow* window, const int width, const int height) {
-	(void)window;
-	glViewport(0, 0, width, height);
-
-	// Broadcast resize message
-	Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
-}
+//static void FramebufferSizeCallback(GLFWwindow* window, const int width, const int height) {
+//	(void)window;
+//	glViewport(0, 0, width, height);
+//
+//	// Broadcast resize message
+//	Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ width, height });
+//}
 
 Window::~Window() { Destroy(); }
 

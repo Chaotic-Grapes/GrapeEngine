@@ -6,13 +6,13 @@
 \date   3rd October 2025
 \brief
 Defines the Color struct, a lightweight utility for representing RGBA color
-values in both LDR (0–255) and HDR (floating-point) formats. It provides
+values in both LDR (0-255) and HDR (floating-point) formats. It provides
 convenient constructors, clamping, and conversion utilities for use across
 the rendering pipeline.
 
 Responsibilities:
 - Store color values as normalized floats in linear space.
-- Support initialization from both byte (0–255) and float (0.0–1.0) inputs.
+- Support initialization from both byte (0-255) and float (0.0-1.0) inputs.
 - Provide conversions to glm::vec4 and clamped byte arrays for API compatibility.
 - Ensure consistent color handling between CPU-side operations and GPU rendering.
 */

@@ -1,294 +1,219 @@
-﻿// /**
-//  * @file    SerializationTest.cpp
-//  * @author  k.danielneozuofeng
-//  * @date    26/09/2025
-//  * @brief   Implementation of automated serialization test scene
-//  *
-//  * This source file implements the SerializationTestScene class,
-//  * which performs a multi-phase integrity test of the serialization
-//  * system. It creates sample entities, saves them to a JSON scene file,
-//  * reloads them, and verifies that entity data (such as transform,
-//  * components, and names) are preserved correctly across the process.
-//  *
-//  * Test phases include:
-//  *  - Creating controlled test entities
-//  *  - Saving the current world to disk
-//  *  - Loading the saved world back into memory
-//  *  - Verifying loaded entities against expected values
-//  *  - Printing final pass/fail test results
-//  */
+/**
+ * @file    SerializationTest.cpp
+ * @author  k.danielneozuofeng
+ * @date    26/09/2025
+ * @brief   Implementation of automated serialization test scene
+ *
+ * This source file implements the SerializationTestScene class,
+ * which performs a multi-phase integrity test of the serialization
+ * system. It creates sample entities, saves them to a JSON scene file,
+ * reloads them, and verifies that entity data (such as transform,
+ * components, and names) are preserved correctly across the process.
+ *
+ * Test phases include:
+ *  - Creating controlled test entities
+ *  - Saving the current world to disk
+ *  - Loading the saved world back into memory
+ *  - Verifying loaded entities against expected values
+ *  - Printing final pass/fail test results
+ */
 
-// #include "SerializationTest.h"
-// #include "serialization/Serialization.h"
-// #include "ecs/Components.h"
-// #include "services/WindowManager.h"
-// #include <iostream>
-// #include <filesystem>
+#include "SerializationTest.h"
+#include "serialization/EntitySerializer.h"
+#include "serialization/Serializer.h"
+#include "ecs/Components.h"
+#include "core/Logger.h"
+#include "core/Application.h"
+#include "services/WindowManager.h"
+#include <filesystem>
+#include <cmath>
+#include <cstring>
 
-// using namespace Sandbox;
+using namespace Sandbox;
 
-// SerializationTestScene::SerializationTestScene()
-//     : Scene("SerializationTestScene") {
-//     CREATE_WINDOW("Serialization Test", 1600, 900);
-// }
+void SerializationTestScene::OnLoad() {
+    const auto &config = Engine::CORE->GetConfig();
+    const int windowWidth = config.WindowConfig.Width;
+    const int windowHeight = config.WindowConfig.Height;
 
-// void SerializationTestScene::OnLoad() {
-//     std::cout << "\nSERIALIZATION INTEGRITY TEST" << '\n';
-//     std::cout << "Running automated serialization test..." << '\n';
+    CREATE_WINDOW("Serialization Test Scene", windowWidth, windowHeight);
+    LOG_INFO("========================================");
+    LOG_INFO("SERIALIZATION INTEGRITY TEST");
+    LOG_INFO("========================================");
 
-//     RunAutomatedTest();
-// }
+    m_rendererSystem = std::make_shared<ECS::RendererSystem>();
+    m_rendererSystem->Initialize(GetWorld());
+    AddSystem([this](Scenes::Scene& s, const float dt) {
+        m_rendererSystem->Update(s.GetWorld(), dt);
+    }, "Renderer System");
 
-// void SerializationTestScene::RunAutomatedTest() {
-//     std::cout << "\nPHASE 1: Creating Test Entities" << '\n';
-//     CreateTestEntities();
+    RunAutomatedTest();
+}
 
-//     std::cout << "\nPHASE 2: Saving Scene" << '\n';
-//     SaveScene();
+void SerializationTestScene::RunAutomatedTest() {
+    LOG_DEBUG("PHASE 1: Loading Prefab from assets/samples/sample-enemy-prefab.prefab");
+    LoadPrefabAndVerify();
+    
+    LOG_DEBUG("PHASE 2: Verifying Prefab Data");
+    if (m_testPassed && GetWorld().IsAlive(m_loadedEntity)) {
+        VerifyPrefabData(m_loadedEntity);
+    }
+    else {
+        LOG_ERROR("TEST STOPPED: Prefab load failed");
+        m_testPassed = false;
+    }
+    
+    PrintTestResults();
+    LOG_DEBUG("Test complete. Check above for any failures.");
+}
 
-//     if (!m_testPassed) {
-//         std::cout << "TEST STOPPED: Save failed" << '\n';
-//         return;
-//     }
+void SerializationTestScene::LoadPrefabAndVerify() {
+    ECS::World& world = GetWorld();
+    
+    try {
+        json prefabJson;
+        if (!Serialization::Serializer::LoadJson("assets/samples/sample-enemy-prefab.prefab", "prefab", prefabJson)) {
+            LOG_ERROR("[FAIL] Cannot load prefab JSON");
+            m_testPassed = false;
+            return;
+        }
+        
+        // Deserialize the prefab entity
+        m_loadedEntity = Serialization::EntitySerializer::DeserializeEntity(world, prefabJson);
+        
+        if (!world.IsAlive(m_loadedEntity)) {
+            LOG_ERROR("[FAIL] Loaded entity is not alive");
+            m_testPassed = false;
+            return;
+        }
+        
+        LOG_INFO("[PASS] Prefab loaded successfully");
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("[FAIL] Error during prefab load: " << e.what());
+        m_testPassed = false;
+    }
+}
 
-//     std::cout << "\nPHASE 3: Loading Scene" << '\n';
-//     LoadScene();
+void SerializationTestScene::VerifyPrefabData(ECS::Entity entity) {
+    ECS::World& world = GetWorld();
+    bool allTestsPassed = true;
+    
+    // Expected data from sample-enemy-prefab.prefab
+    const std::string expectedName = "EnemyPrefab";
+    const Vector3D expectedPosition = {650.0f, 750.0f, 0.0f};
+    const Vector3D expectedScale = {256.0f, 256.0f, 1.0f};
+    const Quaternion expectedRotation = {0.0f, 0.0f, 0.0f, 1.0f};
+    const uint32_t expectedTextureId = 1;
+    const Color expectedColor = {1.0f, 0.498039f, 0.498039f, 1.0f};
+    const uint16_t expectedLayerId = 0;
+    
+    // Verify Name component
+    if (world.Has<ECS::Components::Name>(entity)) {
+        const auto& nameComp = world.Get<ECS::Components::Name>(entity);
+        bool nameMatch = (std::strcmp(nameComp.Value, expectedName.c_str()) == 0);
+        LOG_DEBUG("  Name: " << (nameMatch ? "[PASS]" : "[FAIL]") 
+                  << " (Expected: '" << expectedName << "', Got: '" << nameComp.Value << "')");
+        if (!nameMatch) allTestsPassed = false;
+    }
+    else {
+        LOG_ERROR("[FAIL] Entity missing Name component");
+        allTestsPassed = false;
+    }
+    
+    // Verify Layer component
+    if (world.Has<ECS::Components::Layer>(entity)) {
+        const auto& layerComp = world.Get<ECS::Components::Layer>(entity);
+        bool layerMatch = (layerComp.Id == expectedLayerId);
+        LOG_DEBUG("  Layer: " << (layerMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: " << expectedLayerId << ", Got: " << layerComp.Id << ")");
+        if (!layerMatch) allTestsPassed = false;
+    }
+    else {
+        LOG_ERROR("[FAIL] Entity missing Layer component");
+        allTestsPassed = false;
+    }
+    
+    // Verify LocalTransform component
+    if (world.Has<ECS::Components::LocalTransform>(entity)) {
+        const auto& transform = world.Get<ECS::Components::LocalTransform>(entity);
+        
+        bool posMatch = (std::abs(transform.Position.X - expectedPosition.X) < 0.01f &&
+                       std::abs(transform.Position.Y - expectedPosition.Y) < 0.01f &&
+                       std::abs(transform.Position.Z - expectedPosition.Z) < 0.01f);
+        LOG_DEBUG("  Position: " << (posMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: [" << expectedPosition.X << ", " << expectedPosition.Y << ", " << expectedPosition.Z << "], "
+                  << "Got: [" << transform.Position.X << ", " << transform.Position.Y << ", " << transform.Position.Z << "])");
+        if (!posMatch) allTestsPassed = false;
+        
+        bool scaleMatch = (std::abs(transform.Scale.X - expectedScale.X) < 0.01f &&
+                         std::abs(transform.Scale.Y - expectedScale.Y) < 0.01f &&
+                         std::abs(transform.Scale.Z - expectedScale.Z) < 0.01f);
+        LOG_DEBUG("  Scale: " << (scaleMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: [" << expectedScale.X << ", " << expectedScale.Y << ", " << expectedScale.Z << "], "
+                  << "Got: [" << transform.Scale.X << ", " << transform.Scale.Y << ", " << transform.Scale.Z << "])");
+        if (!scaleMatch) allTestsPassed = false;
+        
+        bool rotMatch = (std::abs(transform.Rotation.W - expectedRotation.W) < 0.01f &&
+                       std::abs(transform.Rotation.X - expectedRotation.X) < 0.01f &&
+                       std::abs(transform.Rotation.Y - expectedRotation.Y) < 0.01f &&
+                       std::abs(transform.Rotation.Z - expectedRotation.Z) < 0.01f);
+        LOG_DEBUG("  Rotation: " << (rotMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: [" << expectedRotation.W << ", " << expectedRotation.X << ", " 
+                  << expectedRotation.Y << ", " << expectedRotation.Z << "], "
+                  << "Got: [" << transform.Rotation.W << ", " << transform.Rotation.X << ", " 
+                  << transform.Rotation.Y << ", " << transform.Rotation.Z << "])");
+        if (!rotMatch) allTestsPassed = false;
+    }
+    else {
+        LOG_ERROR("[FAIL] Entity missing LocalTransform component");
+        allTestsPassed = false;
+    }
+    
+    // Verify SpriteRenderer2D component
+    if (world.Has<ECS::Components::SpriteRenderer2D>(entity)) {
+        const auto& sprite = world.Get<ECS::Components::SpriteRenderer2D>(entity);
+        
+        bool texMatch = (sprite.TextureId == expectedTextureId);
+        LOG_DEBUG("  TextureId: " << (texMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: " << expectedTextureId << ", Got: " << sprite.TextureId << ")");
+        if (!texMatch) allTestsPassed = false;
+        
+        bool colorMatch = (std::abs(sprite.Color.R - expectedColor.R) < 0.01f &&
+                         std::abs(sprite.Color.G - expectedColor.G) < 0.01f &&
+                         std::abs(sprite.Color.B - expectedColor.B) < 0.01f &&
+                         std::abs(sprite.Color.A - expectedColor.A) < 0.01f);
+        LOG_DEBUG("  Color: " << (colorMatch ? "[PASS]" : "[FAIL]")
+                  << " (Expected: [" << expectedColor.R << ", " << expectedColor.G << ", " 
+                  << expectedColor.B << ", " << expectedColor.A << "], "
+                  << "Got: [" << sprite.Color.R << ", " << sprite.Color.G << ", " 
+                  << sprite.Color.B << ", " << sprite.Color.A << "])");
+        if (!colorMatch) allTestsPassed = false;
+    }
+    else {
+        LOG_ERROR("[FAIL] Entity missing SpriteRenderer2D component");
+        allTestsPassed = false;
+    }
+    
+    m_testPassed = allTestsPassed;
+}
 
-//     if (!m_testPassed) {
-//         std::cout << "TEST STOPPED: Load failed" << '\n';
-//         return;
-//     }
+void SerializationTestScene::PrintTestResults() {
+    LOG_INFO("========================================");
+    if (m_testPassed)
+        LOG_INFO("[PASS] ALL TESTS PASSED");
+    else
+        LOG_ERROR("[FAIL] SOME TESTS FAILED");
+    
+    LOG_INFO("========================================");
 
-//     std::cout << "\nPHASE 4: Verifying Loaded Data" << '\n';
-//     VerifyLoadedEntities();
+    // exit(m_testPassed ? 0 : 1);
+}
 
-//     PrintTestResults();
+void SerializationTestScene::OnUpdate() {}
 
-//     std::cout << "\nTest complete. Check above for any failures." << '\n';
-// }
-
-// void SerializationTestScene::CreateTestEntities() {
-//     std::cout << "CreateTestEntities() started" << '\n';
-
-//     World& world = GetWorld();
-//     std::cout << "Got world reference" << '\n';
-
-//     // test 1: Basic Transform + SpriteRenderer
-//     std::cout << "Creating TestSprite entity..." << '\n';
-//     Entity sprite = world.CreateEntity("TestSprite");
-//     std::cout << "Entity created with ID: " << sprite.GetId() << '\n';
-
-//     auto& spriteTransform = sprite.Transform();
-//     spriteTransform.Position = { 400.0f, 450.0f };
-//     spriteTransform.Scale = { 128.0f, 128.0f };
-//     spriteTransform.Rotation = 45.0f;
-//     std::cout << "Transform set" << '\n';
-
-//     auto& spriteRenderer = sprite.AddComponent<Component::SpriteRenderer>(
-//         "assets/textures/test/player.png"
-//     );
-//     std::cout << "SpriteRenderer component added" << '\n';
-//     spriteRenderer.Color = { 1.0f, 0.5f, 0.5f, 1.0f };
-
-//     m_originalEntities.push_back(sprite);
-//     m_expectedData.push_back({
-//         "TestSprite",
-//         { 400.0f, 450.0f },
-//         { 128.0f, 128.0f },
-//            45.0f, "assets/textures/test/player.png",
-//             0.0f, 0.0f
-//         });
-
-//     std::cout << "Created Sprite entity: " << sprite.GetName() << '\n';
-
-//     // test 2: Simple entity with only transform
-//     std::cout << "Creating simple entity without complex components..." << '\n';
-//     Entity simpleEntity = world.CreateEntity("SimpleEntity");
-//     auto& simpleTransform = simpleEntity.Transform();
-//     simpleTransform.Position = { 100.0f, 100.0f };
-//     simpleTransform.Scale = { 50.0f, 50.0f };
-
-//     m_originalEntities.push_back(simpleEntity);
-//     m_expectedData.push_back({
-//         "SimpleEntity",
-//         { 100.0f, 100.0f },
-//         { 50.0f, 50.0f },
-//         0.0f,
-//         "",
-//         0.0f,
-//         0.0f
-//         });
-
-//     std::cout << "Created Simple entity: " << simpleEntity.GetName() << '\n';
-//     std::cout << "Total entities created: " << m_originalEntities.size() << '\n';
-//     std::cout << "CreateTestEntities() completed successfully" << '\n';
-// }
-
-// void SerializationTestScene::SaveScene() {
-//     std::cout << "SaveScene() started" << '\n';
-
-//     World& world = GetWorld();
-//     std::cout << "Got world reference for saving" << '\n';
-
-//     std::cout << "Creating save directory..." << '\n';
-//     std::filesystem::create_directories("assets/saves");
-//     std::cout << "Save directory ready" << '\n';
-
-//     std::cout << "Calling SceneSerializer::SaveScene..." << '\n';
-//     const bool success = Serialization::SceneSerializer::SaveScene(
-//         world,
-//         "assets/samples/sample-scene.json"
-//     );
-//     std::cout << "SceneSerializer::SaveScene returned: " << success << '\n';
-
-//     if (success) {
-//         std::cout << "Scene save operation reported success" << '\n';
-
-//         if (std::filesystem::exists("assets/samples/sample-scene.json")) {
-//             const auto fileSize = std::filesystem::file_size("assets/samples/sample-scene.json");
-//             std::cout << "File created with size: " << fileSize << " bytes" << '\n';
-
-//             std::ifstream testFile("assets/samples/sample-scene.json");
-//             std::string firstLine;
-//             std::getline(testFile, firstLine);
-//             std::cout << "First line of file: " << firstLine.substr(0, 50) << "..." << '\n';
-//             testFile.close();
-//         }
-//         else {
-//             std::cout << "ERROR: File was not created!" << '\n';
-//             m_testPassed = false;
-//             return;
-//         }
-//     }
-//     else {
-//         std::cout << "Scene save failed!" << '\n';
-//         m_testPassed = false;
-//         return;
-//     }
-
-//     std::cout << "SaveScene() completed successfully" << '\n';
-// }
-
-// void SerializationTestScene::LoadScene() {
-//     std::cout << "LoadScene() started" << '\n';
-
-//     World& world = GetWorld();
-//     std::cout << "Got world reference for loading" << '\n';
-
-//     if (!std::filesystem::exists("assets/samples/sample-scene.json")) {
-//         std::cout << "ERROR: Save file doesn't exist for loading!" << '\n';
-//         m_testPassed = false;
-//         return;
-//     }
-
-//     std::cout << "Clearing original entities..." << '\n';
-//     for (auto& entity : m_originalEntities) {
-//         world.GetEntityManager().DestroyEntity(entity);
-//     }
-//     m_originalEntities.clear();
-//     std::cout << "Original entities cleared" << '\n';
-
-//     std::cout << "Calling SceneSerializer::LoadScene..." << '\n';
-//     const bool success = Serialization::SceneSerializer::LoadScene(
-//         world,
-//         "assets/samples/sample-scene.json"
-//     );
-//     std::cout << "SceneSerializer::LoadScene returned: " << success << '\n';
-
-//     if (success) {
-//         std::cout << "Scene load operation reported success" << '\n';
-
-//         const auto entityIds = world.GetEntityManager().GetAllEntities();
-//         std::cout << "Found " << entityIds.size() << " entities after load" << '\n';
-
-//         for (const EntityId id : entityIds) {
-//             Entity newEntity = world.GetEntityManager().GetEntity(id);
-//             std::cout << "Loaded entity: [" << id << "] " << newEntity.GetName() << '\n';
-//             m_originalEntities.push_back(newEntity);
-//         }
-//         std::cout << "Loaded entities: " << m_originalEntities.size() << '\n';
-//     }
-//     else {
-//         std::cout << "Scene load failed!" << '\n';
-//         m_testPassed = false;
-//         return;
-//     }
-
-//     std::cout << "LoadScene() completed successfully" << '\n';
-// }
-
-// void SerializationTestScene::VerifyLoadedEntities() {
-//     std::cout << "VerifyLoadedEntities() started" << '\n';
-
-//     World& world = GetWorld();
-//     const auto entityIds = world.GetEntityManager().GetAllEntities();
-
-//     std::cout << "Verifying " << entityIds.size() << " loaded entities..." << '\n';
-
-//     bool allTestsPassed = true;
-
-//     for (const EntityId id : entityIds) {
-//         Entity entity = world.GetEntityManager().GetEntity(id);
-//         std::string name = entity.GetName();
-
-//         std::cout << "\nChecking entity: [" << id << "] " << name << '\n';
-
-//         const ExpectedData* expected = nullptr;
-//         for (auto& exp : m_expectedData) {
-//             if (exp.name == name) {
-//                 expected = &exp;
-//                 break;
-//             }
-//         }
-
-//         if (!expected) {
-//             std::cout << "No expected data for entity" << name << "'" << '\n';
-//             continue;
-//         }
-
-//         const auto& transform = entity.Transform();
-//         const bool posMatch = (std::abs(transform.Position.X - expected->position.X) < 0.01f &&
-//             std::abs(transform.Position.Y - expected->position.Y) < 0.01f);
-//         const bool scaleMatch = (std::abs(transform.Scale.X - expected->scale.X) < 0.01f &&
-//             std::abs(transform.Scale.Y - expected->scale.Y) < 0.01f);
-//         const bool rotMatch = std::abs(transform.Rotation - expected->rotation) < 0.01f;
-
-//         std::cout << "  Position: " << (posMatch ? "Success" : "Fail")
-//             << " (" << transform.Position.X << ", " << transform.Position.Y << ")" << '\n';
-//         std::cout << "  Scale: " << (scaleMatch ? "Success" : "Fail")
-//             << " (" << transform.Scale.X << ", " << transform.Scale.Y << ")" << '\n';
-//         std::cout << "  Rotation: " << (rotMatch ? "Success" : "Fail")
-//             << " (" << transform.Rotation << " deg)" << '\n';
-
-//         if (!posMatch || !scaleMatch || !rotMatch) {
-//             allTestsPassed = false;
-//         }
-
-//         if (name == "TestSprite") {
-//             const bool hasSprite = entity.HasComponent<Component::SpriteRenderer>();
-//             std::cout << "  SpriteRenderer: " << (hasSprite ? "Success" : "Fail") << '\n';
-//             if (!hasSprite) allTestsPassed = false;
-//         }
-//     }
-
-//     m_testPassed = allTestsPassed;
-//     std::cout << "VerifyLoadedEntities() completed" << '\n';
-// }
-
-// void SerializationTestScene::PrintTestResults() {
-//     std::cout << "\nFINAL TEST RESULTS" << '\n';
-//     if (m_testPassed) {
-//         std::cout << "ALL TESTS PASSED - Serialization system is working correctly!" << '\n';
-//     }
-//     else {
-//         std::cout << "SOME TESTS FAILED - Serialization system has issues!" << '\n';
-//     }
-//     std::cout << "==========================" << '\n';
-// }
-
-// void SerializationTestScene::OnUpdate() {}
-
-// void SerializationTestScene::OnUnload() {
-//     m_originalEntities.clear();
-//     m_expectedData.clear();
-// }
+void SerializationTestScene::OnUnload() {
+    if (GetWorld().IsAlive(m_loadedEntity)) {
+        GetWorld().Destroy(m_loadedEntity);
+    }
+}

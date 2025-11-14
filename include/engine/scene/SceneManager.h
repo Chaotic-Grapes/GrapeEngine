@@ -23,9 +23,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <vector>
 #include <fstream>
 #include <iostream>
+#include <unordered_set>
 #include <nlohmann/json.hpp>
 #include "core/Logger.h"
+#include "core/Profiler.h"
+#include "ecs/Hierarchy.h"
 #include "scene/Scene.h"
+#include "scene/SystemRegistry.h"
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 
@@ -46,12 +50,11 @@ namespace Scenes {
         SceneManager& operator=(SceneManager&&) = default;
 
         /**
-         * @brief Adds a new scene to the manager and calls its OnLoad() method.
+         * @brief Adds a new scene to the manager.
          * @param scene The scene to add.
          * @return The index of the added scene.
          */
         size_t AddScene(Scene* scene) {
-            scene->OnLoad();
             m_scenes.push_back(std::move(std::unique_ptr<Scene>(scene)));
 
             // If there is no active scene, make the first added scene active next frame
@@ -71,9 +74,8 @@ namespace Scenes {
             if (index >= m_scenes.size())
                 return false;
 
-            // If active, exit first
+            // If active, clear it
             if (m_active == index) {
-                m_scenes[m_active]->OnExit();
                 m_active = NPOS;
             }
 
@@ -82,8 +84,7 @@ namespace Scenes {
                 m_pendingActive = NPOS;
             }
 
-            // Unload and erase
-            m_scenes[index]->OnUnload();
+            // Erase
             m_scenes.erase(m_scenes.begin() + index);
 
             // Fix indices post-erase
@@ -162,7 +163,7 @@ namespace Scenes {
         void Update() {
             _processPending();
             if (m_active != NPOS) {
-                m_scenes[m_active]->_update(Time::DeltaTime());
+                _updateScene(*m_scenes[m_active], Time::DeltaTime());
             }
         }
 
@@ -190,6 +191,9 @@ namespace Scenes {
                 sceneJson["Version"] = version;
                 sceneJson["SceneName"] = sceneName;
                 sceneJson["EntityCount"] = 0;
+
+                // Serialize SystemProfile
+                sceneJson["SystemProfile"] = scene.GetSystemProfile();
 
                 json entities = json::array();
                 int entityCount = 0;
@@ -240,6 +244,11 @@ namespace Scenes {
 
                 world.DestroyAll();
 
+                // Load SystemProfile if present
+                if (sceneJson.contains("SystemProfile")) {
+                    scene.GetSystemProfile() = sceneJson["SystemProfile"].get<SystemProfile>();
+                }
+
                 int loadedCount = 0;
                 if (sceneJson.contains("Entities")) {
                     for (const auto& entityJson : sceneJson["Entities"]) {
@@ -277,11 +286,45 @@ namespace Scenes {
             if (toIndex >= m_scenes.size() || m_active == toIndex)
                 return;
 
-            if (m_active != NPOS)
-                m_scenes[m_active]->OnExit();
-
             m_active = toIndex;
-            m_scenes[m_active]->OnEnter();
+        }
+
+        /**
+         * @brief Updates a scene by executing its system profile.
+         * @param scene The scene to update.
+         * @param dt Delta time in seconds.
+         */
+        void _updateScene(Scene& scene, const float dt) {
+            auto& world = scene.GetWorld();
+            const auto& profile = scene.GetSystemProfile();
+
+            // Execute systems in order based on SystemProfile
+            for (const auto& entry : profile.Systems) {
+                if (!entry.Enabled)
+                    continue;
+
+                // Physics runs on a fixed timestep in Application; skip here to avoid double updates
+                if (entry.Name == "Physics")
+                    continue;
+
+                auto* systemFunc = SystemRegistry::Get(entry.Name);
+                if (systemFunc) {
+                    Profiler::Get().BeginScope(entry.Name.c_str());
+                    (*systemFunc)(world, dt);
+                    Profiler::Get().EndScope(entry.Name.c_str());
+                }
+                else {
+                    // System not found in registry - log warning once per update
+                    static std::unordered_set<std::string> s_warnedSystems;
+                    if (s_warnedSystems.find(entry.Name) == s_warnedSystems.end()) {
+                        LOG_WARNING("System '" << entry.Name << "' not found in SystemRegistry");
+                        s_warnedSystems.insert(entry.Name);
+                    }
+                }
+            }
+
+            // Always update transform hierarchy after all systems
+            ECS::Hierarchy::UpdateTransforms(world);
         }
 
         std::vector<std::unique_ptr<Scene>> m_scenes;

@@ -1,4 +1,20 @@
-﻿#include "services/Time.h"
+﻿/* Start Header *****************************************************************/
+/*!
+\file   Time.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\date   14th September 2025
+\brief
+Implements the Time service which provides time-related functionality
+within the engine.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#include "services/Time.h"
 #include <algorithm>
 #include <string>
 #include <GLFW/glfw3.h>

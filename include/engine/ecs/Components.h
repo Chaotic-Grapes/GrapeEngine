@@ -98,7 +98,7 @@ namespace ECS {
     namespace Components {
         // ---------------------------------- Core utility/tag components ----------------------------------
 
-        // Lightweight name (fixed-size). Avoids std::string to remain trivially copyable.
+        // Lightweight name (fixed-size).
         struct Name {
         public:
             // UTF-8 bytes, null-terminated if shorter than buffer. Keep small for cache.
@@ -119,6 +119,28 @@ namespace ECS {
             bool Enabled = true;
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
+
+        // Tracks source prefab asset for entity instantiation and editor re-import workflows
+        struct PrefabLink {
+        public:
+            // Fixed size buffer for prefab asset path to maintain 
+            // trivially copyable status for ECS performance
+            static constexpr size_t MaxPathLength = 256;
+            char prefabPath[MaxPathLength] = { 0 };     // Path to the prefab file this entity was created from
+            PrefabLink() = default;
+
+            // Construct from std::string
+            PrefabLink(const std::string& path) { setPath(path); }
+
+            // Safe string copy with null termination guarantee
+            void setPath(const std::string& path) {
+                strncpy_s(prefabPath, path.c_str(), MaxPathLength - 1);
+                prefabPath[MaxPathLength - 1] = '\0'; // Always null-terminate
+            }
+            // Convert back to std::string for convenience
+            std::string getPath() const { return std::string(prefabPath); }
+        };
+        static_assert(std::is_trivially_copyable_v<PrefabLink>, "PrefabLink must be trivially copyable");
 
         // Lifetime in seconds; entities with Time <= 0 can be culled by a system.
         struct Lifetime {
@@ -271,10 +293,11 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<CircleCollider2D>, "CircleCollider2D must be trivially copyable");
 
+
         // ---------------------------------- Rendering ----------------------------------
 
         // 2D sprite renderer (for UI/2D layers)
-        struct SpriteRenderer2D {
+        struct SpriteRenderer2D {   
         public:
             uint32_t TextureId = 0;
             Color Color{1.0f, 1.0f, 1.0f, 1.0f};
@@ -284,6 +307,7 @@ namespace ECS {
             int Height = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
+        
 
         // Optional: sprite flipping flags for atlases
         struct SpriteFlip2D {
@@ -300,6 +324,33 @@ namespace ECS {
         };
 
         // TODO: Add Shader components
+
+        // ---------------------------------- Animation ----------------------------------
+
+        // Sprite sheet animation configuration (POD)
+        struct SpriteSheetAnimation2D {
+        public:
+            uint32_t TextureId = 0;           // Texture containing the sprite sheet
+            int FrameWidth = 0;               // Width of a single frame in pixels
+            int FrameHeight = 0;              // Height of a single frame in pixels
+            int SheetWidth = 0;               // Total width of the sprite sheet
+            int SheetHeight = 0;              // Total height of the sprite sheet
+            int StartFrame = 0;               // First frame index in the animation
+            int FrameCount = 0;               // Number of frames in the animation
+            float FramesPerSecond = 10.0f;    // Animation speed (FPS)
+            bool Loop = true;                 // Whether animation loops
+            bool Playing = true;              // Whether animation is currently playing
+        };
+        static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
+
+        // Animation state (runtime data, updated by AnimationSystem)
+        struct AnimationState2D {
+        public:
+            int CurrentFrame = 0;             // Current frame index (relative to StartFrame)
+            float TimeAccumulator = 0.0f;     // Time accumulated since last frame change
+            bool Finished = false;            // True if non-looping animation completed
+        };
+        static_assert(std::is_trivially_copyable_v<AnimationState2D>, "AnimationState2D must be trivially copyable");
 
         // ---------- Minimal 2D shape data for debug rendering ----------
         // Keep these POD to be fast and compatible with archetype moves.
@@ -443,8 +494,8 @@ namespace ECS {
                 }
             }
 
-            std::string_view getContent() const { return std::string_view(Content); }
-            std::string_view getFontPath() const { return std::string_view(FontPath); }
+            std::string_view getContent() const { return { Content }; }
+            std::string_view getFontPath() const { return { FontPath }; }
         };
         static_assert(std::is_trivially_copyable_v<Text>, "Text must be trivially copyable");
 
@@ -459,20 +510,22 @@ namespace ECS {
 
         // ---------- Scripting / Audio (kept minimal) ----------
 
-        struct ScriptId {
+        // C# Script instance component for CoreCLR hosting
+        struct ScriptInstance {
         public:
-            uint32_t Id = 0;
+            uint64_t ManagedHandle = 0;   // Handle to C# object instance
+            uint32_t TypeHash = 0;        // Hash of script type name
+            bool Initialized = false;     // Whether OnStart() has been called
+            char TypeName[128] = {0};     // Script class name (e.g., "MyGame.PlayerController")
         };
-        static_assert(std::is_trivially_copyable_v<ScriptId>, "ScriptId must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<ScriptInstance>, "ScriptInstance must be trivially copyable");
 
         struct AudioSource {
         public:
             uint32_t CueId = 0;
-            uint32_t _Pad = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
-            uint8_t _Pad0 = 0, _Pad1 = 0, _Pad2 = 0;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
     }
