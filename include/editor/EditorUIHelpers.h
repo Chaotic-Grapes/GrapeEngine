@@ -85,7 +85,7 @@ namespace EditorUI {
 
     // This returns the content width constant
     // It helps set up scrolling area
-    constexpr float GetContentWidth() { return 700.0f; }
+    constexpr float GetContentWidth() { return 730.0f; }
 
 } // namespace EditorUI
 

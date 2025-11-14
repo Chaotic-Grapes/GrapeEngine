@@ -23,6 +23,7 @@ RESTORED FEATURES:
 
 #include "ecs/World.h"
 #include "../editor/ComponentInspectorUI.h"
+#include "../editor/EditorUIHelpers.h"
 #include <imgui.h>
 #include <string>
 #include <vector>
@@ -147,7 +148,6 @@ private:
 // -------------------------------------------------------------------------
 // Template Implementation (must be in header for template instantiation)
 // -------------------------------------------------------------------------
-
 template <typename T>
 void InspectorPanel::_renderComponentSection(const std::string& headerName, const std::string& componentType,
     nlohmann::json& data, T renderContent, bool canDelete) {
@@ -161,13 +161,16 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         const char* deleteIcon = "\xEE\xA1\xB2";
         ImVec2 contentCursorPos = ImGui::GetCursorPos();
 
-        // Calculate button position
+        // FIX: Calculate button position at full scrollable width edge (not just visible)
         ImGui::PushFont(m_symbolsFont);
         float iconWidth = ImGui::CalcTextSize(deleteIcon).x;
         float btnWidth = iconWidth + ImGui::GetStyle().FramePadding.x * 2.0f;
         ImGui::PopFont();
-        float rightVisible = ImGui::GetWindowContentRegionMax().x + ImGui::GetScrollX();
-        ImGui::SetCursorPosX(rightVisible - btnWidth);
+
+        // FIX: Use EditorUI::GetContentWidth() for the FULL SCROLLABLE width, not just visible
+        float deleteButtonX = EditorUI::GetContentWidth() - btnWidth;
+        float verticalOffset = 5.0f;  // ADJUST THIS to move it down more
+        ImGui::SetCursorPos(ImVec2(deleteButtonX, contentCursorPos.y + verticalOffset));
 
         // Render delete button
         if (!canDelete) ImGui::BeginDisabled();
@@ -191,7 +194,7 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
 
         // Restore cursor and render content
         ImGui::SetCursorPos(contentCursorPos);
-        ImGui::Dummy(ImVec2(0.0f, 10.0f));
+        ImGui::Dummy(ImVec2(0.0f, 5.0f));
         renderContent(data);
     }
 }

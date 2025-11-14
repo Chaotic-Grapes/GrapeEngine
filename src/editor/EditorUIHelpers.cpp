@@ -69,6 +69,8 @@ namespace EditorUI {
         float axisLabelWidth = ImGui::CalcTextSize("W").x;
         ImGui::SetCursorPosX(valueStartOffset + axisLabelWidth + FIELD_LABEL_GAP);
         ImGui::Text("%s", value.c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("(drag a texture here)");
     }
 
     // -------------------------------------------------------------------------

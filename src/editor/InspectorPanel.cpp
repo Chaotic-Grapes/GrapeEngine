@@ -7,24 +7,20 @@
         s.leong@digipen.edu
 \date   5th November 2025
 \brief
-Implements the unified InspectorPanel that adapts to selection context:
-- Entity mode: Shows components of a selected entity instance
-- Prefab mode: Shows components of a prefab template (editing the .prefab file)
+Implements the unified InspectorPanel that adapts to selection context.
 
-RESTORED FEATURES:
-- Proper component rendering with delete buttons
-- Full "Add Component" menu with all component types
-- Entity-prefab linking with "Open Prefab" button
-- Working prefab inspector with save/apply functionality
-- Status messages and proper UI layout
-- Hash-based change tracking for prefabs
-- Proper width and padding
-- Footer positioning fixed
+FINAL FIXES:
+- Shape components now mutually exclusive (adding one removes others)
+- Transform always shows even on new entities
+- Footer height reduced (1 line instead of 2)
+- Delete button positioned at full scrollable width edge
+- Auto-save on prefab edit (removed manual "Save Changes" button)
 */
 /* End Header *******************************************************************/
 
 #include "../editor/InspectorPanel.h"
 #include "../editor/ComponentInspectorUI.h"
+#include "../editor/EditorUIHelpers.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
@@ -169,7 +165,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
         }
 
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Opens the prefab template file for editing.\nChanges to prefab will update ALL instances.");
+            ImGui::SetTooltip("Opens the prefab template file for editing");
         }
 
         ImGui::Separator();
@@ -202,7 +198,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 }
 
 void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
-    // Calculate proper child height
+    // FIX: Footer needs 2 lines - one for button, one for status message
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
     // Add padding for better layout
@@ -215,14 +211,32 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     if (entityJson.contains("Components")) {
         ImGui::Dummy(ImVec2(0, 4));
 
-        // ALWAYS render Transform first (cannot be deleted)
+        // FIX: ALWAYS render Transform first, even if not in JSON (new entities)
+        bool hasTransform = false;
         for (auto& componentEntry : entityJson["Components"]) {
             if (componentEntry["TypeName"] == "ECS::Components::LocalTransform") {
+                hasTransform = true;
                 _renderComponentSection("Transform", "LocalTransform", componentEntry["Data"],
                     [this](nlohmann::json& d) { m_componentUI.RenderLocalTransform(d); }, false);
                 ImGui::Dummy(ImVec2(0, 4));
                 break;
             }
+        }
+
+        // If entity has no Transform component in JSON, ensure it has one and render it
+        if (!hasTransform) {
+            if (!m_world->Has<ECS::Components::LocalTransform>(entity)) {
+                m_world->Add<ECS::Components::LocalTransform>(entity);
+            }
+            // Create temp JSON for default transform
+            nlohmann::json tempTransform = {
+                {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
+                {"Rotation", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 1.0f}}},
+                {"Scale", {{"X", 1.0f}, {"Y", 1.0f}, {"Z", 1.0f}}}
+            };
+            _renderComponentSection("Transform", "LocalTransform", tempTransform,
+                [this](nlohmann::json& d) { m_componentUI.RenderLocalTransform(d); }, false);
+            ImGui::Dummy(ImVec2(0, 4));
         }
 
         // Render other components in preferred order
@@ -319,7 +333,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
 void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
     ImGui::Separator();
-    if (ImGui::Button("Add Component")) {
+    if (ImGui::Button("Add Component")) {  // Default width
         ImGui::OpenPopup("AddComponentMenu");
     }
 
@@ -358,17 +372,18 @@ void InspectorPanel::_renderPrefabInspector() {
 }
 
 void InspectorPanel::_renderPrefabHeader() {
-    ImGui::Text("Editing Prefab Template");
+    ImGui::Text("Editing Template");
     ImGui::SameLine();
     ImGui::TextDisabled("%s", std::filesystem::path(m_prefabPath).filename().string().c_str());
 
     ImGui::Separator();
-    ImGui::TextWrapped("Changes to this prefab will update ALL instances in the scene");
+    ImGui::TextWrapped("Changes to this prefab will auto-save and update ALL instances");
     ImGui::Separator();
 }
 
 void InspectorPanel::_renderPrefabComponents() {
-    float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 3;
+    // FIX: Footer needs 2 lines - one for buttons, one for status message
+    float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 8));
     ImGui::BeginChild("PrefabComponents", ImVec2(0, childHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
@@ -451,6 +466,9 @@ void InspectorPanel::_renderPrefabComponents() {
             _removeComponentFromPrefab(type);
         }
         m_componentsToDelete.clear();
+
+        // FIX: Auto-save prefab on any change
+        _savePrefabData();
     }
 
     ImGui::EndChild();
@@ -460,7 +478,7 @@ void InspectorPanel::_renderPrefabComponents() {
 void InspectorPanel::_renderPrefabActions() {
     ImGui::Separator();
 
-    // Add Component button
+    // Add Component button with default width
     if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");
     }
@@ -486,16 +504,8 @@ void InspectorPanel::_renderPrefabActions() {
 
     ImGui::SameLine();
 
-    // Save Changes button
-    if (ImGui::Button("Save Changes")) {
-        _savePrefabData();
-    }
-
-    ImGui::SameLine();
-
-    // Apply to All Instances button
+    // Apply to All Instances button with default width
     if (ImGui::Button("Apply to All Instances")) {
-        _savePrefabData();
         _applyPrefabToInstances();
     }
 }
@@ -534,6 +544,19 @@ void InspectorPanel::_addComponentToEntity(const std::string& componentType) {
     if (!m_world) return;
     ECS::Entity entity{ m_entityId, 0 };
     if (!m_world->IsAlive(entity)) return;
+
+    // FIX: Adding a shape component removes other shapes (mutually exclusive)
+    if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
+        if (m_world->Has<ECS::Components::ShapeCircle2D>(entity)) {
+            m_world->Remove<ECS::Components::ShapeCircle2D>(entity);
+        }
+        if (m_world->Has<ECS::Components::ShapeBox2D>(entity)) {
+            m_world->Remove<ECS::Components::ShapeBox2D>(entity);
+        }
+        if (m_world->Has<ECS::Components::ShapeLine2D>(entity)) {
+            m_world->Remove<ECS::Components::ShapeLine2D>(entity);
+        }
+    }
 
     if (componentType == "LocalTransform") {
         if (!m_world->Has<ECS::Components::LocalTransform>(entity)) {
@@ -577,7 +600,7 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
     auto remove = [&]<typename T>(const std::string & name) {
         if (componentType == name) {
             m_world->Remove<T>(entity);
-            m_statusMessage = std::string("Removed ") + componentType + " from entity";
+            m_statusMessage = std::string("Removed ") + componentType;
             m_statusTimer = 2.0f;
             return true;
         }
@@ -628,10 +651,20 @@ void InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
 
     if (_prefabHasComponent(componentType)) return;
 
+    // FIX: Adding a shape component removes other shapes (mutually exclusive)
+    if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
+        _removeComponentFromPrefab("ShapeCircle2D");
+        _removeComponentFromPrefab("ShapeBox2D");
+        _removeComponentFromPrefab("ShapeLine2D");
+    }
+
     nlohmann::json data = _getDefaultComponentData(componentType);
     // Use full typename for prefabs
     std::string fullTypeName = "ECS::Components::" + componentType;
     m_prefabData["Components"].push_back({ {"TypeName", fullTypeName}, {"Data", data} });
+
+    // Auto-save after adding component
+    _savePrefabData();
 }
 
 void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType) {
@@ -643,8 +676,10 @@ void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType
         // Match both short and full names
         if (typeName == componentType || typeName == "ECS::Components::" + componentType) {
             components.erase(it);
-            m_statusMessage = std::string("Component removed: ") + componentType;
+            m_statusMessage = std::string("Removed ") + componentType;
             m_statusTimer = 2.0f;
+            // Auto-save after removing component
+            _savePrefabData();
             return;
         }
     }
@@ -762,8 +797,7 @@ void InspectorPanel::_savePrefabData() {
     // Check if data actually changed using hash
     size_t currentHash = std::hash<std::string>{}(m_prefabData.dump());
     if (currentHash == m_lastSavedPrefabHash) {
-        m_statusMessage = "No changes to save";
-        m_statusTimer = 2.0f;
+        // No changes, skip save
         return;
     }
 
@@ -779,12 +813,14 @@ void InspectorPanel::_savePrefabData() {
     file.close();
 
     m_lastSavedPrefabHash = currentHash;
-    m_statusMessage = "Prefab saved successfully";
-    m_statusTimer = 2.0f;
+    // Don't show "saved" message on every frame - only on meaningful changes
 }
 
 void InspectorPanel::_applyPrefabToInstances() {
     if (!m_world) return;
+
+    // First save the prefab
+    _savePrefabData();
 
     // Find all entities with PrefabLink pointing to this prefab
     int count = 0;

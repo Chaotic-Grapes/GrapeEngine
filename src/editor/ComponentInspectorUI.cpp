@@ -43,15 +43,15 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Sprite", "Color", "Tiling", "Offset" });
 
     // --- uses layout helper for consistency ---
+    uint32_t tid = data.value("TextureId", 0);
+    std::string valueText = "TextureId: " + std::to_string(tid);
+
+    // Optionally show filename too
     std::string texPath = data.value("TexturePath", "");
-    std::string valueText;
     if (!texPath.empty()) {
-        valueText = std::filesystem::path(texPath).filename().string();
+        valueText += " (" + std::filesystem::path(texPath).filename().string() + ")";
     }
-    else {
-        uint32_t tid = data.value("TextureId", 0);
-        valueText = "TextureId: " + std::to_string(tid);
-    }
+
     EditorUI::RenderStaticValueRow("Sprite", valueText);
 
     bool dropped = false;
