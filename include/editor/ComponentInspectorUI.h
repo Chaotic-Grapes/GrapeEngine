@@ -65,6 +65,10 @@ public:
     // This edits shape line data
     // It updates the JSON fields
     void RenderShapeLine2D(nlohmann::json& data);
+    // This edits Audio src data
+    // It updates the JSON fields
+    void RenderAudioSource(nlohmann::json& data);
+
 
     // This edits projection and clipping
     // It writes values to the JSON data

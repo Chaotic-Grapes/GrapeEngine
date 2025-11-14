@@ -299,6 +299,16 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         });
     }
 
+    if (m_world->Has<ECS::Components::AudioSource>(entity)) {
+        renderComponent("Audio Source", [&]() {
+            auto& comp = m_world->Get<ECS::Components::AudioSource>(entity);
+            nlohmann::json j;
+            to_json(j, comp);                     // Component -> JSON
+            m_componentUI.RenderAudioSource(j);   // Draw + edit UI
+            from_json(j, comp);                   // JSON -> component
+            });
+    }
+
     ImGui::EndChild();
 }
 
@@ -321,6 +331,10 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
         }
         if (ImGui::MenuItem("Box Collider 2D") && !m_world->Has<ECS::Components::BoxCollider2D>(entity)) {
             m_world->Add<ECS::Components::BoxCollider2D>(entity);
+        }
+        if (ImGui::MenuItem("Audio Source") &&!m_world->Has<ECS::Components::AudioSource>(entity))
+        {
+            m_world->Add<ECS::Components::AudioSource>(entity);
         }
         ImGui::EndPopup();
     }

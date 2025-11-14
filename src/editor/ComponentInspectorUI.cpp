@@ -225,3 +225,38 @@ void ComponentUI::RenderCamera3D(nlohmann::json& data) {
 
     EditorUI::EndPropertySection();
 }
+
+// Render the Audio src component with property fields
+void ComponentUI::RenderAudioSource(nlohmann::json& data) {
+
+    // Begin drawing a grouped property section in the Inspector.
+    // The inner vector {"Cue", "Volume", "Pitch", "Loop"} is used for
+    // visual grouping
+    EditorUI::BeginPropertySection({ "Cue", "Volume", "Pitch", "Loop" });
+
+    // For now the CueId is rendered as a simple integer input box.
+    // Later, this can be replaced with a proper dropdown asset picker
+    //  "Cue Id"  -> label shown to the user
+    //  data      -> JSON object
+    //  "CueId"   -> JSON field name to read/write
+    EditorUI::RenderIntProperty("Cue Id", data, "CueId");
+
+    // Volume slider 
+    EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f);
+
+    // Pitch slider
+    EditorUI::RenderFloatRow("Pitch", "", data, "Pitch", 0.05f);
+
+    // Draws a checkbox UI for the boolean loop flag.
+    EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
+
+    //optional pick check boxes 
+    if (data.contains("PlayOnStart"))
+        EditorUI::RenderCheckboxProperty("Play On Start", data, "PlayOnStart");
+
+    if (data.contains("Spatial3D"))
+        EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
+
+    // End the grouped property block.
+    EditorUI::EndPropertySection();
+}
