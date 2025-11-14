@@ -179,6 +179,9 @@ namespace Engine {
         const float depth,
         const ECS::Components::PhysicsMaterial2D& physics
     ) {
+ 
+
+		(void)transformB;
 
         // Create a result structure to store collision outcome
         CollisionResult result{};
@@ -255,8 +258,6 @@ namespace Engine {
                     velB.Value += frictionVector * invMassB;
                 }
             }
-        }
-
         // ========================================================================
         // POSITION CORRECTION (push objects apart)
         // IMPROVED FOR THIN RECTANGLES
@@ -271,7 +272,7 @@ namespace Engine {
             // Calculate base correction
             float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
 
-
+         
             // This prevents balls from getting stuck in thin walls
             if (depth > slop * 2.0f) {
                 // Deep penetration - likely tunneled through thin wall
@@ -306,6 +307,8 @@ namespace Engine {
             }
         }
 
+
+        // Return the final collision result
         return result;
     }
 
