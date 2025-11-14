@@ -526,6 +526,7 @@ namespace ECS {
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
+            bool PlayOnStart = false;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
     }

@@ -33,6 +33,7 @@ References:
 #include "core/Logger.h"
 #include <vector>
 #include <services/ResourceManager.h>
+#include <iostream>
 
 // Initialize the asset library with the fonts used across the editor.
 // Stores font pointers so entries can mix icon and text styling.
@@ -143,6 +144,7 @@ void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::
         }
         // If item is file
         else {
+        
             _displayFile(entry.path(), selectedAsset);
         }
     }
