@@ -98,7 +98,7 @@ namespace ECS {
     namespace Components {
         // ---------------------------------- Core utility/tag components ----------------------------------
 
-        // Lightweight name (fixed-size). Avoids std::string to remain trivially copyable.
+        // Lightweight name (fixed-size).
         struct Name {
         public:
             // UTF-8 bytes, null-terminated if shorter than buffer. Keep small for cache.

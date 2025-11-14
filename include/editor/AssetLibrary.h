@@ -27,13 +27,15 @@ References:
 #include <filesystem>
 #include <imgui.h>
 
+namespace ECS { class World; }
+
 // Forward declarations
 struct ImFont;
-class AssetBrowser;            // Forward declare to use as friend
-class InspectorWindow;         // Forward declare to wire double-click open
+class AssetBrowserPanel;            // Forward declare to use as friend
+class InspectorPanel;         // Forward declare to wire double-click open
 
 class AssetLibrary {
-    friend class AssetBrowser; // Only AssetBrowser can access private members
+    friend class AssetBrowserPanel; // Only AssetBrowserPanel can access private members
 
 public:
     // This stores fonts used by the asset library UI
@@ -42,7 +44,8 @@ public:
 
     // This connects the inspector window
     // It enables opening prefabs from file entries
-    void SetInspector(InspectorWindow* inspector) { m_inspector = inspector; }
+    void SetInspector(InspectorPanel* inspector) { m_inspector = inspector; }
+    void SetWorld(ECS::World* world) { m_world = world; }
 
 private:
     // This shows the breadcrumb path bar
@@ -83,7 +86,8 @@ private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
-    InspectorWindow* m_inspector = nullptr;
+    InspectorPanel* m_inspector = nullptr;
+    ECS::World* m_world = nullptr;
 };
 
 #endif

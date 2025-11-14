@@ -34,6 +34,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <utility>
 #include <cassert>
 #include <functional>
+#include <algorithm>
 #include "ecs/Entity.h"
 #include "ecs/Archetype.h"
 #include "ecs/Components.h"
@@ -83,9 +84,11 @@ namespace ECS {
 
             // Reuse from free list if available
             if (!m_free.empty()) {
-                // If we have a free entity, reuse it instead
-                idx = m_free.back();
-                m_free.pop_back();
+                // Sort to always reuse lowest index first
+                std::sort(m_free.begin(), m_free.end());
+                // Takes from FRONT (lowest index)
+                idx = m_free.front();
+                m_free.erase(m_free.begin());
             }
             else {
                 // Create new entity based on current size of generations vector

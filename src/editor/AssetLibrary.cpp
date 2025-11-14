@@ -29,7 +29,7 @@ References:
 #endif
 
 #include "../editor/AssetLibrary.h"
-#include "../editor/InspectorWindow.h"
+#include "../editor/InspectorPanel.h"
 #include "core/Logger.h"
 #include <vector>
 #include <services/ResourceManager.h>
@@ -237,11 +237,11 @@ void AssetLibrary::_displaySelectedFileInfo(const std::string& selectedAsset) {
             auto fileSize = std::filesystem::file_size(selectedPath);
 
             // If less than 1KB, show in bytes
-            if (fileSize < 1024) {
-                ImGui::Text("Size: %llu bytes", fileSize);
+            if (fileSize < 1024ull) {
+                ImGui::Text("Size: %llu bytes", static_cast<unsigned long long>(fileSize));
             }
             // If less than 1MB, show in KB (divide by 1024)
-            else if (fileSize < 1024 * 1024) {
+            else if (fileSize < 1024ull * 1024ull) {
                 ImGui::Text("Size: %.2f KB", fileSize / 1024.0);
             }
             // Otherwise show in MB (divide by 1024 * 1024)
