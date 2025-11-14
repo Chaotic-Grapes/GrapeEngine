@@ -28,6 +28,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/OverlayService.h"
 #include <thread>
 
+
 namespace Engine {
     // Global pointer to the core engine
     Application* CORE = nullptr;
@@ -52,6 +53,20 @@ namespace Engine {
                 LOG_INFO("Loaded configuration from parent directory: ../config.json");
             }
         }
+
+        // Initialize the message system here
+        // Subscribe to Events
+        //auto& bus = EventBus::Get();
+
+        // Subscribe to action events
+        /*bus.subscribe<ActionPressed>([this](const ActionPressed& e) {
+            auto& busRef = EventBus::Get();
+            if (e.action == "ActiveCameraSwitch") {
+            std::cout << 'event action pressed';
+
+            }
+        }*/
+
 
 #if !_DEBUG
         if (consoleFlag)
@@ -92,6 +107,11 @@ namespace Engine {
             
             Time::_update(rawDelta, frameStart);
             Profiler::UpdateTime();
+
+            // if (5 second passed ){
+               // publish the event
+                //bus.publish(ActionPressed{ actionName });
+            //}
 
             // --- Input & Game Update ---
             Input::_processInput();
