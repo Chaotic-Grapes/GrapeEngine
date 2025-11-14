@@ -7,13 +7,19 @@
         s.leong@digipen.edu
 \date   5th November 2025
 \brief
-Declares the HierarchyPanel class for Unity-like hierarchy window UI.
-Provides entity management, tree structure display, drag-drop parenting,
-prefab instantiation and selection handling for scene editing.
+Declares the HierarchyPanel class which manages the hierarchy window used to
+browse and organise entities in a scene.
+
+The hierarchy presents the ECS world as a tree, letting the editor display
+parent-child relationships clearly. It handles selection, drag-drop reparenting,
+entity creation and deletion and supports prefab instantiation by accepting
+dragged prefab assets. Other editor panels use this class to stay updated on
+which entity the user is working with.
 */
 /* End Header *******************************************************************/
 
-#pragma once
+#ifndef HIERARCHY_PANEL_H
+#define HIERARCHY_PANEL_H
 
 #include "ecs/World.h"
 #include <imgui.h>
@@ -154,3 +160,5 @@ private:
     std::unordered_set<EntityId> m_expandedNodes; // Track which tree nodes are expanded
     SelectionCallback m_selectionCallback;        // Callback for selection change events
 };
+
+#endif
