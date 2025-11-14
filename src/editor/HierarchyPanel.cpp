@@ -7,9 +7,13 @@
         s.leong@digipen.edu
 \date   5th November 2025
 \brief
-Implements a hierarchy window UI for managing entities in a tree structure. Provides 
-entity creation, deletion, cloning, parenting and drag-drop functionality. Supports 
-prefab instantiation and entity selection with callback notifications.
+Implements the Hierarchy panel that shows all scene entities as a tree.
+
+The hierarchy gives a structured view of the active scene and is used to select
+entities, organize them through parent-child relationships and perform common
+editor actions like create, delete, clone and reparent through drag-drop. It also
+syncs with the inspector and viewport so selection stays consistent across the UI
+and supports prefab instantiation by accepting dragged prefab assets.
 */
 /* End Header *******************************************************************/
 
@@ -89,7 +93,7 @@ void HierarchyPanel::OnSelectionChanged(SelectionCallback callback) {
 // -------------------------------------------------------------------------
 
 // Render the hierarchy window with entity tree and controls
-// Handles entity selection, drag-drop, and keyboard shortcuts
+// Handles entity selection, drag-drop and keyboard shortcuts
 void HierarchyPanel::Render() {
     // Push main font for consistent text styling
     if (m_mainFont) ImGui::PushFont(m_mainFont);
@@ -110,8 +114,8 @@ void HierarchyPanel::Render() {
     _renderEntityTree();       // Main entity tree with drag-drop
     _renderFooterButtons();    // Footer buttons like Clear All
 
-    // Handle delete key for selected entity - global keyboard shortcut
-    if (Input::IsKeyPressed(KEY_DELETE)) {
+    // Handle delete key for selected entity: global keyboard shortcut
+    if (Input::IsKeyDown(KEY_DELETE)) {
         _deleteEntity(m_selectedEntityId);
     }
 
@@ -227,7 +231,7 @@ void HierarchyPanel::_renderFooterButtons() {
 // -------------------------------------------------------------------------
 
 // Render a single entity tree node and its children recursively
-// Handles selection, drag source, and drop target logic
+// Handles selection, drag source and drop target logic
 // Depth parameter tracks recursion level for indentation
 void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     // Resolve (i.e. turn) entity ID to entity object and check if valid
