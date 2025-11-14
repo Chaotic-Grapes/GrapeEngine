@@ -180,6 +180,7 @@ namespace Engine {
         const ECS::Components::PhysicsMaterial2D& physics
     ) {
 
+ 
         // Create a result structure to store collision outcome
         CollisionResult result{};
         result.Collided = true;          // Mark collision as valid
@@ -272,6 +273,7 @@ namespace Engine {
             float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
 
 
+         
             // This prevents balls from getting stuck in thin walls
             if (depth > slop * 2.0f) {
                 // Deep penetration - likely tunneled through thin wall
