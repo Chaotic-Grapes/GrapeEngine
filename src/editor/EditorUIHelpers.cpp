@@ -203,20 +203,42 @@ namespace EditorUI {
         _ensureObject(colorData);
         ImGui::Text("%s", _displayLabel(label).c_str());
 
+#if 0
+        // WORK IN PROGRESS; DON'T DELETE ANYTHING HERE
+        // OLD CODE: This was causing HDR values to be divided by 255 every frame
+        // When you entered "2.0" in the color picker, it would:
+        // 1. Store 2.0 to JSON
+        // 2. Next frame: read 2.0, see it's > 1.0, divide by 255 => 0.00784
+        // 3. This created an infinite loop of division, clamping HDR colors to tiny values
+        // The lambda was designed for legacy 0-255 integer format, but we're using HDR floats (0.0 to inf)
         auto get = [&](const char* k) {
             float v = colorData.value(k, 1.0f);
             return (v > 1.0f) ? v / 255.0f : v;
             };
-
         float col[4] = { get("R"), get("G"), get("B"), get("A") };
-        const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+#else
+        // Not fixed yet, color stores beyond LDR but rendering is not right
+        // NEW CODE: Read HDR float values directly without conversion
+        // HDR colors are stored as floats in the range [0.0, INF), so no conversion needed
+        float col[4] = {
+            colorData.value("R", 1.0f),
+            colorData.value("G", 1.0f),
+            colorData.value("B", 1.0f),
+            colorData.value("A", 1.0f)
+        };
+#endif
 
+        const float axisLabelWidth = ImGui::CalcTextSize("W").x;
         ImGui::SameLine();
         ImGui::SetCursorPosX(valueStartOffset + axisLabelWidth + FIELD_LABEL_GAP);
         ImGui::SetNextItemWidth(220.0f);
         if (ImGui::ColorEdit4(("##" + label).c_str(), col,
-            ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar |
-            ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel))
+            ImGuiColorEditFlags_NoInputs |
+            ImGuiColorEditFlags_AlphaBar |
+            ImGuiColorEditFlags_NoLabel |
+            ImGuiColorEditFlags_PickerHueWheel |
+            ImGuiColorEditFlags_HDR |    // <-- Enable HDR
+            ImGuiColorEditFlags_Float))  // <-- Optional but recommended for HDR
         {
             colorData["R"] = col[0];
             colorData["G"] = col[1];
