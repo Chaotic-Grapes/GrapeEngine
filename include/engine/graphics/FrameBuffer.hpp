@@ -100,7 +100,7 @@ public:
             : 0;
     }
 
-    GLuint GetID() const { return fbo; }           // if you haven't already
+    GLuint GetID() const { return fbo; }
     int     Width() const { return width; }
     int     Height() const { return height; }
 
