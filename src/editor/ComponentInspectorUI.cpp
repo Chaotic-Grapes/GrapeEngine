@@ -18,6 +18,7 @@ Implements unified component rendering UI for both entity inspection and prefab 
 #include "serialization/EntitySerializer.h"
 #include "services/ResourceManager.h"
 #include <algorithm>
+#include "../editor/AudioAssetLibrary.h"
 
 // Initialize the component UI with editor fonts for consistent styling.
 // Stores font pointers so sections can mix text and iconography.
@@ -234,29 +235,186 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data) {
     // visual grouping
     EditorUI::BeginPropertySection({ "Cue", "Volume", "Pitch", "Loop" });
 
-    // For now the CueId is rendered as a simple integer input box.
-    // Later, this can be replaced with a proper dropdown asset picker
-    //  "Cue Id"  -> label shown to the user
-    //  data      -> JSON object
-    //  "CueId"   -> JSON field name to read/write
-    EditorUI::RenderIntProperty("Cue Id", data, "CueId");
+    // we'll be using lots of this
+    using Clip = AudioAssetLibrary::ClipInfo;
 
-    // Volume slider 
+    // Reference to the global audio asset database.
+    // This contains the list of all audio clips found under assets/Audio
+    // basically library access
+    AudioAssetLibrary& lib = AudioAssetLibrary::Get();
+
+    // Read current CueId from JSON; default to 0 if not present.
+   // 0 means "no clip assigned" in our convention.
+    uint32_t cueId = data.value("CueId", 0u);
+
+
+    // Try to find a clip in the library that matches this CueId.
+    // If not found, 'current' will be nullptr, and we display "<none>".
+    const Clip* current = lib.FindById(cueId);
+
+
+    //Used for the error pop ups for unsupported file types
+    static bool s_showUnsupportedPopup = false;    // flag for whether to show popup
+    static std::string s_unsupportedPath;          // path that caused error
+
+
+    // Build the label for the cue selection button.
+    // If we have a valid clip, show its name (file name without extension),
+    // otherwise show "<none>".
+    std::string cueLabel = current ? current->name : std::string("None (Audio Clip)");
+
+    // Audio Clip name
+    ImGui::Text("Audio Clip");
+
+    // Store the cursor position where the button will appear
+    ImVec2 buttonPos = ImGui::GetCursorScreenPos();
+
+    // Main cue selection button.
+    //
+    // This behaves like Unity's object field: clicking it opens a popup
+    // where the user can choose one of the available audio clips.
+    //
+    // ImVec2(-FLT_MIN, 0) means:
+    //   - width: take the full available width in the layout
+    //   - height: automatic
+    if (ImGui::Button(cueLabel.c_str(), ImVec2(-FLT_MIN, 0))) {
+        ImGui::OpenPopup("AudioClipPicker");
+    }
+
+    // Force popup to appear directly under the button
+    if (ImGui::BeginPopup("AudioClipPicker"))
+    {
+        // Move popup to align with the button (like Unity does)
+        ImGui::SetWindowPos(ImVec2(buttonPos.x, buttonPos.y + ImGui::GetFrameHeight()));
+
+        // Now draw all selectable clips
+        for (const Clip& clip : lib.GetAllClips())
+        {
+            bool selected = (clip.id == cueId);
+            if (ImGui::Selectable(clip.name.c_str(), selected))
+            {
+                data["CueId"] = clip.id;
+                cueId = clip.id;
+            }
+        }
+
+        ImGui::EndPopup();
+    }
+
+    // Drag-and-drop target for assigning a clip.
+    //
+    // This lets the user drag a file from the AssetBrowser (which sets a
+    // payload of type "ASSET_PATH") and drop it onto the cue area.
+    //
+    // That payload contains a C-string of the file path (relative or absolute,
+    // depending on how AssetBrowser is set up).
+    if (ImGui::BeginDragDropTarget())
+    {
+        // Accept payloads tagged as "ASSET_PATH".
+        // This must match the string used in AssetLibrary::_displayFile when
+        // calling ImGui::SetDragDropPayload("ASSET_PATH", ...).
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH"))
+        {
+            // Payload data is the path string (including null terminator).
+            const char* droppedPath = static_cast<const char*>(payload->Data);
+            std::string fullPath = droppedPath;
+
+            // We only want to handle supported audio files.
+            // Check the file extension: .wav, .ogg, .mp3, .flac
+            std::string ext = std::filesystem::path(fullPath).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            if (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac")
+            {
+                // If the path is absolute but your library expects project-relative
+                // paths (e.g., "assets/Audio/..."), you may want to convert here.
+                // For now, we assume 'fullPath' is consistent with what Refresh()
+                // sees and Normalize() inside AudioAssetLibrary.
+
+                // Register the file in the library if it doesn't already exist.
+                // This returns a ClipInfo with a generated id, name, and normalized path.
+                const Clip& info = lib.Register(fullPath);
+
+                // Store the new CueId into JSON.
+                data["CueId"] = info.id;
+                cueId = info.id;
+            }
+            else
+            {
+                // Mark that we need to show the unsupported popup.
+                s_showUnsupportedPopup = true;
+                s_unsupportedPath = fullPath;
+
+                // Open the popup 
+                ImGui::OpenPopup("Unsupported Audio Format");
+            }
+        }
+
+        ImGui::EndDragDropTarget();
+    }
+
+    // Volume slider / input.
+    //
+    // This calls your existing helper that:
+    //  - shows a labeled float row
+    //  - binds it to data["Volume"]
+    //  - uses 0.05f as the step for adjustment
     EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f);
 
-    // Pitch slider
+    // Pitch slider / input.
     EditorUI::RenderFloatRow("Pitch", "", data, "Pitch", 0.05f);
 
-    // Draws a checkbox UI for the boolean loop flag.
+    // Loop checkbox.
     EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
 
-    //optional pick check boxes 
+    // Optional flags if you added them to AudioSource and JSON:
     if (data.contains("PlayOnStart"))
         EditorUI::RenderCheckboxProperty("Play On Start", data, "PlayOnStart");
 
     if (data.contains("Spatial3D"))
         EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
 
-    // End the grouped property block.
+    // End the Ui section
     EditorUI::EndPropertySection();
+
+    if (s_showUnsupportedPopup)
+    {
+        // Center the popup on the main viewport
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 center = viewport->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing,
+            ImVec2(0.5f, 0.5f)); // 0.5,0.5 = center
+        
+        //set popup sizing
+        ImGui::SetNextWindowSize(ImVec2(450, 230), ImGuiCond_Appearing);
+
+        // Begin a modal popup; user must acknowledge it
+        if (ImGui::BeginPopupModal("Unsupported Audio Format",
+            nullptr,
+            ImGuiWindowFlags_NoResize | // No resizing
+            ImGuiWindowFlags_NoMove)) // No moves
+        {   
+            ImGui::TextWrapped(
+                "The file you tried to assign is not a supported audio format.\n\n"
+                "Only .wav, .ogg, .mp3, and .flac files are allowed."
+            );
+
+            ImGui::Separator();
+
+            // Ok button closes the popup and clears the flag
+            if (ImGui::Button("OK", ImVec2(120, 0)))
+            {
+                s_showUnsupportedPopup = false;
+                s_unsupportedPath.clear();
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+        else
+        {
+            //to just reset this flag to get out of this popup incase
+            s_showUnsupportedPopup = false;
+        }
+    }
 }

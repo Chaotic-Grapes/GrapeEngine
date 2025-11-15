@@ -19,6 +19,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include <imgui_internal.h>
 #include <core/Application.h>
 #include "services/Time.h"
+#include "../editor/AudioAssetLibrary.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
@@ -187,6 +188,11 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     auto& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
+
+    // Initialize audio asset library:
+    // this will scan for folder assets/Audio
+    AudioAssetLibrary::Get().Refresh("assets/Audio");
+
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
     _loadFonts();
 
