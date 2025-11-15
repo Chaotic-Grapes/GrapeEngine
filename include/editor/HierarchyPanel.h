@@ -124,7 +124,8 @@ private:
     // -------------------------------------------------------------------------
 
     // Instantiate a prefab file as a child of the specified parent entity
-    void _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
+    // Returns the entity ID of the newly created instance
+    EntityId _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
 
     // -------------------------------------------------------------------------
     // Helper Methods
@@ -144,9 +145,9 @@ private:
     // -------------------------------------------------------------------------
 
     // Font references for UI styling
-    ImFont* m_mainFont = nullptr;      
-    ImFont* m_boldFont = nullptr;      
-    ImFont* m_symbolsFont = nullptr;   
+    ImFont* m_mainFont = nullptr;
+    ImFont* m_boldFont = nullptr;
+    ImFont* m_symbolsFont = nullptr;
 
     // System references
     ECS::World* m_world = nullptr;                // ECS world containing all entities and components

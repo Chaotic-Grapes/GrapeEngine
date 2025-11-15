@@ -7,18 +7,14 @@
 \brief
 Provides unified component rendering UI for both entity inspection and prefab editing.
 
-Features:
-- Reusable component rendering functions for all component types
-- JSON-based interface works with both live entities and prefab files
-- Bidirectional conversion between C++ components and JSON representation
-- Consistent UI layout across entity inspector and prefab editor
-
-References:
-- ImGui documentation for UI widgets and styling
-- nlohmann/json for data manipulation
-- EditorUIHelpers for property rendering widgets
+This class handles the visual editing of all component types through a JSON-based 
+interface. It provides rendering functions for each component type that modify JSON 
+data directly. The same UI functions work for both live entities (via JSON conversion) 
+and prefab files. Component data is converted to JSON for editing then applied back 
+to C++ components.
 */
 /* End Header *******************************************************************/
+
 #ifndef COMPONENT_INSPECTOR_UI_H
 #define COMPONENT_INSPECTOR_UI_H
 
@@ -29,53 +25,44 @@ References:
 
 class ComponentUI {
 public:
-    // This sets fonts for component UI
-    // It keeps headers labels and icons consistent
+    // Sets fonts for component UI rendering to maintain visual consistency across all inspectors
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
 
-    // Render functions that work on BOTH JSON and live components
-    // Updated to match new ECS::Components namespace
-    // This edits position rotation and scale
-    // It writes values back to the JSON data
-    void RenderLocalTransform(nlohmann::json& data);        
-    // This edits sprite material and tint
-    // It writes changes to the JSON data
-    void RenderSpriteRenderer2D(nlohmann::json& data);      
-    // This edits mass drag and gravity toggle
-    // It applies values to the JSON data
-    void RenderRigidbody2D(nlohmann::json& data);           
-    // This edits linear velocity
-    // It updates the JSON values
+    // Renders transform properties including position, rotation and scale values
+    void RenderLocalTransform(nlohmann::json& data);
+
+    // Renders sprite properties including material reference and color tint values
+    void RenderSpriteRenderer2D(nlohmann::json& data);
+
+    // Renders physics body properties including mass, drag and gravity settings
+    void RenderRigidbody2D(nlohmann::json& data);
+
+    // Renders linear velocity vector for 2D movement with X and Y components
     void RenderLinearVelocity2D(nlohmann::json& data);
-    // This edits angular velocity
-    // It updates the JSON values
+
+    // Renders angular velocity for rotation around Z-axis in radians per second
     void RenderAngularVelocity2D(nlohmann::json& data);
-    // This edits radius and offset
-    // It writes data to JSON
-    void RenderCircleCollider2D(nlohmann::json& data);      
-    // This edits size and offset
-    // It writes data to JSON
-    void RenderBoxCollider2D(nlohmann::json& data);         
-    // This edits shape circle data
-    // It updates the JSON fields
-    void RenderShapeCircle2D(nlohmann::json& data);         
-    // This edits shape box data
-    // It updates the JSON fields
-    void RenderShapeBox2D(nlohmann::json& data);            
-    // This edits shape line data
-    // It updates the JSON fields
+
+    // Renders circle collider properties including radius and center offset values
+    void RenderCircleCollider2D(nlohmann::json& data);
+
+    // Renders box collider properties including width, height and offset values
+    void RenderBoxCollider2D(nlohmann::json& data);
+
+    // Renders circle shape properties for visual representation including radius
+    void RenderShapeCircle2D(nlohmann::json& data);
+
+    // Renders box shape properties for visual representation including dimensions
+    void RenderShapeBox2D(nlohmann::json& data);
+
+    // Renders line shape properties including start and end point coordinates
     void RenderShapeLine2D(nlohmann::json& data);
 
-    // This edits projection and clipping
-    // It writes values to the JSON data
+    // Renders camera properties including projection type and near/far clipping planes
     void RenderCamera3D(nlohmann::json& data);
 
-    // This lets us use ONE set of Render*() functions for BOTH prefabs and entities
-    // Prefabs store data as JSON files that can be edited directly
-    // Entities store data as C++ structs in memory that need conversion to edit with the same UI
-
-    // This turns a C++ component into JSON
-    // It uses to_json to fill the data
+    // Converts C++ component to JSON format for unified editing interface
+    // Uses auto-generated to_json functions from NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE macros
     template<typename T>
     nlohmann::json ComponentToJson(const T& component) {
         nlohmann::json j;
@@ -83,23 +70,18 @@ public:
         return j;
     }
 
-    // This applies JSON back to a C++ component
-    // It uses from_json to set fields
+    // Applies JSON data back to C++ component after UI modifications are complete
+    // Uses auto-generated from_json functions for bidirectional data conversion
     template<typename T>
     void JsonToComponent(const nlohmann::json& data, T& component) {
         from_json(data, component);
     }
 
-    // Uses to_json/from_json (auto-generated by NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE)
-    // Round-trip: ComponentToJson -> UI edits `Data` -> JsonToComponent
-
 private:
-    // Main font for standard text
-    ImFont* m_mainFont;
-    // Bold font for headers and labels
-    ImFont* m_boldFont;
-    // Symbols font for icons and glyphs
-    ImFont* m_symbolsFont;
+    // Font references for UI styling
+    ImFont* m_mainFont;     
+    ImFont* m_boldFont;       
+    ImFont* m_symbolsFont; 
 };
 
 #endif

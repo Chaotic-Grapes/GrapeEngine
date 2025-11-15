@@ -193,7 +193,23 @@ namespace Serialization {
 			entityJson["EntityId"] = ECS::EntityUtils::Pack(e);
 			entityJson["Components"] = json::array();
 
+			// CREATE SORTED COMPONENT LIST
+			std::vector<std::pair<TypeId, ComponentInfo>> sortedComponents;
 			for (const auto& [tid, info] : Registry()) {
+				sortedComponents.emplace_back(tid, info);
+			}
+
+			// SORT: Transform first, then alphabetical
+			std::sort(sortedComponents.begin(), sortedComponents.end(),
+				[](const auto& a, const auto& b) {
+					// Transform always comes first
+					if (a.second.Name == "LocalTransform") return true;
+					if (b.second.Name == "LocalTransform") return false;
+					// Everything else alphabetical
+					return a.second.Name < b.second.Name;
+				});
+
+			for (const auto& [tid, info] : sortedComponents) {
 				json compJson;
 				info.Serialize(world, e, compJson);
 				if (!compJson.is_null() && !compJson.empty()) {

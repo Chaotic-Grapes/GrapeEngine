@@ -5,22 +5,27 @@
         Samantha Leong (20%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
-\date   5th November 2025
+\date   15th November 2025
 \brief
 Implements the unified InspectorPanel that adapts to selection context.
 
-FINAL FIXES:
-- Shape components now mutually exclusive (adding one removes others)
-- Transform always shows even on new entities
-- Footer height reduced (1 line instead of 2)
+FEATURES:
+- Shape components mutually exclusive (adding one removes others)
+- Transform always shows on all entities (added automatically via registry)
+- "Save as Prefab" button exports entities to assets/prefabs/ directory
+- Footer height optimized (1 line)
 - Delete button positioned at full scrollable width edge
-- Auto-save on prefab edit (removed manual "Save Changes" button)
+- Auto-save on prefab edit (no manual "Save Changes" button)
+- Component registry eliminates repetitive component handling code
+- Empty prefabs get default Transform component when opened
+- Prefab dragging onto hierarchy creates entity with PrefabLink component
 */
 /* End Header *******************************************************************/
 
 #include "../editor/InspectorPanel.h"
 #include "../editor/ComponentInspectorUI.h"
 #include "../editor/EditorUIHelpers.h"
+#include "../editor/ComponentRegistryUI.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
@@ -56,7 +61,18 @@ void InspectorPanel::InspectEntity(EntityId id) {
         return;
     }
     ECS::Entity e{ id, 0 };
-    m_mode = m_world->IsAlive(e) ? InspectionMode::Entity : InspectionMode::None;
+    if (!m_world->IsAlive(e)) {
+        m_mode = InspectionMode::None;
+        return;
+    }
+
+    // Ensure all entities have Transform component (mandatory) - add immediately
+    const auto* transformMeta = ComponentRegistryUI::Find("LocalTransform");
+    if (transformMeta && !transformMeta->HasComponent(m_world, e)) {
+        transformMeta->AddComponent(m_world, e, transformMeta->GetDefaults());
+    }
+
+    m_mode = InspectionMode::Entity;
 }
 
 void InspectorPanel::InspectPrefab(const std::string& path) {
@@ -75,13 +91,66 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
     }
 
     try {
-        m_prefabData = nlohmann::json::parse(file);
+        // Read file content
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         file.close();
+
+        // Handle empty or whitespace-only files - create minimal valid structure
+        if (content.empty() || content.find_first_not_of(" \t\n\r") == std::string::npos) {
+            // Empty file gets default Transform component
+            const auto* transformMeta = ComponentRegistryUI::Find("LocalTransform");
+            nlohmann::json defaultTransform = transformMeta ? transformMeta->GetDefaults() : nlohmann::json::object();
+
+            m_prefabData = nlohmann::json{
+                {"Components", nlohmann::json::array({
+                    {{"TypeName", "ECS::Components::LocalTransform"}, {"Data", defaultTransform}}
+                })}
+            };
+
+            m_prefabPath = path;
+            m_lastSavedPrefabHash = 0; // Force save on first edit
+            m_mode = InspectionMode::Prefab;
+
+            // Auto-save the default structure to disk
+            _savePrefabData();
+
+            m_statusMessage = "Opened empty prefab, added Transform";
+            m_statusTimer = 2.0f;
+            return;
+        }
+
+        // Parse existing JSON content
+        m_prefabData = nlohmann::json::parse(content);
+
+        // Debug logging
+        LOG_INFO("Loaded prefab: " << path);
+        LOG_INFO("Prefab JSON keys: " << m_prefabData.dump());
+
+        // Ensure Components array exists
+        if (!m_prefabData.contains("Components")) {
+            LOG_WARNING("Prefab missing Components key, creating empty array");
+            m_prefabData["Components"] = nlohmann::json::array();
+        }
+
+        // Validate Components is actually an array
+        if (!m_prefabData["Components"].is_array()) {
+            LOG_ERROR("Prefab Components is not an array, type: " << m_prefabData["Components"].type_name());
+            m_statusMessage = "Failed: Invalid prefab format (Components not array)";
+            m_statusTimer = 3.0f;
+            m_mode = InspectionMode::None;
+            return;
+        }
+
+        // Log component count
+        LOG_INFO("Prefab has " << m_prefabData["Components"].size() << " components");
+
         m_prefabPath = path;
         m_lastSavedPrefabHash = std::hash<std::string>{}(m_prefabData.dump());
         m_mode = InspectionMode::Prefab;
     }
     catch (const std::exception& e) {
+        m_statusMessage = "Failed: Invalid JSON in prefab";
+        m_statusTimer = 3.0f;
         m_mode = InspectionMode::None;
         LOG_ERROR("Failed to parse prefab JSON: " << e.what());
     }
@@ -177,10 +246,18 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
         ImGui::SameLine();
         ImGui::TextDisabled("None (drag .prefab here to link)");
 
+        // BeginDragDropTarget creates an invisible rectangular region over the last drawn item
+        // where drag-and-drop payloads can be received when the mouse releases
         if (ImGui::BeginDragDropTarget()) {
+            // AcceptDragDropPayload checks if payload type matches and returns data if mouse released
+            // returns nullptr if no valid payload or wrong type
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+                // Payload->Data is void* pointer to dragged string data
+                // cast to const char* to read as C-string
                 std::string droppedPath = static_cast<const char*>(payload->Data);
                 if (std::filesystem::path(droppedPath).extension() == ".prefab") {
+                    // Add PrefabLink component to entity with the prefab path
+                    // this connects the entity to the prefab template file
                     m_world->Add<ECS::Components::PrefabLink>(entity, droppedPath);
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
@@ -198,7 +275,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 }
 
 void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
-    // FIX: Footer needs 2 lines - one for button, one for status message
+    // Footer needs 2 lines: one for button row, one for status message
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
     // Add padding for better layout
@@ -208,89 +285,25 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     // Serialize entity to JSON for unified editing
     nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
 
-    if (entityJson.contains("Components")) {
+    if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
         ImGui::Dummy(ImVec2(0, 4));
 
-        // FIX: ALWAYS render Transform first, even if not in JSON (new entities)
-        bool hasTransform = false;
+        // Render components using registry
+        // match components from JSON with registry entries
         for (auto& componentEntry : entityJson["Components"]) {
-            if (componentEntry["TypeName"] == "ECS::Components::LocalTransform") {
-                hasTransform = true;
-                _renderComponentSection("Transform", "LocalTransform", componentEntry["Data"],
-                    [this](nlohmann::json& d) { m_componentUI.RenderLocalTransform(d); }, false);
-                ImGui::Dummy(ImVec2(0, 4));
-                break;
-            }
-        }
+            // Validate component entry structure before accessing fields
+            if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
+            if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
 
-        // If entity has no Transform component in JSON, ensure it has one and render it
-        if (!hasTransform) {
-            if (!m_world->Has<ECS::Components::LocalTransform>(entity)) {
-                m_world->Add<ECS::Components::LocalTransform>(entity);
-            }
-            // Create temp JSON for default transform
-            nlohmann::json tempTransform = {
-                {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
-                {"Rotation", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 1.0f}}},
-                {"Scale", {{"X", 1.0f}, {"Y", 1.0f}, {"Z", 1.0f}}}
-            };
-            _renderComponentSection("Transform", "LocalTransform", tempTransform,
-                [this](nlohmann::json& d) { m_componentUI.RenderLocalTransform(d); }, false);
-            ImGui::Dummy(ImVec2(0, 4));
-        }
+            std::string typeName = componentEntry["TypeName"];
+            const auto* meta = ComponentRegistryUI::Find(typeName);
 
-        // Render other components in preferred order
-        const std::vector<std::string> orderedTypes = {
-            "ECS::Components::Camera3D",
-            "ECS::Components::SpriteRenderer2D",
-            "ECS::Components::Rigidbody2D",
-            "ECS::Components::CircleCollider2D",
-            "ECS::Components::BoxCollider2D",
-            "ECS::Components::ShapeCircle2D",
-            "ECS::Components::ShapeBox2D",
-            "ECS::Components::ShapeLine2D"
-        };
-
-        for (const auto& type : orderedTypes) {
-            for (auto& componentEntry : entityJson["Components"]) {
-                if (componentEntry["TypeName"] != type) continue;
+            if (meta) {
                 auto& data = componentEntry["Data"];
-
-                if (type == "ECS::Components::SpriteRenderer2D") {
-                    _renderComponentSection("Sprite Renderer", "SpriteRenderer2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderSpriteRenderer2D(d); });
-                }
-                else if (type == "ECS::Components::Rigidbody2D") {
-                    _renderComponentSection("Rigidbody 2D", "Rigidbody2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderRigidbody2D(d); });
-                }
-                else if (type == "ECS::Components::CircleCollider2D") {
-                    _renderComponentSection("Circle Collider 2D", "CircleCollider2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderCircleCollider2D(d); });
-                }
-                else if (type == "ECS::Components::BoxCollider2D") {
-                    _renderComponentSection("Box Collider 2D", "BoxCollider2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderBoxCollider2D(d); });
-                }
-                else if (type == "ECS::Components::ShapeCircle2D") {
-                    _renderComponentSection("Shape Circle", "ShapeCircle2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderShapeCircle2D(d); });
-                }
-                else if (type == "ECS::Components::ShapeBox2D") {
-                    _renderComponentSection("Shape Box", "ShapeBox2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderShapeBox2D(d); });
-                }
-                else if (type == "ECS::Components::ShapeLine2D") {
-                    _renderComponentSection("Shape Line", "ShapeLine2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderShapeLine2D(d); });
-                }
-                else if (type == "ECS::Components::Camera3D") {
-                    _renderComponentSection("Camera 3D", "Camera3D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderCamera3D(d); });
-                }
-
+                _renderComponentSection(meta->DisplayName, meta->TypeName, data,
+                    [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); },
+                    meta->CanDelete);
                 ImGui::Dummy(ImVec2(0, 4));
-                break;
             }
         }
 
@@ -302,28 +315,14 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         // Write modified JSON back to entity components
         for (const auto& componentEntry : entityJson["Components"]) {
+            if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
+            if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
+
             std::string typeName = componentEntry["TypeName"];
-
-            auto applyComponent = [&]<typename T>(const std::string & name) {
-                if (typeName == name) {
-                    if (m_world->Has<T>(entity)) {
-                        auto& comp = m_world->Get<T>(entity);
-                        from_json(componentEntry["Data"], comp);
-                    }
-                    return true;
-                }
-                return false;
-            };
-
-            if (applyComponent.operator() < ECS::Components::LocalTransform > ("ECS::Components::LocalTransform")) continue;
-            if (applyComponent.operator() < ECS::Components::SpriteRenderer2D > ("ECS::Components::SpriteRenderer2D")) continue;
-            if (applyComponent.operator() < ECS::Components::Rigidbody2D > ("ECS::Components::Rigidbody2D")) continue;
-            if (applyComponent.operator() < ECS::Components::CircleCollider2D > ("ECS::Components::CircleCollider2D")) continue;
-            if (applyComponent.operator() < ECS::Components::BoxCollider2D > ("ECS::Components::BoxCollider2D")) continue;
-            if (applyComponent.operator() < ECS::Components::ShapeCircle2D > ("ECS::Components::ShapeCircle2D")) continue;
-            if (applyComponent.operator() < ECS::Components::ShapeBox2D > ("ECS::Components::ShapeBox2D")) continue;
-            if (applyComponent.operator() < ECS::Components::ShapeLine2D > ("ECS::Components::ShapeLine2D")) continue;
-            if (applyComponent.operator() < ECS::Components::Camera3D > ("ECS::Components::Camera3D")) continue;
+            const auto* meta = ComponentRegistryUI::Find(typeName);
+            if (meta) {
+                meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
+            }
         }
     }
 
@@ -333,8 +332,16 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
 void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
     ImGui::Separator();
-    if (ImGui::Button("Add Component")) {  // Default width
+
+    // Add Component button
+    if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");
+    }
+
+    // Save as Prefab button next to Add Component
+    ImGui::SameLine();
+    if (ImGui::Button("Save as Prefab")) {
+        _saveEntityAsPrefab(entity);
     }
 
     if (ImGui::BeginPopup("AddComponentMenu")) {
@@ -343,15 +350,10 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
         ImGui::PopFont();
         ImGui::Separator();
 
-        _renderComponentMenuItem("Transform", "LocalTransform");
-        _renderComponentMenuItem("Sprite Renderer", "SpriteRenderer2D");
-        _renderComponentMenuItem("Rigidbody 2D", "Rigidbody2D");
-        _renderComponentMenuItem("Circle Collider 2D", "CircleCollider2D");
-        _renderComponentMenuItem("Box Collider 2D", "BoxCollider2D");
-        _renderComponentMenuItem("Shape Circle", "ShapeCircle2D");
-        _renderComponentMenuItem("Shape Box", "ShapeBox2D");
-        _renderComponentMenuItem("Shape Line", "ShapeLine2D");
-        _renderComponentMenuItem("Camera 3D", "Camera3D");
+        // Render all components from registry
+        for (const auto& meta : ComponentRegistryUI::GetAll()) {
+            _renderComponentMenuItem(meta.DisplayName.c_str(), meta.TypeName.c_str());
+        }
 
         ImGui::EndPopup();
     }
@@ -382,7 +384,7 @@ void InspectorPanel::_renderPrefabHeader() {
 }
 
 void InspectorPanel::_renderPrefabComponents() {
-    // FIX: Footer needs 2 lines - one for buttons, one for status message
+    // Footer needs 2 lines: one for buttons, one for status message
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 8));
@@ -391,73 +393,40 @@ void InspectorPanel::_renderPrefabComponents() {
     if (m_prefabData.contains("Components") && m_prefabData["Components"].is_array()) {
         ImGui::Dummy(ImVec2(0, 4));
 
-        // ALWAYS render Transform first
-        for (auto& componentEntry : m_prefabData["Components"]) {
+        int componentsRendered = 0;
+
+        // SORT PREFAB COMPONENTS: Transform first, then alphabetical (same as EntitySerializer)
+        auto& componentsArray = m_prefabData["Components"];
+        std::sort(componentsArray.begin(), componentsArray.end(),
+            [](const nlohmann::json& a, const nlohmann::json& b) {
+                std::string nameA = a.value("TypeName", "");
+                std::string nameB = b.value("TypeName", "");
+                // Transform always comes first
+                if (nameA == "LocalTransform") return true;
+                if (nameB == "LocalTransform") return false;
+                // Everything else alphabetical
+                return nameA < nameB;
+            });
+
+        // Render in sorted order
+        for (auto& componentEntry : componentsArray) {
+            // Validate component entry structure before accessing fields
             if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string())
                 continue;
-            if (componentEntry["TypeName"] == "ECS::Components::LocalTransform") {
+
+            std::string typeName = componentEntry["TypeName"];
+            const auto* meta = ComponentRegistryUI::Find(typeName);
+
+            if (meta) {
+                // Ensure Data field exists and is an object
                 if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object())
                     componentEntry["Data"] = nlohmann::json::object();
+
                 auto& dataObj = componentEntry["Data"];
-                _renderComponentSection("Transform", "LocalTransform", dataObj,
-                    [this](nlohmann::json& d) { m_componentUI.RenderLocalTransform(d); }, false);
+                _renderComponentSection(meta->DisplayName, meta->TypeName, dataObj,
+                    [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); },
+                    meta->CanDelete);
                 ImGui::Dummy(ImVec2(0, 4));
-                break;
-            }
-        }
-
-        // Render other components in preferred order
-        const std::vector<std::string> orderedTypes = {
-            "ECS::Components::Camera3D",
-            "ECS::Components::SpriteRenderer2D",
-            "ECS::Components::Rigidbody2D",
-            "ECS::Components::CircleCollider2D",
-            "ECS::Components::BoxCollider2D",
-            "ECS::Components::ShapeCircle2D",
-            "ECS::Components::ShapeBox2D",
-            "ECS::Components::ShapeLine2D"
-        };
-
-        for (const auto& type : orderedTypes) {
-            for (auto& componentEntry : m_prefabData["Components"]) {
-                if (componentEntry["TypeName"] != type) continue;
-                auto& data = componentEntry["Data"];
-
-                if (type == "ECS::Components::SpriteRenderer2D") {
-                    _renderComponentSection("Sprite Renderer", "SpriteRenderer2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderSpriteRenderer2D(d); });
-                }
-                else if (type == "ECS::Components::Rigidbody2D") {
-                    _renderComponentSection("Rigidbody 2D", "Rigidbody2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderRigidbody2D(d); });
-                }
-                else if (type == "ECS::Components::CircleCollider2D") {
-                    _renderComponentSection("Circle Collider 2D", "CircleCollider2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderCircleCollider2D(d); });
-                }
-                else if (type == "ECS::Components::BoxCollider2D") {
-                    _renderComponentSection("Box Collider 2D", "BoxCollider2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderBoxCollider2D(d); });
-                }
-                else if (type == "ECS::Components::ShapeCircle2D") {
-                    _renderComponentSection("Shape Circle", "ShapeCircle2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderShapeCircle2D(d); });
-                }
-                else if (type == "ECS::Components::ShapeBox2D") {
-                    _renderComponentSection("Shape Box", "ShapeBox2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderShapeBox2D(d); });
-                }
-                else if (type == "ECS::Components::ShapeLine2D") {
-                    _renderComponentSection("Shape Line", "ShapeLine2D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderShapeLine2D(d); });
-                }
-                else if (type == "ECS::Components::Camera3D") {
-                    _renderComponentSection("Camera 3D", "Camera3D", data,
-                        [this](nlohmann::json& d) { m_componentUI.RenderCamera3D(d); });
-                }
-
-                ImGui::Dummy(ImVec2(0, 4));
-                break;
             }
         }
 
@@ -467,7 +436,7 @@ void InspectorPanel::_renderPrefabComponents() {
         }
         m_componentsToDelete.clear();
 
-        // FIX: Auto-save prefab on any change
+        // Auto-save prefab on any change
         _savePrefabData();
     }
 
@@ -489,15 +458,10 @@ void InspectorPanel::_renderPrefabActions() {
         ImGui::PopFont();
         ImGui::Separator();
 
-        _renderComponentMenuItem("Transform", "LocalTransform");
-        _renderComponentMenuItem("Sprite Renderer", "SpriteRenderer2D");
-        _renderComponentMenuItem("Rigidbody 2D", "Rigidbody2D");
-        _renderComponentMenuItem("Circle Collider 2D", "CircleCollider2D");
-        _renderComponentMenuItem("Box Collider 2D", "BoxCollider2D");
-        _renderComponentMenuItem("Shape Circle", "ShapeCircle2D");
-        _renderComponentMenuItem("Shape Box", "ShapeBox2D");
-        _renderComponentMenuItem("Shape Line", "ShapeLine2D");
-        _renderComponentMenuItem("Camera 3D", "Camera3D");
+        // Render all components from registry
+        for (const auto& meta : ComponentRegistryUI::GetAll()) {
+            _renderComponentMenuItem(meta.DisplayName.c_str(), meta.TypeName.c_str());
+        }
 
         ImGui::EndPopup();
     }
@@ -545,51 +509,21 @@ void InspectorPanel::_addComponentToEntity(const std::string& componentType) {
     ECS::Entity entity{ m_entityId, 0 };
     if (!m_world->IsAlive(entity)) return;
 
-    // FIX: Adding a shape component removes other shapes (mutually exclusive)
+    // Adding a shape component removes other shapes (mutually exclusive)
     if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
-        if (m_world->Has<ECS::Components::ShapeCircle2D>(entity)) {
-            m_world->Remove<ECS::Components::ShapeCircle2D>(entity);
-        }
-        if (m_world->Has<ECS::Components::ShapeBox2D>(entity)) {
-            m_world->Remove<ECS::Components::ShapeBox2D>(entity);
-        }
-        if (m_world->Has<ECS::Components::ShapeLine2D>(entity)) {
-            m_world->Remove<ECS::Components::ShapeLine2D>(entity);
-        }
+        auto* circle = ComponentRegistryUI::Find("ShapeCircle2D");
+        auto* box = ComponentRegistryUI::Find("ShapeBox2D");
+        auto* line = ComponentRegistryUI::Find("ShapeLine2D");
+        if (circle) circle->RemoveComponent(m_world, entity);
+        if (box) box->RemoveComponent(m_world, entity);
+        if (line) line->RemoveComponent(m_world, entity);
     }
 
-    if (componentType == "LocalTransform") {
-        if (!m_world->Has<ECS::Components::LocalTransform>(entity)) {
-            m_world->Add<ECS::Components::LocalTransform>(entity);
-        }
-        return;
+    // Get component from registry and add it
+    const auto* meta = ComponentRegistryUI::Find(componentType);
+    if (meta) {
+        meta->AddComponent(m_world, entity, meta->GetDefaults());
     }
-
-    nlohmann::json defaults = _getDefaultComponentData(componentType);
-
-    auto applyDefault = [&]<typename T>(const std::string & name) {
-        if (componentType == name) {
-            if (!m_world->Has<T>(entity)) {
-                m_world->Add<T>(entity);
-            }
-            if (m_world->Has<T>(entity)) {
-                auto& comp = m_world->Get<T>(entity);
-                from_json(defaults, comp);
-            }
-            return true;
-        }
-        return false;
-    };
-
-    if (applyDefault.operator() < ECS::Components::LocalTransform > ("LocalTransform")) return;
-    if (applyDefault.operator() < ECS::Components::SpriteRenderer2D > ("SpriteRenderer2D")) return;
-    if (applyDefault.operator() < ECS::Components::Rigidbody2D > ("Rigidbody2D")) return;
-    if (applyDefault.operator() < ECS::Components::CircleCollider2D > ("CircleCollider2D")) return;
-    if (applyDefault.operator() < ECS::Components::BoxCollider2D > ("BoxCollider2D")) return;
-    if (applyDefault.operator() < ECS::Components::ShapeCircle2D > ("ShapeCircle2D")) return;
-    if (applyDefault.operator() < ECS::Components::ShapeBox2D > ("ShapeBox2D")) return;
-    if (applyDefault.operator() < ECS::Components::ShapeLine2D > ("ShapeLine2D")) return;
-    if (applyDefault.operator() < ECS::Components::Camera3D > ("Camera3D")) return;
 }
 
 void InspectorPanel::_removeComponentFromEntity(const std::string& componentType) {
@@ -597,48 +531,22 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
     ECS::Entity entity{ m_entityId, 0 };
     if (!m_world->IsAlive(entity)) return;
 
-    auto remove = [&]<typename T>(const std::string & name) {
-        if (componentType == name) {
-            m_world->Remove<T>(entity);
-            m_statusMessage = std::string("Removed ") + componentType;
-            m_statusTimer = 2.0f;
-            return true;
-        }
-        return false;
-    };
+    if (componentType == "LocalTransform") return; // Can't delete transform
 
-    if (componentType == "LocalTransform") return;
-
-    if (remove.operator() < ECS::Components::SpriteRenderer2D > ("SpriteRenderer2D")) return;
-    if (remove.operator() < ECS::Components::Rigidbody2D > ("Rigidbody2D")) return;
-    if (remove.operator() < ECS::Components::CircleCollider2D > ("CircleCollider2D")) return;
-    if (remove.operator() < ECS::Components::BoxCollider2D > ("BoxCollider2D")) return;
-    if (remove.operator() < ECS::Components::ShapeCircle2D > ("ShapeCircle2D")) return;
-    if (remove.operator() < ECS::Components::ShapeBox2D > ("ShapeBox2D")) return;
-    if (remove.operator() < ECS::Components::ShapeLine2D > ("ShapeLine2D")) return;
-    if (remove.operator() < ECS::Components::Camera3D > ("Camera3D")) return;
+    const auto* meta = ComponentRegistryUI::Find(componentType);
+    if (meta) {
+        meta->RemoveComponent(m_world, entity);
+        m_statusMessage = std::string("Removed ") + componentType;
+        m_statusTimer = 2.0f;
+    }
 }
 
 bool InspectorPanel::_entityHasComponent(EntityId id, const std::string& componentType) {
     ECS::Entity entity{ id, 0 };
     if (!m_world->IsAlive(entity)) return false;
 
-    auto has = [&]<typename T>(const std::string & name) {
-        if (componentType == name) return m_world->Has<T>(entity);
-        return false;
-    };
-
-    if (has.operator() < ECS::Components::LocalTransform > ("LocalTransform")) return true;
-    if (has.operator() < ECS::Components::SpriteRenderer2D > ("SpriteRenderer2D")) return true;
-    if (has.operator() < ECS::Components::Rigidbody2D > ("Rigidbody2D")) return true;
-    if (has.operator() < ECS::Components::CircleCollider2D > ("CircleCollider2D")) return true;
-    if (has.operator() < ECS::Components::BoxCollider2D > ("BoxCollider2D")) return true;
-    if (has.operator() < ECS::Components::ShapeCircle2D > ("ShapeCircle2D")) return true;
-    if (has.operator() < ECS::Components::ShapeBox2D > ("ShapeBox2D")) return true;
-    if (has.operator() < ECS::Components::ShapeLine2D > ("ShapeLine2D")) return true;
-    if (has.operator() < ECS::Components::Camera3D > ("Camera3D")) return true;
-
-    return false;
+    const auto* meta = ComponentRegistryUI::Find(componentType);
+    return meta ? meta->HasComponent(m_world, entity) : false;
 }
 
 // -------------------------------------------------------------------------
@@ -651,27 +559,32 @@ void InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
 
     if (_prefabHasComponent(componentType)) return;
 
-    // FIX: Adding a shape component removes other shapes (mutually exclusive)
+    // Adding a shape component removes other shapes (mutually exclusive)
     if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
         _removeComponentFromPrefab("ShapeCircle2D");
         _removeComponentFromPrefab("ShapeBox2D");
         _removeComponentFromPrefab("ShapeLine2D");
     }
 
-    nlohmann::json data = _getDefaultComponentData(componentType);
-    // Use full typename for prefabs
-    std::string fullTypeName = "ECS::Components::" + componentType;
-    m_prefabData["Components"].push_back({ {"TypeName", fullTypeName}, {"Data", data} });
+    // Get defaults from registry
+    const auto* meta = ComponentRegistryUI::Find(componentType);
+    if (!meta) return;
+
+    nlohmann::json data = meta->GetDefaults();
+    m_prefabData["Components"].push_back({ {"TypeName", meta->FullTypeName}, {"Data", data} });
 
     // Auto-save after adding component
     _savePrefabData();
 }
 
 void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType) {
-    if (!m_prefabData.contains("Components")) return;
+    if (!m_prefabData.contains("Components") || !m_prefabData["Components"].is_array()) return;
 
     auto& components = m_prefabData["Components"];
     for (auto it = components.begin(); it != components.end(); it++) {
+        // Validate component entry structure before accessing fields
+        if (!(*it).contains("TypeName") || !(*it)["TypeName"].is_string()) continue;
+
         std::string typeName = (*it)["TypeName"];
         // Match both short and full names
         if (typeName == componentType || typeName == "ECS::Components::" + componentType) {
@@ -686,102 +599,17 @@ void InspectorPanel::_removeComponentFromPrefab(const std::string& componentType
 }
 
 bool InspectorPanel::_prefabHasComponent(const std::string& componentType) {
-    if (!m_prefabData.contains("Components")) return false;
+    if (!m_prefabData.contains("Components") || !m_prefabData["Components"].is_array()) return false;
+
     for (const auto& comp : m_prefabData["Components"]) {
+        // Validate component entry structure before accessing fields
+        if (!comp.contains("TypeName") || !comp["TypeName"].is_string()) continue;
+
         std::string typeName = comp["TypeName"];
         // Match both short and full names
         if (typeName == componentType || typeName == "ECS::Components::" + componentType) return true;
     }
     return false;
-}
-
-// -------------------------------------------------------------------------
-// Default Component Data
-// -------------------------------------------------------------------------
-nlohmann::json InspectorPanel::_getDefaultComponentData(const std::string& componentType) {
-    if (componentType == "LocalTransform") {
-        return {
-            {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
-            {"Rotation", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 1.0f}}},
-            {"Scale", {{"X", 1.0f}, {"Y", 1.0f}, {"Z", 1.0f}}}
-        };
-    }
-    else if (componentType == "SpriteRenderer2D") {
-        return {
-            {"TextureId", 0},
-            {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-            {"Tiling", {{"X", 1.0f}, {"Y", 1.0f}}},
-            {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
-            {"Width", 0},
-            {"Height", 0}
-        };
-    }
-    else if (componentType == "Rigidbody2D") {
-        return {
-            {"Mass", 1.0f},
-            {"InverseMass", 1.0f},
-            {"LinearDamping", 0.0f},
-            {"AngularDamping", 0.0f},
-            {"GravityScale", 1.0f},
-            {"Flags", 0}
-        };
-    }
-    else if (componentType == "CircleCollider2D") {
-        return {
-            {"Radius", 0.5f},
-            {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
-            {"LayerMask", 0xFFFFFFFFu},
-            {"Flags", 0}
-        };
-    }
-    else if (componentType == "Camera3D") {
-        return {
-            {"UsePerspective", false},
-            {"FOV", 45.0f},
-            {"NearPlane", 0.1f},
-            {"FarPlane", 100.0f},
-            {"OrthoSize", 10.0f},
-            {"AspectRatio", 16.0f / 9.0f},
-            {"Active", false}
-        };
-    }
-    else if (componentType == "BoxCollider2D") {
-        return {
-            {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
-            {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
-            {"Rotation", 0.0f},
-            {"LayerMask", 0xFFFFFFFFu},
-            {"Flags", 0}
-        };
-    }
-    else if (componentType == "ShapeCircle2D") {
-        return {
-            {"Radius", 0.5f},
-            {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
-            {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-            {"Thickness", 1.0f},
-            {"Filled", false}
-        };
-    }
-    else if (componentType == "ShapeBox2D") {
-        return {
-            {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
-            {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
-            {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-            {"Thickness", 1.0f},
-            {"Filled", false}
-        };
-    }
-    else if (componentType == "ShapeLine2D") {
-        return {
-            {"A", {{"X", 0.0f}, {"Y", 0.0f}}},
-            {"B", {{"X", 1.0f}, {"Y", 0.0f}}},
-            {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-            {"Thickness", 1.0f}
-        };
-    }
-
-    return {};
 }
 
 // -------------------------------------------------------------------------
@@ -813,8 +641,61 @@ void InspectorPanel::_savePrefabData() {
     file.close();
 
     m_lastSavedPrefabHash = currentHash;
-    // Don't show "saved" message on every frame - only on meaningful changes
 }
+
+void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
+    if (!m_world || !m_world->IsAlive(entity)) return;
+
+    // Get entity name for filename
+    std::string entityName = "Entity";
+    if (m_world->Has<ECS::Components::Name>(entity)) {
+        entityName = m_world->Get<ECS::Components::Name>(entity).Value;
+        // Sanitize name for filesystem
+        std::replace_if(entityName.begin(), entityName.end(),
+            [](char c) { return !std::isalnum(c) && c != '_' && c != '-'; }, '_');
+    }
+
+    // Create prefabs directory if it doesn't exist
+    std::filesystem::path prefabDir = "assets/prefabs";
+    std::filesystem::create_directories(prefabDir);
+
+    // Generate unique filename
+    std::filesystem::path prefabPath = prefabDir / (entityName + ".prefab");
+    int suffix = 1;
+    while (std::filesystem::exists(prefabPath)) {
+        prefabPath = prefabDir / (entityName + "_" + std::to_string(suffix) + ".prefab");
+        suffix++;
+    }
+
+    // Serialize entity to JSON using EntitySerializer
+    nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+
+    // Extract just the Components array for the prefab
+    nlohmann::json prefabData;
+    if (entityJson.contains("Components")) {
+        prefabData["Components"] = entityJson["Components"];
+    }
+    else {
+        prefabData["Components"] = nlohmann::json::array();
+    }
+
+    // Write to file
+    std::ofstream file(prefabPath);
+    if (!file.is_open()) {
+        m_statusMessage = "Failed: Cannot create prefab file";
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Cannot create prefab file: " << prefabPath);
+        return;
+    }
+
+    file << prefabData.dump(4);
+    file.close();
+
+    m_statusMessage = "Saved as " + prefabPath.filename().string();
+    m_statusTimer = 3.0f;
+    LOG_INFO("Entity saved as prefab: " << prefabPath);
+}
+
 
 void InspectorPanel::_applyPrefabToInstances() {
     if (!m_world) return;
@@ -836,35 +717,19 @@ void InspectorPanel::_applyPrefabToInstances() {
 }
 
 void InspectorPanel::_applyPrefabDataToEntity(ECS::Entity entity) {
-    if (!m_prefabData.contains("Components")) return;
+    if (!m_prefabData.contains("Components") || !m_prefabData["Components"].is_array()) return;
 
     // Apply each component from prefab data to the entity
     for (const auto& componentEntry : m_prefabData["Components"]) {
+        // Validate component entry structure before accessing fields
+        if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
+        if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
+
         std::string typeName = componentEntry["TypeName"];
-
-        auto applyComponent = [&]<typename T>(const std::string & name) {
-            if (typeName == name) {
-                if (!m_world->Has<T>(entity)) {
-                    m_world->Add<T>(entity);
-                }
-                if (m_world->Has<T>(entity)) {
-                    auto& comp = m_world->Get<T>(entity);
-                    from_json(componentEntry["Data"], comp);
-                }
-                return true;
-            }
-            return false;
-        };
-
-        if (applyComponent.operator() < ECS::Components::LocalTransform > ("ECS::Components::LocalTransform")) continue;
-        if (applyComponent.operator() < ECS::Components::SpriteRenderer2D > ("ECS::Components::SpriteRenderer2D")) continue;
-        if (applyComponent.operator() < ECS::Components::Rigidbody2D > ("ECS::Components::Rigidbody2D")) continue;
-        if (applyComponent.operator() < ECS::Components::CircleCollider2D > ("ECS::Components::CircleCollider2D")) continue;
-        if (applyComponent.operator() < ECS::Components::BoxCollider2D > ("ECS::Components::BoxCollider2D")) continue;
-        if (applyComponent.operator() < ECS::Components::ShapeCircle2D > ("ECS::Components::ShapeCircle2D")) continue;
-        if (applyComponent.operator() < ECS::Components::ShapeBox2D > ("ECS::Components::ShapeBox2D")) continue;
-        if (applyComponent.operator() < ECS::Components::ShapeLine2D > ("ECS::Components::ShapeLine2D")) continue;
-        if (applyComponent.operator() < ECS::Components::Camera3D > ("ECS::Components::Camera3D")) continue;
+        const auto* meta = ComponentRegistryUI::Find(typeName);
+        if (meta) {
+            meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
+        }
     }
 }
 
