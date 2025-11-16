@@ -6,14 +6,21 @@
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
 \date   5th November 2025
+
 \brief
-Declares the HierarchyPanel class for Unity-like hierarchy window UI.
-Provides entity management, tree structure display, drag-drop parenting,
-prefab instantiation and selection handling for scene editing.
+Declares the HierarchyPanel class which manages the hierarchy window used to
+browse and organise entities in a scene.
+
+The hierarchy presents the ECS world as a tree, letting the editor display
+parent-child relationships clearly. It handles selection, drag-drop reparenting,
+entity creation and deletion and supports prefab instantiation by accepting
+dragged prefab assets. Other editor panels use this class to stay updated on
+which entity the user is working with.
 */
 /* End Header *******************************************************************/
 
-#pragma once
+#ifndef HIERARCHY_PANEL_H
+#define HIERARCHY_PANEL_H
 
 #include "ecs/World.h"
 #include <imgui.h>
@@ -41,7 +48,8 @@ public:
 
     // Initialize the hierarchy panel with required fonts and system references
     // Fonts are used for consistent UI styling across the panel
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, Viewport* viewport);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, 
+        Viewport* viewport);
 
     // Update the world reference when switching between scenes
     // Clears internal state like selection and expanded nodes
@@ -118,7 +126,8 @@ private:
     // -------------------------------------------------------------------------
 
     // Instantiate a prefab file as a child of the specified parent entity
-    void _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
+    // Returns the entity ID of the newly created instance
+    EntityId _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
 
     // -------------------------------------------------------------------------
     // Helper Methods
@@ -138,9 +147,9 @@ private:
     // -------------------------------------------------------------------------
 
     // Font references for UI styling
-    ImFont* m_mainFont = nullptr;      
-    ImFont* m_boldFont = nullptr;      
-    ImFont* m_symbolsFont = nullptr;   
+    ImFont* m_mainFont = nullptr;
+    ImFont* m_boldFont = nullptr;
+    ImFont* m_symbolsFont = nullptr;
 
     // System references
     ECS::World* m_world = nullptr;                // ECS world containing all entities and components
@@ -154,3 +163,5 @@ private:
     std::unordered_set<EntityId> m_expandedNodes; // Track which tree nodes are expanded
     SelectionCallback m_selectionCallback;        // Callback for selection change events
 };
+
+#endif
