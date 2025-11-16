@@ -70,6 +70,21 @@ public:
     // Renders camera properties including projection type and near/far clipping planes
     void RenderCamera3D(nlohmann::json& data);
 
+    // Renders acceleration vector for forces applied to 2D physics bodies
+    void RenderAcceleration2D(nlohmann::json& data);
+
+    // Renders physics material properties including friction and restitution
+    void RenderPhysicsMaterial2D(nlohmann::json& data);
+
+    // Renders sprite sheet animation properties including frame data and playback settings
+    void RenderSpriteSheetAnimation2D(nlohmann::json& data);
+
+    // Renders sprite flip properties for mirroring sprites horizontally or vertically
+    void RenderSpriteFlip2D(nlohmann::json& data);
+
+    // Renders Z-index for controlling 2D rendering order
+    void RenderZIndex2D(nlohmann::json& data);
+
 private:
     // -------------------------------------------------------------------------
     // State

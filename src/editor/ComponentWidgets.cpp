@@ -71,8 +71,19 @@ namespace EditorUI {
         ImGui::SameLine();
         ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
         ImGui::Text("%s", value.c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("(drag a texture here)");
+        
+        // Show appropriate drag hint for texture fields that are empty (TextureId: 0)
+        if (value.find("TextureId: 0") != std::string::npos) {
+            ImGui::SameLine();
+            // Sprite sheet animation
+            if (label == "Sprite Sheet") {
+                ImGui::TextDisabled("(drag a sprite sheet here)");
+            }
+            // Sprite renderer
+            else if (label == "Sprite") {
+                ImGui::TextDisabled("(drag a texture here)");
+            }
+        }
     }
 
     // Renders a float property using a drag widget

@@ -162,7 +162,7 @@ void ComponentUI::RenderRigidbody2D(nlohmann::json& data) {
 // Renders the LinearVelocity2D component
 void ComponentUI::RenderLinearVelocity2D(nlohmann::json& data) {
     // Single row section for velocity vector
-    EditorUI::BeginPropertySection({ "Velocity" });
+    EditorUI::BeginPropertySection({ "Linear Velocity" });
 
     // data["Value"] stores the X and Y components for velocity
     EditorUI::RenderVector2DRow("Velocity##Linear", data["Value"], "X", "Y", 1.0f);
@@ -332,5 +332,129 @@ void ComponentUI::RenderCamera3D(nlohmann::json& data) {
 
     // Aspect ratio is the ratio of width to height used for projection
     EditorUI::RenderFloatRow("Aspect Ratio", "w/h", data, "AspectRatio", 0.01f);
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Acceleration2D component properties
+// Shows the 2D acceleration vector that affects physics bodies
+void ComponentUI::RenderAcceleration2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Acceleration" });
+
+    // X and Y components of the acceleration vector
+    EditorUI::RenderVector2DRow("Acceleration", data["Value"], "X", "Y", 0.1f);
+    EditorUI::EndPropertySection();
+}
+
+// Renders the PhysicsMaterial2D component properties
+// Controls friction, bounciness and position correction for colliders
+void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Friction", "Restitution", "Position Correct" });
+
+    // Friction coefficient (0 = frictionless, 1 = very sticky)
+    EditorUI::RenderFloatRow("Friction", "", data, "Friction", 0.01f);
+
+    // Restitution (bounciness) - 0 = no bounce, 1 = perfect bounce
+    EditorUI::RenderFloatRow("Restitution", "", data, "Restitution", 0.01f);
+
+    // How much of penetration to correct each frame (stability vs accuracy)
+    EditorUI::RenderFloatRow("Position Correct", "%", data, "PositionCorrectPercent", 0.01f);
+    EditorUI::EndPropertySection();
+}
+
+// Renders the SpriteSheetAnimation2D component properties
+// Controls animated sprite playback from sprite sheets
+void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Sprite Sheet", "Frame Size", "Sheet Size", "Animation", "Playback" });
+
+    // Build a human readable summary of the current texture (same as SpriteRenderer2D)
+    std::string valueText = "TextureId: " + std::to_string(data.value("TextureId", 0u));
+    std::string texPath = data.value("TexturePath", "");
+    if (!texPath.empty()) {
+        // Show only the file name instead of the full path for readability
+        valueText += " (" + std::filesystem::path(texPath).filename().string() + ")";
+    }
+
+    // Show the sprite sheet information in a read only row
+    EditorUI::RenderStaticValueRow("Sprite Sheet", valueText);
+
+    // Tracks whether a valid texture was dropped this frame
+    bool dropped = false;
+
+    // Allow users to drag a texture asset from the asset browser into this control
+    if (ImGui::BeginDragDropTarget()) {
+        // Accept payloads tagged as ASSET_PATH which contain a file path string
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            // Payload data is a char buffer containing the file path
+            std::string droppedPath = static_cast<const char*>(payLoad->Data);
+
+            // Extract file extension and normalise to lowercase for comparison
+            auto ext = std::filesystem::path(droppedPath).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            // Only accept common image formats as sprite sheet textures
+            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                // Load texture through the resource manager using the dropped path
+                auto tex = RM.Get<Texture>(droppedPath);
+                if (tex) {
+                    // Store texture ID and path in JSON so renderer can use them
+                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["TexturePath"] = droppedPath;
+
+                    // Cache sheet dimensions from the texture
+                    data["SheetWidth"] = tex->Width();
+                    data["SheetHeight"] = tex->Height();
+
+                    dropped = true;
+                    LOG_INFO("Dropped sprite sheet: " << droppedPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped sprite sheet: " << droppedPath);
+                }
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    // Individual frame dimensions
+    EditorUI::RenderIntProperty("Frame Width", data, "FrameWidth");
+    EditorUI::RenderIntProperty("Frame Height", data, "FrameHeight");
+
+    // Total sprite sheet dimensions (auto-filled when texture is dropped)
+    EditorUI::RenderIntProperty("Sheet Width", data, "SheetWidth");
+    EditorUI::RenderIntProperty("Sheet Height", data, "SheetHeight");
+
+    // Which frame to start the animation from
+    EditorUI::RenderIntProperty("Start Frame", data, "StartFrame");
+
+    // How many frames in the animation sequence
+    EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
+
+    // Animation speed in frames per second
+    EditorUI::RenderFloatRow("FPS", "", data, "FramesPerSecond", 0.5f);
+
+    // Playback controls
+    EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
+    EditorUI::RenderCheckboxProperty("Playing", data, "Playing");
+
+    EditorUI::EndPropertySection();
+}
+
+// Renders the SpriteFlip2D component properties
+// Allows mirroring sprites horizontally and vertically
+void ComponentUI::RenderSpriteFlip2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Flip" });
+
+    // Two flip toggles on one row for compact display
+    EditorUI::RenderCheckboxRow("Flip", data, "FlipX", "Horiz.", "FlipY", "Vert.");
+    EditorUI::EndPropertySection();
+}
+
+// Renders the ZIndex2D component properties
+// Controls the rendering order in 2D (higher values render on top)
+void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Z-Order" });
+
+    // Integer Z-order value (can be negative)
+    EditorUI::RenderIntProperty("Z-Order", data, "ZOrder");
     EditorUI::EndPropertySection();
 }

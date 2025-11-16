@@ -101,7 +101,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
 
     // Sprite Renderer 2D
     {
-        "Sprite Renderer", "SpriteRenderer2D", "ECS::Components::SpriteRenderer2D", true,
+        "Sprite Renderer 2D", "SpriteRenderer2D", "ECS::Components::SpriteRenderer2D", true,
         [](ComponentUI& ui, nlohmann::json& d) { ui.RenderSpriteRenderer2D(d); },
         []() { return nlohmann::json{
             {"TextureId", 0},
@@ -111,6 +111,39 @@ static std::vector<ComponentUIMetadata> m_registry = {
             {"Width", 0}, {"Height", 0}
         }; },
         COMPONENT_OPS(ECS::Components::SpriteRenderer2D)
+    },
+
+    // Sprite Flip 2D
+    {
+        "Sprite Flip 2D", "SpriteFlip2D", "ECS::Components::SpriteFlip2D", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderSpriteFlip2D(d); },
+        []() { return nlohmann::json{
+            {"FlipX", false}, {"FlipY", false}
+        }; },
+        COMPONENT_OPS(ECS::Components::SpriteFlip2D)
+    },
+
+    // Sprite Sheet Animation 2D
+    {
+        "Sprite Sheet Animation 2D", "SpriteSheetAnimation2D", "ECS::Components::SpriteSheetAnimation2D", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderSpriteSheetAnimation2D(d); },
+        []() { return nlohmann::json{
+            {"TextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
+            {"SheetWidth", 256}, {"SheetHeight", 256},
+            {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
+            {"Loop", true}, {"Playing", false}
+        }; },
+        COMPONENT_OPS(ECS::Components::SpriteSheetAnimation2D)
+    },
+
+    // Z-Index 2D
+    {
+        "Z-Index 2D", "ZIndex2D", "ECS::Components::ZIndex2D", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderZIndex2D(d); },
+        []() { return nlohmann::json{
+            {"ZOrder", 0}
+        }; },
+        COMPONENT_OPS(ECS::Components::ZIndex2D)
     },
 
     // Rigidbody 2D
@@ -123,6 +156,46 @@ static std::vector<ComponentUIMetadata> m_registry = {
             {"GravityScale", 1.0f}, {"Flags", 0}
         }; },
         COMPONENT_OPS(ECS::Components::Rigidbody2D)
+    },
+
+    // Linear Velocity 2D
+    {
+        "Linear Velocity 2D", "LinearVelocity2D", "ECS::Components::LinearVelocity2D", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLinearVelocity2D(d); },
+        []() { return nlohmann::json{
+            {"Value", {{"X", 0.0f}, {"Y", 0.0f}}}
+        }; },
+        COMPONENT_OPS(ECS::Components::LinearVelocity2D)
+    },
+
+    // Angular Velocity 2D
+    {
+        "Angular Velocity 2D", "AngularVelocity2D", "ECS::Components::AngularVelocity2D", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderAngularVelocity2D(d); },
+        []() { return nlohmann::json{
+            {"Value", 0.0f}
+        }; },
+        COMPONENT_OPS(ECS::Components::AngularVelocity2D)
+    },
+
+    // Acceleration 2D
+    {
+        "Acceleration 2D", "Acceleration2D", "ECS::Components::Acceleration2D", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderAcceleration2D(d); },
+        []() { return nlohmann::json{
+            {"Value", {{"X", 0.0f}, {"Y", 0.0f}}}
+        }; },
+        COMPONENT_OPS(ECS::Components::Acceleration2D)
+    },
+
+    // Physics Material 2D
+    {
+        "Physics Material 2D", "PhysicsMaterial2D", "ECS::Components::PhysicsMaterial2D", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderPhysicsMaterial2D(d); },
+        []() { return nlohmann::json{
+            {"Friction", 0.5f}, {"Restitution", 0.0f}, {"PositionCorrectPercent", 0.2f}
+        }; },
+        COMPONENT_OPS(ECS::Components::PhysicsMaterial2D)
     },
 
     // Circle Collider 2D
