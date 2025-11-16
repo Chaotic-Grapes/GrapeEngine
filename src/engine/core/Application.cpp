@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/WindowManager.h"
 #include "services/OverlayService.h"
 #include <thread>
+#include "../engine/audio/AudioSystem.h"
 
 namespace Engine {
     // Global pointer to the core engine
@@ -80,6 +81,10 @@ namespace Engine {
             s_renderer.BindWorld(w);
             s_renderer.Update(w, dt);
         });
+        Scenes::SystemRegistry::Register("Audio", [](ECS::World& w, float dt) {
+            static AudioSystem s_audioSystem(w, Services::AudioService::Get());
+            s_audioSystem.Update(dt);
+            });
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
