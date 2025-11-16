@@ -43,6 +43,16 @@ public:
     void ShowEditorWindows();
 
     // -------------------------------------------------------------------------
+    // Entity Operations
+    // -------------------------------------------------------------------------
+    void AddEntity(const std::string& name, EntityId parentId);
+    void ReparentEntity(EntityId childId, EntityId newParentId);
+    void RemoveEntity(EntityId id, bool recursive);
+    void CloneEntity(EntityId id);
+    void ClearAllEntities();
+    void FocusOnEntity(EntityId id);
+
+    // -------------------------------------------------------------------------
     // Accessors
     // -------------------------------------------------------------------------
     inline bool HasValidWorld() const { return m_world != nullptr; }

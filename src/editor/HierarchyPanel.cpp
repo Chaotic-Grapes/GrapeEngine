@@ -18,7 +18,6 @@ and supports prefab instantiation by accepting dragged prefab assets.
 /* End Header *******************************************************************/
 
 #include "../editor/HierarchyPanel.h"
-#include "../editor/Viewport.h"
 #include "../editor/ComponentWidgets.h"
 #include "../editor/EditorComponentRegistry.h"
 #include "core/Logger.h"
@@ -64,14 +63,14 @@ namespace {
 // Initialize the hierarchy panel with fonts and world/editor references
 // Sets up local state used for selection and expanded nodes
 void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
-    ECS::World* world, Viewport* viewport)
+    ECS::World* world, EntityActions* entityActions)
 {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
-    // Cache pointers to world and viewport so we operate on correct scene
+    // Cache pointers to world and entity actions so we operate on correct scene
     m_world = world;
-    m_viewport = viewport;
+    m_entityActions = entityActions;
 }
 
 // Update the world reference when scene changes
@@ -155,9 +154,9 @@ void HierarchyPanel::_renderHeader() {
     if (ImGui::Button("Add")) {
         // Use default name if buffer is empty
         std::string entityName = (strlen(nameBuffer) > 0) ? nameBuffer : "NewEntity";
-        if (m_viewport) {
+        if (m_entityActions) {
             // Add as root entity (NPOS32 means no parent)
-            m_viewport->AddEntity(entityName, ECS::Entity::NPOS32);
+            m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
         }
         // Don't clear the buffer: keep the name for easy repeated additions
     }
@@ -221,8 +220,8 @@ void HierarchyPanel::_renderEntityTree() {
 void HierarchyPanel::_renderFooterButtons() {
     // Clear All button: removes all entities from the scene
     if (ImGui::Button("Clear All")) {
-        if (m_viewport) {
-            m_viewport->ClearAllEntities();
+        if (m_entityActions) {
+            m_entityActions->ClearAllEntities();
         }
         m_selectedEntityId = 0;
         if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
@@ -332,8 +331,8 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
 
     // Double-click to focus camera on this entity in viewport
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        if (m_viewport) {
-            m_viewport->FocusOnEntity(entityId);
+        if (m_entityActions) {
+            // TODO: Implement camera focus functionality
         }
     }
 }
@@ -360,8 +359,8 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
         // Handle entity reparenting
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
             EntityId draggedId = *(EntityId*)payload->Data;
-            if (m_viewport) {
-                m_viewport->ReparentEntity(draggedId, entityId);
+            if (m_entityActions) {
+                m_entityActions->ReparentEntity(draggedId, entityId);
             }
         }
 
@@ -389,8 +388,8 @@ void HierarchyPanel::_handleTreeDragDrop() {
         // Reparent entity to root (make it have no parent)
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
             EntityId draggedId = *(EntityId*)payload->Data;
-            if (m_viewport) {
-                m_viewport->ReparentEntity(draggedId, ECS::Entity::NPOS32);
+            if (m_entityActions) {
+                m_entityActions->ReparentEntity(draggedId, ECS::Entity::NPOS32);
             }
         }
 
@@ -443,8 +442,8 @@ void HierarchyPanel::_renderEntityContextMenu() {
 // Delete an entity and update selection
 // Also handles cleanup of selection state
 void HierarchyPanel::_deleteEntity(EntityId entityId) {
-    if (m_viewport) {
-        m_viewport->RemoveEntity(entityId, true);
+    if (m_entityActions) {
+        m_entityActions->RemoveEntity(entityId);
     }
 
     // Clear selection if deleted entity was selected
@@ -457,23 +456,23 @@ void HierarchyPanel::_deleteEntity(EntityId entityId) {
 
 // Clone an entity: creates a duplicate with same components and hierarchy
 void HierarchyPanel::_cloneEntity(EntityId entityId) {
-    if (m_viewport) {
-        m_viewport->CloneEntity(entityId);
+    if (m_entityActions) {
+        m_entityActions->CloneEntity(entityId);
     }
 }
 
 // Add a child entity to the selected entity
 // Creates a new entity as child of the specified parent
 void HierarchyPanel::_addChildEntity(EntityId parentId) {
-    if (m_viewport) {
-        m_viewport->AddEntity("Entity", parentId);
+    if (m_entityActions) {
+        m_entityActions->AddEntity("Entity", parentId);
     }
 }
 
 // Add a new root entity (entity without parent)
 void HierarchyPanel::_addRootEntity() {
-    if (m_viewport) {
-        m_viewport->AddEntity("Entity", ECS::Entity::NPOS32);
+    if (m_entityActions) {
+        m_entityActions->AddEntity("Entity", ECS::Entity::NPOS32);
     }
 }
 

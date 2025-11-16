@@ -24,6 +24,7 @@ New Features:
 #include "../editor/HierarchyPanel.h"
 #include "../editor/InspectorPanel.h"
 #include "../editor/Viewport.h"
+#include "../editor/EditorEntityActions.h"
 #include <imgui.h>
 #include <unordered_set>
 #include <functional>
@@ -41,7 +42,7 @@ struct LevelEditorConfig {
 // Uses a centralized panel registration system to reduce boilerplate when adding panels.
 class LevelEditor {
 public:
-    LevelEditor(ECS::World* world, const LevelEditorConfig& config);
+    LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene);
     ~LevelEditor();
 
     // Core lifecycle methods
@@ -107,6 +108,7 @@ private:
     Viewport m_viewport;          // Viewport and core editor features
     HierarchyPanel m_hierarchyWindow; // Entity tree view
     InspectorPanel m_inspector;      // Component property editor
+    EntityActions m_entityActions;
 
     // -------------------------------------------------------------------------
     // State

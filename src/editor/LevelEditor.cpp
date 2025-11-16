@@ -21,10 +21,10 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include "services/Time.h"
 
 // Create the editor and initialize panel members and config
-LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
+LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
     : m_world(world), m_config(config), m_playback(world), m_symbolsFont(nullptr),
     m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_viewport(),
-    m_hierarchyWindow(), m_inspector() {
+    m_hierarchyWindow(), m_inspector(), m_entityActions(scene) {
 // Defer panel initialization to Initialize to use loaded fonts
 }
 
@@ -216,7 +216,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     );
 
     _registerPanel("Hierarchy",
-        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_viewport); },
+        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); },
         [this]() { m_hierarchyWindow.Render(); },
         [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
     );
