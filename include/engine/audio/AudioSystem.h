@@ -38,5 +38,5 @@ private:
     Services::AudioService& m_audioService; //reference to audioservice
 
     // Map entity -> playing instance handle
-    std::unordered_map<ECS::Entity, Audio::PlaybackHandle, ECS::EntityHash> m_activeSounds;
+    std::unordered_map<ECS::Entity, Audio::PlaybackHandle> m_activeSounds;
 };
