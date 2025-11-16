@@ -4,6 +4,7 @@
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
+
 \brief
 Declares the LevelEditor class - main orchestrator for the game editor interface.
 Manages docking layout, panel coordination, entity selection, and playback controls.

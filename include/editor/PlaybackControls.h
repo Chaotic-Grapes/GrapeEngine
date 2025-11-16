@@ -4,6 +4,7 @@
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
+
 \brief
 Declares the PlaybackControls class for managing game playback state in the
 level editor (play, pause, stop, step).

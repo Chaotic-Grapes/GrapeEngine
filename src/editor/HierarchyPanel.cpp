@@ -19,7 +19,8 @@ and supports prefab instantiation by accepting dragged prefab assets.
 
 #include "../editor/HierarchyPanel.h"
 #include "../editor/Viewport.h"
-#include "../editor/ComponentRegistryUI.h"
+#include "../editor/ComponentWidgets.h"
+#include "../editor/EditorComponentRegistry.h"
 #include "core/Logger.h"
 #include "helpers/MathUtils.h"
 #include "services/Input.h"

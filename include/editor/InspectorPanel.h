@@ -6,6 +6,7 @@
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
 \date   15th November 2025
+
 \brief
 Editor panel for viewing and editing game entities and prefab assets.
 
@@ -20,9 +21,9 @@ instantiation and synchronization between live entities and serialized prefab da
 #define INSPECTOR_PANEL_H
 
 #include "ecs/World.h"
-#include "../editor/ComponentInspectorUI.h"
-#include "../editor/EditorUIHelpers.h"
-#include "../editor/ComponentRegistryUI.h"
+#include "../editor/ComponentPropertyEditor.h"
+#include "../editor/ComponentWidgets.h"
+#include "../editor/EditorComponentRegistry.h"
 #include <imgui.h>
 #include <string>
 #include <vector>
@@ -73,7 +74,7 @@ public:
 
     // Renders the inspector panel interface based on current mode
     // Either entity or prefab
-    void Render(float fontScale);
+    void Render();
 
     // -------------------------------------------------------------------------
     // State Query
@@ -134,9 +135,6 @@ private:
     // -------------------------------------------------------------------------
     // Prefab Data Management
     // -------------------------------------------------------------------------
-
-    // Loads prefab data from disk into memory for editing
-    void _loadPrefabData();
 
     // Saves modified prefab data back to disk with change tracking
     void _savePrefabData();
