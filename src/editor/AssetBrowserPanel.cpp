@@ -4,19 +4,17 @@
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
+
 \brief
-Implements the AssetBrowserPanel class for browsing and managing game assets.
+Implements the AssetBrowserPanel which renders the asset browser UI.
 
-Features:
-- File browser with breadcrumb navigation
-- File selection with info display
-- Display of assets folder structure
-- Prefab editing and instance synchronization
-
-References:
-- Windows file dialog using Win32 API (commdlg.h)
-- ImGui styling and layout functions (imgui.h)
-- Breadcrumb navigation pattern & button customization adapted from ImGui examples
+Provides:
+- Breadcrumb navigation and folder traversal
+- File listing with selection and info display
+- Import replace and delete actions
+- Prefab load and edit workflow
+- Status bar updates and file-drop handling
+- Integration with AssetLibrary and InspectorPanel
 */
 /* End Header *******************************************************************/
 
@@ -27,13 +25,15 @@ References:
 #include "serialization/EntitySerializer.h"
 #include "ecs/Entity.h"
 #include "../editor/InspectorPanel.h"
+#include "services/Input.h"
 #include <fstream>
 
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
-// Initialize the Asset Browser with fonts and a world reference.
-// Also hook file-drop messages so imports work from the OS.
+
+// Initialize the Asset Browser with fonts and a world reference
+// Also hook file-drop messages so imports work from the OS
 void AssetBrowserPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
@@ -68,20 +68,31 @@ void AssetBrowserPanel::SetInspector(InspectorPanel* inspector) {
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
-// Render the Asset Browser window with breadcrumbs, actions, and panels.
-// Uses child regions to split file list and file info side-by-side.
+
+// Render the Asset Browser window with breadcrumbs, actions and panels
+// Uses child regions to split file list and file info side-by-side
 void AssetBrowserPanel::Render() {
     ImGui::PushFont(m_mainFont);
     // Window flags: NoScrollbar removes the vertical scrollbar; child regions handle scrolling
     ImGui::Begin("Asset Browser", nullptr, ImGuiWindowFlags_NoScrollbar);
 
+    // Render all the UI stuff
     _renderNavigationBar();
     _renderActionButtons();
     _renderContentArea();
-    _renderStatusBar();
+
+    // Handle DELETE key press to delete selected asset
+    if (!m_selectedAsset.empty() && Input::IsKeyDown(KEY_DELETE)) {
+        m_assetLibrary._deleteSelectedAsset(m_selectedAsset, m_statusMessage, m_statusTimer);
+    }
 
     // Click on empty space in parent Asset Browser window to clear everything
     AssetBrowserPanel::_selectEmptySpace();
+
+    // Only render status bar if we have an active message
+    if (m_statusTimer > 0.0f) {
+        _renderStatusBar();
+    }
 
     ImGui::End();
     ImGui::PopFont();
@@ -92,6 +103,7 @@ void AssetBrowserPanel::Render() {
 // -------------------------------------------------------------------------
 // UI Sections
 // -------------------------------------------------------------------------
+
 // Render the breadcrumb navigation bar at the top
 void AssetBrowserPanel::_renderNavigationBar() {
     // Display clickable breadcrumb navigation
@@ -116,6 +128,7 @@ void AssetBrowserPanel::_renderActionButtons() {
     }
     ImGui::PopFont();
 
+    // Tooltip
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Import new assets into current folder");
     }
@@ -123,13 +136,20 @@ void AssetBrowserPanel::_renderActionButtons() {
     ImGui::SameLine();
 
     // Replace button (enabled only if a file is selected, not a folder)
+    // True if something is selected at all
     bool hasSelection = !m_selectedAsset.empty();
     bool isFolderSelection = false;
+
+    // If something is selected, check if it's a directory
+    // Use error_code so is_directory doesn't throw on invalid paths
     if (hasSelection) {
         std::error_code ec;
         isFolderSelection = std::filesystem::is_directory(m_selectedAsset, ec) && !ec;
     }
+
+    // Replace is allowed only when a file is selected (not a folder)
     bool enableReplace = hasSelection && !isFolderSelection;
+
     // Wrap controls in BeginDisabled/EndDisabled to gray-out and block interaction when not applicable
     if (!enableReplace) ImGui::BeginDisabled();
 
@@ -157,7 +177,7 @@ void AssetBrowserPanel::_renderActionButtons() {
     }
 
     ImGui::SameLine();
-
+    // UI things
     _renderPrefabButton();
 }
 
@@ -187,6 +207,7 @@ void AssetBrowserPanel::_renderPrefabButton() {
         }
     }
 
+    // UI things
     _renderPrefabPopup();
 }
 
@@ -292,26 +313,40 @@ void AssetBrowserPanel::_renderDeleteButton() {
     }
 }
 
-// Render the status bar at the bottom
+// Render the status bar and update its timer
 void AssetBrowserPanel::_renderStatusBar() {
-    // Status bar (fixed at bottom; does not overlap content)
     float statusBarHeight = 24.0f;
-    // Fixed-height status bar; NoScrollbar removes the vertical bar from this child
     ImGui::BeginChild("StatusBar", ImVec2(0, statusBarHeight), false, ImGuiWindowFlags_NoScrollbar);
-    if (m_statusTimer > 0.0f) {
-        ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
-            : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
-        ImGui::SetCursorPosX(12);
-        ImGui::TextColored(color, "%s", m_statusMessage.c_str());
-        m_statusTimer -= ImGui::GetIO().DeltaTime;
+
+    // Pick text color based on whether the message indicates failure
+    ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
+        ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
+        : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+    ImGui::SetCursorPosX(3);
+    ImGui::TextColored(color, "%s", m_statusMessage.c_str());
+
+    // Read DeltaTime for timer countdown
+    float dt = ImGui::GetIO().DeltaTime;
+
+    // If dt is huge, it means the frame was frozen by:
+    // - File dialog
+    // - Breakpoint
+    // - Window move
+    // - Alt-tab
+    // - System stall
+    if (dt > 0.2f) {
+        dt = 0.0f;  // Don't let a jump instantly wipe the timer
     }
+
+    // Decrement the status timer safely
+    m_statusTimer -= dt;
     ImGui::EndChild();
 }
 
 // -------------------------------------------------------------------------
-// Prefab Operations
+// Prefab Operations and Selection
 // -------------------------------------------------------------------------
+
 // Load the selected prefab into the scene
 void AssetBrowserPanel::_loadPrefab() {
     // Only proceed if an asset is selected and world pointer is valid

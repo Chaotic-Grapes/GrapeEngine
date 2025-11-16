@@ -4,40 +4,43 @@
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
 \date   3rd November 2025
+
 \brief
-Handles file system operations and asset management utilities for the asset browser.
+Declares the AssetLibrary which powers all asset browser file operations.
 
-Features:
-- File and folder browsing operations
-- Asset import and replacement with hot reload
-- File information display
-- OS file drop handling
-- Asset deletion
-
-References:
-- Windows file dialog using Win32 API (commdlg.h)
-- std::filesystem for cross-platform file operations
+Provides:
+- Folder navigation and file listing
+- Import and replace using OS dialogs
+- Drag-drop import support
+- File info display for the inspector panel
+- Syncing assets between ../assets and build/assets
+- Safe deletion for files and folders
 */
 /* End Header *******************************************************************/
 
-#ifndef ASSETLIBRARY_H
-#define ASSETLIBRARY_H
+#ifndef ASSET_LIBRARY_H
+#define ASSET_LIBRARY_H
 
 #include <string>
 #include <filesystem>
 #include <imgui.h>
 
+// So we can write something like ECS::World* m_world without including the World header
 namespace ECS { class World; }
 
 // Forward declarations
-struct ImFont;
+struct ImFont;  
 class AssetBrowserPanel;            // Forward declare to use as friend
-class InspectorPanel;         // Forward declare to wire double-click open
+class InspectorPanel;               // Forward declare to wire double-click open
 
 class AssetLibrary {
     friend class AssetBrowserPanel; // Only AssetBrowserPanel can access private members
 
 public:
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
     // This stores fonts used by the asset library UI
     // It prepares helpers for drawing labels and icons
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
@@ -48,6 +51,10 @@ public:
     void SetWorld(ECS::World* world) { m_world = world; }
 
 private:
+    // -------------------------------------------------------------------------
+    // Navigation and Display
+    // -------------------------------------------------------------------------
+    
     // This shows the breadcrumb path bar
     // It lets you click to navigate and updates selection
     void _displayBreadcrumbs(const std::string& currentPath, std::string& selectedAsset, std::string& outNewPath);
@@ -64,6 +71,10 @@ private:
     // It displays type size and quick actions
     void _displaySelectedFileInfo(const std::string& selectedAsset);
 
+    // -------------------------------------------------------------------------
+    // Import Replace Delete
+    // -------------------------------------------------------------------------
+    
     // This brings a new file into the current folder
     // It sets status text and updates selection
     void _importAsset(const std::string& currentPath, std::string& selectedAsset,
@@ -82,10 +93,29 @@ private:
     // It updates status and clears selection
     void _deleteSelectedAsset(std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
-    // Member variables
+    // -------------------------------------------------------------------------
+    // Helper Methods
+    // -------------------------------------------------------------------------
+
+    // This copies a file to both build and source asset locations
+    // Returns true on success, false on failure
+    bool _copyFileToBothLocations(const std::filesystem::path& sourcePath,
+        const std::filesystem::path& destBuildPath, bool createDirs = false);
+
+    // This deletes a file or folder from both build and source asset locations
+    // Returns true on success, false on failure
+    bool _deleteFromBothLocations(const std::filesystem::path& pathToDelete, bool isFolder);
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+    
+    // Fonts used for all UI text and icons
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
+
+    // System references
     InspectorPanel* m_inspector = nullptr;
     ECS::World* m_world = nullptr;
 };
