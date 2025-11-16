@@ -458,3 +458,34 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
     EditorUI::RenderIntProperty("Z-Order", data, "ZOrder");
     EditorUI::EndPropertySection();
 }
+
+//Renders the AudioSource component Properties
+void ComponentUI::RenderAudioSource(nlohmann::json& data)
+{
+    // Ensure keys exist with defaults
+    if (!data.contains("CueId"))   data["CueId"] = 0;
+    if (!data.contains("Volume"))  data["Volume"] = 1.0f;
+    if (!data.contains("Pitch"))   data["Pitch"] = 1.0f;
+    if (!data.contains("Loop"))    data["Loop"] = false;
+    if (!data.contains("PlayOnStart")) data["PlayOnStart"] = false;
+    if (!data.contains("Spatial3D"))   data["Spatial3D"] = false;
+
+    // Group the properties visually
+    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop" });
+
+    // to be editted
+    EditorUI::RenderIntProperty("Cue Id", data, "CueId");
+
+    // Volume + Pitch sliders
+    EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f);
+    EditorUI::RenderFloatRow("Pitch", "", data, "Pitch", 0.05f);
+
+    // Loop checkbox
+    EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
+
+    // to be done edits.. missing stuff here
+    EditorUI::RenderCheckboxProperty("Play On Start", data, "PlayOnStart");
+    EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
+
+    EditorUI::EndPropertySection();
+}

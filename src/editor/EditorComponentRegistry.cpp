@@ -260,7 +260,62 @@ static std::vector<ComponentUIMetadata> m_registry = {
             {"Thickness", 1.0f}
         }; },
         COMPONENT_OPS(ECS::Components::ShapeLine2D)
+    },
+
+    // Audio Source
+    {
+            "Audio Source",                    // DisplayName 
+            "AudioSource",                     // TypeName in JSON *match entityserializerzz
+            "ECS::Components::AudioSource",    // FullTypeName (for clarity)
+            true,                              // Can byebye
+
+            // RenderUI -> use ComponentUI's RenderAudioSource
+            [](ComponentUI& ui, nlohmann::json& data)
+            {
+                ui.RenderAudioSource(data);
+            },
+
+            // Defaults -> initial JSON for a new AudioSource
+            []() -> nlohmann::json
+            {
+                return nlohmann::json{
+                    { "CueId",       0 },
+                    { "Volume",      1.0f },
+                    { "Pitch",       1.0f },
+                    { "Loop",        false },
+                    { "PlayOnStart", false },
+                    { "Spatial3D",   false }
+                };
+            },
+
+            // Has Component
+            [](ECS::World* world, ECS::Entity e) -> bool
+            {
+                return world->Has<ECS::Components::AudioSource>(e);
+            },
+
+            // Add Component
+            [](ECS::World* world, ECS::Entity e, const nlohmann::json& data)
+            {
+                ECS::Components::AudioSource comp{};
+                from_json(data, comp);  // uses your NLOHMANN_DEFINE_TYPE_* mapping
+                world->Add<ECS::Components::AudioSource>(e, comp);
+            },
+
+            // Remove Component
+            [](ECS::World* world, ECS::Entity e)
+            {
+                world->Remove<ECS::Components::AudioSource>(e);
+            },
+
+            // Apply To Entity (update existing component from JSON)
+            [](ECS::World* world, ECS::Entity e, const nlohmann::json& data)
+            {
+                auto& comp = world->Get<ECS::Components::AudioSource>(e);
+                from_json(data, comp);
+            }
     }
+
 };
 
 // -----------------------------------------------------------------------------
