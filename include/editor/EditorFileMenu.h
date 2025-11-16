@@ -1,105 +1,86 @@
 /* Start Header *****************************************************************/
 /*!
-\file   ViewportPanel.h
-\author Samantha Leong (80%)
-        Foo Rui Qin    (20%)
-\par    s.leong@digipen.edu
-        ruiqin.foo@digipen.edu
-\date   3rd November 2025
+\file   EditorFileMenu.h
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   16th November 2025
+
 \brief
-Declares the ViewportPanel class for core editor functionality and entity management.
+Declares the EditorFileMenu class which manages all File-menu actions in the
+editor. This includes creating new scenes, opening existing scene files and
+saving scenes through standard file dialogs.
+
+The class provides the UI for the File menu tab and exposes operations that can
+also be triggered by keyboard shortcuts. It forwards all load/save requests to
+the SceneManager and ensures the editor state stays in sync with the currently
+active scene.
 */
 /* End Header *******************************************************************/
 
-#pragma once
+#ifndef EDITOR_FILE_MENU_H
+#define EDITOR_FILE_MENU_H
 
-#include "ecs/World.h"
-#include <imgui.h>
 #include <string>
-#include <memory>
-#include <functional>
+#include <imgui.h>
 
-// Forward declarations
-namespace ECS { class RendererSystem; }
-using EntityId = uint32_t;
+// Forward declaration so we don't need the full SceneManager here
+namespace Scenes { class SceneManager; }
 
-// Viewport panel for main menu, viewport rendering, and entity operations
-class Viewport {
+// Handles File menu UI and scene file operations
+class EditorFileMenu {
 public:
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
-    void SetWorld(ECS::World* world);
 
-    // -------------------------------------------------------------------------
-    // Update
-    // -------------------------------------------------------------------------
-    void HandleInWorldInteraction();
+    // Connects the File menu to the SceneManager so it can create, load and save scenes
+    void Initialize(Scenes::SceneManager* sceneManager);
 
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
-    void ShowEditorWindows();
+
+    // Draws the "File" dropdown menu in the menu bar
+    void RenderFileMenu(float& uiScale);
 
     // -------------------------------------------------------------------------
-    // Entity Operations
+    // Public Operations (callable from keyboard shortcuts)
     // -------------------------------------------------------------------------
-    void AddEntity(const std::string& name, EntityId parentId);
-    void ReparentEntity(EntityId childId, EntityId newParentId);
-    void RemoveEntity(EntityId id, bool recursive);
-    void CloneEntity(EntityId id);
-    void ClearAllEntities();
-    void FocusOnEntity(EntityId id);
 
-    // -------------------------------------------------------------------------
-    // Accessors
-    // -------------------------------------------------------------------------
-    inline bool HasValidWorld() const { return m_world != nullptr; }
-    inline EntityId GetSelectedEntityId() const { return m_selectedEntityId; }
-    inline bool IsViewportHovered() const { return m_isViewportHovered; }
+    // Creates a blank scene and replaces the current active scene
+    void CreateNewScene();
 
-private:
+    // Shows a file dialog allowing the user to pick a .scene file to load
+    void OpenSceneDialog();
+
+    // Shows a Save As dialog and writes the current scene to disk
+    void SaveSceneAsDialog();
+
     // -------------------------------------------------------------------------
     // Keyboard Shortcuts
     // -------------------------------------------------------------------------
-    void _handleKeyboardShortcuts();
 
-    // -------------------------------------------------------------------------
-    // Main Menu
-    // -------------------------------------------------------------------------
-    void _renderMainMenu();
+    // Respond to keyboard shortcuts that trigger file menu actions like new open or save
+    void HandleShortcuts(float& uiScale);
 
+private:
     // -------------------------------------------------------------------------
-    // Viewport
+    // Internal Helpers
     // -------------------------------------------------------------------------
-    void _renderViewport();
 
-    // -------------------------------------------------------------------------
-    // Scene Management
-    // -------------------------------------------------------------------------
-    void _createNewScene();
-    void _openSceneDialog();
+    // Loads a scene from the provided filesystem path and sets it as active
     void _openScene(const std::string& path);
-    void _saveScene();
-    void _saveSceneAsDialog(bool isTemplate);
-    void _saveSceneToFile(const std::string& path);
 
-    // -------------------------------------------------------------------------
-    // Helper Methods
-    // -------------------------------------------------------------------------
-    void _invalidateCache();
+    // Serializes and writes the current scene to the given file path
+    void _saveSceneToFile(const std::string& path);
 
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
-    ImFont* m_mainFont = nullptr;
-    ImFont* m_boldFont = nullptr;
-    ImFont* m_symbolsFont = nullptr;
-    ECS::World* m_world = nullptr;
-    std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
 
-    EntityId m_selectedEntityId = 0;
-    bool m_isViewportHovered = false;
-    float m_uiScale = 1.0f;
+    // Scene manager used to create, load, and save scenes
+    Scenes::SceneManager* m_sceneManager = nullptr;
+
 };
+
+#endif

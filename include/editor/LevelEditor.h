@@ -25,6 +25,7 @@ New Features:
 #include "../editor/InspectorPanel.h"
 #include "../editor/Viewport.h"
 #include "../editor/EditorEntityActions.h"
+#include "../editor/EditorFileMenu.h"
 #include <imgui.h>
 #include <unordered_set>
 #include <functional>
@@ -109,6 +110,7 @@ private:
     HierarchyPanel m_hierarchyWindow; // Entity tree view
     InspectorPanel m_inspector;      // Component property editor
     EntityActions m_entityActions;
+    EditorFileMenu m_fileMenu;
 
     // -------------------------------------------------------------------------
     // State
@@ -128,6 +130,7 @@ private:
     ImGuiID m_dockspaceId = 0;
     bool m_dockLayoutBuilt = false;
     ImVec2 m_lastViewportSize{ 0, 0 };
+    float m_uiScale = 1.0f;
 
     // Playback state tracking
     Playback::GameState m_lastGameState = Playback::GameState::Stopped;

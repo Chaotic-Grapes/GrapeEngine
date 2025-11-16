@@ -10,7 +10,7 @@
 \brief
 Implements editor-side entity operations such as creation, deletion, cloning
 and reparenting for the active scene. Called by panels so editor scripts avoid
-direct ECS manipulation
+direct ECS manipulation.
 */
 /* End Header *******************************************************************/
 
