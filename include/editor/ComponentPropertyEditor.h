@@ -85,6 +85,9 @@ public:
     // Renders Z-index for controlling 2D rendering order
     void RenderZIndex2D(nlohmann::json& data);
 
+    // Renders AudioSource for component 
+    void RenderAudioSource(nlohmann::json& data);
+
 private:
     // -------------------------------------------------------------------------
     // State

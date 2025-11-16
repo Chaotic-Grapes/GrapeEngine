@@ -47,6 +47,7 @@ public:
         m_byPath.clear();
 
         namespace fs = std::filesystem;
+
         fs::path root(audioRoot);
 
         if (!fs::exists(root) || !fs::is_directory(root))

@@ -353,14 +353,31 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         }
     }
 
+
+
     if (m_world->Has<ECS::Components::AudioSource>(entity)) {
-        renderComponent("Audio Source", [&]() {
-            auto& comp = m_world->Get<ECS::Components::AudioSource>(entity);
-            nlohmann::json j;
-            to_json(j, comp);                     // Component -> JSON
-            m_componentUI.RenderAudioSource(j);   // Draw + edit UI
-            from_json(j, comp);                   // JSON -> component
-            });
+        // Get ECS component
+        auto& comp = m_world->Get<ECS::Components::AudioSource>(entity);
+
+        // Component -> Json
+        nlohmann::json j;
+        to_json(j, comp); 
+
+        // Audio section     
+        _renderComponentSection(
+            "Audio Source",   // Display Name
+            "AudioSource",    // Type name -> matching serializer string
+            j,                // JSON data to be edited
+            [this](nlohmann::json& data)
+            {
+                // Use ComponentUI to draw the fields: Cue, Volume, etc
+                m_componentUI.RenderAudioSource(data);
+            },
+            true // Set to button true
+        );
+
+        // Editted json back to component
+        from_json(j, comp); // JSON -> Component
     }
 
     ImGui::EndChild();
