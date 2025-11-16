@@ -1,4 +1,4 @@
-#include "AudioSystem.h"
+#include "../engine/audio/AudioSystem.h"
 #include "../editor/AudioAssetLibrary.h"
 #include "../engine/services/AudioService.h"
 #include "audio/FmodAudioDevice.h"
@@ -14,7 +14,7 @@
       - If it does have one -> update volume/pitch every frame
       - If CueId becomes 0 or clip disappears -> Stop and clear handle
 */
-void AudioSystem::Update(float dt)
+void AudioSystem::Update(float /* dt if used*/)
 {
     AudioAssetLibrary& lib = AudioAssetLibrary::Get();
 
@@ -26,11 +26,9 @@ void AudioSystem::Update(float dt)
     m_world.Each<ECS::Components::AudioSource, ECS::Components::WorldTransform>(
         [&](ECS::Entity e,
             ECS::Components::AudioSource& src,
-            ECS::Components::WorldTransform& xform)
+            ECS::Components::WorldTransform& /*xform*/)
         {
-            // -----------------------------------------------------
-            // 1) If no cue is assigned, make sure we stop any sound
-            // -----------------------------------------------------
+           // If no que make sure there isnt a clip playing
             if (src.CueId == 0)
             {
                 auto it = m_activeSounds.find(e);
@@ -44,9 +42,7 @@ void AudioSystem::Update(float dt)
                 return;
             }
 
-            // -----------------------------------------------------
-            // 2) Resolve CueId -> clip info (contains path)
-            // -----------------------------------------------------
+            // CueID-> for path resolution
             const auto* clip = lib.FindById(src.CueId);
             if (!clip)
             {
@@ -61,25 +57,19 @@ void AudioSystem::Update(float dt)
                 return;
             }
 
-            // We’ll use the asset path as a unique cue key for FMOD
+            // Use the asset path as a unique cue key for FMOD
             std::string cueKey = clip->path;
 
-            // -----------------------------------------------------
-            // 3) Ensure this cue is loaded in the device
-            // -----------------------------------------------------
+            // Cue is loaded
             Audio::SoundParams params{};
             // params.is3D = true; // if you later want this to be 3D
             m_audioService.LoadCue(cueKey, clip->path, params);
 
-            // -----------------------------------------------------
-            // 4) Check if this entity already has a playing instance
-            // -----------------------------------------------------
+            // Check if entity has a playing soundclip
             auto it = m_activeSounds.find(e);
             bool hasInstance = (it != m_activeSounds.end());
 
-            // -----------------------------------------------------
-            // 5) If no instance yet -> start playback once
-            // -----------------------------------------------------
+            // If no setplayback
             if (!hasInstance)
             {
                 Audio::PlaySettings settings{};
@@ -96,23 +86,12 @@ void AudioSystem::Update(float dt)
                 return; // just started it; we'll update next frame
             }
 
-            // -----------------------------------------------------
-            // 6) Already playing -> update volume/pitch each frame
-            // -----------------------------------------------------
+            // IF playing -> set vol/pitch
             Audio::PlaybackHandle handle = it->second;
 
             device->SetInstanceVolume(handle, src.Volume);
             device->SetInstancePitch(handle, src.Pitch);
 
-            // If later you want positional audio and have a way to
-            // reconstruct position from WorldTransform.Matrix, you can
-            // compute a Vec3 and call:
-            //
-            //   Audio::Vec3 pos{ x, y, z };
-            //   Audio::Vec3 vel{ 0.0f, 0.0f, 0.0f };
-            //   device->SetInstancePosition(handle, pos, vel);
-            //
-            // For now we keep it as simple 2D audio.
         }
     );
 }
