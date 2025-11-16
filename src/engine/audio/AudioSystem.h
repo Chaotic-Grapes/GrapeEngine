@@ -5,7 +5,7 @@
 #include "services/AudioService.h"
 #include <unordered_map>
 #include "ecs/Components.h"
-#include "..
+#include "../engine/audio/FmodAudioDevice.h"
 
 /*
    AudioSystem
@@ -24,14 +24,19 @@
 class AudioSystem
 {
 public:
-    AudioSystem(ECS::World& world);
+    AudioSystem(ECS::World& world, Services::AudioService& audioService)
+        : m_world(world)
+        , m_audioService(audioService)
+    {
+    }
 
     // Called every frame
     void Update(float dt);
 
 private:
-    ECS::World& m_world;
+    ECS::World& m_world; //reference to world
+    Services::AudioService& m_audioService; //reference to audioservice
 
     // Map entity -> playing instance handle
-    std::unordered_map<ECS::Entity, SoundHandle, ECS::EntityHash> m_activeSounds;
+    std::unordered_map<ECS::Entity, Audio::PlaybackHandle> m_activeSounds;
 };

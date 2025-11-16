@@ -1,83 +1,118 @@
 #include "AudioSystem.h"
-
-AudioSystem::AudioSystem(ECS::World& world)
-    : m_world(world)
-{
-}
-
+#include "../editor/AudioAssetLibrary.h"
+#include "../engine/services/AudioService.h"
+#include "audio/FmodAudioDevice.h"
 /*
     Update(dt)
     ----------
-    This is the heart of your audio pipeline during runtime.
+    Runtime audio update:
 
-    Steps:
-    1. Iterate over all AudioSource components (and optionally WorldTransform)
-    2. For each:
-         - Resolve its CueId via AudioAssetLibrary
-         - Ensure audio is loaded using AudioService
-         - If PlayOnStart and NOT already playing -> play it
-         - If looping is changed -> update FMOD channel
-         - If Spatial3D -> push 3D position to FMOD
+    For every entity with AudioSource + WorldTransform:
+      - Resolve CueId -> clip (path) via AudioAssetLibrary
+      - Ensure the cue is loaded into the audio device
+      - If this entity has no active PlaybackHandle yet -> Play
+      - If it does have one -> update volume/pitch every frame
+      - If CueId becomes 0 or clip disappears -> Stop and clear handle
 */
 void AudioSystem::Update(float dt)
 {
     AudioAssetLibrary& lib = AudioAssetLibrary::Get();
 
-    // Iterate every AudioSource in the world
-    m_world.Each<Components::AudioSource, Components::WorldTransform>(
-        [&](ECS::Entity e,
-            Components::AudioSource& src,
-            Components::WorldTransform& xform)
-        {
-            // Resolve sound from CueId
-            const auto* clip = lib.FindById(src.CueId);
+    // If the device isn't ready, do nothing
+    Audio::FmodAudioDevice* device = m_audioService.Device();
+    if (!device)
+        return;
 
-            if (!clip)
+    m_world.Each<ECS::Components::AudioSource, ECS::Components::WorldTransform>(
+        [&](ECS::Entity e,
+            ECS::Components::AudioSource& src,
+            ECS::Components::WorldTransform& xform)
+        {
+            // -----------------------------------------------------
+            // 1) If no cue is assigned, make sure we stop any sound
+            // -----------------------------------------------------
+            if (src.CueId == 0)
             {
-                // No valid audio clip assigned -> stop if previously playing
-                if (m_activeSounds.count(e))
+                auto it = m_activeSounds.find(e);
+                if (it != m_activeSounds.end())
                 {
-                    AudioService::Get().Stop(m_activeSounds[e]);
-                    m_activeSounds.erase(e);
+                    // m_activeSounds stores Audio::PlaybackHandle,
+                    // which matches AudioService::Stop(...)
+                    m_audioService.Stop(it->second, Audio::StopMode::Immediate);
+                    m_activeSounds.erase(it);
                 }
                 return;
             }
 
-            AudioService& audio = AudioService::Get();
-
-            // Lazily load this clip
-            SoundHandle handle = audio.Load(clip->path);
-            if (!handle.IsValid())
-                return; // Could not load -> ignore
-
-            // Start sound on first time (PlayOnStart)
-            if (src.PlayOnStart && !m_activeSounds.count(e))
+            // -----------------------------------------------------
+            // 2) Resolve CueId -> clip info (contains path)
+            // -----------------------------------------------------
+            const auto* clip = lib.FindById(src.CueId);
+            if (!clip)
             {
-                SoundHandle instance = audio.Play(handle, /*loop=*/src.Loop, src.Volume, src.Pitch);
-                m_activeSounds[e] = instance;
+                // CueId is set but library has no matching clip
+                // -> stop any playing instance
+                auto it = m_activeSounds.find(e);
+                if (it != m_activeSounds.end())
+                {
+                    m_audioService.Stop(it->second, Audio::StopMode::Immediate);
+                    m_activeSounds.erase(it);
+                }
+                return;
             }
 
-            // If already playing, update properties each frame
-            if (m_activeSounds.count(e))
+            // We’ll use the asset path as a unique cue key for FMOD
+            std::string cueKey = clip->path;
+
+            // -----------------------------------------------------
+            // 3) Ensure this cue is loaded in the device
+            // -----------------------------------------------------
+            Audio::SoundParams params{};
+            // params.is3D = true; // if you later want this to be 3D
+            m_audioService.LoadCue(cueKey, clip->path, params);
+
+            // -----------------------------------------------------
+            // 4) Check if this entity already has a playing instance
+            // -----------------------------------------------------
+            auto it = m_activeSounds.find(e);
+            bool hasInstance = (it != m_activeSounds.end());
+
+            // -----------------------------------------------------
+            // 5) If no instance yet -> start playback once
+            // -----------------------------------------------------
+            if (!hasInstance)
             {
-                SoundHandle inst = m_activeSounds[e];
+                Audio::PlaySettings settings{};
+                settings.volume = src.Volume;
+                settings.pitch = src.Pitch;
+                settings.loop = src.Loop;
+                // settings.mode stays default (PlayMode::Single)
 
-                audio.SetVolume(inst, src.Volume);
-                audio.SetPitch(inst, src.Pitch);
-                audio.SetLoop(inst, src.Loop);
-
-                if (src.Spatial3D)
+                Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings);
+                if (handle)   // operator bool() => handle.Id != 0
                 {
-                    // Convert world transform position to FMOD listener space
-                    audio.Set3DPosition(inst, xform.Position.x, xform.Position.y, xform.Position.z);
+                    m_activeSounds[e] = handle;
                 }
-
-                // If sound finished playing and not looping -> erase
-                if (!src.Loop && audio.IsStopped(inst))
-                {
-                    m_activeSounds.erase(e);
-                }
+                return; // just started it; we'll update next frame
             }
+
+            // -----------------------------------------------------
+            // 6) Already playing -> update volume/pitch each frame
+            // -----------------------------------------------------
+            Audio::PlaybackHandle handle = it->second;
+
+            device->SetInstanceVolume(handle, src.Volume);
+            device->SetInstancePitch(handle, src.Pitch);
+
+            // If later you want positional audio and have a way to
+            // reconstruct position from WorldTransform.Matrix, you can
+            // compute a Vec3 and call:
+            //
+            //   Audio::Vec3 pos{ x, y, z };
+            //   Audio::Vec3 vel{ 0.0f, 0.0f, 0.0f };
+            //   device->SetInstancePosition(handle, pos, vel);
+            //
+            // For now we keep it as simple 2D audio.
         }
     );
 }
