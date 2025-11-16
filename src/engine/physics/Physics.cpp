@@ -179,9 +179,9 @@ namespace Engine {
         const float depth,
         const ECS::Components::PhysicsMaterial2D& physics
     ) {
- 
 
-		(void)transformB;
+
+        (void)transformB;
 
         // Create a result structure to store collision outcome
         CollisionResult result{};
@@ -258,59 +258,59 @@ namespace Engine {
                     velB.Value += frictionVector * invMassB;
                 }
             }
-        // ========================================================================
-        // POSITION CORRECTION (push objects apart)
-        // IMPROVED FOR THIN RECTANGLES
-        // ========================================================================
-        {
-            // Use smaller slop for thin objects to prevent tunneling
-            const float slop = 0.1f;  // Increased from 0.01f
+            // ========================================================================
+            // POSITION CORRECTION (push objects apart)
+            // IMPROVED FOR THIN RECTANGLES
+            // ========================================================================
+            {
+                // Use smaller slop for thin objects to prevent tunneling
+                const float slop = 0.1f;  // Increased from 0.01f
 
-            // Use higher percentage for aggressive correction
-            const float percent = std::min(physics.PositionCorrectPercent, 0.95f);
+                // Use higher percentage for aggressive correction
+                const float percent = std::min(physics.PositionCorrectPercent, 0.95f);
 
-            // Calculate base correction
-            float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
+                // Calculate base correction
+                float correctionMagnitude = std::max(depth - slop, 0.0f) * percent;
 
-         
-            // This prevents balls from getting stuck in thin walls
-            if (depth > slop * 2.0f) {
-                // Deep penetration - likely tunneled through thin wall
-                // Use even more aggressive correction
-                const float deepPenetrationBoost = 1.5f;
-                correctionMagnitude = std::max(depth - slop, 0.0f) * percent * deepPenetrationBoost;
-            }
 
-            const Vector2D correction = normal * (correctionMagnitude / invMassSum);
-
-            // Apply position correction
-            transformA.Position.X -= correction.X * invMassA;
-            transformA.Position.Y -= correction.Y * invMassA;
-            transformB.Position.X += correction.X * invMassB;
-            transformB.Position.Y += correction.Y * invMassB;
-
-            // Kill velocity toward wall for deeply penetrated objects
-            if (depth > slop * 3.0f) {
-                // Check velocity toward collision normal
-                const float vNormalA = Dot(velA.Value, normal);
-                const float vNormalB = Dot(velB.Value, normal);
-
-                // If object A is moving toward B (negative normal velocity), dampen it
-                if (vNormalA < 0.0f && invMassA > 0.0f) {
-                    velA.Value -= normal * vNormalA * 0.5f;  // Remove 50% of inward velocity
+                // This prevents balls from getting stuck in thin walls
+                if (depth > slop * 2.0f) {
+                    // Deep penetration - likely tunneled through thin wall
+                    // Use even more aggressive correction
+                    const float deepPenetrationBoost = 1.5f;
+                    correctionMagnitude = std::max(depth - slop, 0.0f) * percent * deepPenetrationBoost;
                 }
 
-                // If object B is moving toward A (positive normal velocity), dampen it
-                if (vNormalB > 0.0f && invMassB > 0.0f) {
-                    velB.Value -= normal * vNormalB * 0.5f;  // Remove 50% of inward velocity
+                const Vector2D correction = normal * (correctionMagnitude / invMassSum);
+
+                // Apply position correction
+                transformA.Position.X -= correction.X * invMassA;
+                transformA.Position.Y -= correction.Y * invMassA;
+                transformB.Position.X += correction.X * invMassB;
+                transformB.Position.Y += correction.Y * invMassB;
+
+                // Kill velocity toward wall for deeply penetrated objects
+                if (depth > slop * 3.0f) {
+                    // Check velocity toward collision normal
+                    const float vNormalA = Dot(velA.Value, normal);
+                    const float vNormalB = Dot(velB.Value, normal);
+
+                    // If object A is moving toward B (negative normal velocity), dampen it
+                    if (vNormalA < 0.0f && invMassA > 0.0f) {
+                        velA.Value -= normal * vNormalA * 0.5f;  // Remove 50% of inward velocity
+                    }
+
+                    // If object B is moving toward A (positive normal velocity), dampen it
+                    if (vNormalB > 0.0f && invMassB > 0.0f) {
+                        velB.Value -= normal * vNormalB * 0.5f;  // Remove 50% of inward velocity
+                    }
                 }
             }
+
+
+            // Return the final collision result
+            return result;
         }
 
-
-        // Return the final collision result
-        return result;
     }
-
-
 }
