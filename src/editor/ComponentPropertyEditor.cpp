@@ -460,6 +460,11 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
+// Static variab/flags
+static bool s_showUnsupportedPopup = false;
+static std::string s_unsupportedPath;
+
+
 //Renders the AudioSource component Properties
 void ComponentUI::RenderAudioSource(nlohmann::json& data)
 {
@@ -558,10 +563,8 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data)
             }
             else
             {
-                // Here you trigger your existing "unsupported format" popup.
-                // e.g. set a global flag & store the path string:
-                // s_showUnsupportedPopup = true;
-                // s_unsupportedPath = path.string();
+                s_showUnsupportedPopup = true;
+                s_unsupportedPath = path.string();
             }
         }
         ImGui::EndDragDropTarget();
@@ -579,4 +582,29 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data)
     EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
 
     EditorUI::EndPropertySection();
+
+    if (s_showUnsupportedPopup)
+    {
+        ImGui::OpenPopup("Unsupported Audio Format");
+        ImGui::SetNextWindowSize(ImVec2(450, 250), ImGuiCond_Appearing);
+    }
+
+    if (ImGui::BeginPopupModal("Unsupported Audio Format",
+        nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextWrapped(
+            "The file you tried to assign is not a supported audio format.\n\n"
+            "Only .wav, .ogg, .mp3, and .flac files are allowed.\n\n"
+        );
+
+        if (ImGui::Button("OK", ImVec2(120, 0)))
+        {
+            s_showUnsupportedPopup = false;
+            s_unsupportedPath.clear();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
 }
