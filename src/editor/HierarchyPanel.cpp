@@ -19,6 +19,8 @@ and supports prefab instantiation by accepting dragged prefab assets.
 
 #include "../editor/HierarchyPanel.h"
 #include "../editor/Viewport.h"
+#include "../editor/ComponentWidgets.h"
+#include "../editor/EditorComponentRegistry.h"
 #include "core/Logger.h"
 #include "helpers/MathUtils.h"
 #include "services/Input.h"
@@ -104,11 +106,12 @@ void HierarchyPanel::Render() {
     // Early return if no world is attached to prevent crashes
     if (!m_world) {
         ImGui::TextDisabled("No scene attached");
+        ImGui::TextDisabled("Create a new scene or open one via File");
         if (m_mainFont) ImGui::PopFont();
         ImGui::End();
         return;
     }
-    
+
     // Render the main UI sections
     _renderHeader();           // Header with entity creation controls
     _renderEntityTree();       // Main entity tree with drag-drop
@@ -122,7 +125,7 @@ void HierarchyPanel::Render() {
     // Click empty space to clear selection
     // Only clears if clicking on window background, not on any items
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered()) 
+        && !ImGui::IsAnyItemHovered())
     {
         m_selectedEntityId = 0;
         if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
@@ -200,7 +203,7 @@ void HierarchyPanel::_renderEntityTree() {
 
     // Click empty space in tree to clear selection
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered()) 
+        && !ImGui::IsAnyItemHovered())
     {
         m_selectedEntityId = 0;
         if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
@@ -367,7 +370,13 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
                 // Instantiate the prefab as a child of the current entity node
-                _instantiatePrefabAsChild(droppedPath, entityId);
+                EntityId newEntityId = _instantiatePrefabAsChild(droppedPath, entityId);
+
+                // Select the newly created entity so it shows up in inspector immediately
+                if (newEntityId != ECS::Entity::NPOS32) {
+                    m_selectedEntityId = newEntityId;
+                    if (m_selectionCallback) m_selectionCallback(newEntityId);
+                }
             }
         }
         ImGui::EndDragDropTarget();
@@ -389,7 +398,13 @@ void HierarchyPanel::_handleTreeDragDrop() {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
-                _instantiatePrefabAsChild(droppedPath, ECS::Entity::NPOS32);
+                EntityId newEntityId = _instantiatePrefabAsChild(droppedPath, ECS::Entity::NPOS32);
+
+                // Select the newly created entity so it shows up in inspector immediately
+                if (newEntityId != ECS::Entity::NPOS32) {
+                    m_selectedEntityId = newEntityId;
+                    if (m_selectionCallback) m_selectionCallback(newEntityId);
+                }
             }
         }
         ImGui::EndDragDropTarget();
@@ -468,25 +483,57 @@ void HierarchyPanel::_addRootEntity() {
 
 // Instantiate a prefab as a child of the specified parent
 // Handles JSON deserialization and component setup
-void HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId) {
-    if (!m_world) return;
+// Returns the entity ID of the newly created instance
+EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId) {
+    if (!m_world) return ECS::Entity::NPOS32;
 
     try {
         // Open and read prefab file
         std::ifstream file(prefabPath);
         if (!file.is_open()) {
             LOG_ERROR("Cannot open prefab: " << prefabPath);
-            return;
+            return ECS::Entity::NPOS32;
         }
 
         // Parse JSON data from prefab file
         nlohmann::json prefabJson;
-        file >> prefabJson; 
-        file.close();     
+        file >> prefabJson;
+        file.close();
 
-        // Deserialize entity from JSON data
-        // EntitySerializer converts JSON data into actual ECS components and entity
-        auto entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, prefabJson);
+        // Validate prefab structure
+        if (!prefabJson.contains("Components") || !prefabJson["Components"].is_array()) {
+            LOG_ERROR("Invalid prefab format: missing Components array");
+            return ECS::Entity::NPOS32;
+        }
+
+        // Create new entity
+        ECS::Entity entity = m_world->Create();
+
+        // Set entity name from prefab filename (Unity-like behavior)
+        std::filesystem::path p(prefabPath);
+        std::string prefabName = p.stem().string();
+
+        // Create Name component and copy prefab name into it
+        ECS::Components::Name nameComp;
+        strncpy_s(nameComp.Value, prefabName.c_str(), sizeof(nameComp.Value) - 1);
+        nameComp.Value[sizeof(nameComp.Value) - 1] = '\0'; // Ensure null termination
+        m_world->Set<ECS::Components::Name>(entity, nameComp);
+
+        // Apply all components from prefab data using ComponentRegistryUI
+        // This automatically handles all component types without repetitive code
+        for (const auto& componentEntry : prefabJson["Components"]) {
+            // Validate component entry structure
+            if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
+            if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
+
+            std::string typeName = componentEntry["TypeName"];
+            const auto* meta = ComponentRegistryUI::Find(typeName);
+
+            // Use registry's AddComponent function to create and deserialize the component
+            if (meta) {
+                meta->AddComponent(m_world, entity, componentEntry["Data"]);
+            }
+        }
 
         // Set parent relationship if not creating as root
         // NPOS32 is a special value meaning "no parent" (root entity)
@@ -500,14 +547,18 @@ void HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath, En
         }
 
         // Add prefab link component to track prefab relationship
-        std::filesystem::path p(prefabPath);
+        // This component connects the instance back to the prefab template file
         std::string linkPath = p.lexically_normal().string();
         m_world->Set<ECS::Components::PrefabLink>(entity, ECS::Components::PrefabLink(linkPath));
 
-        LOG_INFO("Instantiated prefab: " << p.filename().string());
+        LOG_INFO("Instantiated prefab: " << prefabName);
+
+        // Return the entity ID so caller can select it
+        return entity.Index;
     }
     catch (const std::exception& e) {
         LOG_ERROR("Failed to instantiate prefab: " << e.what());
+        return ECS::Entity::NPOS32;
     }
 }
 

@@ -6,6 +6,7 @@
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
 \date   5th November 2025
+
 \brief
 Declares the HierarchyPanel class which manages the hierarchy window used to
 browse and organise entities in a scene.
@@ -47,7 +48,8 @@ public:
 
     // Initialize the hierarchy panel with required fonts and system references
     // Fonts are used for consistent UI styling across the panel
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, Viewport* viewport);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, 
+        Viewport* viewport);
 
     // Update the world reference when switching between scenes
     // Clears internal state like selection and expanded nodes
@@ -124,7 +126,8 @@ private:
     // -------------------------------------------------------------------------
 
     // Instantiate a prefab file as a child of the specified parent entity
-    void _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
+    // Returns the entity ID of the newly created instance
+    EntityId _instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId);
 
     // -------------------------------------------------------------------------
     // Helper Methods
@@ -144,9 +147,9 @@ private:
     // -------------------------------------------------------------------------
 
     // Font references for UI styling
-    ImFont* m_mainFont = nullptr;      
-    ImFont* m_boldFont = nullptr;      
-    ImFont* m_symbolsFont = nullptr;   
+    ImFont* m_mainFont = nullptr;
+    ImFont* m_boldFont = nullptr;
+    ImFont* m_symbolsFont = nullptr;
 
     // System references
     ECS::World* m_world = nullptr;                // ECS world containing all entities and components

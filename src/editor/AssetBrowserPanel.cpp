@@ -4,6 +4,7 @@
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
 \date   26th October 2025
+
 \brief
 Implements the AssetBrowserPanel which renders the asset browser UI.
 

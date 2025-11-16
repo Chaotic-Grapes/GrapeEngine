@@ -270,6 +270,9 @@ void Viewport::ReparentEntity(EntityId childId, EntityId newParentId) {
             if (!isDescendant) {
                 m_world->Set<ECS::Parent>(child, ECS::Parent{ newParent });
             }
+            else {
+                LOG_WARNING("Cannot parent entity to its own descendant: this would create a cyclic hierarchy");
+            }
         }
     }
 

@@ -4,6 +4,7 @@
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
 \date   3rd November 2025
+
 \brief
 Declares the AssetLibrary which powers all asset browser file operations.
 
