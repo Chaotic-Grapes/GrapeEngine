@@ -22,10 +22,10 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include "../editor/AudioAssetLibrary.h"
 
 // Create the editor and initialize panel members and config
-LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
+LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
     : m_world(world), m_config(config), m_playback(world), m_symbolsFont(nullptr),
     m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_viewport(),
-    m_hierarchyWindow(), m_inspector() {
+    m_hierarchyWindow(), m_inspector(), m_entityActions(scene) {
 // Defer panel initialization to Initialize to use loaded fonts
 }
 
@@ -196,6 +196,9 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
     _loadFonts();
 
+    Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
+    m_fileMenu.Initialize(sm);
+
     // Register all panels with their initialization and render callbacks.
     // Centralizes panel lifecycle management and reduces code duplication.
     _registerPanel("Playback Controls",
@@ -215,14 +218,15 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     _registerPanel("Editor Core",
         [this]() { 
-            m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+            Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
+            m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
         },
         [this]() { m_viewport.ShowEditorWindows(); },
         [this](ECS::World* w) { m_viewport.SetWorld(w); }
     );
 
     _registerPanel("Hierarchy",
-        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_viewport); },
+        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); },
         [this]() { m_hierarchyWindow.Render(); },
         [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
     );
@@ -313,12 +317,16 @@ void LevelEditor::_loadFonts() {
 // -------------------------------------------------------------------------
 // Process input and in world interactions for editor panels
 void LevelEditor::Update() {
+    // Apply global shortcuts
+    m_fileMenu.HandleShortcuts(m_uiScale);
+
     // Auto-sync to active scene world if it changed (e.g., via File > New Scene)
     if (Engine::CORE) {
         auto& sm = Engine::CORE->GetSceneManager();
         auto* active = sm.GetActive();
         ECS::World* activeWorld = active ? &active->GetWorld() : nullptr;
         if (activeWorld != m_world) {
+            m_entityActions.SetScene(active);
             SetWorld(activeWorld);
         }
     }
@@ -406,6 +414,10 @@ void LevelEditor::Update() {
 // -------------------------------------------------------------------------
 // Render dock space and editor panels with a fallback when world is missing
 void LevelEditor::Render() {
+    if (ImGui::BeginMainMenuBar()) {
+        m_fileMenu.RenderFileMenu(m_uiScale);
+        ImGui::EndMainMenuBar();
+    }
     _renderDockSpace();
 
     if (m_world) {

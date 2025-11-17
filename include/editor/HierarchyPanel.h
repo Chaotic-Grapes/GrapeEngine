@@ -28,9 +28,7 @@ which entity the user is working with.
 #include <vector>
 #include <unordered_set>
 #include <functional>
-
-// Forward declarations to avoid circular dependencies
-class Viewport;
+#include "../editor/EditorEntityActions.h"
 
 // EntityId is a numeric identifier for entities in the ECS world
 using EntityId = uint32_t;
@@ -49,7 +47,7 @@ public:
     // Initialize the hierarchy panel with required fonts and system references
     // Fonts are used for consistent UI styling across the panel
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, 
-        Viewport* viewport);
+        EntityActions* entityActions);
 
     // Update the world reference when switching between scenes
     // Clears internal state like selection and expanded nodes
@@ -152,16 +150,16 @@ private:
     ImFont* m_symbolsFont = nullptr;
 
     // System references
-    ECS::World* m_world = nullptr;                // ECS world containing all entities and components
-    Viewport* m_viewport = nullptr;               // Viewport for entity operations and camera control
+    ECS::World* m_world = nullptr;                  // ECS world containing all entities and components
+    EntityActions* m_entityActions = nullptr; // For entity operations
 
     // Selection state
-    EntityId m_selectedEntityId = 0;              // Currently selected entity ID (0 = no selection)
-    EntityId m_contextMenuTarget = 0;             // Entity targeted for context menu operations
+    EntityId m_selectedEntityId = 0;                // Currently selected entity ID (0 = no selection)
+    EntityId m_contextMenuTarget = 0;               // Entity targeted for context menu operations
 
     // UI state
-    std::unordered_set<EntityId> m_expandedNodes; // Track which tree nodes are expanded
-    SelectionCallback m_selectionCallback;        // Callback for selection change events
+    std::unordered_set<EntityId> m_expandedNodes;   // Track which tree nodes are expanded
+    SelectionCallback m_selectionCallback;          // Callback for selection change events
 };
 
 #endif

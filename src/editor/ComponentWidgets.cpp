@@ -72,8 +72,8 @@ namespace EditorUI {
         ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
         ImGui::Text("%s", value.c_str());
         
-        // Show appropriate drag hint for texture fields that are empty (TextureId: 0)
-        if (value.find("TextureId: 0") != std::string::npos) {
+        // Show appropriate drag hint for texture fields (TextureId)
+        if (value.find("TextureId: ") != std::string::npos) {
             ImGui::SameLine();
             // Sprite sheet animation
             if (label == "Sprite Sheet") {
