@@ -116,6 +116,7 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ZIndex2D, ZOrder)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PrefabLink, prefabPath)
 		
 		// Custom serialization for ScriptInstance component (char array needs special handling)
 		inline void to_json(nlohmann::json& j, const ScriptInstance& s) {
@@ -192,7 +193,23 @@ namespace Serialization {
 			entityJson["EntityId"] = ECS::EntityUtils::Pack(e);
 			entityJson["Components"] = json::array();
 
+			// CREATE SORTED COMPONENT LIST
+			std::vector<std::pair<TypeId, ComponentInfo>> sortedComponents;
 			for (const auto& [tid, info] : Registry()) {
+				sortedComponents.emplace_back(tid, info);
+			}
+
+			// SORT: Transform first, then alphabetical
+			std::sort(sortedComponents.begin(), sortedComponents.end(),
+				[](const auto& a, const auto& b) {
+					// Transform always comes first
+					if (a.second.Name == "LocalTransform") return true;
+					if (b.second.Name == "LocalTransform") return false;
+					// Everything else alphabetical
+					return a.second.Name < b.second.Name;
+				});
+
+			for (const auto& [tid, info] : sortedComponents) {
 				json compJson;
 				info.Serialize(world, e, compJson);
 				if (!compJson.is_null() && !compJson.empty()) {
@@ -301,6 +318,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices, "CameraMatrices")
 	REGISTER_COMPONENT_SERIALIZER(ScriptInstance, ECS::Components::ScriptInstance, "ScriptInstance")
 	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource, "AudioSource")
+	REGISTER_COMPONENT_SERIALIZER(PrefabLink, ECS::Components::PrefabLink, "PrefabLink")
 }
 
 #endif

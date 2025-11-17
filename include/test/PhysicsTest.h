@@ -16,6 +16,7 @@
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/LifetimeSystem.h"
+#include "scene/TestScene.h"
 #include <vector>
 #include <memory>
 
@@ -24,7 +25,7 @@
 * @brief  sandbox scene to drive physics demonstrations.
 */
 namespace Sandbox {
-	class PhysicsTestScene : public Scenes::Scene {
+	class PhysicsTestScene : public Scenes::TestScene {
 	public:
 		
 		//store test iteration vars in enum

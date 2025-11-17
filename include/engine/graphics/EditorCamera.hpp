@@ -35,6 +35,7 @@ Usage Example:
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include "ecs/Components.h"
+#include "core/messaging/MessageSystem.h"
 #include "services/Input.h"
 #include "services/WindowManager.h"
 #include <glm/glm.hpp>
@@ -49,14 +50,16 @@ namespace Engine {
         /// Updates camera position and projection based on user input.
         void Update(float deltaTime);
 
-        /// Returns the view matrix derived from the camera’s transform.
+        /// Enable/disable processing of input (pan/orbit/zoom). When disabled,
+        /// camera state remains stable regardless of mouse/scroll activity.
+        void SetAllowInput(bool allow) { m_allowInput = allow; }
+
+        /// Returns the view matrix derived from the cameraï¿½s transform.
         [[nodiscard]] glm::mat4 GetViewMatrix() const;
 
         /// Returns the projection matrix from the internal Camera3D component.
         [[nodiscard]] glm::mat4 GetProjectionMatrix() const;
 
-        /// Returns the current world-space position of the camera.
-        [[nodiscard]] glm::vec3 GetPosition() const;
 
         /// Focuses the camera on a given world-space point.
         void Focus(const glm::vec3& target);
@@ -70,15 +73,20 @@ namespace Engine {
         /// Accessor for the internal entity (for filtering in debug visualization)
         ECS::Entity GetEntity() const { return m_cameraEntity; }
 
+        /// Rebind the camera to a different ECS world without recreating the object
+        void BindWorld(ECS::World& world);
+
         void OnWindowResize(int newWidth, int newHeight);
 
     private:
         // --------------------------------------------------------------------
         // Internal state
         // --------------------------------------------------------------------
+        ECS::World* m_world = nullptr;                      //!< Owning ECS world (for cleanup)
         ECS::Entity m_cameraEntity;                         //!< Wrapped ECS entity
         ECS::Components::LocalTransform* m_transform{};     //!< Pointer to Transform component
         ECS::Components::Camera3D* m_camera{};              //!< Pointer to Camera3D component
+        Messaging::SubscriptionHandle m_windowResizedSub{}; //!< Subscription to window resize
 
         glm::vec3 m_target = { 0.f, 0.f, 0.f };             //!< Orbit center
         glm::vec3 m_cameraPosition = { 0.f, 0.f, 10.f };    //!< Cached position
@@ -97,6 +105,9 @@ namespace Engine {
         bool m_firstMouse = true;
         bool m_panning = false;
         bool m_orbiting = false;
+
+        // Whether to process input in Update(). Controlled by editor viewport hover.
+        bool m_allowInput = true;
 
         // --------------------------------------------------------------------
         // Internal helpers

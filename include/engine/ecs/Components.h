@@ -98,7 +98,7 @@ namespace ECS {
     namespace Components {
         // ---------------------------------- Core utility/tag components ----------------------------------
 
-        // Lightweight name (fixed-size). Avoids std::string to remain trivially copyable.
+        // Lightweight name (fixed-size).
         struct Name {
         public:
             // UTF-8 bytes, null-terminated if shorter than buffer. Keep small for cache.
@@ -119,6 +119,28 @@ namespace ECS {
             bool Enabled = true;
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
+
+        // Tracks source prefab asset for entity instantiation and editor re-import workflows
+        struct PrefabLink {
+        public:
+            // Fixed size buffer for prefab asset path to maintain 
+            // trivially copyable status for ECS performance
+            static constexpr size_t MaxPathLength = 256;
+            char prefabPath[MaxPathLength] = { 0 };     // Path to the prefab file this entity was created from
+            PrefabLink() = default;
+
+            // Construct from std::string
+            PrefabLink(const std::string& path) { setPath(path); }
+
+            // Safe string copy with null termination guarantee
+            void setPath(const std::string& path) {
+                strncpy_s(prefabPath, path.c_str(), MaxPathLength - 1);
+                prefabPath[MaxPathLength - 1] = '\0'; // Always null-terminate
+            }
+            // Convert back to std::string for convenience
+            std::string getPath() const { return std::string(prefabPath); }
+        };
+        static_assert(std::is_trivially_copyable_v<PrefabLink>, "PrefabLink must be trivially copyable");
 
         // Lifetime in seconds; entities with Time <= 0 can be culled by a system.
         struct Lifetime {

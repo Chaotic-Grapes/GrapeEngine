@@ -73,6 +73,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Third-Party Libraries
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui_internal.h>
 
 namespace ECS {
     // Helper function to get the effective transform for rendering
@@ -94,15 +95,20 @@ namespace ECS {
     }
 
     // Helper function to convert screen coordinates to world coordinates
-    static glm::vec2 ScreenToWorld(const glm::dvec2& screenPos, const glm::mat4& view, const glm::mat4& projection) {
-        const auto& mainWindow = WindowManager::GetMainWindow();
-        const float screenWidth = static_cast<float>(mainWindow->Width());
-        const float screenHeight = static_cast<float>(mainWindow->Height());
+    static glm::vec2 ScreenToWorld(
+        const glm::dvec2& screenPos,
+        const glm::mat4& view,
+        const glm::mat4& projection,
+        const glm::vec2& viewportMin,    // NEW: viewport offset
+        const glm::vec2& viewportSize)   // NEW: viewport size
+    {
+        // Convert to viewport-local coordinates first
+        glm::vec2 localPos = glm::vec2(screenPos) - viewportMin;
 
-        // Normalize device coordinates (-1 to 1)
+        // Normalize device coordinates (-1 to 1) using viewport dimensions
         glm::vec4 ndc;
-        ndc.x = (2.0f * static_cast<float>(screenPos.x)) / screenWidth - 1.0f;  // explicit cast
-        ndc.y = 1.0f - (2.0f * static_cast<float>(screenPos.y)) / screenHeight; // explicit cast
+        ndc.x = (2.0f * localPos.x) / viewportSize.x - 1.0f;
+        ndc.y = 1.0f - (2.0f * localPos.y) / viewportSize.y;
         ndc.z = 0.0f;
         ndc.w = 1.0f;
 
@@ -212,6 +218,22 @@ namespace ECS {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
+    void RendererSystem::BindWorld(World& world) {
+        // Maintain a single EditorCamera instance; rebind to the new world instead of recreating
+        if (!m_editorCamera) {
+            m_editorCamera = std::make_unique<Engine::EditorCamera>(world);
+        }
+        else {
+            m_editorCamera->BindWorld(world);
+        }
+
+        if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
+            // Keep editor camera usage consistent across scenes
+            m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
+            m_cameraOrthoSize = m_editorCamera->GetCameraComponent()->OrthoSize;
+        }
+    }
+
     glm::vec2 RendererSystem::CalculateAnchoredPosition(
         const Components::LocalTransform& transform,
         Components::TextAnchor anchor,
@@ -277,7 +299,7 @@ namespace ECS {
         // ============================================================
         // 1. Toggle or cycle camera
         // ============================================================
-        if (Input::IsKeyPressed(KEY_C)) {
+        if (!m_lockEditorCamera && Input::IsKeyPressed(KEY_C)) {
             // Count available cameras
             bool hasSceneCamera = false;
 
@@ -292,21 +314,18 @@ namespace ECS {
             // Determine what to do based on camera availability
             if (!hasSceneCamera && !m_useEditorCamera) {
                 // We're on scene camera but there isn't one - shouldn't happen, but stay safe
-                std::cout << "[RendererSystem] Warning: No scene camera exists, switching to editor camera"
-                    << std::endl;
+                LOG_DEBUG("[RendererSystem] Warning: No scene camera exists, switching to editor camera");
                 m_useEditorCamera = true;
             }
             else if (hasSceneCamera) {
                 // Normal toggle; we have a scene camera to toggle to/from
                 m_useEditorCamera = !m_useEditorCamera;
-                std::cout << "[RendererSystem] "
-                    << (m_useEditorCamera ? "Using Editor Camera" : "Using Scene Camera")
-                    << std::endl;
+                LOG_DEBUG("[RendererSystem] "
+                    << (m_useEditorCamera ? "Using Editor Camera" : "Using Scene Camera"));
             }
             else {
                 // We're on editor camera and there's no scene camera so don't toggle
-                std::cout << "[RendererSystem] No scene camera available - staying on editor camera"
-                    << std::endl;
+                LOG_DEBUG("[RendererSystem] No scene camera available - staying on editor camera");
             }
 
             if (m_editorCamera) {
@@ -317,7 +336,17 @@ namespace ECS {
         // ============================================================
         // 2. Use EditorCamera if active, otherwise ECS camera
         // ============================================================
+        if (m_lockEditorCamera) {
+            // Hard-lock: always use editor camera
+            m_useEditorCamera = true;
+            if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
+                m_editorCamera->GetCameraComponent()->Active = true;
+            }
+        }
+
         if (m_useEditorCamera && m_editorCamera) {
+            // Respect editor UI hover: only process input when viewport is hovered
+            m_editorCamera->SetAllowInput(m_editorInputEnabled);
             m_editorCamera->Update(Time::DeltaTime());
             view = m_editorCamera->GetViewMatrix();
             projection = m_editorCamera->GetProjectionMatrix();
@@ -756,13 +785,80 @@ namespace ECS {
                 (void)res;
                 // Dont pick while dragging.
                 if (m_isDragging) return;
-
-                // single-click detection
                 if (!Input::IsMousePressed(MOUSE_LEFT)) return;
+
+                // ============================================================
+                // GET VIEWPORT BOUNDS
+                // ============================================================
+                glm::vec2 viewportMin(0, 0);
+                glm::vec2 viewportSize;
+
+                const auto& win = WindowManager::GetMainWindow();
+                viewportSize = glm::vec2(win->Width(), win->Height());
+                bool useViewportCoords = m_useEditorCamera;
+
+                glm::dvec2 mousePos;
+                Input::GetMousePosition(mousePos.x, mousePos.y);
+
+                if (useViewportCoords) {
+                    // SAFETY: Check if ImGui context is valid
+                    ImGuiContext* ctx = ImGui::GetCurrentContext();
+                    if (!ctx || ctx->Windows.Size == 0) {
+                        // ImGui not initialized or no windows exist - fall back to full window
+                        LOG_DEBUG("[PICKING] ImGui not available, using full window");
+                        useViewportCoords = false;
+                        // Continue with viewportSize = full window (already set above)
+                    }
+                    else {
+                        ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
+
+                        if (viewportWindow) {
+                            ImVec2 vpMin = viewportWindow->ContentRegionRect.Min;
+                            ImVec2 vpMax = viewportWindow->ContentRegionRect.Max;
+                            ImVec2 vpSize = ImVec2(vpMax.x - vpMin.x, vpMax.y - vpMin.y);
+
+                            LOG_DEBUG("[PICKING] Found viewport!");
+                            LOG_DEBUG("[PICKING]   Content min: (" << vpMin.x << ", " << vpMin.y << ")");
+                            LOG_DEBUG("[PICKING]   Content max: (" << vpMax.x << ", " << vpMax.y << ")");
+                            LOG_DEBUG("[PICKING]   Viewport size: " << vpSize.x << " x " << vpSize.y);
+
+                            // Check if mouse is inside viewport content
+                            if (mousePos.x < vpMin.x || mousePos.x > vpMax.x ||
+                                mousePos.y < vpMin.y || mousePos.y > vpMax.y) {
+                                LOG_DEBUG("[PICKING] Mouse OUTSIDE viewport content");
+                                return;
+                            }
+
+                            LOG_DEBUG("[PICKING] Mouse INSIDE viewport content");
+
+                            viewportMin = glm::vec2(vpMin.x, vpMin.y);
+                            viewportSize = glm::vec2(vpSize.x, vpSize.y);
+                        }
+                        else {
+                            // Viewport window not found - fall back to full window
+                            LOG_DEBUG("[PICKING] Viewport window not found, using full window");
+                            useViewportCoords = false;
+                        }
+                    }
+                }
+
+                // ============================================================
+                // RESIZE PICKING FBO IF NEEDED
+                // ============================================================
+                int vpWidth = static_cast<int>(viewportSize.x);
+                int vpHeight = static_cast<int>(viewportSize.y);
+
+                // Check if picking FBO needs resize
+                if (m_pickingFBO.Width() != vpWidth || m_pickingFBO.Height() != vpHeight) {
+                    LOG_DEBUG("[PICKING] Resizing picking FBO: " << vpWidth << "x" << vpHeight);
+                    m_pickingFBO.Resize(vpWidth, vpHeight, false, false);
+                }
 
                 m_pickingFBO.BindAndClear(0, 0, 0, 1);
 
-                // Disable blending for picking to prevent ID color contamination
+                // Set viewport to match FBO size
+                glViewport(0, 0, vpWidth, vpHeight);
+
                 GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
                 if (blendWasEnabled) glDisable(GL_BLEND);
 
@@ -885,25 +981,33 @@ namespace ECS {
 
                 m_renderer->endFrame();
 
-                // Read pixel at mouse position (async)
-                glm::dvec2 mousePos;
-                Input::GetMousePosition(mousePos.x, mousePos.y);
+                // ============================================================
+                // READ PIXEL (now in FBO-local coordinates)
+                // ============================================================
+                glm::vec2 localMouse = glm::vec2(mousePos) - viewportMin;
 
-                int x = static_cast<int>(mousePos.x);
-                int y = m_pickingFBO.height - static_cast<int>(mousePos.y); // Flip Y
+                int x = static_cast<int>(localMouse.x);
+                int y = static_cast<int>(viewportSize.y - localMouse.y);
+
+                x = glm::clamp(x, 0, vpWidth - 1);
+                y = glm::clamp(y, 0, vpHeight - 1);
+
+                LOG_DEBUG("[PICKING] FBO size: " << vpWidth << "x" << vpHeight);
+                LOG_DEBUG("[PICKING] Reading pixel: (" << x << ", " << y << ")");
 
                 static bool firstFrame = true;
                 if (!firstFrame) {
-                    // Frame N: Read from PBO 1 (contains data from frame N-1)
                     int readPBO = 1 - m_currentPBO;
-                    uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF; // Mask to 24-bit
+                    uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
+
+                    LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
 
                     if (pickedID > 0) {
                         m_selectedEntityID = pickedID;
-                        std::cout << "Picked entity index: " << pickedID << std::endl;
-
-                    } else {
-                        m_selectedEntityID = 0; // Clear selection if clicking empty space
+                        LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
+                    }
+                    else {
+                        m_selectedEntityID = 0;
                     }
                 }
                 firstFrame = false;
@@ -923,6 +1027,9 @@ namespace ECS {
                 if (blendWasEnabled) glEnable(GL_BLEND);
 
                 Framebuffer::Unbind();
+
+                // Restore viewport to full window
+                glViewport(0, 0, win->Width(), win->Height());
             });
 
         // Highlight the currently selected entity (overlay onto HDR)
@@ -1288,13 +1395,39 @@ namespace ECS {
         // ============================================================
         // DRAG-TO-MOVE SELECTED ENTITY
         // ============================================================
+        // Store viewport bounds (recalculate or cache from picking pass)
+        glm::vec2 dragViewportMin(0, 0);
+        glm::vec2 dragViewportSize;
+
+        dragViewportSize = glm::vec2(win->Width(), win->Height());
+
+        // Get viewport bounds if using editor camera
+        if (m_useEditorCamera) {
+            // SAFETY: Check if ImGui context is valid
+            ImGuiContext* ctx = ImGui::GetCurrentContext();
+            if (ctx && ctx->Windows.Size > 0) {
+                ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
+                if (viewportWindow) {
+                    ImVec2 vpMin = viewportWindow->ContentRegionRect.Min;
+                    ImVec2 vpMax = viewportWindow->ContentRegionRect.Max;
+                    ImVec2 vpSize = ImVec2(vpMax.x - vpMin.x, vpMax.y - vpMin.y);
+
+                    dragViewportMin = glm::vec2(vpMin.x, vpMin.y);
+                    dragViewportSize = glm::vec2(vpSize.x, vpSize.y);
+                }
+            }
+            // If ImGui not available or viewport not found, use full window (already set)
+        }
+
         static bool wasMouseDownLastFrame = false;
-        static uint32_t lastSelectedEntityID = 0;  // Track previous selection
+        static uint32_t lastSelectedEntityID = 0;
+
 
         if (m_selectedEntityID != 0) {
             glm::dvec2 mousePos;
             Input::GetMousePosition(mousePos.x, mousePos.y);
-            glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection);
+            glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection,
+                dragViewportMin, dragViewportSize);
 
             bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
             bool mouseJustPressed = isMouseDownThisFrame && !wasMouseDownLastFrame;
@@ -1302,8 +1435,8 @@ namespace ECS {
             // Check if selection changed
             bool selectionChanged = (m_selectedEntityID != lastSelectedEntityID);
             if (selectionChanged) {
-                std::cout << "[DRAG] Selection changed from " << lastSelectedEntityID
-                    << " to " << m_selectedEntityID << std::endl;
+                LOG_DEBUG("[DRAG] Selection changed from " << lastSelectedEntityID
+                    << " to " << m_selectedEntityID);
                 // Cancel any ongoing drag
                 m_isDragging = false;
                 lastSelectedEntityID = m_selectedEntityID;
@@ -1315,7 +1448,7 @@ namespace ECS {
                 world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
                     if (e.Index == m_selectedEntityID) {
                         m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
-                        std::cout << "[DRAG] Captured entity pos: " << lt.Position.X << ", " << lt.Position.Y << std::endl;
+                        LOG_DEBUG("[DRAG] Captured entity pos: " << lt.Position.X << ", " << lt.Position.Y);
                     }
                     });
 

@@ -34,6 +34,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <utility>
 #include <cassert>
 #include <functional>
+#include <algorithm>
 #include "ecs/Entity.h"
 #include "ecs/Archetype.h"
 #include "ecs/Components.h"
@@ -83,9 +84,11 @@ namespace ECS {
 
             // Reuse from free list if available
             if (!m_free.empty()) {
-                // If we have a free entity, reuse it instead
-                idx = m_free.back();
-                m_free.pop_back();
+                // Sort to always reuse lowest index first
+                std::sort(m_free.begin(), m_free.end());
+                // Takes from FRONT (lowest index)
+                idx = m_free.front();
+                m_free.erase(m_free.begin());
             }
             else {
                 // Create new entity based on current size of generations vector
@@ -123,10 +126,25 @@ namespace ECS {
 		 * @return bool True if the entity is alive; false otherwise
          */
         bool IsAlive(const Entity e) const {
-            // How to check if an entity is alive:
-            // An entity is considered alive if its index is within the valid range
-            // and its generation number matches the current generation.
-            return e.Index < m_generations.size() && m_generations[e.Index] == e.Generation;
+            // An entity is considered alive if:
+            // - its index is within the valid range,
+            // - its generation number matches the current generation, and
+            // - it currently resides in an archetype (i.e., has a valid location).
+            if (e.Index >= m_generations.size()) return false;
+            if (m_generations[e.Index] != e.Generation) return false;
+            return m_locations[e.Index].ArchetypePtr != nullptr;
+        }
+
+        /**
+         * @brief Resolve an entity id to a valid Entity handle with current generation.
+         * @param id The entity index/id.
+         * @return ECS::Entity with up-to-date generation, or NULL_ENTITY if out of range.
+         */
+        Entity Resolve(const EntityId id) const {
+            if (id >= m_generations.size()) {
+                return NULL_ENTITY;
+            }
+            return Entity{ id, m_generations[id] };
         }
 
         /**
@@ -135,7 +153,11 @@ namespace ECS {
          * @note Assumes the entity is alive, behavior is undefined for dead entities.
          */
         void Destroy(const Entity e) {
-			// Assume entity is alive
+            // Assume entity is alive
+            // If entity participates in hierarchy, unlink it first
+            if (Has<Parent>(e)) {
+                _onComponentRemoving(e, TypeIdOf<Parent>());
+            }
 
             // Lookup location and remove from archetype if present
             auto &loc = m_locations[e.Index];
