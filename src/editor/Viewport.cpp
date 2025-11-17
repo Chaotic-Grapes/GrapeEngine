@@ -20,6 +20,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #endif
 
 #include "../editor/Viewport.h"
+#include "graphics/EditorCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -44,10 +45,6 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include "core/messaging/MessageTypes.h"
 #include <unordered_map>
 
-static constexpr const char* LEVEL_DIR = "assets/levels/";
-static constexpr const char* SCENE_DIR = "assets/scenes/";
-static constexpr const char* SCENE_TEMPLATE_DIR = "assets/scenes/templates/";
-
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
@@ -61,18 +58,27 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
     m_fileMenu.Initialize(sceneManager);
 
     // Create and initialize renderer system
+    // RendererSystem creates and manages its own EditorCamera internally
     if (m_world && !m_rendererSystem) {
         m_rendererSystem = std::make_shared<ECS::RendererSystem>();
         m_rendererSystem->Initialize(*m_world);
         m_rendererSystem->BindWorld(*m_world);
-        m_rendererSystem->ForceUseEditorCamera(true);
-        m_rendererSystem->SetEditorCameraLocked(true);
+        m_rendererSystem->SetEditorInputEnabled(true);
     }
 }
 
 void Viewport::SetWorld(ECS::World* world) {
     m_world = world;
-    if (m_rendererSystem && world) {
+
+    // Create renderer if it doesn't exist yet (handles File > Open Scene case)
+    if (!m_rendererSystem && world) {
+        m_rendererSystem = std::make_shared<ECS::RendererSystem>();
+        m_rendererSystem->Initialize(*world);
+        m_rendererSystem->BindWorld(*world);
+        m_rendererSystem->SetEditorInputEnabled(true);
+    }
+    // Rebind existing renderer to new world
+    else if (m_rendererSystem && world) {
         m_rendererSystem->BindWorld(*world);
     }
 }
@@ -89,6 +95,12 @@ void Viewport::OnSelectionChanged(std::function<void(EntityId)> callback) {
 // -------------------------------------------------------------------------
 void Viewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
+
+    // Control editor camera input based on viewport hover state
+    // RendererSystem will call EditorCamera::Update() in its own Update()
+    if (m_rendererSystem) {
+        m_rendererSystem->SetEditorInputEnabled(m_isViewportHovered);
+    }
 
     // Keep selection in sync with renderer picking only when hovering the viewport
     if (m_rendererSystem && m_isViewportHovered) {

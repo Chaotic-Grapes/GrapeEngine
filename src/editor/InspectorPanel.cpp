@@ -32,6 +32,37 @@ through a unified system shared by both entities and prefab templates.
 #include <fstream>
 #include <algorithm>
 
+namespace {
+    // Helper template function to safely add components during deserialization
+    // Checks if the component type matches expected name before adding
+    template <typename T>
+    bool AddComponentIfMatch(ECS::World* world, ECS::Entity instance, const std::string& typeName,
+        const std::string& expectedName, nlohmann::json& compData)
+    {
+        // If the json component name does not match what this function handles we skip it
+        // This avoids adding the wrong component type to the entity
+        if (typeName != expectedName) return false;
+
+        // Only add the component if the entity does not already have it
+        // world Has<T> checks if this entity already contains a component of type T
+        if (!world->Has<T>(instance)) {
+            // Add<T> attaches the component to the entity and returns a reference to it
+            auto& c = world->Add<T>(instance);
+            // from_json fills the new component using values from the json 
+            // This allows prefabs and saved scenes to restore component state exactly
+            from_json(compData, c);
+        }
+        // true means this template handled the component successfully
+        return true;
+    }
+
+    // Helper to check if an entity ID is protected from editing
+    // Returns true if entity should NOT be inspected or modified
+    bool IsProtectedEntity(EntityId id) {
+        return (id == 0); // Entity ID 0 is EditorCamera (system entity)
+    }
+}
+
 // -------------------------------------------------------------------------
 // Lifecycle Management
 // -------------------------------------------------------------------------
@@ -59,6 +90,13 @@ void InspectorPanel::SetWorld(ECS::World* world) {
 
 // Switch inspector into entity mode and validate the entity we want to inspect
 void InspectorPanel::InspectEntity(EntityId id) {
+    // Block inspection of protected system entities (EditorCamera at ID 0)
+    if (IsProtectedEntity(id)) {
+        m_mode = InspectionMode::None;
+        m_entityId = 0; // Clear selection
+        return;
+    }
+
     m_entityId = id;
 
     // If we do not have a world there is nothing to inspect
@@ -141,10 +179,10 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
         m_prefabData = nlohmann::json::parse(content);
         m_prefabPath = path;
 
-        /* 
+        /*
         Take the entire prefab JSON, convert it to a string
         Hash the string (turn it into a number), then store that number
-        
+
         This hash acts like a fingerprint of the prefab at the moment we saved it
         Next time we try to save, we compute a new hash and compare it with this one
         If the hashes match, it means nothing changed, so we skip rewriting the file
@@ -185,8 +223,13 @@ void InspectorPanel::Render() {
     ImGui::Begin(windowTitle);
 
     if (m_mode == InspectionMode::None) {
-        // No selection at all
-        ImGui::TextDisabled("No selection");
+        // Check if we're trying to view a protected entity
+        if (IsProtectedEntity(m_entityId)) {
+            ImGui::TextDisabled("System entity (read-only)");
+        }
+        else {
+            ImGui::TextDisabled("No selection");
+        }
     }
     else if (m_mode == InspectionMode::Entity) {
         _renderEntityInspector();
@@ -324,8 +367,8 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
                 // UI renderer callback: InspectorPanel calls this and forwards to ComponentWidgets
                 // via the ComponentUI helper to draw the actual fields
-                _renderComponentSection( meta->DisplayName, meta->TypeName, data, 
-                    [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); }, meta->CanDelete );
+                _renderComponentSection(meta->DisplayName, meta->TypeName, data,
+                    [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); }, meta->CanDelete);
 
                 ImGui::Dummy(ImVec2(0, 4));
             }
@@ -359,7 +402,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                 }
 
                 // Nothing erased
-                it++; 
+                it++;
             }
 
             // Remove actual ECS component last
