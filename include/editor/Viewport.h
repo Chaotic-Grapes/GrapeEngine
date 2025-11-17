@@ -5,70 +5,65 @@
         Foo Rui Qin    (20%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
-\date   16th November 2025
+\date   3rd November 2025
 \brief
-Declares the Viewport class for viewport rendering and interaction.
-File menu operations have been moved to EditorFileMenu.
+Header for Viewport class handling viewport rendering and entity selection with events.
 */
 /* End Header *******************************************************************/
 
-#pragma once
+#ifndef VIEWPORT_H
+#define VIEWPORT_H
 
 #include "ecs/World.h"
+#include "ecs/Entity.h"
 #include "../editor/EditorFileMenu.h"
 #include <imgui.h>
 #include <memory>
+#include <functional>
 
 // Forward declarations
 namespace ECS { class RendererSystem; }
 namespace Scenes { class SceneManager; }
+
 using EntityId = uint32_t;
 
-// Viewport panel for main menu, viewport rendering, and entity operations
 class Viewport {
 public:
-    // -------------------------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------------------------
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
         ECS::World* world, Scenes::SceneManager* sceneManager);
+
     void SetWorld(ECS::World* world);
-
-    // -------------------------------------------------------------------------
-    // Update
-    // -------------------------------------------------------------------------
     void HandleInWorldInteraction();
-
-    // -------------------------------------------------------------------------
-    // Rendering
-    // -------------------------------------------------------------------------
     void ShowEditorWindows();
 
-    // -------------------------------------------------------------------------
+    // Event registration
+    void OnSelectionChanged(std::function<void(EntityId)> callback);
+
     // Accessors
-    // -------------------------------------------------------------------------
-    inline bool HasValidWorld() const { return m_world != nullptr; }
-    inline EntityId GetSelectedEntityId() const { return m_selectedEntityId; }
-    inline bool IsViewportHovered() const { return m_isViewportHovered; }
+    EntityId GetSelectedEntityId() const;
+    bool IsViewportHovered() const;
+    bool HasValidWorld() const { return m_world != nullptr; }
 
 private:
-    // -------------------------------------------------------------------------
-    // Viewport
-    // -------------------------------------------------------------------------
     void _renderViewport();
 
-    // -------------------------------------------------------------------------
-    // State
-    // -------------------------------------------------------------------------
+    ECS::World* m_world = nullptr;
+    EditorFileMenu m_fileMenu;
+
+    // UI fonts
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
-    ECS::World* m_world = nullptr;
+
+    // Renderer
     std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
 
-    EditorFileMenu m_fileMenu;
-
+    // State
     EntityId m_selectedEntityId = 0;
     bool m_isViewportHovered = false;
-    float m_uiScale = 1.0f;
+
+    // Event callback
+    std::function<void(EntityId)> m_onSelectionChanged;
 };
+
+#endif // VIEWPORT_H

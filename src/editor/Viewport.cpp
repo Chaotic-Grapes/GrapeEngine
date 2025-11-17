@@ -8,7 +8,7 @@
 \date   3rd November 2025
 \brief
 Implements the ViewportPanel class for core editor functionality and entity management.
-Handles the main menu, viewport rendering, and entity operations.
+Handles the main menu, viewport rendering, and entity selection with event callbacks.
 */
 /* End Header *******************************************************************/
 
@@ -77,6 +77,12 @@ void Viewport::SetWorld(ECS::World* world) {
     }
 }
 
+// -------------------------------------------------------------------------
+// Event Registration
+// -------------------------------------------------------------------------
+void Viewport::OnSelectionChanged(std::function<void(EntityId)> callback) {
+    m_onSelectionChanged = callback;
+}
 
 // -------------------------------------------------------------------------
 // Update
@@ -86,7 +92,17 @@ void Viewport::HandleInWorldInteraction() {
 
     // Keep selection in sync with renderer picking only when hovering the viewport
     if (m_rendererSystem && m_isViewportHovered) {
-        m_selectedEntityId = m_rendererSystem->GetSelectedEntityID();
+        EntityId newSelection = m_rendererSystem->GetSelectedEntityID();
+
+        // Only notify if selection actually changed
+        if (newSelection != m_selectedEntityId) {
+            m_selectedEntityId = newSelection;
+
+            // Emit selection change event
+            if (m_onSelectionChanged) {
+                m_onSelectionChanged(m_selectedEntityId);
+            }
+        }
     }
 }
 
@@ -127,4 +143,15 @@ void Viewport::_renderViewport() {
     }
 
     ImGui::End();
+}
+
+// -------------------------------------------------------------------------
+// Accessors
+// -------------------------------------------------------------------------
+EntityId Viewport::GetSelectedEntityId() const {
+    return m_selectedEntityId;
+}
+
+bool Viewport::IsViewportHovered() const {
+    return m_isViewportHovered;
 }

@@ -19,6 +19,7 @@ Features:
 */
 /* End Header *******************************************************************/
 
+#include "glad/glad.h"
 #include "services/OverlayService.h"
 #include "scene/SceneManager.h"
 #include "services/WindowManager.h"
