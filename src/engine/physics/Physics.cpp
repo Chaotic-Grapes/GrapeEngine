@@ -263,7 +263,7 @@ namespace Engine {
         // ========================================================================
         {
             // Use smaller slop for thin objects to prevent tunneling
-            const float slop = 0.1f;  // Increased from 0.01f
+            const float slop = 0.0001f;  // Increased from 0.01f
 
             // Use higher percentage for aggressive correction
             const float percent = std::min(physics.PositionCorrectPercent, 0.95f);

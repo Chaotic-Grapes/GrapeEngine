@@ -206,7 +206,8 @@ namespace Scenes {
                 sceneJson["Entities"] = std::move(entities);
                 sceneJson["EntityCount"] = entityCount;
 
-                if (!Serialization::Serializer::SaveJson(filename, "scn", sceneJson)) {
+                const std::string ext = Serialization::Serializer::HasExtension(filename, "scene") ? "scene" : "scn";
+                if (!Serialization::Serializer::SaveJson(filename, ext, sceneJson)) {
                     LOG_ERROR("Error: Could not open file for writing: " << filename);
                     return false;
                 }
@@ -237,7 +238,8 @@ namespace Scenes {
 
             try {
                 json sceneJson;
-                if (!Serialization::Serializer::LoadJson(filename, "scn", sceneJson)) {
+                const std::string ext = Serialization::Serializer::HasExtension(filename, "scene") ? "scene" : "scn";
+                if (!Serialization::Serializer::LoadJson(filename, ext, sceneJson)) {
                     LOG_ERROR("Error: Cannot open file: " << filename);
                     return false;
                 }
