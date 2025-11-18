@@ -180,7 +180,6 @@ namespace Engine {
         const ECS::Components::PhysicsMaterial2D& physics
     ) {
  
->>>>>>>>> Temporary merge branch 2
         // Create a result structure to store collision outcome
         CollisionResult result{};
         result.Collided = true;          // Mark collision as valid
@@ -276,36 +275,31 @@ namespace Engine {
                 const float deepPenetrationBoost = 1.5f;
                 correctionMagnitude = std::max(depth - slop, 0.0f) * percent * deepPenetrationBoost;
             }
-                // Deep penetration - likely tunneled through thin wall
-                // Use even more aggressive correction
-                const float deepPenetrationBoost = 1.5f;
-                correctionMagnitude = std::max(depth - slop, 0.0f) * percent * deepPenetrationBoost;
-            }
 
                 const Vector2D correction = normal * (correctionMagnitude / invMassSum);
 
-                // Apply position correction
-                transformA.Position.X -= correction.X * invMassA;
-                transformA.Position.Y -= correction.Y * invMassA;
-                transformB.Position.X += correction.X * invMassB;
-                transformB.Position.Y += correction.Y * invMassB;
+            // Apply position correction
+            transformA.Position.X -= correction.X * invMassA;
+            transformA.Position.Y -= correction.Y * invMassA;
+            transformB.Position.X += correction.X * invMassB;
+            transformB.Position.Y += correction.Y * invMassB;
 
-                // Kill velocity toward wall for deeply penetrated objects
-                if (depth > slop * 3.0f) {
-                    // Check velocity toward collision normal
-                    const float vNormalA = Dot(velA.Value, normal);
-                    const float vNormalB = Dot(velB.Value, normal);
+            // Kill velocity toward wall for deeply penetrated objects
+            if (depth > slop * 3.0f) {
+                // Check velocity toward collision normal
+                const float vNormalA = Dot(velA.Value, normal);
+                const float vNormalB = Dot(velB.Value, normal);
 
-                    // If object A is moving toward B (negative normal velocity), dampen it
-                    if (vNormalA < 0.0f && invMassA > 0.0f) {
-                        velA.Value -= normal * vNormalA * 0.5f;  // Remove 50% of inward velocity
-                    }
-
-                    // If object B is moving toward A (positive normal velocity), dampen it
-                    if (vNormalB > 0.0f && invMassB > 0.0f) {
-                        velB.Value -= normal * vNormalB * 0.5f;  // Remove 50% of inward velocity
-                    }
+                // If object A is moving toward B (negative normal velocity), dampen it
+                if (vNormalA < 0.0f && invMassA > 0.0f) {
+                    velA.Value -= normal * vNormalA * 0.5f;  // Remove 50% of inward velocity
                 }
+
+                // If object B is moving toward A (positive normal velocity), dampen it
+                if (vNormalB > 0.0f && invMassB > 0.0f) {
+                    velB.Value -= normal * vNormalB * 0.5f;  // Remove 50% of inward velocity
+                }
+            }
             }
 
 
