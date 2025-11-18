@@ -480,10 +480,10 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data)
     uint32_t cueId = data.value("CueId", 0u);
 
     // Get static reference of AudioAssetlib via getter
-    auto& lib = AudioAssetLibrary::Get();  
+    auto& lib = AudioAssetLibrary::Get();
 
     // Set clips to get clips struct info from a storage vector via getallclips function
-    const auto& clips = lib.GetAllClips(); 
+    const auto& clips = lib.GetAllClips();
 
     const AudioAssetLibrary::ClipInfo* selectedClip = nullptr;
 
@@ -606,6 +606,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data)
 
         ImGui::EndPopup();
     }
+}
 
 // Renders the Layer component properties
 void ComponentUI::RenderLayer2D(nlohmann::json& data) {
