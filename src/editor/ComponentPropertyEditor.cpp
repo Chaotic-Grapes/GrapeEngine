@@ -458,3 +458,10 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
     EditorUI::RenderIntProperty("Z-Order", data, "ZOrder");
     EditorUI::EndPropertySection();
 }
+
+// Renders the Layer component properties
+void ComponentUI::RenderLayer2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Layer" });
+    EditorUI::RenderIntProperty("Id", data, "Id");
+    EditorUI::EndPropertySection();
+}

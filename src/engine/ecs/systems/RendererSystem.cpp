@@ -458,9 +458,9 @@ namespace ECS {
                     return;
                 }
 
-                // Bceause of tone-mapping, the background will appear slightly lighter.
-                // tone mapping remaps linear HDR gray (0.1) into gamma-corrected space (looks brighter)
-                hdrFbo->BindAndClear(0.15f, 0.15f, 0.15f, 1.0f);
+                // Because of tone-mapping, the background will appear slightly lighter.
+                // Choose a slightly brighter neutral gray for a nicer look
+                hdrFbo->BindAndClear(0.28f, 0.28f, 0.28f, 1.0f);
 
                 // ---------------------------------------
                 // Layered rendering: SDF first, then batch

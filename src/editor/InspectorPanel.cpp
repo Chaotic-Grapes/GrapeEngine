@@ -223,13 +223,7 @@ void InspectorPanel::Render() {
     ImGui::Begin(windowTitle);
 
     if (m_mode == InspectionMode::None) {
-        // Check if we're trying to view a protected entity
-        if (IsProtectedEntity(m_entityId)) {
-            ImGui::TextDisabled("System entity (read-only)");
-        }
-        else {
-            ImGui::TextDisabled("No selection");
-        }
+        ImGui::TextDisabled("No selection");
     }
     else if (m_mode == InspectionMode::Entity) {
         _renderEntityInspector();

@@ -69,6 +69,7 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Scene", "Ctrl+N")) { CreateNewScene(); }
         if (ImGui::MenuItem("Open Scene", "Ctrl+O")) { OpenSceneDialog(); }
+        if (ImGui::MenuItem("Save Scene", "Ctrl+S")) { SaveScene(); }
         if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S")) { SaveSceneAsDialog(); }
         ImGui::Separator();
         if (ImGui::MenuItem("Exit")) { if (Engine::CORE) { Engine::CORE->Close(); } }
@@ -108,6 +109,7 @@ void EditorFileMenu::CreateNewScene() {
 
     // Switch the editor to use this new scene as the active one
     m_sceneManager->SetActive(idx);
+    m_currentScenePath.clear();
     LOG_INFO("Created new scene");
 }
 
@@ -182,7 +184,16 @@ void EditorFileMenu::SaveSceneAsDialog() {
 
         // Actually write the active scene to this path
         _saveSceneToFile(savePath);
+        m_currentScenePath = savePath;
     }
+#endif
+}
+
+void EditorFileMenu::SaveScene() {
+#ifdef _WIN32
+    if (!m_sceneManager) return;
+    if (m_currentScenePath.empty()) { SaveSceneAsDialog(); return; }
+    _saveSceneToFile(m_currentScenePath);
 #endif
 }
 
@@ -192,17 +203,18 @@ void EditorFileMenu::SaveSceneAsDialog() {
 
 // Handle keyboard shortcuts for editor actions
 void EditorFileMenu::HandleShortcuts(float& uiScale) {
-    // Check whether Ctrl or Shift key is currently held
     bool ctrlDown = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
     bool shiftDown = Input::IsKeyDown(KEY_LEFT_SHIFT) || Input::IsKeyDown(KEY_RIGHT_SHIFT);
 
-    // All shortcuts only activate when Ctrl is down
     if (ctrlDown) {
         if (Input::IsKeyPressed(KEY_EQUAL)) uiScale += 0.10f;
         if (Input::IsKeyPressed(KEY_MINUS)) uiScale -= 0.10f;
         if (Input::IsKeyPressed(KEY_N)) CreateNewScene();
         if (Input::IsKeyPressed(KEY_O)) OpenSceneDialog();
-        if (Input::IsKeyPressed(KEY_S) && shiftDown) SaveSceneAsDialog();
+        if (Input::IsKeyPressed(KEY_S)) {
+            if (shiftDown) SaveSceneAsDialog();
+            else SaveScene();
+        }
     }
 }
 
@@ -224,12 +236,11 @@ void EditorFileMenu::_openScene(const std::string& path) {
 
     // Ask the SceneManager to read the file and populate the scene
     if (m_sceneManager->LoadScene(idx, path)) {
-        // On success, make this scene the currently active one
         m_sceneManager->SetActive(idx);
+        m_currentScenePath = path;
         LOG_INFO("Opened scene: " << path);
     }
     else {
-        // If loading failed we log an error and remove the unused scene slot
         LOG_ERROR("Failed to open scene: " << path);
         m_sceneManager->RemoveScene(idx);
     }

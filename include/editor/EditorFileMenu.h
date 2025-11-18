@@ -55,6 +55,8 @@ public:
 
     // Shows a Save As dialog and writes the current scene to disk
     void SaveSceneAsDialog();
+    // Saves to current scene path if known; otherwise falls back to Save As
+    void SaveScene();
 
     // -------------------------------------------------------------------------
     // Keyboard Shortcuts
@@ -80,6 +82,8 @@ private:
 
     // Scene manager used to create, load, and save scenes
     Scenes::SceneManager* m_sceneManager = nullptr;
+    // Tracks last opened/saved path for direct Save
+    std::string m_currentScenePath;
 
 };
 
