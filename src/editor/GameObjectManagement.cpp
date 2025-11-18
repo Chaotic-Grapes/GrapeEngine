@@ -26,29 +26,28 @@ written consent of DigiPen Institute of Technology is prohibited.
 #include "services/DebugUI.h"
 #include "services/Input.h"
 #include <imgui.h>
-//#include "services/UICommon.h"
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <algorithm>
 #include <iostream>
 #include <sstream>
 #include "serialization/EntitySerializer.h"
+#include "../engine/scene/SceneManager.h"
 #include "core/Profiler.h"
-#include "helpers/MathHelper.h"
 #include <filesystem>
 #include "core/Logger.h"
 #include "audio/FmodAudioDevice.h"
 #include "audio/SoundTypes.h"
 
 
-void GameObjectEditor::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world) {
+void GameObjectEditor::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
 	m_mainFont = mainFont;
 	m_boldFont = boldFont;
 	m_symbolsFont = symbolsFont;
 	m_world = world;
 }
 
-GameObjectEditor::GameObjectEditor(World* world)
+GameObjectEditor::GameObjectEditor(ECS::World* world)
 	: m_world(world) {
 }
 
@@ -63,17 +62,23 @@ static constexpr const char* LEVEL_DIR = "assets/levels/";
  * @param filename Full path and filename to save the level data to.
  * @exception std::exception If serialization or file I/O fails.
  */
-//void GameObjectEditor::SaveLevel(const std::string& filename) {
-//	if (!HasValidWorld()) return;
-//	try {
-//		// Assumed: EntitySerializer::SerializeWorld exists and handles file output
-//		Serialization::EntitySerializer::SerializeWorld(*m_world, filename);
-//		LOG_INFO("Successfully saved level to: " << filename);
-//	}
-//	catch (const std::exception& e) {
-//		LOG_ERROR("Failed to save world: " << e.what());
-//	}
-//}
+void GameObjectEditor::SaveLevel(const std::string& filename) {
+	if (!HasValidWorld()) return;
+	
+	const size_t activeIndex = m_sceneManager->GetActiveIndex();
+	if (activeIndex == static_cast<size_t>(-1)) {
+		LOG_ERROR("No active scene to save.");
+		return;
+	}
+
+	// Call the SceneManager's SaveScene function
+	if (m_sceneManager->SaveScene(activeIndex, filename, filename)) {
+		LOG_INFO("Successfully saved scene/level to: " << filename);
+	}
+	else {
+		LOG_ERROR("Failed to save scene/level via SceneManager.");
+	}
+}
 
 /**
  * @brief Loads a level from a JSON file and replaces the current world.
@@ -81,23 +86,27 @@ static constexpr const char* LEVEL_DIR = "assets/levels/";
  * @param filename Full path and filename to load the level data from.
  * @exception std::exception If deserialization or file reading fails.
  */
-//void GameObjectEditor::LoadLevel(const std::string& filename) {
-//	if (!HasValidWorld()) return;
-//	try {
-//		// 1. Clear current level before loading a new one
-//		ClearAllGameObjects();
-//
-//		// 2. Assumed: EntitySerializer::DeserializeWorld exists and handles entity creation
-//		Serialization::EntitySerializer::DeserializeWorld(*m_world, filename);
-//		LOG_INFO("Successfully loaded level from: " << filename);
-//
-//		m_selectedEntityId = 0; // Deselect everything on load
-//		_invalidateCache();
-//	}
-//	catch (const std::exception& e) {
-//		LOG_ERROR("Failed to load world: " << e.what());
-//	}
-//}
+void GameObjectEditor::LoadLevel(const std::string& filename) {
+	if (!HasValidWorld()) return;
+	
+	const size_t activeIndex = m_sceneManager->GetActiveIndex();
+	if (activeIndex == static_cast<size_t>(-1)) {
+		LOG_ERROR("Cannot load: No active scene slot available.");
+		return;
+	}
+	
+	// Call the SceneManager's LoadScene function
+	if (m_sceneManager->LoadScene(activeIndex, filename)) {
+		LOG_INFO("Successfully loaded scene/level from: " << filename);
+
+		// Necessary editor-specific cleanup after a load
+		m_selectedEntity = ECS::NULL_ENTITY; // Deselect everything on load
+		_invalidateCache();
+	}
+	else {
+		LOG_ERROR("Failed to load scene/level via SceneManager.");
+	}
+}
 
 // --- In-World Picking/Dragging Implementation ---
 
@@ -290,47 +299,70 @@ void GameObjectEditor::_showHierarchyWindow() {
 
 	ImGui::Separator();
 
-	// Display list of current objects
-	const auto entities = m_world->GetEntityManager().GetAllEntities();
-	ImGui::Text("Current Objects (%zu):", entities.size());
+	// Count entities
+	size_t entityCount = 0;
+	m_world->Each([&](ECS::Entity) { entityCount++; });
 
-	// Scrollable region for the list
+	ImGui::Text("Current Objects (%zu):", entityCount);
+
 	ImGui::BeginChild("ObjectsScrollingRegion", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2), true);
 
-	// For each object
-	for (const auto& entId : entities) {
-		auto entity = m_world->GetEntityManager().GetEntity(entId);
-		if (entity.GetId() == 0) continue;
+	// Display list of current objects
+	//const auto entities = m_world->GetEntityManager().GetAllEntities();
+	//ImGui::Text("Current Objects (%zu):", entities.size());
 
-		std::stringstream oss;
-		oss << "[" << entity.GetId() << "] " << entity.GetName();
-		std::string label = oss.str();
+	m_world->Each([&](ECS::Entity e) {
+		std::string label;
 
+		// Scrollable region for the list
+		//ImGui::BeginChild("ObjectsScrollingRegion", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() * 2), true);
+
+		// For each object
+		/*for (const auto& entId : entities) {
+			auto entity = m_world->GetEntityManager().GetEntity(entId);
+			if (entity.GetId() == 0) continue;
+
+			std::stringstream oss;
+			oss << "[" << entity.GetId() << "] " << entity.GetName();
+			std::string label = oss.str();*/
+
+			// Get name if it exists
+		auto* nameComp = m_world->TryGet<ECS::Components::Name>(e);
+		if (nameComp) {
+			label = "[" + std::to_string(e.Index) + "] " + std::string(nameComp->Value);
+		}
+		else {
+			label = "[" + std::to_string(e.Index) + "] Entity";
+		}
 		// CORE HIERARCHY / SELECTION LOGIC
-		const bool is_selected = (m_selectedEntityId == entId);
+		//const bool is_selected = (m_selectedEntityId == entId);
+		const bool is_selected = (m_selectedEntity == e);
 
 		// Use Selectable for the hierarchy list item
+		//if (ImGui::Selectable(label.c_str(), is_selected)) {
+		//	// Select the object, or deselect if already selected
+		//	m_selectedEntityId = is_selected ? 0 : entId;
+		//}
 		if (ImGui::Selectable(label.c_str(), is_selected)) {
-			// Select the object, or deselect if already selected
-			m_selectedEntityId = is_selected ? 0 : entId;
+			m_selectedEntity = is_selected ? ECS::NULL_ENTITY : e;
 		}
 
 		// Handle right-click context menu on the selected item
 		if (ImGui::BeginPopupContextItem()) {
 			if (ImGui::Selectable("Clone")) {
-				CloneGameObject(entity);
+				CloneGameObject(e);
 			}
 			if (ImGui::Selectable("Delete")) {
-				RemoveGameObject(entId);
-				if (m_selectedEntityId == entId) {
-					m_selectedEntityId = 0; // Deselect if deleted
+				RemoveGameObject(e);
+				if (m_selectedEntity == e) {
+					m_selectedEntity = ECS::NULL_ENTITY; // Deselect if deleted
 				}
 				ImGui::EndPopup();
-				break; // Break the loop after deletion
+				return; // Exit lambda early
 			}
 			ImGui::EndPopup();
 		}
-	}
+		});
 
 	ImGui::EndChild();
 
@@ -338,7 +370,7 @@ void GameObjectEditor::_showHierarchyWindow() {
 	ImGui::Separator();
 	if (ImGui::Button("Clear All Objects")) {
 		ClearAllGameObjects();
-		m_selectedEntityId = 0; // Deselect everything
+		m_selectedEntity = ECS::NULL_ENTITY; // Deselect everything
 	}
 
 	ImGui::End();
@@ -359,7 +391,7 @@ void GameObjectEditor::_showPropertyEditorWindow() {
 	ImGui::Begin("Property Editor");
 
 	// Check if an entity is selected
-	if (m_selectedEntityId != 0 && HasValidWorld()) {
+	/*if (m_selectedEntityId != 0 && HasValidWorld()) {
 		auto selectedEntity = m_world->GetEntityManager().GetEntity(m_selectedEntityId);
 
 		if (selectedEntity.GetId() == 0) {
@@ -367,58 +399,78 @@ void GameObjectEditor::_showPropertyEditorWindow() {
 			ImGui::Text("Selected Entity is no longer valid.");
 			ImGui::End();
 			return;
+		}*/
+
+	if (!m_selectedEntity.IsNull() && HasValidWorld()) {
+		if (!m_world->IsAlive(m_selectedEntity)) {
+			m_selectedEntity = ECS::NULL_ENTITY;
+			ImGui::Text("Selected Entity is no longer valid.");
+			ImGui::End();
+			return;
 		}
 
 		// Entity Header and Deselect button
-		ImGui::Text("Selected Object: %s (ID: %u)", selectedEntity.GetName().c_str(), m_selectedEntityId);
+		/*ImGui::Text("Selected Object: %s (ID: %u)", selectedEntity.GetName().c_str(), m_selectedEntityId);
 		ImGui::SameLine(ImGui::GetWindowWidth() - 70);
 		if (ImGui::SmallButton("Deselect")) {
 			m_selectedEntityId = 0;
 			ImGui::End();
 			return;
+		}*/
+
+		auto* nameComp = m_world->TryGet<ECS::Components::Name>(m_selectedEntity);
+		std::string displayName = nameComp ? std::string(nameComp->Value) : "Entity";
+
+		ImGui::Text("Selected Object: %s (ID: %u)", displayName.c_str(), m_selectedEntity.Index);
+		ImGui::SameLine(ImGui::GetWindowWidth() - 70);
+		if (ImGui::SmallButton("Deselect")) {
+			m_selectedEntity = ECS::NULL_ENTITY;
+			ImGui::End();
+			return;
 		}
+
 		ImGui::Separator();
 
 		ImGui::BeginChild("PropertyScroll", ImVec2(0, 0), false);
 
 		// ** Component Property Editing: Transform Component **
 		if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-			auto* transform = selectedEntity.GetComponent<Component::Transform>();
+			auto* transform = m_world->TryGet<ECS::Components::LocalTransform>(m_selectedEntity);
 			if (transform) {
 				float inputWidth = (ImGui::GetWindowWidth() - ImGui::GetStyle().ItemSpacing.x * 3) / 2.0f;
 
 				// Position
 				ImGui::Text("Position");
 				ImGui::SetNextItemWidth(inputWidth);
-				ImGui::InputFloat(std::string("X##Pos" + std::to_string(m_selectedEntityId)).c_str(), &transform->Position.X, 0.0f, 0.0f, "%.2f");
+				ImGui::InputFloat("X##Pos", &transform->Position.X, 0.0f, 0.0f, "%.2f");
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(inputWidth);
-				ImGui::InputFloat(std::string("Y##Pos" + std::to_string(m_selectedEntityId)).c_str(), &transform->Position.Y, 0.0f, 0.0f, "%.2f");
+				ImGui::InputFloat("Y##Pos", &transform->Position.Y, 0.0f, 0.0f, "%.2f");
 
 				// Rotation
 				ImGui::SetNextItemWidth(inputWidth);
-				ImGui::InputFloat(std::string("Rotation##Rot" + std::to_string(m_selectedEntityId)).c_str(), &transform->Rotation, 0.0f, 0.0f, "%.2f");
+				ImGui::InputFloat("Z##Pos", &transform->Position.Z, 0.0f, 0.0f, "%.2f");
 
 				// Scale
 				ImGui::Text("Scale");
 				ImGui::SetNextItemWidth(inputWidth);
-				ImGui::InputFloat(std::string("X##Scale" + std::to_string(m_selectedEntityId)).c_str(), &transform->Scale.X, 0.0f, 0.0f, "%.2f");
+				ImGui::InputFloat("X##Scale", &transform->Scale.X, 0.0f, 0.0f, "%.2f");
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(inputWidth);
-				ImGui::InputFloat(std::string("Y##Scale" + std::to_string(m_selectedEntityId)).c_str(), &transform->Scale.Y, 0.0f, 0.0f, "%.2f");
+				ImGui::InputFloat("Y##Scale", &transform->Scale.Y, 0.0f, 0.0f, "%.2f");
 			}
 		}
 
 		// ** Component Property Editing: ShapeRenderer2D Component **
 		if (ImGui::CollapsingHeader("ShapeRenderer2D")) {
-			auto* shapeRenderer = selectedEntity.GetComponent<Component::ShapeRenderer2D>();
-			if (shapeRenderer) {
-				ImGui::ColorEdit4(std::string("Fill Color##Color" + std::to_string(m_selectedEntityId)).c_str(), (float*) & shapeRenderer->FillColor.R);
+			auto* shape = m_world->TryGet<ECS::Components::ShapeCircle2D>(m_selectedEntity);
+			if (shape) {
+				ImGui::ColorEdit4("Color", (float*)&shape->Color);
 
 				// Radius (Specific to Circle type)
 				if (shapeRenderer->Type == Component::ShapeRenderer2D::ShapeType::Circle) {
 					ImGui::SetNextItemWidth(100.f);
-					ImGui::InputFloat(std::string("Radius##Rad" + std::to_string(m_selectedEntityId)).c_str(), &shapeRenderer->Radius, 1.0f, 10.0f, "%.2f");
+					ImGui::InputFloat("Radius", &shape->Radius, 1.0f, 10.0f, "%.2f");
 				}
 
 				// Future: Add logic for other shape types (Square, Sprite, etc.)
@@ -660,7 +712,7 @@ void GameObjectEditor::ClearAllGameObjects() {
  * @return The created Entity.
  */
 // Helper function to create entities with basic components
-Entity GameObjectEditor::_createGameEntity(const std::string& name) {
+/*Entity GameObjectEditor::_createGameEntity(const std::string& name) {
     // Create new entity in ECS
     auto entity = m_world->CreateEntity(name);
 
@@ -682,7 +734,7 @@ Entity GameObjectEditor::_createGameEntity(const std::string& name) {
     entity.AddComponent<Component::CircleCollider2D>(35.0f);
 
     return entity;
-}
+}*/
 
 /**
  * @brief Clears cached UI labels for delete/clone buttons to ensure unique naming.

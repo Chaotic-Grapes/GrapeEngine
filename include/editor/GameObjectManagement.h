@@ -22,23 +22,38 @@
 #include <string>
 #include <unordered_map>
 #include "ecs/Entity.h"
+#include "ecs/World.h" 
 #include <services/DebugUI.h>
+#include "../engine/scene/SceneManager.h"
 
  // Forward declarations
 struct ImFont;
-class World;
-class Entity;
+//class World;
+//class Entity;
 
+/**
+ * @brief Game object editor for managing entities in the ECS world
+ *
+ * Provides ImGui-based editor windows for:
+ * - Hierarchy view of all entities
+ * - Property editor for selected entity components
+ * - Level save/load functionality
+ * - In-world object picking and dragging
+ */
 class GameObjectEditor {
 public:
 
 	// Initialize with symbols font for icons and world reference
-	void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, World* world);
+	void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
 
 	// Render the asset browser UI
 	//void Render();
 
-	explicit GameObjectEditor(World* world);
+	/**
+	 * @brief Constructor - creates editor with world reference
+	 * @param world Pointer to the ECS::World to manage
+	 */
+	explicit GameObjectEditor(ECS::World* world = nullptr);
 
 	/**
  * @brief Set the world reference for entity management
@@ -47,7 +62,7 @@ public:
  * Updates the world reference used for creating and managing entities
  * through the debug interface.
  */
-	void SetWorld(World* world) { m_world = world; }
+	void SetWorld(ECS::World* world) { m_world = world; }
 
 
 	/**
@@ -73,7 +88,7 @@ public:
 	 * Finds and destroys the entity with the specified ID, removing it
 	 * from the world and updating the UI cache.
 	 */
-	void RemoveGameObject(EntityId id);
+	void RemoveGameObject(ECS::Entity entity);
 
 	/**
 	 * @brief Clone an existing game object
@@ -82,7 +97,7 @@ public:
 	 * Creates a copy of the specified entity with slightly offset position
 	 * to avoid overlapping with the original.
 	 */
-	void CloneGameObject(const Entity& entity);
+	void CloneGameObject(ECS::Entity entity);
 
 	/**
 	 * @brief Clear all game objects from the world
@@ -118,22 +133,28 @@ public:
 	 * @brief Saves the current world/level state to a JSON file.
 	 * @param filename Full path and name of the file to save to.
 	 */
-	//void SaveLevel(const std::string& filename);
+	void SaveLevel(const std::string& filename);
 
 	/**
 	 * @brief Loads a new world/level state from a JSON file.
 	 * @param filename Full path and name of the file to load from.
 	 */
-	//void LoadLevel(const std::string& filename);
+	void LoadLevel(const std::string& filename);
 
 	/**
 	 * @brief Sets the currently selected entity.
 	 */
-	void SetSelectedEntityId(EntityId id) { m_selectedEntityId = id; }
+	void SetSelectedEntityId(ECS::Entity entity) { m_selectedEntity = entity; }
+
+	/**
+	 * @brief Gets the currently selected entity
+	 * @return ECS::Entity Currently selected entity handle
+	 */
+	ECS::Entity GetSelectedEntity() const { return m_selectedEntity; }
 
 private:
 	DebugUIConfig m_config;     ///< Configuration settings for UI layout and appearance
-	World* m_world = nullptr;   ///< Pointer to World object for entity management
+	ECS::World* m_world = nullptr;   ///< Pointer to World object for entity management
 	bool m_enabled = false;     ///< Flag indicating if debug UI is currently enabled
 	bool m_initialized = false; ///< Flag indicating if ImGui has been initialized
 	
@@ -152,7 +173,10 @@ private:
 	int m_spaceReleased = 0;  ///< Counter for space key release events
 
 	// State for the currently selected object
-	EntityId m_selectedEntityId = 0;
+	ECS::Entity m_selectedEntity = ECS::NULL_ENTITY;
+
+	// A pointer to the engine's main SceneManager instance
+	Scenes::SceneManager* m_sceneManager = nullptr;
 
 	// Helper functions to draw specific editor windows
 	void _showMainMenu();
@@ -172,7 +196,7 @@ private:
 	* Helper method that creates an entity with transform and other
 	* basic components needed for game objects.
 	*/
-	Entity _createGameEntity(const std::string& name);
+	//Entity _createGameEntity(const std::string& name);
 
 	/**
 	 * @brief Invalidate UI caches when entities change
