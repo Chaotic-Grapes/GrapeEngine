@@ -244,7 +244,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
             {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
             {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
             {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-            {"Thickness", 1.0f}, {"Filled", false}
+            {"Thickness", 0.1f}, {"Filled", false}
         }; },
         COMPONENT_OPS(ECS::Components::ShapeBox2D)
     },
@@ -314,6 +314,13 @@ static std::vector<ComponentUIMetadata> m_registry = {
                 auto& comp = world->Get<ECS::Components::AudioSource>(e);
                 from_json(data, comp);
             }
+    // Layer
+    {
+        "Layer 2D", "Layer", "ECS::Components::Layer", true,
+            [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLayer2D(d); },
+            []() { return nlohmann::json{
+                {"Id", 0}}; },
+            COMPONENT_OPS(ECS::Components::Layer)
     }
 
 };

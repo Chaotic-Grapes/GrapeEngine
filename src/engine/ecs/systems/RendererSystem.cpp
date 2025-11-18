@@ -299,7 +299,7 @@ namespace ECS {
         // ============================================================
         // 1. Toggle or cycle camera
         // ============================================================
-        if (!m_lockEditorCamera && Input::IsKeyPressed(KEY_C)) {
+        if (Input::IsKeyPressed(KEY_C)) {
             // Count available cameras
             bool hasSceneCamera = false;
 
@@ -336,14 +336,6 @@ namespace ECS {
         // ============================================================
         // 2. Use EditorCamera if active, otherwise ECS camera
         // ============================================================
-        if (m_lockEditorCamera) {
-            // Hard-lock: always use editor camera
-            m_useEditorCamera = true;
-            if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
-                m_editorCamera->GetCameraComponent()->Active = true;
-            }
-        }
-
         if (m_useEditorCamera && m_editorCamera) {
             // Respect editor UI hover: only process input when viewport is hovered
             m_editorCamera->SetAllowInput(m_editorInputEnabled);
@@ -466,9 +458,9 @@ namespace ECS {
                     return;
                 }
 
-                // Bceause of tone-mapping, the background will appear slightly lighter.
-                // tone mapping remaps linear HDR gray (0.1) into gamma-corrected space (looks brighter)
-                hdrFbo->BindAndClear(0.018f, 0.018f, 0.019f, 1.0f);
+                // Because of tone-mapping, the background will appear slightly lighter.
+                // Choose a slightly brighter neutral gray for a nicer look
+                hdrFbo->BindAndClear(0.28f, 0.28f, 0.28f, 1.0f);
 
                 // ---------------------------------------
                 // Layered rendering: SDF first, then batch

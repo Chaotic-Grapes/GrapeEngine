@@ -87,6 +87,8 @@ public:
 
     // Renders AudioSource for component 
     void RenderAudioSource(nlohmann::json& data);
+    // Renders entity layer
+    void RenderLayer2D(nlohmann::json& data);
 
 private:
     // -------------------------------------------------------------------------

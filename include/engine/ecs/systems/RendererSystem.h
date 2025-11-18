@@ -99,29 +99,6 @@ namespace ECS {
         // Enable/disable editor camera input (pan/orbit/zoom) based on viewport hover
         void SetEditorInputEnabled(bool enabled) { m_editorInputEnabled = enabled; }
 
-        // Explicitly control whether the renderer uses the editor camera.
-        // Used by the Level Editor to ensure the viewport starts in editor camera mode
-        // without affecting non-editor contexts.
-        void ForceUseEditorCamera(bool enabled) {
-            m_useEditorCamera = enabled;
-            if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
-                m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
-            }
-        }
-
-        // Level Editor-only: lock renderer to the editor camera regardless of toggles.
-        // Other contexts should not enable this.
-        void SetEditorCameraLocked(bool locked) {
-            m_lockEditorCamera = locked;
-            if (locked) {
-                // Enforce editor camera immediately
-                m_useEditorCamera = true;
-                if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
-                    m_editorCamera->GetCameraComponent()->Active = true;
-                }
-            }
-        }
-
         // ====================================================================
         // Temporary Accessors (For Stress Testing - Remove Later)
         // ====================================================================
@@ -198,10 +175,6 @@ namespace ECS {
 
         // Whether editor camera should process input this frame (set by editor viewport hover)
         bool m_editorInputEnabled = true;
-
-        // When true, ignore toggles and always use the editor camera (Level Editor only)
-        bool m_lockEditorCamera = false;
-
 
         // ====================================================================
         // Member Variables - Shaders

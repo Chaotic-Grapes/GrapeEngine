@@ -57,6 +57,9 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     // Mandatory LocalTransform
     world.Set<ECS::Components::LocalTransform>(e, ECS::Components::LocalTransform{});
 
+    // Default render layer (0) so the renderer includes the entity
+    world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
+
     // Optional parent
     if (parent != ECS::Entity::NPOS32) {
         ECS::Entity p = world.Resolve(parent);

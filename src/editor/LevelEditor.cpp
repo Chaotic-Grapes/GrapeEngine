@@ -11,8 +11,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 */
 /* End Header *******************************************************************/
 
-#include "glad/glad.h"
-#include "../editor/LevelEditor.h"
+#include "../../include/editor/LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include "graphics/graphicsConfig.hpp"
@@ -343,7 +342,7 @@ void LevelEditor::Update() {
     }
 
     m_playback.ProcessInput(); // Handle playback hotkeys and actions
-    m_viewport.HandleInWorldInteraction(); // Handle viewport interactions
+    m_viewport.HandleInWorldInteraction(); // Handle viewport interactions and camera input control
 }
 
 // -------------------------------------------------------------------------

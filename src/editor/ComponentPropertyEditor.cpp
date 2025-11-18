@@ -607,4 +607,9 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data)
         ImGui::EndPopup();
     }
 
+// Renders the Layer component properties
+void ComponentUI::RenderLayer2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Layer" });
+    EditorUI::RenderIntProperty("Id", data, "Id");
+    EditorUI::EndPropertySection();
 }
