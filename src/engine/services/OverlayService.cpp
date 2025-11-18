@@ -19,6 +19,7 @@ Features:
 */
 /* End Header *******************************************************************/
 
+#include "glad/glad.h"
 #include "services/OverlayService.h"
 #include "scene/SceneManager.h"
 #include "services/WindowManager.h"
@@ -115,7 +116,8 @@ namespace Services {
         if (m_pendingLevelEditorRebuild && m_levelEditor) {
             LevelEditorConfig config;
             m_levelEditor.reset();
-            m_levelEditor = std::make_unique<LevelEditor>(m_world, config);
+            Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : m_sceneManager.GetActive();
+            m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
             Window* mainWindow = WindowManager::GetMainWindow();
             if (mainWindow && m_initialized) {
                 m_levelEditor->Initialize(mainWindow->Handle());
@@ -141,7 +143,8 @@ namespace Services {
         // Initialize LevelEditor only when needed (even without a world)
         if (shouldShowLevelEditor && !m_levelEditor) {
             LevelEditorConfig config;
-            m_levelEditor = std::make_unique<LevelEditor>(m_world, config);
+            Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : activeScene;
+            m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
 
             Window* mainWindow = WindowManager::GetMainWindow();
             if (mainWindow && m_initialized) {

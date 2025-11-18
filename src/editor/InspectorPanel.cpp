@@ -19,7 +19,6 @@ through a unified system shared by both entities and prefab templates.
 */
 /* End Header *******************************************************************/
 
-
 #include "../editor/InspectorPanel.h"
 #include "../editor/ComponentPropertyEditor.h"
 #include "../editor/ComponentWidgets.h"
@@ -332,10 +331,41 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             }
         }
 
-        // Process deferred deletions after UI loop to avoid mutating while iterating
+        // Process deferred deletions after UI loop so we don't mutate while iterating
+        // Also remove deleted components from the JSON buffer so they are not re-applied below
         for (const auto& type : m_componentsToDelete) {
+            // Pull out Components array (early-continue instead of nesting)
+            if (!entityJson.contains("Components")) continue;
+            if (!entityJson["Components"].is_array()) continue;
+
+            auto& comps = entityJson["Components"];
+
+            // Manual iterator loop because we may erase while iterating
+            for (auto it = comps.begin(); it != comps.end(); ) {
+                // Bail early if no valid TypeName
+                bool hasTypeName = it->contains("TypeName") && (*it)["TypeName"].is_string();
+                if (!hasTypeName) {
+                    it++;
+                    continue;
+                }
+
+                std::string tn = (*it)["TypeName"];
+
+                // Check short or fully-qualified names
+                bool matches = (tn == type) || (tn == "ECS::Components::" + type);
+                if (matches) {
+                    it = comps.erase(it);   // Erase returns next iterator
+                    continue;               // Do not increment manually
+                }
+
+                // Nothing erased
+                it++; 
+            }
+
+            // Remove actual ECS component last
             _removeComponentFromEntity(type);
         }
+
         m_componentsToDelete.clear();
 
         // Second pass: push any edited JSON values back into ECS components
@@ -448,7 +478,7 @@ void InspectorPanel::_renderPrefabComponents() {
     // SORT COMPONENTS: Transform first, then alphabetical by TypeName
     // Create a sorted list of indices so we don't modify the actual JSON array order
     std::vector<size_t> sortedIndices;
-    for (size_t i = 0; i < components.size(); ++i) {
+    for (size_t i = 0; i < components.size(); i++) {
         sortedIndices.push_back(i);
     }
 

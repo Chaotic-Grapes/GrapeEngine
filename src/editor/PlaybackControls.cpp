@@ -14,6 +14,7 @@ Features:
 - World state serialization and restoration for play/stop
 - ImGui UI with tooltips and Material Symbols icons
 - Step-by-step physics frame execution for debugging
+- State change callbacks for external coordination
 
 Reference:
 - ImGui UI layout and button styling (imgui.h)
@@ -22,6 +23,7 @@ Reference:
 
 #include "../editor/PlaybackControls.h"
 #include "services/Input.h"
+#include "services/Time.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
@@ -53,13 +55,13 @@ void Playback::ProcessInput() {
         if (m_gameState == GameState::Stopped) {
             // Simulate play button
             _saveWorldState();
-            m_gameState = GameState::Playing;
+            _changeState(GameState::Playing);
             LOG_INFO("Game started (Ctrl+P)");
         }
         else {
             // Simulate stop button
             _restoreWorldState();
-            m_gameState = GameState::Stopped;
+            _changeState(GameState::Stopped);
             LOG_INFO("Game stopped (Ctrl+P)");
         }
     }
@@ -69,11 +71,11 @@ void Playback::ProcessInput() {
         Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT))
     {
         if (m_gameState == GameState::Playing) {
-            m_gameState = GameState::Paused;
+            _changeState(GameState::Paused);
             LOG_INFO("Game paused (Ctrl+Shift+P)");
         }
         else if (m_gameState == GameState::Paused) {
-            m_gameState = GameState::Playing;
+            _changeState(GameState::Playing);
             LOG_INFO("Game resumed (Ctrl+Shift+P)");
         }
     }
@@ -140,7 +142,7 @@ void Playback::Render() {
                     if (newState == GameState::Stopped) {
                         _restoreWorldState();
                     }
-                    m_gameState = newState;
+                    _changeState(newState);
                 }
                 LOG_INFO(logMsg);
             }
@@ -255,6 +257,36 @@ void Playback::_restoreWorldState() {
     LOG_INFO("World restored");
 }
 
+// Internal state change handler that manages time scale and callbacks
+void Playback::_changeState(GameState newState) {
+    if (m_gameState == newState) return;
+
+    GameState oldState = m_gameState;
+    m_gameState = newState;
+
+    // Handle time scale changes based on state
+    switch (newState) {
+    case GameState::Stopped:
+        Time::TimeScale(1.0f);
+        break;
+    case GameState::Paused:
+        Time::TimeScale(0.0f);
+        break;
+    case GameState::Playing:
+        Time::TimeScale(1.0f);
+        break;
+    }
+
+    // Notify external listeners about state change
+    if (m_onStateChanged) {
+        m_onStateChanged(oldState, newState);
+    }
+}
+
+// Register callback for state change events
+void Playback::OnStateChanged(std::function<void(GameState, GameState)> callback) {
+    m_onStateChanged = callback;
+}
 
 // Query: Is the game currently in the Playing state?
 bool Playback::IsPlaying() const {
@@ -270,6 +302,11 @@ bool Playback::IsStepRequested() const {
 // Clear any outstanding step request flag.
 void Playback::ClearStepRequest() {
     m_stepRequested = false;
+}
+
+// Get current game state
+Playback::GameState Playback::GetGameState() const {
+    return m_gameState;
 }
 
 // Update the world reference safely when scenes change

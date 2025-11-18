@@ -11,7 +11,8 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 */
 /* End Header *******************************************************************/
 
-#include "../../include/editor/LevelEditor.h"
+#include "glad/glad.h"
+#include "../editor/LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include "graphics/graphicsConfig.hpp"
@@ -21,11 +22,11 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include "services/Time.h"
 
 // Create the editor and initialize panel members and config
-LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config)
+LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
     : m_world(world), m_config(config), m_playback(world), m_symbolsFont(nullptr),
     m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_viewport(),
-    m_hierarchyWindow(), m_inspector() {
-// Defer panel initialization to Initialize to use loaded fonts
+    m_hierarchyWindow(), m_inspector(), m_entityActions(scene) {
+    // Defer panel initialization to Initialize to use loaded fonts
 }
 
 // Destroy the editor instance without owning the world
@@ -36,10 +37,10 @@ LevelEditor::~LevelEditor() {}
 // -------------------------------------------------------------------------
 // Register a panel with initialization and render callbacks.
 // Centralizes panel management and eliminates repetitive init/render boilerplate.
-void LevelEditor::_registerPanel(const char* panelName, 
-                                  std::function<void()> initFn, 
-                                  std::function<void()> renderFn,
-                                  std::function<void(ECS::World*)> setWorldFn) {
+void LevelEditor::_registerPanel(const char* panelName,
+    std::function<void()> initFn,
+    std::function<void()> renderFn,
+    std::function<void(ECS::World*)> setWorldFn) {
     PanelRegistration reg;
     reg.Name = panelName;
     reg.InitializeCallback = initFn;
@@ -96,7 +97,7 @@ void LevelEditor::_buildDockLayout() {
 
     // Target layout: left hierarchy, center viewport with controls on top,
     // bottom asset browser, right strip for inspector/prefab editors
-            
+
     ImGuiID leftCenterNode, rightNode;
     // Split root: carve right strip (25% width) for inspectors
     // Params: (source_node, direction, size_ratio, out_id_primary, out_id_remaining)
@@ -166,7 +167,7 @@ void LevelEditor::_renderDockSpace() {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent host background
 
     // Begin invisible host window
-    ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);                    
+    ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(3);
 
@@ -190,16 +191,25 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
     _loadFonts();
 
+    Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
+    m_fileMenu.Initialize(sm);
+
     // Register all panels with their initialization and render callbacks.
     // Centralizes panel lifecycle management and reduces code duplication.
     _registerPanel("Playback Controls",
-        [this]() { m_playback.Initialize(m_mainFont, m_symbolsFont); },
+        [this]() {
+            m_playback.Initialize(m_mainFont, m_symbolsFont);
+            // Register playback state change callback
+            m_playback.OnStateChanged([this](Playback::GameState oldState, Playback::GameState newState) {
+                _onPlaybackStateChanged(oldState, newState);
+                });
+        },
         [this]() { m_playback.Render(); },
         [this](ECS::World* w) { m_playback.SetWorld(w); }
     );
 
     _registerPanel("Asset Browser",
-        [this]() { 
+        [this]() {
             m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
             m_assetBrowser.SetInspector(&m_inspector);
         },
@@ -208,15 +218,20 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     );
 
     _registerPanel("Editor Core",
-        [this]() { 
-            m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+        [this]() {
+            Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
+            m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
+            // Register viewport selection callback
+            m_viewport.OnSelectionChanged([this](EntityId id) {
+                _onViewportSelectionChanged(id);
+                });
         },
         [this]() { m_viewport.ShowEditorWindows(); },
         [this](ECS::World* w) { m_viewport.SetWorld(w); }
     );
 
     _registerPanel("Hierarchy",
-        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_viewport); },
+        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); },
         [this]() { m_hierarchyWindow.Render(); },
         [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
     );
@@ -238,7 +253,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         ECS::Entity e = m_world->Resolve(id);
         if (m_world->IsAlive(e)) m_inspector.InspectEntity(id); // Inspect when valid
         else m_inspector.ClearSelection(); // Clear when entity is dead
-    });
+        });
 }
 
 void LevelEditor::_loadFonts() {
@@ -307,91 +322,56 @@ void LevelEditor::_loadFonts() {
 // -------------------------------------------------------------------------
 // Process input and in world interactions for editor panels
 void LevelEditor::Update() {
+    // Apply global shortcuts
+    m_fileMenu.HandleShortcuts(m_uiScale);
+
     // Auto-sync to active scene world if it changed (e.g., via File > New Scene)
     if (Engine::CORE) {
         auto& sm = Engine::CORE->GetSceneManager();
         auto* active = sm.GetActive();
         ECS::World* activeWorld = active ? &active->GetWorld() : nullptr;
         if (activeWorld != m_world) {
+            m_entityActions.SetScene(active);
             SetWorld(activeWorld);
         }
     }
 
     m_playback.ProcessInput(); // Handle playback hotkeys and actions
-
-    // Handle playback state transitions (no camera toggling)
-    {
-        auto current = m_playback.GetGameState();
-        if (current != m_lastGameState) {
-            if (current == Playback::GameState::Stopped) {
-                // Seed conversion tracking sets to avoid double pixel->world conversion
-                // on restored entities created during play
-                if (m_world) {
-                    m_world->Each<ECS::Components::LocalTransform>([&](ECS::Entity e, ECS::Components::LocalTransform& /*tr*/) {
-                        m_convertedPositions.insert(e.Index);
-                    });
-                    m_world->Each<ECS::Components::ShapeCircle2D>([&](ECS::Entity e, ECS::Components::ShapeCircle2D& /*circle*/) {
-                        m_convertedCircles.insert(e.Index);
-                    });
-                    m_world->Each<ECS::Components::ShapeBox2D>([&](ECS::Entity e, ECS::Components::ShapeBox2D& /*box*/) {
-                        m_convertedBoxes.insert(e.Index);
-                    });
-                }
-                // Ensure simulation runs normally when stopped
-                Time::TimeScale(1.0f);
-            } else if (current == Playback::GameState::Paused) {
-                // Pause simulation by zeroing time scale
-                Time::TimeScale(0.0f);
-            } else if (current == Playback::GameState::Playing) {
-                // Resume simulation at normal speed
-                Time::TimeScale(1.0f);
-            }
-            // Playing/Paused: keep existing camera behavior; no toggling here
-            m_lastGameState = current;
-        }
-    }
-
-    // Restore automatic pixel->world conversion so newly added entities
-    // use world units consistent with renderer/camera
-    if (!IsPlaying() && m_world) {
-        m_world->Each<ECS::Components::LocalTransform>([&](ECS::Entity e, ECS::Components::LocalTransform& tr) {
-            if (m_convertedPositions.find(e.Index) == m_convertedPositions.end()) {
-                tr.Position.X = graphicsConfig::PixelsToWorld(tr.Position.X);
-                tr.Position.Y = graphicsConfig::PixelsToWorld(tr.Position.Y);
-                m_convertedPositions.insert(e.Index);
-            }
-        });
-
-        m_world->Each<ECS::Components::ShapeCircle2D>([&](ECS::Entity e, ECS::Components::ShapeCircle2D& circle) {
-            if (m_convertedCircles.find(e.Index) == m_convertedCircles.end()) {
-                circle.Radius = graphicsConfig::PixelsToWorld(circle.Radius);
-                m_convertedCircles.insert(e.Index);
-            }
-        });
-
-        m_world->Each<ECS::Components::ShapeBox2D>([&](ECS::Entity e, ECS::Components::ShapeBox2D& box) {
-            if (m_convertedBoxes.find(e.Index) == m_convertedBoxes.end()) {
-                box.HalfExtents.X = graphicsConfig::PixelsToWorld(box.HalfExtents.X);
-                box.HalfExtents.Y = graphicsConfig::PixelsToWorld(box.HalfExtents.Y);
-                m_convertedBoxes.insert(e.Index);
-            }
-        });
-    }
-
     m_viewport.HandleInWorldInteraction(); // Handle viewport interactions
+}
 
-    // Synchronize inspector selection with viewport picking when hovering the viewport
-    if (m_viewport.IsViewportHovered()) {
-        static EntityId s_lastInspected = 0;
-        EntityId picked = m_viewport.GetSelectedEntityId();
-        if (picked != s_lastInspected) {
-            if (picked != 0) {
-                m_inspector.InspectEntity(picked);
-            } else {
-                m_inspector.ClearSelection();
-            }
-            s_lastInspected = picked;
-        }
+// -------------------------------------------------------------------------
+// Event Handlers
+// -------------------------------------------------------------------------
+// Handle playback state changes (called by Playback via callback)
+void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback::GameState newState) {
+    // Any editor-specific logic that needs to happen on state change goes here
+    // (The time scale is already handled by Playback itself)
+
+    // Example: You could emit events to other systems, update UI, etc.
+    LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
+}
+
+// Handle viewport selection changes (called by Viewport via callback)
+void LevelEditor::_onViewportSelectionChanged(EntityId id) {
+    if (!m_world) {
+        m_inspector.ClearSelection();
+        return;
+    }
+
+    if (id == 0 || id == ECS::Entity::NPOS32) {
+        m_inspector.ClearSelection();
+        return;
+    }
+
+    // Validate entity before inspecting
+    ECS::Entity e = m_world->Resolve(id);
+    if (m_world->IsAlive(e)) {
+        m_inspector.InspectEntity(id);
+        // Optionally: m_hierarchyWindow.HighlightEntity(id);
+    }
+    else {
+        m_inspector.ClearSelection();
     }
 }
 
@@ -400,6 +380,10 @@ void LevelEditor::Update() {
 // -------------------------------------------------------------------------
 // Render dock space and editor panels with a fallback when world is missing
 void LevelEditor::Render() {
+    if (ImGui::BeginMainMenuBar()) {
+        m_fileMenu.RenderFileMenu(m_uiScale);
+        ImGui::EndMainMenuBar();
+    }
     _renderDockSpace();
 
     if (m_world) {
@@ -409,7 +393,7 @@ void LevelEditor::Render() {
     else {
         // Render all panels but show placeholder in inspector
         _renderPanels();
-        
+
         // Override inspector with placeholder message when no world attached
         ImGui::PushFont(m_mainFont);
         ImGui::Begin("Property Editor");
@@ -425,13 +409,22 @@ void LevelEditor::Render() {
 // Update the world reference and propagate it to all editor panels
 void LevelEditor::SetWorld(ECS::World* world) {
     m_world = world; // Store new world
-    
+
     // Propagate world to all registered panels using centralized system
     _updatePanelWorlds(world);
+}
 
-    // When binding a scene for editing, keep current camera; no toggling
-    // Reset conversion tracking for the new world
-    m_convertedCircles.clear();
-    m_convertedBoxes.clear();
-    m_convertedPositions.clear();
+// -------------------------------------------------------------------------
+// Accessors
+// -------------------------------------------------------------------------
+bool LevelEditor::IsPlaying() const {
+    return m_playback.IsPlaying();
+}
+
+bool LevelEditor::IsStepRequested() const {
+    return m_playback.IsStepRequested();
+}
+
+void LevelEditor::ClearStepRequest() {
+    m_playback.ClearStepRequest();
 }
