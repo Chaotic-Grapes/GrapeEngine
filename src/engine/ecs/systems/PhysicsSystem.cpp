@@ -213,15 +213,13 @@ namespace ECS {
     /**
      * @brief Test box-box collision using Collision utility
      */
-    bool TestBoxBox(
+    Engine::Collision::ContactManifold TestBoxBox(
         const Components::BoxCollider2D& boxA,
         const Components::LocalTransform& transformA,
         const Components::BoxCollider2D& boxB,
-        const Components::LocalTransform& transformB,
-        Vector2D& outNormal,
-        float& outDepth)
+        const Components::LocalTransform& transformB)
     {
-        // Convert local (offset, half-extents) to world AABBs
+        // Convert to world-space centers
         Vector2D centerA(
             transformA.Position.X + boxA.Offset.X,
             transformA.Position.Y + boxA.Offset.Y
@@ -231,7 +229,7 @@ namespace ECS {
             transformB.Position.Y + boxB.Offset.Y
         );
 
-        // get AABB center sizes
+        // Do AABB test
         Engine::Collision::AABB aabbA = Engine::Collision::MakeAABBCenterSize(
             centerA, boxA.HalfExtents * 2.0f
         );
@@ -239,18 +237,27 @@ namespace ECS {
             centerB, boxB.HalfExtents * 2.0f
         );
 
-        // Ask helper for manifold outputs.
         Vector2D normal;
         float penetration;
-        if (Engine::Collision::AABBvsAABB(aabbA, aabbB, &normal, &penetration)) {
-            outNormal = normal;
-            outDepth = penetration;
-            return true;
+
+        // Check if boxes overlap
+        if (!Engine::Collision::AABBvsAABB(aabbA, aabbB, &normal, &penetration)) {
+            // No collision - return empty manifold
+            return Engine::Collision::ContactManifold();
         }
 
-        return false;
-    }
+        // CREATE SIMPLE MANIFOLD (single contact point)
+        Engine::Collision::ContactManifold manifold;
+        manifold.normal = normal;
+        manifold.penetration = penetration;
 
+        // Single contact point at midpoint
+        manifold.points[0].X = (centerA.X + centerB.X) * 0.5f;
+        manifold.points[0].Y = (centerA.Y + centerB.Y) * 0.5f;
+        manifold.pointCount = 1;
+
+        return manifold;
+    }
 
     /**
      * @brief Test circle-box collision using Collision utility
@@ -305,7 +312,7 @@ namespace ECS {
         if (dt <= 0.0f) return;
 
         // 0) Choose substep count; make it a tunable or cvar if you like.
-        const int   substeps = 3;                         //higher = more stable, slower
+        const int   substeps = 8;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
 
         // Running frame counter to reset per-frame SFX dedupe
@@ -480,14 +487,62 @@ namespace ECS {
                     if (!hasPhysA && !hasPhysB) continue;
 
                     // Narrow phase: run the appropriate shape test to get contact normal and depth.
-                    Vector2D n; float depth{}; bool hit = false;
-                    if (circA && circB)        hit = TestCircleCircle(*circA, *tA, *circB, *tB, n, depth);
-                    else if (boxA && boxB)     hit = TestBoxBox(*boxA, *tA, *boxB, *tB, n, depth);
-                    else if (circA && boxB)    hit = TestCircleBox(*circA, *tA, *boxB, *tB, n, depth);
-                    else if (boxA && circB) { hit = TestCircleBox(*circB, *tB, *boxA, *tA, n, depth); if (hit) n = -n; }
+                    Engine::Collision::ContactManifold manifold;
+                    bool hasCollision = false;
 
-                    // No overlap -> nothing to resolve for this pair.
-                    if (!hit) continue;
+                    if (circA && circB) {
+                        // Circle-circle: single contact point (keep old method for now)
+                        Vector2D n;
+                        float depth;
+                        if (TestCircleCircle(*circA, *tA, *circB, *tB, n, depth)) {
+                            manifold.normal = n;
+                            manifold.penetration = depth;
+                            // Calculate contact point (between centers)
+                            manifold.points[0] = Vector2D(
+                                (tA->Position.X + tB->Position.X) * 0.5f,
+                                (tA->Position.Y + tB->Position.Y) * 0.5f
+                            );
+                            manifold.pointCount = 1;
+                            hasCollision = true;
+                        }
+                    }
+                    else if (boxA && boxB) {
+                        // Box-box: use new manifold generation
+                        manifold = TestBoxBox(*boxA, *tA, *boxB, *tB);
+                        hasCollision = (manifold.pointCount > 0);
+                    }
+                    else if (circA && boxB) {
+                        // Circle-box: single contact point
+                        Vector2D n;
+                        float depth;
+                        if (TestCircleBox(*circA, *tA, *boxB, *tB, n, depth)) {
+                            manifold.normal = n;
+                            manifold.penetration = depth;
+                            manifold.points[0] = Vector2D(
+                                tA->Position.X + circA->Offset.X,
+                                tA->Position.Y + circA->Offset.Y
+                            );
+                            manifold.pointCount = 1;
+                            hasCollision = true;
+                        }
+                    }
+                    else if (boxA && circB) {
+                        // Box-circle: single contact point
+                        Vector2D n;
+                        float depth;
+                        if (TestCircleBox(*circB, *tB, *boxA, *tA, n, depth)) {
+                            manifold.normal = -n;  // Flip normal
+                            manifold.penetration = depth;
+                            manifold.points[0] = Vector2D(
+                                tB->Position.X + circB->Offset.X,
+                                tB->Position.Y + circB->Offset.Y
+                            );
+                            manifold.pointCount = 1;
+                            hasCollision = true;
+                        }
+                    }
+
+                    if (!hasCollision) continue;
 
                     // Gather physics state (by value) and current velocities; some may be missing.
                     Components::Rigidbody2D      rbA{ 0 }, rbB{ 0 };
@@ -518,7 +573,7 @@ namespace ECS {
                     };
 
                     // Resolve
-                    Engine::Physics::ResolveCollision(rbA, rbB, vA, vB, *tA, *tB, n, depth, mCombined);
+                    Engine::Physics::ResolveCollisionManifold(rbA, rbB, vA, vB, *tA, *tB, manifold, mCombined);
 
                     // Write back
                     if (vAp) *vAp = vA;
@@ -528,7 +583,7 @@ namespace ECS {
                     {
                         // Compute impact magnitude from relative velocity along normal BEFORE the next iteration changes it further.
                         const Vector2D rel = vB.Value - vA.Value;
-                        const float    vn = rel.X * n.X + rel.Y * n.Y; // dot(rel, n)
+                        const float vn = rel.X * manifold.normal.X + rel.Y * manifold.normal.Y;
                         const float    impactSpeed = std::abs(vn);
 
                         // Filter tiny contacts to avoid spam; tune as needed.
