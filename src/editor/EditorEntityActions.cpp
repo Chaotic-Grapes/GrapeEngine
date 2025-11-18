@@ -1,0 +1,250 @@
+/* Start Header *****************************************************************/
+/*!
+\file   EditorEntityActions.cpp
+\author Samantha Leong (80%)
+        Foo Rui Qin    (20%)
+\par    s.leong@digipen.edu
+        ruiqin.foo@digipen.edu
+\date   16th November 2025
+
+\brief
+Implements editor-side entity operations such as creation, deletion, cloning
+and reparenting for the active scene. Called by panels so editor scripts avoid
+direct ECS manipulation.
+*/
+/* End Header *******************************************************************/
+
+#include "../editor/EditorEntityActions.h"
+#include "serialization/EntitySerializer.h"
+#include "ecs/World.h"
+#include "ecs/Hierarchy.h" 
+#include "ecs/Components.h" 
+#include "core/Logger.h"
+#include <functional>
+#include <unordered_map>
+#include <vector>
+
+// -----------------------------------------------------------------------------
+// Construction
+// -----------------------------------------------------------------------------
+
+// Store initial scene reference so all editor actions work immediately
+EntityActions::EntityActions(Scenes::Scene* scene) : m_scene(scene) {}
+
+// Update the scene pointer when the editor loads or switches scenes
+void EntityActions::SetScene(Scenes::Scene* scene) {
+    m_scene = scene;
+}
+
+// -----------------------------------------------------------------------------
+// Entity Creation and Destruction
+// -----------------------------------------------------------------------------
+
+// Add a new entity to the scene
+EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
+    if (!m_scene) return ECS::Entity::NPOS32;
+    ECS::World& world = m_scene->GetWorld();
+
+    // Create empty entity
+    ECS::Entity e = world.Create();
+
+    // Name (char buffer)
+    ECS::Components::Name nm{};
+    strncpy_s(nm.Value, name.c_str(), sizeof(nm.Value) - 1);
+    nm.Value[sizeof(nm.Value) - 1] = '\0';
+    world.Set<ECS::Components::Name>(e, nm);
+
+    // Mandatory LocalTransform
+    world.Set<ECS::Components::LocalTransform>(e, ECS::Components::LocalTransform{});
+
+    // Default render layer (0) so the renderer includes the entity
+    world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
+
+    // Optional parent
+    if (parent != ECS::Entity::NPOS32) {
+        ECS::Entity p = world.Resolve(parent);
+        if (world.IsAlive(p)) {
+            world.Set<ECS::Parent>(e, ECS::Parent{ p });
+        }
+    }
+
+    return e.Index;
+}
+
+// Delete an entity and all its children from the scene
+void EntityActions::RemoveEntity(EntityId id) {
+    if (!m_scene) return;
+    ECS::World& world = m_scene->GetWorld();
+
+    ECS::Entity entity = world.Resolve(id);
+    if (entity.IsNull() || !world.IsAlive(entity)) return;
+
+    // Recursive lambda to delete entity and all children
+    std::function<void(EntityId)> deleteRecursive = [&](EntityId entityId) {
+        // Collect children first to avoid iterator invalidation
+        std::vector<EntityId> children;
+        world.Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
+            if (p.ParentEntity.Index == entityId) {
+                children.push_back(e.Index);
+            }
+            });
+
+        // Recursively delete all children
+        for (auto childId : children) {
+            deleteRecursive(childId);
+        }
+
+        // Finally delete this entity
+        ECS::Entity e = world.Resolve(entityId);
+        if (!e.IsNull() && world.IsAlive(e)) {
+            world.Destroy(e);
+        }
+        };
+
+    deleteRecursive(id);
+}
+
+// Remove every entity in the scene
+void EntityActions::ClearAllEntities() {
+    if (!m_scene) return;
+    ECS::World& world = m_scene->GetWorld();
+
+    std::vector<ECS::Entity> allEntities;
+    world.Each([&](ECS::Entity e) {
+        // Keep editor camera
+        if (world.Has<ECS::Components::Name>(e)) {
+            const auto& name = world.Get<ECS::Components::Name>(e);
+            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
+                std::strcmp(name.Value, "Editor Camera") == 0) {
+                return;
+            }
+        }
+        allEntities.push_back(e);
+        });
+
+    for (const auto& e : allEntities) {
+        world.Destroy(e);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Entity Hierarchy Operations
+// -----------------------------------------------------------------------------
+
+// Clone an entity including all components and children
+EntityId EntityActions::CloneEntity(EntityId id) {
+    if (!m_scene) return ECS::Entity::NPOS32;
+    ECS::World& world = m_scene->GetWorld();
+
+    ECS::Entity entity = world.Resolve(id);
+    if (entity.IsNull() || !world.IsAlive(entity)) return ECS::Entity::NPOS32;
+
+    // Map to track original entity -> clone entity for maintaining hierarchy
+    std::unordered_map<EntityId, ECS::Entity> cloneMap;
+
+    // Recursive lambda to clone entity and all its children
+    std::function<ECS::Entity(EntityId, EntityId)> cloneRecursive =
+        [&](EntityId entityId, EntityId newParentId) -> ECS::Entity {
+
+        ECS::Entity original = world.Resolve(entityId);
+        if (original.IsNull() || !world.IsAlive(original)) {
+            return ECS::NULL_ENTITY;
+        }
+
+        // Clone the entity (this copies all components)
+        ECS::Entity clone = world.Clone(original);
+
+        // Update name to indicate it's a clone
+        if (world.Has<ECS::Components::Name>(clone)) {
+            auto& name = world.Get<ECS::Components::Name>(clone);
+            std::string newName = std::string(name.Value) + " (Clone)";
+            strncpy_s(name.Value, newName.c_str(), sizeof(name.Value) - 1);
+            name.Value[sizeof(name.Value) - 1] = '\0';
+        }
+
+        // Set parent relationship
+        if (newParentId != ECS::Entity::NPOS32) {
+            ECS::Entity newParent = world.Resolve(newParentId);
+            if (!newParent.IsNull() && world.IsAlive(newParent)) {
+                world.Set<ECS::Parent>(clone, ECS::Parent{ newParent });
+            }
+        }
+        else {
+            // Remove parent component if cloning as root
+            if (world.Has<ECS::Parent>(clone)) {
+                world.Remove<ECS::Parent>(clone);
+            }
+        }
+
+        // Store mapping
+        cloneMap[entityId] = clone;
+
+        // Find and clone all children
+        std::vector<EntityId> children;
+        world.Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
+            if (p.ParentEntity.Index == entityId) {
+                children.push_back(e.Index);
+            }
+            });
+
+        // Recursively clone children with this clone as their parent
+        for (auto childId : children) {
+            cloneRecursive(childId, clone.Index);
+        }
+
+        return clone;
+        };
+
+    // Get the parent of the original entity (if any)
+    EntityId originalParentId = ECS::Entity::NPOS32;
+    if (world.Has<ECS::Parent>(entity)) {
+        const auto& parent = world.Get<ECS::Parent>(entity);
+        originalParentId = parent.ParentEntity.Index;
+    }
+
+    // Clone the entity hierarchy
+    ECS::Entity cloned = cloneRecursive(id, originalParentId);
+
+    return cloned.Index;
+}
+
+// Move an entity under a new parent in the hierarchy
+void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
+    if (!m_scene) return;
+    ECS::World& world = m_scene->GetWorld();
+
+    ECS::Entity childEntity = world.Resolve(child);
+    if (childEntity.IsNull() || !world.IsAlive(childEntity)) return;
+
+    // Handle setting a new parent
+    if (newParent != ECS::Entity::NPOS32) {
+        ECS::Entity newParentEntity = world.Resolve(newParent);
+        if (newParentEntity.IsNull() || !world.IsAlive(newParentEntity)) return;
+
+        // Check for circular parenting (child cannot be ancestor of new parent)
+        bool isDescendant = false;
+        ECS::Entity checkParent = newParentEntity;
+        while (!checkParent.IsNull()) {
+            if (checkParent.Index == child) {
+                // Circular dependency detected
+                isDescendant = true;
+                break;
+            }
+            checkParent = world.ParentOf(checkParent);
+        }
+
+        if (!isDescendant) {
+            // Set the new parent
+            world.Set<ECS::Parent>(childEntity, ECS::Parent{ newParentEntity });
+        }
+        else {
+            LOG_WARNING("Cannot parent entity to its own descendant: this would create a cyclic hierarchy");
+        }
+    }
+    else {
+        // Remove parent (make root entity)
+        if (world.Has<ECS::Parent>(childEntity)) {
+            world.Remove<ECS::Parent>(childEntity);
+        }
+    }
+}

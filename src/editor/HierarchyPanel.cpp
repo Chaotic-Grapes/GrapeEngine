@@ -18,7 +18,6 @@ and supports prefab instantiation by accepting dragged prefab assets.
 /* End Header *******************************************************************/
 
 #include "../editor/HierarchyPanel.h"
-#include "../editor/Viewport.h"
 #include "../editor/ComponentWidgets.h"
 #include "../editor/EditorComponentRegistry.h"
 #include "core/Logger.h"
@@ -55,6 +54,32 @@ namespace {
         // true means this template handled the component successfully
         return true;
     }
+
+    // Helper function to check if entity should be hidden from hierarchy
+    // Returns true if entity should be filtered out (hidden)
+    bool ShouldHideFromHierarchy(ECS::World* world, ECS::Entity entity) {
+        if (!world || entity.IsNull() || !world->IsAlive(entity)) return true;
+
+        // Hide entity ID 0 (EditorCamera and other system entities)
+        if (entity.Index == 0) return true;
+
+        // Additional filter: hide entities named "EditorCamera" regardless of ID
+        if (world->Has<ECS::Components::Name>(entity)) {
+            const auto& name = world->Get<ECS::Components::Name>(entity);
+            if (std::string(name.Value) == "EditorCamera") {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Helper function to check if an entity is protected from modification
+    // Returns true if entity should NOT be modified (deleted, cloned, reparented, etc.)
+    bool IsProtectedEntity(EntityId entityId) {
+        // Protect entity ID 0 (EditorCamera) from all modifications
+        return (entityId == 0);
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -64,14 +89,14 @@ namespace {
 // Initialize the hierarchy panel with fonts and world/editor references
 // Sets up local state used for selection and expanded nodes
 void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
-    ECS::World* world, Viewport* viewport)
+    ECS::World* world, EntityActions* entityActions)
 {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
-    // Cache pointers to world and viewport so we operate on correct scene
+    // Cache pointers to world and entity actions so we operate on correct scene
     m_world = world;
-    m_viewport = viewport;
+    m_entityActions = entityActions;
 }
 
 // Update the world reference when scene changes
@@ -118,7 +143,8 @@ void HierarchyPanel::Render() {
     _renderFooterButtons();    // Footer buttons like Clear All
 
     // Handle delete key for selected entity: global keyboard shortcut
-    if (Input::IsKeyDown(KEY_DELETE)) {
+    // Block deletion of protected entities (ID 0)
+    if (Input::IsKeyDown(KEY_DELETE) && !IsProtectedEntity(m_selectedEntityId)) {
         _deleteEntity(m_selectedEntityId);
     }
 
@@ -155,9 +181,9 @@ void HierarchyPanel::_renderHeader() {
     if (ImGui::Button("Add")) {
         // Use default name if buffer is empty
         std::string entityName = (strlen(nameBuffer) > 0) ? nameBuffer : "NewEntity";
-        if (m_viewport) {
+        if (m_entityActions) {
             // Add as root entity (NPOS32 means no parent)
-            m_viewport->AddEntity(entityName, ECS::Entity::NPOS32);
+            m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
         }
         // Don't clear the buffer: keep the name for easy repeated additions
     }
@@ -167,10 +193,12 @@ void HierarchyPanel::_renderHeader() {
     ImGui::Separator();
     ImGui::Dummy(ImVec2(0, 2));
 
-    // Count entities for display by iterating through all entities
+    // Count visible entities (excluding hidden ones like EditorCamera)
     size_t entityCount = 0;
     m_world->Each([&](ECS::Entity e) {
-        entityCount++;
+        if (!ShouldHideFromHierarchy(m_world, e)) {
+            entityCount++;
+        }
         });
 
     // Display entity count
@@ -189,7 +217,7 @@ void HierarchyPanel::_renderEntityTree() {
     // Get fresh root entities list every frame to reflect changes
     auto rootEntities = _getRootEntities();
 
-    // Sort by index to display entities in consistent order (0, 1, 2, 3, ...)
+    // Sort by index to display entities in consistent order (1, 2, 3, ...)
     std::sort(rootEntities.begin(), rootEntities.end());
 
     // Render each root entity and its children recursively
@@ -221,8 +249,8 @@ void HierarchyPanel::_renderEntityTree() {
 void HierarchyPanel::_renderFooterButtons() {
     // Clear All button: removes all entities from the scene
     if (ImGui::Button("Clear All")) {
-        if (m_viewport) {
-            m_viewport->ClearAllEntities();
+        if (m_entityActions) {
+            m_entityActions->ClearAllEntities();
         }
         m_selectedEntityId = 0;
         if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
@@ -237,15 +265,17 @@ void HierarchyPanel::_renderFooterButtons() {
 // Handles selection, drag source and drop target logic
 // Depth parameter tracks recursion level for indentation
 void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
-    // Resolve (i.e. turn) entity ID to entity object and check if valid
+    // Resolve entity ID to entity object and check if valid
     ECS::Entity entity = m_world->Resolve(entityId);
-    if (entity.IsNull() || !m_world->IsAlive(entity)) return;
+
+    // Skip hidden entities (like EditorCamera at ID 0)
+    if (ShouldHideFromHierarchy(m_world, entity)) return;
 
     // Get children for this entity to determine if it's a leaf node
     auto children = _getChildren(entityId);
     bool hasChildren = !children.empty();
 
-    // Build display label with entity name and ID
+    // Build display label with entity name and REAL entity ID (no offset)
     std::stringstream oss;
     if (m_world->Has<ECS::Components::Name>(entity)) {
         const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
@@ -316,6 +346,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
 // Handle node interaction (click, right-click, double-click)
 void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
+    // Block selection of protected entities (shouldn't happen due to filtering, but just in case)
+    if (IsProtectedEntity(entityId)) return;
+
     // Single-click selection - select this entity
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         m_selectedEntityId = entityId;
@@ -332,14 +365,17 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
 
     // Double-click to focus camera on this entity in viewport
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        if (m_viewport) {
-            m_viewport->FocusOnEntity(entityId);
+        if (m_entityActions) {
+            // TODO: Implement camera focus functionality
         }
     }
 }
 
 // Handle drag-drop for entity reparenting and prefab instantiation
 void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
+    // Block dragging protected entities
+    if (IsProtectedEntity(entityId)) return;
+
     // Drag source: make this entity draggable
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         // Set payload with entity ID for drag-drop operations
@@ -360,8 +396,12 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
         // Handle entity reparenting
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
             EntityId draggedId = *(EntityId*)payload->Data;
-            if (m_viewport) {
-                m_viewport->ReparentEntity(draggedId, entityId);
+
+            // Block reparenting if either entity is protected
+            if (!IsProtectedEntity(draggedId) && !IsProtectedEntity(entityId)) {
+                if (m_entityActions) {
+                    m_entityActions->ReparentEntity(draggedId, entityId);
+                }
             }
         }
 
@@ -389,8 +429,12 @@ void HierarchyPanel::_handleTreeDragDrop() {
         // Reparent entity to root (make it have no parent)
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_ID")) {
             EntityId draggedId = *(EntityId*)payload->Data;
-            if (m_viewport) {
-                m_viewport->ReparentEntity(draggedId, ECS::Entity::NPOS32);
+
+            // Block reparenting protected entities
+            if (!IsProtectedEntity(draggedId)) {
+                if (m_entityActions) {
+                    m_entityActions->ReparentEntity(draggedId, ECS::Entity::NPOS32);
+                }
             }
         }
 
@@ -420,8 +464,8 @@ void HierarchyPanel::_renderEntityContextMenu() {
     if (ImGui::BeginPopup("EntityContextMenu")) {
         ECS::Entity entity = m_world->Resolve(m_contextMenuTarget);
 
-        // Only show menu options if entity is valid
-        if (!entity.IsNull() && m_world->IsAlive(entity)) {
+        // Only show menu options if entity is valid AND not protected
+        if (!entity.IsNull() && m_world->IsAlive(entity) && !IsProtectedEntity(m_contextMenuTarget)) {
             if (ImGui::Selectable("Delete")) {
                 _deleteEntity(m_contextMenuTarget);
             }
@@ -443,8 +487,11 @@ void HierarchyPanel::_renderEntityContextMenu() {
 // Delete an entity and update selection
 // Also handles cleanup of selection state
 void HierarchyPanel::_deleteEntity(EntityId entityId) {
-    if (m_viewport) {
-        m_viewport->RemoveEntity(entityId, true);
+    // Block deletion of protected entities
+    if (IsProtectedEntity(entityId)) return;
+
+    if (m_entityActions) {
+        m_entityActions->RemoveEntity(entityId);
     }
 
     // Clear selection if deleted entity was selected
@@ -457,23 +504,29 @@ void HierarchyPanel::_deleteEntity(EntityId entityId) {
 
 // Clone an entity: creates a duplicate with same components and hierarchy
 void HierarchyPanel::_cloneEntity(EntityId entityId) {
-    if (m_viewport) {
-        m_viewport->CloneEntity(entityId);
+    // Block cloning protected entities
+    if (IsProtectedEntity(entityId)) return;
+
+    if (m_entityActions) {
+        m_entityActions->CloneEntity(entityId);
     }
 }
 
 // Add a child entity to the selected entity
 // Creates a new entity as child of the specified parent
 void HierarchyPanel::_addChildEntity(EntityId parentId) {
-    if (m_viewport) {
-        m_viewport->AddEntity("Entity", parentId);
+    // Block adding children to protected entities
+    if (IsProtectedEntity(parentId)) return;
+
+    if (m_entityActions) {
+        m_entityActions->AddEntity("Entity", parentId);
     }
 }
 
 // Add a new root entity (entity without parent)
 void HierarchyPanel::_addRootEntity() {
-    if (m_viewport) {
-        m_viewport->AddEntity("Entity", ECS::Entity::NPOS32);
+    if (m_entityActions) {
+        m_entityActions->AddEntity("Entity", ECS::Entity::NPOS32);
     }
 }
 
@@ -486,6 +539,11 @@ void HierarchyPanel::_addRootEntity() {
 // Returns the entity ID of the newly created instance
 EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath, EntityId parentId) {
     if (!m_world) return ECS::Entity::NPOS32;
+
+    // Block adding children to protected entities
+    if (parentId != ECS::Entity::NPOS32 && IsProtectedEntity(parentId)) {
+        return ECS::Entity::NPOS32;
+    }
 
     try {
         // Open and read prefab file
@@ -573,6 +631,9 @@ std::vector<EntityId> HierarchyPanel::_getRootEntities() const {
     if (!m_world) return roots;
 
     m_world->Each([&](ECS::Entity e) {
+        // Skip hidden/protected entities (like EditorCamera at ID 0)
+        if (ShouldHideFromHierarchy(m_world, e)) return;
+
         if (!m_world->Has<ECS::Parent>(e)) {
             roots.push_back(e.Index);
         }
@@ -590,6 +651,9 @@ std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) const {
     // Iterate through all entities that have a Parent component
     // The Each<> template function only processes entities with the specified component
     m_world->Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& parent) {
+        // Skip hidden children
+        if (ShouldHideFromHierarchy(m_world, e)) return;
+
         if (parent.ParentEntity.Index == parentId) {
             children.push_back(e.Index);
         }
