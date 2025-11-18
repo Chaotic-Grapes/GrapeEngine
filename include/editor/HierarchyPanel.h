@@ -57,6 +57,8 @@ public:
     // Useful for synchronizing selection with other editor panels
     void OnSelectionChanged(SelectionCallback callback);
 
+    void SetSelectedEntity(EntityId id);
+
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
