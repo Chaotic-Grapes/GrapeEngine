@@ -16,7 +16,8 @@ Header for Viewport class handling viewport rendering and entity selection with 
 
 #include "ecs/World.h"
 #include "ecs/Entity.h"
-#include "../editor/EditorFileMenu.h"
+#include "EditorFileMenu.h"
+#include "graphics/EditorCamera.hpp"
 #include <imgui.h>
 #include <memory>
 #include <functional>
@@ -24,6 +25,7 @@ Header for Viewport class handling viewport rendering and entity selection with 
 // Forward declarations
 namespace ECS { class RendererSystem; }
 namespace Scenes { class SceneManager; }
+namespace Engine { class EditorCamera; }
 
 using EntityId = uint32_t;
 
@@ -55,7 +57,7 @@ private:
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
 
-    // Renderer
+    // Renderer (manages EditorCamera internally)
     std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
 
     // State
