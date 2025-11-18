@@ -324,7 +324,7 @@ void LevelEditor::Update() {
     // Apply global shortcuts
     m_fileMenu.HandleShortcuts(m_uiScale);
 
-    // Auto-sync to active scene world if it changed (e.g., via File > New Scene)
+    // Auto-sync to active scene world if it changed (e.g. via File > New Scene)
     if (Engine::CORE) {
         auto& sm = Engine::CORE->GetSceneManager();
         auto* active = sm.GetActive();
@@ -355,11 +355,13 @@ void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback
 void LevelEditor::_onViewportSelectionChanged(EntityId id) {
     if (!m_world) {
         m_inspector.ClearSelection();
+        m_hierarchyWindow.SetSelectedEntity(0);
         return;
     }
 
     if (id == 0 || id == ECS::Entity::NPOS32) {
         m_inspector.ClearSelection();
+        m_hierarchyWindow.SetSelectedEntity(0);
         return;
     }
 
@@ -367,10 +369,12 @@ void LevelEditor::_onViewportSelectionChanged(EntityId id) {
     ECS::Entity e = m_world->Resolve(id);
     if (m_world->IsAlive(e)) {
         m_inspector.InspectEntity(id);
+        m_hierarchyWindow.SetSelectedEntity(id);
         // Optionally: m_hierarchyWindow.HighlightEntity(id);
     }
     else {
         m_inspector.ClearSelection();
+        m_hierarchyWindow.SetSelectedEntity(0);
     }
 }
 
