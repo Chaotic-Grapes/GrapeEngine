@@ -19,6 +19,7 @@ Header for Viewport class handling viewport rendering and entity selection with 
 #include "EditorFileMenu.h"
 #include "graphics/EditorCamera.hpp"
 #include <imgui.h>
+#include "ImGuizmo.h"
 #include <memory>
 #include <functional>
 
@@ -63,6 +64,10 @@ private:
     // State
     EntityId m_selectedEntityId = 0;
     bool m_isViewportHovered = false;
+
+    // Stores the exact screen position and size of the drawn scene texture. M3<<<<<<<<<<<<<<<<<<<<<<<
+    ImVec2 m_sceneDrawPos = { 0.0f, 0.0f };
+    ImVec2 m_sceneDrawSize = { 0.0f, 0.0f };
 
     // Event callback
     std::function<void(EntityId)> m_onSelectionChanged;

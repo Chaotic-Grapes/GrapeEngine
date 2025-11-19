@@ -74,6 +74,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui_internal.h>
+#include <imgui.h>
+#include "ImGuizmo.h"
 
 namespace ECS {
     // Helper function to get the effective transform for rendering
@@ -1383,7 +1385,7 @@ namespace ECS {
         // EXECUTE RENDER GRAPH
         // ============================================================
         m_renderGraph->Execute();
-
+        
         // ============================================================
         // DRAG-TO-MOVE SELECTED ENTITY
         // ============================================================
@@ -1410,12 +1412,29 @@ namespace ECS {
             }
             // If ImGui not available or viewport not found, use full window (already set)
         }
-
+        
         static bool wasMouseDownLastFrame = false;
         static uint32_t lastSelectedEntityID = 0;
 
 
         if (m_selectedEntityID != 0) {
+
+            // ------------------------------------------------------------------
+            // <<<< IMGUIZMO BYPASS CHECK STARTS >>>>
+            // ------------------------------------------------------------------
+            if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+                // If ImGuizmo is currently manipulating the entity,
+                // we must disable the custom drag-to-move logic immediately.
+                m_isDragging = false;
+                wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT); // Update mouse state
+                // Skip the rest of the custom drag logic
+                lastSelectedEntityID = m_selectedEntityID; // Keep selection tracking consistent
+                return; // Exit the block early
+            }
+            // ------------------------------------------------------------------
+            // <<<< IMGUIZMO BYPASS CHECK ENDS >>>>
+            // ------------------------------------------------------------------
+
             glm::dvec2 mousePos;
             Input::GetMousePosition(mousePos.x, mousePos.y);
             glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection,
