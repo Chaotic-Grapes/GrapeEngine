@@ -98,27 +98,32 @@ void LevelEditor::_buildDockLayout() {
     // Target layout: left hierarchy, center viewport with controls on top,
     // bottom asset browser, right strip for inspector/prefab editors
 
+    // First split: toolbar at the very top (calculate ratio from config)
+    float toolbarRatio = m_config.ToolbarHeight / vp->Size.y;
+    ImGuiID toolbarNode, mainAreaNode;
+    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Up, toolbarRatio, &toolbarNode, &mainAreaNode);
+    
+    // Hide tab bar and disable resizing on toolbar node
+    ImGuiDockNode* toolbarDockNode = ImGui::DockBuilderGetNode(toolbarNode);
+    toolbarDockNode->LocalFlags |= ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_NoResize;
+    
     ImGuiID leftCenterNode, rightNode;
-    // Split root: carve right strip (25% width) for inspectors
+    // Split main area: carve right strip (25% width) for inspectors
     // Params: (source_node, direction, size_ratio, out_id_primary, out_id_remaining)
-    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
+    ImGui::DockBuilderSplitNode(mainAreaNode, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
 
     ImGuiID topSection, assetBrowserNode;
-    // Split main area vertically: top work area (65%), bottom asset browser (35%)
+    // Split left-center area vertically: top work area (65%), bottom asset browser (35%)
     ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.65f, &topSection, &assetBrowserNode); // Split for assets
 
-    ImGuiID leftTopNode, centerTopSection;
-    // Split top work area horizontally: left hierarchy (33%), center viewport/controls (67%)
-    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &centerTopSection); // Hierarchy strip
-
-    ImGuiID centerControlsNode, centerViewportNode;
-    // Split center area vertically: controls bar (~15.4%), viewport below
-    ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Up, 0.154f, &centerControlsNode, &centerViewportNode); // Controls above viewport
+    ImGuiID leftTopNode, viewportNode;
+    // Split top work area horizontally: left hierarchy (33%), center viewport (67%)
+    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &viewportNode); // Hierarchy strip
 
     // Map panels to target nodes to realize the layout
+    ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
-    ImGui::DockBuilderDockWindow("Game Controls", centerControlsNode);
-    ImGui::DockBuilderDockWindow("Viewport", centerViewportNode);
+    ImGui::DockBuilderDockWindow("Viewport", viewportNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
@@ -158,8 +163,8 @@ void LevelEditor::_renderDockSpace() {
     // NoTitleBar/NoResize/NoMove: make it a static, decoration-less host
     // NoBringToFrontOnFocus/NoNavFocus: keep focus behavior stable
     ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+                                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                                 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host
@@ -209,7 +214,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     // Centralizes panel lifecycle management and reduces code duplication.
     _registerPanel("Playback Controls",
         [this]() {
-            m_playback.Initialize(m_mainFont, m_symbolsFont);
+            m_playback.Initialize(m_mainFont, m_symbolsFont, m_config.ToolbarHeight);
             // Register playback state change callback
             m_playback.OnStateChanged([this](Playback::GameState oldState, Playback::GameState newState) {
                 _onPlaybackStateChanged(oldState, newState);

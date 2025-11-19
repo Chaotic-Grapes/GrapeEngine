@@ -40,9 +40,10 @@ Playback::~Playback() {}
 
 // Initialize fonts used by the playback UI and Material Symbols.
 // Keeps pointers for drawing icons on control buttons.
-void Playback::Initialize(ImFont* mainFont, ImFont* symbolsFont) {
+void Playback::Initialize(ImFont* mainFont, ImFont* symbolsFont, float toolbarHeight) {
     m_mainFont = mainFont;
     m_symbolsFont = symbolsFont;
+    m_toolbarHeight = toolbarHeight;
 }
 
 // Process keyboard input for play/stop, pause/resume, and step.
@@ -92,39 +93,41 @@ void Playback::ProcessInput() {
 // Render the playback toolbar UI using ImGui.
 // Centers buttons and shows tooltips with current state.
 void Playback::Render() {
-    // Window flags: NoResize prevents manual resizing; docking stays enabled by default
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize;
+    // Toolbar window flags: NoTitleBar removes title bar, NoScrollbar prevents scrolling,
+    // NoResize prevents manual resizing, NoCollapse prevents collapsing
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | 
+                             ImGuiWindowFlags_NoScrollbar | 
+                             ImGuiWindowFlags_NoResize | 
+                             ImGuiWindowFlags_NoCollapse;
+    
+    // Set fixed height for toolbar from config
+    ImGui::SetNextWindowSize(ImVec2(-1, m_toolbarHeight), ImGuiCond_Always);
+    
     // Use default ImGui tab styling; no local overrides
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(2, 2));
     ImGui::Begin("Game Controls", nullptr, flags);
 
     // Follow global FontGlobalScale (no local override)
 
-    // If mouse is over window then show tooltips (with keyboard shortcuts)
-    if (ImGui::IsWindowHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::Text("Play/Stop - Ctrl+P");
-        ImGui::Text("Pause/Resume - Ctrl+Shift+P");
-        ImGui::Text("Step - Alt+P");
-        ImGui::Dummy(ImVec2(0, 20));
-
-        // Show current state (resume is essentially == playing)
-        ImGui::Text("State: %s",
-            m_gameState == GameState::Stopped ? "STOPPED" :
-            m_gameState == GameState::Paused ? "PAUSED" :
-            "PLAYING"
-        );
-        ImGui::EndTooltip();
-    }
-
     // If the buttons have been clicked, they get grayed out
     auto button = [&](const char* icon, bool shouldBeEnabled, GameState newState, const char* logMsg,
-        bool isStepButton = false, ImVec2 size = ImVec2(100, 40))
+        bool isStepButton = false, const char* tooltip = nullptr, ImVec2 size = ImVec2(35, 20))
         {
             // Disabled scope: gray-out and block clicks when the control shouldn't be active
             if (!shouldBeEnabled) ImGui::BeginDisabled();
 
             // ImGui::Button returns true if the user clicks it during this frame.
+            // Style adjustments for padding and font scaling
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(-5, -5));
             bool clicked = ImGui::Button(icon, size);
+            
+            // Show tooltip on hover
+            if (tooltip && ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("%s", tooltip);
+                ImGui::EndTooltip();
+            }
+
             // Close the disabled block if it was opened
             if (!shouldBeEnabled) ImGui::EndDisabled();
 
@@ -146,16 +149,18 @@ void Playback::Render() {
                 }
                 LOG_INFO(logMsg);
             }
+
+            ImGui::PopStyleVar();
         };
 
     // Center buttons horizontally within available content region (Y unchanged)
     {
-        float btnWidth = 100.0f;
-        float spacing = ImGui::GetStyle().ItemSpacing.x;       // Default horizontal spacing between buttons from ImGui style
-        float totalWidth = btnWidth * 3.0f + spacing * 2.0f;   // Total width = 3 buttons + 2 spaces between them
+        float btnWidth = 35.0f;
+        float totalWidth = btnWidth * 3.0f;                    // Total width = 3 buttons + 2 spaces between them
         float availWidth = ImGui::GetContentRegionAvail().x;   // Get width of available space in current ImGui window/content region
         float startX = (availWidth - totalWidth) * 0.5f;       // Compute starting X position so buttons are centered
-        if (startX < 0.0f) startX = 0.0f;                      // If available width < total width, don't use negative starting pos
+        startX = std::max(startX, 0.0f);                       // If available width < total width, don't use negative starting pos
+
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + startX);
     }
 
@@ -164,29 +169,31 @@ void Playback::Render() {
     if (m_gameState == GameState::Stopped || m_gameState == GameState::Paused) {
         ImGui::PushFont(m_symbolsFont);
         button("\xEE\x80\xB7", true, GameState::Playing,
-            m_gameState == GameState::Stopped ? "Game started" : "Game resumed", false, ImVec2(100, 40));
+            m_gameState == GameState::Stopped ? "Game started" : "Game resumed", false,
+            m_gameState == GameState::Stopped ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
         ImGui::PopFont();
     }
     // Shows pause when playing
     else {
         ImGui::PushFont(m_symbolsFont);
-        button("\xEE\x80\xB4", true, GameState::Paused, "Game paused", false, ImVec2(100, 40));
+        button("\xEE\x80\xB4", true, GameState::Paused, "Game paused", false, "Pause (Ctrl+Shift+P)");
         ImGui::PopFont();
     }
     ImGui::SameLine();
 
     // STOP: playing/paused > stopped
     ImGui::PushFont(m_symbolsFont);
-    button("\xEE\x81\x87", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped", false, ImVec2(100, 40));
+    button("\xEE\x81\x87", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped", false, "Stop (Ctrl+P)");
     ImGui::PopFont();
     ImGui::SameLine();
 
     // Step button (for step-by-step physics)
     // Only enabled when paused
     ImGui::PushFont(m_symbolsFont);
-    button("\xEE\x81\x84", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true, ImVec2(100, 40));
+    button("\xEE\x81\x84", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true, "Step (Alt+P)");
     ImGui::PopFont();
 
+    ImGui::PopStyleVar();
     ImGui::End();
 }
 

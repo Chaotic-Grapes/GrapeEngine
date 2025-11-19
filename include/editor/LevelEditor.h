@@ -30,6 +30,7 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 struct LevelEditorConfig {
     float TextFontSize = 23.0f;
     float IconFontSize = 26.0f;
+    float ToolbarHeight = 26.0f;
 };
 
 struct PanelRegistration {

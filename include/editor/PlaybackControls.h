@@ -28,7 +28,7 @@ public:
     Playback(ECS::World* world);
     ~Playback();
 
-    void Initialize(ImFont* mainFont, ImFont* symbolsFont);
+    void Initialize(ImFont* mainFont, ImFont* symbolsFont, float toolbarHeight = 60.0f);
     void ProcessInput();
     void Render();
 
@@ -58,6 +58,7 @@ private:
     // UI fonts
     ImFont* m_mainFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
+    float m_toolbarHeight = 26.0f;
 
     // Event callback
     std::function<void(GameState, GameState)> m_onStateChanged;
