@@ -19,6 +19,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include <imgui_internal.h>
 #include <core/Application.h>
 #include "services/Time.h"
+#include "../editor/AudioAssetLibrary.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
@@ -187,6 +188,11 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     auto& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
+
+    // Initialize audio asset library:
+    // this will scan for folder assets/Audio
+    AudioAssetLibrary::Get().Refresh("assets/Audio");
+
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
     _loadFonts();
 
@@ -324,7 +330,7 @@ void LevelEditor::Update() {
     // Apply global shortcuts
     m_fileMenu.HandleShortcuts(m_uiScale);
 
-    // Auto-sync to active scene world if it changed (e.g., via File > New Scene)
+    // Auto-sync to active scene world if it changed (e.g. via File > New Scene)
     if (Engine::CORE) {
         auto& sm = Engine::CORE->GetSceneManager();
         auto* active = sm.GetActive();
@@ -355,11 +361,13 @@ void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback
 void LevelEditor::_onViewportSelectionChanged(EntityId id) {
     if (!m_world) {
         m_inspector.ClearSelection();
+        m_hierarchyWindow.SetSelectedEntity(0);
         return;
     }
 
     if (id == 0 || id == ECS::Entity::NPOS32) {
         m_inspector.ClearSelection();
+        m_hierarchyWindow.SetSelectedEntity(0);
         return;
     }
 
@@ -367,10 +375,12 @@ void LevelEditor::_onViewportSelectionChanged(EntityId id) {
     ECS::Entity e = m_world->Resolve(id);
     if (m_world->IsAlive(e)) {
         m_inspector.InspectEntity(id);
+        m_hierarchyWindow.SetSelectedEntity(id);
         // Optionally: m_hierarchyWindow.HighlightEntity(id);
     }
     else {
         m_inspector.ClearSelection();
+        m_hierarchyWindow.SetSelectedEntity(0);
     }
 }
 

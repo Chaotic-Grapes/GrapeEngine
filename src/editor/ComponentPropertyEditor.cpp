@@ -24,6 +24,7 @@ prefab assets use the same UI path.
 #include "serialization/EntitySerializer.h"
 #include "services/ResourceManager.h"
 #include <algorithm>
+#include "../editor/AudioAssetLibrary.h"
 
 // -----------------------------------------------------------------------------
 // Initialization
@@ -457,6 +458,154 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
     // Integer Z-order value (can be negative)
     EditorUI::RenderIntProperty("Z-Order", data, "ZOrder");
     EditorUI::EndPropertySection();
+}
+
+// Static variab/flags
+static bool s_showUnsupportedPopup = false;
+static std::string s_unsupportedPath;
+
+
+//Renders the AudioSource component Properties
+void ComponentUI::RenderAudioSource(nlohmann::json& data)
+{
+    // Ensure keys exist with defaults
+    if (!data.contains("CueId"))   data["CueId"] = 0;
+    if (!data.contains("Volume"))  data["Volume"] = 1.0f;
+    if (!data.contains("Pitch"))   data["Pitch"] = 1.0f;
+    if (!data.contains("Loop"))    data["Loop"] = false;
+    if (!data.contains("PlayOnStart")) data["PlayOnStart"] = false;
+    if (!data.contains("Spatial3D"))   data["Spatial3D"] = false;
+
+    // Get current CueID and set it to clip.Id from audiolibrary
+    uint32_t cueId = data.value("CueId", 0u);
+
+    // Get static reference of AudioAssetlib via getter
+    auto& lib = AudioAssetLibrary::Get();
+
+    // Set clips to get clips struct info from a storage vector via getallclips function
+    const auto& clips = lib.GetAllClips();
+
+    const AudioAssetLibrary::ClipInfo* selectedClip = nullptr;
+
+    //Iterate through the Clips to access specific clip ID 
+    for (const auto& clip : clips)
+    {
+        if (clip.id == cueId)
+        {
+            // selected Clip is set
+            selectedClip = &clip;
+            break;
+        }
+    }
+
+    // Label to show in the combo box
+    std::string currentLabel;
+    if (!selectedClip)
+        currentLabel = "None (Audio Clip)";
+    else
+        currentLabel = selectedClip->name;
+
+
+    // Group the properties visually
+    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop" });
+
+    ImGui::TextUnformatted("Audio Clip");
+    ImGui::SameLine();
+
+    if (ImGui::BeginCombo("##AudioClipCombo", currentLabel.c_str()))
+    {
+        // "None" option
+        bool isNone = (cueId == 0);
+        if (ImGui::Selectable("None (Audio Clip)", isNone))
+        {
+            data["CueId"] = 0;
+            cueId = 0;
+        }
+        if (isNone)
+            ImGui::SetItemDefaultFocus();
+
+        // One option per known clip
+        for (const auto& clip : clips)
+        {
+            bool isSelected = (clip.id == cueId);
+            if (ImGui::Selectable(clip.name.c_str(), isSelected))
+            {
+                data["CueId"] = clip.id;
+                cueId = clip.id;
+            }
+            if (isSelected)
+                ImGui::SetItemDefaultFocus();
+        }
+
+        ImGui::EndCombo();
+    }
+
+    // Assign cueID from Aud library
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH"))
+        {
+            const char* droppedPath = static_cast<const char*>(payload->Data);
+            std::filesystem::path path(droppedPath);
+
+            // Simple extension check here (since the library itself only filters in Refresh)
+            std::string ext = path.extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            bool supported =
+                (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
+
+            if (supported)
+            {
+                // This will either return existing ClipInfo or register a new one
+                const auto& clipInfo = lib.Register(path.string());
+                data["CueId"] = clipInfo.id;
+            }
+            else
+            {
+                s_showUnsupportedPopup = true;
+                s_unsupportedPath = path.string();
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    // Volume + Pitch sliders
+    EditorUI::RenderFloatRow("Volume", "", data, "Volume", 0.05f);
+    EditorUI::RenderFloatRow("Pitch", "", data, "Pitch", 0.05f);
+
+    // Loop checkbox
+    EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
+
+    // to be done edits.. missing stuff here
+    EditorUI::RenderCheckboxProperty("Play On Start", data, "PlayOnStart");
+    EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
+
+    EditorUI::EndPropertySection();
+
+    if (s_showUnsupportedPopup)
+    {
+        ImGui::OpenPopup("Unsupported Audio Format");
+        ImGui::SetNextWindowSize(ImVec2(450, 250), ImGuiCond_Appearing);
+    }
+
+    if (ImGui::BeginPopupModal("Unsupported Audio Format",
+        nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextWrapped(
+            "The file you tried to assign is not a supported audio format.\n\n"
+            "Only .wav, .ogg, .mp3, and .flac files are allowed.\n\n"
+        );
+
+        if (ImGui::Button("OK", ImVec2(120, 0)))
+        {
+            s_showUnsupportedPopup = false;
+            s_unsupportedPath.clear();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
 }
 
 // Renders the Layer component properties

@@ -3,6 +3,7 @@
 
 #include "ecs/Components.h"
 #include "math/Vector2D.h"
+#include "Collision.h"
 
 namespace Engine {
     class Physics {
@@ -61,15 +62,14 @@ namespace Engine {
             float entityRestitution = -1.0f  // -1 means use bounds.Restitution
         );
 
-        static CollisionResult ResolveCollision(
+        static CollisionResult ResolveCollisionManifold(
             const ECS::Components::Rigidbody2D& rbA,
-            const ECS::Components::Rigidbody2D& RbB,
+            const ECS::Components::Rigidbody2D& rbB,
             ECS::Components::LinearVelocity2D& velA,
-            ECS::Components::LinearVelocity2D& VelB,
+            ECS::Components::LinearVelocity2D& velB,
             ECS::Components::LocalTransform& transformA,
             ECS::Components::LocalTransform& transformB,
-            const Vector2D& normal,
-            float depth,
+            const Collision::ContactManifold& manifold,
             const ECS::Components::PhysicsMaterial2D& physics
         );
 

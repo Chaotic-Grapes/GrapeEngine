@@ -137,7 +137,7 @@ namespace ECS {
 			s.TypeName[sizeof(s.TypeName) - 1] = '\0';
 		}
 		
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D)
 	} 
 }
 

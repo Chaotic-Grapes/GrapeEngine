@@ -115,6 +115,12 @@ void HierarchyPanel::OnSelectionChanged(SelectionCallback callback) {
     m_selectionCallback = callback;
 }
 
+// Add this implementation
+void HierarchyPanel::SetSelectedEntity(EntityId id) {
+    m_selectedEntityId = id;
+    // Don't trigger the callback here to avoid circular updates
+}
+
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------

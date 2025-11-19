@@ -420,6 +420,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         }
     }
 
+
     ImGui::EndChild();
     ImGui::PopStyleVar();
 }
