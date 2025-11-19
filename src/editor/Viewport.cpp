@@ -54,9 +54,6 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
     m_symbolsFont = symbolsFont;
     m_world = world;
 
-    // Initialize file menu
-    m_fileMenu.Initialize(sceneManager);
-
     // Create and initialize renderer system
     // RendererSystem creates and manages its own EditorCamera internally
     if (m_world && !m_rendererSystem) {
@@ -64,6 +61,11 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
         m_rendererSystem->Initialize(*m_world);
         m_rendererSystem->BindWorld(*m_world);
         m_rendererSystem->SetEditorInputEnabled(true);
+
+        // Wire up file menu if available
+        if (m_fileMenu) {
+            m_rendererSystem->SetFileMenu(m_fileMenu);
+        }
     }
 }
 
@@ -76,10 +78,20 @@ void Viewport::SetWorld(ECS::World* world) {
         m_rendererSystem->Initialize(*world);
         m_rendererSystem->BindWorld(*world);
         m_rendererSystem->SetEditorInputEnabled(true);
+
+        // Wire up file menu if available
+        if (m_fileMenu) {
+            m_rendererSystem->SetFileMenu(m_fileMenu);
+        }
     }
     // Rebind existing renderer to new world
     else if (m_rendererSystem && world) {
         m_rendererSystem->BindWorld(*world);
+
+        // Reset file menu when world changes
+        if (m_fileMenu) {
+            m_rendererSystem->SetFileMenu(m_fileMenu);
+        }
     }
 }
 
@@ -166,4 +178,13 @@ EntityId Viewport::GetSelectedEntityId() const {
 
 bool Viewport::IsViewportHovered() const {
     return m_isViewportHovered;
+}
+
+void Viewport::SetFileMenu(EditorFileMenu* fileMenu) {
+    m_fileMenu = fileMenu;
+
+    // Propagate to renderer if it exists
+    if (m_rendererSystem) {
+        m_rendererSystem->SetFileMenu(fileMenu);
+    }
 }

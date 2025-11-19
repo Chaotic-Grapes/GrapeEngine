@@ -24,6 +24,14 @@ direct ECS manipulation.
 #include <unordered_map>
 #include <vector>
 
+namespace {
+    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
+        if (fileMenu) {
+            fileMenu->MarkSceneDirty();
+        }
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Construction
 // -----------------------------------------------------------------------------
@@ -68,6 +76,8 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
         }
     }
 
+    // MARK SCENE AS DIRTY
+    MarkSceneDirtyIfNeeded(m_fileMenu);
     return e.Index;
 }
 
@@ -102,6 +112,9 @@ void EntityActions::RemoveEntity(EntityId id) {
         };
 
     deleteRecursive(id);
+
+    // MARK SCENE AS DIRTY
+    MarkSceneDirtyIfNeeded(m_fileMenu);
 }
 
 // Remove every entity in the scene
@@ -125,6 +138,9 @@ void EntityActions::ClearAllEntities() {
     for (const auto& e : allEntities) {
         world.Destroy(e);
     }
+
+    // MARK SCENE AS DIRTY
+    MarkSceneDirtyIfNeeded(m_fileMenu);
 }
 
 // -----------------------------------------------------------------------------
@@ -205,6 +221,8 @@ EntityId EntityActions::CloneEntity(EntityId id) {
     // Clone the entity hierarchy
     ECS::Entity cloned = cloneRecursive(id, originalParentId);
 
+    // MARK SCENE AS DIRTY
+    MarkSceneDirtyIfNeeded(m_fileMenu);
     return cloned.Index;
 }
 
@@ -247,4 +265,7 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
             world.Remove<ECS::Parent>(childEntity);
         }
     }
+
+    // MARK SCENE AS DIRTY (only if operation succeeded)
+    MarkSceneDirtyIfNeeded(m_fileMenu);
 }

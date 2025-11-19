@@ -28,6 +28,7 @@ namespace Scenes { class SceneManager; }
 namespace Engine { class EditorCamera; }
 
 using EntityId = uint32_t;
+class EditorFileMenu;
 
 class Viewport {
 public:
@@ -40,6 +41,7 @@ public:
 
     // Event registration
     void OnSelectionChanged(std::function<void(EntityId)> callback);
+    void SetFileMenu(EditorFileMenu* fileMenu);
 
     // Accessors
     EntityId GetSelectedEntityId() const;
@@ -50,7 +52,7 @@ private:
     void _renderViewport();
 
     ECS::World* m_world = nullptr;
-    EditorFileMenu m_fileMenu;
+    EditorFileMenu* m_fileMenu = nullptr;
 
     // UI fonts
     ImFont* m_mainFont = nullptr;

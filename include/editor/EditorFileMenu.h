@@ -35,6 +35,12 @@ public:
 
     // Connects the File menu to the SceneManager so it can create, load and save scenes
     void Initialize(Scenes::SceneManager* sceneManager);
+    
+    // Set fonts for rendering bold asterisk
+    void SetFonts(ImFont* mainFont, ImFont* boldFont) {
+        m_mainFont = mainFont;
+        m_boldFont = boldFont;
+    }
 
     // -------------------------------------------------------------------------
     // Rendering
@@ -55,8 +61,16 @@ public:
 
     // Shows a Save As dialog and writes the current scene to disk
     void SaveSceneAsDialog();
+
     // Saves to current scene path if known; otherwise falls back to Save As
     void SaveScene();
+
+    // Mark the scene as having unsaved changes (only if it was loaded from a file)
+    void MarkSceneDirty() {
+        if (!m_currentScenePath.empty()) {
+            m_hasUnsavedChanges = true;
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Keyboard Shortcuts
@@ -84,6 +98,10 @@ private:
     Scenes::SceneManager* m_sceneManager = nullptr;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
+    // Track whether current scene has unsaved changes
+    bool m_hasUnsavedChanges = false;
+    ImFont* m_mainFont = nullptr;
+    ImFont* m_boldFont = nullptr;
 
 };
 

@@ -25,6 +25,7 @@ through a unified system shared by both entities and prefab templates.
 #include "../editor/EditorComponentRegistry.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
+#include "../editor/EditorFileMenu.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include <imgui.h>
@@ -60,6 +61,12 @@ namespace {
     // Returns true if entity should NOT be inspected or modified
     bool IsProtectedEntity(EntityId id) {
         return (id == 0); // Entity ID 0 is EditorCamera (system entity)
+    }
+
+    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
+        if (fileMenu) {
+            fileMenu->MarkSceneDirty();
+        }
     }
 }
 
@@ -347,6 +354,8 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
         ImGui::Dummy(ImVec2(0, 4));
 
+        bool wasEdited = false;
+
         // First pass: draw every component using registry metadata
         for (auto& componentEntry : entityJson["Components"]) {
             // Basic validation
@@ -359,10 +368,17 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (meta) {
                 auto& data = componentEntry["Data"];
 
+                size_t hashBefore = std::hash<std::string>{}(data.dump());
+
                 // UI renderer callback: InspectorPanel calls this and forwards to ComponentWidgets
                 // via the ComponentUI helper to draw the actual fields
                 _renderComponentSection(meta->DisplayName, meta->TypeName, data,
                     [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); }, meta->CanDelete);
+
+                size_t hashAfter = std::hash<std::string>{}(data.dump());
+                if (hashBefore != hashAfter) {
+                    wasEdited = true;
+                }
 
                 ImGui::Dummy(ImVec2(0, 4));
             }
@@ -417,6 +433,11 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (meta) {
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
             }
+        }
+
+        // MARK SCENE AS DIRTY if anything was edited
+        if (wasEdited) {
+            MarkSceneDirtyIfNeeded(m_fileMenu);
         }
     }
 
@@ -663,7 +684,10 @@ void InspectorPanel::_addComponentToEntity(const std::string& componentType) {
         // Add to ECS with default JSON values
         meta->AddComponent(m_world, entity, meta->GetDefaults());
         m_statusMessage = std::string("Added ") + componentType;
-        m_statusTimer = 2.0f;
+        m_statusTimer = 3.0f;
+
+        // MARK SCENE AS DIRTY
+        MarkSceneDirtyIfNeeded(m_fileMenu);
     }
 }
 
@@ -682,7 +706,10 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
         // Remove from ECS
         meta->RemoveComponent(m_world, entity);
         m_statusMessage = std::string("Removed ") + componentType;
-        m_statusTimer = 2.0f;
+        m_statusTimer = 3.0f;
+
+        // MARK SCENE AS DIRTY
+        MarkSceneDirtyIfNeeded(m_fileMenu);
     }
 }
 
