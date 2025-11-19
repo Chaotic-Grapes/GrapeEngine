@@ -192,6 +192,7 @@ namespace ECS {
         std::unique_ptr<Shader> m_shader;          ///< Main batched geometry shader
         std::unique_ptr<Shader> m_textShader;      ///< SDF text rendering shader
         std::unique_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
+        std::unique_ptr<Shader> m_blitShader;
 
         // Post-process shaders
         std::unique_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass

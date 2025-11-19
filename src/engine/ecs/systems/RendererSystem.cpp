@@ -155,6 +155,10 @@ namespace ECS {
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_combine.frag");
 
+        m_blitShader = std::make_unique<Shader>(
+            "assets/shaders/blit.vert",
+            "assets/shaders/blit.frag");
+
         // Object Picking
         m_pickingFBO.Create(width, height, false, false, 1);
         m_pbos[0].Create(4, GL_STREAM_READ);
@@ -181,6 +185,8 @@ namespace ECS {
         m_renderGraph->CreateTexture("BloomBlur"
             , { width / 2, height / 2, GL_RGBA16F, false });
 
+        m_renderGraph->CreateTexture("LDR",
+            { width, height, GL_RGBA8, false });
 
         // Resize HDR when window resizes
         Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
@@ -191,9 +197,10 @@ namespace ECS {
                 m_renderGraph = std::make_unique<RenderGraph>();
 
                 m_renderGraph->CreateTexture("HDR",          { msg.Width,      msg.Height,      GL_RGBA16F, false });
-                m_renderGraph->CreateTexture("Backbuffer",   { msg.Width,      msg.Height,      GL_RGBA8,   true });
+                m_renderGraph->CreateTexture("Backbuffer",   { msg.Width,      msg.Height,      GL_RGBA8,   true  });
                 m_renderGraph->CreateTexture("BloomExtract", { msg.Width / 2,  msg.Height / 2,  GL_RGBA16F, false });
                 m_renderGraph->CreateTexture("BloomBlur",    { msg.Width / 2,  msg.Height / 2,  GL_RGBA16F, false });
+                m_renderGraph->CreateTexture("LDR",          { msg.Width,      msg.Height,      GL_RGBA8, false });
 
                 // Update fallback projection
                 m_projection = glm::ortho(
@@ -463,8 +470,8 @@ namespace ECS {
                 }
 
                 // Because of tone-mapping, the background will appear slightly lighter.
-                // Choose a slightly brighter neutral gray for a nicer look
-                hdrFbo->BindAndClear(0.28f, 0.28f, 0.28f, 1.0f);
+                // I chose a slightly brighter neutral gray for a nicer look
+                hdrFbo->BindAndClear(0.025f, 0.028f, 0.032f, 1.0f);
 
                 // ---------------------------------------
                 // Layered rendering: SDF first, then batch
@@ -1360,26 +1367,47 @@ namespace ECS {
                 Framebuffer::Unbind();
             });
 
-        // Pass 2: Blit HDR to backbuffer
-        m_renderGraph->AddPass("Composite", { "HDR", "BloomExtract" }, { "Backbuffer" },
+        // ToneMap pass -> writes final color to LDR texture
+        m_renderGraph->AddPass("ToneMap", { "HDR", "BloomExtract" }, { "LDR" },
             [this](ResourceAccessor& res)
             {
                 auto* hdr = res.GetFramebuffer("HDR");
                 auto* bloom = res.GetFramebuffer("BloomExtract");
-                if (!hdr || !bloom) return;
+                auto* ldr = res.GetFramebuffer("LDR");
+                if (!hdr || !bloom || !ldr) return;
+
+                ldr->BindAndClear(0, 0, 0, 1);
+
+                m_bloomCombineShader->use();
+                m_bloomCombineShader->setUniform("uScene", 0);
+                m_bloomCombineShader->setUniform("uBloomBlur", 1);
+                m_bloomCombineShader->setUniform("uExposure", 1.3f);
+                m_bloomCombineShader->setUniform("uBloomStrength", 5.2f);
+                m_bloomCombineShader->setUniform("uGamma", 1.5f);
+
+                hdr->BindColorTexture(0, 0);
+                bloom->BindColorTexture(0, 1);
+
+                m_renderer->drawFullscreenQuad();
+                Framebuffer::Unbind();
+            });
+
+        // Blit LDR to backbuffer
+        m_renderGraph->AddPass("Composite", { "LDR" }, { "Backbuffer" },
+            [this](ResourceAccessor& res)
+            {
+                auto* ldr = res.GetFramebuffer("LDR");
+                if (!ldr) return;
 
                 const auto& win = WindowManager::GetMainWindow();
                 Framebuffer::BindDefault();
                 glViewport(0, 0, win->Width(), win->Height());
 
-                m_bloomCombineShader->use();
-                m_bloomCombineShader->setUniform("uScene", 0);
-                m_bloomCombineShader->setUniform("uBloomBlur", 1);
-                m_bloomCombineShader->setUniform("uExposure", 1.3f);      // Or 0.8f if still too bright?
-                m_bloomCombineShader->setUniform("uBloomStrength", 5.2f); // Control bloom intensity
-                m_bloomCombineShader->setUniform("uGamma", 1.5f);
-                hdr->BindColorTexture(0, 0);
-                bloom->BindColorTexture(0, 1);
+                // Use a simple blit shader, NOT bloomCombine
+                m_blitShader->use();
+                m_blitShader->setUniform("uTex", 0);
+                ldr->BindColorTexture(0, 0);
+
                 m_renderer->drawFullscreenQuad();
             });
 
@@ -1419,6 +1447,24 @@ namespace ECS {
         static uint32_t lastSelectedEntityID = 0;
 
         if (m_selectedEntityID != 0) {
+            // ----------------------------------------------------------
+            // CANCEL DRAG IF MOUSE LEAVES THE VIEWPORT CONTENT REGION
+            // ----------------------------------------------------------
+            glm::dvec2 mpos;
+            Input::GetMousePosition(mpos.x, mpos.y);
+
+            bool mouseOutside =
+                (mpos.x < dragViewportMin.x) ||
+                (mpos.y < dragViewportMin.y) ||
+                (mpos.x > dragViewportMin.x + dragViewportSize.x) ||
+                (mpos.y > dragViewportMin.y + dragViewportSize.y);
+
+            if (mouseOutside) {
+                m_isDragging = false;
+                // Do NOT early return; still allow selection updates
+                // Just skip drag logic
+            }
+
             glm::dvec2 mousePos;
             Input::GetMousePosition(mousePos.x, mousePos.y);
             glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection,
