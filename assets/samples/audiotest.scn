@@ -1,0 +1,157 @@
+{
+    "Entities": [
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "NewEntity"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "Filled": true,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Radius": 0.5,
+                        "Thickness": 1.0
+                    },
+                    "TypeName": "ShapeCircle2D"
+                }
+            ],
+            "EntityId": 1
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "AspectRatio": 1.7777777910232544,
+                        "FOV": 45.0,
+                        "FarPlane": 100.0,
+                        "NearPlane": 0.10000000149011612,
+                        "OrthoSize": 10.0,
+                        "UsePerspective": false
+                    },
+                    "TypeName": "Camera3D"
+                },
+                {
+                    "Data": {
+                        "Value": "EditorCamera"
+                    },
+                    "TypeName": "Name"
+                }
+            ],
+            "EntityId": 0
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "AspectRatio": 1.7777777910232544,
+                        "FOV": 45.0,
+                        "FarPlane": 100.0,
+                        "NearPlane": 0.10000000149011612,
+                        "OrthoSize": 10.0,
+                        "UsePerspective": false
+                    },
+                    "TypeName": "Camera3D"
+                },
+                {
+                    "Data": {
+                        "Value": "EditorCamera"
+                    },
+                    "TypeName": "Name"
+                }
+            ],
+            "EntityId": 2
+        }
+    ],
+    "EntityCount": 3,
+    "SceneName": "Scene",
+    "SystemProfile": {
+        "Systems": [
+            {
+                "Enabled": true,
+                "Name": "Audio"
+            }
+        ]
+    },
+    "Version": "1.0"
+}

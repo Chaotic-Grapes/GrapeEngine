@@ -20,6 +20,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include <core/Application.h>
 #include "services/Time.h"
 #include "../editor/AudioAssetLibrary.h"
+#include "../engine/services/Time.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
@@ -186,7 +187,6 @@ void LevelEditor::_renderDockSpace() {
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
 
-    auto& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
 
     // Initialize audio asset library:
@@ -356,6 +356,11 @@ void LevelEditor::Update() {
 
     m_playback.ProcessInput(); // Handle playback hotkeys and actions
     m_viewport.HandleInWorldInteraction(); // Handle viewport interactions and camera input control
+
+    if (m_playback.IsPlaying()) {
+        Engine::CORE->GetSceneManager().Update(); // Updates scenemanager to run Audio
+    }
+
 }
 
 // -------------------------------------------------------------------------

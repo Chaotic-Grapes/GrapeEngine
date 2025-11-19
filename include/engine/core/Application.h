@@ -51,8 +51,13 @@ namespace Engine {
          */
         void Close();
 
+        // Getters for services
         Services::AudioService* GetAudioService() { return m_audio; }
         const Services::AudioService* GetAudioService() const { return m_audio; }
+
+        Services::OverlayService* GetOverlayService() { return m_overlay; }
+        const Services::OverlayService* GetOverlayService() const { return m_overlay; }
+
     private:
         // Flag to indicate if application should stop
         static bool m_shouldStop;
@@ -75,6 +80,9 @@ namespace Engine {
 
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
+
+        void _onGameStart(Scenes::Scene* scene);
+        void _onGameStop(Scenes::Scene* scene);
     };
 
     extern Application* CORE;

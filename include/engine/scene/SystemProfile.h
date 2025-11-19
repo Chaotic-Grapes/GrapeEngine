@@ -73,6 +73,7 @@ namespace Scenes {
             profile.Systems.push_back({"Physics", true});
             profile.Systems.push_back({"Animation", true});
             profile.Systems.push_back({"Render", true});
+            profile.Systems.push_back({ "Audio", true});
             return profile;
         }
 

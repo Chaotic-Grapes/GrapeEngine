@@ -48,6 +48,7 @@ public:
     bool IsViewportHovered() const;
     bool HasValidWorld() const { return m_world != nullptr; }
 
+
 private:
     void _renderViewport();
 
