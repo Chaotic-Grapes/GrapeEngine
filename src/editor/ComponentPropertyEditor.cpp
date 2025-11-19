@@ -48,7 +48,6 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Local Rotation", "Local Position", "Local Scale" });
 
     // Draw rotation as a quaternion with X Y Z W components
-    // data["Rotation"] is expected to be a JSON object containing these keys
     EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
 
     // Draw position as a 3D vector with X Y Z fields

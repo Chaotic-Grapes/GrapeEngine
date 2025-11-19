@@ -35,6 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Color.h"
 #include "ecs/World.h"
 #include "Math/Vector2D.h"
+#include "../editor/EditorFileMenu.h"
 
 // ============================================================================
 // Graphics Includes
@@ -46,6 +47,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
+
+namespace {
+    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
+        if (fileMenu) { fileMenu->MarkSceneDirty(); }
+    }
+}
 
 namespace ECS {
 
@@ -98,6 +105,7 @@ namespace ECS {
 
         // Enable/disable editor camera input (pan/orbit/zoom) based on viewport hover
         void SetEditorInputEnabled(bool enabled) { m_editorInputEnabled = enabled; }
+        void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
 
         // ====================================================================
         // Temporary Accessors (For Stress Testing - Remove Later)
@@ -172,6 +180,7 @@ namespace ECS {
         std::unique_ptr<Renderer> m_renderer;                   ///< Low-level batch renderer
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         std::unique_ptr<Engine::EditorCamera> m_editorCamera;   ///< Editor camera
+        EditorFileMenu* m_fileMenu = nullptr;
 
         // Whether editor camera should process input this frame (set by editor viewport hover)
         bool m_editorInputEnabled = true;

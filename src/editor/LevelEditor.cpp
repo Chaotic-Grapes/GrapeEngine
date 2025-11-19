@@ -199,6 +199,12 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
     m_fileMenu.Initialize(sm);
 
+    // Wire up fonts to file menu so it can render bold asterisk
+    m_fileMenu.SetFonts(m_mainFont, m_boldFont);
+
+    // Wire up file menu to entity actions for dirty tracking
+    m_entityActions.SetFileMenu(&m_fileMenu);
+
     // Register all panels with their initialization and render callbacks.
     // Centralizes panel lifecycle management and reduces code duplication.
     _registerPanel("Playback Controls",
@@ -222,7 +228,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         [this](ECS::World* w) { m_assetBrowser.SetWorld(w); }
     );
 
-    _registerPanel("Editor Core",
+    _registerPanel("Viewport",
         [this]() {
             Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
             m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
@@ -242,13 +248,20 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     );
 
     _registerPanel("Inspector",
-        [this]() { m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world); },
+        [this]() { 
+            m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
+            // WIRE UP FILE MENU to inspector
+            m_inspector.SetFileMenu(&m_fileMenu); 
+        },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
     );
 
     // Initialize all registered panels
     _initializePanels();
+
+    // Wire up file menu to viewport after panels are initialized
+    m_viewport.SetFileMenu(&m_fileMenu);
 
     // Set up hierarchy selection callback to sync with inspector
     m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
@@ -352,8 +365,6 @@ void LevelEditor::Update() {
 void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback::GameState newState) {
     // Any editor-specific logic that needs to happen on state change goes here
     // (The time scale is already handled by Playback itself)
-
-    // Example: You could emit events to other systems, update UI, etc.
     LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
 }
 
@@ -376,7 +387,6 @@ void LevelEditor::_onViewportSelectionChanged(EntityId id) {
     if (m_world->IsAlive(e)) {
         m_inspector.InspectEntity(id);
         m_hierarchyWindow.SetSelectedEntity(id);
-        // Optionally: m_hierarchyWindow.HighlightEntity(id);
     }
     else {
         m_inspector.ClearSelection();
