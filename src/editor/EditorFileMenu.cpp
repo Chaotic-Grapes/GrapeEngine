@@ -41,7 +41,7 @@ centralized and consistent with the currently active scene.
 
 // Default directory where scenes are stored on disk
 // The Windows file dialogs will open here first
-static constexpr const char* SCENE_DIR = "assets/scenes/";
+static constexpr const char* SCENE_DIR = "assets/"; // By right it should be working directory
 
 // -------------------------------------------------------------------------
 // Lifecycle

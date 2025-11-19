@@ -154,6 +154,11 @@ void HierarchyPanel::Render() {
         _deleteEntity(m_selectedEntityId);
     }
 
+    // Handle F2 key for renaming selected entity
+    if (ImGui::IsKeyPressed(ImGuiKey_F2) && m_selectedEntityId != 0 && !IsProtectedEntity(m_selectedEntityId)) {
+        _startRename(m_selectedEntityId);
+    }
+
     // Click empty space to clear selection
     // Only clears if clicking on window background, not on any items
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
@@ -174,9 +179,16 @@ void HierarchyPanel::Render() {
 
 // Render the header with entity count, context menu & add entity controls
 void HierarchyPanel::_renderHeader() {
+    // Search bar for filtering entities
+    ImGui::SetNextItemWidth(-1); // Full width
+    if (ImGui::InputTextWithHint("##SearchFilter", "Search...", m_searchBuffer, sizeof(m_searchBuffer))) {
+        m_searchFilter = m_searchBuffer;
+    }
+    ImGui::Dummy(ImVec2(0, 2));
+
     // Entity creation section
-    ImGui::Text("Create New Entity");
-    static char nameBuffer[128] = "NewEntity";
+    // ImGui::Text("Create New Entity");
+    static char nameBuffer[128] = "New Entity";
 
     // Input text for entity name with responsive width
     ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.5f);
@@ -186,7 +198,7 @@ void HierarchyPanel::_renderHeader() {
     ImGui::SameLine();
     if (ImGui::Button("Add")) {
         // Use default name if buffer is empty
-        std::string entityName = (strlen(nameBuffer) > 0) ? nameBuffer : "NewEntity";
+        std::string entityName = (strlen(nameBuffer) > 0) ? nameBuffer : "New Entity";
         if (m_entityActions) {
             // Add as root entity (NPOS32 means no parent)
             m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
@@ -209,6 +221,7 @@ void HierarchyPanel::_renderHeader() {
 
     // Display entity count
     ImGui::Text("Entities (%zu)", entityCount);
+    ImGui::Dummy(ImVec2(0, 2));
 }
 
 // Render the main entity tree with drag-drop support
@@ -281,14 +294,14 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     auto children = _getChildren(entityId);
     bool hasChildren = !children.empty();
 
-    // Build display label with entity name and REAL entity ID (no offset)
+    // Build display label with entity name
     std::stringstream oss;
     if (m_world->Has<ECS::Components::Name>(entity)) {
         const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        oss << nameComp.Value << " (" << entityId << ")";
+        oss << nameComp.Value;
     }
     else {
-        oss << "Entity (" << entityId << ")";
+        oss << "Entity";
     }
 
     // Append prefab indicator if this is a prefab instance
@@ -299,6 +312,11 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     std::string label = oss.str();
+
+    // Skip this entity if it doesn't match the search filter
+    if (!_matchesSearchFilter(entityId)) {
+        return;
+    }
 
     // Configure tree node flags for proper behavior and appearance
     ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags_OpenOnArrow   // Open when clicking arrow
@@ -318,12 +336,41 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     // Push ID to ensure unique imgui identifiers
     ImGui::PushID(static_cast<int>(entityId));
 
-    // Render the actual tree node
-    bool nodeOpen = ImGui::TreeNodeEx(label.c_str(), nodeFlags);
+    // Render rename input if this entity is being renamed
+    bool nodeOpen = false;
+    if (m_renamingEntityId == entityId) {
+        // Show input field for renaming
+        if (m_focusRenameInput) {
+            ImGui::SetKeyboardFocusHere();
+            m_focusRenameInput = false;
+        }
+        
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer), 
+            ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
+            // Apply rename on Enter
+            if (strlen(m_renameBuffer) > 0 && m_world->Has<ECS::Components::Name>(entity)) {
+                auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
+                strncpy_s(nameComp.Value, m_renameBuffer, sizeof(nameComp.Value) - 1);
+                nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
+            }
+            m_renamingEntityId = 0;
+        }
+        
+        // Cancel rename on Escape or click away
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape) || 
+            (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsItemHovered())) {
+            m_renamingEntityId = 0;
+        }
+    }
+    else {
+        // Render the actual tree node
+        nodeOpen = ImGui::TreeNodeEx(label.c_str(), nodeFlags);
 
-    // Handle interactions like clicks and drag-drop
-    _handleNodeInteraction(entityId);
-    _handleNodeDragDrop(entityId);
+        // Handle interactions like clicks and drag-drop
+        _handleNodeInteraction(entityId);
+        _handleNodeDragDrop(entityId);
+    }
 
     // Render context menu if opened
     _renderEntityContextMenu();
@@ -352,14 +399,14 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
 // Handle node interaction (click, right-click, double-click)
 void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
-    // Block selection of protected entities (shouldn't happen due to filtering, but just in case)
+    // Block interaction with protected entities (shouldn't happen due to filtering, but just in case)
     if (IsProtectedEntity(entityId)) return;
 
-    // Single-click selection - select this entity
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-        m_selectedEntityId = entityId;
-        if (m_selectionCallback) m_selectionCallback(entityId);
-    }
+    // Skip interaction if currently renaming
+    if (m_renamingEntityId != 0) return;
+
+    // Get current time for click timing
+    float currentTime = ImGui::GetTime();
 
     // Right-click context menu: select and open context menu
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
@@ -369,11 +416,37 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         ImGui::OpenPopup("EntityContextMenu");
     }
 
-    // Double-click to focus camera on this entity in viewport
+    // Fast double-click to focus camera
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         if (m_entityActions) {
             // TODO: Implement camera focus functionality
+            // This triggers on fast double-click
         }
+        // Update click tracking
+        m_lastClickedEntity = entityId;
+        m_lastClickTime = currentTime;
+    }
+    // Handle single clicks (for selection and rename detection)
+    else if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+        // Check if this is a slow second click on the same already-selected entity BEFORE updating times
+        bool isSlowSecondClick = (m_lastClickedEntity == entityId && 
+                                   m_selectedEntityId == entityId &&
+                                   (currentTime - m_lastClickTime) > RENAME_DELAY_THRESHOLD &&
+                                   (currentTime - m_lastClickTime) < 2.0f);
+        
+        if (isSlowSecondClick) {
+            // Start rename mode
+            _startRename(entityId);
+        }
+        else {
+            // Normal selection
+            m_selectedEntityId = entityId;
+            if (m_selectionCallback) m_selectionCallback(entityId);
+        }
+        
+        // Update click tracking for next time
+        m_lastClickedEntity = entityId;
+        m_lastClickTime = currentTime;
     }
 }
 
@@ -472,14 +545,18 @@ void HierarchyPanel::_renderEntityContextMenu() {
 
         // Only show menu options if entity is valid AND not protected
         if (!entity.IsNull() && m_world->IsAlive(entity) && !IsProtectedEntity(m_contextMenuTarget)) {
-            if (ImGui::Selectable("Delete")) {
-                _deleteEntity(m_contextMenuTarget);
+            if (ImGui::Selectable("Add Child")) {
+                _addChildEntity(m_contextMenuTarget);
             }
             if (ImGui::Selectable("Clone")) {
                 _cloneEntity(m_contextMenuTarget);
             }
-            if (ImGui::Selectable("Add Child")) {
-                _addChildEntity(m_contextMenuTarget);
+            if (ImGui::Selectable("Rename")) {
+                _startRename(m_contextMenuTarget);
+            }
+            ImGui::Separator();
+            if (ImGui::Selectable("Delete")) {
+                _deleteEntity(m_contextMenuTarget);
             }
         }
         ImGui::EndPopup();
@@ -534,6 +611,28 @@ void HierarchyPanel::_addRootEntity() {
     if (m_entityActions) {
         m_entityActions->AddEntity("Entity", ECS::Entity::NPOS32);
     }
+}
+
+// Start renaming an entity (prepare rename state and buffers)
+void HierarchyPanel::_startRename(EntityId entityId) {
+    // Block renaming protected entities
+    if (IsProtectedEntity(entityId)) return;
+
+    // Start renaming this entity
+    m_renamingEntityId = entityId;
+    
+    // Copy current name to rename buffer
+    ECS::Entity entity = m_world->Resolve(entityId);
+    if (m_world->Has<ECS::Components::Name>(entity)) {
+        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
+        strncpy_s(m_renameBuffer, nameComp.Value, sizeof(m_renameBuffer) - 1);
+        m_renameBuffer[sizeof(m_renameBuffer) - 1] = '\0';
+    }
+    else {
+        strncpy_s(m_renameBuffer, "Entity", sizeof(m_renameBuffer) - 1);
+    }
+    
+    m_focusRenameInput = true;
 }
 
 // -------------------------------------------------------------------------
@@ -666,4 +765,35 @@ std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) const {
         });
 
     return children;
+}
+
+// Check if entity matches current search filter
+bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
+    // Empty filter matches everything
+    if (m_searchFilter.empty()) return true;
+
+    // Get entity and check name
+    ECS::Entity entity = m_world->Resolve(entityId);
+    if (entity.IsNull() || !m_world->IsAlive(entity)) return false;
+
+    if (m_world->Has<ECS::Components::Name>(entity)) {
+        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
+        std::string entityName = nameComp.Value;
+        
+        // Convert both to lowercase for case-insensitive search
+        std::string lowerName = entityName;
+        std::string lowerFilter = m_searchFilter;
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+        std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(), ::tolower);
+        
+        // Check if entity name contains the filter string
+        return lowerName.find(lowerFilter) != std::string::npos;
+    }
+
+    // No name component, check if searching for "Entity"
+    std::string defaultName = "Entity";
+    std::string lowerFilter = m_searchFilter;
+    std::transform(defaultName.begin(), defaultName.end(), defaultName.begin(), ::tolower);
+    std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(), ::tolower);
+    return defaultName.find(lowerFilter) != std::string::npos;
 }

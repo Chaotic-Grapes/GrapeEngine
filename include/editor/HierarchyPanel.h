@@ -121,6 +121,9 @@ private:
     // Add a new root entity (no parent)
     void _addRootEntity();
 
+    // Start renaming an entity (prepare rename state and buffers)
+    void _startRename(EntityId entityId);
+
     // -------------------------------------------------------------------------
     // Prefab Operations
     // -------------------------------------------------------------------------
@@ -139,6 +142,9 @@ private:
     // Get all direct children of a parent entity
     std::vector<EntityId> _getChildren(EntityId parentId) const;
 
+    // Check if entity matches current search filter
+    bool _matchesSearchFilter(EntityId entityId) const;
+
     // Handle clicking empty space to clear selection
     void _selectEmptySpace();
 
@@ -153,7 +159,7 @@ private:
 
     // System references
     ECS::World* m_world = nullptr;                  // ECS world containing all entities and components
-    EntityActions* m_entityActions = nullptr; // For entity operations
+    EntityActions* m_entityActions = nullptr;       // For entity operations
 
     // Selection state
     EntityId m_selectedEntityId = 0;                // Currently selected entity ID (0 = no selection)
@@ -162,6 +168,20 @@ private:
     // UI state
     std::unordered_set<EntityId> m_expandedNodes;   // Track which tree nodes are expanded
     SelectionCallback m_selectionCallback;          // Callback for selection change events
+
+    // Search filter state
+    char m_searchBuffer[256] = "";                  // Buffer for search text input
+    std::string m_searchFilter = "";                // Active search filter string
+
+    // Rename state
+    EntityId m_renamingEntityId = 0;                // Entity currently being renamed (0 = none)
+    char m_renameBuffer[128] = "";                  // Buffer for rename text input
+    bool m_focusRenameInput = false;                // Flag to focus rename input on next frame
+
+    // Click timing for distinguishing fast double-click from slow double-click
+    EntityId m_lastClickedEntity = 0;               // Last entity that was clicked
+    float m_lastClickTime = 0.0f;                   // Time of last click
+    static constexpr float RENAME_DELAY_THRESHOLD = 0.75f; // Delay threshold for rename (in seconds)
 };
 
 #endif
