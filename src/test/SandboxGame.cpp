@@ -77,7 +77,7 @@ void SandboxGame::OnStart(Scenes::SceneManager& sceneManager) {
             // I want it to start sceneless
             LOG_INFO("Starting Level Editor (scene-less startup)...");
             const auto& config = Engine::CORE->GetConfig();
-            CREATE_WINDOW("Level Editor", config.WindowConfig.Width, config.WindowConfig.Height);
+            CREATE_WINDOW("Grape Engine Editor", config.WindowConfig.Width, config.WindowConfig.Height);
             if (auto* overlay = Services::OverlayService::Get()) {
                 overlay->EnableLevelEditorForScene(nullptr);
             }
