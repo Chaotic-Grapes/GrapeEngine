@@ -76,6 +76,9 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
         }
     }
 
+    // For undo system
+    if (m_undoSystem) { m_undoSystem->RecordEntityCreation(e.Index); }
+
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);
     return e.Index;
@@ -112,6 +115,9 @@ void EntityActions::RemoveEntity(EntityId id) {
         };
 
     deleteRecursive(id);
+
+    // For undo system
+    if (m_undoSystem) { m_undoSystem->RecordEntityDeletion(id); }
 
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);

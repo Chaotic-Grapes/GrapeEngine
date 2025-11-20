@@ -107,6 +107,9 @@ private:
 
     // Playback state tracking
     Playback::GameState m_lastGameState = Playback::GameState::Stopped;
+
+    // Undo System
+    Editor::UndoSystem m_undoSystem;
 };
 
 #endif // LEVEL_EDITOR_H

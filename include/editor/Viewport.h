@@ -18,6 +18,7 @@ Header for Viewport class handling viewport rendering and entity selection with 
 #include "ecs/Entity.h"
 #include "EditorFileMenu.h"
 #include "graphics/EditorCamera.hpp"
+#include "../editor/UndoSystem.h"
 #include <imgui.h>
 #include <memory>
 #include <functional>
@@ -48,6 +49,9 @@ public:
     bool IsViewportHovered() const;
     bool HasValidWorld() const { return m_world != nullptr; }
 
+    // Undo System
+    Editor::UndoSystem* GetUndoSystem() { return &m_undoSystem; }
+
 private:
     void _renderViewport();
 
@@ -68,6 +72,9 @@ private:
 
     // Event callback
     std::function<void(EntityId)> m_onSelectionChanged;
+
+    // Undo system
+    Editor::UndoSystem m_undoSystem;
 };
 
 #endif // VIEWPORT_H

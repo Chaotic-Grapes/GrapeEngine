@@ -20,6 +20,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include <core/Application.h>
 #include "services/Time.h"
 #include "../editor/AudioAssetLibrary.h"
+#include "../editor/UndoSystem.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
@@ -209,6 +210,14 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     // Wire up file menu to entity actions for dirty tracking
     m_entityActions.SetFileMenu(&m_fileMenu);
+
+    // Undo system
+    m_entityActions.SetUndoSystem(&m_undoSystem);
+
+    if (m_world) {
+        m_undoSystem.Initialize(m_world, 50);
+        // LOG_INFO("[LevelEditor] Undo system initialized with world");
+    }
 
     // Register all panels with their initialization and render callbacks.
     // Centralizes panel lifecycle management and reduces code duplication.
@@ -433,6 +442,9 @@ void LevelEditor::Render() {
 // Update the world reference and propagate it to all editor panels
 void LevelEditor::SetWorld(ECS::World* world) {
     m_world = world; // Store new world
+
+    // Undo system
+    if (world) { m_undoSystem.Initialize(world, 50); }
 
     // Propagate world to all registered panels using centralized system
     _updatePanelWorlds(world);

@@ -61,11 +61,16 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
         m_rendererSystem->Initialize(*m_world);
         m_rendererSystem->BindWorld(*m_world);
         m_rendererSystem->SetEditorInputEnabled(true);
+        m_rendererSystem->SetUndoSystem(&m_undoSystem);
 
         // Wire up file menu if available
         if (m_fileMenu) {
             m_rendererSystem->SetFileMenu(m_fileMenu);
         }
+    }
+
+    if (world) {
+        m_undoSystem.Initialize(world, 50);
     }
 }
 
@@ -78,6 +83,7 @@ void Viewport::SetWorld(ECS::World* world) {
         m_rendererSystem->Initialize(*world);
         m_rendererSystem->BindWorld(*world);
         m_rendererSystem->SetEditorInputEnabled(true);
+        m_rendererSystem->SetUndoSystem(&m_undoSystem);
 
         // Wire up file menu if available
         if (m_fileMenu) {
@@ -87,11 +93,16 @@ void Viewport::SetWorld(ECS::World* world) {
     // Rebind existing renderer to new world
     else if (m_rendererSystem && world) {
         m_rendererSystem->BindWorld(*world);
+        m_rendererSystem->SetUndoSystem(&m_undoSystem);
 
         // Reset file menu when world changes
         if (m_fileMenu) {
             m_rendererSystem->SetFileMenu(m_fileMenu);
         }
+    }
+
+    if (world) {
+        m_undoSystem.Initialize(world, 50);
     }
 }
 
@@ -107,6 +118,8 @@ void Viewport::OnSelectionChanged(std::function<void(EntityId)> callback) {
 // -------------------------------------------------------------------------
 void Viewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
+
+    m_undoSystem.Update();
 
     // Control editor camera input based on viewport hover state
     // RendererSystem will call EditorCamera::Update() in its own Update()
