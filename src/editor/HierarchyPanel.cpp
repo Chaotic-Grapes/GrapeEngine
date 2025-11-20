@@ -96,7 +96,6 @@ namespace {
     }
 }
 
-
 void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
     if (entityId == 0) return;
 
@@ -133,8 +132,10 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
         // 2. Attach the ScriptInstance component.
         _attachScriptComponent(entityId, scriptClassName);
 
-        // 3. Update selection state.
-        m_selectedEntityId = entityId;
+        // 3. Update selection state (using the correct member variable name)
+        m_selectedEntityIds.clear();
+        m_selectedEntityIds.insert(entityId);
+        m_anchorEntityId = entityId;
         if (m_selectionCallback) m_selectionCallback(entityId);
     }
     else {

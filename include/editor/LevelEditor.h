@@ -28,7 +28,7 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 #include <unordered_set>
 
 struct LevelEditorConfig {
-    float TextFontSize = 18.0f;
+    float TextFontSize = 23.0f;
     float IconFontSize = 26.0f;
     float ToolbarHeight = 26.0f;
 };
