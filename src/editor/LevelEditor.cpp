@@ -248,13 +248,14 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         [this]() {
             Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
             m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
+            m_viewport.SetUndoSystem(&m_undoSystem);
             // Register viewport selection callback
             m_viewport.OnSelectionChanged([this](EntityId id) {
                 _onViewportSelectionChanged(id);
                 });
         },
         [this]() { m_viewport.ShowEditorWindows(); },
-        [this](ECS::World* w) { m_viewport.SetWorld(w); }
+        [this](ECS::World* w) { m_viewport.SetWorld(w); m_viewport.SetUndoSystem(&m_undoSystem); }
     );
 
     _registerPanel("Hierarchy",

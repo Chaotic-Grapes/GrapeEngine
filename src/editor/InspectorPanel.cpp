@@ -26,6 +26,7 @@ through a unified system shared by both entities and prefab templates.
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "../editor/EditorFileMenu.h"
+#include "../editor/UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include <imgui.h>
@@ -370,6 +371,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         bool wasEdited = false;
 
+        static nlohmann::json editStartState;
+        static bool isEditing = false;
+
         // First pass: draw every component using registry metadata
         for (auto& componentEntry : entityJson["Components"]) {
             // Basic validation
@@ -390,7 +394,12 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                     [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); }, meta->CanDelete);
 
                 size_t hashAfter = std::hash<std::string>{}(data.dump());
+
                 if (hashBefore != hashAfter) {
+                    if (!isEditing) {
+                        editStartState = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+                        isEditing = true;
+                    }
                     wasEdited = true;
                 }
 

@@ -461,7 +461,9 @@ namespace Editor {
             newPos, newRot, newScale
         );
 
-        ExecuteCommand(std::move(command));
+        m_undoStack.push_back(std::move(command));
+        m_redoStack.clear();
+        TrimUndoStack();
     }
 
     void UndoSystem::RecordEntityCreation(EntityId entityId) {

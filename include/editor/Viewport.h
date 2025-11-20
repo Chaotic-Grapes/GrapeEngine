@@ -51,7 +51,7 @@ public:
     bool HasValidWorld() const { return m_world != nullptr; }
 
     // Undo System
-    Editor::UndoSystem* GetUndoSystem() { return &m_undoSystem; }
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
 
 private:
     void _renderViewport();
@@ -79,7 +79,7 @@ private:
     std::function<void(EntityId)> m_onSelectionChanged;
 
     // Undo system
-    Editor::UndoSystem m_undoSystem;
+    Editor::UndoSystem* m_undoSystem = nullptr;
 };
 
 #endif // VIEWPORT_H
