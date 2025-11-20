@@ -198,26 +198,49 @@ namespace Scenes {
                 sceneJson["SystemProfile"] = scene.GetSystemProfile();
 
                 json entities = json::array();
+                json hierarchyArray = json::array();
                 int entityCount = 0;
+
+                // Map to track entity index in save order
+                std::unordered_map<uint32_t, size_t> entityToSaveIndex;
 
                 // Use provided entity order if available, otherwise iterate naturally
                 if (entityOrder && !entityOrder->empty()) {
                     for (uint32_t entityId : *entityOrder) {
                         ECS::Entity entity = world.Resolve(entityId);
                         if (world.IsAlive(entity)) {
+                            entityToSaveIndex[entity.Index] = entityCount;
                             entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
                             ++entityCount;
                         }
                     }
                 } else {
                     world.Each([&](const ECS::Entity entity) {
+                        entityToSaveIndex[entity.Index] = entityCount;
                         entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
                         ++entityCount;
                     });
                 }
 
+                // Save hierarchy relationships separately (as child->parent index mappings)
+                world.Each([&](const ECS::Entity entity) {
+                    ECS::Entity parent = world.ParentOf(entity);
+                    if (!parent.IsNull()) {
+                        auto childIt = entityToSaveIndex.find(entity.Index);
+                        auto parentIt = entityToSaveIndex.find(parent.Index);
+                        
+                        if (childIt != entityToSaveIndex.end() && parentIt != entityToSaveIndex.end()) {
+                            json hierarchyEntry;
+                            hierarchyEntry["child"] = childIt->second;
+                            hierarchyEntry["parent"] = parentIt->second;
+                            hierarchyArray.push_back(hierarchyEntry);
+                        }
+                    }
+                });
+
                 sceneJson["Entities"] = std::move(entities);
                 sceneJson["EntityCount"] = entityCount;
+                sceneJson["Hierarchy"] = std::move(hierarchyArray);
 
                 const std::string ext = Serialization::Serializer::HasExtension(filename, "scene") ? "scene" : "scn";
                 if (!Serialization::Serializer::SaveJson(filename, ext, sceneJson)) {
@@ -267,6 +290,8 @@ namespace Scenes {
                 }
 
                 int loadedCount = 0;
+                std::vector<ECS::Entity> restoredEntities;
+                
                 if (outEntityOrder) {
                     outEntityOrder->clear();
                 }
@@ -275,6 +300,7 @@ namespace Scenes {
                     for (const auto& entityJson : sceneJson["Entities"]) {
                         ECS::Entity entity = Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
                         ++loadedCount;
+                        restoredEntities.push_back(entity);
                         
                         // Track entity order for hierarchy preservation
                         if (outEntityOrder) {
@@ -282,6 +308,26 @@ namespace Scenes {
                         }
                     }
                 }
+
+                // Restore hierarchy relationships if present
+                if (sceneJson.contains("Hierarchy") && sceneJson["Hierarchy"].is_array()) {
+                    const auto& hierarchyArray = sceneJson["Hierarchy"];
+                    for (const auto& hierarchyEntry : hierarchyArray) {
+                        if (!hierarchyEntry.contains("child") || !hierarchyEntry.contains("parent")) {
+                            continue;
+                        }
+                        
+                        size_t childIndex = hierarchyEntry["child"].get<size_t>();
+                        size_t parentIndex = hierarchyEntry["parent"].get<size_t>();
+                        
+                        if (childIndex < restoredEntities.size() && parentIndex < restoredEntities.size()) {
+                            ECS::Entity child = restoredEntities[childIndex];
+                            ECS::Entity parent = restoredEntities[parentIndex];
+                            world.Attach(child, parent);
+                        }
+                    }
+                }
+
                 LOG_DEBUG("Scene successfully loaded: "
                     << sceneJson.value("SceneName", "Unknown") << '\n'
                     << "\tVersion: " << sceneJson.value("Version", "Unknown") << '\n'

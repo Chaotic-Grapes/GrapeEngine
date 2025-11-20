@@ -1544,6 +1544,68 @@
         }
     ],
     "EntityCount": 17,
+    "Hierarchy": [
+        {
+            "child": 13,
+            "parent": 12
+        },
+        {
+            "child": 14,
+            "parent": 12
+        },
+        {
+            "child": 15,
+            "parent": 12
+        },
+        {
+            "child": 16,
+            "parent": 12
+        },
+        {
+            "child": 1,
+            "parent": 0
+        },
+        {
+            "child": 2,
+            "parent": 0
+        },
+        {
+            "child": 3,
+            "parent": 0
+        },
+        {
+            "child": 4,
+            "parent": 0
+        },
+        {
+            "child": 5,
+            "parent": 0
+        },
+        {
+            "child": 6,
+            "parent": 0
+        },
+        {
+            "child": 7,
+            "parent": 0
+        },
+        {
+            "child": 8,
+            "parent": 0
+        },
+        {
+            "child": 9,
+            "parent": 0
+        },
+        {
+            "child": 10,
+            "parent": 0
+        },
+        {
+            "child": 11,
+            "parent": 0
+        }
+    ],
     "SceneName": "Scene",
     "SystemProfile": {
         "Systems": []
