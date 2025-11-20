@@ -123,9 +123,19 @@ void Playback::Render() {
             
             // Show tooltip on hover
             if (tooltip && ImGui::IsItemHovered()) {
+                ImGui::PushFont(m_mainFont);
+
                 ImGui::BeginTooltip();
                 ImGui::Text("%s", tooltip);
+                ImGui::Dummy(ImVec2(0, 20));
+
+                // Show current state (resume is essentially == playing)
+                ImGui::Text("State: %s",
+                            m_gameState == GameState::Stopped ? "STOPPED" : m_gameState == GameState::Paused ? "PAUSED"
+                                                                                                             : "PLAYING");
                 ImGui::EndTooltip();
+
+                ImGui::PopFont();
             }
 
             // Close the disabled block if it was opened
@@ -168,7 +178,7 @@ void Playback::Render() {
     // Shows play when stopped/paused
     if (m_gameState == GameState::Stopped || m_gameState == GameState::Paused) {
         ImGui::PushFont(m_symbolsFont);
-        button("\xEE\x80\xB7", true, GameState::Playing,
+        button("\xEE\x80\xB7", HasValidWorld(), GameState::Playing,
             m_gameState == GameState::Stopped ? "Game started" : "Game resumed", false,
             m_gameState == GameState::Stopped ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
         ImGui::PopFont();
@@ -176,7 +186,7 @@ void Playback::Render() {
     // Shows pause when playing
     else {
         ImGui::PushFont(m_symbolsFont);
-        button("\xEE\x80\xB4", true, GameState::Paused, "Game paused", false, "Pause (Ctrl+Shift+P)");
+        button("\xEE\x80\xB4", HasValidWorld(), GameState::Paused, "Game paused", false, "Pause (Ctrl+Shift+P)");
         ImGui::PopFont();
     }
     ImGui::SameLine();
