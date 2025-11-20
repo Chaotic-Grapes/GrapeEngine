@@ -270,6 +270,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
             m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
             // WIRE UP FILE MENU to inspector
             m_inspector.SetFileMenu(&m_fileMenu);
+            m_inspector.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }

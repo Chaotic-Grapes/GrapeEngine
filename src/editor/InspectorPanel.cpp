@@ -29,6 +29,7 @@ through a unified system shared by both entities and prefab templates.
 #include "UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
+#include "../editor/UndoSystem.h"
 #include <imgui.h>
 #include <filesystem>
 #include <fstream>
@@ -374,6 +375,23 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         static nlohmann::json editStartState;
         static bool isEditing = false;
 
+        // Capture initial state when starting to edit
+        if (!m_editState.isEditing) {
+            // Check if any ImGui widget is active (isit being edited?)
+            if (ImGui::IsAnyItemActive()) {
+                m_editState.isEditing = true;
+                m_editState.entityId = entity.Index;
+
+                // Capture initial transform state
+                if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
+                    const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
+                    m_editState.startPosition = lt.Position;
+                    m_editState.startRotation = lt.Rotation;
+                    m_editState.startScale = lt.Scale;
+                }
+            }
+        }
+
         // First pass: draw every component using registry metadata
         for (auto& componentEntry : entityJson["Components"]) {
             // Basic validation
@@ -456,6 +474,30 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (meta) {
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
             }
+        }
+
+        // Record undo when editing finishes
+        if (m_editState.isEditing && !ImGui::IsAnyItemActive()) {
+            // Editing just finished - record the change
+            if (m_undoSystem && m_world->Has<ECS::Components::LocalTransform>(entity)) {
+                const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
+
+                // Only record if something actually changed
+                bool posChanged = (m_editState.startPosition != lt.Position);
+                bool rotChanged = (m_editState.startRotation != lt.Rotation);
+                bool scaleChanged = (m_editState.startScale != lt.Scale);
+
+                if (posChanged || rotChanged || scaleChanged) {
+                    m_undoSystem->RecordTransformChange(
+                        entity.Index,
+                        m_editState.startPosition, m_editState.startRotation, m_editState.startScale,
+                        lt.Position, lt.Rotation, lt.Scale
+                    );
+                    LOG_DEBUG("[Inspector] Recorded transform change for undo");
+                }
+            }
+
+            m_editState.isEditing = false;
         }
 
         // MARK SCENE AS DIRTY if anything was edited
