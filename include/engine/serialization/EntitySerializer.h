@@ -190,7 +190,6 @@ namespace Serialization {
 		// Serialize a single entity
 		static json SerializeEntity(const ECS::World& world, const ECS::Entity e) {
 			json entityJson;
-			entityJson["EntityId"] = ECS::EntityUtils::Pack(e);
 			entityJson["Components"] = json::array();
 
 			// CREATE SORTED COMPONENT LIST

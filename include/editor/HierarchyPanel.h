@@ -58,6 +58,8 @@ public:
     void OnSelectionChanged(SelectionCallback callback);
 
     void SetSelectedEntity(EntityId id);
+    const std::unordered_set<EntityId>& GetSelectedEntities() const { return m_selectedEntityIds; }
+    EntityId GetPrimarySelectedEntity() const { return m_selectedEntityIds.empty() ? 0 : *m_selectedEntityIds.begin(); }
 
     // -------------------------------------------------------------------------
     // Rendering
@@ -148,6 +150,22 @@ private:
     // Handle clicking empty space to clear selection
     void _selectEmptySpace();
 
+    // Rebuild the entity order list by collecting all entities in hierarchy order
+    void _rebuildEntityOrder();
+
+    // Move an entity to a new position in the order, after a target entity
+    // If targetId is NPOS32, moves to the beginning
+    void _moveEntityInOrder(EntityId movedId, EntityId targetId);
+
+public:
+    // Get the ordered list of entities (for serialization)
+    const std::vector<EntityId>& GetEntityOrder() const { return m_entityOrder; }
+
+    // Set the entity order (for deserialization)
+    void SetEntityOrder(const std::vector<EntityId>& order) { m_entityOrder = order; }
+
+private:
+
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
@@ -162,8 +180,9 @@ private:
     EntityActions* m_entityActions = nullptr;       // For entity operations
 
     // Selection state
-    EntityId m_selectedEntityId = 0;                // Currently selected entity ID (0 = no selection)
-    EntityId m_contextMenuTarget = 0;               // Entity targeted for context menu operations
+    std::unordered_set<EntityId> m_selectedEntityIds;   // Currently selected entity IDs (empty = no selection)
+    EntityId m_anchorEntityId = 0;                      // Anchor entity for shift-selection range
+    EntityId m_contextMenuTarget = 0;                   // Entity targeted for context menu operations
 
     // UI state
     std::unordered_set<EntityId> m_expandedNodes;   // Track which tree nodes are expanded
@@ -182,6 +201,9 @@ private:
     EntityId m_lastClickedEntity = 0;               // Last entity that was clicked
     float m_lastClickTime = 0.0f;                   // Time of last click
     static constexpr float RENAME_DELAY_THRESHOLD = 0.75f; // Delay threshold for rename (in seconds)
+
+    // Entity ordering for preserving scene file order
+    std::vector<EntityId> m_entityOrder;            // Ordered list of all entities
 };
 
 #endif

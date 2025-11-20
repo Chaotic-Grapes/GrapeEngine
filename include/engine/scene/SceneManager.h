@@ -175,11 +175,13 @@ namespace Scenes {
          * @param filename Path to the output JSON file.
          * @param sceneName Optional scene name for metadata.
          * @param version Optional version string for metadata.
+         * @param entityOrder Optional ordered list of entity IDs for preserving hierarchy order.
          * @return true if save was successful, false otherwise.
          */
         bool SaveScene(const size_t index, const std::string& filename,
                        const std::string& sceneName = "Scene",
-                       const std::string& version = "1.0") const {
+                       const std::string& version = "1.0",
+                       const std::vector<uint32_t>* entityOrder = nullptr) const {
             if (index >= m_scenes.size() || !m_scenes[index])
                 return false;
 
@@ -198,10 +200,21 @@ namespace Scenes {
                 json entities = json::array();
                 int entityCount = 0;
 
-                world.Each([&](const ECS::Entity entity) {
-                    entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
-                    ++entityCount;
-                });
+                // Use provided entity order if available, otherwise iterate naturally
+                if (entityOrder && !entityOrder->empty()) {
+                    for (uint32_t entityId : *entityOrder) {
+                        ECS::Entity entity = world.Resolve(entityId);
+                        if (world.IsAlive(entity)) {
+                            entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
+                            ++entityCount;
+                        }
+                    }
+                } else {
+                    world.Each([&](const ECS::Entity entity) {
+                        entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
+                        ++entityCount;
+                    });
+                }
 
                 sceneJson["Entities"] = std::move(entities);
                 sceneJson["EntityCount"] = entityCount;
@@ -227,9 +240,11 @@ namespace Scenes {
          *        This will destroy all existing entities in the scene before loading.
          * @param index The index of the scene to load into.
          * @param filename Path to the input JSON file.
+         * @param outEntityOrder Optional output vector to receive the loaded entity order.
          * @return true if load was successful, false otherwise.
          */
-        bool LoadScene(const size_t index, const std::string& filename) const {
+        bool LoadScene(const size_t index, const std::string& filename,
+                       std::vector<uint32_t>* outEntityOrder = nullptr) const {
             if (index >= m_scenes.size() || !m_scenes[index])
                 return false;
 
@@ -252,10 +267,19 @@ namespace Scenes {
                 }
 
                 int loadedCount = 0;
+                if (outEntityOrder) {
+                    outEntityOrder->clear();
+                }
+
                 if (sceneJson.contains("Entities")) {
                     for (const auto& entityJson : sceneJson["Entities"]) {
-                        Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
+                        ECS::Entity entity = Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
                         ++loadedCount;
+                        
+                        // Track entity order for hierarchy preservation
+                        if (outEntityOrder) {
+                            outEntityOrder->push_back(entity.Index);
+                        }
                     }
                 }
                 LOG_DEBUG("Scene successfully loaded: "
