@@ -58,6 +58,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Time.h"
 
 // ============================================================================
+// Editor (Undo)
+// ============================================================================
+#include "../editor/UndoSystem.h"
+
+// ============================================================================
 // Helpers
 // ============================================================================
 #include "helpers/TransformUtils.h"
@@ -1460,6 +1465,8 @@ namespace ECS {
                 world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
                     if (e.Index == m_selectedEntityID) {
                         m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
+                        m_dragStartEntityRot = lt.Rotation;     // Store rotation
+                        m_dragStartEntityScale = lt.Scale;      // Store scale
                         LOG_DEBUG("[DRAG] Captured entity pos: " << lt.Position.X << ", " << lt.Position.Y);
                     }
                     });
@@ -1508,6 +1515,23 @@ namespace ECS {
             // End drag when mouse released
             if (m_isDragging && !isMouseDownThisFrame) {
                 LOG_DEBUG("[DRAG] Drag ended");
+
+                // Record the transform change for undo
+                if (m_undoSystem) {
+                    world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+                        if (e.Index == m_selectedEntityID) {
+                            // Create undo command with old and new transforms
+                            Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
+                            Vector3D newPos = lt.Position;
+
+                            // Only record if position actually changed
+                            if (oldPos != newPos) {
+                                m_undoSystem->RecordTransformChange(e.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale, newPos, lt.Rotation, lt.Scale);
+                                LOG_DEBUG("[UNDO] Recorded transform change");
+                            }
+                        }
+                    });
+                }
                 m_isDragging = false;
             }
 

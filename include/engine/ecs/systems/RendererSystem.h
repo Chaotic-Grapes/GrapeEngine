@@ -54,6 +54,11 @@ namespace {
     }
 }
 
+namespace Editor {
+    // Undo System
+    class UndoSystem;
+}
+
 namespace ECS {
 
     // ========================================================================
@@ -123,6 +128,8 @@ namespace ECS {
         const glm::mat4& GetProjection() const { return m_projection; }
 
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
+
+        void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
 
     private:
         // ====================================================================
@@ -241,6 +248,14 @@ namespace ECS {
             float screenWidth,
             float screenHeight,
             float scaleFactor) const;
+
+        // ====================================================================
+        // Undo System
+        // ==================================================================== 
+        Editor::UndoSystem* m_undoSystem = nullptr;
+
+        Quaternion m_dragStartEntityRot;
+        Vector3D m_dragStartEntityScale;
     };
 
 } // namespace ECS
