@@ -61,6 +61,14 @@ public:
     const std::unordered_set<EntityId>& GetSelectedEntities() const { return m_selectedEntityIds; }
     EntityId GetPrimarySelectedEntity() const { return m_selectedEntityIds.empty() ? 0 : *m_selectedEntityIds.begin(); }
 
+    // Entity order for scene serialization (preserves visual hierarchy order)
+    const std::vector<EntityId>& GetEntityOrder() const { return m_entityOrder; }
+    void SetEntityOrder(const std::vector<EntityId>& order) { m_entityOrder = order; }
+    void RebuildEntityOrder(); // Rebuild from current hierarchy state
+
+    // Clear UI state (selection, rename mode, context menu) - call when scene changes
+    void ClearUIState();
+
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
@@ -144,25 +152,16 @@ private:
     // Get all direct children of a parent entity
     std::vector<EntityId> _getChildren(EntityId parentId) const;
 
+    // Rebuild entity order list by traversing hierarchy depth-first
+    void _rebuildEntityOrderRecursive(EntityId entityId);
+
     // Check if entity matches current search filter
     bool _matchesSearchFilter(EntityId entityId) const;
 
     // Handle clicking empty space to clear selection
     void _selectEmptySpace();
 
-    // Rebuild the entity order list by collecting all entities in hierarchy order
-    void _rebuildEntityOrder();
-
-    // Move an entity to a new position in the order, after a target entity
-    // If targetId is NPOS32, moves to the beginning
-    void _moveEntityInOrder(EntityId movedId, EntityId targetId);
-
 public:
-    // Get the ordered list of entities (for serialization)
-    const std::vector<EntityId>& GetEntityOrder() const { return m_entityOrder; }
-
-    // Set the entity order (for deserialization)
-    void SetEntityOrder(const std::vector<EntityId>& order) { m_entityOrder = order; }
 
 private:
 
@@ -181,8 +180,8 @@ private:
 
     // Selection state
     std::unordered_set<EntityId> m_selectedEntityIds;   // Currently selected entity IDs (empty = no selection)
-    EntityId m_anchorEntityId = 0;                      // Anchor entity for shift-selection range
-    EntityId m_contextMenuTarget = 0;                   // Entity targeted for context menu operations
+    EntityId m_anchorEntityId = ECS::Entity::NPOS32;    // Anchor entity for shift-selection range
+    EntityId m_contextMenuTarget = ECS::Entity::NPOS32; // Entity targeted for context menu operations
 
     // UI state
     std::unordered_set<EntityId> m_expandedNodes;   // Track which tree nodes are expanded
@@ -193,17 +192,18 @@ private:
     std::string m_searchFilter = "";                // Active search filter string
 
     // Rename state
-    EntityId m_renamingEntityId = 0;                // Entity currently being renamed (0 = none)
-    char m_renameBuffer[128] = "";                  // Buffer for rename text input
-    bool m_focusRenameInput = false;                // Flag to focus rename input on next frame
+    EntityId m_renamingEntityId = ECS::Entity::NPOS32;  // Entity currently being renamed
+    char m_renameBuffer[128] = "";                      // Buffer for rename text input
+    bool m_focusRenameInput = false;                    // Flag to focus rename input on next frame
 
     // Click timing for distinguishing fast double-click from slow double-click
-    EntityId m_lastClickedEntity = 0;               // Last entity that was clicked
-    float m_lastClickTime = 0.0f;                   // Time of last click
+    EntityId m_lastClickedEntity = ECS::Entity::NPOS32; // Last entity that was clicked
+    float m_lastClickTime = 0.0f;                       // Time of last click
     static constexpr float RENAME_DELAY_THRESHOLD = 0.75f; // Delay threshold for rename (in seconds)
 
-    // Entity ordering for preserving scene file order
-    std::vector<EntityId> m_entityOrder;            // Ordered list of all entities
+    // Entity order for scene serialization (preserves visual hierarchy order)
+    // This is a HINT for saving - the ECS World's HierarchyIndex is the source of truth for rendering
+    std::vector<EntityId> m_entityOrder;            // Ordered list for serialization
 };
 
 #endif

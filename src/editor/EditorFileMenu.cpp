@@ -22,6 +22,7 @@ centralized and consistent with the currently active scene.
 #endif
 
 #include "../editor/EditorFileMenu.h"
+#include "../editor/HierarchyPanel.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -247,8 +248,13 @@ void EditorFileMenu::_openScene(const std::string& path) {
 
     // If opening the SAME scene, reload into the current slot to avoid world rebinding issues
     if (hasActive && (m_currentScenePath == path)) {
-        if (m_sceneManager->LoadScene(activeIdx, path)) {
+        std::vector<uint32_t> entityOrder;
+        if (m_sceneManager->LoadScene(activeIdx, path, &entityOrder)) {
             m_sceneManager->SetActiveImmediate(activeIdx);
+            if (m_hierarchyPanel) {
+                m_hierarchyPanel->ClearUIState();
+                m_hierarchyPanel->SetEntityOrder(entityOrder);
+            }
             m_hasUnsavedChanges = false;
             LOG_INFO("Reloaded active scene: " << path);
         } else {
@@ -264,8 +270,13 @@ void EditorFileMenu::_openScene(const std::string& path) {
     size_t idx = m_sceneManager->AddScene(newScene.release());
 
     // Ask the SceneManager to read the file and populate the scene
-    if (m_sceneManager->LoadScene(idx, path)) {
+    std::vector<uint32_t> entityOrder;
+    if (m_sceneManager->LoadScene(idx, path, &entityOrder)) {
         m_sceneManager->SetActive(idx);
+        if (m_hierarchyPanel) {
+            m_hierarchyPanel->ClearUIState();
+            m_hierarchyPanel->SetEntityOrder(entityOrder);
+        }
         m_currentScenePath = path;
         m_hasUnsavedChanges = false;
         LOG_INFO("Opened scene: " << path);
@@ -287,9 +298,20 @@ void EditorFileMenu::_saveSceneToFile(const std::string& path) {
         return;
     }
 
+    // Rebuild entity order from hierarchy panel to preserve visual order
+    if (m_hierarchyPanel) {
+        m_hierarchyPanel->RebuildEntityOrder();
+    }
+
+    // Get entity order for serialization
+    const std::vector<uint32_t>* entityOrder = nullptr;
+    if (m_hierarchyPanel) {
+        entityOrder = &m_hierarchyPanel->GetEntityOrder();
+    }
+
     // FIRST: Save to the build location (where path currently points)
     LOG_INFO("Saving to build location: " << path);
-    if (!m_sceneManager->SaveScene(activeIdx, path)) {
+    if (!m_sceneManager->SaveScene(activeIdx, path, "Scene", "1.0", entityOrder)) {
         LOG_ERROR("Failed to save scene to build: " << path);
         return;
     }
@@ -311,7 +333,7 @@ void EditorFileMenu::_saveSceneToFile(const std::string& path) {
 
         // Save to source location
         LOG_INFO("Saving to source location: " << sourcePath.string());
-        if (m_sceneManager->SaveScene(activeIdx, sourcePath.string())) {
+        if (m_sceneManager->SaveScene(activeIdx, sourcePath.string(), "Scene", "1.0", entityOrder)) {
             LOG_INFO("Successfully saved to source: " << sourcePath.string());
         }
         else {

@@ -207,6 +207,9 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     // Wire up fonts to file menu so it can render bold asterisk
     m_fileMenu.SetFonts(m_mainFont, m_boldFont);
 
+    // Wire up hierarchy panel to file menu for entity order preservation
+    m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);
+
     // Wire up file menu to entity actions for dirty tracking
     m_entityActions.SetFileMenu(&m_fileMenu);
 
@@ -371,6 +374,16 @@ void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback
     // Any editor-specific logic that needs to happen on state change goes here
     // (The time scale is already handled by Playback itself)
     LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
+    
+    // Handle state transitions
+    if (newState == Playback::GameState::Stopped) {
+        // Clear selection (entity IDs have changed after restore)
+        m_hierarchyWindow.SetSelectedEntity(0);
+        m_inspector.ClearSelection();
+        
+        // Rebuild entity order to reflect restored hierarchy
+        m_hierarchyWindow.RebuildEntityOrder();
+    }
 }
 
 // Handle viewport selection changes (called by Viewport via callback)

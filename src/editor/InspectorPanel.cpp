@@ -59,8 +59,22 @@ namespace {
 
     // Helper to check if an entity ID is protected from editing
     // Returns true if entity should NOT be inspected or modified
-    bool IsProtectedEntity(EntityId id) {
-        return (id == 0); // Entity ID 0 is EditorCamera (system entity)
+    bool IsProtectedEntity(ECS::World* world, EntityId entityId) {
+        if (!world)
+            return false;
+        
+        // Resolve the entity from its ID
+        ECS::Entity entity = world->Resolve(entityId);
+
+        // Not alive, cannot be protected
+        if (!world->IsAlive(entity))
+            return false;
+
+        // Protect editor cameras from modification
+        if (world->Has<ECS::Components::CameraEditor3D>(entity))
+            return true;
+
+        return false;
     }
 
     void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
@@ -97,8 +111,8 @@ void InspectorPanel::SetWorld(ECS::World* world) {
 
 // Switch inspector into entity mode and validate the entity we want to inspect
 void InspectorPanel::InspectEntity(EntityId id) {
-    // Block inspection of protected system entities (EditorCamera at ID 0)
-    if (IsProtectedEntity(id)) {
+    // Block inspection of protected system entities
+    if (IsProtectedEntity(m_world, id)) {
         m_mode = InspectionMode::None;
         m_entityId = 0; // Clear selection
         return;

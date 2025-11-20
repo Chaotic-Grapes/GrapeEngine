@@ -27,6 +27,7 @@ Reference:
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
+#include <unordered_map>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
@@ -214,64 +215,154 @@ void Playback::_saveWorldState() {
 
     LOG_INFO("Saving world state.");
 
-    nlohmann::json worldJson = nlohmann::json::array();
+    nlohmann::json worldJson = nlohmann::json::object();
+    nlohmann::json entitiesArray = nlohmann::json::array();
+    nlohmann::json hierarchyArray = nlohmann::json::array();
+    
+    // Map to track entity index in save order
+    std::unordered_map<uint32_t, size_t> entityToSaveIndex;
     size_t entityCount = 0;
 
-    m_world->Each([&](ECS::Entity entity) {
+    // Helper to recursively save entities in hierarchy order (parents before children)
+    std::function<void(ECS::Entity)> saveRecursive = [&](ECS::Entity entity) {
         if (m_world->Has<ECS::Components::Name>(entity)) {
             const auto& name = m_world->Get<ECS::Components::Name>(entity);
-
-            // Skip both variants of the editor camera name
+            // Skip editor camera
             if (std::strcmp(name.Value, "EditorCamera") == 0 ||
-                std::strcmp(name.Value, "Editor Camera") == 0)
-            {
+                std::strcmp(name.Value, "Editor Camera") == 0) {
                 return;
             }
         }
 
-        auto entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
-        worldJson.push_back(entityJson);
-        ++entityCount;
-        });
+        // Track this entity's position in save order
+        entityToSaveIndex[entity.Index] = entityCount;
 
+        // Save entity components (WITHOUT Parent component - we'll rebuild hierarchy separately)
+        auto entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+        
+        // Remove Parent component from serialization if present
+        if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+            auto& components = entityJson["Components"];
+            components.erase(
+                std::remove_if(components.begin(), components.end(),
+                    [](const nlohmann::json& comp) {
+                        return comp.contains("TypeName") && comp["TypeName"] == "Parent";
+                    }),
+                components.end()
+            );
+        }
+        
+        entitiesArray.push_back(entityJson);
+        ++entityCount;
+
+        // Save all children recursively
+        m_world->ForChildren(entity, [&](ECS::Entity child) {
+            saveRecursive(child);
+        });
+    };
+
+    // Start with all root entities (those without parents)
+    m_world->Each([&](ECS::Entity entity) {
+        if (m_world->ParentOf(entity).IsNull()) {
+            saveRecursive(entity);
+        }
+    });
+
+    // Now save hierarchy relationships separately (as child->parent index mappings)
+    m_world->Each<ECS::Parent>([&](ECS::Entity child, const ECS::Parent& parent) {
+        // Skip editor camera
+        if (m_world->Has<ECS::Components::Name>(child)) {
+            const auto& name = m_world->Get<ECS::Components::Name>(child);
+            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
+                std::strcmp(name.Value, "Editor Camera") == 0) {
+                return;
+            }
+        }
+        
+        auto childIt = entityToSaveIndex.find(child.Index);
+        auto parentIt = entityToSaveIndex.find(parent.ParentEntity.Index);
+        
+        if (childIt != entityToSaveIndex.end() && parentIt != entityToSaveIndex.end()) {
+            nlohmann::json hierarchyEntry;
+            hierarchyEntry["child"] = childIt->second;
+            hierarchyEntry["parent"] = parentIt->second;
+            hierarchyArray.push_back(hierarchyEntry);
+        }
+    });
+
+    worldJson["entities"] = entitiesArray;
+    worldJson["hierarchy"] = hierarchyArray;
     m_savedWorldState = worldJson;
-    LOG_INFO("Saved " << entityCount << " entities");
+    
+    LOG_INFO("Saved " << entityCount << " entities with hierarchy in order");
 }
 
 void Playback::_restoreWorldState() {
     // Restore the world from the previously saved snapshot.
     // Keeps editor cameras and rebuilds runtime entities.
-    if (!HasValidWorld() || m_savedWorldState.empty()) {
+    if (!HasValidWorld() || m_savedWorldState.is_null()) {
         LOG_WARNING("No saved state to restore");
+        return;
+    }
+
+    // Check for new format (object with entities and hierarchy)
+    if (!m_savedWorldState.is_object() || !m_savedWorldState.contains("entities")) {
+        LOG_ERROR("Saved world state has invalid format.");
         return;
     }
 
     LOG_INFO("Restoring world state.");
 
-    std::vector<ECS::Entity> allEntities;
-    m_world->Each([&](ECS::Entity e) {
-        if (m_world->Has<ECS::Components::Name>(e)) {
-            const auto& name = m_world->Get<ECS::Components::Name>(e);
-
-            // --- FIX: keep the editor camera, whichever way it's named ---
+    // Destroy all current entities (except editor camera)
+    std::vector<ECS::Entity> entitiesToDestroy;
+    m_world->Each([&](ECS::Entity entity) {
+        if (m_world->Has<ECS::Components::Name>(entity)) {
+            const auto& name = m_world->Get<ECS::Components::Name>(entity);
+            // Skip editor camera
             if (std::strcmp(name.Value, "EditorCamera") == 0 ||
-                std::strcmp(name.Value, "Editor Camera") == 0)
-            {
-                return; // keep editor camera
+                std::strcmp(name.Value, "Editor Camera") == 0) {
+                return;
             }
         }
-        allEntities.push_back(e);
-        });
+        entitiesToDestroy.push_back(entity);
+    });
 
-    for (const auto& e : allEntities) {
-        m_world->Destroy(e);
+    for (auto entity : entitiesToDestroy) {
+        m_world->Destroy(entity);
     }
 
-    for (const auto& entityJson : m_savedWorldState) {
-        Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+    // Extract entities and hierarchy arrays
+    const auto& entitiesArray = m_savedWorldState["entities"];
+    const auto& hierarchyArray = m_savedWorldState.contains("hierarchy") && m_savedWorldState["hierarchy"].is_array() 
+        ? m_savedWorldState["hierarchy"] 
+        : nlohmann::json::array();
+
+    // First pass: Create all entities (without Parent components - those were stripped)
+    std::vector<ECS::Entity> restoredEntities;
+    restoredEntities.reserve(entitiesArray.size());
+
+    for (const auto& entityJson : entitiesArray) {
+        ECS::Entity newEntity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+        restoredEntities.push_back(newEntity);
     }
 
-    LOG_INFO("World restored");
+    // Second pass: Rebuild hierarchy from saved relationships
+    for (const auto& hierarchyEntry : hierarchyArray) {
+        if (!hierarchyEntry.contains("child") || !hierarchyEntry.contains("parent")) {
+            continue;
+        }
+        
+        size_t childIndex = hierarchyEntry["child"].get<size_t>();
+        size_t parentIndex = hierarchyEntry["parent"].get<size_t>();
+        
+        if (childIndex < restoredEntities.size() && parentIndex < restoredEntities.size()) {
+            ECS::Entity child = restoredEntities[childIndex];
+            ECS::Entity parent = restoredEntities[parentIndex];
+            m_world->Attach(child, parent);
+        }
+    }
+
+    LOG_INFO("Restored " << restoredEntities.size() << " entities with hierarchy.");
 }
 
 // Internal state change handler that manages time scale and callbacks

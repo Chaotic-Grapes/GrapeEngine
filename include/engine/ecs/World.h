@@ -1138,19 +1138,31 @@ namespace ECS {
                 if (p.ParentEntity.IsNull())
                     return;
 
-                // Link into new parent's child list
-                const Entity oldFirst = m_hierarchy.FirstChild[p.ParentEntity];
-                m_hierarchy.FirstChild[p.ParentEntity] = e; // New first child
-
-                // Update sibling links
-                if (!oldFirst.IsNull()) {
-                    m_hierarchy.PrevSibling[oldFirst] = e;
+                // Get first child of the new parent, if it exists 
+                const Entity firstChild = m_hierarchy.FirstChild[p.ParentEntity];
+                
+                if (firstChild.IsNull()) {
+                    // No existing children, make this the first child
+                    m_hierarchy.FirstChild[p.ParentEntity] = e;
+                    m_hierarchy.NextSibling[e] = NULL_ENTITY;
+                    m_hierarchy.PrevSibling[e] = NULL_ENTITY;
                 }
-
-                // Update new child's links
-                m_hierarchy.NextSibling[e] = oldFirst;      // New child's next sibling is old first
-                m_hierarchy.PrevSibling[e] = NULL_ENTITY;   // New child's prev sibling is NULL_ENTITY
-                m_hierarchy.ParentOf[e] = p.ParentEntity;   // New child's parent is p.ParentEntity
+                else {
+                    // Find the last child in the sibling list
+                    Entity lastChild = firstChild;
+                    auto it = m_hierarchy.NextSibling.find(lastChild);
+                    while (it != m_hierarchy.NextSibling.end() && !it->second.IsNull()) {
+                        lastChild = it->second;
+                        it = m_hierarchy.NextSibling.find(lastChild);
+                    }
+                    
+                    // Append new child after the last child
+                    m_hierarchy.NextSibling[lastChild] = e;
+                    m_hierarchy.PrevSibling[e] = lastChild;
+                    m_hierarchy.NextSibling[e] = NULL_ENTITY;
+                }
+                
+                m_hierarchy.ParentOf[e] = p.ParentEntity;   // Set parent mapping
             }
         }
 
