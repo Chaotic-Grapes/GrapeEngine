@@ -24,6 +24,7 @@
 #include <fstream>
 #include <sstream>
 #include <mutex>
+#include <functional>
 
 enum class LogLevel {
 	TRACE,
@@ -78,6 +79,11 @@ public:
 	 * @param enable True to enable console logging, false to disable
 	 */
 	void SetLogConsole(bool enable);
+	void EnableDebug(bool enable) { m_debugEnabled = enable; }
+
+	// Console callback for editor integration
+	using ConsoleCallback = std::function<void(LogLevel, const std::string&, const std::string&)>;
+	void SetConsoleCallback(ConsoleCallback callback) { m_consoleCallback = callback; }
 
 private:
 	// void _writeCrashLog(LogLevel level, const std::string& message);
@@ -109,6 +115,9 @@ private:
 
 	bool m_LogConsoleEnabled{ true }; // Default to log to console
 	bool m_debugEnabled{ true }; // Default to log debug messages
+
+	// Console callback for editor
+	ConsoleCallback m_consoleCallback;
 };
 
 #endif
