@@ -25,6 +25,8 @@ Provides:
 #include "AssetLibrary.h"
 #include <imgui.h>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 // Forward declarations
 class InspectorPanel;
@@ -105,6 +107,9 @@ private:
     // Render right-click context menu for creating assets
     void _renderContextMenu();
 
+    // Render right-click context menu for selected items
+    void _renderItemContextMenu();
+
     // Create a new C# script file with template
     void _createScript();
 
@@ -113,6 +118,38 @@ private:
 
     // Create a new folder
     void _createFolder();
+
+    // -------------------------------------------------------------------------
+    // Copy/Paste Operations
+    // -------------------------------------------------------------------------
+
+    // Copy selected assets to clipboard
+    void _copySelectedAssets();
+
+    // Paste clipboard assets to current directory
+    void _pasteAssets();
+
+    // Delete selected assets
+    void _deleteSelectedAssets();
+
+    // Rename selected asset (single selection only)
+    void _startRename();
+
+    // -------------------------------------------------------------------------
+    // Drag-Drop Operations
+    // -------------------------------------------------------------------------
+
+    // Handle dragging selected assets
+    void _handleAssetDragDrop(const std::string& assetPath);
+
+    // Handle dropping assets onto a folder
+    void _handleFolderDropTarget(const std::string& folderPath);
+
+    // Move assets to target directory
+    void _moveAssetsToDirectory(const std::vector<std::string>& assets, const std::string& targetDir);
+
+    // Copy assets to target directory
+    void _copyAssetsToDirectory(const std::vector<std::string>& assets, const std::string& targetDir);
 
     // -------------------------------------------------------------------------
     // State
@@ -129,8 +166,14 @@ private:
 
     // Asset browsing state
     AssetLibrary m_assetLibrary;
-    std::string m_currentPath = "assets";
+    std::string m_currentPath = "";
     std::string m_selectedAsset;
+    std::unordered_set<std::string> m_selectedAssets;  // Multi-selection support
+    std::string m_anchorAsset;  // For shift-selection
+
+    // Clipboard state
+    std::vector<std::string> m_clipboardAssets;
+    bool m_clipboardIsCut = false;
 
     // Status bar state
     std::string m_statusMessage;
@@ -142,6 +185,11 @@ private:
     bool m_focusNameInput = false;
     enum class AssetCreationType { None, Script, Scene, Folder };
     AssetCreationType m_creationType = AssetCreationType::None;
+
+    // Rename state
+    std::string m_renamingAsset;
+    char m_renameBuffer[256] = "";
+    bool m_focusRenameInput = false;
 };
 
 #endif
