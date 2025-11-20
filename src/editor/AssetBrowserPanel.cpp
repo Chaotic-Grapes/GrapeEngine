@@ -18,16 +18,17 @@ Provides:
 */
 /* End Header *******************************************************************/
 
-#include "../editor/AssetBrowserPanel.h"
+#include "AssetBrowserPanel.h"
 #include "core/Logger.h"
 #include "core/ProjectPaths.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/Entity.h"
-#include "../editor/InspectorPanel.h"
+#include "InspectorPanel.h"
 #include "services/Input.h"
 #include <fstream>
+#include <cstring>
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -261,6 +262,15 @@ void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
     m_assetLibrary._displayFolder(m_currentPath, m_selectedAsset, m_currentPath);
 
+    // Right-click context menu for creating assets (only when no item is selected/hovered)
+    if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        // Check if no item is hovered by verifying the hovered ID is the background
+        if (!ImGui::IsAnyItemHovered()) {
+            ImGui::OpenPopup("AssetContextMenu");
+        }
+    }
+    _renderContextMenu();
+
     // Clicking empty space in file list clears EVERYTHING (File/folder list)
     AssetBrowserPanel::_selectEmptySpace();
     ImGui::EndChild();
@@ -448,5 +458,261 @@ void AssetBrowserPanel::_selectEmptySpace() {
         if (m_inspector) {
             m_inspector->ClearSelection();
         }
+    }
+}
+
+// -------------------------------------------------------------------------
+// Context Menu
+// -------------------------------------------------------------------------
+
+void AssetBrowserPanel::_renderContextMenu() {
+    bool openCreateDialog = false;
+    
+    if (ImGui::BeginPopup("AssetContextMenu")) {
+        ImGui::PushFont(m_mainFont);
+        ImGui::Text("Create");
+        ImGui::Separator();
+        
+        // Create Script option
+        if (ImGui::MenuItem("C# Script")) {
+            m_creationType = AssetCreationType::Script;
+            strcpy_s(m_newAssetNameBuffer, "NewScript");
+            m_focusNameInput = true;
+            openCreateDialog = true;
+        }
+        
+        // Create Scene option
+        if (ImGui::MenuItem("Scene")) {
+            m_creationType = AssetCreationType::Scene;
+            strcpy_s(m_newAssetNameBuffer, "NewScene");
+            m_focusNameInput = true;
+            openCreateDialog = true;
+        }
+        
+        // Create Folder option
+        if (ImGui::MenuItem("Folder")) {
+            m_creationType = AssetCreationType::Folder;
+            strcpy_s(m_newAssetNameBuffer, "NewFolder");
+            m_focusNameInput = true;
+            openCreateDialog = true;
+        }
+        
+        ImGui::PopFont();
+        ImGui::EndPopup();
+    }
+    
+    // Open the dialog outside of the popup to avoid nesting issues
+    if (openCreateDialog) {
+        ImGui::OpenPopup("CreateAssetDialog");
+    }
+    
+    // Asset creation dialog (modal)
+    if (ImGui::BeginPopupModal("CreateAssetDialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::PushFont(m_mainFont);
+        
+        const char* dialogTitle = "Create Asset";
+        if (m_creationType == AssetCreationType::Script) dialogTitle = "Create Script";
+        else if (m_creationType == AssetCreationType::Scene) dialogTitle = "Create Scene";
+        else if (m_creationType == AssetCreationType::Folder) dialogTitle = "Create Folder";
+        ImGui::Text("%s", dialogTitle);
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(0, 5));
+        
+        // Name input
+        ImGui::Text("Name:");
+        ImGui::SameLine();
+        if (m_focusNameInput) {
+            ImGui::SetKeyboardFocusHere();
+            m_focusNameInput = false;
+        }
+        
+        bool enterPressed = ImGui::InputText("##AssetName", m_newAssetNameBuffer, sizeof(m_newAssetNameBuffer), 
+            ImGuiInputTextFlags_EnterReturnsTrue);
+        
+        ImGui::Dummy(ImVec2(0, 5));
+        
+        // Buttons
+        bool createClicked = ImGui::Button("Create") || enterPressed;
+        ImGui::SameLine();
+        bool cancelClicked = ImGui::Button("Cancel");
+        
+        if (createClicked && strlen(m_newAssetNameBuffer) > 0) {
+            if (m_creationType == AssetCreationType::Script) {
+                _createScript();
+            } 
+            else if (m_creationType == AssetCreationType::Scene) {
+                _createScene();
+            } 
+            else if (m_creationType == AssetCreationType::Folder) {
+                _createFolder();
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        
+        if (cancelClicked) {
+            ImGui::CloseCurrentPopup();
+        }
+        
+        ImGui::PopFont();
+        ImGui::EndPopup();
+    }
+}
+
+void AssetBrowserPanel::_createScript() {
+    // Create in current directory
+    std::filesystem::path targetDir = m_currentPath;
+    
+    // Ensure the directory exists
+    if (!std::filesystem::exists(targetDir)) {
+        std::filesystem::create_directories(targetDir);
+    }
+    
+    // Create file path with .cs extension
+    std::string fileName = m_newAssetNameBuffer;
+    if (fileName.find(".cs") == std::string::npos) {
+        fileName += ".cs";
+    }
+    std::filesystem::path filePath = targetDir / fileName;
+    
+    // Check if file already exists
+    if (std::filesystem::exists(filePath)) {
+        m_statusMessage = "Script already exists: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Script file already exists: " << filePath.string());
+        return;
+    }
+    
+    // Create script template
+    std::string className = m_newAssetNameBuffer;
+    std::string scriptContent = 
+        "using GrapeEngine.ScriptAPI;\n\n"
+        "namespace GameScripts;\n"
+        "\n"
+        "public class " + className + " : ScriptBehaviour\n"
+        "{\n"
+        "    protected override void OnStart()\n"
+        "    {\n"
+        "        // Called once when the script is initialized\n"
+        "    }\n\n"
+        "    protected override void OnUpdate()\n"
+        "    {\n"
+        "        // Called every frame\n"
+        "    }\n"
+        "}\n"
+        "\n";
+    
+    // Write file
+    try {
+        std::ofstream file(filePath);
+        if (!file.is_open()) {
+            m_statusMessage = "Failed to create script: " + fileName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create script file: " << filePath.string());
+            return;
+        }
+        
+        file << scriptContent;
+        file.close();
+        
+        m_statusMessage = "Created script: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_INFO("Created script: " << filePath.string());
+        
+        // Select the newly created file
+        m_selectedAsset = filePath.string();
+        
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating script: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating script: " << e.what());
+    }
+}
+
+void AssetBrowserPanel::_createScene() {
+    // Create file path with .scn extension
+    std::string fileName = m_newAssetNameBuffer;
+    if (fileName.find(".scn") == std::string::npos) {
+        fileName += ".scn";
+    }
+    std::filesystem::path filePath = std::filesystem::path(m_currentPath) / fileName;
+    
+    // Check if file already exists
+    if (std::filesystem::exists(filePath)) {
+        m_statusMessage = "Scene already exists: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Scene file already exists: " << filePath.string());
+        return;
+    }
+    
+    // Create empty scene template
+    std::string sceneContent = 
+        "{\n"
+        "  \"Version\": \"1.0\",\n"
+        "  \"Name\": \"" + std::string(m_newAssetNameBuffer) + "\",\n"
+        "  \"Entities\": []\n"
+        "}\n";
+    
+    // Write file
+    try {
+        std::ofstream file(filePath);
+        if (!file.is_open()) {
+            m_statusMessage = "Failed to create scene: " + fileName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create scene file: " << filePath.string());
+            return;
+        }
+        
+        file << sceneContent;
+        file.close();
+        
+        m_statusMessage = "Created scene: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_INFO("Created scene: " << filePath.string());
+        
+        // Select the newly created file
+        m_selectedAsset = filePath.string();
+        
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating scene: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating scene: " << e.what());
+    }
+}
+
+void AssetBrowserPanel::_createFolder() {
+    // Create folder path
+    std::string folderName = m_newAssetNameBuffer;
+    std::filesystem::path folderPath = std::filesystem::path(m_currentPath) / folderName;
+    
+    // Check if folder already exists
+    if (std::filesystem::exists(folderPath)) {
+        m_statusMessage = "Folder already exists: " + folderName;
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Folder already exists: " << folderPath.string());
+        return;
+    }
+    
+    // Create the folder
+    try {
+        if (std::filesystem::create_directory(folderPath)) {
+            m_statusMessage = "Created folder: " + folderName;
+            m_statusTimer = 3.0f;
+            LOG_INFO("Created folder: " << folderPath.string());
+            
+            // Select the newly created folder
+            m_selectedAsset = folderPath.string();
+        }
+        else {
+            m_statusMessage = "Failed to create folder: " + folderName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create folder: " << folderPath.string());
+        }
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating folder: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating folder: " << e.what());
     }
 }

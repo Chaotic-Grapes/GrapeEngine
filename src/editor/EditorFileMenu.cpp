@@ -21,8 +21,8 @@ centralized and consistent with the currently active scene.
 #include <commdlg.h>
 #endif
 
-#include "../editor/EditorFileMenu.h"
-#include "../editor/HierarchyPanel.h"
+#include "EditorFileMenu.h"
+#include "HierarchyPanel.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -145,8 +145,7 @@ void EditorFileMenu::OpenSceneDialog() {
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
     // TODO: Remove when editor is separated - use project-relative paths
-    std::string sceneDir = Engine::ProjectPaths::GetScenesPath();
-    ofn.lpstrInitialDir = sceneDir.c_str();
+    ofn.lpstrInitialDir = Engine::ProjectPaths::GetProjectRoot().c_str();
 
     // OFN_PATHMUSTEXIST: ensures the folder exists
     // OFN_FILEMUSTEXIST: ensures the file exists before returning
@@ -182,8 +181,7 @@ void EditorFileMenu::SaveSceneAsDialog() {
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
     // TODO: Remove when editor is separated - use project-relative paths
-    std::string sceneDir = Engine::ProjectPaths::GetScenesPath();
-    ofn.lpstrInitialDir = sceneDir.c_str();
+    ofn.lpstrInitialDir = Engine::ProjectPaths::GetProjectRoot().c_str();
     ofn.lpstrDefExt = "scn";
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 
@@ -258,7 +256,8 @@ void EditorFileMenu::_openScene(const std::string& path) {
             }
             m_hasUnsavedChanges = false;
             LOG_INFO("Reloaded active scene: " << path);
-        } else {
+        }
+        else {
             LOG_ERROR("Failed to reload scene: " << path);
         }
         return;
@@ -310,38 +309,13 @@ void EditorFileMenu::_saveSceneToFile(const std::string& path) {
         entityOrder = &m_hierarchyPanel->GetEntityOrder();
     }
 
-    // FIRST: Save to the build location (where path currently points)
-    LOG_INFO("Saving to build location: " << path);
+    // Save scene (symlink automatically keeps source in sync)
+    LOG_INFO("Saving scene: " << path);
     if (!m_sceneManager->SaveScene(activeIdx, path, "Scene", "1.0", entityOrder)) {
-        LOG_ERROR("Failed to save scene to build: " << path);
+        LOG_ERROR("Failed to save scene: " << path);
         return;
     }
-    LOG_INFO("Successfully saved to build: " << path);
-
-    // SECOND: Mirror the save to the root assets folder
-    // Check if path contains "assets"
-    std::string pathStr = path;
-    if (pathStr.find("assets") != std::string::npos) {
-        // Extract the relative path after "assets"
-        size_t assetsPos = pathStr.find("assets");
-        std::string relativePath = pathStr.substr(assetsPos);
-
-        // Build source path: ../assets/scenes/filename.scn
-        std::filesystem::path sourcePath = std::filesystem::path("..") / relativePath;
-
-        // Ensure parent directory exists
-        std::filesystem::create_directories(sourcePath.parent_path());
-
-        // Save to source location
-        LOG_INFO("Saving to source location: " << sourcePath.string());
-        if (m_sceneManager->SaveScene(activeIdx, sourcePath.string(), "Scene", "1.0", entityOrder)) {
-            LOG_INFO("Successfully saved to source: " << sourcePath.string());
-        }
-        else {
-            LOG_ERROR("Failed to save scene to source: " << sourcePath.string());
-        }
-    }
     else {
-        LOG_WARNING("Path does not contain 'assets', skipping source save: " << path);
+        LOG_INFO("Successfully saved scene: " << path);
     }
 }

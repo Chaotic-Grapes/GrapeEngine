@@ -15,8 +15,8 @@ prefab assets use the same UI path.
 */
 /* End Header *******************************************************************/
 
-#include "../editor/ComponentPropertyEditor.h"
-#include "../editor/ComponentWidgets.h"
+#include "ComponentPropertyEditor.h"
+#include "ComponentWidgets.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include <filesystem>
@@ -24,7 +24,7 @@ prefab assets use the same UI path.
 #include "serialization/EntitySerializer.h"
 #include "services/ResourceManager.h"
 #include <algorithm>
-#include "../editor/AudioAssetLibrary.h"
+#include "AudioAssetLibrary.h"
 
 // -----------------------------------------------------------------------------
 // Initialization

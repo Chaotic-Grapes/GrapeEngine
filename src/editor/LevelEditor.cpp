@@ -11,7 +11,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 */
 /* End Header *******************************************************************/
 
-#include "../../include/editor/LevelEditor.h"
+#include "LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include "graphics/graphicsConfig.hpp"
@@ -19,8 +19,8 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include <imgui_internal.h>
 #include <core/Application.h>
 #include "services/Time.h"
-#include "../editor/AudioAssetLibrary.h"
-#include "../editor/UndoSystem.h"
+#include "AudioAssetLibrary.h"
+#include "UndoSystem.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)

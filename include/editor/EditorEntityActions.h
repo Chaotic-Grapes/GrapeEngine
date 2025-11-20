@@ -23,8 +23,8 @@ Stores the current scene so actions stay consistent across scene loads.
 #include "Scene/Scene.h"
 #include "Scene/SceneManager.h"
 #include "ecs/Entity.h"
-#include "../editor/EditorFileMenu.h"
-#include "../editor/UndoSystem.h"
+#include "EditorFileMenu.h"
+#include "UndoSystem.h"
 
 // Provides editor-side operations for creating, deleting, cloning and reparenting 
 // entities in the active scene

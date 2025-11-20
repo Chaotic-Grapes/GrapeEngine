@@ -21,7 +21,7 @@ Reference:
 */
 /* End Header *******************************************************************/
 
-#include "../editor/PlaybackControls.h"
+#include "PlaybackControls.h"
 #include "services/Input.h"
 #include "services/Time.h"
 #include "ecs/World.h"

@@ -14,7 +14,7 @@ direct ECS manipulation.
 */
 /* End Header *******************************************************************/
 
-#include "../editor/EditorEntityActions.h"
+#include "EditorEntityActions.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
 #include "ecs/Hierarchy.h" 

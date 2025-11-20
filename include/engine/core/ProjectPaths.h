@@ -55,42 +55,6 @@ namespace Engine {
         static std::string GetAssetsPath();
         
         /**
-         * @brief Get the Scenes directory path
-         * @return Full path to EchoesBelow/Assets/Scenes/
-         */
-        static std::string GetScenesPath();
-        
-        /**
-         * @brief Get the Prefabs directory path
-         * @return Full path to EchoesBelow/Assets/Prefabs/
-         */
-        static std::string GetPrefabsPath();
-        
-        /**
-         * @brief Get the Textures directory path
-         * @return Full path to EchoesBelow/Assets/Textures/
-         */
-        static std::string GetTexturesPath();
-        
-        /**
-         * @brief Get the Audio directory path
-         * @return Full path to EchoesBelow/Assets/Audio/
-         */
-        static std::string GetAudioPath();
-        
-        /**
-         * @brief Get the Shaders directory path
-         * @return Full path to EchoesBelow/Assets/Shaders/
-         */
-        static std::string GetShadersPath();
-        
-        /**
-         * @brief Get the Scripts directory path
-         * @return Full path to EchoesBelow/Scripts/
-         */
-        static std::string GetScriptsPath();
-        
-        /**
          * @brief Get the ProjectSettings.json file path
          * @return Full path to EchoesBelow/ProjectSettings.json
          */

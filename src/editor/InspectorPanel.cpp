@@ -19,14 +19,14 @@ through a unified system shared by both entities and prefab templates.
 */
 /* End Header *******************************************************************/
 
-#include "../editor/InspectorPanel.h"
-#include "../editor/ComponentPropertyEditor.h"
-#include "../editor/ComponentWidgets.h"
-#include "../editor/EditorComponentRegistry.h"
+#include "InspectorPanel.h"
+#include "ComponentPropertyEditor.h"
+#include "ComponentWidgets.h"
+#include "EditorComponentRegistry.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
-#include "../editor/EditorFileMenu.h"
-#include "../editor/UndoSystem.h"
+#include "EditorFileMenu.h"
+#include "UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include <imgui.h>

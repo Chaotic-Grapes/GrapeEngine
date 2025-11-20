@@ -26,19 +26,12 @@ namespace Engine {
         s_projectRoot = projectRoot;
         s_initialized = true;
         
+        // TODO: This is temporary - remove when editor is separated
         // Ensure all required directories exist
         EnsureDirectoryExists(GetAssetsPath());
-        EnsureDirectoryExists(GetScenesPath());
-        EnsureDirectoryExists(GetPrefabsPath());
-        EnsureDirectoryExists(GetTexturesPath());
-        EnsureDirectoryExists(GetAudioPath());
-        EnsureDirectoryExists(GetShadersPath());
-        EnsureDirectoryExists(GetScriptsPath());
         
         LOG_INFO("ProjectPaths initialized: " << s_projectRoot);
         LOG_INFO("  Assets: " << GetAssetsPath());
-        LOG_INFO("  Scenes: " << GetScenesPath());
-        LOG_INFO("  Scripts: " << GetScriptsPath());
     }
     
     bool ProjectPaths::IsInitialized() {
@@ -56,30 +49,6 @@ namespace Engine {
     
     std::string ProjectPaths::GetAssetsPath() {
         return GetProjectRoot() + "/Assets";
-    }
-    
-    std::string ProjectPaths::GetScenesPath() {
-        return GetAssetsPath() + "/Scenes";
-    }
-    
-    std::string ProjectPaths::GetPrefabsPath() {
-        return GetAssetsPath() + "/Prefabs";
-    }
-    
-    std::string ProjectPaths::GetTexturesPath() {
-        return GetAssetsPath() + "/Textures";
-    }
-    
-    std::string ProjectPaths::GetAudioPath() {
-        return GetAssetsPath() + "/Audio";
-    }
-    
-    std::string ProjectPaths::GetShadersPath() {
-        return GetAssetsPath() + "/Shaders";
-    }
-    
-    std::string ProjectPaths::GetScriptsPath() {
-        return GetProjectRoot() + "/Scripts";
     }
     
     std::string ProjectPaths::GetSettingsPath() {

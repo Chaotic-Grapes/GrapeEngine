@@ -247,17 +247,17 @@ else()
     message(WARNING ".NET SDK not found - Scripting will not be available")
 endif()
 
-# ======================= Game Project Copy =========================
+# ======================= Game Project Symlink =========================
 # TODO: Remove this section when editor is separated from engine
-# Copy GameProject folder to build directory so editor can access game assets
+# Create symlink to EchoesBelow project folder so editor can access it from build directory
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/EchoesBelow")
     add_custom_command(TARGET GrapeEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
         "${CMAKE_CURRENT_LIST_DIR}/EchoesBelow"
         "$<TARGET_FILE_DIR:GrapeEngine>/EchoesBelow"
-        COMMENT "Copying EchoesBelow to build directory"
+        COMMENT "Creating symlink to EchoesBelow project"
     )
-    message(STATUS "The game project 'EchoesBelow' will be copied to build directory")
+    message(STATUS "Symlink to 'EchoesBelow' will be created in build directory")
 endif()
 
 message(STATUS "GrapeEngine configured successfully!")

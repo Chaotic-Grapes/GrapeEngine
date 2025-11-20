@@ -35,7 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Color.h"
 #include "ecs/World.h"
 #include "Math/Vector2D.h"
-#include "../editor/EditorFileMenu.h"
+#include "EditorFileMenu.h"
 
 // ============================================================================
 // Graphics Includes

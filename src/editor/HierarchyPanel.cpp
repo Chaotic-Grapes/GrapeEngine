@@ -20,9 +20,9 @@ and supports prefab instantiation by accepting dragged prefab assets.
 #define NOMINMAX
 #define NO_ERROR
 #include <windows.h>
-#include "../editor/HierarchyPanel.h"
-#include "../editor/ComponentWidgets.h"
-#include "../editor/EditorComponentRegistry.h"
+#include "HierarchyPanel.h"
+#include "ComponentWidgets.h"
+#include "EditorComponentRegistry.h"
 #include "core/Logger.h"
 #include "helpers/MathUtils.h"
 #include "services/Input.h"

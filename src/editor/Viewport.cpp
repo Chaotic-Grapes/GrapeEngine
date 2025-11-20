@@ -19,7 +19,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include <commdlg.h>
 #endif
 
-#include "../editor/Viewport.h"
+#include "Viewport.h"
 #include "graphics/EditorCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>

@@ -22,7 +22,7 @@ Provides:
 #define ASSET_BROWSER_PANEL_H
 
 #include "ecs/World.h"
-#include "../editor/AssetLibrary.h"
+#include "AssetLibrary.h"
 #include <imgui.h>
 #include <string>
 
@@ -99,6 +99,22 @@ private:
     void _selectEmptySpace();
 
     // -------------------------------------------------------------------------
+    // Context Menu
+    // -------------------------------------------------------------------------
+
+    // Render right-click context menu for creating assets
+    void _renderContextMenu();
+
+    // Create a new C# script file with template
+    void _createScript();
+
+    // Create a new scene file
+    void _createScene();
+
+    // Create a new folder
+    void _createFolder();
+
+    // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
 
@@ -119,6 +135,13 @@ private:
     // Status bar state
     std::string m_statusMessage;
     float m_statusTimer = 0.0f;
+
+    // Context menu state
+    bool m_showContextMenu = false;
+    char m_newAssetNameBuffer[128] = "";
+    bool m_focusNameInput = false;
+    enum class AssetCreationType { None, Script, Scene, Folder };
+    AssetCreationType m_creationType = AssetCreationType::None;
 };
 
 #endif

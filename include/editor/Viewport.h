@@ -18,7 +18,7 @@ Header for Viewport class handling viewport rendering and entity selection with 
 #include "ecs/Entity.h"
 #include "EditorFileMenu.h"
 #include "graphics/EditorCamera.hpp"
-#include "../editor/UndoSystem.h"
+#include "UndoSystem.h"
 #include <imgui.h>
 #include "ImGuizmo.h"
 #include <memory>

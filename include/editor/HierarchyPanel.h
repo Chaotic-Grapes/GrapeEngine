@@ -28,7 +28,7 @@ which entity the user is working with.
 #include <vector>
 #include <unordered_set>
 #include <functional>
-#include "../editor/EditorEntityActions.h"
+#include "EditorEntityActions.h"
 
 // EntityId is a numeric identifier for entities in the ECS world
 using EntityId = uint32_t;

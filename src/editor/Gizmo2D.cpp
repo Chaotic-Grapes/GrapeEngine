@@ -2,7 +2,7 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 // In Gizmo2D.cpp
-#include "../engine/ecs/systems/RendererSystem.h"
+#include "ecs/systems/RendererSystem.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include "ImGuizmo.h"

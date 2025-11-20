@@ -1,12 +1,12 @@
-#include "../engine/audio/AudioSystem.h"
-#include "../editor/AudioAssetLibrary.h"
-#include "../engine/services/AudioService.h"
+#include "audio/AudioSystem.h"
+#include "AudioAssetLibrary.h"
+#include "services/AudioService.h"
 #include "audio/FmodAudioDevice.h"
 #include <iostream>
 #include "core/Logger.h"
 #include <set>
-#include "../engine/core/Application.h"
-#include "../engine/services/OverlayService.h"
+#include "core/Application.h"
+#include "services/OverlayService.h"
 
 /*
     Update(dt)

@@ -14,13 +14,13 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 
 #include "ecs/World.h"
 #include "scene/Scene.h"
-#include "../editor/PlaybackControls.h"
-#include "../editor/EditorFileMenu.h"
-#include "../editor/AssetBrowserPanel.h"
-#include "../editor/Viewport.h"
-#include "../editor/HierarchyPanel.h"
-#include "../editor/InspectorPanel.h"
-#include "../editor/EditorEntityActions.h"
+#include "PlaybackControls.h"
+#include "EditorFileMenu.h"
+#include "AssetBrowserPanel.h"
+#include "Viewport.h"
+#include "HierarchyPanel.h"
+#include "InspectorPanel.h"
+#include "EditorEntityActions.h"
 #include <imgui.h>
 #include <GLFW/glfw3.h>
 #include <functional>
