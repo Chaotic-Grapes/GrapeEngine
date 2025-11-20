@@ -80,6 +80,14 @@ void Logger::Log(const LogLevel level, const std::string& message) {
 		return; // No logging destination available
 	}
 
+	// Get timestamp once for this log call
+	std::string timestamp = _getCurrentTimestamp("%H:%M:%S");
+
+	// Forward to console callback if registered
+	if (m_consoleCallback) {
+		m_consoleCallback(level, timestamp, message);
+	}
+
 	switch (level) {
 	case LogLevel::TRACE:	_logTrace(message); break;
 	case LogLevel::INFO:	_logInfo(message); break;

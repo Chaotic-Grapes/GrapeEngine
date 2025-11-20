@@ -103,11 +103,11 @@ void LevelEditor::_buildDockLayout() {
     float toolbarRatio = m_config.ToolbarHeight / vp->Size.y;
     ImGuiID toolbarNode, mainAreaNode;
     ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Up, toolbarRatio, &toolbarNode, &mainAreaNode);
-    
+
     // Hide tab bar and disable resizing on toolbar node
     ImGuiDockNode* toolbarDockNode = ImGui::DockBuilderGetNode(toolbarNode);
     toolbarDockNode->LocalFlags |= ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_NoResize;
-    
+
     ImGuiID leftCenterNode, rightNode;
     // Split main area: carve right strip (25% width) for inspectors
     // Params: (source_node, direction, size_ratio, out_id_primary, out_id_remaining)
@@ -125,9 +125,10 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
     ImGui::DockBuilderDockWindow("Viewport", viewportNode);
-    ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
+    ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
+    ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
 
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
     m_dockLayoutBuilt = true;                // Mark layout as built
@@ -164,8 +165,8 @@ void LevelEditor::_renderDockSpace() {
     // NoTitleBar/NoResize/NoMove: make it a static, decoration-less host
     // NoBringToFrontOnFocus/NoNavFocus: keep focus behavior stable
     ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
-                                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                                 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host
@@ -265,13 +266,28 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     );
 
     _registerPanel("Inspector",
-        [this]() { 
+        [this]() {
             m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
             // WIRE UP FILE MENU to inspector
-            m_inspector.SetFileMenu(&m_fileMenu); 
+            m_inspector.SetFileMenu(&m_fileMenu);
         },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
+    );
+
+    // Register Console Panel
+    _registerPanel("Console",
+        [this]() {
+            m_console.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
+
+            // Connect Logger to Console - use singleton instance
+            Logger::Get().SetConsoleCallback([this](LogLevel level,
+                const std::string& timestamp, const std::string& message) {
+                    m_console.AddMessage(level, timestamp, message);
+                });
+        },
+        [this]() { m_console.Render(); },
+        nullptr
     );
 
     // Initialize all registered panels
@@ -388,13 +404,13 @@ void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback
     // Any editor-specific logic that needs to happen on state change goes here
     // (The time scale is already handled by Playback itself)
     LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
-    
+
     // Handle state transitions
     if (newState == Playback::GameState::Stopped) {
         // Clear selection (entity IDs have changed after restore)
         m_hierarchyWindow.SetSelectedEntity(0);
         m_inspector.ClearSelection();
-        
+
         // Rebuild entity order to reflect restored hierarchy
         m_hierarchyWindow.RebuildEntityOrder();
     }

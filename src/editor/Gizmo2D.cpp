@@ -39,11 +39,11 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     // Set the screen area (the viewport image bounds).
     ImGuizmo::SetRect(drawPosX, drawPosY, drawSizeX, drawSizeY);
 
-    // --- B. HANDLE TOOL SWITCH INPUT (W, E, R) ---
+    // --- B. HANDLE TOOL SWITCH INPUT (T, E, R) ---
     // Updates the private member m_currentGizmoOperation
     if (ImGui::IsWindowFocused() && !ImGuizmo::IsUsing())
     {
-        if (ImGui::IsKeyPressed(ImGuiKey_W)) { m_currentGizmoOperation = ImGuizmo::TRANSLATE; }
+        if (ImGui::IsKeyPressed(ImGuiKey_T)) { m_currentGizmoOperation = ImGuizmo::TRANSLATE; }
         if (ImGui::IsKeyPressed(ImGuiKey_E)) { m_currentGizmoOperation = ImGuizmo::ROTATE; }
         if (ImGui::IsKeyPressed(ImGuiKey_R)) { m_currentGizmoOperation = ImGuizmo::SCALE; }
     }
