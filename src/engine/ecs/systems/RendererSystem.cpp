@@ -792,6 +792,15 @@ namespace ECS {
         m_renderGraph->AddPass("Picking", {}, {},
             [this, &world, &viewProj, &buckets](ResourceAccessor& res)
             {
+              
+                bool leftMouseButtonDownThisFrame;
+                {
+                    static bool prev_frame = false;
+                    bool curr_frame = Input::IsMousePressed(MOUSE_LEFT);
+                    leftMouseButtonDownThisFrame = curr_frame == 1 && prev_frame == 0;
+                    prev_frame = curr_frame;
+                } 
+
                 (void)res;
                 // Dont pick while dragging.
                 if (m_isDragging) return;
@@ -1006,18 +1015,21 @@ namespace ECS {
                 LOG_DEBUG("[PICKING] Reading pixel: (" << x << ", " << y << ")");
 
                 static bool firstFrame = true;
-                if (!firstFrame) {
-                    int readPBO = 1 - m_currentPBO;
-                    uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
+                if (leftMouseButtonDownThisFrame)
+                {
+                    if (!firstFrame) {
+                        int readPBO = 1 - m_currentPBO;
+                        uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
 
-                    LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
+                        LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
 
-                    if (pickedID > 0) {
-                        m_selectedEntityID = pickedID;
-                        LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
-                    }
-                    else {
-                        m_selectedEntityID = 0;
+                        if (pickedID > 0) {
+                            m_selectedEntityID = pickedID;
+                            LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
+                        }
+                        else {
+                            m_selectedEntityID = 0;
+                        }
                     }
                 }
                 firstFrame = false;
@@ -1472,6 +1484,7 @@ namespace ECS {
                 // Just skip drag logic
             }
 
+#if 1
             // ------------------------------------------------------------------
             // <<<< IMGUIZMO BYPASS CHECK STARTS >>>>
             // ------------------------------------------------------------------
@@ -1482,12 +1495,12 @@ namespace ECS {
                 wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT); // Update mouse state
                 // Skip the rest of the custom drag logic
                 lastSelectedEntityID = m_selectedEntityID; // Keep selection tracking consistent
-                return; // Exit the block early
+              //  return; // Exit the block early
             }
             // ------------------------------------------------------------------
             // <<<< IMGUIZMO BYPASS CHECK ENDS >>>>
             // ------------------------------------------------------------------
-
+#else
             glm::dvec2 mousePos;
             Input::GetMousePosition(mousePos.x, mousePos.y);
             glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection,
@@ -1600,6 +1613,8 @@ namespace ECS {
             }
 
             wasMouseDownLastFrame = isMouseDownThisFrame;
+#endif
+
         }
         else {
             // Nothing selected, reset tracking
