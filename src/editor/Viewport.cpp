@@ -40,6 +40,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include "graphics/RenderGraph.hpp"
 #include "services/Time.h"
 #include "services/WindowManager.h"
+
 // Messaging for editor warnings
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
@@ -181,6 +182,16 @@ void Viewport::_renderViewport() {
             if (textureId > 0) {
                 ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
             }
+
+            // 1. Get the drawing position of the image we just rendered
+            ImVec2 gizmoPos = ImGui::GetItemRectMin(); // Get the top-left corner of the image item
+
+            // 2. Call the RendererSystem method to draw the Gizmo overlay
+            m_rendererSystem->DrawEditorGizmo(
+                *m_world,
+                gizmoPos.x, gizmoPos.y,
+                size.x, size.y
+            );
         }
     }
     else {

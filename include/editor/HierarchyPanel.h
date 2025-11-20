@@ -115,6 +115,9 @@ private:
     // Render the right-click context menu for entity operations
     void _renderEntityContextMenu();
 
+    // Ensure entity has a ScriptInstance component and set its script class name 
+    void _attachScriptComponent(EntityId entityId, const std::string& scriptName);
+
     // -------------------------------------------------------------------------
     // Entity Operations
     // -------------------------------------------------------------------------
@@ -160,10 +163,9 @@ private:
 
     // Handle clicking empty space to clear selection
     void _selectEmptySpace();
-
-public:
-
-private:
+    
+    // Opens a file dialog to select a script file and attaches the component using the filename as the script class name.
+    void _importAndAttachScript(EntityId entityId);
 
     // -------------------------------------------------------------------------
     // State

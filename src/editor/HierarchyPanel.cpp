@@ -17,6 +17,9 @@ and supports prefab instantiation by accepting dragged prefab assets.
 */
 /* End Header *******************************************************************/
 
+#define NOMINMAX
+#define NO_ERROR
+#include <windows.h>
 #include "../editor/HierarchyPanel.h"
 #include "../editor/ComponentWidgets.h"
 #include "../editor/EditorComponentRegistry.h"
@@ -30,6 +33,7 @@ and supports prefab instantiation by accepting dragged prefab assets.
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
+
 
 namespace {
     // Helper template function to safely add components during deserialization
@@ -90,6 +94,58 @@ namespace {
 
         return false;
     }
+}
+
+
+void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
+    if (entityId == 0) return;
+
+    // 1. Call your external file dialog utility.
+#ifdef _WIN32
+
+    char filename[512] = "";
+
+    // Win32 OPENFILENAMEA struct setup
+    OPENFILENAMEA ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = sizeof(filename);
+
+    //Set the filter ONLY for C# Script files (*.cs)
+    // Format: "Description\0Pattern\0"
+    ofn.lpstrFilter = "C# Script Files\0*.cs\0All Files\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrTitle = "Select Script File to Attach"; // Custom title
+
+    // Flags remain the same to ensure the file exists and paths are valid
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+    // Show file dialog: execution pauses here until the user selects or cancels
+    if (GetOpenFileNameA(&ofn)) {
+        // User selected a file; the path is in the 'filename' buffer
+        std::string selectedFilePath(filename);
+
+        // 1. Extract the class name from the file path.
+        std::filesystem::path p(selectedFilePath);
+        std::string scriptClassName = p.stem().string();
+
+        // 2. Attach the ScriptInstance component.
+        _attachScriptComponent(entityId, scriptClassName);
+
+        // 3. Update selection state.
+        m_selectedEntityId = entityId;
+        if (m_selectionCallback) m_selectionCallback(entityId);
+    }
+    else {
+        // User clicked cancel
+        // Optional: LOG_INFO("Script selection cancelled by user");
+    }
+
+#else // Not Windows (Linux, Mac, etc.)
+    // Matches the AssetLibrary's error handling for other platforms
+    LOG_WARNING("File dialog not implemented for this platform");
+#endif
 }
 
 // -------------------------------------------------------------------------
@@ -730,6 +786,40 @@ void HierarchyPanel::_renderEntityContextMenu() {
                     }
                 }
             }
+
+            ImGui::Separator();
+
+            if (ImGui::BeginMenu("Add Component")) {
+
+                // Option 1: Scripting Sub-Menu
+                if (ImGui::BeginMenu("Scripting")) {
+
+                    ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
+
+                    // Check if ScriptInstance component is already attached
+                    bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
+
+                    // If no ScriptInstance component exists, offer to add one
+                    if (!hasScriptComponent) {
+                        if (ImGui::MenuItem("Attach Script")) {
+                            // This attaches a default, empty ScriptInstance component
+                            /*_attachScriptComponent(m_contextMenuTarget, "");
+                            ImGui::CloseCurrentPopup();*/
+                            _importAndAttachScript(m_contextMenuTarget);
+                        }
+                        ImGui::Separator();
+                    }
+
+                    
+
+                    ImGui::EndMenu(); // End Scripting menu
+                }
+
+                // You can add other component types (Renderer, Rigidbody, etc.) here later
+                // if (ImGui::BeginMenu("Physics")) { ... }
+
+                ImGui::EndMenu(); // End Add Component menu
+            }
         }
         ImGui::EndPopup();
     }
@@ -813,6 +903,40 @@ void HierarchyPanel::_startRename(EntityId entityId) {
     }
     
     m_focusRenameInput = true;
+}
+
+/**
+ * @brief Ensures an entity has a ScriptInstance component, and sets its TypeName.
+ * @param entityId The entity to modify.
+ * @param scriptName The C# class name (e.g., "PlayerController").
+ */
+void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string& scriptName) {
+    if (entityId == 0 || !m_world) return;
+
+    ECS::Entity e = m_world->Resolve(entityId);
+    if (e.IsNull() || !m_world->IsAlive(e)) return;
+
+    // 1. Ensure the component exists (Add it if it doesn't)
+    if (!m_world->Has<ECS::Components::ScriptInstance>(e)) {
+        ECS::Components::ScriptInstance newScript;
+        // The default constructor of Text component initializes the font path, 
+        // ensure ScriptInstance also has a sane default or proper initialization.
+        m_world->Add<ECS::Components::ScriptInstance>(e, newScript);
+    }
+
+    // 2. Update the component's TypeName
+    auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(e);
+
+    // SetTypeName is not exposed in the provided code, 
+    // but the component has char TypeName[128]. We must manually copy.
+    strncpy_s(scriptComp.TypeName, scriptName.c_str(), sizeof(scriptComp.TypeName) - 1);
+    scriptComp.TypeName[sizeof(scriptComp.TypeName) - 1] = '\0'; // Always null-terminate
+
+    // 3. Mark for re-initialization by the ScriptingSystem at runtime
+    // Setting Initialized = false forces the runtime to load this C# class 
+    // and call its Start/Awake method.
+    scriptComp.Initialized = false;
+
 }
 
 // -------------------------------------------------------------------------

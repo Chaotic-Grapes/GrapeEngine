@@ -58,6 +58,11 @@ namespace Editor {
     // Undo System
     class UndoSystem;
 }
+// ============================================================================
+// ImGuizmo Includes
+// ============================================================================
+#include <imgui.h>
+#include "ImGuizmo.h"
 
 namespace ECS {
 
@@ -130,6 +135,18 @@ namespace ECS {
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
 
         void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+        /**
+        * @brief Renders the ImGuizmo overlay and allows manipulation of the selected entity.
+        * * This function must be called within the ImGui window context that displays the scene texture.
+        * It handles input for tool switching (W, E, R) and updates the selected entity's
+        * LocalTransform component if the gizmo is being used.
+        * * @param world The current ECS world instance, used to access entity data and scene settings.
+        * @param drawPosX The screen X-coordinate of the top-left corner of the rendered scene image.
+        * @param drawPosY The screen Y-coordinate of the top-left corner of the rendered scene image.
+        * @param drawSizeX The width of the rendered scene image (in pixels).
+        * @param drawSizeY The height of the rendered scene image (in pixels).
+        */
+        void DrawEditorGizmo(ECS::World& world, float drawPosX, float drawPosY, float drawSizeX, float drawSizeY);
 
     private:
         // ====================================================================
@@ -218,6 +235,12 @@ namespace ECS {
         bool m_isDragging = false;
         glm::vec2 m_dragStartMouseWorld = {0, 0};
         glm::vec3 m_dragStartEntityPos = { 0, 0, 0};
+
+        // ====================================================================
+        // NEW: Member Variables - ImGuizmo State
+        // ====================================================================
+        ImGuizmo::OPERATION m_currentGizmoOperation = ImGuizmo::TRANSLATE;
+        ImGuizmo::MODE m_currentGizmoMode = ImGuizmo::WORLD;
 
         // ====================================================================
         // Member Variables - UI Scaling

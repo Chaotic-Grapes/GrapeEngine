@@ -54,6 +54,7 @@ endif()
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS 
     ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/*.c
+    ${CMAKE_CURRENT_LIST_DIR}/ImGuizmo/*.cpp
 )
 
 file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS 
@@ -82,6 +83,7 @@ target_include_directories(GrapeEngine PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include/engine
     ${CMAKE_CURRENT_LIST_DIR}/include/test
     ${CMAKE_CURRENT_LIST_DIR}/include/externals
+    ${CMAKE_CURRENT_LIST_DIR}/ImGuizmo
 )
 
 # Link libraries
