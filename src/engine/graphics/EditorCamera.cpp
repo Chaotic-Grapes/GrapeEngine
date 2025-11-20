@@ -5,9 +5,9 @@
 \par    choi.m@digipen.edu
 \date   31st October 2025
 \brief
-Implements a simplified EditorCamera for panning and zooming within the
+Implements a 3D EditorCamera for panning and zooming within the
 editor viewport. Left-click drag pans the view, right-click drag orbits,
-and scroll input zooms in/out.
+WASD keys move the camera, and scroll input zooms in/out.
 */
 /* End Header *******************************************************************/
 
@@ -42,6 +42,7 @@ namespace {
 
     // Panning constants
     constexpr float kPanningMinimumDelta = 0.001f;
+    constexpr float kKeyboardMoveSpeed = 5.0f; // World units per second
 
     // Zoom constants
     constexpr float kZoomFactor = 1.1f;
@@ -215,7 +216,32 @@ namespace Engine {
         }
 
         // ------------------------------
-        // PANNING (LMB drag)
+        // WASD KEYBOARD MOVEMENT (XY plane only)
+        // ------------------------------
+        glm::vec2 moveDirection(0.0f);
+
+        if (Input::IsKeyDown(KEY_W)) moveDirection.y += 1.0f;  // Move up
+        if (Input::IsKeyDown(KEY_S)) moveDirection.y -= 1.0f;  // Move down
+        if (Input::IsKeyDown(KEY_A)) moveDirection.x -= 1.0f;  // Move left
+        if (Input::IsKeyDown(KEY_D)) moveDirection.x += 1.0f;  // Move right
+
+        if (glm::length(moveDirection) > 0.0f) {
+            // Normalize to ensure diagonal movement isn't faster...
+            moveDirection = glm::normalize(moveDirection);
+
+            // Scale movement by current ortho size for zoom-relative speed
+            const float scaledSpeed = kKeyboardMoveSpeed * (m_camera->OrthoSize / kDefaultWorldViewHeight);
+            const glm::vec2 movement = moveDirection * scaledSpeed * dt;
+
+            // Apply movement to both target and camera position
+            m_target.x += movement.x;
+            m_target.y += movement.y;
+            m_cameraPosition.x += movement.x;
+            m_cameraPosition.y += movement.y;
+        }
+
+        // ------------------------------
+        // PANNING (MMB drag)
         // ------------------------------
         if (Input::IsMouseDown(MOUSE_MIDDLE)) {
             if (!m_panning) {
