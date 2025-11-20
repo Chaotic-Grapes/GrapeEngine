@@ -6,6 +6,12 @@ cmake_policy(VERSION 3.13)
 
 project(GrapeEngine)
 
+# To make compile time faster
+# Enable /MP for all targets globally
+if(MSVC)
+    add_compile_options(/MP)
+endif()
+
 # Set C++ standard globally
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

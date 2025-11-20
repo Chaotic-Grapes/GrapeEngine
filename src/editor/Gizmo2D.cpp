@@ -3,6 +3,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 // In Gizmo2D.cpp
 #include "../engine/ecs/systems/RendererSystem.h"
+#include "core/Logger.h"
 #include <imgui.h>
 #include "ImGuizmo.h"
 #include "ecs/World.h"
@@ -27,6 +28,7 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
         return;
 
     // --- A. SETUP IMGUIZMO CONTEXT ---
+    ImGuizmo::BeginFrame();
 
     // Set orthographic mode for 2D.
     ImGuizmo::SetOrthographic(true);
@@ -89,6 +91,8 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     // --- F. DECOMPOSE AND APPLY CHANGES ---
     if (ImGuizmo::IsUsing())
     {
+        LOG_DEBUG("GIZMO IS USING: Applying changes!");
+
         glm::vec3 scale, translation, skew;
         glm::quat rotation;
         glm::vec4 perspective;
