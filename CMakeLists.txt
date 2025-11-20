@@ -70,12 +70,18 @@ file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS
 
 # Create executable or library
 # Right now, both should be .exe
-add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS} app.rc)
 #if(CMAKE_BUILD_TYPE STREQUAL "Release")
 #    add_library(GrapeEngine STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 #else()
 #    add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 #endif()
+
+# Set resource compiler include directory (so it can find assets/icon.ico)
+set(CMAKE_VS_SDK_INCLUDE_DIRECTORIES ${CUSTOM_INCLUDE_DIRECTORIES})
+foreach(LANG  C CXX RC)
+    set(CMAKE_${LANG}_STANDARD_INCLUDE_DIRECTORIES ${CUSTOM_INCLUDE_DIRECTORIES})
+endforeach()
 
 # Set C++ standard for the target
 set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 23)

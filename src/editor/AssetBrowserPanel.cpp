@@ -43,8 +43,8 @@ void AssetBrowserPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* s
     m_world = world;
 
     // TODO: Remove when editor is separated - use project-relative paths
-    // Set initial path to game project assets folder
-    m_currentPath = Engine::ProjectPaths::GetAssetsPath();
+    // Set initial path to game project root folder
+    m_currentPath = Engine::ProjectPaths::GetProjectRoot();
 
     // Initialize helper modules
     m_assetLibrary.Initialize(mainFont, boldFont, symbolsFont);
