@@ -793,18 +793,14 @@ namespace ECS {
             [this, &world, &viewProj, &buckets](ResourceAccessor& res)
             {
               
-                bool leftMouseButtonDownThisFrame;
-                {
-                    static bool prev_frame = false;
-                    bool curr_frame = Input::IsMousePressed(MOUSE_LEFT);
-                    leftMouseButtonDownThisFrame = curr_frame == 1 && prev_frame == 0;
-                    prev_frame = curr_frame;
-                } 
+                static bool prevMouseDown = false;
+                bool currMouseDown = Input::IsMouseDown(MOUSE_LEFT);
+                bool mouseJustReleased = (!currMouseDown && prevMouseDown);
+                prevMouseDown = currMouseDown;
 
                 (void)res;
-                // Dont pick while dragging.
                 if (m_isDragging) return;
-                if (!Input::IsMousePressed(MOUSE_LEFT)) return;
+                if (!currMouseDown && !mouseJustReleased) return;
 
                 // ============================================================
                 // GET VIEWPORT BOUNDS
@@ -1014,28 +1010,23 @@ namespace ECS {
                 LOG_DEBUG("[PICKING] FBO size: " << vpWidth << "x" << vpHeight);
                 LOG_DEBUG("[PICKING] Reading pixel: (" << x << ", " << y << ")");
 
-                static bool firstFrame = true;
-                if (leftMouseButtonDownThisFrame)
-                {
-                    if (!firstFrame) {
-                        int readPBO = 1 - m_currentPBO;
-                        uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
+                if (mouseJustReleased) {
+                    int readPBO = 1 - m_currentPBO;
+                    uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
 
-                        LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
+                    LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
 
-                        if (pickedID > 0) {
-                            m_selectedEntityID = pickedID;
-                            LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
-                        }
-                        else {
-                            m_selectedEntityID = 0;
-                        }
+                    if (pickedID > 0) {
+                        m_selectedEntityID = pickedID;
+                        LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
+                    }
+                    else {
+                        m_selectedEntityID = 0;
                     }
                 }
-                firstFrame = false;
 
-                // Frame N: Swap for next frame
-                // Swap PBOs FIRST
+                
+                
                 m_currentPBO = 1 - m_currentPBO;
 
                 // Frame N: Write to PBO 0
@@ -1461,7 +1452,6 @@ namespace ECS {
             }
             // If ImGui not available or viewport not found, use full window (already set)
         }
-        
         static bool wasMouseDownLastFrame = false;
         static uint32_t lastSelectedEntityID = 0;
 
@@ -1484,23 +1474,9 @@ namespace ECS {
                 // Just skip drag logic
             }
 
-#if 1
-            // ------------------------------------------------------------------
-            // <<<< IMGUIZMO BYPASS CHECK STARTS >>>>
-            // ------------------------------------------------------------------
-            if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
-                // If ImGuizmo is currently manipulating the entity,
-                // we must disable the custom drag-to-move logic immediately.
-                m_isDragging = false;
-                wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT); // Update mouse state
-                // Skip the rest of the custom drag logic
-                lastSelectedEntityID = m_selectedEntityID; // Keep selection tracking consistent
-              //  return; // Exit the block early
-            }
-            // ------------------------------------------------------------------
-            // <<<< IMGUIZMO BYPASS CHECK ENDS >>>>
-            // ------------------------------------------------------------------
-#else
+            {
+            bool bypassDrag = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
+            if (!bypassDrag) {
             glm::dvec2 mousePos;
             Input::GetMousePosition(mousePos.x, mousePos.y);
             glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection,
@@ -1559,6 +1535,7 @@ namespace ECS {
                 float dragDistance = glm::length(dragDelta);
 
                 // Calculate drag threshold in world space (5 pixels)
+                const auto& win = WindowManager::GetMainWindow();
                 const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->Height())) * 5.0f;
 
                 // Start dragging if moved beyond threshold
@@ -1613,7 +1590,12 @@ namespace ECS {
             }
 
             wasMouseDownLastFrame = isMouseDownThisFrame;
-#endif
+            } else {
+                m_isDragging = false;
+                wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
+                lastSelectedEntityID = m_selectedEntityID;
+            }
+            }
 
         }
         else {
