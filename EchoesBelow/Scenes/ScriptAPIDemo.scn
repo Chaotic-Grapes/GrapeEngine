@@ -1,0 +1,691 @@
+{
+    "Entities": [
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "Player"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "AssemblyName": "MyGame",
+                        "ClassName": "PlayerController"
+                    },
+                    "TypeName": "ScriptComponent"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 1,
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Radius": 0.5
+                    },
+                    "TypeName": "CircleCollider2D"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.3,
+                        "PositionCorrectPercent": 0.4,
+                        "Restitution": 0.0
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.5,
+                        "Flags": 2,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 5.0,
+                        "Mass": 2.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.3,
+                            "G": 0.8,
+                            "R": 0.2
+                        },
+                        "Filled": true,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Radius": 0.5,
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeCircle2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 5.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "Falling Ball 1"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "AssemblyName": "MyGame",
+                        "ClassName": "BouncyBall"
+                    },
+                    "TypeName": "ScriptComponent"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 1,
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Radius": 0.4
+                    },
+                    "TypeName": "CircleCollider2D"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.2,
+                        "PositionCorrectPercent": 0.4,
+                        "Restitution": 0.9
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 2,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.5,
+                        "Mass": 1.5
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.9,
+                            "G": 0.4,
+                            "R": 0.3
+                        },
+                        "Filled": true,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Radius": 0.4,
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeCircle2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -3.0,
+                            "Y": 6.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "Falling Ball 2"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "AssemblyName": "MyGame",
+                        "ClassName": "BouncyBall"
+                    },
+                    "TypeName": "ScriptComponent"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 1,
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Radius": 0.35
+                    },
+                    "TypeName": "CircleCollider2D"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.2,
+                        "PositionCorrectPercent": 0.4,
+                        "Restitution": 0.85
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 2,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.5,
+                        "Mass": 1.2
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.3,
+                            "G": 0.5,
+                            "R": 0.9
+                        },
+                        "Filled": true,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Radius": 0.35,
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeCircle2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 3.0,
+                            "Y": 7.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "Spinning Box"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "AssemblyName": "MyGame",
+                        "ClassName": "SpinningObject"
+                    },
+                    "TypeName": "ScriptComponent"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 1,
+                        "HalfExtents": {
+                            "X": 0.5,
+                            "Y": 0.5
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.3,
+                        "PositionCorrectPercent": 0.4,
+                        "Restitution": 0.5
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 2,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 1.0,
+                        "Mass": 2.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.3,
+                            "G": 0.3,
+                            "R": 0.8
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 0.5,
+                            "Y": 0.5
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": -3.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Flags": 1,
+                        "HalfExtents": {
+                            "X": 10.0,
+                            "Y": 0.5
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "Ground"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.5,
+                        "PositionCorrectPercent": 0.2,
+                        "Restitution": 0.0
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 1,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.0,
+                        "Mass": 0.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.4,
+                            "G": 0.4,
+                            "R": 0.4
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 10.0,
+                            "Y": 0.5
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -8.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Flags": 1,
+                        "HalfExtents": {
+                            "X": 0.2,
+                            "Y": 5.0
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "Left Wall"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.5,
+                            "G": 0.5,
+                            "R": 0.5
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 0.2,
+                            "Y": 5.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Flags": 1,
+                        "HalfExtents": {
+                            "X": 0.2,
+                            "Y": 5.0
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "Right Wall"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.5,
+                            "G": 0.5,
+                            "R": 0.5
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 0.2,
+                            "Y": 5.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                }
+            ]
+        }
+    ],
+    "EntityCount": 7,
+    "Hierarchy": [],
+    "SceneName": "Script API Demo",
+    "SystemProfile": {
+        "Systems": []
+    },
+    "Version": "1.0"
+}
