@@ -252,18 +252,16 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
         }
 
         if (!isDescendant) {
-            // Set the new parent
-            world.Set<ECS::Parent>(childEntity, ECS::Parent{ newParentEntity });
+            // Use Attach to set the new parent (handles hierarchy index updates automatically)
+            world.Attach(childEntity, newParentEntity);
         }
         else {
             LOG_WARNING("Cannot parent entity to its own descendant: this would create a cyclic hierarchy");
         }
     }
     else {
-        // Remove parent (make root entity)
-        if (world.Has<ECS::Parent>(childEntity)) {
-            world.Remove<ECS::Parent>(childEntity);
-        }
+        // Use Detach to remove parent (make root entity)
+        world.Detach(childEntity);
     }
 
     // MARK SCENE AS DIRTY (only if operation succeeded)
