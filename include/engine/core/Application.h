@@ -36,7 +36,17 @@ namespace Engine {
         /**
          * @brief Get the application configuration
          */
-        const ApplicationConfig& GetConfig() const { return m_config; }
+        const EditorSettings& GetConfig() const { return m_config; }
+
+        /**
+         * @brief Get the project settings
+         */
+        const ProjectSettings& GetProjectSettings() const { return m_projectSettings; }
+
+        /**
+         * @brief Check if project settings have been loaded
+         */
+        bool HasProjectSettings() const { return m_hasProjectSettings; }
 
         /**
          * @brief Starts the engine
@@ -45,6 +55,13 @@ namespace Engine {
          * @param consoleFlag If true, runs with console output enabled
          */
         void Run(Game& game, bool consoleFlag);
+
+        /**
+         * @brief Load project-specific settings from ProjectSettings.json
+         * @param projectRoot Path to the project root directory
+         * @return true if project settings were loaded successfully
+         */
+        bool LoadProjectSettings(const std::string& projectRoot);
 
         /**
          * @brief Close worlds and release resources.
@@ -65,8 +82,12 @@ namespace Engine {
         // Scene manager
         Scenes::SceneManager m_sceneManager;
 
-        // Application configuration
-        ApplicationConfig m_config;
+        // Editor configuration
+        EditorSettings m_config;
+
+        // Project settings
+        ProjectSettings m_projectSettings;
+        bool m_hasProjectSettings = false;
 
 		// Functions to enable/disable console output
         static void _enableConsole();

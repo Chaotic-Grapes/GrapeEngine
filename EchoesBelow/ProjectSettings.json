@@ -1,5 +1,5 @@
 {
-  "GameName": "Echoes Below",
+  "Title": "Echoes Below",
   "Version": "1.0.0",
   "StartupScene": "EchoesBelow/Assets/Scenes/MainScene.scn",
   "WindowSettings": {

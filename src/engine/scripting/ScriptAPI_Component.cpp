@@ -16,8 +16,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "helpers/EntityUtils.h"
-#include <iostream>
 #include <cstring>
+#include "core/Logger.h"
 
 // Export macro
 #ifndef SCRIPT_API
@@ -25,6 +25,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
     #define SCRIPT_API extern "C" __declspec(dllexport)
 #endif
 #endif
+
+// Global world pointer for script API access
+// TODO: Replace with proper singleton or dependency injection
+ECS::World* g_scriptWorld = nullptr;
 
 namespace {
     // FNV-1a hash algorithm - must match C# implementation exactly
@@ -38,10 +42,6 @@ namespace {
         return hash;
     }
 
-    // Global world pointer for script API access
-    // TODO: Replace with proper singleton or dependency injection
-    ECS::World* g_scriptWorld = nullptr;
-
     ECS::World* GetScriptWorld() {
         return g_scriptWorld;
     }
@@ -50,13 +50,14 @@ namespace {
     bool GetComponentGeneric(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize) {
         ECS::World* world = GetScriptWorld();
         if (!world) {
-            std::cerr << "[ScriptAPI] World not set" << '\n';
+            LOG_ERROR("[ScriptAPI] World not set");
             return false;
         }
 
         ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
         if (!world->IsAlive(entity)) {
             std::cerr << "[ScriptAPI] Entity not alive" << '\n';
+            LOG_ERROR("[ScriptAPI] Entity not alive");
             return false;
         }
 
@@ -65,7 +66,7 @@ namespace {
                 auto* comp = world->TryGet<ECS::Components::ComponentType>(entity); \
                 if (!comp) return false; \
                 if (bufferSize < static_cast<int>(sizeof(ECS::Components::ComponentType))) { \
-                    std::cerr << "[ScriptAPI] Buffer too small" << '\n'; \
+                    LOG_ERROR("[ScriptAPI] Buffer too small"); \
                     return false; \
                 } \
                 std::memcpy(outBuffer, comp, sizeof(ECS::Components::ComponentType)); \
@@ -102,7 +103,7 @@ namespace {
 
         #undef HANDLE_COMPONENT_TYPE
 
-        std::cerr << "[ScriptAPI] Unknown component type hash: " << typeHash << '\n';
+        LOG_ERROR("[ScriptAPI] Unknown component type hash: %u", typeHash);
         return false;
     }
 
@@ -155,20 +156,20 @@ namespace {
     bool AddComponentGeneric(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
         ECS::World* world = GetScriptWorld();
         if (!world) {
-            std::cerr << "[ScriptAPI] World not set" << '\n';
+            LOG_ERROR("[ScriptAPI] World not set");
             return false;
         }
 
         ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
         if (!world->IsAlive(entity)) {
-            std::cerr << "[ScriptAPI] Entity not alive" << '\n';
+            LOG_ERROR("[ScriptAPI] Entity not alive");
             return false;
         }
 
         #define HANDLE_COMPONENT_TYPE(ComponentType, HashName) \
             if (typeHash == FNV1aHash(HashName)) { \
                 if (dataSize != sizeof(ECS::Components::ComponentType)) { \
-                    std::cerr << "[ScriptAPI] Component size mismatch" << '\n'; \
+                    LOG_ERROR("[ScriptAPI] Component size mismatch"); \
                     return false; \
                 } \
                 ECS::Components::ComponentType comp; \
@@ -210,27 +211,27 @@ namespace {
 
         #undef HANDLE_COMPONENT_TYPE
 
-        std::cerr << "[ScriptAPI] Unknown component type hash: " << typeHash << '\n';
+        LOG_ERROR("[ScriptAPI] Unknown component type hash: %u", typeHash);
         return false;
     }
 
     void SetComponentGeneric(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize) {
         ECS::World* world = GetScriptWorld();
         if (!world) {
-            std::cerr << "[ScriptAPI] World not set" << '\n';
+            LOG_ERROR("[ScriptAPI] World not set");
             return;
         }
 
         ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
         if (!world->IsAlive(entity)) {
-            std::cerr << "[ScriptAPI] Entity not alive" << '\n';
+            LOG_ERROR("[ScriptAPI] Entity not alive");
             return;
         }
 
         #define HANDLE_COMPONENT_TYPE(ComponentType, HashName) \
             if (typeHash == FNV1aHash(HashName)) { \
                 if (dataSize != sizeof(ECS::Components::ComponentType)) { \
-                    std::cerr << "[ScriptAPI] Component size mismatch" << '\n'; \
+                    LOG_ERROR("[ScriptAPI] Component size mismatch"); \
                     return; \
                 } \
                 auto* existing = world->TryGet<ECS::Components::ComponentType>(entity); \
@@ -274,13 +275,13 @@ namespace {
 
         #undef HANDLE_COMPONENT_TYPE
 
-        std::cerr << "[ScriptAPI] Unknown component type hash: " << typeHash << '\n';
+        LOG_ERROR("[ScriptAPI] Unknown component type hash: %u", typeHash);
     }
 
     bool HasComponentGeneric(uint64_t entityId, uint32_t typeHash) {
         ECS::World* world = GetScriptWorld();
         if (!world) {
-            std::cerr << "[ScriptAPI] World not set" << '\n';
+            LOG_ERROR("[ScriptAPI] World not set");
             return false;
         }
 
@@ -328,7 +329,7 @@ namespace {
     void RemoveComponentGeneric(uint64_t entityId, uint32_t typeHash) {
         ECS::World* world = GetScriptWorld();
         if (!world) {
-            std::cerr << "[ScriptAPI] World not set" << '\n';
+            LOG_ERROR("[ScriptAPI] World not set");
             return;
         }
 
@@ -377,51 +378,75 @@ namespace {
 // Component API - Exported Functions
 // ============================================================================
 
-/// <summary>
-/// Get a component from an entity by type hash
-/// </summary>
+/**
+ * @brief Get a component from an entity by type hash
+ * @param entityId The packed entity ID
+ * @param typeHash The FNV-1a hash of the component type name
+ * @param outBuffer Pointer to the output buffer to receive the component data
+ * @param bufferSize Size of the output buffer in bytes
+ * @return True if the component was retrieved successfully; false otherwise
+ */
 SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize) {
     return GetComponentGeneric(entityId, typeHash, outBuffer, bufferSize);
 }
 
-/// <summary>
-/// Get a pointer to a component on an entity by type hash
-/// </summary>
+/**
+ * @brief Get a pointer to a component on an entity by type hash
+ * @param entityId The packed entity ID
+ * @param typeHash The FNV-1a hash of the component type name
+ * @return Pointer to the component data, or nullptr if not found
+ */
 SCRIPT_API void* ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash) {
     return GetComponentPtr(entityId, typeHash);
 }
 
-/// <summary>
-/// Add a component to an entity by type hash
-/// </summary>
+/**
+ * @brief Add a component to an entity by type hash
+ * @param entityId The packed entity ID
+ * @param typeHash The FNV-1a hash of the component type name
+ * @param componentData Pointer to the component data to add
+ * @param dataSize Size of the component data in bytes
+ * @param outBuffer Pointer to the output buffer to receive the added component data
+ * @return True if the component was added successfully; false otherwise
+ */
 SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
     return AddComponentGeneric(entityId, typeHash, componentData, dataSize, outBuffer);
 }
 
-/// <summary>
-/// Set a component on an entity by type hash
-/// </summary>
+/**
+ * @brief Set (add or update) a component on an entity by type hash
+ * @param entityId The packed entity ID
+ * @param typeHash The FNV-1a hash of the component type name
+ * @param componentData Pointer to the component data to set
+ * @param dataSize Size of the component data in bytes
+ */
 SCRIPT_API void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize) {
     SetComponentGeneric(entityId, typeHash, componentData, dataSize);
 }
 
-/// <summary>
-/// Check if an entity has a component
-/// </summary>
+/**
+ * @brief Check if an entity has a component by type hash
+ * @param entityId The packed entity ID
+ * @param typeHash The FNV-1a hash of the component type name
+ * @return True if the entity has the component; false otherwise
+ */
 SCRIPT_API bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash) {
     return HasComponentGeneric(entityId, typeHash);
 }
 
-/// <summary>
-/// Remove a component from an entity
-/// </summary>
+/**
+ * @brief Remove a component from an entity by type hash
+ * @param entityId The packed entity ID
+ * @param typeHash The FNV-1a hash of the component type name
+ */
 SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash) {
     RemoveComponentGeneric(entityId, typeHash);
 }
 
-/// <summary>
-/// Set the world instance for script API access
-/// </summary>
+/**
+ * @brief Set the global ECS world for script API access
+ * @param world Pointer to the ECS world
+ */
 SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world) {
     g_scriptWorld = world;
 }

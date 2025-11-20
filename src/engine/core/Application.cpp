@@ -53,7 +53,7 @@ namespace Engine {
         Grape_Engine::CrashDumping::SetProgramName("GrapeEngine");
         Grape_Engine::CrashDumping::SetDumpCreateState(true);
 
-        // Load configuration first (try working dir, then parent dir fallback)
+        // Load editor configuration (try working dir, then parent dir fallback)
         bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
         if (!configLoaded) {
             // Fallback: common scenario when running from build directory
@@ -241,6 +241,18 @@ namespace Engine {
 
     void Application::Close() {
         m_shouldStop = true;
+    }
+
+    bool Application::LoadProjectSettings(const std::string& projectRoot) {
+        std::string settingsPath = projectRoot + "/ProjectSettings.json";
+        m_hasProjectSettings = Serialization::ConfigurationSerializer::LoadProjectSettings(settingsPath, m_projectSettings);
+        if (m_hasProjectSettings) {
+            LOG_INFO("Loaded project settings from: " << settingsPath);
+        }
+        else {
+            LOG_WARNING("Failed to load project settings from: " << settingsPath);
+        }
+        return m_hasProjectSettings;
     }
 
     void Application::_initializeServices() {

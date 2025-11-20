@@ -16,7 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "helpers/EntityUtils.h"
-#include <iostream>
+#include "core/Logger.h"
 
 // Export macro
 #ifndef SCRIPT_API
@@ -32,12 +32,13 @@ extern ECS::World* g_scriptWorld;
 // Entity API - Lifecycle Operations
 // ============================================================================
 
-/// <summary>
-/// Create a new entity in the world
-/// </summary>
+/**
+ * @brief Create a new entity in the world
+ * @return The packed entity ID of the newly created entity
+ */
 SCRIPT_API uint64_t ScriptAPI_CreateEntity() {
     if (!g_scriptWorld) {
-        std::cerr << "[ScriptAPI] World not set" << '\n';
+        LOG_ERROR("[ScriptAPI] World not set");
         return 0;
     }
 
@@ -47,12 +48,13 @@ SCRIPT_API uint64_t ScriptAPI_CreateEntity() {
     return ECS::EntityUtils::Pack(entity);
 }
 
-/// <summary>
-/// Destroy an entity
-/// </summary>
+/**
+ * @brief Destroy an entity in the world
+ * @param entityId The packed entity ID of the entity to destroy
+ */
 SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId) {
     if (!g_scriptWorld) {
-        std::cerr << "[ScriptAPI] World not set" << '\n';
+        LOG_ERROR("[ScriptAPI] World not set");
         return;
     }
 
@@ -62,12 +64,14 @@ SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId) {
     }
 }
 
-/// <summary>
-/// Check if an entity is alive in the world
-/// </summary>
+/**
+ * @brief Check if an entity is alive in the world
+ * @param entityId The packed entity ID to check
+ * @return True if the entity is alive; false otherwise
+ */
 SCRIPT_API bool ScriptAPI_IsAlive(uint64_t entityId) {
     if (!g_scriptWorld) {
-        std::cerr << "[ScriptAPI] World not set" << '\n';
+        LOG_ERROR("[ScriptAPI] World not set");
         return false;
     }
 

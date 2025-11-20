@@ -85,21 +85,3 @@ SCRIPT_API double ScriptAPI_GetScrollX() {
 SCRIPT_API double ScriptAPI_GetScrollY() {
     return Input::GetScrollY();
 }
-
-// ============================================================================
-// Input API - Window
-// ============================================================================
-
-/// <summary>
-/// Get the current window width in pixels
-/// </summary>
-SCRIPT_API int ScriptAPI_GetWindowWidth() {
-    return Input::GetWindowWidth();
-}
-
-/// <summary>
-/// Get the current window height in pixels
-/// </summary>
-SCRIPT_API int ScriptAPI_GetWindowHeight() {
-    return Input::GetWindowHeight();
-}
