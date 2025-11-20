@@ -32,7 +32,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
  */
 SCRIPT_API void ScriptAPI_Debug_LogInfo(const char* message) {
     if (!message) return;
-    LOG_INFO("%s", message);
+    Logger::Get().Log(LogLevel::INFO, message, LogSource::SCRIPT);
 }
 
 /** 
@@ -41,7 +41,7 @@ SCRIPT_API void ScriptAPI_Debug_LogInfo(const char* message) {
  */
 SCRIPT_API void ScriptAPI_Debug_LogDebug(const char* message) {
     if (!message) return;
-    LOG_DEBUG("%s", message);
+    Logger::Get().Log(LogLevel::DEBUG, message, LogSource::SCRIPT);
 }
 
 /**
@@ -50,7 +50,7 @@ SCRIPT_API void ScriptAPI_Debug_LogDebug(const char* message) {
  */
 SCRIPT_API void ScriptAPI_Debug_LogWarning(const char* message) {
     if (!message) return;
-    LOG_WARNING("%s", message);
+    Logger::Get().Log(LogLevel::WARNING, message, LogSource::SCRIPT);
 }
 
 /**
@@ -59,5 +59,5 @@ SCRIPT_API void ScriptAPI_Debug_LogWarning(const char* message) {
  */
 SCRIPT_API void ScriptAPI_Debug_LogError(const char* message) {
     if (!message) return;
-    LOG_ERROR("%s", message);
+    Logger::Get().Log(LogLevel::ERROR, message, LogSource::SCRIPT);
 }

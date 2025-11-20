@@ -28,6 +28,20 @@ void ConsolePanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 
     // Clear any messages that accumulated before console was initialized
     Clear();
+    
+    m_initialized = true;
+}
+
+void ConsolePanel::Shutdown() {
+    // Mark as uninitialized to prevent any new messages
+    m_initialized = false;
+    
+    // Clear callback to prevent further invocations during shutdown
+    Logger::Get().SetConsoleCallback(nullptr);
+    
+    // Clear messages
+    std::lock_guard<std::mutex> lock(m_messagesMutex);
+    m_messages.clear();
 }
 
 // -------------------------------------------------------------------------
@@ -67,6 +81,10 @@ void ConsolePanel::_renderToolbar() {
     ImGui::Text(" Filter:");
     ImGui::SameLine();
 
+    if (ImGui::Checkbox("INF", &m_showInfo)) {}
+    ImGui::SameLine();
+    if (ImGui::Checkbox("DBG", &m_showDebug)) {}
+    ImGui::SameLine();
     if (ImGui::Checkbox("WRN", &m_showWarning)) {}
     ImGui::SameLine();
     if (ImGui::Checkbox("ERR", &m_showError)) {}
@@ -83,7 +101,8 @@ void ConsolePanel::_renderMessages() {
     // Use child region for scrolling
     ImGui::BeginChild("MessageList", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
 
-    // Display messages
+    // Display messages with thread safety
+    std::lock_guard<std::mutex> lock(m_messagesMutex);
     int displayedCount = 0;
     for (size_t i = 0; i < m_messages.size(); ++i) {
         const auto& msg = m_messages[i];
@@ -136,12 +155,26 @@ void ConsolePanel::_renderMessage(const ConsoleMessage& msg, int index) {
 // Message Management
 // -------------------------------------------------------------------------
 
-void ConsolePanel::AddMessage(LogLevel level, const std::string& timestamp, const std::string& message) {
-    // Only store warnings, errors, and critical messages
-    if (level == LogLevel::TRACE || level == LogLevel::INFO || level == LogLevel::DEBUG) {
-        return; // Don't even add these to the buffer
+void ConsolePanel::AddMessage(LogLevel level, LogSource source, const std::string& timestamp, const std::string& message) {
+    // Don't process messages if panel isn't initialized or is shutting down
+    // Check this before any other operations to avoid race conditions
+    if (!m_initialized) {
+        return;
+    }
+    
+    // Filter: Only store warnings/errors/critical from any source,
+    // OR info/debug from SCRIPT source only
+    if (level == LogLevel::TRACE) {
+        return; // Never show TRACE in console
+    }
+    
+    if ((level == LogLevel::INFO || level == LogLevel::DEBUG) && source != LogSource::SCRIPT) {
+        return; // Only show INFO/DEBUG from scripts, not engine
     }
 
+    // Thread-safe message insertion
+    std::lock_guard<std::mutex> lock(m_messagesMutex);
+    
     // Limit message buffer size
     if (m_messages.size() >= MAX_MESSAGES) {
         m_messages.erase(m_messages.begin());
@@ -152,6 +185,7 @@ void ConsolePanel::AddMessage(LogLevel level, const std::string& timestamp, cons
 }
 
 void ConsolePanel::Clear() {
+    std::lock_guard<std::mutex> lock(m_messagesMutex);
     m_messages.clear();
 }
 
@@ -160,12 +194,14 @@ void ConsolePanel::Clear() {
 // -------------------------------------------------------------------------
 
 bool ConsolePanel::_shouldDisplayMessage(const ConsoleMessage& msg) const {
-    // Filter by level checkboxes (INFO/DEBUG/TRACE are already excluded at AddMessage)
+    // Filter by level checkboxes
     switch (msg.Level) {
+    case LogLevel::INFO:     if (!m_showInfo) return false; break;
+    case LogLevel::DEBUG:    if (!m_showDebug) return false; break;
     case LogLevel::WARNING:  if (!m_showWarning) return false; break;
     case LogLevel::ERROR:    if (!m_showError) return false; break;
     case LogLevel::CRITICAL: if (!m_showCritical) return false; break;
-    default: return false; // Shouldn't happen, but just in case
+    default: return false; // TRACE or unknown
     }
 
     // Check search filter
@@ -191,6 +227,8 @@ bool ConsolePanel::_shouldDisplayMessage(const ConsoleMessage& msg) const {
 
 ImVec4 ConsolePanel::_getColorForLevel(LogLevel level) const {
     switch (level) {
+    case LogLevel::INFO:     return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);  // Light Gray
+    case LogLevel::DEBUG:    return ImVec4(0.4f, 0.8f, 1.0f, 1.0f);  // Light Blue
     case LogLevel::WARNING:  return ImVec4(1.0f, 1.0f, 0.0f, 1.0f);  // Yellow
     case LogLevel::ERROR:    return ImVec4(1.0f, 0.3f, 0.3f, 1.0f);  // Red
     case LogLevel::CRITICAL: return ImVec4(1.0f, 0.0f, 1.0f, 1.0f);  // Magenta
@@ -211,6 +249,8 @@ const char* ConsolePanel::_getLevelIcon(LogLevel level) const {
 
 const char* ConsolePanel::_getLevelText(LogLevel level) const {
     switch (level) {
+    case LogLevel::INFO:     return "INF";
+    case LogLevel::DEBUG:    return "DBG";
     case LogLevel::WARNING:  return "WRN";
     case LogLevel::ERROR:    return "ERR";
     case LogLevel::CRITICAL: return "CRT";

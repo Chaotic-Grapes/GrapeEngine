@@ -103,7 +103,7 @@ namespace {
 
         #undef HANDLE_COMPONENT_TYPE
 
-        LOG_ERROR("[ScriptAPI] Unknown component type hash: %u", typeHash);
+        LOG_ERROR("[ScriptAPI] Unknown component type hash: " << typeHash);
         return false;
     }
 
@@ -211,7 +211,7 @@ namespace {
 
         #undef HANDLE_COMPONENT_TYPE
 
-        LOG_ERROR("[ScriptAPI] Unknown component type hash: %u", typeHash);
+        LOG_ERROR("[ScriptAPI] Unknown component type hash: " << typeHash);
         return false;
     }
 
@@ -275,7 +275,7 @@ namespace {
 
         #undef HANDLE_COMPONENT_TYPE
 
-        LOG_ERROR("[ScriptAPI] Unknown component type hash: %u", typeHash);
+        LOG_ERROR("[ScriptAPI] Unknown component type hash: " << typeHash);
     }
 
     bool HasComponentGeneric(uint64_t entityId, uint32_t typeHash) {

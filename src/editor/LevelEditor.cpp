@@ -31,7 +31,10 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Sce
 }
 
 // Destroy the editor instance without owning the world
-LevelEditor::~LevelEditor() {}
+LevelEditor::~LevelEditor() {
+    // Shutdown console panel to disconnect Logger callback
+    m_console.Shutdown();
+}
 
 // -------------------------------------------------------------------------
 // Panel Registration System
@@ -281,9 +284,9 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
             m_console.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
 
             // Connect Logger to Console - use singleton instance
-            Logger::Get().SetConsoleCallback([this](LogLevel level,
+            Logger::Get().SetConsoleCallback([this](LogLevel level, LogSource source,
                 const std::string& timestamp, const std::string& message) {
-                    m_console.AddMessage(level, timestamp, message);
+                    m_console.AddMessage(level, source, timestamp, message);
                 });
         },
         [this]() { m_console.Render(); },
