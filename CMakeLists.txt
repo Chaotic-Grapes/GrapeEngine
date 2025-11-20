@@ -100,7 +100,7 @@ target_link_libraries(GrapeEngine
 # Note: This is temporary until we refactor to a DLL!
 if(MSVC)
     set_target_properties(GrapeEngine PROPERTIES
-        LINK_FLAGS "/EXPORT:ScriptAPI_GetComponent /EXPORT:ScriptAPI_SetComponent /EXPORT:ScriptAPI_HasComponent /EXPORT:ScriptAPI_RemoveComponent /EXPORT:ScriptAPI_DestroyEntity /EXPORT:ScriptAPI_SetWorld"
+        LINK_FLAGS "/EXPORT:ScriptAPI_GetComponent /EXPORT:ScriptAPI_GetComponentPtr /EXPORT:ScriptAPI_AddComponent /EXPORT:ScriptAPI_SetComponent /EXPORT:ScriptAPI_HasComponent /EXPORT:ScriptAPI_RemoveComponent /EXPORT:ScriptAPI_CreateEntity /EXPORT:ScriptAPI_DestroyEntity /EXPORT:ScriptAPI_IsAlive /EXPORT:ScriptAPI_SetWorld /EXPORT:ScriptAPI_IsKeyPressed /EXPORT:ScriptAPI_IsKeyDown /EXPORT:ScriptAPI_IsKeyUp /EXPORT:ScriptAPI_IsMousePressed /EXPORT:ScriptAPI_GetMouseX /EXPORT:ScriptAPI_GetMouseY /EXPORT:ScriptAPI_GetScrollX /EXPORT:ScriptAPI_GetScrollY /EXPORT:ScriptAPI_GetWindowWidth /EXPORT:ScriptAPI_GetWindowHeight /EXPORT:ScriptAPI_Time_GetDeltaTime /EXPORT:ScriptAPI_Time_GetUnscaledDeltaTime /EXPORT:ScriptAPI_Time_GetFixedDeltaTime /EXPORT:ScriptAPI_Time_GetUnscaledFixedDeltaTime /EXPORT:ScriptAPI_Time_GetElapsedTime /EXPORT:ScriptAPI_Time_GetFrameCount /EXPORT:ScriptAPI_Time_GetTimeScale /EXPORT:ScriptAPI_Time_SetTimeScale /EXPORT:ScriptAPI_Time_GetMaximumDeltaTime /EXPORT:ScriptAPI_Time_SetMaximumDeltaTime"
     )
 endif()
 
@@ -171,8 +171,7 @@ if(EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
 endif()
 
 # ======================= C# Scripting API Build ===========================
-# Build the engine's scripting API AND any game scripts in scripts/ folder
-# This allows game scripts to be separate C# projects while being built automatically
+# Build the engine's scripting API AND discover ALL .cs files in game projects
 if(DOTNET_EXECUTABLE)
     message(STATUS "Configuring C# Scripting Projects...")
     
@@ -187,26 +186,91 @@ if(DOTNET_EXECUTABLE)
         VERBATIM
     )
     
-    # Find all .csproj files in scripts/ folder (excluding the API itself)
-    file(GLOB GAME_SCRIPT_PROJECTS 
-        "${CMAKE_CURRENT_LIST_DIR}/scripts/*/*.csproj"
+    # TODO: Remove when editor is separated - auto-discover game project folders
+    # Find all ProjectSettings.json files (indicates a game project folder)
+    file(GLOB_RECURSE PROJECT_SETTINGS_FILES 
+        "${CMAKE_CURRENT_LIST_DIR}/*/ProjectSettings.json"
     )
     
-    # Build each game script project found
     set(GAME_SCRIPT_TARGETS "")
-    foreach(CSPROJ_FILE ${GAME_SCRIPT_PROJECTS})
-        # Skip the ScriptAPI project (already built above)
-        get_filename_component(PROJ_NAME ${CSPROJ_FILE} NAME_WE)
-        if(NOT PROJ_NAME STREQUAL "GrapeEngine.ScriptAPI")
-            message(STATUS "  Found game script project: ${PROJ_NAME}")
+    foreach(SETTINGS_FILE ${PROJECT_SETTINGS_FILES})
+        get_filename_component(PROJECT_DIR ${SETTINGS_FILE} DIRECTORY)
+        get_filename_component(PROJECT_NAME ${PROJECT_DIR} NAME)
+        
+        # Find ALL .cs files anywhere within the project folder
+        # Developers can organize scripts however they want - no enforced structure
+        file(GLOB_RECURSE CS_FILES "${PROJECT_DIR}/*.cs")
+        
+        # Exclude .cs files in build directories
+        set(FILTERED_CS_FILES "")
+        foreach(CS_FILE ${CS_FILES})
+            string(FIND "${CS_FILE}" "/build/" IN_BUILD)
+            string(FIND "${CS_FILE}" "\\build\\" IN_BUILD_WIN)
+            if(IN_BUILD EQUAL -1 AND IN_BUILD_WIN EQUAL -1)
+                list(APPEND FILTERED_CS_FILES ${CS_FILE})
+            endif()
+        endforeach()
+        
+        if(FILTERED_CS_FILES)
+            list(LENGTH FILTERED_CS_FILES CS_COUNT)
+            message(STATUS "  Found game project: ${PROJECT_NAME} with ${CS_COUNT} script(s)")
             
-            # Create a build target for this project
+            # Build directly using csc.exe without needing .csproj files
+            # Reference the ScriptAPI DLL that was built above
+            set(OUTPUT_DLL "${CMAKE_BINARY_DIR}/$<CONFIG>/${PROJECT_NAME}.dll")
+            set(SCRIPTAPI_DLL "${CMAKE_BINARY_DIR}/$<CONFIG>/GrapeEngine.ScriptAPI.dll")
+            
+            # Convert CS files list to space-separated string
+            string(REPLACE ";" " " CS_FILES_STR "${FILTERED_CS_FILES}")
+            
+            # Create a build target that compiles .cs files directly
+            add_custom_target(
+                Build_${PROJECT_NAME}Scripts ALL
+                COMMAND ${DOTNET_EXECUTABLE} exec 
+                    $ENV{ProgramFiles}/dotnet/sdk/9.0.*/Roslyn/bincore/csc.dll
+                    /target:library
+                    /out:${OUTPUT_DLL}
+                    /reference:${SCRIPTAPI_DLL}
+                    /langversion:latest
+                    /nullable:enable
+                    ${FILTERED_CS_FILES}
+                WORKING_DIRECTORY "${PROJECT_DIR}"
+                COMMENT "Compiling ${PROJECT_NAME} scripts (${CS_COUNT} files)..."
+                DEPENDS BuildScriptAPI
+                VERBATIM
+            )
+            
+            list(APPEND GAME_SCRIPT_TARGETS Build_${PROJECT_NAME}Scripts)
+        endif()
+    endforeach()
+    
+    # Also find standalone .csproj files (for developers who prefer manual control)
+    file(GLOB_RECURSE ALL_CSPROJ_FILES 
+        "${CMAKE_CURRENT_LIST_DIR}/*.csproj"
+    )
+    
+    foreach(CSPROJ_FILE ${ALL_CSPROJ_FILES})
+        get_filename_component(PROJ_NAME ${CSPROJ_FILE} NAME_WE)
+        get_filename_component(PROJ_DIR ${CSPROJ_FILE} DIRECTORY)
+        
+        # Skip engine API, build dirs, and auto-generated project files
+        string(FIND "${PROJ_DIR}" "/build/" IN_BUILD_DIR)
+        string(FIND "${PROJ_DIR}" "\\build\\" IN_BUILD_DIR_WIN)
+        string(FIND "${PROJ_NAME}" "Scripts" HAS_SCRIPTS_SUFFIX)
+        
+        if(NOT PROJ_NAME STREQUAL "GrapeEngine.ScriptAPI" AND 
+           IN_BUILD_DIR EQUAL -1 AND IN_BUILD_DIR_WIN EQUAL -1 AND
+           HAS_SCRIPTS_SUFFIX EQUAL -1)
+            
+            file(RELATIVE_PATH REL_PATH "${CMAKE_CURRENT_LIST_DIR}" "${CSPROJ_FILE}")
+            message(STATUS "  Found standalone script project: ${PROJ_NAME} (${REL_PATH})")
+            
             add_custom_target(
                 Build_${PROJ_NAME} ALL
                 COMMAND ${DOTNET_EXECUTABLE} build "${CSPROJ_FILE}"
                     --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
-                    --output "${CMAKE_BINARY_DIR}/$<CONFIG>" # Output to same directory as .exe file
-                WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
+                    --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
+                WORKING_DIRECTORY "${PROJ_DIR}"
                 COMMENT "Building ${PROJ_NAME}..."
                 DEPENDS BuildScriptAPI
                 VERBATIM
@@ -234,10 +298,36 @@ if(DOTNET_EXECUTABLE)
     
     message(STATUS "C# build output: ${CMAKE_BINARY_DIR}/$<CONFIG>")
     message(STATUS "DLLs will be copied to: $<TARGET_FILE_DIR:GrapeEngine>")
-    #message(STATUS "Game scripts can be added as separate .csproj files in scripts/ folder")
+    message(STATUS "")
+    message(STATUS "Script Development:")
+    message(STATUS "  - Create a game project folder with ProjectSettings.json")
+    message(STATUS "  - Add .cs files ANYWHERE in the project folder")
+    message(STATUS "  - Scripts compiled directly")
+    message(STATUS "  - Example: EchoesBelow/Player.cs, EchoesBelow/Code/Enemy.cs, etc.")
 else()
     message(WARNING ".NET SDK not found - Scripting will not be available")
 endif()
+
+# ======================= Game Project Symlink =========================
+# TODO: Remove this section when editor is separated from engine
+# Create symlinks for all game project folders so editor can access them from build directory
+file(GLOB_RECURSE ALL_PROJECT_SETTINGS_FOR_COPY
+    "${CMAKE_CURRENT_LIST_DIR}/*/ProjectSettings.json"
+)
+
+foreach(SETTINGS_FILE ${ALL_PROJECT_SETTINGS_FOR_COPY})
+    get_filename_component(PROJECT_DIR ${SETTINGS_FILE} DIRECTORY)
+    get_filename_component(PROJECT_NAME ${PROJECT_DIR} NAME)
+    
+    # Create symlink instead of copying for faster builds and real-time file access
+    add_custom_command(TARGET GrapeEngine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+        "${PROJECT_DIR}"
+        "$<TARGET_FILE_DIR:GrapeEngine>/${PROJECT_NAME}"
+        COMMENT "Creating symlink to ${PROJECT_NAME} project"
+    )
+    message(STATUS "Symlink to '${PROJECT_NAME}' will be created in build directory")
+endforeach()
 
 message(STATUS "GrapeEngine configured successfully!")
 
