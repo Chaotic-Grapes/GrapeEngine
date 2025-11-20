@@ -78,7 +78,7 @@ namespace Engine {
         m_world = &world;
 
         m_transform = &world.Add<ECS::Components::LocalTransform>(m_cameraEntity);
-        m_camera = &world.Add<ECS::Components::Camera3D>(m_cameraEntity);
+        m_camera = &world.Add<ECS::Components::CameraEditor3D>(m_cameraEntity);
 
         // Ensure the editor camera shows up with a clear name in the hierarchy
         auto& nameComp = world.Add<ECS::Components::Name>(m_cameraEntity);
@@ -144,7 +144,7 @@ namespace Engine {
         m_world = &world;
         m_cameraEntity = world.Create();
         m_transform = &world.Add<ECS::Components::LocalTransform>(m_cameraEntity);
-        m_camera = &world.Add<ECS::Components::Camera3D>(m_cameraEntity);
+        m_camera = &world.Add<ECS::Components::CameraEditor3D>(m_cameraEntity);
 
         auto& nameComp = world.Add<ECS::Components::Name>(m_cameraEntity);
         std::strncpy(nameComp.Value, "EditorCamera", sizeof(nameComp.Value) - 1);

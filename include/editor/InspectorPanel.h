@@ -21,14 +21,14 @@ instantiation and synchronization between live entities and serialized prefab da
 #define INSPECTOR_PANEL_H
 
 #include "ecs/World.h"
-#include "../editor/ComponentPropertyEditor.h"
-#include "../editor/ComponentWidgets.h"
-#include "../editor/EditorComponentRegistry.h"
+#include "ComponentPropertyEditor.h"
+#include "ComponentWidgets.h"
+#include "EditorComponentRegistry.h"
 #include <imgui.h>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
-#include "../editor/EditorFileMenu.h"
+#include "EditorFileMenu.h"
 
 using EntityId = uint32_t;
 class EditorFileMenu;

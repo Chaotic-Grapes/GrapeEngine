@@ -25,6 +25,7 @@ active scene.
 
 // Forward declaration so we don't need the full SceneManager here
 namespace Scenes { class SceneManager; }
+class HierarchyPanel;
 
 // Handles File menu UI and scene file operations
 class EditorFileMenu {
@@ -40,6 +41,11 @@ public:
     void SetFonts(ImFont* mainFont, ImFont* boldFont) {
         m_mainFont = mainFont;
         m_boldFont = boldFont;
+    }
+
+    // Set hierarchy panel for entity order management during save/load
+    void SetHierarchyPanel(HierarchyPanel* hierarchyPanel) {
+        m_hierarchyPanel = hierarchyPanel;
     }
 
     // -------------------------------------------------------------------------
@@ -96,6 +102,8 @@ private:
 
     // Scene manager used to create, load, and save scenes
     Scenes::SceneManager* m_sceneManager = nullptr;
+    // Hierarchy panel for entity order preservation
+    HierarchyPanel* m_hierarchyPanel = nullptr;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
     // Track whether current scene has unsaved changes

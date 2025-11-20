@@ -58,6 +58,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Time.h"
 
 // ============================================================================
+// Editor (Undo)
+// ============================================================================
+#include "UndoSystem.h"
+
+// ============================================================================
 // Helpers
 // ============================================================================
 #include "helpers/TransformUtils.h"
@@ -74,6 +79,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui_internal.h>
+#include <imgui.h>
+#include "ImGuizmo.h"
 
 namespace ECS {
     // Helper function to get the effective transform for rendering
@@ -785,6 +792,15 @@ namespace ECS {
         m_renderGraph->AddPass("Picking", {}, {},
             [this, &world, &viewProj, &buckets](ResourceAccessor& res)
             {
+              
+                bool leftMouseButtonDownThisFrame;
+                {
+                    static bool prev_frame = false;
+                    bool curr_frame = Input::IsMousePressed(MOUSE_LEFT);
+                    leftMouseButtonDownThisFrame = curr_frame == 1 && prev_frame == 0;
+                    prev_frame = curr_frame;
+                } 
+
                 (void)res;
                 // Dont pick while dragging.
                 if (m_isDragging) return;
@@ -999,18 +1015,21 @@ namespace ECS {
                 LOG_DEBUG("[PICKING] Reading pixel: (" << x << ", " << y << ")");
 
                 static bool firstFrame = true;
-                if (!firstFrame) {
-                    int readPBO = 1 - m_currentPBO;
-                    uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
+                if (leftMouseButtonDownThisFrame)
+                {
+                    if (!firstFrame) {
+                        int readPBO = 1 - m_currentPBO;
+                        uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
 
-                    LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
+                        LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
 
-                    if (pickedID > 0) {
-                        m_selectedEntityID = pickedID;
-                        LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
-                    }
-                    else {
-                        m_selectedEntityID = 0;
+                        if (pickedID > 0) {
+                            m_selectedEntityID = pickedID;
+                            LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
+                        }
+                        else {
+                            m_selectedEntityID = 0;
+                        }
                     }
                 }
                 firstFrame = false;
@@ -1415,7 +1434,7 @@ namespace ECS {
         // EXECUTE RENDER GRAPH
         // ============================================================
         m_renderGraph->Execute();
-
+        
         // ============================================================
         // DRAG-TO-MOVE SELECTED ENTITY
         // ============================================================
@@ -1442,7 +1461,7 @@ namespace ECS {
             }
             // If ImGui not available or viewport not found, use full window (already set)
         }
-
+        
         static bool wasMouseDownLastFrame = false;
         static uint32_t lastSelectedEntityID = 0;
 
@@ -1465,6 +1484,23 @@ namespace ECS {
                 // Just skip drag logic
             }
 
+#if 1
+            // ------------------------------------------------------------------
+            // <<<< IMGUIZMO BYPASS CHECK STARTS >>>>
+            // ------------------------------------------------------------------
+            if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+                // If ImGuizmo is currently manipulating the entity,
+                // we must disable the custom drag-to-move logic immediately.
+                m_isDragging = false;
+                wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT); // Update mouse state
+                // Skip the rest of the custom drag logic
+                lastSelectedEntityID = m_selectedEntityID; // Keep selection tracking consistent
+              //  return; // Exit the block early
+            }
+            // ------------------------------------------------------------------
+            // <<<< IMGUIZMO BYPASS CHECK ENDS >>>>
+            // ------------------------------------------------------------------
+#else
             glm::dvec2 mousePos;
             Input::GetMousePosition(mousePos.x, mousePos.y);
             glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection,
@@ -1506,6 +1542,8 @@ namespace ECS {
                 world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
                     if (e.Index == m_selectedEntityID) {
                         m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
+                        m_dragStartEntityRot = lt.Rotation;     // Store rotation
+                        m_dragStartEntityScale = lt.Scale;      // Store scale
                         LOG_DEBUG("[DRAG] Captured entity pos: " << lt.Position.X << ", " << lt.Position.Y);
                     }
                     });
@@ -1554,10 +1592,29 @@ namespace ECS {
             // End drag when mouse released
             if (m_isDragging && !isMouseDownThisFrame) {
                 LOG_DEBUG("[DRAG] Drag ended");
+
+                // Record the transform change for undo
+                if (m_undoSystem) {
+                    world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+                        if (e.Index == m_selectedEntityID) {
+                            // Create undo command with old and new transforms
+                            Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
+                            Vector3D newPos = lt.Position;
+
+                            // Only record if position actually changed
+                            if (oldPos != newPos) {
+                                m_undoSystem->RecordTransformChange(e.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale, newPos, lt.Rotation, lt.Scale);
+                                LOG_DEBUG("[UNDO] Recorded transform change");
+                            }
+                        }
+                    });
+                }
                 m_isDragging = false;
             }
 
             wasMouseDownLastFrame = isMouseDownThisFrame;
+#endif
+
         }
         else {
             // Nothing selected, reset tracking

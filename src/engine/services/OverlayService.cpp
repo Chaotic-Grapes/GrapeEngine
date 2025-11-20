@@ -30,7 +30,7 @@ Features:
 #include <imgui_internal.h>
 #include "core/messaging/MessageTypes.h"
 #include "core/messaging/MessageSystem.h"
-#include "../editor/LevelEditor.h"
+#include "LevelEditor.h"
 #include "serialization/EntitySerializer.h"
 #include "services/UICommon.h"
 

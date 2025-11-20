@@ -35,7 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Color.h"
 #include "ecs/World.h"
 #include "Math/Vector2D.h"
-#include "../editor/EditorFileMenu.h"
+#include "EditorFileMenu.h"
 
 // ============================================================================
 // Graphics Includes
@@ -53,6 +53,16 @@ namespace {
         if (fileMenu) { fileMenu->MarkSceneDirty(); }
     }
 }
+
+namespace Editor {
+    // Undo System
+    class UndoSystem;
+}
+// ============================================================================
+// ImGuizmo Includes
+// ============================================================================
+#include <imgui.h>
+#include "ImGuizmo.h"
 
 namespace ECS {
 
@@ -123,6 +133,20 @@ namespace ECS {
         const glm::mat4& GetProjection() const { return m_projection; }
 
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
+
+        void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+        /**
+        * @brief Renders the ImGuizmo overlay and allows manipulation of the selected entity.
+        * * This function must be called within the ImGui window context that displays the scene texture.
+        * It handles input for tool switching (W, E, R) and updates the selected entity's
+        * LocalTransform component if the gizmo is being used.
+        * * @param world The current ECS world instance, used to access entity data and scene settings.
+        * @param drawPosX The screen X-coordinate of the top-left corner of the rendered scene image.
+        * @param drawPosY The screen Y-coordinate of the top-left corner of the rendered scene image.
+        * @param drawSizeX The width of the rendered scene image (in pixels).
+        * @param drawSizeY The height of the rendered scene image (in pixels).
+        */
+        void DrawEditorGizmo(ECS::World& world, float drawPosX, float drawPosY, float drawSizeX, float drawSizeY);
 
     private:
         // ====================================================================
@@ -213,6 +237,12 @@ namespace ECS {
         glm::vec3 m_dragStartEntityPos = { 0, 0, 0};
 
         // ====================================================================
+        // NEW: Member Variables - ImGuizmo State
+        // ====================================================================
+        ImGuizmo::OPERATION m_currentGizmoOperation = ImGuizmo::TRANSLATE;
+        ImGuizmo::MODE m_currentGizmoMode = ImGuizmo::WORLD;
+
+        // ====================================================================
         // Member Variables - UI Scaling
         // ====================================================================
 
@@ -242,6 +272,14 @@ namespace ECS {
             float screenWidth,
             float screenHeight,
             float scaleFactor) const;
+
+        // ====================================================================
+        // Undo System
+        // ==================================================================== 
+        Editor::UndoSystem* m_undoSystem = nullptr;
+
+        Quaternion m_dragStartEntityRot;
+        Vector3D m_dragStartEntityScale;
     };
 
 } // namespace ECS

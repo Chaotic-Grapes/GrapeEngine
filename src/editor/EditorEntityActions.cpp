@@ -14,7 +14,7 @@ direct ECS manipulation.
 */
 /* End Header *******************************************************************/
 
-#include "../editor/EditorEntityActions.h"
+#include "EditorEntityActions.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
 #include "ecs/Hierarchy.h" 
@@ -76,6 +76,9 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
         }
     }
 
+    // For undo system
+    if (m_undoSystem) { m_undoSystem->RecordEntityCreation(e.Index); }
+
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);
     return e.Index;
@@ -112,6 +115,9 @@ void EntityActions::RemoveEntity(EntityId id) {
         };
 
     deleteRecursive(id);
+
+    // For undo system
+    if (m_undoSystem) { m_undoSystem->RecordEntityDeletion(id); }
 
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);
@@ -252,18 +258,16 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
         }
 
         if (!isDescendant) {
-            // Set the new parent
-            world.Set<ECS::Parent>(childEntity, ECS::Parent{ newParentEntity });
+            // Use Attach to set the new parent (handles hierarchy index updates automatically)
+            world.Attach(childEntity, newParentEntity);
         }
         else {
             LOG_WARNING("Cannot parent entity to its own descendant: this would create a cyclic hierarchy");
         }
     }
     else {
-        // Remove parent (make root entity)
-        if (world.Has<ECS::Parent>(childEntity)) {
-            world.Remove<ECS::Parent>(childEntity);
-        }
+        // Use Detach to remove parent (make root entity)
+        world.Detach(childEntity);
     }
 
     // MARK SCENE AS DIRTY (only if operation succeeded)

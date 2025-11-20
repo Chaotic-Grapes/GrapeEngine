@@ -13,7 +13,7 @@ so both entities and prefab files use the same UI drawing path.
 */
 /* End Header *******************************************************************/
 
-#include "../editor/ComponentWidgets.h"
+#include "ComponentWidgets.h"
 #include <imgui.h>
 
 namespace EditorUI {
@@ -285,7 +285,7 @@ namespace EditorUI {
         // NoLabel: prevents ImGui from drawing a label (we draw ours)
         // PickerHueWheel: circular color wheel (more intuitive)
         // HDR: enables brightness values above 1.0
-        // Float: treats color values as float (not 0–255)
+        // Float: treats color values as float (not 0ï¿½255)
         if (ImGui::ColorEdit4(("##" + label).c_str(), col,
             ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar |
             ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel |

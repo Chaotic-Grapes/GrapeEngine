@@ -11,7 +11,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 */
 /* End Header *******************************************************************/
 
-#include "../../include/editor/LevelEditor.h"
+#include "LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include "graphics/graphicsConfig.hpp"
@@ -19,8 +19,8 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include <imgui_internal.h>
 #include <core/Application.h>
 #include "services/Time.h"
-#include "../editor/AudioAssetLibrary.h"
-#include "../engine/services/Time.h"
+#include "AudioAssetLibrary.h"
+#include "UndoSystem.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
@@ -99,27 +99,32 @@ void LevelEditor::_buildDockLayout() {
     // Target layout: left hierarchy, center viewport with controls on top,
     // bottom asset browser, right strip for inspector/prefab editors
 
+    // First split: toolbar at the very top (calculate ratio from config)
+    float toolbarRatio = m_config.ToolbarHeight / vp->Size.y;
+    ImGuiID toolbarNode, mainAreaNode;
+    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Up, toolbarRatio, &toolbarNode, &mainAreaNode);
+    
+    // Hide tab bar and disable resizing on toolbar node
+    ImGuiDockNode* toolbarDockNode = ImGui::DockBuilderGetNode(toolbarNode);
+    toolbarDockNode->LocalFlags |= ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_NoResize;
+    
     ImGuiID leftCenterNode, rightNode;
-    // Split root: carve right strip (25% width) for inspectors
+    // Split main area: carve right strip (25% width) for inspectors
     // Params: (source_node, direction, size_ratio, out_id_primary, out_id_remaining)
-    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
+    ImGui::DockBuilderSplitNode(mainAreaNode, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
 
     ImGuiID topSection, assetBrowserNode;
-    // Split main area vertically: top work area (65%), bottom asset browser (35%)
+    // Split left-center area vertically: top work area (65%), bottom asset browser (35%)
     ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.65f, &topSection, &assetBrowserNode); // Split for assets
 
-    ImGuiID leftTopNode, centerTopSection;
-    // Split top work area horizontally: left hierarchy (33%), center viewport/controls (67%)
-    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &centerTopSection); // Hierarchy strip
-
-    ImGuiID centerControlsNode, centerViewportNode;
-    // Split center area vertically: controls bar (~15.4%), viewport below
-    ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Up, 0.154f, &centerControlsNode, &centerViewportNode); // Controls above viewport
+    ImGuiID leftTopNode, viewportNode;
+    // Split top work area horizontally: left hierarchy (33%), center viewport (67%)
+    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &viewportNode); // Hierarchy strip
 
     // Map panels to target nodes to realize the layout
+    ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
-    ImGui::DockBuilderDockWindow("Game Controls", centerControlsNode);
-    ImGui::DockBuilderDockWindow("Viewport", centerViewportNode);
+    ImGui::DockBuilderDockWindow("Viewport", viewportNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
@@ -159,8 +164,8 @@ void LevelEditor::_renderDockSpace() {
     // NoTitleBar/NoResize/NoMove: make it a static, decoration-less host
     // NoBringToFrontOnFocus/NoNavFocus: keep focus behavior stable
     ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+                                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                                 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host
@@ -202,14 +207,25 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     // Wire up fonts to file menu so it can render bold asterisk
     m_fileMenu.SetFonts(m_mainFont, m_boldFont);
 
+    // Wire up hierarchy panel to file menu for entity order preservation
+    m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);
+
     // Wire up file menu to entity actions for dirty tracking
     m_entityActions.SetFileMenu(&m_fileMenu);
+
+    // Undo system
+    m_entityActions.SetUndoSystem(&m_undoSystem);
+
+    if (m_world) {
+        m_undoSystem.Initialize(m_world, 50);
+        // LOG_INFO("[LevelEditor] Undo system initialized with world");
+    }
 
     // Register all panels with their initialization and render callbacks.
     // Centralizes panel lifecycle management and reduces code duplication.
     _registerPanel("Playback Controls",
         [this]() {
-            m_playback.Initialize(m_mainFont, m_symbolsFont);
+            m_playback.Initialize(m_mainFont, m_symbolsFont, m_config.ToolbarHeight);
             // Register playback state change callback
             m_playback.OnStateChanged([this](Playback::GameState oldState, Playback::GameState newState) {
                 _onPlaybackStateChanged(oldState, newState);
@@ -232,13 +248,14 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         [this]() {
             Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
             m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
+            m_viewport.SetUndoSystem(&m_undoSystem);
             // Register viewport selection callback
             m_viewport.OnSelectionChanged([this](EntityId id) {
                 _onViewportSelectionChanged(id);
                 });
         },
         [this]() { m_viewport.ShowEditorWindows(); },
-        [this](ECS::World* w) { m_viewport.SetWorld(w); }
+        [this](ECS::World* w) { m_viewport.SetWorld(w); m_viewport.SetUndoSystem(&m_undoSystem); }
     );
 
     _registerPanel("Hierarchy",
@@ -371,6 +388,16 @@ void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback
     // Any editor-specific logic that needs to happen on state change goes here
     // (The time scale is already handled by Playback itself)
     LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
+    
+    // Handle state transitions
+    if (newState == Playback::GameState::Stopped) {
+        // Clear selection (entity IDs have changed after restore)
+        m_hierarchyWindow.SetSelectedEntity(0);
+        m_inspector.ClearSelection();
+        
+        // Rebuild entity order to reflect restored hierarchy
+        m_hierarchyWindow.RebuildEntityOrder();
+    }
 }
 
 // Handle viewport selection changes (called by Viewport via callback)
@@ -433,6 +460,9 @@ void LevelEditor::Render() {
 // Update the world reference and propagate it to all editor panels
 void LevelEditor::SetWorld(ECS::World* world) {
     m_world = world; // Store new world
+
+    // Undo system
+    if (world) { m_undoSystem.Initialize(world, 50); }
 
     // Propagate world to all registered panels using centralized system
     _updatePanelWorlds(world);

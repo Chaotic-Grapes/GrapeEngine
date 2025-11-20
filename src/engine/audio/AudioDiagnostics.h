@@ -6,7 +6,7 @@
 #include "scene/SystemRegistry.h"
 #include "core/Application.h"
 #include "core/Logger.h"
-#include "../editor/AudioAssetLibrary.h"
+#include "AudioAssetLibrary.h"
 
 namespace AudioDiagnostics {
 
