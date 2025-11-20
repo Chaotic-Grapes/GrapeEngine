@@ -59,7 +59,7 @@ namespace Scenes {
 
             // If there is no active scene, make the first added scene active next frame
             if (m_active == NPOS && m_pendingActive == NPOS) {
-                m_pendingActive = m_scenes.size() - 1;
+                m_pendingActive = m_scenes.size() - 1;  
             }
 
             return m_scenes.size() - 1;
@@ -270,7 +270,7 @@ namespace Scenes {
                        std::vector<uint32_t>* outEntityOrder = nullptr) const {
             if (index >= m_scenes.size() || !m_scenes[index])
                 return false;
-
+            
             Scene& scene = *m_scenes[index];
             auto& world = scene.GetWorld();
 
@@ -288,6 +288,8 @@ namespace Scenes {
                 if (sceneJson.contains("SystemProfile")) {
                     scene.GetSystemProfile() = sceneJson["SystemProfile"].get<SystemProfile>();
                 }
+
+                _ensureAudioSystemInProfile(scene);
 
                 int loadedCount = 0;
                 std::vector<ECS::Entity> restoredEntities;
@@ -359,6 +361,30 @@ namespace Scenes {
                 return;
 
             m_active = toIndex;
+        }
+
+        /**
+         * @brief Ensures the Audio system is present in the scene's SystemProfile
+         * @param scene The scene to check and fix
+         */
+        static void _ensureAudioSystemInProfile(Scene& scene) {
+            auto& profile = scene.GetSystemProfile();
+
+            // Check if Audio system exists
+            bool hasAudio = false;
+            for (const auto& entry : profile.Systems) {
+                if (entry.Name == "Audio") {
+                    hasAudio = true;
+                    break;
+                }
+            }
+
+            // If not found, add it
+            if (!hasAudio) {
+                LOG_INFO("Audio system missing from scene - adding automatically");
+                profile.AddSystem("Audio", true);
+                LOG_WARNING("REMINDER: Save your scene (Ctrl+S) to persist this change!");
+            }
         }
 
         /**

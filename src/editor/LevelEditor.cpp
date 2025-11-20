@@ -192,7 +192,6 @@ void LevelEditor::_renderDockSpace() {
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
 
-    auto& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
 
     // Initialize audio asset library:
@@ -373,6 +372,11 @@ void LevelEditor::Update() {
 
     m_playback.ProcessInput(); // Handle playback hotkeys and actions
     m_viewport.HandleInWorldInteraction(); // Handle viewport interactions and camera input control
+
+    if (m_playback.IsPlaying()) {
+        Engine::CORE->GetSceneManager().Update(); // Updates scenemanager to run Audio
+    }
+
 }
 
 // -------------------------------------------------------------------------

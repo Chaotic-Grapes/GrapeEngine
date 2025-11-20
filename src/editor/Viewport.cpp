@@ -169,7 +169,15 @@ void Viewport::_renderViewport() {
         auto* rg = m_rendererSystem->GetRenderGraph();
         if (rg) {
             ResourceAccessor acc(rg);
-            uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("HDR"));
+            // Previously, the editor viewport was sampling from the "HDR" texture,
+            // which meant ImGui was displaying raw FP16 linear data with no tone mapping
+            // or gamma. Resulting in very dark, incorrect colors.
+            //
+            // We now use a dedicated ToneMap pass that converts HDR to LDR. The Composite
+            // pass then blits LDR to the real backbuffer. Sampling "LDR" here ensures the
+            // Editor viewport shows the same tone-mapped, gamma-correct image the game
+            // actually outputs.
+            uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
             if (textureId > 0) {
                 ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
             }
