@@ -81,7 +81,7 @@ target_compile_definitions(GrapeEngine PRIVATE USE_IMGUI)
 # Include directories
 target_include_directories(GrapeEngine PRIVATE 
     ${CMAKE_CURRENT_LIST_DIR}/include/engine
-    ${CMAKE_CURRENT_LIST_DIR}/include/test
+    ${CMAKE_CURRENT_LIST_DIR}/include/editor
     ${CMAKE_CURRENT_LIST_DIR}/include/externals
     ${CMAKE_CURRENT_LIST_DIR}/ImGuizmo
 )
@@ -239,6 +239,19 @@ if(DOTNET_EXECUTABLE)
     #message(STATUS "Game scripts can be added as separate .csproj files in scripts/ folder")
 else()
     message(WARNING ".NET SDK not found - Scripting will not be available")
+endif()
+
+# ======================= Game Project Copy =========================
+# TODO: Remove this section when editor is separated from engine
+# Copy GameProject folder to build directory so editor can access game assets
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/EchoesBelow")
+    add_custom_command(TARGET GrapeEngine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_LIST_DIR}/EchoesBelow"
+        "$<TARGET_FILE_DIR:GrapeEngine>/EchoesBelow"
+        COMMENT "Copying EchoesBelow to build directory"
+    )
+    message(STATUS "The game project 'EchoesBelow' will be copied to build directory")
 endif()
 
 message(STATUS "GrapeEngine configured successfully!")

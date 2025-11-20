@@ -33,16 +33,13 @@ centralized and consistent with the currently active scene.
 
 #include "core/Logger.h"
 #include "core/Application.h"
+#include "core/ProjectPaths.h"
 #include "scene/SceneManager.h"
 #include "scene/Scene.h"
 #include "services/WindowManager.h"
 #include "services/Input.h"
 #include <filesystem>
 #include <algorithm>
-
-// Default directory where scenes are stored on disk
-// The Windows file dialogs will open here first
-static constexpr const char* SCENE_DIR = "assets/"; // By right it should be working directory
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -147,7 +144,9 @@ void EditorFileMenu::OpenSceneDialog() {
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = SCENE_DIR;
+    // TODO: Remove when editor is separated - use project-relative paths
+    std::string sceneDir = Engine::ProjectPaths::GetScenesPath();
+    ofn.lpstrInitialDir = sceneDir.c_str();
 
     // OFN_PATHMUSTEXIST: ensures the folder exists
     // OFN_FILEMUSTEXIST: ensures the file exists before returning
@@ -182,7 +181,9 @@ void EditorFileMenu::SaveSceneAsDialog() {
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = SCENE_DIR;
+    // TODO: Remove when editor is separated - use project-relative paths
+    std::string sceneDir = Engine::ProjectPaths::GetScenesPath();
+    ofn.lpstrInitialDir = sceneDir.c_str();
     ofn.lpstrDefExt = "scn";
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 

@@ -20,6 +20,7 @@ Provides:
 
 #include "../editor/AssetBrowserPanel.h"
 #include "core/Logger.h"
+#include "core/ProjectPaths.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "serialization/EntitySerializer.h"
@@ -39,6 +40,10 @@ void AssetBrowserPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* s
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
     m_world = world;
+
+    // TODO: Remove when editor is separated - use project-relative paths
+    // Set initial path to game project assets folder
+    m_currentPath = Engine::ProjectPaths::GetAssetsPath();
 
     // Initialize helper modules
     m_assetLibrary.Initialize(mainFont, boldFont, symbolsFont);
