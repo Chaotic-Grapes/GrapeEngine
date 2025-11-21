@@ -305,6 +305,10 @@ namespace ECS {
             Vector2D Offset{0.0f, 0.0f};
             int Width = 0;
             int Height = 0;
+
+            // Emissive support
+            uint32_t EmissiveTextureId = 0;  // 0 = no emissive map
+            float EmissiveStrength = 5.0f;   // HDR multiplier
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
