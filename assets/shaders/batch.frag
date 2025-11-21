@@ -42,22 +42,22 @@ void main() {
     vec3 emission = vec3(0.0);
     int emissiveIdx = int(vEmissiveTexIndex);
     
-if (emissiveIdx >= 0 && vEmissiveStrength > 0.0) {
-    float emissiveMask = texture(uEmissiveTextures[emissiveIdx], vTexCoord).r;
-    
-    // Get the hue from albedo
-    vec3 albedoColor = albedo.rgb;
-    
-    // Calculate perceived brightness (luminance)
-    float luminance = dot(albedoColor, vec3(0.2126, 0.7152, 0.0722));
-    
-    // Normalize to constant luminance
-    if (luminance > 0.001) {
-        albedoColor = albedoColor / luminance;  // All colors now have luminance = 1.0
+    if (emissiveIdx >= 0 && vEmissiveStrength > 0.0) {
+        float emissiveMask = texture(uEmissiveTextures[emissiveIdx], vTexCoord).r;
+        
+        // Get the hue from albedo
+        vec3 albedoColor = albedo.rgb;
+        
+        // Calculate perceived brightness (luminance)
+        float luminance = dot(albedoColor, vec3(0.2126, 0.7152, 0.0722));
+        
+        // Normalize to constant luminance
+        if (luminance > 0.001) {
+            albedoColor = albedoColor / luminance;  // All colors now have luminance = 1.0
+        }
+        
+        emission = albedoColor * emissiveMask * vEmissiveStrength;
     }
-    
-    emission = albedoColor * emissiveMask * vEmissiveStrength;
-}
     
     // Output HDR color (albedo + emission)
     FragColor = vec4(albedo.rgb + emission, albedo.a);
