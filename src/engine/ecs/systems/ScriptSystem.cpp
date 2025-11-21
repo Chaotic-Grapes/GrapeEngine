@@ -976,133 +976,14 @@ namespace {
     }
 }
 
-// Consideration: Move to their respective headers
 // ============================================================================
-// Exported C Functions for P/Invoke
+// Note: Script API exports have been refactored into separate files:
+// - ScriptAPI_Component.cpp - Component operations (Get, Add, Set, Has, Remove)
+// - ScriptAPI_Entity.cpp - Entity lifecycle (Create, Destroy, IsAlive)
+// - ScriptAPI_Input.cpp - Input handling (Keyboard, Mouse, Window)
+// - ScriptAPI_Time.cpp - Time functions (DeltaTime, TimeScale, etc.)
+//
+// The implementation details (helper functions and dispatch tables) remain
+// in this file but are no longer exported directly. The global world pointer
+// g_scriptWorld is now extern and defined in ScriptAPI_Component.cpp.
 // ============================================================================
-
-#ifndef SCRIPT_API
-#ifdef _WIN32
-    // __declspec(dllexport) means the function is exported from DLL
-	// This is necessary for P/Invoke in C# to find the functions
-    #define SCRIPT_API extern "C" __declspec(dllexport)
-#endif
-#endif
-
-SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize) {
-    return GetComponentGeneric(entityId, typeHash, outBuffer, bufferSize);
-}
-
-SCRIPT_API void *ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash) {
-    return GetComponentPtr(entityId, typeHash);
-}
-
-SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
-    return AddComponentGeneric(entityId, typeHash, componentData, dataSize, outBuffer);
-}
-
-SCRIPT_API void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize) {
-    SetComponentGeneric(entityId, typeHash, componentData, dataSize);
-}
-
-SCRIPT_API bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash) {
-    return HasComponentGeneric(entityId, typeHash);
-}
-
-SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash) {
-    RemoveComponentGeneric(entityId, typeHash);
-}
-
-SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId) {
-    ECS::World* world = GetScriptWorld();
-    if (!world) {
-        std::cerr << "[ScriptAPI] No world set for script access" << '\n';
-        return;
-    }
-
-    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
-    if (world->IsAlive(entity)) {
-        world->Destroy(entity);
-    }
-}
-
-SCRIPT_API uint64_t ScriptAPI_CreateEntity() {
-    ECS::World* world = GetScriptWorld();
-    if (!world) {
-        std::cerr << "[ScriptAPI] No world set for script access" << '\n';
-        return 0;
-    }
-
-    ECS::Entity entity = world->Create();
-    // Ensure new entities always have a default transform
-    world->Add<ECS::Components::LocalTransform>(entity);
-    return ECS::EntityUtils::Pack(entity);
-}
-
-SCRIPT_API bool ScriptAPI_IsAlive(uint64_t entityId) {
-    ECS::World* world = GetScriptWorld();
-    if (!world) {
-        std::cerr << "[ScriptAPI] No world set for script access" << '\n';
-        return false;
-    }
-
-    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
-    return world->IsAlive(entity);
-}
-
-// World management - must be called before using script API
-SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world) {
-    SetScriptWorld(world);
-}
-
-// ============================================================================
-// Input API - Keyboard
-// ============================================================================
-
-SCRIPT_API bool ScriptAPI_IsKeyPressed(int key) {
-    return Input::IsKeyPressed(key);
-}
-
-SCRIPT_API bool ScriptAPI_IsKeyDown(int key) {
-    return Input::IsKeyDown(key);
-}
-
-SCRIPT_API bool ScriptAPI_IsKeyUp(int key) {
-    return Input::IsKeyUp(key);
-}
-
-// ============================================================================
-// Input API - Mouse
-// ============================================================================
-
-SCRIPT_API bool ScriptAPI_IsMousePressed(int button) {
-    return Input::IsMousePressed(button);
-}
-
-SCRIPT_API double ScriptAPI_GetMouseX() {
-    return Input::GetMouseX();
-}
-
-SCRIPT_API double ScriptAPI_GetMouseY() {
-    return Input::GetMouseY();
-}
-
-SCRIPT_API double ScriptAPI_GetScrollX() {
-    return Input::GetScrollX();
-}
-
-SCRIPT_API double ScriptAPI_GetScrollY() {
-    return Input::GetScrollY();
-}
-
-// ============================================================================
-// Input API - Window
-// ============================================================================
-
-SCRIPT_API int ScriptAPI_GetWindowWidth() {
-    return Input::GetWindowWidth();
-}
-
-SCRIPT_API int ScriptAPI_GetWindowHeight() {
-    return Input::GetWindowHeight();
-}

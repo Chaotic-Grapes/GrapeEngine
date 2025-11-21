@@ -21,7 +21,8 @@ centralized and consistent with the currently active scene.
 #include <commdlg.h>
 #endif
 
-#include "../editor/EditorFileMenu.h"
+#include "EditorFileMenu.h"
+#include "HierarchyPanel.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -32,16 +33,13 @@ centralized and consistent with the currently active scene.
 
 #include "core/Logger.h"
 #include "core/Application.h"
+#include "core/ProjectPaths.h"
 #include "scene/SceneManager.h"
 #include "scene/Scene.h"
 #include "services/WindowManager.h"
 #include "services/Input.h"
 #include <filesystem>
 #include <algorithm>
-
-// Default directory where scenes are stored on disk
-// The Windows file dialogs will open here first
-static constexpr const char* SCENE_DIR = "assets/scenes/";
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -69,7 +67,19 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Scene", "Ctrl+N")) { CreateNewScene(); }
         if (ImGui::MenuItem("Open Scene", "Ctrl+O")) { OpenSceneDialog(); }
-        if (ImGui::MenuItem("Save Scene", "Ctrl+S")) { SaveScene(); }
+
+        // Show "Save Scene*" in BOLD when there are unsaved changes
+        if (m_hasUnsavedChanges && m_boldFont) {
+            ImGui::PushFont(m_boldFont);
+            bool clicked = ImGui::MenuItem("Save Scene*", "Ctrl+S");
+            ImGui::PopFont();
+            if (clicked) SaveScene();
+        }
+        else {
+            // Normal font when no unsaved changes
+            if (ImGui::MenuItem("Save Scene", "Ctrl+S")) { SaveScene(); }
+        }
+
         if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S")) { SaveSceneAsDialog(); }
         ImGui::Separator();
         if (ImGui::MenuItem("Exit")) { if (Engine::CORE) { Engine::CORE->Close(); } }
@@ -110,6 +120,7 @@ void EditorFileMenu::CreateNewScene() {
     // Switch the editor to use this new scene as the active one
     m_sceneManager->SetActive(idx);
     m_currentScenePath.clear();
+    m_hasUnsavedChanges = false;
     LOG_INFO("Created new scene");
 }
 
@@ -133,7 +144,8 @@ void EditorFileMenu::OpenSceneDialog() {
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = SCENE_DIR;
+    // TODO: Remove when editor is separated - use project-relative paths
+    ofn.lpstrInitialDir = Engine::ProjectPaths::GetProjectRoot().c_str();
 
     // OFN_PATHMUSTEXIST: ensures the folder exists
     // OFN_FILEMUSTEXIST: ensures the file exists before returning
@@ -168,7 +180,8 @@ void EditorFileMenu::SaveSceneAsDialog() {
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = SCENE_DIR;
+    // TODO: Remove when editor is separated - use project-relative paths
+    ofn.lpstrInitialDir = Engine::ProjectPaths::GetProjectRoot().c_str();
     ofn.lpstrDefExt = "scn";
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 
@@ -185,6 +198,7 @@ void EditorFileMenu::SaveSceneAsDialog() {
         // Actually write the active scene to this path
         _saveSceneToFile(savePath);
         m_currentScenePath = savePath;
+        m_hasUnsavedChanges = false;
     }
 #endif
 }
@@ -194,6 +208,7 @@ void EditorFileMenu::SaveScene() {
     if (!m_sceneManager) return;
     if (m_currentScenePath.empty()) { SaveSceneAsDialog(); return; }
     _saveSceneToFile(m_currentScenePath);
+    m_hasUnsavedChanges = false;
 #endif
 }
 
@@ -227,7 +242,27 @@ void EditorFileMenu::_openScene(const std::string& path) {
     // Again we protect against a missing SceneManager pointer
     if (!m_sceneManager) return;
 
-    // Allocate a new empty Scene that will receive the loaded data
+    size_t activeIdx = m_sceneManager->GetActiveIndex();
+    const bool hasActive = (activeIdx != static_cast<size_t>(-1));
+
+    // If opening the SAME scene, reload into the current slot to avoid world rebinding issues
+    if (hasActive && (m_currentScenePath == path)) {
+        std::vector<uint32_t> entityOrder;
+        if (m_sceneManager->LoadScene(activeIdx, path, &entityOrder)) {
+            m_sceneManager->SetActiveImmediate(activeIdx);
+            if (m_hierarchyPanel) {
+                m_hierarchyPanel->ClearUIState();
+                m_hierarchyPanel->SetEntityOrder(entityOrder);
+            }
+            m_hasUnsavedChanges = false;
+            LOG_INFO("Reloaded active scene: " << path);
+        }
+        else {
+            LOG_ERROR("Failed to reload scene: " << path);
+        }
+        return;
+    }
+
     auto newScene = std::make_unique<Scenes::Scene>();
 
     // Register the scene with the SceneManager
@@ -235,9 +270,15 @@ void EditorFileMenu::_openScene(const std::string& path) {
     size_t idx = m_sceneManager->AddScene(newScene.release());
 
     // Ask the SceneManager to read the file and populate the scene
-    if (m_sceneManager->LoadScene(idx, path)) {
+    std::vector<uint32_t> entityOrder;
+    if (m_sceneManager->LoadScene(idx, path, &entityOrder)) {
         m_sceneManager->SetActive(idx);
+        if (m_hierarchyPanel) {
+            m_hierarchyPanel->ClearUIState();
+            m_hierarchyPanel->SetEntityOrder(entityOrder);
+        }
         m_currentScenePath = path;
+        m_hasUnsavedChanges = false;
         LOG_INFO("Opened scene: " << path);
     }
     else {
@@ -250,21 +291,31 @@ void EditorFileMenu::_openScene(const std::string& path) {
 void EditorFileMenu::_saveSceneToFile(const std::string& path) {
     if (!m_sceneManager) return;
 
-    // Query which scene is currently active
     size_t activeIdx = m_sceneManager->GetActiveIndex();
 
-    // Some engines use -1 to mean "no active scene"
-    // We compare against that sentinel after casting
     if (activeIdx == static_cast<size_t>(-1)) {
         LOG_ERROR("No active scene to save");
         return;
     }
 
-    // Ask the SceneManager to serialize and write the scene to disk
-    if (m_sceneManager->SaveScene(activeIdx, path)) {
-        LOG_INFO("Saved scene: " << path);
+    // Rebuild entity order from hierarchy panel to preserve visual order
+    if (m_hierarchyPanel) {
+        m_hierarchyPanel->RebuildEntityOrder();
+    }
+
+    // Get entity order for serialization
+    const std::vector<uint32_t>* entityOrder = nullptr;
+    if (m_hierarchyPanel) {
+        entityOrder = &m_hierarchyPanel->GetEntityOrder();
+    }
+
+    // Save scene (symlink automatically keeps source in sync)
+    LOG_INFO("Saving scene: " << path);
+    if (!m_sceneManager->SaveScene(activeIdx, path, "Scene", "1.0", entityOrder)) {
+        LOG_ERROR("Failed to save scene: " << path);
+        return;
     }
     else {
-        LOG_ERROR("Failed to save scene: " << path);
+        LOG_INFO("Successfully saved scene: " << path);
     }
 }

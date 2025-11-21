@@ -36,7 +36,17 @@ namespace Engine {
         /**
          * @brief Get the application configuration
          */
-        const ApplicationConfig& GetConfig() const { return m_config; }
+        const EditorSettings& GetConfig() const { return m_config; }
+
+        /**
+         * @brief Get the project settings
+         */
+        const ProjectSettings& GetProjectSettings() const { return m_projectSettings; }
+
+        /**
+         * @brief Check if project settings have been loaded
+         */
+        bool HasProjectSettings() const { return m_hasProjectSettings; }
 
         /**
          * @brief Starts the engine
@@ -47,12 +57,24 @@ namespace Engine {
         void Run(Game& game, bool consoleFlag);
 
         /**
+         * @brief Load project-specific settings from ProjectSettings.json
+         * @param projectRoot Path to the project root directory
+         * @return true if project settings were loaded successfully
+         */
+        bool LoadProjectSettings(const std::string& projectRoot);
+
+        /**
          * @brief Close worlds and release resources.
          */
         void Close();
 
+        // Getters for services
         Services::AudioService* GetAudioService() { return m_audio; }
         const Services::AudioService* GetAudioService() const { return m_audio; }
+
+        Services::OverlayService* GetOverlayService() { return m_overlay; }
+        const Services::OverlayService* GetOverlayService() const { return m_overlay; }
+
     private:
         // Flag to indicate if application should stop
         static bool m_shouldStop;
@@ -60,8 +82,12 @@ namespace Engine {
         // Scene manager
         Scenes::SceneManager m_sceneManager;
 
-        // Application configuration
-        ApplicationConfig m_config;
+        // Editor configuration
+        EditorSettings m_config;
+
+        // Project settings
+        ProjectSettings m_projectSettings;
+        bool m_hasProjectSettings = false;
 
 		// Functions to enable/disable console output
         static void _enableConsole();
@@ -75,6 +101,9 @@ namespace Engine {
 
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
+
+        void _onGameStart(Scenes::Scene* scene);
+        void _onGameStop(Scenes::Scene* scene);
     };
 
     extern Application* CORE;

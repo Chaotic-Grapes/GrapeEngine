@@ -1,7 +1,13 @@
-#include "../engine/audio/AudioSystem.h"
-#include "../editor/AudioAssetLibrary.h"
-#include "../engine/services/AudioService.h"
+#include "audio/AudioSystem.h"
+#include "AudioAssetLibrary.h"
+#include "services/AudioService.h"
 #include "audio/FmodAudioDevice.h"
+#include <iostream>
+#include "core/Logger.h"
+#include <set>
+#include "core/Application.h"
+#include "services/OverlayService.h"
+
 /*
     Update(dt)
     ----------
@@ -14,84 +20,222 @@
       - If it does have one -> update volume/pitch every frame
       - If CueId becomes 0 or clip disappears -> Stop and clear handle
 */
-void AudioSystem::Update(float /* dt if used*/)
+
+AudioSystem::AudioSystem(ECS::World& world, Services::AudioService& audioService)
+    : m_world(world)
+    , m_audioService(audioService)
+    , m_hasStarted(true) 
 {
-    AudioAssetLibrary& lib = AudioAssetLibrary::Get();
+}
 
-    // If the device isn't ready, do nothing
+void AudioSystem::Update(float /*dt*/)
+{
+    // Get device
     Audio::FmodAudioDevice* device = m_audioService.Device();
-    if (!device)
+    if (!device) {
+        static bool s_warningLogged = false;
+        if (!s_warningLogged) {
+            LOG_WARNING("AudioSystem::Update: No audio device available");
+            s_warningLogged = true;
+        }
         return;
+    }
 
-    m_world.Each<ECS::Components::AudioSource, ECS::Components::WorldTransform>(
-        [&](ECS::Entity e,
-            ECS::Components::AudioSource& src,
-            ECS::Components::WorldTransform& /*xform*/)
+    // Get audio clip registry
+    auto& lib = AudioAssetLibrary::Get();
+
+    // Check if game is playing (for editor mode)
+    bool isPlaying = _isGamePlaying();
+
+    // Track which entities we've processed this frame
+    std::unordered_set<ECS::Entity, ECS::EntityHash> processedEntities;
+
+    // Process all entities with AudioSource
+    m_world.Each<ECS::Components::AudioSource>(
+        [&](ECS::Entity e, ECS::Components::AudioSource& src)
         {
-           // If no que make sure there isnt a clip playing
-            if (src.CueId == 0)
-            {
-                auto it = m_activeSounds.find(e);
-                if (it != m_activeSounds.end())
-                {
-                    // m_activeSounds stores Audio::PlaybackHandle,
-                    // which matches AudioService::Stop(...)
-                    m_audioService.Stop(it->second, Audio::StopMode::Immediate);
-                    m_activeSounds.erase(it);
-                }
+            processedEntities.insert(e);
+
+            // ----------------------------------------------------------------
+            // Handle CueId = 0 (no audio assigned)
+            // ----------------------------------------------------------------
+            if (src.CueId == 0) {
+                _stopSound(e);
                 return;
             }
 
-            // CueID-> for path resolution
+            // ----------------------------------------------------------------
+            // Resolve cueId -> clip info
+            // ----------------------------------------------------------------
             const auto* clip = lib.FindById(src.CueId);
-            if (!clip)
-            {
-                // CueId is set but library has no matching clip
-                // -> stop any playing instance
-                auto it = m_activeSounds.find(e);
-                if (it != m_activeSounds.end())
-                {
-                    m_audioService.Stop(it->second, Audio::StopMode::Immediate);
-                    m_activeSounds.erase(it);
+            if (!clip) {
+                static std::set<uint32_t> s_warnedCues;
+                if (s_warnedCues.find(src.CueId) == s_warnedCues.end()) {
+                    LOG_WARNING("AudioSystem: Entity " << e.Index
+                        << " has invalid CueId " << src.CueId);
+                    s_warnedCues.insert(src.CueId);
+                }
+                _stopSound(e);
+                return;
+            }
+
+            const std::string cueKey = clip->path;
+
+            // ----------------------------------------------------------------
+            // Load the sound if not already loaded
+            // ----------------------------------------------------------------
+            Audio::SoundParams params{};
+            params.Stream = false;
+            params.Is3D = src.Spatial3D;
+            params.DefaultVolume = src.Volume;
+
+            if (!m_audioService.LoadCue(cueKey, clip->path, params)) {
+                static std::set<std::string> s_failedCues;
+                if (s_failedCues.find(cueKey) == s_failedCues.end()) {
+                    LOG_ERROR("AudioSystem: Failed to load cue: " << cueKey);
+                    s_failedCues.insert(cueKey);
                 }
                 return;
             }
 
-            // Use the asset path as a unique cue key for FMOD
-            std::string cueKey = clip->path;
-
-            // Cue is loaded
-            Audio::SoundParams params{};
-            // params.is3D = true; // if you later want this to be 3D
-            m_audioService.LoadCue(cueKey, clip->path, params);
-
-            // Check if entity has a playing soundclip
+            // ----------------------------------------------------------------
+            // Check if we have an active instance
+            // ----------------------------------------------------------------
             auto it = m_activeSounds.find(e);
-            bool hasInstance = (it != m_activeSounds.end());
+            const bool hasInstance = (it != m_activeSounds.end());
 
-            // If no setplayback
-            if (!hasInstance)
-            {
+            // ----------------------------------------------------------------
+            // Determine if this sound should be playing
+            // ----------------------------------------------------------------
+            bool shouldPlay = false;
+
+            if (src.PlayOnStart) {
+                // PlayOnStart sounds only play when:
+                // 1. Game is in play mode
+                // 2. System has started (prevents playing during entity creation in editor)
+                shouldPlay = isPlaying && m_hasStarted;
+            }
+            else {
+                // Non-PlayOnStart sounds can be controlled manually
+                // For now, we don't auto-play these at all
+                // (You can add manual Play() API later if needed)
+                shouldPlay = false;
+            }
+
+            // ----------------------------------------------------------------
+            // Handle starting/stopping based on game state
+            // ----------------------------------------------------------------
+            if (!isPlaying) {
+                // Game is paused/stopped - stop all sounds
+                if (hasInstance) {
+                    _stopSound(e);
+                }
+                return;
+            }
+
+            // ----------------------------------------------------------------
+            // Start playback if needed
+            // ----------------------------------------------------------------
+            if (shouldPlay && !hasInstance) {
                 Audio::PlaySettings settings{};
-                settings.volume = src.Volume;
-                settings.pitch = src.Pitch;
-                settings.loop = src.Loop;
-                // settings.mode stays default (PlayMode::Single)
+                settings.Volume = src.Volume;
+                settings.Pitch = src.Pitch;
+                settings.Loop = src.Loop;
+
+                LOG_DEBUG("AudioSystem: Starting playback for entity " << e.Index
+                    << " cue: " << cueKey
+                    << " (loop=" << src.Loop
+                    << ", vol=" << src.Volume
+                    << ", pitch=" << src.Pitch << ")");
 
                 Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings);
-                if (handle)   // operator bool() => handle.Id != 0
-                {
+                if (handle) {
                     m_activeSounds[e] = handle;
+                    LOG_DEBUG("AudioSystem: Playback started (handle ID=" << handle.Id << ")");
                 }
-                return; // just started it; we'll update next frame
+                else {
+                    LOG_ERROR("AudioSystem: Failed to start playback for " << cueKey);
+                }
+                return;
             }
 
-            // IF playing -> set vol/pitch
-            Audio::PlaybackHandle handle = it->second;
+            // ----------------------------------------------------------------
+            // Stop playback if it shouldn't be playing
+            // ----------------------------------------------------------------
+            if (!shouldPlay && hasInstance) {
+                _stopSound(e);
+                return;
+            }
 
-            device->SetInstanceVolume(handle, src.Volume);
-            device->SetInstancePitch(handle, src.Pitch);
+            // ----------------------------------------------------------------
+            // Update existing playback (volume/pitch changes)
+            // ----------------------------------------------------------------
+            if (hasInstance) {
+                Audio::PlaybackHandle handle = it->second;
+                device->SetInstanceVolume(handle, src.Volume);
+                device->SetInstancePitch(handle, src.Pitch);
 
+                //// Update 3D position if needed
+                //if (src.Spatial3D && m_world.Has<ECS::Components::WorldTransform>(e)) {
+                //    auto& transform = m_world.Get<ECS::Components::WorldTransform>(e);
+                //    Audio::Vec3 pos{ transform.Position.x, transform.Position.y, transform.Position.z };
+                //    Audio::Vec3 vel{ 0, 0, 0 };
+                //    device->SetInstancePosition(handle, pos, vel);
+                //}
+            }
+        });
+
+    // ----------------------------------------------------------------
+    // Clean up sounds for entities that no longer have AudioSource
+    // ----------------------------------------------------------------
+    std::vector<ECS::Entity> toRemove;
+    for (auto& [entity, handle] : m_activeSounds) {
+        if (processedEntities.find(entity) == processedEntities.end()) {
+            toRemove.push_back(entity);
         }
-    );
+    }
+
+    for (auto entity : toRemove) {
+        _stopSound(entity);
+    }
+}
+
+void AudioSystem::OnSceneStart()
+{
+    m_hasStarted = true;
+    LOG_DEBUG("AudioSystem: Scene started - PlayOnStart sounds will now play");
+}
+
+void AudioSystem::OnSceneStop()
+{
+    m_hasStarted = false;
+
+    // Stop all currently playing sounds
+    for (auto& [entity, handle] : m_activeSounds) {
+        m_audioService.Stop(handle, Audio::StopMode::Immediate);
+    }
+    m_activeSounds.clear();
+
+    LOG_DEBUG("AudioSystem: Scene stopped - all sounds stopped");
+}
+
+void AudioSystem::_stopSound(ECS::Entity entity)
+{
+    auto it = m_activeSounds.find(entity);
+    if (it != m_activeSounds.end()) {
+        m_audioService.Stop(it->second, Audio::StopMode::Immediate);
+        m_activeSounds.erase(it);
+        LOG_DEBUG("AudioSystem: Stopped sound for entity " << entity.Index);
+    }
+}
+
+bool AudioSystem::_isGamePlaying() const
+{
+    auto* app = Engine::CORE;
+    if (!app) return true;
+
+    auto* overlay = app->GetOverlayService();  // You'll need to expose this
+    if (!overlay) return true;
+
+    return overlay->IsGamePlaying();  // Uses your PlaybackControls!
 }

@@ -60,9 +60,6 @@ using hostfxr_handle = void*;
 // !! Important !! //
 // Possibly need a rewrite as this implementation don't seem to adhere to the core design of the ECS.
 
-// Maybe TODO:
-// 1.  Separate API functions into another header or in their related classes
-
 namespace ECS {
     /**
      * @brief Manages C# script execution through CoreCLR hosting.
@@ -209,102 +206,7 @@ namespace ECS {
 
         // Internal cleanup
         void CleanupScript(Components::ScriptInstance& script);
-
-        // ============================================================================
-        // C++ Callbacks for C# Scripts (Generic Component API)
-        // ============================================================================
-        // These functions are exported and callable from C# via P/Invoke.
-        // They provide safe, type-agnostic component access.
-        
-        // friend bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
-		// friend bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer);
-        // friend void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
-        // friend bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
-        // friend void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
-        // friend void ScriptAPI_DestroyEntity(uint64_t entityId);
     };
-
 }
-
-// ============================================================================
-// Exported C Functions for C# P/Invoke
-// ============================================================================
-
-#ifndef SCRIPT_API
-#ifdef _WIN32
-    #define SCRIPT_API extern "C" __declspec(dllexport)
-#endif
-#endif
-
-/**
- * @brief Get a component from an entity by type hash.
- * @param entityId Entity to query
- * @param typeHash FNV-1a hash of component type name
- * @param outBuffer Buffer to write component data to
- * @param bufferSize Size of the buffer
- * @return true if component exists and was copied, false otherwise
- */
-SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize);
-
-/**
- * @brief Get a pointer to a component on an entity by type hash.
- * @param entityId Entity to query
- * @param typeHash FNV-1a hash of component type name
- * @return Pointer to the component data, or nullptr if not found
- */
-SCRIPT_API void *ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash);
-
-/**
- * @brief Get a component from an entity by type hash.
- * @param entityId Entity to modify
- * @param typeHash FNV-1a hash of component type name
- * @param componentData Pointer to component data to add
- * @param dataSize Size of the component data
- * @param outBuffer Buffer to write the added component data to
- * @return true if component was added successfully, false otherwise
- */
-SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer);
-
-/**
- * @brief Set a component on an entity by type hash.
- * @param entityId Entity to modify
- * @param typeHash FNV-1a hash of component type name
- * @param componentData Pointer to component data to copy
- * @param dataSize Size of the component data
- */
-SCRIPT_API void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize);
-
-/**
- * @brief Check if an entity has a component.
- * @param entityId Entity to query
- * @param typeHash FNV-1a hash of component type name
- * @return true if the component exists
- */
-SCRIPT_API bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash);
-
-/**
- * @brief Remove a component from an entity.
- * @param entityId Entity to modify
- * @param typeHash FNV-1a hash of component type name
- */
-SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash);
-
-/**
- * @brief Destroy an entity.
- * @param entityId Entity to destroy
- */
-SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId);
-
-/**
- * @brief Checks if an entity is alive in the world.
- * @return Packed entity ID
- */
-SCRIPT_API bool ScriptAPI_IsAlive(uint64_t entityId);
-
-/**
- * @brief Set the world instance for script API access.
- * @param world Pointer to the ECS world
- */
-SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world);
 
 #endif

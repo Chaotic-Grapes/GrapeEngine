@@ -1,11 +1,11 @@
 #pragma once
 
 #include "ecs/World.h"
-#include "../editor/AudioAssetLibrary.h"
+#include "AudioAssetLibrary.h"
 #include "services/AudioService.h"
 #include <unordered_map>
 #include "ecs/Components.h"
-#include "../engine/audio/FmodAudioDevice.h"
+#include "audio/FmodAudioDevice.h"
 
 /*
    AudioSystem
@@ -24,19 +24,28 @@
 class AudioSystem
 {
 public:
-    AudioSystem(ECS::World& world, Services::AudioService& audioService)
-        : m_world(world)
-        , m_audioService(audioService)
-    {
-    }
+    AudioSystem(ECS::World& world, Services::AudioService& audioService);
 
-    // Called every frame
+    // Called every frame to update audio
     void Update(float dt);
 
+    // Called when the scene/game starts playing
+    void OnSceneStart();
+
+    // Called when the scene/game stops playing
+    void OnSceneStop();
+
 private:
-    ECS::World& m_world; //reference to world
-    Services::AudioService& m_audioService; //reference to audioservice
+    ECS::World& m_world;
+    Services::AudioService& m_audioService;
 
     // Map entity -> playing instance handle
     std::unordered_map<ECS::Entity, Audio::PlaybackHandle, ECS::EntityHash> m_activeSounds;
+
+    // Track if the scene has started (for PlayOnStart logic)
+    bool m_hasStarted;
+
+    // Helper methods
+    void _stopSound(ECS::Entity entity);
+    bool _isGamePlaying() const;
 };

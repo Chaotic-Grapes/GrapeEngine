@@ -59,7 +59,7 @@ namespace Scenes {
 
             // If there is no active scene, make the first added scene active next frame
             if (m_active == NPOS && m_pendingActive == NPOS) {
-                m_pendingActive = m_scenes.size() - 1;
+                m_pendingActive = m_scenes.size() - 1;  
             }
 
             return m_scenes.size() - 1;
@@ -175,11 +175,13 @@ namespace Scenes {
          * @param filename Path to the output JSON file.
          * @param sceneName Optional scene name for metadata.
          * @param version Optional version string for metadata.
+         * @param entityOrder Optional ordered list of entity IDs for preserving hierarchy order.
          * @return true if save was successful, false otherwise.
          */
         bool SaveScene(const size_t index, const std::string& filename,
                        const std::string& sceneName = "Scene",
-                       const std::string& version = "1.0") const {
+                       const std::string& version = "1.0",
+                       const std::vector<uint32_t>* entityOrder = nullptr) const {
             if (index >= m_scenes.size() || !m_scenes[index])
                 return false;
 
@@ -196,15 +198,49 @@ namespace Scenes {
                 sceneJson["SystemProfile"] = scene.GetSystemProfile();
 
                 json entities = json::array();
+                json hierarchyArray = json::array();
                 int entityCount = 0;
 
+                // Map to track entity index in save order
+                std::unordered_map<uint32_t, size_t> entityToSaveIndex;
+
+                // Use provided entity order if available, otherwise iterate naturally
+                if (entityOrder && !entityOrder->empty()) {
+                    for (uint32_t entityId : *entityOrder) {
+                        ECS::Entity entity = world.Resolve(entityId);
+                        if (world.IsAlive(entity)) {
+                            entityToSaveIndex[entity.Index] = entityCount;
+                            entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
+                            ++entityCount;
+                        }
+                    }
+                } else {
+                    world.Each([&](const ECS::Entity entity) {
+                        entityToSaveIndex[entity.Index] = entityCount;
+                        entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
+                        ++entityCount;
+                    });
+                }
+
+                // Save hierarchy relationships separately (as child->parent index mappings)
                 world.Each([&](const ECS::Entity entity) {
-                    entities.push_back(Serialization::EntitySerializer::SerializeEntity(world, entity));
-                    ++entityCount;
+                    ECS::Entity parent = world.ParentOf(entity);
+                    if (!parent.IsNull()) {
+                        auto childIt = entityToSaveIndex.find(entity.Index);
+                        auto parentIt = entityToSaveIndex.find(parent.Index);
+                        
+                        if (childIt != entityToSaveIndex.end() && parentIt != entityToSaveIndex.end()) {
+                            json hierarchyEntry;
+                            hierarchyEntry["child"] = childIt->second;
+                            hierarchyEntry["parent"] = parentIt->second;
+                            hierarchyArray.push_back(hierarchyEntry);
+                        }
+                    }
                 });
 
                 sceneJson["Entities"] = std::move(entities);
                 sceneJson["EntityCount"] = entityCount;
+                sceneJson["Hierarchy"] = std::move(hierarchyArray);
 
                 const std::string ext = Serialization::Serializer::HasExtension(filename, "scene") ? "scene" : "scn";
                 if (!Serialization::Serializer::SaveJson(filename, ext, sceneJson)) {
@@ -227,12 +263,14 @@ namespace Scenes {
          *        This will destroy all existing entities in the scene before loading.
          * @param index The index of the scene to load into.
          * @param filename Path to the input JSON file.
+         * @param outEntityOrder Optional output vector to receive the loaded entity order.
          * @return true if load was successful, false otherwise.
          */
-        bool LoadScene(const size_t index, const std::string& filename) const {
+        bool LoadScene(const size_t index, const std::string& filename,
+                       std::vector<uint32_t>* outEntityOrder = nullptr) const {
             if (index >= m_scenes.size() || !m_scenes[index])
                 return false;
-
+            
             Scene& scene = *m_scenes[index];
             auto& world = scene.GetWorld();
 
@@ -251,13 +289,47 @@ namespace Scenes {
                     scene.GetSystemProfile() = sceneJson["SystemProfile"].get<SystemProfile>();
                 }
 
+                _ensureAudioSystemInProfile(scene);
+
                 int loadedCount = 0;
+                std::vector<ECS::Entity> restoredEntities;
+                
+                if (outEntityOrder) {
+                    outEntityOrder->clear();
+                }
+
                 if (sceneJson.contains("Entities")) {
                     for (const auto& entityJson : sceneJson["Entities"]) {
-                        Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
+                        ECS::Entity entity = Serialization::EntitySerializer::DeserializeEntity(world, entityJson);
                         ++loadedCount;
+                        restoredEntities.push_back(entity);
+                        
+                        // Track entity order for hierarchy preservation
+                        if (outEntityOrder) {
+                            outEntityOrder->push_back(entity.Index);
+                        }
                     }
                 }
+
+                // Restore hierarchy relationships if present
+                if (sceneJson.contains("Hierarchy") && sceneJson["Hierarchy"].is_array()) {
+                    const auto& hierarchyArray = sceneJson["Hierarchy"];
+                    for (const auto& hierarchyEntry : hierarchyArray) {
+                        if (!hierarchyEntry.contains("child") || !hierarchyEntry.contains("parent")) {
+                            continue;
+                        }
+                        
+                        size_t childIndex = hierarchyEntry["child"].get<size_t>();
+                        size_t parentIndex = hierarchyEntry["parent"].get<size_t>();
+                        
+                        if (childIndex < restoredEntities.size() && parentIndex < restoredEntities.size()) {
+                            ECS::Entity child = restoredEntities[childIndex];
+                            ECS::Entity parent = restoredEntities[parentIndex];
+                            world.Attach(child, parent);
+                        }
+                    }
+                }
+
                 LOG_DEBUG("Scene successfully loaded: "
                     << sceneJson.value("SceneName", "Unknown") << '\n'
                     << "\tVersion: " << sceneJson.value("Version", "Unknown") << '\n'
@@ -289,6 +361,30 @@ namespace Scenes {
                 return;
 
             m_active = toIndex;
+        }
+
+        /**
+         * @brief Ensures the Audio system is present in the scene's SystemProfile
+         * @param scene The scene to check and fix
+         */
+        static void _ensureAudioSystemInProfile(Scene& scene) {
+            auto& profile = scene.GetSystemProfile();
+
+            // Check if Audio system exists
+            bool hasAudio = false;
+            for (const auto& entry : profile.Systems) {
+                if (entry.Name == "Audio") {
+                    hasAudio = true;
+                    break;
+                }
+            }
+
+            // If not found, add it
+            if (!hasAudio) {
+                LOG_INFO("Audio system missing from scene - adding automatically");
+                profile.AddSystem("Audio", true);
+                LOG_WARNING("REMINDER: Save your scene (Ctrl+S) to persist this change!");
+            }
         }
 
         /**

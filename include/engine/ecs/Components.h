@@ -423,6 +423,22 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Camera3D>, "Camera3D must be trivially copyable");
 
+        // Editor camera component (separate from gameplay cameras)
+        // DO NOT USE UNLESS IT IS FOR EDITOR CAMERA ONLY!!!
+        // DO NOT EXPOSE THIS TO COMPONENT LIST THAT CAN BE ADDED TO ENTITIES
+        // DO NOT EXPOSE THIS TO C# SCRIPTS EITHER
+        struct CameraEditor3D {
+        public: 
+            bool UsePerspective = false;
+            float FOV           = 45.f;
+            float NearPlane     = 0.1f;
+            float FarPlane      = 100.f;
+            float OrthoSize     = 10.f;
+            float AspectRatio   = 16.f / 9.f;
+            bool  Active        = false;
+        };
+        static_assert(std::is_trivially_copyable_v<CameraEditor3D>, "CameraEditor3D must be trivially copyable");
+
         // Optional matrices output for cameras (computed by CameraSystem)
         struct CameraMatrices {
         public:

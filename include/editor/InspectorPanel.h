@@ -21,15 +21,17 @@ instantiation and synchronization between live entities and serialized prefab da
 #define INSPECTOR_PANEL_H
 
 #include "ecs/World.h"
-#include "../editor/ComponentPropertyEditor.h"
-#include "../editor/ComponentWidgets.h"
-#include "../editor/EditorComponentRegistry.h"
+#include "ComponentPropertyEditor.h"
+#include "ComponentWidgets.h"
+#include "EditorComponentRegistry.h"
 #include <imgui.h>
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include "EditorFileMenu.h"
 
 using EntityId = uint32_t;
+class EditorFileMenu;
 
 // Unified inspector panel capable of inspecting both entities and prefabs
 class InspectorPanel {
@@ -82,6 +84,9 @@ public:
 
     // Returns the current inspection mode to determine context
     InspectionMode GetMode() const { return m_mode; }
+
+    // Set file menu reference for dirty tracking
+    void SetFileMenu(EditorFileMenu * fileMenu) { m_fileMenu = fileMenu; }
 
 private:
     // -------------------------------------------------------------------------
@@ -193,6 +198,7 @@ private:
     // System references
     ECS::World* m_world = nullptr;
     ComponentUI m_componentUI;
+    EditorFileMenu* m_fileMenu = nullptr;
 
     // Selection state
     InspectionMode m_mode = InspectionMode::None;  // Current inspection context

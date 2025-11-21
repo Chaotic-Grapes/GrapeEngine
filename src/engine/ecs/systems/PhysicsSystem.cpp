@@ -602,15 +602,15 @@ namespace ECS {
                                     const std::string cue = "sfx_collide";
                                     const std::string path =
                                         std::filesystem::absolute("assets/Audio/SFX/Squishy-Splatter_1.wav").string();
-                                    Audio::SoundParams sp; sp.stream = false; sp.is3D = false;
+                                    Audio::SoundParams sp; sp.Stream = false; sp.Is3D = false;
                                     // Preload is cheap after first time; keep for safety:
                                     audio->LoadCue(cue, path, sp);
 
                                     Audio::PlaySettings ps;
-                                    ps.loop = false;
+                                    ps.Loop = false;
                                     // Scale volume by impact; clamp to [0.2, 1.0]
-                                    ps.volume = std::max(0.2f, std::min(impactSpeed / 350.0f, 1.0f));
-                                    ps.pitch = 1.0f;
+                                    ps.Volume = std::max(0.2f, std::min(impactSpeed / 350.0f, 1.0f));
+                                    ps.Pitch = 1.0f;
                                     audio->PlaySingle(cue, ps, Audio::PlayPolicy::SingleInstanceRestart);
                                 }
                             }

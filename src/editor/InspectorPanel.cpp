@@ -19,12 +19,14 @@ through a unified system shared by both entities and prefab templates.
 */
 /* End Header *******************************************************************/
 
-#include "../editor/InspectorPanel.h"
-#include "../editor/ComponentPropertyEditor.h"
-#include "../editor/ComponentWidgets.h"
-#include "../editor/EditorComponentRegistry.h"
+#include "InspectorPanel.h"
+#include "ComponentPropertyEditor.h"
+#include "ComponentWidgets.h"
+#include "EditorComponentRegistry.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
+#include "EditorFileMenu.h"
+#include "UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include <imgui.h>
@@ -58,8 +60,28 @@ namespace {
 
     // Helper to check if an entity ID is protected from editing
     // Returns true if entity should NOT be inspected or modified
-    bool IsProtectedEntity(EntityId id) {
-        return (id == 0); // Entity ID 0 is EditorCamera (system entity)
+    bool IsProtectedEntity(ECS::World* world, EntityId entityId) {
+        if (!world)
+            return false;
+        
+        // Resolve the entity from its ID
+        ECS::Entity entity = world->Resolve(entityId);
+
+        // Not alive, cannot be protected
+        if (!world->IsAlive(entity))
+            return false;
+
+        // Protect editor cameras from modification
+        if (world->Has<ECS::Components::CameraEditor3D>(entity))
+            return true;
+
+        return false;
+    }
+
+    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
+        if (fileMenu) {
+            fileMenu->MarkSceneDirty();
+        }
     }
 }
 
@@ -90,8 +112,8 @@ void InspectorPanel::SetWorld(ECS::World* world) {
 
 // Switch inspector into entity mode and validate the entity we want to inspect
 void InspectorPanel::InspectEntity(EntityId id) {
-    // Block inspection of protected system entities (EditorCamera at ID 0)
-    if (IsProtectedEntity(id)) {
+    // Block inspection of protected system entities
+    if (IsProtectedEntity(m_world, id)) {
         m_mode = InspectionMode::None;
         m_entityId = 0; // Clear selection
         return;
@@ -347,6 +369,11 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
         ImGui::Dummy(ImVec2(0, 4));
 
+        bool wasEdited = false;
+
+        static nlohmann::json editStartState;
+        static bool isEditing = false;
+
         // First pass: draw every component using registry metadata
         for (auto& componentEntry : entityJson["Components"]) {
             // Basic validation
@@ -359,10 +386,22 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (meta) {
                 auto& data = componentEntry["Data"];
 
+                size_t hashBefore = std::hash<std::string>{}(data.dump());
+
                 // UI renderer callback: InspectorPanel calls this and forwards to ComponentWidgets
                 // via the ComponentUI helper to draw the actual fields
                 _renderComponentSection(meta->DisplayName, meta->TypeName, data,
                     [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); }, meta->CanDelete);
+
+                size_t hashAfter = std::hash<std::string>{}(data.dump());
+
+                if (hashBefore != hashAfter) {
+                    if (!isEditing) {
+                        editStartState = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+                        isEditing = true;
+                    }
+                    wasEdited = true;
+                }
 
                 ImGui::Dummy(ImVec2(0, 4));
             }
@@ -417,6 +456,11 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (meta) {
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
             }
+        }
+
+        // MARK SCENE AS DIRTY if anything was edited
+        if (wasEdited) {
+            MarkSceneDirtyIfNeeded(m_fileMenu);
         }
     }
 
@@ -664,7 +708,10 @@ void InspectorPanel::_addComponentToEntity(const std::string& componentType) {
         // Add to ECS with default JSON values
         meta->AddComponent(m_world, entity, meta->GetDefaults());
         m_statusMessage = std::string("Added ") + componentType;
-        m_statusTimer = 2.0f;
+        m_statusTimer = 3.0f;
+
+        // MARK SCENE AS DIRTY
+        MarkSceneDirtyIfNeeded(m_fileMenu);
     }
 }
 
@@ -683,7 +730,10 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
         // Remove from ECS
         meta->RemoveComponent(m_world, entity);
         m_statusMessage = std::string("Removed ") + componentType;
-        m_statusTimer = 2.0f;
+        m_statusTimer = 3.0f;
+
+        // MARK SCENE AS DIRTY
+        MarkSceneDirtyIfNeeded(m_fileMenu);
     }
 }
 

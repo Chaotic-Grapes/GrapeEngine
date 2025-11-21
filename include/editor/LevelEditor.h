@@ -14,22 +14,24 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 
 #include "ecs/World.h"
 #include "scene/Scene.h"
-#include "../editor/PlaybackControls.h"
-#include "../editor/EditorFileMenu.h"
-#include "../editor/AssetBrowserPanel.h"
-#include "../editor/Viewport.h"
-#include "../editor/HierarchyPanel.h"
-#include "../editor/InspectorPanel.h"
-#include "../editor/EditorEntityActions.h"
+#include "PlaybackControls.h"
+#include "EditorFileMenu.h"
+#include "AssetBrowserPanel.h"
+#include "Viewport.h"
+#include "HierarchyPanel.h"
+#include "InspectorPanel.h"
+#include "EditorEntityActions.h"
 #include <imgui.h>
 #include <GLFW/glfw3.h>
 #include <functional>
 #include <vector>
 #include <unordered_set>
+#include "../editor/ConsolePanel.h"
 
 struct LevelEditorConfig {
     float TextFontSize = 23.0f;
     float IconFontSize = 26.0f;
+    float ToolbarHeight = 26.0f;
 };
 
 struct PanelRegistration {
@@ -89,6 +91,7 @@ private:
     HierarchyPanel m_hierarchyWindow;
     InspectorPanel m_inspector;
     EntityActions m_entityActions;
+    ConsolePanel m_console;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;
@@ -106,6 +109,9 @@ private:
 
     // Playback state tracking
     Playback::GameState m_lastGameState = Playback::GameState::Stopped;
+
+    // Undo System
+    Editor::UndoSystem m_undoSystem;
 };
 
 #endif // LEVEL_EDITOR_H

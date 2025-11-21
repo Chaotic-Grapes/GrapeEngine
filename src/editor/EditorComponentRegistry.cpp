@@ -17,8 +17,8 @@ To add a new component:
 */
 /* End Header *******************************************************************/
 
-#include "../editor/EditorComponentRegistry.h"
-#include "../editor/ComponentPropertyEditor.h"
+#include "EditorComponentRegistry.h"
+#include "ComponentPropertyEditor.h"
 #include "serialization/EntitySerializer.h" 
 
 /* 

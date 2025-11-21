@@ -19,7 +19,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include <commdlg.h>
 #endif
 
-#include "../editor/Viewport.h"
+#include "Viewport.h"
 #include "graphics/EditorCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -40,6 +40,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include "graphics/RenderGraph.hpp"
 #include "services/Time.h"
 #include "services/WindowManager.h"
+
 // Messaging for editor warnings
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
@@ -54,9 +55,6 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
     m_symbolsFont = symbolsFont;
     m_world = world;
 
-    // Initialize file menu
-    m_fileMenu.Initialize(sceneManager);
-
     // Create and initialize renderer system
     // RendererSystem creates and manages its own EditorCamera internally
     if (m_world && !m_rendererSystem) {
@@ -64,6 +62,15 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
         m_rendererSystem->Initialize(*m_world);
         m_rendererSystem->BindWorld(*m_world);
         m_rendererSystem->SetEditorInputEnabled(true);
+
+        if (m_undoSystem) {
+            m_rendererSystem->SetUndoSystem(m_undoSystem);
+        }
+
+        // Wire up file menu if available
+        if (m_fileMenu) {
+            m_rendererSystem->SetFileMenu(m_fileMenu);
+        }
     }
 }
 
@@ -76,10 +83,25 @@ void Viewport::SetWorld(ECS::World* world) {
         m_rendererSystem->Initialize(*world);
         m_rendererSystem->BindWorld(*world);
         m_rendererSystem->SetEditorInputEnabled(true);
+        m_rendererSystem->SetUndoSystem(m_undoSystem);
+
+        // Wire up file menu if available
+        if (m_fileMenu) {
+            m_rendererSystem->SetFileMenu(m_fileMenu);
+        }
     }
     // Rebind existing renderer to new world
     else if (m_rendererSystem && world) {
         m_rendererSystem->BindWorld(*world);
+
+        if (m_undoSystem) {
+            m_rendererSystem->SetUndoSystem(m_undoSystem);
+        }
+
+        // Reset file menu when world changes
+        if (m_fileMenu) {
+            m_rendererSystem->SetFileMenu(m_fileMenu);
+        }
     }
 }
 
@@ -95,6 +117,10 @@ void Viewport::OnSelectionChanged(std::function<void(EntityId)> callback) {
 // -------------------------------------------------------------------------
 void Viewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
+
+    if (m_undoSystem) {
+        m_undoSystem->Update();
+    }
 
     // Control editor camera input based on viewport hover state
     // RendererSystem will call EditorCamera::Update() in its own Update()
@@ -156,6 +182,16 @@ void Viewport::_renderViewport() {
             if (textureId > 0) {
                 ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
             }
+
+            // 1. Get the drawing position of the image we just rendered
+            ImVec2 gizmoPos = ImGui::GetItemRectMin(); // Get the top-left corner of the image item
+
+            // 2. Call the RendererSystem method to draw the Gizmo overlay
+            m_rendererSystem->DrawEditorGizmo(
+                *m_world,
+                gizmoPos.x, gizmoPos.y,
+                size.x, size.y
+            );
         }
     }
     else {
@@ -174,4 +210,13 @@ EntityId Viewport::GetSelectedEntityId() const {
 
 bool Viewport::IsViewportHovered() const {
     return m_isViewportHovered;
+}
+
+void Viewport::SetFileMenu(EditorFileMenu* fileMenu) {
+    m_fileMenu = fileMenu;
+
+    // Propagate to renderer if it exists
+    if (m_rendererSystem) {
+        m_rendererSystem->SetFileMenu(fileMenu);
+    }
 }

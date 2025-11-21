@@ -18,7 +18,9 @@ Header for Viewport class handling viewport rendering and entity selection with 
 #include "ecs/Entity.h"
 #include "EditorFileMenu.h"
 #include "graphics/EditorCamera.hpp"
+#include "UndoSystem.h"
 #include <imgui.h>
+#include "ImGuizmo.h"
 #include <memory>
 #include <functional>
 
@@ -28,6 +30,7 @@ namespace Scenes { class SceneManager; }
 namespace Engine { class EditorCamera; }
 
 using EntityId = uint32_t;
+class EditorFileMenu;
 
 class Viewport {
 public:
@@ -40,17 +43,21 @@ public:
 
     // Event registration
     void OnSelectionChanged(std::function<void(EntityId)> callback);
+    void SetFileMenu(EditorFileMenu* fileMenu);
 
     // Accessors
     EntityId GetSelectedEntityId() const;
     bool IsViewportHovered() const;
     bool HasValidWorld() const { return m_world != nullptr; }
 
+    // Undo System
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+
 private:
     void _renderViewport();
 
     ECS::World* m_world = nullptr;
-    EditorFileMenu m_fileMenu;
+    EditorFileMenu* m_fileMenu = nullptr;
 
     // UI fonts
     ImFont* m_mainFont = nullptr;
@@ -64,8 +71,15 @@ private:
     EntityId m_selectedEntityId = 0;
     bool m_isViewportHovered = false;
 
+    // Stores the exact screen position and size of the drawn scene texture. M3<<<<<<<<<<<<<<<<<<<<<<<
+    ImVec2 m_sceneDrawPos = { 0.0f, 0.0f };
+    ImVec2 m_sceneDrawSize = { 0.0f, 0.0f };
+
     // Event callback
     std::function<void(EntityId)> m_onSelectionChanged;
+
+    // Undo system
+    Editor::UndoSystem* m_undoSystem = nullptr;
 };
 
 #endif // VIEWPORT_H

@@ -57,6 +57,8 @@ Messaging::ScopedSubscription<CollisionEvent> scopedSub(
 #include <unordered_map>
 #include <string>
 
+#include "MessageTypes.h" 
+
 namespace Messaging {
     // Forward declaration
     template<typename T>

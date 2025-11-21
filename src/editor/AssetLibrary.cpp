@@ -27,8 +27,8 @@ Provides:
 #include <commdlg.h> 
 #endif
 
-#include "../editor/AssetLibrary.h"
-#include "../editor/InspectorPanel.h"
+#include "AssetLibrary.h"
+#include "InspectorPanel.h"
 #include "core/Logger.h"
 #include <vector>
 #include <services/ResourceManager.h>

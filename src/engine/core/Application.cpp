@@ -28,6 +28,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/OverlayService.h"
 #include <thread>
 #include "../engine/audio/AudioSystem.h"
+#include <unordered_map> 
+
+namespace {
+    // Global map to access AudioSystem instances from anywhere
+    std::unordered_map<ECS::World*, AudioSystem*> g_audioSystemMap;
+}
+
 
 namespace Engine {
     // Global pointer to the core engine
@@ -36,6 +43,7 @@ namespace Engine {
 
     void Application::Run(Game& game, const bool consoleFlag) {
         Time::_initialize();
+        bool wasPlaying = false;
 
         // Set global pointer to this application instance
         CORE = this;
@@ -45,7 +53,7 @@ namespace Engine {
         Grape_Engine::CrashDumping::SetProgramName("GrapeEngine");
         Grape_Engine::CrashDumping::SetDumpCreateState(true);
 
-        // Load configuration first (try working dir, then parent dir fallback)
+        // Load editor configuration (try working dir, then parent dir fallback)
         bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
         if (!configLoaded) {
             // Fallback: common scenario when running from build directory
@@ -53,6 +61,20 @@ namespace Engine {
                 LOG_INFO("Loaded configuration from parent directory: ../config.json");
             }
         }
+
+        // Initialize the message system here
+        // Subscribe to Events
+        //auto& bus = EventBus::Get();
+
+        // Subscribe to action events
+        /*bus.subscribe<ActionPressed>([this](const ActionPressed& e) {
+            auto& busRef = EventBus::Get();
+            if (e.action == "ActiveCameraSwitch") {
+            std::cout << 'event action pressed';
+
+            }
+        }*/
+
 
 #if !_DEBUG
         if (consoleFlag)
@@ -81,22 +103,28 @@ namespace Engine {
             s_renderer.BindWorld(w);
             s_renderer.Update(w, dt);
         });
+
+        // Store one AudioSystem instance per world to handle scene switching properly
         Scenes::SystemRegistry::Register("Audio", [](ECS::World& w, float dt) {
-            // Grab the app & Serivce 
             auto* app = Engine::CORE;
             auto* svc = app ? app->GetAudioService() : nullptr;
             if (!svc) return;
 
-            // Create/refresh a persistent AudioSystem bound to this world
-            static ECS::World* s_boundWorld = nullptr;
-            static std::unique_ptr<AudioSystem> s_audioSystem;
+            // Store AudioSystem per world to handle scene switching
+            static std::unordered_map<ECS::World*, std::unique_ptr<AudioSystem>> s_audioSystems;
 
-            if (!s_audioSystem || s_boundWorld != &w) {
-                s_audioSystem = std::make_unique<AudioSystem>(w, *svc);
-                s_boundWorld = &w;
+            auto it = s_audioSystems.find(&w);
+            if (it == s_audioSystems.end()) {
+                auto result = s_audioSystems.emplace(&w, std::make_unique<AudioSystem>(w, *svc));
+                it = result.first;
+                g_audioSystemMap[&w] = it->second.get();
+                LOG_DEBUG("Audio system: Created AudioSystem for world at " << &w);
             }
 
-            s_audioSystem->Update(dt);
+            // Update the audio system
+            if (it->second) {
+                it->second->Update(dt);
+            }
             });
 
         // Call OnStart() function of game then attempt to create a main window
@@ -110,6 +138,11 @@ namespace Engine {
             
             Time::_update(rawDelta, frameStart);
             Profiler::UpdateTime();
+
+            // if (5 second passed ){
+               // publish the event
+                //bus.publish(ActionPressed{ actionName });
+            //}
 
             // --- Input & Game Update ---
             Input::_processInput();
@@ -128,6 +161,17 @@ namespace Engine {
                 auto& world = currentScene->GetWorld();
                 auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
 
+                if (isPlaying && !wasPlaying) {
+                    // Just started playing
+                    LOG_INFO("Game started playing");
+                    _onGameStart(currentScene);
+                }
+                else if (!isPlaying && wasPlaying) {
+                    // Just stopped/paused
+                    LOG_INFO("Game stopped/paused");
+                    _onGameStop(currentScene);
+                }
+                wasPlaying = isPlaying;
                 if (physicsSystem) {
                     if (isPlaying) {
                         m_accumulator += Time::UnscaledDeltaTime();
@@ -199,6 +243,18 @@ namespace Engine {
         m_shouldStop = true;
     }
 
+    bool Application::LoadProjectSettings(const std::string& projectRoot) {
+        std::string settingsPath = projectRoot + "/ProjectSettings.json";
+        m_hasProjectSettings = Serialization::ConfigurationSerializer::LoadProjectSettings(settingsPath, m_projectSettings);
+        if (m_hasProjectSettings) {
+            LOG_INFO("Loaded project settings from: " << settingsPath);
+        }
+        else {
+            LOG_WARNING("Failed to load project settings from: " << settingsPath);
+        }
+        return m_hasProjectSettings;
+    }
+
     void Application::_initializeServices() {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
@@ -208,6 +264,30 @@ namespace Engine {
 		m_overlay->Initialize();
     }
 
+    void Application::_onGameStart(Scenes::Scene* scene) {
+        if (!scene) return;
+
+        auto* world = &scene->GetWorld();
+        auto it = g_audioSystemMap.find(world);
+        if (it != g_audioSystemMap.end() && it->second) {
+            it->second->OnSceneStart();
+            LOG_DEBUG("AudioSystem: Notified of scene start");
+        }
+    }
+
+    void Application::_onGameStop(Scenes::Scene* scene) {
+        if (!scene) return;
+
+        m_accumulator = 0.0f; // Reset accumulator on stop
+
+        auto* world = &scene->GetWorld();
+        auto it = g_audioSystemMap.find(world);
+        if (it != g_audioSystemMap.end() && it->second) {
+            it->second->OnSceneStop();
+            LOG_DEBUG("AudioSystem: Notified of scene stop");
+        }
+    }
+   
 
     void Application::_enableConsole() {
 #ifdef _WIN32
