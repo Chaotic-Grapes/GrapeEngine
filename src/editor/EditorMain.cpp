@@ -17,6 +17,7 @@ Launches the application in editor mode with the level editor interface.
 #include "services/WindowManager.h"
 #include "services/OverlayService.h"
 #include "core/Logger.h"
+#include "physics/Physics.h"
 
 /**
  * @brief Editor-focused game class that launches directly into the level editor
@@ -41,6 +42,10 @@ public:
             const auto& projectSettings = Engine::CORE->GetProjectSettings();
             width = projectSettings.WindowSettings.Width;
             height = projectSettings.WindowSettings.Height;
+            
+            // Apply physics settings from project configuration
+            Engine::Physics::SetGravity(Vector2D(0.0f, projectSettings.Physics.Gravity));
+            LOG_INFO("Applied physics gravity from ProjectSettings: " << projectSettings.Physics.Gravity);
         }
         else {
             const auto& config = Engine::CORE->GetConfig();

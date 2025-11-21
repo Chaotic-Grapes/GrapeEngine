@@ -175,12 +175,40 @@ endif()
 if(DOTNET_EXECUTABLE)
     message(STATUS "Configuring C# Scripting Projects...")
     
+    # Detect installed .NET SDK version dynamically
+    execute_process(
+        COMMAND ${DOTNET_EXECUTABLE} --list-sdks
+        OUTPUT_VARIABLE DOTNET_SDK_LIST
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    
+    # Find all .NET SDK versions and select the highest one
+    string(REGEX MATCHALL "([0-9]+\\.[0-9]+\\.[0-9]+)" DOTNET_SDK_VERSIONS "${DOTNET_SDK_LIST}")
+    
+    # Sort versions and pick the highest (last in sorted list)
+    list(SORT DOTNET_SDK_VERSIONS COMPARE NATURAL ORDER DESCENDING)
+    list(GET DOTNET_SDK_VERSIONS 0 DOTNET_SDK_VERSION)
+    
+    if(DOTNET_SDK_VERSION)
+        message(STATUS "  Detected .NET SDK version: ${DOTNET_SDK_VERSION}")
+        
+        # Determine target framework moniker (TFM) for generated projects
+        string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" DOTNET_MAJOR_MINOR "${DOTNET_SDK_VERSION}")
+        set(DOTNET_TFM "net${CMAKE_MATCH_1}.${CMAKE_MATCH_2}")
+        message(STATUS "  Target framework: ${DOTNET_TFM}")
+    else()
+        message(WARNING "  Could not detect .NET SDK version")
+        set(DOTNET_TFM "net9.0")  # Fallback
+    endif()
+    
     # Build GrapeEngine.ScriptAPI (engine's API)
     add_custom_target(
         BuildScriptAPI ALL
+        COMMAND ${DOTNET_EXECUTABLE} restore "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj"
         COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj" 
             --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
-            --output "${CMAKE_BINARY_DIR}/$<CONFIG>" # Output to same directory as .exe file
+            --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
+            --no-restore
         WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
         COMMENT "Building GrapeEngine Scripting API..."
         VERBATIM
@@ -213,32 +241,69 @@ if(DOTNET_EXECUTABLE)
         
         if(FILTERED_CS_FILES)
             list(LENGTH FILTERED_CS_FILES CS_COUNT)
-            message(STATUS "  Found game project: ${PROJECT_NAME} with ${CS_COUNT} script(s)")
             
-            # Build directly using csc.exe without needing .csproj files
-            # Reference the ScriptAPI DLL that was built above
-            set(OUTPUT_DLL "${CMAKE_BINARY_DIR}/$<CONFIG>/${PROJECT_NAME}.dll")
-            set(SCRIPTAPI_DLL "${CMAKE_BINARY_DIR}/$<CONFIG>/GrapeEngine.ScriptAPI.dll")
+            # Look for an existing .csproj file in the project directory
+            set(PROJECT_CSPROJ "${PROJECT_DIR}/${PROJECT_NAME}.csproj")
             
-            # Convert CS files list to space-separated string
-            string(REPLACE ";" " " CS_FILES_STR "${FILTERED_CS_FILES}")
-            
-            # Create a build target that compiles .cs files directly
-            add_custom_target(
-                Build_${PROJECT_NAME}Scripts ALL
-                COMMAND ${DOTNET_EXECUTABLE} exec 
-                    $ENV{ProgramFiles}/dotnet/sdk/9.0.*/Roslyn/bincore/csc.dll
-                    /target:library
-                    /out:${OUTPUT_DLL}
-                    /reference:${SCRIPTAPI_DLL}
-                    /langversion:latest
-                    /nullable:enable
-                    ${FILTERED_CS_FILES}
-                WORKING_DIRECTORY "${PROJECT_DIR}"
-                COMMENT "Compiling ${PROJECT_NAME} scripts (${CS_COUNT} files)..."
-                DEPENDS BuildScriptAPI
-                VERBATIM
-            )
+            if(EXISTS "${PROJECT_CSPROJ}")
+                message(STATUS "  Found game project: ${PROJECT_NAME} with ${CS_COUNT} script(s) (using ${PROJECT_NAME}.csproj)")
+                
+                # Use the existing .csproj file
+                add_custom_target(
+                    Build_${PROJECT_NAME}Scripts ALL
+                    COMMAND ${DOTNET_EXECUTABLE} build "${PROJECT_CSPROJ}"
+                        --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
+                        --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
+                    WORKING_DIRECTORY "${PROJECT_DIR}"
+                    COMMENT "Building ${PROJECT_NAME} scripts (${CS_COUNT} files)..."
+                    DEPENDS BuildScriptAPI
+                    VERBATIM
+                )
+            else()
+                message(STATUS "  Found game project: ${PROJECT_NAME} with ${CS_COUNT} script(s) (no .csproj - auto-discovery)")
+                message(STATUS "    Tip: Create ${PROJECT_NAME}.csproj for IDE support and hot reload")
+                
+                # Build directly - output to build/Debug or build/Release based on config
+                if(CMAKE_CONFIGURATION_TYPES)
+                    set(OUTPUT_DIR "${CMAKE_BINARY_DIR}/Debug")  # Default to Debug for multi-config
+                else()
+                    set(OUTPUT_DIR "${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}")
+                endif()
+                set(SCRIPTAPI_DLL_PATH "${OUTPUT_DIR}/GrapeEngine.ScriptAPI.dll")
+                
+                # Generate a temporary .csproj for this game project
+                set(TEMP_CSPROJ "${CMAKE_BINARY_DIR}/${PROJECT_NAME}_Generated.csproj")
+                file(WRITE ${TEMP_CSPROJ} "<Project Sdk=\"Microsoft.NET.Sdk\">\n")
+                file(APPEND ${TEMP_CSPROJ} "  <PropertyGroup>\n")
+                file(APPEND ${TEMP_CSPROJ} "    <TargetFramework>${DOTNET_TFM}</TargetFramework>\n")
+                file(APPEND ${TEMP_CSPROJ} "    <ImplicitUsings>enable</ImplicitUsings>\n")
+                file(APPEND ${TEMP_CSPROJ} "    <Nullable>enable</Nullable>\n")
+                file(APPEND ${TEMP_CSPROJ} "    <AssemblyName>${PROJECT_NAME}</AssemblyName>\n")
+                file(APPEND ${TEMP_CSPROJ} "    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>\n")
+                file(APPEND ${TEMP_CSPROJ} "  </PropertyGroup>\n")
+                file(APPEND ${TEMP_CSPROJ} "  <ItemGroup>\n")
+                foreach(CS_FILE ${FILTERED_CS_FILES})
+                    file(APPEND ${TEMP_CSPROJ} "    <Compile Include=\"${CS_FILE}\" />\n")
+                endforeach()
+                file(APPEND ${TEMP_CSPROJ} "  </ItemGroup>\n")
+                file(APPEND ${TEMP_CSPROJ} "  <ItemGroup>\n")
+                file(APPEND ${TEMP_CSPROJ} "    <Reference Include=\"GrapeEngine.ScriptAPI\">\n")
+                file(APPEND ${TEMP_CSPROJ} "      <HintPath>${SCRIPTAPI_DLL_PATH}</HintPath>\n")
+                file(APPEND ${TEMP_CSPROJ} "    </Reference>\n")
+                file(APPEND ${TEMP_CSPROJ} "  </ItemGroup>\n")
+                file(APPEND ${TEMP_CSPROJ} "</Project>\n")
+                
+                add_custom_target(
+                    Build_${PROJECT_NAME}Scripts ALL
+                    COMMAND ${DOTNET_EXECUTABLE} build "${TEMP_CSPROJ}"
+                        --configuration Debug
+                        --output "${OUTPUT_DIR}"
+                    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+                    COMMENT "Building ${PROJECT_NAME} scripts (${CS_COUNT} files)..."
+                    DEPENDS BuildScriptAPI ${FILTERED_CS_FILES}
+                    VERBATIM
+                )
+            endif()
             
             list(APPEND GAME_SCRIPT_TARGETS Build_${PROJECT_NAME}Scripts)
         endif()

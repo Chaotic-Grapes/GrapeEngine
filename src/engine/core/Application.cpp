@@ -278,6 +278,8 @@ namespace Engine {
     void Application::_onGameStop(Scenes::Scene* scene) {
         if (!scene) return;
 
+        m_accumulator = 0.0f; // Reset accumulator on stop
+
         auto* world = &scene->GetWorld();
         auto it = g_audioSystemMap.find(world);
         if (it != g_audioSystemMap.end() && it->second) {

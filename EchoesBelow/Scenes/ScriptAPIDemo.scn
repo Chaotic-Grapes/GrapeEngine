@@ -71,20 +71,20 @@
                 },
                 {
                     "Data": {
-                        "Friction": 0.3,
-                        "PositionCorrectPercent": 0.4,
-                        "Restitution": 0.0
+                        "Friction": 0.2,
+                        "PositionCorrectPercent": 0.2,
+                        "Restitution": 0.8
                     },
                     "TypeName": "PhysicsMaterial2D"
                 },
                 {
                     "Data": {
-                        "AngularDamping": 0.5,
+                        "AngularDamping": 0.0,
                         "Flags": 2,
                         "GravityScale": 1.0,
                         "InverseMass": 0.0,
-                        "LinearDamping": 5.0,
-                        "Mass": 2.0
+                        "LinearDamping": 1.0,
+                        "Mass": 1.0
                     },
                     "TypeName": "Rigidbody2D"
                 },
@@ -180,8 +180,8 @@
                 {
                     "Data": {
                         "Friction": 0.2,
-                        "PositionCorrectPercent": 0.4,
-                        "Restitution": 0.9
+                        "PositionCorrectPercent": 0.2,
+                        "Restitution": 0.8
                     },
                     "TypeName": "PhysicsMaterial2D"
                 },
@@ -191,8 +191,8 @@
                         "Flags": 2,
                         "GravityScale": 1.0,
                         "InverseMass": 0.0,
-                        "LinearDamping": 0.5,
-                        "Mass": 1.5
+                        "LinearDamping": 1.0,
+                        "Mass": 1.0
                     },
                     "TypeName": "Rigidbody2D"
                 },
@@ -288,8 +288,8 @@
                 {
                     "Data": {
                         "Friction": 0.2,
-                        "PositionCorrectPercent": 0.4,
-                        "Restitution": 0.85
+                        "PositionCorrectPercent": 0.2,
+                        "Restitution": 0.8
                     },
                     "TypeName": "PhysicsMaterial2D"
                 },
@@ -297,10 +297,10 @@
                     "Data": {
                         "AngularDamping": 0.0,
                         "Flags": 2,
-                        "GravityScale": 1.0,
+                        "GravityScale": 1.5,
                         "InverseMass": 0.0,
-                        "LinearDamping": 0.5,
-                        "Mass": 1.2
+                        "LinearDamping": 1.0,
+                        "Mass": 1.0
                     },
                     "TypeName": "Rigidbody2D"
                 },
@@ -400,19 +400,19 @@
                 {
                     "Data": {
                         "Friction": 0.3,
-                        "PositionCorrectPercent": 0.4,
-                        "Restitution": 0.5
+                        "PositionCorrectPercent": 0.2,
+                        "Restitution": 0.7
                     },
                     "TypeName": "PhysicsMaterial2D"
                 },
                 {
                     "Data": {
-                        "AngularDamping": 0.0,
+                        "AngularDamping": 0.1,
                         "Flags": 2,
                         "GravityScale": 1.0,
                         "InverseMass": 0.0,
                         "LinearDamping": 1.0,
-                        "Mass": 2.0
+                        "Mass": 1.0
                     },
                     "TypeName": "Rigidbody2D"
                 },
@@ -493,7 +493,7 @@
                 {
                     "Data": {
                         "Friction": 0.5,
-                        "PositionCorrectPercent": 0.2,
+                        "PositionCorrectPercent": 0.4,
                         "Restitution": 0.0
                     },
                     "TypeName": "PhysicsMaterial2D"
@@ -681,7 +681,7 @@
             ]
         }
     ],
-    "EntityCount": 7,
+    "EntityCount": 8,
     "Hierarchy": [],
     "SceneName": "Script API Demo",
     "SystemProfile": {
