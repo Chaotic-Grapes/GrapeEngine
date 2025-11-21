@@ -49,9 +49,9 @@ namespace Engine {
         CORE = this;
 
         // Initialize crash dumping system
-        Grape_Engine::CrashDumping::Initialize();
-        Grape_Engine::CrashDumping::SetProgramName("GrapeEngine");
-        Grape_Engine::CrashDumping::SetDumpCreateState(true);
+        CrashDumping::Initialize();
+        CrashDumping::SetProgramName("GrapeEngine");
+        CrashDumping::SetDumpCreateState(true);
 
         // Load editor configuration (try working dir, then parent dir fallback)
         bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
