@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
+#include "ecs/systems/ScriptSystem.h"
 #include "audio/AudioSystem.h"
 #include "audio/AudioSystemRegistry.h"
 #include "scene/Scene.h"
@@ -127,6 +128,7 @@ namespace Engine {
 
                 // Update physics and scripts
                 _updatePhysics(world, shouldRun, stepRequested);
+                _updateScripts(world, shouldRun);
             }
             
             // Run all non-physics systems at variable timestep
@@ -164,6 +166,11 @@ namespace Engine {
         game.OnShutdown(m_sceneManager);
 
         // Clean up services
+        if (m_scriptSystem) {
+            m_scriptSystem->Shutdown();
+            delete m_scriptSystem;
+            m_scriptSystem = nullptr;
+        }
         delete m_audio;
         delete m_overlay;
 
@@ -197,6 +204,18 @@ namespace Engine {
         // Set editor mode flag (overlay exists = editor mode)
         m_isInEditorMode = (m_overlay != nullptr);
 
+        // Initialize scripting system
+        m_scriptSystem = new ECS::ScriptSystem();
+        if (!m_scriptSystem->Initialize("scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")) {
+            LOG_WARNING("Failed to initialize ScriptSystem");
+        }
+        else {
+            LOG_INFO("ScriptSystem initialized successfully");
+            // Load the script API assembly
+            if (!m_scriptSystem->LoadAssembly("scripts/GrapeEngine.ScriptAPI.dll")) {
+                LOG_WARNING("Failed to load ScriptAPI assembly");
+            }
+        }
 
         // Register all ECS systems
         _registerSystems();
@@ -253,6 +272,15 @@ namespace Engine {
                 it->second->Update(dt);
             }
         });
+
+        // Register scripting system
+        Scenes::SystemRegistry::Register("Script", [this](ECS::World& w, const float dt) {
+            (void)dt; // Unused - scripts are updated via separate callbacks
+            if (!m_scriptSystem || !m_scriptSystem->IsInitialized()) return;
+            
+            // Scripts are updated through ScriptSystem::Update which is called separately
+            // This registration mainly ensures the system is tracked
+        });
     }
 
     void Application::_onGameStart(Scenes::Scene* scene) {
@@ -263,6 +291,12 @@ namespace Engine {
         if (it != Audio::AUDIO_MAP.end() && it->second) {
             it->second->OnSceneStart();
             LOG_DEBUG("AudioSystem: Notified of scene start");
+        }
+
+        // Initialize all scripts when game starts
+        if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
+            ECS::ScriptSystem::OnStart(*world);
+            LOG_DEBUG("ScriptSystem: Initialized all scripts");
         }
     }
 
@@ -276,6 +310,12 @@ namespace Engine {
         if (it != Audio::AUDIO_MAP.end() && it->second) {
             it->second->OnSceneStop();
             LOG_DEBUG("AudioSystem: Notified of scene stop");
+        }
+
+        // Cleanup scripts when game stops
+        if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
+            ECS::ScriptSystem::OnDestroy(*world);
+            LOG_DEBUG("ScriptSystem: Cleaned up scripts");
         }
     }
    
@@ -351,4 +391,17 @@ namespace Engine {
         }
     }
 
+    void Application::_updateScripts(ECS::World& world, bool shouldRun) {
+        if (!shouldRun || !m_scriptSystem || !m_scriptSystem->IsInitialized())
+            return;
+
+        // Regular update
+        ECS::ScriptSystem::Update(world);
+        
+        // Active state changes (OnEnable/OnDisable)
+        ECS::ScriptSystem::UpdateActiveState(world);
+        
+        // Late update
+        ECS::ScriptSystem::LateUpdate(world);
+    }
 }

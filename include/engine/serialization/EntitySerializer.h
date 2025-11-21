@@ -125,7 +125,8 @@ namespace ECS {
 				{"ManagedHandle", s.ManagedHandle},
 				{"TypeHash", s.TypeHash},
 				{"Initialized", s.Initialized},
-				{"TypeName", std::string(s.TypeName)}
+				{"TypeName", std::string(s.TypeName)},
+				{"ScriptPath", std::string(s.ScriptPath)}
 			};
 		}
 		
@@ -136,6 +137,13 @@ namespace ECS {
 			std::string typeName = j.at("TypeName").get<std::string>(); // get type name as std::string
 			strncpy_s(s.TypeName, typeName.c_str(), sizeof(s.TypeName) - 1); // copy to char array
 			s.TypeName[sizeof(s.TypeName) - 1] = '\0';
+			
+			// Handle ScriptPath (may not exist in older save files)
+			if (j.contains("ScriptPath")) {
+				std::string scriptPath = j.at("ScriptPath").get<std::string>();
+				strncpy_s(s.ScriptPath, scriptPath.c_str(), sizeof(s.ScriptPath) - 1);
+				s.ScriptPath[sizeof(s.ScriptPath) - 1] = '\0';
+			}
 		}
 		
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D)

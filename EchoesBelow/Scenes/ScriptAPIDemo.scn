@@ -37,13 +37,6 @@
                 },
                 {
                     "Data": {
-                        "AssemblyName": "MyGame",
-                        "ClassName": "PlayerController"
-                    },
-                    "TypeName": "ScriptComponent"
-                },
-                {
-                    "Data": {
                         "Value": 0.0
                     },
                     "TypeName": "AngularVelocity2D"
@@ -142,13 +135,6 @@
                         "Value": "Falling Ball 1"
                     },
                     "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "AssemblyName": "MyGame",
-                        "ClassName": "BouncyBall"
-                    },
-                    "TypeName": "ScriptComponent"
                 },
                 {
                     "Data": {
@@ -253,13 +239,6 @@
                 },
                 {
                     "Data": {
-                        "AssemblyName": "MyGame",
-                        "ClassName": "BouncyBall"
-                    },
-                    "TypeName": "ScriptComponent"
-                },
-                {
-                    "Data": {
                         "Value": 0.0
                     },
                     "TypeName": "AngularVelocity2D"
@@ -358,13 +337,6 @@
                         "Value": "Spinning Box"
                     },
                     "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "AssemblyName": "MyGame",
-                        "ClassName": "SpinningObject"
-                    },
-                    "TypeName": "ScriptComponent"
                 },
                 {
                     "Data": {

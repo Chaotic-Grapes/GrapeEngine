@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 // Forward declarations
 namespace Services { class OverlayService; }
+namespace ECS { class ScriptSystem; }
 
 namespace Engine {
     class Application {
@@ -105,6 +106,7 @@ namespace Engine {
         // Services
         Services::AudioService* m_audio = nullptr;
 		Services::OverlayService* m_overlay = nullptr;
+        ECS::ScriptSystem* m_scriptSystem = nullptr;
 
         // Editor mode flag
         bool m_isInEditorMode = false;
@@ -118,6 +120,7 @@ namespace Engine {
         // Helper methods for cleaner game loop logic
         bool _shouldRunGameLogic() const;
         void _updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested);
+        void _updateScripts(ECS::World& world, bool shouldRun);
     };
 
     extern Application* CORE;

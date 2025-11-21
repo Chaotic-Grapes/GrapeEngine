@@ -589,3 +589,64 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data) {
     EditorUI::RenderIntProperty("Id", data, "Id");
     EditorUI::EndPropertySection();
 }
+
+// Renders the ScriptInstance component properties
+void ComponentUI::RenderScriptInstance(nlohmann::json& data) {
+    // Ensure keys exist with defaults
+    if (!data.contains("TypeName")) data["TypeName"] = "";
+    if (!data.contains("ScriptPath")) data["ScriptPath"] = "";
+    if (!data.contains("Initialized")) data["Initialized"] = false;
+    if (!data.contains("ManagedHandle")) data["ManagedHandle"] = 0;
+    if (!data.contains("TypeHash")) data["TypeHash"] = 0;
+
+    EditorUI::BeginPropertySection({ "Script Class", "Script Path", "Initialized" });
+    
+    // Display script class name (read-only)
+    std::string typeName = data.value("TypeName", std::string(""));
+    ImGui::Text("Script Class");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", typeName.empty() ? "None" : typeName.c_str());
+    
+    // Display script path (read-only)
+    std::string scriptPath = data.value("ScriptPath", std::string(""));
+    ImGui::Text("Script Path");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "%s", scriptPath.empty() ? "None" : scriptPath.c_str());
+    
+    // Show initialization status
+    bool initialized = data.value("Initialized", false);
+    ImGui::Text("Initialized");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::TextColored(
+        initialized ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
+        "%s", initialized ? "Yes" : "No"
+    );
+    
+    EditorUI::EndPropertySection();
+    
+    // Modify Script button
+    ImGui::Spacing();
+    if (!typeName.empty() && !scriptPath.empty()) {
+        if (ImGui::Button("Modify Script")) {
+            // Use the stored script path
+            if (std::filesystem::exists(scriptPath)) {
+                // Open the file with the default system editor
+#ifdef _WIN32
+                std::string command = "start \"\" \"" + scriptPath + "\"";
+                system(command.c_str());
+#endif
+            }
+            else {
+                LOG_WARNING("Script file not found: " << scriptPath);
+            }
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("Opens script file in default editor");
+    }
+    else {
+        ImGui::TextDisabled("No script attached. Use 'Attach Script' from hierarchy context menu.");
+    }
+}

@@ -323,6 +323,20 @@ static std::vector<ComponentUIMetadata> m_registry = {
             []() { return nlohmann::json{
                 {"Id", 0}}; },
             COMPONENT_OPS(ECS::Components::Layer)
+    },
+
+    // Script Instance
+    {
+        "Script Instance", "ScriptInstance", "ECS::Components::ScriptInstance", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderScriptInstance(d); },
+        []() { return nlohmann::json{
+            {"TypeName", ""},
+            {"ScriptPath", ""},
+            {"ManagedHandle", 0},
+            {"TypeHash", 0},
+            {"Initialized", false}
+        }; },
+        COMPONENT_OPS(ECS::Components::ScriptInstance)
     }
 };
 

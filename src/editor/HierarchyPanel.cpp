@@ -97,7 +97,7 @@ namespace {
 }
 
 void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
-    if (entityId == 0) return;
+    if (entityId == ECS::Entity::NPOS32) return;
 
     // 1. Call your external file dialog utility.
 #ifdef _WIN32
@@ -129,10 +129,22 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
         std::filesystem::path p(selectedFilePath);
         std::string scriptClassName = p.stem().string();
 
-        // 2. Attach the ScriptInstance component.
-        _attachScriptComponent(entityId, scriptClassName);
+        // 2. Convert to relative path if within project
+        std::string relativePath = selectedFilePath;
+        try {
+            std::filesystem::path absPath = std::filesystem::absolute(selectedFilePath);
+            std::filesystem::path currentPath = std::filesystem::current_path();
+            relativePath = std::filesystem::relative(absPath, currentPath).string();
+        }
+        catch (const std::exception&) {
+            // If relative path conversion fails, use the original path
+            relativePath = selectedFilePath;
+        }
 
-        // 3. Update selection state (using the correct member variable name)
+        // 3. Attach the ScriptInstance component with both class name and path
+        _attachScriptComponent(entityId, scriptClassName, relativePath);
+
+        // 4. Update selection state (using the correct member variable name)
         m_selectedEntityIds.clear();
         m_selectedEntityIds.insert(entityId);
         m_anchorEntityId = entityId;
@@ -395,6 +407,14 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         const auto& link = m_world->Get<ECS::Components::PrefabLink>(entity);
         std::string prefabName = std::filesystem::path(link.getPath()).stem().string();
         oss << " [" << prefabName << "]";
+    }
+
+    // Append script indicator if this entity has a script attached
+    if (m_world->Has<ECS::Components::ScriptInstance>(entity)) {
+        const auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(entity);
+        if (strlen(scriptComp.TypeName) > 0) {
+            oss << " {S}";
+        }
     }
 
     std::string label = oss.str();
@@ -776,6 +796,25 @@ void HierarchyPanel::_renderEntityContextMenu() {
             
             ImGui::Separator();
             
+            // Script attachment/detachment - only for single selection
+            if (selectionCount == 1) {
+                ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
+                bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
+                
+                if (!hasScriptComponent) {
+                    if (ImGui::Selectable("Attach Script")) {
+                        _importAndAttachScript(m_contextMenuTarget);
+                    }
+                }
+                else {
+                    if (ImGui::Selectable("Detach Script")) {
+                        m_world->Remove<ECS::Components::ScriptInstance>(targetEntity);
+                    }
+                }
+                
+                ImGui::Separator();
+            }
+            
             // Delete works with multiple selections
             std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
             if (ImGui::Selectable(deleteLabel.c_str())) {
@@ -791,31 +830,6 @@ void HierarchyPanel::_renderEntityContextMenu() {
             ImGui::Separator();
 
             if (ImGui::BeginMenu("Add Component")) {
-
-                // Option 1: Scripting Sub-Menu
-                if (ImGui::BeginMenu("Scripting")) {
-
-                    ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
-
-                    // Check if ScriptInstance component is already attached
-                    bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
-
-                    // If no ScriptInstance component exists, offer to add one
-                    if (!hasScriptComponent) {
-                        if (ImGui::MenuItem("Attach Script")) {
-                            // This attaches a default, empty ScriptInstance component
-                            /*_attachScriptComponent(m_contextMenuTarget, "");
-                            ImGui::CloseCurrentPopup();*/
-                            _importAndAttachScript(m_contextMenuTarget);
-                        }
-                        ImGui::Separator();
-                    }
-
-                    
-
-                    ImGui::EndMenu(); // End Scripting menu
-                }
-
                 // You can add other component types (Renderer, Rigidbody, etc.) here later
                 // if (ImGui::BeginMenu("Physics")) { ... }
 
@@ -907,12 +921,13 @@ void HierarchyPanel::_startRename(EntityId entityId) {
 }
 
 /**
- * @brief Ensures an entity has a ScriptInstance component, and sets its TypeName.
+ * @brief Ensures an entity has a ScriptInstance component, and sets its TypeName and ScriptPath.
  * @param entityId The entity to modify.
  * @param scriptName The C# class name (e.g., "PlayerController").
+ * @param scriptPath The relative path to the script file (e.g., "Assets/Scripts/PlayerController.cs").
  */
-void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string& scriptName) {
-    if (entityId == 0 || !m_world) return;
+void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string& scriptName, const std::string& scriptPath) {
+    if (entityId == ECS::Entity::NPOS32 || !m_world) return;
 
     ECS::Entity e = m_world->Resolve(entityId);
     if (e.IsNull() || !m_world->IsAlive(e)) return;
@@ -920,18 +935,19 @@ void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string
     // 1. Ensure the component exists (Add it if it doesn't)
     if (!m_world->Has<ECS::Components::ScriptInstance>(e)) {
         ECS::Components::ScriptInstance newScript;
-        // The default constructor of Text component initializes the font path, 
-        // ensure ScriptInstance also has a sane default or proper initialization.
         m_world->Add<ECS::Components::ScriptInstance>(e, newScript);
     }
 
-    // 2. Update the component's TypeName
+    // 2. Update the component's TypeName and ScriptPath
     auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(e);
 
-    // SetTypeName is not exposed in the provided code, 
-    // but the component has char TypeName[128]. We must manually copy.
+    // Set the script class name
     strncpy_s(scriptComp.TypeName, scriptName.c_str(), sizeof(scriptComp.TypeName) - 1);
     scriptComp.TypeName[sizeof(scriptComp.TypeName) - 1] = '\0'; // Always null-terminate
+
+    // Set the script path
+    strncpy_s(scriptComp.ScriptPath, scriptPath.c_str(), sizeof(scriptComp.ScriptPath) - 1);
+    scriptComp.ScriptPath[sizeof(scriptComp.ScriptPath) - 1] = '\0'; // Always null-terminate
 
     // 3. Mark for re-initialization by the ScriptingSystem at runtime
     // Setting Initialized = false forces the runtime to load this C# class 
