@@ -109,59 +109,24 @@ namespace Engine {
             // --- Scene Update ---
             auto* currentScene = m_sceneManager.GetActive();
             
-            // Fixed timestep accumulator for physics, gated by playback controls
             if (currentScene) {
-                const bool isPlaying = (m_overlay && m_overlay->IsGamePlaying());
+                const bool shouldRun = _shouldRunGameLogic();
                 const bool stepRequested = (m_overlay && m_overlay->IsStepRequested());
-
                 auto& world = currentScene->GetWorld();
-                auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
 
-                // Enable physics when playing, disable when stopped/paused
-                if (m_overlay) {
-                    if (isPlaying && !Scenes::SystemRegistry::IsEnabled("Physics")) {
-                        Scenes::SystemRegistry::Enable("Physics");
-                    }
-                    else if (!isPlaying && Scenes::SystemRegistry::IsEnabled("Physics")) {
-                        Scenes::SystemRegistry::Disable("Physics");
-                    }
-                }
-
-                if (isPlaying && !wasPlaying) {
-                    // Just started playing
+                // Handle game state transitions (start/stop)
+                if (shouldRun && !wasPlaying) {
                     LOG_INFO("Game started playing");
                     _onGameStart(currentScene);
                 }
-                else if (!isPlaying && wasPlaying) {
-                    // Just stopped/paused
+                else if (!shouldRun && wasPlaying) {
                     LOG_INFO("Game stopped/paused");
                     _onGameStop(currentScene);
                 }
-                wasPlaying = isPlaying;
-                if (physicsSystem) {
-                    if (isPlaying) {
-                        m_accumulator += Time::UnscaledDeltaTime();
+                wasPlaying = shouldRun;
 
-                        // Prevent fixed delta time from deadlocking(?)
-                        const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
-                        if (m_accumulator > maxAccumulator)
-                            m_accumulator = maxAccumulator;
-
-                        // Run physics at fixed timestep while playing
-                        while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
-                            // (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
-                            m_accumulator -= Time::UnscaledFixedDeltaTime();
-                        }
-                    }
-                    else if (stepRequested) {
-                        // Run exactly one fixed-step when paused and step requested
-                        (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
-                        if (m_overlay) m_overlay->ClearStepRequest();
-                    }
-                    else {
-                        // Not playing and no step: do not accumulate or run physics
-                    }
-                }
+                // Update physics and scripts
+                _updatePhysics(world, shouldRun, stepRequested);
             }
             
             // Run all non-physics systems at variable timestep
@@ -228,6 +193,10 @@ namespace Engine {
         m_overlay = new Services::OverlayService(m_sceneManager);
         m_overlay->SetAudio(m_audio->Device());
 		m_overlay->Initialize();
+        
+        // Set editor mode flag (overlay exists = editor mode)
+        m_isInEditorMode = (m_overlay != nullptr);
+
 
         // Register all ECS systems
         _registerSystems();
@@ -249,12 +218,16 @@ namespace Engine {
             ECS::AnimationSystem::Update(w, dt);
         });
         
-        // Render (non-static system): use a persistent instance
-        Scenes::SystemRegistry::Register("Render", [](ECS::World& w, const float dt) {
-            static ECS::RendererSystem s_renderer;
-            s_renderer.Initialize(w);
-            s_renderer.BindWorld(w);
-            s_renderer.Update(w, dt);
+        // Render
+        Scenes::SystemRegistry::Register("Render", [this](ECS::World& w, const float dt) {
+            // Only run renderer system in standalone mode
+            // In editor mode, the Viewport handles rendering to avoid double updates
+            if (!IsInEditorMode()) {
+                static ECS::RendererSystem s_renderer;
+                s_renderer.Initialize(w);
+                s_renderer.BindWorld(w);
+                s_renderer.Update(w, dt);
+            }
         });
 
         // Register UI System soon
@@ -324,4 +297,58 @@ namespace Engine {
             ShowWindow(console, SW_HIDE);
 #endif
     }
+
+    // -------------------------------------------------------------------------
+    // Game Loop Helper Methods
+    // -------------------------------------------------------------------------
+
+    bool Application::_shouldRunGameLogic() const {
+        // Standalone build: always run game logic
+        if (!IsInEditorMode())
+            return true;
+        
+        // Editor build: respect play/pause state
+        return m_overlay->IsGamePlaying();
+    }
+
+    void Application::_updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested) {
+        auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
+        if (!physicsSystem) return;
+
+        // Editor-only: Enable/disable physics based on play state
+        if (IsInEditorMode()) {
+            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Physics")) {
+                Scenes::SystemRegistry::Enable("Physics");
+            }
+            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Physics")) {
+                Scenes::SystemRegistry::Disable("Physics");
+            }
+        }
+
+        // Run physics at fixed timestep when playing
+        if (shouldRun) {
+            m_accumulator += Time::UnscaledDeltaTime();
+
+            const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
+            if (m_accumulator > maxAccumulator)
+                m_accumulator = maxAccumulator;
+
+            while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
+                // (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+                
+                // Run script FixedUpdate during physics step
+                if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
+                    ECS::ScriptSystem::FixedUpdate(world);
+                }
+                
+                m_accumulator -= Time::UnscaledFixedDeltaTime();
+            }
+        }
+        // Editor-only: Single step when paused
+        else if (stepRequested) {
+            (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+            if (m_overlay) m_overlay->ClearStepRequest();
+        }
+    }
+
 }

@@ -68,6 +68,12 @@ namespace Engine {
          */
         void Close();
 
+        /**
+         * @brief Check if running in editor mode (with overlay/level editor)
+         * @return true if editor is active, false for standalone builds
+         */
+        bool IsInEditorMode() const { return m_isInEditorMode; }
+
         // Getters for services
         Services::AudioService* GetAudioService() { return m_audio; }
         const Services::AudioService* GetAudioService() const { return m_audio; }
@@ -100,11 +106,18 @@ namespace Engine {
         Services::AudioService* m_audio = nullptr;
 		Services::OverlayService* m_overlay = nullptr;
 
+        // Editor mode flag
+        bool m_isInEditorMode = false;
+
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
 
         void _onGameStart(Scenes::Scene* scene);
         void _onGameStop(Scenes::Scene* scene);
+        
+        // Helper methods for cleaner game loop logic
+        bool _shouldRunGameLogic() const;
+        void _updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested);
     };
 
     extern Application* CORE;

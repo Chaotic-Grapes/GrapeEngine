@@ -157,11 +157,16 @@ void Viewport::ShowEditorWindows() {
 void Viewport::_renderViewport() {
     ImGui::Begin("Viewport");
 
-    m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_None);
+    // Check if viewport window is hovered AND focused (not blocked by other windows)
+    m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
+                       && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     if (m_rendererSystem) {
         auto size = ImGui::GetContentRegionAvail();
         auto pos = ImGui::GetCursorScreenPos();
+
+        // Broadcast viewport resize event for camera aspect ratio updates
+        Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
 
         if (m_world) {
             m_rendererSystem->Update(*m_world, Time::DeltaTime());
