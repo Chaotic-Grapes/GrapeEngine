@@ -56,7 +56,7 @@ Features:
 using namespace Sandbox;
 using namespace ECS;
 
-constexpr GraphicsTestScene::TestType DEFAULT_TEST  = GraphicsTestScene::TestType::FontSys;
+constexpr GraphicsTestScene::TestType DEFAULT_TEST = GraphicsTestScene::TestType::BasicGraphics;
 constexpr GraphicsTestScene::TestType LAST_TEST     = GraphicsTestScene::TestType::ObjectPicking;
 
 // extern ResourceManager RM;
@@ -275,7 +275,6 @@ void GraphicsTestScene::runBasicGraphics() {
             },
             ECS::Components::Name{ "BasicGraphics_Square" }
         );
-
         // ------------------------------------------------------------
         // circle (left)
         // ------------------------------------------------------------
@@ -295,7 +294,6 @@ void GraphicsTestScene::runBasicGraphics() {
             },
             ECS::Components::Name{ "Filled_Circle" }
         );
-
         // ------------------------------------------------------------
         // Outlined green circle (center-right)
         // ------------------------------------------------------------
@@ -315,7 +313,6 @@ void GraphicsTestScene::runBasicGraphics() {
             },
             ECS::Components::Name{ "Outlined_Circle" }
         );
-
         // ------------------------------------------------------------
         // Hollow magenta collider circle (semi-transparent outline)
         // ------------------------------------------------------------
@@ -331,18 +328,49 @@ void GraphicsTestScene::runBasicGraphics() {
                 0.6f,                          // radius
                 Vector2D{0.f, 0.f},            // offset
                 Color{4.5f, 1.2f, 0.2f, 1.0f},
-                0.f                           
+                0.f
             },
             ECS::Components::Name{ "Collider_Circle" }
         );
-       
+
+        // ------------------------------------------------------------
+        // EMISSIVE TEST SPRITE (left of center)
+        // ------------------------------------------------------------
+        // Use static storage to keep textures alive for the lifetime of the program
+        static Texture albedoTex("assets/textures/test/player.png");
+        static Texture emissiveTex("assets/textures/test/player_emissive.png");
+
+        const ECS::Entity emissiveSprite = CreateOnLayer(
+            m_gameplayLayer,
+            ECS::Components::LocalTransform{
+                Vector3D{-2.5f, 0.f, 0.f},  // Left of center
+                Quaternion{0, 0, 0, 1},
+                Vector3D{2.f, 2.f, 1.f}     // 2x scale to see it clearly
+            },
+            ECS::Components::WorldTransform{},
+            ECS::Components::SpriteRenderer2D{
+                albedoTex.ID(),             // TextureId
+                Color{1.f, 1.f, 1.f, 1.f},  // Color
+                Vector2D{1.f, 1.f},         // Tiling
+                Vector2D{0.f, 0.f},         // Offset
+                0,                          // Width
+                0,                          // Height
+                emissiveTex.ID(),           // EmissiveTextureId
+                1.2f                        // EmissiveStrength (slightly bright for testing)
+            },
+            ECS::Components::Name{ "EmissiveTest_Sprite" }
+        );
+
         // Track created entities
         m_testEntities.push_back(EntityUtils::Pack(square));
         m_testEntities.push_back(EntityUtils::Pack(filledCircle));
         m_testEntities.push_back(EntityUtils::Pack(outlinedCircle));
         m_testEntities.push_back(EntityUtils::Pack(colliderCircle));
+        m_testEntities.push_back(EntityUtils::Pack(emissiveSprite));
 
         LOG_DEBUG("Spawned BasicGraphics test entities");
+        LOG_INFO("[EmissiveTest] Albedo ID: " << albedoTex.ID());
+        LOG_INFO("[EmissiveTest] Emissive ID: " << emissiveTex.ID());
     }
 }
 
