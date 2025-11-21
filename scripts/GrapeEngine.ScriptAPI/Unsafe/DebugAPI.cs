@@ -22,9 +22,13 @@ namespace GrapeEngine.ScriptAPI.Unsafe;
 /// </summary>
 internal partial class DebugAPI
 {
-    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_Debug_Log", StringMarshalling = StringMarshalling.Utf8)]
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_Debug_LogInfo", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial void Log(string message);
+    internal static partial void LogInfo(string message);
+
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_Debug_LogDebug", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void LogDebug(string message);
 
     [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_Debug_LogWarning", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]

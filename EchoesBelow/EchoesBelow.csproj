@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Library</OutputType>
+    <AssemblyName>EchoesBelow</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference the engine's Script API -->
+    <Reference Include="GrapeEngine.ScriptAPI">
+      <HintPath>..\build\Debug\GrapeEngine.ScriptAPI.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Scripts are automatically included by default from the project directory -->
+  <!-- No need to explicitly add Compile items unless you want to override the default -->
+
+</Project>

@@ -14,19 +14,19 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.ScriptAPI.Unsafe;
-using System.Numerics;
+using GrapeEngine.Numerics;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Math;
 
 /// <summary>
 /// Mathematical utility functions for game development.
 /// </summary>
 public static class GMath
 {
-    public const float PI = 3.14159265359f;
-    public const float TAU = 6.28318530718f;
-    public const float DEG2RAD = 0.0174532925f;
-    public const float RAD2DEG = 57.2957795131f;
+    public const float Pi = 3.14159265359f;
+    public const float Tau = 6.28318530718f;
+    public const float Deg2Rad = 0.0174532925f;
+    public const float Rad2Deg = 57.2957795131f;
 
     // ============================================================================
     // Random

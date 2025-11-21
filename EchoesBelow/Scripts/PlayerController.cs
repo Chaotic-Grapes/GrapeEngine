@@ -1,5 +1,7 @@
-using System.Numerics;
+using GrapeEngine.Numerics;
 using GrapeEngine;
+using GrapeEngine.Math;
+using GrapeEngine.Physics;
 using GrapeEngine.Scripting;
 
 namespace EchoesBelow.Scripts;
@@ -51,7 +53,7 @@ public class PlayerController : ScriptBehaviour
                            Input.IsKeyPressed(KeyCode.Up)))
         {
             Physics.ApplyImpulse(Entity, new Vector2(0, JumpForce));
-            Debug.Log("Player jumped!");
+            Log("Player jumped!");
         }
 
         // Get current velocity for debug

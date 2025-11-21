@@ -1,4 +1,4 @@
-using GrapeEngine;
+using GrapeEngine.Math;
 using GrapeEngine.Scripting;
 
 namespace EchoesBelow.Scripts;

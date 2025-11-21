@@ -15,9 +15,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.ScriptAPI.Unsafe;
 using GrapeEngine.Scripting;
-using System.Numerics;
+using GrapeEngine.Numerics;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Physics;
 
 /// <summary>
 /// Provides access to 2D physics functionality.
