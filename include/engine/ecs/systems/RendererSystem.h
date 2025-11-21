@@ -48,12 +48,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
 
-namespace {
-    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
-        if (fileMenu) { fileMenu->MarkSceneDirty(); }
-    }
-}
-
 namespace Editor {
     // Undo System
     class UndoSystem;

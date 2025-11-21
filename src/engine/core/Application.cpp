@@ -20,6 +20,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
+#include "audio/AudioSystem.h"
+#include "audio/AudioSystemRegistry.h"
 #include "scene/Scene.h"
 #include "scene/SystemRegistry.h"
 #include "services/Input.h"
@@ -27,13 +29,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/WindowManager.h"
 #include "services/OverlayService.h"
 #include <thread>
-#include "../engine/audio/AudioSystem.h"
-#include <unordered_map> 
-
-namespace {
-    // Global map to access AudioSystem instances from anywhere
-    std::unordered_map<ECS::World*, AudioSystem*> g_audioSystemMap;
-}
 
 
 namespace Engine {
@@ -86,46 +81,7 @@ namespace Engine {
 #endif
 		// Initialize services
 		_initializeServices();
-
-        // Register core ECS systems once (Physics at fixed step, others variable)
-        // Physics
-        Scenes::SystemRegistry::Register("Physics", [](ECS::World& w, float dt) {
-            ECS::PhysicsSystem::Update(w, dt);
-        });
-        // Animation
-        Scenes::SystemRegistry::Register("Animation", [](ECS::World& w, float dt) {
-            ECS::AnimationSystem::Update(w, dt);
-        });
-        // Render (non-static system): use a persistent instance
-        Scenes::SystemRegistry::Register("Render", [](ECS::World& w, float dt) {
-            static ECS::RendererSystem s_renderer;
-            s_renderer.Initialize(w);
-            s_renderer.BindWorld(w);
-            s_renderer.Update(w, dt);
-        });
-
-        // Store one AudioSystem instance per world to handle scene switching properly
-        Scenes::SystemRegistry::Register("Audio", [](ECS::World& w, float dt) {
-            auto* app = Engine::CORE;
-            auto* svc = app ? app->GetAudioService() : nullptr;
-            if (!svc) return;
-
-            // Store AudioSystem per world to handle scene switching
-            static std::unordered_map<ECS::World*, std::unique_ptr<AudioSystem>> s_audioSystems;
-
-            auto it = s_audioSystems.find(&w);
-            if (it == s_audioSystems.end()) {
-                auto result = s_audioSystems.emplace(&w, std::make_unique<AudioSystem>(w, *svc));
-                it = result.first;
-                g_audioSystemMap[&w] = it->second.get();
-                LOG_DEBUG("Audio system: Created AudioSystem for world at " << &w);
-            }
-
-            // Update the audio system
-            if (it->second) {
-                it->second->Update(dt);
-            }
-            });
+        Scenes::SystemRegistry::Disable("Physics"); // Start with physics disabled
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
@@ -161,6 +117,16 @@ namespace Engine {
                 auto& world = currentScene->GetWorld();
                 auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
 
+                // Enable physics when playing, disable when stopped/paused
+                if (m_overlay) {
+                    if (isPlaying && !Scenes::SystemRegistry::IsEnabled("Physics")) {
+                        Scenes::SystemRegistry::Enable("Physics");
+                    }
+                    else if (!isPlaying && Scenes::SystemRegistry::IsEnabled("Physics")) {
+                        Scenes::SystemRegistry::Disable("Physics");
+                    }
+                }
+
                 if (isPlaying && !wasPlaying) {
                     // Just started playing
                     LOG_INFO("Game started playing");
@@ -183,7 +149,7 @@ namespace Engine {
 
                         // Run physics at fixed timestep while playing
                         while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
-                            (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+                            // (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
                             m_accumulator -= Time::UnscaledFixedDeltaTime();
                         }
                     }
@@ -259,17 +225,69 @@ namespace Engine {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
 
-		m_overlay = new Services::OverlayService(m_sceneManager);
+        m_overlay = new Services::OverlayService(m_sceneManager);
         m_overlay->SetAudio(m_audio->Device());
 		m_overlay->Initialize();
+
+        // Register all ECS systems
+        _registerSystems();
+    }
+
+    void Application::_registerSystems() {
+        // Physics
+        Scenes::SystemRegistry::Register("Physics", [](ECS::World& w, const float dt) {
+            ECS::PhysicsSystem::Update(w, dt);
+        });
+
+        // Lifetime
+        Scenes::SystemRegistry::Register("Lifetime", [](ECS::World& w, const float dt) {
+            ECS::LifetimeSystem::Update(w, dt);
+        });
+
+        // Animation
+        Scenes::SystemRegistry::Register("Animation", [](ECS::World& w, const float dt) {
+            ECS::AnimationSystem::Update(w, dt);
+        });
+        
+        // Render (non-static system): use a persistent instance
+        Scenes::SystemRegistry::Register("Render", [](ECS::World& w, const float dt) {
+            static ECS::RendererSystem s_renderer;
+            s_renderer.Initialize(w);
+            s_renderer.BindWorld(w);
+            s_renderer.Update(w, dt);
+        });
+
+        // Register UI System soon
+
+        // Store one AudioSystem instance per world to handle scene switching properly
+        Scenes::SystemRegistry::Register("Audio", [this](ECS::World& w, const float dt) {
+            auto* svc = m_audio;
+            if (!svc) return;
+
+            // Store AudioSystem per world to handle scene switching
+            static std::unordered_map<ECS::World*, std::unique_ptr<AudioSystem>> s_audioSystems;
+
+            auto it = s_audioSystems.find(&w);
+            if (it == s_audioSystems.end()) {
+                auto result = s_audioSystems.emplace(&w, std::make_unique<AudioSystem>(w, *svc));
+                it = result.first;
+                Audio::AUDIO_MAP[&w] = it->second.get();
+                LOG_DEBUG("Audio system: Created AudioSystem for world at " << &w);
+            }
+
+            // Update the audio system
+            if (it->second) {
+                it->second->Update(dt);
+            }
+        });
     }
 
     void Application::_onGameStart(Scenes::Scene* scene) {
         if (!scene) return;
 
         auto* world = &scene->GetWorld();
-        auto it = g_audioSystemMap.find(world);
-        if (it != g_audioSystemMap.end() && it->second) {
+        auto it = Audio::AUDIO_MAP.find(world);
+        if (it != Audio::AUDIO_MAP.end() && it->second) {
             it->second->OnSceneStart();
             LOG_DEBUG("AudioSystem: Notified of scene start");
         }
@@ -281,8 +299,8 @@ namespace Engine {
         m_accumulator = 0.0f; // Reset accumulator on stop
 
         auto* world = &scene->GetWorld();
-        auto it = g_audioSystemMap.find(world);
-        if (it != g_audioSystemMap.end() && it->second) {
+        auto it = Audio::AUDIO_MAP.find(world);
+        if (it != Audio::AUDIO_MAP.end() && it->second) {
             it->second->OnSceneStop();
             LOG_DEBUG("AudioSystem: Notified of scene stop");
         }

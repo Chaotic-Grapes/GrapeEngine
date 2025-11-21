@@ -22,7 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
 
-// Forward declaration
+// Forward declarations
 namespace Services { class OverlayService; }
 
 namespace Engine {
@@ -94,6 +94,7 @@ namespace Engine {
         static void _disableConsole();
 
         void _initializeServices();
+        void _registerSystems();
 
         // Services
         Services::AudioService* m_audio = nullptr;

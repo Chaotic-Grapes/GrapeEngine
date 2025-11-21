@@ -25,6 +25,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <iostream>
 #include <unordered_set>
 #include <nlohmann/json.hpp>
+
 #include "core/Logger.h"
 #include "core/Profiler.h"
 #include "ecs/Hierarchy.h"
@@ -32,6 +33,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scene/SystemRegistry.h"
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
+
+#include "ecs/systems/RendererSystem.h"
+#include "ecs/systems/PhysicsSystem.h"
+#include "ecs/systems/LifetimeSystem.h"
+#include "ecs/systems/AnimationSystem.h"
+#include "ecs/systems/ScriptSystem.h"
+#include "ecs/systems/UISystem.h"
 
 using json = nlohmann::json;
 
@@ -194,9 +202,6 @@ namespace Scenes {
                 sceneJson["SceneName"] = sceneName;
                 sceneJson["EntityCount"] = 0;
 
-                // Serialize SystemProfile
-                sceneJson["SystemProfile"] = scene.GetSystemProfile();
-
                 json entities = json::array();
                 json hierarchyArray = json::array();
                 int entityCount = 0;
@@ -284,13 +289,6 @@ namespace Scenes {
 
                 world.DestroyAll();
 
-                // Load SystemProfile if present
-                if (sceneJson.contains("SystemProfile")) {
-                    scene.GetSystemProfile() = sceneJson["SystemProfile"].get<SystemProfile>();
-                }
-
-                _ensureAudioSystemInProfile(scene);
-
                 int loadedCount = 0;
                 std::vector<ECS::Entity> restoredEntities;
                 
@@ -364,62 +362,21 @@ namespace Scenes {
         }
 
         /**
-         * @brief Ensures the Audio system is present in the scene's SystemProfile
-         * @param scene The scene to check and fix
-         */
-        static void _ensureAudioSystemInProfile(Scene& scene) {
-            auto& profile = scene.GetSystemProfile();
-
-            // Check if Audio system exists
-            bool hasAudio = false;
-            for (const auto& entry : profile.Systems) {
-                if (entry.Name == "Audio") {
-                    hasAudio = true;
-                    break;
-                }
-            }
-
-            // If not found, add it
-            if (!hasAudio) {
-                LOG_INFO("Audio system missing from scene - adding automatically");
-                profile.AddSystem("Audio", true);
-                LOG_WARNING("REMINDER: Save your scene (Ctrl+S) to persist this change!");
-            }
-        }
-
-        /**
          * @brief Updates a scene by executing its system profile.
          * @param scene The scene to update.
          * @param dt Delta time in seconds.
          */
         void _updateScene(Scene& scene, const float dt) {
             auto& world = scene.GetWorld();
-            const auto& profile = scene.GetSystemProfile();
 
-            // Execute systems in order based on SystemProfile
-            for (const auto& entry : profile.Systems) {
-                if (!entry.Enabled)
-                    continue;
-
-                // Physics runs on a fixed timestep in Application; skip here to avoid double updates
-                if (entry.Name == "Physics")
-                    continue;
-
-                auto* systemFunc = SystemRegistry::Get(entry.Name);
-                if (systemFunc) {
-                    Profiler::Get().BeginScope(entry.Name.c_str());
-                    (*systemFunc)(world, dt);
-                    Profiler::Get().EndScope(entry.Name.c_str());
+            // Only iterate through enabled systems in the profile
+            SystemRegistry::ForEach([&world, dt](const std::string& name, const SystemFunction& system) {
+                if (system) {
+                    Profiler::Get().BeginScope(name.c_str());
+                    system(world, dt);
+                    Profiler::Get().EndScope(name.c_str());
                 }
-                else {
-                    // System not found in registry - log warning once per update
-                    static std::unordered_set<std::string> s_warnedSystems;
-                    if (s_warnedSystems.find(entry.Name) == s_warnedSystems.end()) {
-                        LOG_WARNING("System '" << entry.Name << "' not found in SystemRegistry");
-                        s_warnedSystems.insert(entry.Name);
-                    }
-                }
-            }
+            }, true);
 
             // Always update transform hierarchy after all systems
             ECS::Hierarchy::UpdateTransforms(world);

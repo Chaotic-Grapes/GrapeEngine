@@ -82,6 +82,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include "ImGuizmo.h"
 
+namespace {
+    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
+        if (fileMenu) { fileMenu->MarkSceneDirty(); }
+    }
+}
+
 namespace ECS {
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
