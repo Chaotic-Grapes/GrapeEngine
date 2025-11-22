@@ -691,10 +691,24 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
-                // Instantiate the prefab as a child of the current entity node
                 EntityId newEntityId = _instantiatePrefabAsChild(droppedPath, entityId);
-
-                // Select the newly created entity so it shows up in inspector immediately
+                if (newEntityId != ECS::Entity::NPOS32) {
+                    m_selectedEntityIds.clear();
+                    m_selectedEntityIds.insert(newEntityId);
+                    m_anchorEntityId = newEntityId;
+                    if (m_selectionCallback) m_selectionCallback(newEntityId);
+                }
+            }
+        }
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* data = static_cast<const char*>(payload->Data);
+            const char* end = data + payload->DataSize;
+            while (data < end) {
+                std::string path(data);
+                data += path.size() + 1;
+                if (path.empty()) continue;
+                if (std::filesystem::path(path).extension() != ".prefab") continue;
+                EntityId newEntityId = _instantiatePrefabAsChild(path, entityId);
                 if (newEntityId != ECS::Entity::NPOS32) {
                     m_selectedEntityIds.clear();
                     m_selectedEntityIds.insert(newEntityId);
@@ -738,13 +752,27 @@ void HierarchyPanel::_handleTreeDragDrop() {
             }
         }
 
-        // Instantiate prefab as root entity
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
                 EntityId newEntityId = _instantiatePrefabAsChild(droppedPath, ECS::Entity::NPOS32);
-
-                // Select the newly created entity so it shows up in inspector immediately
+                if (newEntityId != ECS::Entity::NPOS32) {
+                    m_selectedEntityIds.clear();
+                    m_selectedEntityIds.insert(newEntityId);
+                    m_anchorEntityId = newEntityId;
+                    if (m_selectionCallback) m_selectionCallback(newEntityId);
+                }
+            }
+        }
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* data = static_cast<const char*>(payload->Data);
+            const char* end = data + payload->DataSize;
+            while (data < end) {
+                std::string path(data);
+                data += path.size() + 1;
+                if (path.empty()) continue;
+                if (std::filesystem::path(path).extension() != ".prefab") continue;
+                EntityId newEntityId = _instantiatePrefabAsChild(path, ECS::Entity::NPOS32);
                 if (newEntityId != ECS::Entity::NPOS32) {
                     m_selectedEntityIds.clear();
                     m_selectedEntityIds.insert(newEntityId);
