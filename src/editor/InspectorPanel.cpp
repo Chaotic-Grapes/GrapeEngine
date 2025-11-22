@@ -26,6 +26,7 @@ through a unified system shared by both entities and prefab templates.
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "EditorFileMenu.h"
+#include "core/ProjectPaths.h"
 #include "UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
@@ -871,8 +872,8 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
             [](char c) { return !std::isalnum(c) && c != '_' && c != '-'; }, '_');
     }
 
-    // Ensure prefab directory exists
-    std::filesystem::path prefabDir = "assets/prefabs";
+    // Ensure prefab directory exists under the active project assets
+    std::filesystem::path prefabDir = std::filesystem::path(Engine::ProjectPaths::GetAssetsPath()) / "Prefabs";
     std::filesystem::create_directories(prefabDir);
 
     // Pick a file name that does not overwrite an existing prefab
