@@ -87,8 +87,9 @@ void AssetBrowserPanel::Render() {
     _renderActionButtons();
     _renderContentArea();
 
-    // Handle keyboard shortcuts
-    if (!m_selectedAssets.empty()) {
+    // Handle keyboard shortcuts - ONLY when Asset Browser window is focused
+    // This prevents conflicts with other panels (e.g., Hierarchy) that also use DELETE key
+    if (!m_selectedAssets.empty() && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
         // DELETE key: delete selected assets
         if (Input::IsKeyDown(KEY_DELETE)) {
             _deleteSelectedAssets();
