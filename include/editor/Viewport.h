@@ -66,10 +66,14 @@ private:
 
     // Renderer (manages EditorCamera internally)
     std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
+    
+    // Game window renderer (always uses scene camera)
+    std::shared_ptr<ECS::RendererSystem> m_gameRendererSystem;
 
     // State
     EntityId m_selectedEntityId = 0;
     bool m_isViewportHovered = false;
+    int m_activeTab = 0; // 0 = Scene, 1 = Game
 
     // Stores the exact screen position and size of the drawn scene texture. M3<<<<<<<<<<<<<<<<<<<<<<<
     ImVec2 m_sceneDrawPos = { 0.0f, 0.0f };

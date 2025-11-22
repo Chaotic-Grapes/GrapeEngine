@@ -362,7 +362,8 @@ namespace ECS {
         // ============================================================
         // 2. Use EditorCamera if active, otherwise ECS camera
         // ============================================================
-        if (m_useEditorCamera && m_editorCamera) {
+        // If force scene camera is enabled (for game window), skip editor camera entirely
+        if (m_useEditorCamera && m_editorCamera && !m_forceSceneCamera) {
             // Respect editor UI hover: only process input when viewport is hovered
             m_editorCamera->SetAllowInput(m_editorInputEnabled);
             m_editorCamera->Update(Time::DeltaTime());
@@ -1036,7 +1037,6 @@ namespace ECS {
                         m_selectedEntityID = INVALID_ENTITY_ID;  // Use max uint32 to indicate "no selection"
                     }
                 }
-                firstFrame = false;
 
                 // Frame N: Write to PBO 0
                 // Write to current PBO (async transfer starts)
