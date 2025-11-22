@@ -127,7 +127,8 @@ void LevelEditor::_buildDockLayout() {
     // Map panels to target nodes to realize the layout
     ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
-    ImGui::DockBuilderDockWindow("Viewport", viewportNode);
+    ImGui::DockBuilderDockWindow("Scene", viewportNode);
+    ImGui::DockBuilderDockWindow("Game", viewportNode);
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
@@ -248,7 +249,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         [this](ECS::World* w) { m_assetBrowser.SetWorld(w); }
     );
 
-    _registerPanel("Viewport",
+    _registerPanel("Scene",
         [this]() {
             Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
             m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);

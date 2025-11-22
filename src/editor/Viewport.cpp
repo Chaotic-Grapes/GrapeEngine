@@ -2,8 +2,8 @@
 /*!
 \file   ViewportPanel.cpp
 \author Samantha Leong (75%)
-        Foo Rui Qin    (15%)
-        Muhammad Nur Fadzly Bin Zulkifli (10%)
+        Foo Rui Qin    (20%)
+        Muhammad Nur Fadzly Bin Zulkifli (5%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
         muhammadnurfadzly.b@digipen.edu
@@ -181,104 +181,91 @@ void Viewport::ShowEditorWindows() {
 // Viewport
 // -------------------------------------------------------------------------
 void Viewport::_renderViewport() {
-    ImGui::Begin("Viewport");
+    // Render Viewport window (editor camera)
+    ImGui::Begin("Scene");
 
     // Check if viewport window is hovered AND focused (not blocked by other windows)
     m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
                        && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
-    // Tab bar for Scene and Game views
-    if (ImGui::BeginTabBar("ViewportTabs")) {
-        // Scene tab (editor camera)
-        if (ImGui::BeginTabItem("Scene")) {
-            m_activeTab = 0;
-            
-            if (m_rendererSystem) {
-                auto size = ImGui::GetContentRegionAvail();
-                auto pos = ImGui::GetCursorScreenPos();
+    if (m_rendererSystem) {
+        auto size = ImGui::GetContentRegionAvail();
+        auto pos = ImGui::GetCursorScreenPos();
 
-                // Broadcast viewport resize event for camera aspect ratio updates
-                Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
+        // Broadcast viewport resize event for camera aspect ratio updates
+        Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
 
-                if (m_world) {
-                    m_rendererSystem->Update(*m_world, Time::DeltaTime());
-                }
-
-                auto* rg = m_rendererSystem->GetRenderGraph();
-                if (rg) {
-                    ResourceAccessor acc(rg);
-                    // Previously, the editor viewport was sampling from the "HDR" texture,
-                    // which meant ImGui was displaying raw FP16 linear data with no tone mapping
-                    // or gamma. Resulting in very dark, incorrect colors.
-                    //
-                    // We now use a dedicated ToneMap pass that converts HDR to LDR. The Composite
-                    // pass then blits LDR to the real backbuffer. Sampling "LDR" here ensures the
-                    // Editor viewport shows the same tone-mapped, gamma-correct image the game
-                    // actually outputs.
-                    uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
-                    if (textureId > 0) {
-                        ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
-                    }
-
-                    // 1. Get the drawing position of the image we just rendered
-                    ImVec2 gizmoPos = ImGui::GetItemRectMin(); // Get the top-left corner of the image item
-
-                    // 2. Call the RendererSystem method to draw the Gizmo overlay
-                    // Draw the Gizmo overlay (only in Scene tab)
-                    m_rendererSystem->DrawEditorGizmo(
-                        *m_world,
-                        gizmoPos.x, gizmoPos.y,
-                        size.x, size.y
-                    );
-                }
-            }
-            else {
-                ImGui::TextDisabled("No renderer available");
-            }
-            
-            ImGui::EndTabItem();
+        if (m_world) {
+            m_rendererSystem->Update(*m_world, Time::DeltaTime());
         }
 
-        // Game tab (scene camera)
-        if (ImGui::BeginTabItem("Game")) {
-            m_activeTab = 1;
-            
-            // Check if any Camera3D components exist in the world
-            bool hasCameraComponent = false;
-            if (m_world) {
-                m_world->Each<ECS::Components::Camera3D>([&](ECS::Entity, ECS::Components::Camera3D&) {
-                    hasCameraComponent = true;
-                });
+        auto* rg = m_rendererSystem->GetRenderGraph();
+        if (rg) {
+            ResourceAccessor acc(rg);
+            // Previously, the editor viewport was sampling from the "HDR" texture,
+            // which meant ImGui was displaying raw FP16 linear data with no tone mapping
+            // or gamma. Resulting in very dark, incorrect colors.
+            //
+            // We now use a dedicated ToneMap pass that converts HDR to LDR. The Composite
+            // pass then blits LDR to the real backbuffer. Sampling "LDR" here ensures the
+            // Editor viewport shows the same tone-mapped, gamma-correct image the game
+            // actually outputs.
+            uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
+            if (textureId > 0) {
+                ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
             }
-            
-            if (!hasCameraComponent) {
-                ImGui::TextDisabled("No camera found");
-            }
-            else if (m_gameRendererSystem) {
-                auto size = ImGui::GetContentRegionAvail();
-                auto pos = ImGui::GetCursorScreenPos();
 
-                if (m_world) {
-                    m_gameRendererSystem->Update(*m_world, Time::DeltaTime());
-                }
+            // 1. Get the drawing position of the image we just rendered
+            ImVec2 gizmoPos = ImGui::GetItemRectMin(); // Get the top-left corner of the image item
 
-                auto* rg = m_gameRendererSystem->GetRenderGraph();
-                if (rg) {
-                    ResourceAccessor acc(rg);
-                    uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
-                    if (textureId > 0) {
-                        ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
-                    }
-                }
-            }
-            else {
-                ImGui::TextDisabled("No renderer available");
-            }
-            
-            ImGui::EndTabItem();
+            // 2. Call the RendererSystem method to draw the Gizmo overlay
+            // Draw the Gizmo overlay (only in Scene tab)
+            m_rendererSystem->DrawEditorGizmo(
+                *m_world,
+                gizmoPos.x, gizmoPos.y,
+                size.x, size.y
+            );
+        }
+    }
+    else {
+        ImGui::TextDisabled("No renderer available");
+    }
+        
+    ImGui::End();
+
+    // Render Game window (scene camera)
+    ImGui::Begin("Game");
+
+    // Check if any Camera3D components exist in the world
+    bool hasCameraComponent = false;
+    if (m_world) {
+        m_world->Each<ECS::Components::Camera3D>([&](ECS::Entity, ECS::Components::Camera3D&) {
+            hasCameraComponent = true;
+        });
+    }
+
+    if (!hasCameraComponent) {
+        ImGui::TextDisabled("No camera found");
+    }
+    else if (m_gameRendererSystem) {
+        auto size = ImGui::GetContentRegionAvail();
+        auto pos = ImGui::GetCursorScreenPos();
+
+        if (m_world) {
+            m_gameRendererSystem->Update(*m_world, Time::DeltaTime());
         }
 
-        ImGui::EndTabBar();
+        auto* rg = m_gameRendererSystem->GetRenderGraph();
+        if (rg) {
+            ResourceAccessor acc(rg);
+            uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
+            if (textureId > 0) {
+                ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
+            }
+        }
+    }
+    else {
+        ImGui::TextDisabled("No renderer available");
     }
 
     ImGui::End();
