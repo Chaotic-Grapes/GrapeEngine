@@ -83,6 +83,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ImGuizmo.h"
 
 namespace ECS {
+    static constexpr uint32_t INVALID_ENTITY_ID = ~0u;
+
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
     static void GetRenderTransform(World& world, const Entity entity,
@@ -199,7 +201,7 @@ namespace ECS {
         Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
             [this](const Messaging::WindowResized& msg)
             {
-                // TODO: Add RenderGraph::ResizeTexture() method to handle this
+                // TODO: Add RenderGraph::ResizeTexture() method to handle this?
                 // For now, recreate the graph on resize
                 m_renderGraph = std::make_unique<RenderGraph>();
 
@@ -654,7 +656,9 @@ namespace ECS {
                                 ToGlm(sr.Color),
                                 sr.TextureId,
                                 angleZ,
-                                1.0f
+                                1.0f,
+                                sr.EmissiveTextureId,
+                                sr.EmissiveStrength
                                 });
                         }
                     }
@@ -897,7 +901,7 @@ namespace ECS {
                         if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                         // Encode entity ID as RGB
-                        uint32_t id = entity.Index;
+                        uint32_t id = entity.Index + 1;
                         glm::vec4 idColor(
                             ((id >> 0) & 0xFF) / 255.0f,
                             ((id >> 8) & 0xFF) / 255.0f,
@@ -946,7 +950,7 @@ namespace ECS {
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                         // Encode entity ID as RGB
-                        uint32_t id = entity.Index;
+                        uint32_t id = entity.Index + 1;
                         glm::vec4 idColor(
                             ((id >> 0) & 0xFF) / 255.0f,
                             ((id >> 8) & 0xFF) / 255.0f,
@@ -988,7 +992,9 @@ namespace ECS {
                                 idColor,
                                 sr.TextureId,
                                 angleZ,
-                                1.0f
+                                1.0f,
+                                0,      // emissiveTextureId (no emissive in picking pass)
+                                0.0f    // emissiveStrength (no emissive in picking pass)
                                 });
                         }
                     }
@@ -1017,23 +1023,24 @@ namespace ECS {
                     LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
 
                     if (pickedID > 0) {
-                        m_selectedEntityID = pickedID;
+                        m_selectedEntityID = pickedID - 1;
                         LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
                     }
                     else {
-                        m_selectedEntityID = 0;
+                        m_selectedEntityID = INVALID_ENTITY_ID;  // Use max uint32 to indicate "no selection"
                     }
                 }
-
-                
-                
-                m_currentPBO = 1 - m_currentPBO;
+                firstFrame = false;
 
                 // Frame N: Write to PBO 0
                 // Write to current PBO (async transfer starts)
                 m_pbos[m_currentPBO].Bind(GL_PIXEL_PACK_BUFFER);
                 glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
                 m_pbos[m_currentPBO].Unbind(GL_PIXEL_PACK_BUFFER);
+
+                // Frame N: Swap for next frame
+                // Swap PBOs FIRST
+                m_currentPBO = 1 - m_currentPBO;
 
 
                 // Restore blending state
@@ -1051,7 +1058,7 @@ namespace ECS {
             [this, &world, &viewProj, &buckets, &transformedCorners, &polyPoints](ResourceAccessor& res)
             {
                 // nothing selected this frame
-                if (m_selectedEntityID == 0) return;
+                if (m_selectedEntityID == INVALID_ENTITY_ID) return;  // Check for sentinel value
 
                 auto* hdrFbo = res.GetFramebuffer("HDR");
                 if (!hdrFbo) return;
@@ -1455,7 +1462,8 @@ namespace ECS {
         static bool wasMouseDownLastFrame = false;
         static uint32_t lastSelectedEntityID = 0;
 
-        if (m_selectedEntityID != 0) {
+
+        if (m_selectedEntityID != INVALID_ENTITY_ID) {
             // ----------------------------------------------------------
             // CANCEL DRAG IF MOUSE LEAVES THE VIEWPORT CONTENT REGION
             // ----------------------------------------------------------
@@ -1600,7 +1608,7 @@ namespace ECS {
         }
         else {
             // Nothing selected, reset tracking
-            lastSelectedEntityID = 0;
+            lastSelectedEntityID = INVALID_ENTITY_ID;  // Use sentinel value
             wasMouseDownLastFrame = false;
         }
 
