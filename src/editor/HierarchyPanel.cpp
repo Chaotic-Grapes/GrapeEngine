@@ -125,9 +125,52 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
         // User selected a file; the path is in the 'filename' buffer
         std::string selectedFilePath(filename);
 
-        // 1. Extract the class name from the file path.
+        // 1. Extract the class name and namespace from the C# file
         std::filesystem::path p(selectedFilePath);
         std::string scriptClassName = p.stem().string();
+        std::string fullTypeName = scriptClassName; // Default to just class name
+        std::string rootNamespace; // e.g. "EchoesBelow" from "EchoesBelow.Scripts"
+
+        // Try to parse namespace from the file
+        std::ifstream fileStream(selectedFilePath);
+        if (fileStream.is_open()) {
+            std::string line;
+            std::string namespaceStr;
+            
+            // Look for "namespace" declaration in the file
+            while (std::getline(fileStream, line)) {
+                // Trim whitespace
+                size_t start = line.find_first_not_of(" \t\r\n");
+                if (start == std::string::npos) continue;
+                
+                // Check if line starts with "namespace"
+                if (line.substr(start, 9) == "namespace") {
+                    // Extract namespace (handle both "namespace X;" and "namespace X {")
+                    size_t nsStart = start + 9;
+                    size_t nsEnd = line.find_first_of(";{", nsStart);
+                    
+                    if (nsEnd != std::string::npos) {
+                        namespaceStr = line.substr(nsStart, nsEnd - nsStart);
+                        
+                        // Trim whitespace from namespace
+                        size_t nsFirst = namespaceStr.find_first_not_of(" \t\r\n");
+                        size_t nsLast = namespaceStr.find_last_not_of(" \t\r\n");
+                        if (nsFirst != std::string::npos && nsLast != std::string::npos) {
+                            namespaceStr = namespaceStr.substr(nsFirst, nsLast - nsFirst + 1);
+                            fullTypeName = namespaceStr + "." + scriptClassName;
+                            
+                            // Extract root namespace (e.g., "EchoesBelow" from "EchoesBelow.Scripts")
+                            size_t dotPos = namespaceStr.find('.');
+                            rootNamespace = (dotPos != std::string::npos) 
+                                ? namespaceStr.substr(0, dotPos) 
+                                : namespaceStr;
+                        }
+                        break;
+                    }
+                }
+            }
+            fileStream.close();
+        }
 
         // 2. Convert to relative path if within project
         std::string relativePath = selectedFilePath;
@@ -141,8 +184,27 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
             relativePath = selectedFilePath;
         }
 
-        // 3. Attach the ScriptInstance component with both class name and path
-        _attachScriptComponent(entityId, scriptClassName, relativePath);
+        // 3. Attempt to load the game assembly if we have a root namespace
+        if (!rootNamespace.empty()) {
+            // Try to find and load the assembly DLL (e.g., EchoesBelow.dll)
+            std::string assemblyName = rootNamespace + ".dll";
+            //std::filesystem::path assemblyPath = std::filesystem::path("build/Debug") / assemblyName;
+            
+            if (std::filesystem::exists(assemblyName)) {
+                // TODO: Call ScriptSystem to load this assembly into the AppDomain
+                // For now, log a warning that the assembly should be loaded
+                LOG_INFO("Script uses assembly: " << assemblyName);
+                LOG_WARNING("Multi-assembly loading not yet implemented - ensure " 
+                    << assemblyName << " is loaded via ScriptSystem");
+            }
+            else {
+                LOG_WARNING("Assembly not found: " << assemblyName 
+                    << " - script may fail to instantiate at runtime");
+            }
+        }
+        
+        // 4. Attach the ScriptInstance component with full type name and path
+        _attachScriptComponent(entityId, fullTypeName, relativePath);
 
         // 4. Update selection state (using the correct member variable name)
         m_selectedEntityIds.clear();
@@ -976,7 +1038,7 @@ void HierarchyPanel::_startRename(EntityId entityId) {
 /**
  * @brief Ensures an entity has a ScriptInstance component, and sets its TypeName and ScriptPath.
  * @param entityId The entity to modify.
- * @param scriptName The C# class name (e.g., "PlayerController").
+ * @param scriptName The fully qualified C# type name including namespace (e.g., "MyGame.PlayerController").
  * @param scriptPath The relative path to the script file (e.g., "Assets/Scripts/PlayerController.cs").
  */
 void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string& scriptName, const std::string& scriptPath) {
@@ -985,16 +1047,32 @@ void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string
     ECS::Entity e = m_world->Resolve(entityId);
     if (e.IsNull() || !m_world->IsAlive(e)) return;
 
-    // 1. Ensure the component exists (Add it if it doesn't)
+    // 1. Ensure the entity has an Active component (required by ScriptSystem)
+    if (!m_world->Has<ECS::Components::Active>(e)) {
+        ECS::Components::Active activeComp;
+        activeComp.Enabled = true;
+        m_world->Add<ECS::Components::Active>(e, activeComp);
+    }
+
+    // 2. Ensure the entity has a LocalTransform component (required by most scripts)
+    if (!m_world->Has<ECS::Components::LocalTransform>(e)) {
+        ECS::Components::LocalTransform transform;
+        transform.Position = Vector3D{0, 0, 0};
+        transform.Rotation = Quaternion{0, 0, 0, 1};
+        transform.Scale = Vector3D{1, 1, 1};
+        m_world->Add<ECS::Components::LocalTransform>(e, transform);
+    }
+
+    // 3. Ensure the ScriptInstance component exists (Add it if it doesn't)
     if (!m_world->Has<ECS::Components::ScriptInstance>(e)) {
         ECS::Components::ScriptInstance newScript;
         m_world->Add<ECS::Components::ScriptInstance>(e, newScript);
     }
 
-    // 2. Update the component's TypeName and ScriptPath
+    // 3. Update the component's TypeName and ScriptPath
     auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(e);
 
-    // Set the script class name
+    // Set the fully qualified type name (e.g., "MyGame.PlayerController")
     strncpy_s(scriptComp.TypeName, scriptName.c_str(), sizeof(scriptComp.TypeName) - 1);
     scriptComp.TypeName[sizeof(scriptComp.TypeName) - 1] = '\0'; // Always null-terminate
 
@@ -1002,7 +1080,7 @@ void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string
     strncpy_s(scriptComp.ScriptPath, scriptPath.c_str(), sizeof(scriptComp.ScriptPath) - 1);
     scriptComp.ScriptPath[sizeof(scriptComp.ScriptPath) - 1] = '\0'; // Always null-terminate
 
-    // 3. Mark for re-initialization by the ScriptingSystem at runtime
+    // 4. Mark for re-initialization by the ScriptingSystem at runtime
     // Setting Initialized = false forces the runtime to load this C# class 
     // and call its Start/Awake method.
     scriptComp.Initialized = false;

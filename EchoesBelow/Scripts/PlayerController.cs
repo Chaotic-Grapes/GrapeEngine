@@ -12,8 +12,8 @@ namespace EchoesBelow.Scripts;
 /// </summary>
 public class PlayerController : ScriptBehaviour
 {
-    private const float MoveForce = 150.0f;
-    private const float JumpForce = 300.0f;
+    private const float MoveSpeed = 5.0f;
+    private const float JumpVelocity = 8.0f;
     private bool _isGrounded;
 
     public override void OnStart()
@@ -27,7 +27,10 @@ public class PlayerController : ScriptBehaviour
     {
         // Check if grounded (simple ground check based on Y position)
         var transform = GetComponent<LocalTransform>();
-        _isGrounded = transform.Position.Y < -1.5f;
+        _isGrounded = transform.Position.Y <= -2.0f;
+
+        // Get current velocity
+        ref var velocity = ref GetComponent<LinearVelocity2D>();
 
         // Horizontal movement with WASD or Arrow keys
         var moveX = 0.0f;
@@ -41,24 +44,18 @@ public class PlayerController : ScriptBehaviour
             moveX += 1.0f;
         }
 
-        // Apply horizontal force
-        if (moveX != 0.0f)
-        {
-            Physics.ApplyForce(Entity, new Vector2(moveX * MoveForce, 0));
-        }
+        // Set horizontal velocity directly
+        velocity.Value.X = moveX * MoveSpeed;
 
         // Jump with Space or W/Up
         if (_isGrounded && (Input.IsKeyPressed(KeyCode.Space) || 
                            Input.IsKeyPressed(KeyCode.W) || 
                            Input.IsKeyPressed(KeyCode.Up)))
         {
-            Physics.ApplyImpulse(Entity, new Vector2(0, JumpForce));
+            velocity.Value.Y = JumpVelocity;
             Log("Player jumped!");
         }
 
-        // Get current velocity for debug
-        var velocity = Physics.GetVelocity(Entity);
-        
         // Random color change on mouse click (demonstrates Math API)
         if (Input.IsMousePressed(MouseButton.Left))
         {
@@ -75,8 +72,8 @@ public class PlayerController : ScriptBehaviour
         {
             Log($"=== Player Info ===");
             Log($"Position: ({transform.Position.X:F2}, {transform.Position.Y:F2})");
-            Log($"Velocity: ({velocity.X:F2}, {velocity.Y:F2})");
-            Log($"Speed: {GMath.Length(velocity):F2}");
+            Log($"Velocity: ({velocity.Value.X:F2}, {velocity.Value.Y:F2})");
+            Log($"Speed: {GMath.Length(velocity.Value):F2}");
             Log($"Grounded: {_isGrounded}");
             Log($"Time Scale: {Time.TimeScale:F2}");
             Log($"FPS: {(1f / Time.DeltaTime):F0}");

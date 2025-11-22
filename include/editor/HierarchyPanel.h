@@ -116,7 +116,7 @@ private:
     void _renderEntityContextMenu();
 
     // Ensure entity has a ScriptInstance component and set its script class name and path
-    void _attachScriptComponent(EntityId entityId, const std::string& scriptName, const std::string& scriptPath);
+    void _attachScriptComponent(EntityId entityId, const std::string& scriptName, const std::string& scriptPath); // scriptName must be fully qualified (e.g., "MyGame.PlayerController")
 
     // -------------------------------------------------------------------------
     // Entity Operations

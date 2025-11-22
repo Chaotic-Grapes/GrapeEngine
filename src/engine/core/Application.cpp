@@ -206,13 +206,13 @@ namespace Engine {
 
         // Initialize scripting system
         m_scriptSystem = new ECS::ScriptSystem();
-        if (!m_scriptSystem->Initialize("scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")) {
+        if (!m_scriptSystem->Initialize("GrapeEngine.ScriptAPI.runtimeconfig.json")) {
             LOG_WARNING("Failed to initialize ScriptSystem");
         }
         else {
             LOG_INFO("ScriptSystem initialized successfully");
             // Load the script API assembly
-            if (!m_scriptSystem->LoadAssembly("scripts/GrapeEngine.ScriptAPI.dll")) {
+            if (!m_scriptSystem->LoadAssembly("GrapeEngine.ScriptAPI.dll")) {
                 LOG_WARNING("Failed to load ScriptAPI assembly");
             }
         }

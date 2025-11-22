@@ -12,10 +12,9 @@
     <!-- Reference the engine's Script API -->
     <Reference Include="GrapeEngine.ScriptAPI">
       <HintPath>..\build\Debug\GrapeEngine.ScriptAPI.dll</HintPath>
+      <Private>false</Private>
+      <SpecificVersion>false</SpecificVersion>
     </Reference>
   </ItemGroup>
-
-  <!-- Scripts are automatically included by default from the project directory -->
-  <!-- No need to explicitly add Compile items unless you want to override the default -->
 
 </Project>
