@@ -22,24 +22,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef RENDERER2D_H
 #define RENDERER2D_H
 
-// ============================================================================
 // Third-Party Includes
-// ============================================================================
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-// ============================================================================
 // Engine Includes
-// ============================================================================
 #include "Color.h"
 #include "ecs/World.h"
 #include "Math/Vector2D.h"
 #include "EditorFileMenu.h"
 
-// ============================================================================
 // Graphics Includes
-// ============================================================================
 #include "graphics/shader.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/debugDraw2D.hpp"

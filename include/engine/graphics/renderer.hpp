@@ -49,7 +49,9 @@ public:
         const glm::vec4& color,
         float rotation = 0.0f,
         float scale = 1.0f,
-        int layer = 0);
+        int layer = 0,
+        GLuint emissiveTextureId = 0,
+        float emissiveStrength = 0.0f);
 
     // Generic triangles for helpers (polygons/circles/etc.)
     void submitTriangles(const Vertex* verts, size_t vCount,
@@ -83,14 +85,17 @@ private:
     size_t vboCapacity = 0;
     size_t eboCapacity = 0;
 
-    // Texture slot cache (for uTextures[N] shader array)
-    static constexpr int MaxTextureSlots = 32;
-    std::vector<GLuint> textureSlots;   // GL texture ids in slots 0..N-1
+    // We share the max 32 slots with different types of textures...
+    static constexpr int MaxAlbedoTextureSlots = 24;
+    static constexpr int MaxEmissiveTextureSlots = 8;
+    std::vector<GLuint> albedoTextureSlots;      // Bind to GL_TEXTURE0-15
+    std::vector<GLuint> emissiveTextureSlots;    // Bind to GL_TEXTURE16-31
 
     // Helpers
     void ensureCapacity(size_t vNeeded, size_t iNeeded);
     void flush();
     void clearTextureSlots();
     int  getOrAssignTextureSlot(GLuint textureId, bool& flushed); // returns 0..N-1
+    int getOrAssignEmissiveTextureSlot(GLuint textureId, bool& flushed);
     void bindTextureSlots() const;
 };
