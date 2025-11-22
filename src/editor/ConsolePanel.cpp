@@ -28,17 +28,17 @@ void ConsolePanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 
     // Clear any messages that accumulated before console was initialized
     Clear();
-    
+
     m_initialized = true;
 }
 
 void ConsolePanel::Shutdown() {
     // Mark as uninitialized to prevent any new messages
     m_initialized = false;
-    
+
     // Clear callback to prevent further invocations during shutdown
     Logger::Get().SetConsoleCallback(nullptr);
-    
+
     // Clear messages
     std::lock_guard<std::mutex> lock(m_messagesMutex);
     m_messages.clear();
@@ -76,15 +76,11 @@ void ConsolePanel::_renderToolbar() {
     // Message count
     ImGui::Text("| Messages: %zu", m_messages.size());
 
-    // Filter toggles
+    // Filter toggles - only show WRN/ERR/CRT since INFO/DEBUG are filtered at source
     ImGui::Separator();
     ImGui::Text(" Filter:");
     ImGui::SameLine();
 
-    if (ImGui::Checkbox("INF", &m_showInfo)) {}
-    ImGui::SameLine();
-    if (ImGui::Checkbox("DBG", &m_showDebug)) {}
-    ImGui::SameLine();
     if (ImGui::Checkbox("WRN", &m_showWarning)) {}
     ImGui::SameLine();
     if (ImGui::Checkbox("ERR", &m_showError)) {}
@@ -161,20 +157,20 @@ void ConsolePanel::AddMessage(LogLevel level, LogSource source, const std::strin
     if (!m_initialized) {
         return;
     }
-    
+
     // Filter: Only store warnings/errors/critical from any source,
     // OR info/debug from SCRIPT source only
     if (level == LogLevel::TRACE) {
         return; // Never show TRACE in console
     }
-    
+
     if ((level == LogLevel::INFO || level == LogLevel::DEBUG) && source != LogSource::SCRIPT) {
         return; // Only show INFO/DEBUG from scripts, not engine
     }
 
     // Thread-safe message insertion
     std::lock_guard<std::mutex> lock(m_messagesMutex);
-    
+
     // Limit message buffer size
     if (m_messages.size() >= MAX_MESSAGES) {
         m_messages.erase(m_messages.begin());
