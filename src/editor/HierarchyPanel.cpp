@@ -80,7 +80,7 @@ namespace {
     bool IsProtectedEntity(ECS::World* world, EntityId entityId) {
         if (!world)
             return false;
-        
+
         // Resolve the entity from its ID
         ECS::Entity entity = world->Resolve(entityId);
 
@@ -234,6 +234,49 @@ void HierarchyPanel::Render() {
     _renderHeader();           // Header with entity creation controls
     _renderEntityTree();       // Main entity tree with drag-drop
     _renderFooterButtons();    // Footer buttons like Clear All
+
+    // Process deferred deletions AFTER tree rendering is complete
+    // This prevents crashes from modifying the hierarchy while iterating it
+    if (!m_deferredDeletions.empty()) {
+        for (EntityId id : m_deferredDeletions) {
+            if (!IsProtectedEntity(m_world, id)) {
+                // Collect all entities that will be deleted (parent + all children recursively)
+                std::vector<EntityId> allDeletedIds;
+                std::function<void(EntityId)> collectRecursive = [&](EntityId deleteId) {
+                    allDeletedIds.push_back(deleteId);
+
+                    // Recursively collect all children
+                    auto children = _getChildren(deleteId);
+                    for (EntityId childId : children) {
+                        collectRecursive(childId);
+                    }
+                    };
+                collectRecursive(id);
+
+                // Perform the deletion (this destroys parent + all children)
+                if (m_entityActions) {
+                    m_entityActions->RemoveEntity(id);
+                }
+
+                // Remove ALL deleted entities from selection
+                for (EntityId deletedId : allDeletedIds) {
+                    m_selectedEntityIds.erase(deletedId);
+                }
+
+                // Update anchor if it was one of the deleted entities
+                if (std::find(allDeletedIds.begin(), allDeletedIds.end(), m_anchorEntityId) != allDeletedIds.end()) {
+                    m_anchorEntityId = m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin();
+                }
+
+                // Notify callback if selection changed
+                if (m_selectedEntityIds.empty()) {
+                    if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
+                }
+            }
+        }
+        m_deferredDeletions.clear();
+        m_contextMenuTarget = ECS::Entity::NPOS32;
+    }
 
     // Handle delete key for selected entities: global keyboard shortcut
     if (Input::IsKeyDown(KEY_DELETE) && !m_selectedEntityIds.empty()) {
@@ -450,9 +493,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
             ImGui::SetKeyboardFocusHere();
             m_focusRenameInput = false;
         }
-        
+
         ImGui::SetNextItemWidth(-1);
-        if (ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer), 
+        if (ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer),
             ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
             // Apply rename on Enter
             if (strlen(m_renameBuffer) > 0 && m_world->Has<ECS::Components::Name>(entity)) {
@@ -462,9 +505,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
             }
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
-        
+
         // Cancel rename on Escape or click away
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape) || 
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape) ||
             (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsItemHovered())) {
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
@@ -510,7 +553,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
 
     // Get current time for click timing
     float currentTime = ImGui::GetTime();
-    
+
     // Check modifier keys
     bool ctrlPressed = ImGui::GetIO().KeyCtrl;
     bool shiftPressed = ImGui::GetIO().KeyShift;
@@ -543,12 +586,12 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     else if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         // Check if this is a slow second click on the same already-selected entity BEFORE updating times
         bool isAlreadySelected = (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end());
-        bool isSlowSecondClick = (m_lastClickedEntity == entityId && 
-                                   isAlreadySelected &&
-                                   m_selectedEntityIds.size() == 1 &&
-                                   (currentTime - m_lastClickTime) > RENAME_DELAY_THRESHOLD &&
-                                   (currentTime - m_lastClickTime) < 2.0f);
-        
+        bool isSlowSecondClick = (m_lastClickedEntity == entityId &&
+            isAlreadySelected &&
+            m_selectedEntityIds.size() == 1 &&
+            (currentTime - m_lastClickTime) > RENAME_DELAY_THRESHOLD &&
+            (currentTime - m_lastClickTime) < 2.0f);
+
         if (isSlowSecondClick && !ctrlPressed && !shiftPressed) {
             // Start rename mode (only for single selection, no modifiers)
             _startRename(entityId);
@@ -556,7 +599,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         else if (shiftPressed && m_anchorEntityId != ECS::Entity::NPOS32) {
             // Shift+Click: Range selection from anchor to clicked entity
             m_selectedEntityIds.clear();
-            
+
             // Get all entities in flat list (hierarchy order)
             std::vector<EntityId> allEntities;
             std::function<void(EntityId)> collectEntities = [&](EntityId id) {
@@ -564,25 +607,25 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
                 for (EntityId childId : _getChildren(id)) {
                     collectEntities(childId);
                 }
-            };
+                };
             for (EntityId rootId : _getRootEntities()) {
                 collectEntities(rootId);
             }
-            
+
             // Find indices of anchor and clicked entity
             auto anchorIt = std::find(allEntities.begin(), allEntities.end(), m_anchorEntityId);
             auto clickedIt = std::find(allEntities.begin(), allEntities.end(), entityId);
-            
+
             if (anchorIt != allEntities.end() && clickedIt != allEntities.end()) {
                 // Select range between anchor and clicked (inclusive)
                 auto startIt = (anchorIt < clickedIt) ? anchorIt : clickedIt;
                 auto endIt = (anchorIt < clickedIt) ? clickedIt : anchorIt;
-                
+
                 for (auto it = startIt; it <= endIt; ++it) {
                     m_selectedEntityIds.insert(*it);
                 }
             }
-            
+
             if (m_selectionCallback) m_selectionCallback(entityId);
         }
         else if (ctrlPressed) {
@@ -616,7 +659,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
                 if (m_selectionCallback) m_selectionCallback(entityId);
             }
         }
-        
+
         // Update click tracking for next time
         m_lastClickedEntity = entityId;
         m_lastClickTime = currentTime;
@@ -631,21 +674,21 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
     // Drag source: make this entity draggable
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         // If dragging a selected entity, drag all selected entities (multi-select support)
-        bool isDraggingSelection = m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end() && 
-                                    m_selectedEntityIds.size() > 1;
-        
+        bool isDraggingSelection = m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end() &&
+            m_selectedEntityIds.size() > 1;
+
         if (isDraggingSelection) {
             // Drag all selected entities as a vector
             std::vector<EntityId> selectedVec(m_selectedEntityIds.begin(), m_selectedEntityIds.end());
             ImGui::SetDragDropPayload("ENTITY_IDS", selectedVec.data(), selectedVec.size() * sizeof(EntityId));
-            
+
             // Show count in drag preview
             ImGui::Text("(%zu entities)", selectedVec.size());
-        } 
+        }
         else {
             // Single entity drag
             ImGui::SetDragDropPayload("ENTITY_ID", &entityId, sizeof(EntityId));
-            
+
             // Show entity name as drag preview
             ECS::Entity entity = m_world->Resolve(entityId);
             if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::Name>(entity)) {
@@ -669,12 +712,12 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
                 }
             }
         }
-        
+
         // Handle multiple entities reparenting
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_IDS")) {
             size_t count = payload->DataSize / sizeof(EntityId);
             const EntityId* draggedIds = static_cast<const EntityId*>(payload->Data);
-            
+
             // Reparent all dragged entities
             for (size_t i = 0; i < count; ++i) {
                 EntityId draggedId = draggedIds[i];
@@ -735,12 +778,12 @@ void HierarchyPanel::_handleTreeDragDrop() {
                 }
             }
         }
-        
+
         // Reparent multiple entities to root
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_IDS")) {
             size_t count = payload->DataSize / sizeof(EntityId);
             const EntityId* draggedIds = static_cast<const EntityId*>(payload->Data);
-            
+
             // Reparent all dragged entities to root
             for (size_t i = 0; i < count; ++i) {
                 EntityId draggedId = draggedIds[i];
@@ -803,7 +846,7 @@ void HierarchyPanel::_renderEntityContextMenu() {
                     _addChildEntity(m_contextMenuTarget);
                 }
             }
-            
+
             // Clone works with multiple selections
             std::string cloneLabel = (selectionCount > 1) ? "Clone (" + std::to_string(selectionCount) + ")" : "Clone";
             if (ImGui::Selectable(cloneLabel.c_str())) {
@@ -814,15 +857,15 @@ void HierarchyPanel::_renderEntityContextMenu() {
                     }
                 }
             }
-            
+
             // Rename only available for single selection
             if (selectionCount == 1) {
                 if (ImGui::Selectable("Rename")) {
                     _startRename(m_contextMenuTarget);
                 }
             }
-            
-            
+
+
             // Delete works with multiple selections
             std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
             if (ImGui::Selectable(deleteLabel.c_str())) {
@@ -871,30 +914,11 @@ void HierarchyPanel::_renderEntityContextMenu() {
 // Entity Operations
 // -------------------------------------------------------------------------
 
-// Delete an entity and update selection
-// Also handles cleanup of selection state
+// Delete an entity - defers actual deletion until after tree rendering
+// This prevents crashes from modifying hierarchy while iterating it
 void HierarchyPanel::_deleteEntity(EntityId entityId) {
-    // Block deletion of protected entities
-    if (IsProtectedEntity(m_world, entityId)) return;
-
-    if (m_entityActions) {
-        m_entityActions->RemoveEntity(entityId);
-    }
-
-    // Remove from selection if deleted entity was selected
-    m_selectedEntityIds.erase(entityId);
-    
-    // Update anchor if it was the deleted entity
-    if (m_anchorEntityId == entityId) {
-        m_anchorEntityId = m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin();
-    }
-    
-    // Notify callback if selection changed
-    if (m_selectedEntityIds.empty()) {
-        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
-    }
-    
-    m_contextMenuTarget = ECS::Entity::NPOS32;
+    // Add to deferred deletion queue
+    m_deferredDeletions.push_back(entityId);
 }
 
 // Clone an entity: creates a duplicate with same components and hierarchy
@@ -932,7 +956,7 @@ void HierarchyPanel::_startRename(EntityId entityId) {
 
     // Start renaming this entity
     m_renamingEntityId = entityId;
-    
+
     // Copy current name to rename buffer
     ECS::Entity entity = m_world->Resolve(entityId);
     if (m_world->Has<ECS::Components::Name>(entity)) {
@@ -943,7 +967,7 @@ void HierarchyPanel::_startRename(EntityId entityId) {
     else {
         strncpy_s(m_renameBuffer, "Entity", sizeof(m_renameBuffer) - 1);
     }
-    
+
     m_focusRenameInput = true;
 }
 
@@ -1092,7 +1116,7 @@ std::vector<EntityId> HierarchyPanel::_getRootEntities() const {
         if (m_world->ParentOf(e).IsNull()) {
             roots.push_back(e.Index);
         }
-    });
+        });
 
     return roots;
 }
@@ -1112,7 +1136,7 @@ std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) const {
         if (!ShouldHideFromHierarchy(m_world, child)) {
             children.push_back(child.Index);
         }
-    });
+        });
 
     return children;
 }
@@ -1131,13 +1155,13 @@ bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
     if (m_world->Has<ECS::Components::Name>(entity)) {
         const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
         std::string entityName = nameComp.Value;
-        
+
         // Convert both to lowercase for case-insensitive search
         std::string lowerName = entityName;
         std::string lowerFilter = m_searchFilter;
         std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
         std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(), ::tolower);
-        
+
         // Check if entity name contains the filter string
         return lowerName.find(lowerFilter) != std::string::npos;
     }
@@ -1171,7 +1195,7 @@ void HierarchyPanel::RebuildEntityOrder() {
 void HierarchyPanel::_rebuildEntityOrderRecursive(EntityId entityId) {
     // Add current entity to order
     m_entityOrder.push_back(entityId);
-    
+
     // Recursively add all children
     auto children = _getChildren(entityId);
     for (EntityId childId : children) {
@@ -1186,7 +1210,7 @@ void HierarchyPanel::ClearUIState() {
     m_renamingEntityId = ECS::Entity::NPOS32;
     m_contextMenuTarget = ECS::Entity::NPOS32;
     m_searchFilter.clear();
-    
+
     // Notify selection callback that nothing is selected
     if (m_selectionCallback) {
         m_selectionCallback(ECS::Entity::NPOS32);

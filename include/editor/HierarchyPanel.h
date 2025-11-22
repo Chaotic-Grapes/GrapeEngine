@@ -206,6 +206,9 @@ private:
     // Entity order for scene serialization (preserves visual hierarchy order)
     // This is a HINT for saving - the ECS World's HierarchyIndex is the source of truth for rendering
     std::vector<EntityId> m_entityOrder;            // Ordered list for serialization
+
+    // DON'T REMOVE: IMPORTANT
+    std::vector<EntityId> m_deferredDeletions;
 };
 
 #endif
