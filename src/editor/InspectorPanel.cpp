@@ -472,8 +472,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
 // Renders the Add Component button row at the bottom of the inspector
 void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
-    ImGui::Separator();
-
     // Button to open the Add Component popup menu
     if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");

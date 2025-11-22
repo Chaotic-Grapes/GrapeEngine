@@ -822,26 +822,6 @@ void HierarchyPanel::_renderEntityContextMenu() {
                 }
             }
             
-            ImGui::Separator();
-            
-            // Script attachment/detachment - only for single selection
-            if (selectionCount == 1) {
-                ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
-                bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
-                
-                if (!hasScriptComponent) {
-                    if (ImGui::Selectable("Attach Script")) {
-                        _importAndAttachScript(m_contextMenuTarget);
-                    }
-                }
-                else {
-                    if (ImGui::Selectable("Detach Script")) {
-                        m_world->Remove<ECS::Components::ScriptInstance>(targetEntity);
-                    }
-                }
-                
-                ImGui::Separator();
-            }
             
             // Delete works with multiple selections
             std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
@@ -854,14 +834,33 @@ void HierarchyPanel::_renderEntityContextMenu() {
                     }
                 }
             }
-
             ImGui::Separator();
-
+            if (selectionCount == 1) {
+                ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
+                bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
+                if (!hasScriptComponent) {
+                    if (ImGui::Selectable("Attach Script")) {
+                        _importAndAttachScript(m_contextMenuTarget);
+                    }
+                }
+                else {
+                    if (ImGui::Selectable("Detach Script")) {
+                        m_world->Remove<ECS::Components::ScriptInstance>(targetEntity);
+                    }
+                }
+            }
             if (ImGui::BeginMenu("Add Component")) {
-                // You can add other component types (Renderer, Rigidbody, etc.) here later
-                // if (ImGui::BeginMenu("Physics")) { ... }
-
-                ImGui::EndMenu(); // End Add Component menu
+                ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
+                const auto& registry = ComponentRegistryUI::GetAll();
+                for (const auto& meta : registry) {
+                    bool hasComponent = meta.HasComponent(m_world, targetEntity);
+                    if (hasComponent) ImGui::BeginDisabled();
+                    if (ImGui::MenuItem(meta.DisplayName.c_str())) {
+                        meta.AddComponent(m_world, targetEntity, meta.GetDefaults());
+                    }
+                    if (hasComponent) ImGui::EndDisabled();
+                }
+                ImGui::EndMenu();
             }
         }
         ImGui::EndPopup();
