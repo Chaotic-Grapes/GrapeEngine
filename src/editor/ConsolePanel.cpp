@@ -104,7 +104,7 @@ void ConsolePanel::_renderMessages() {
         const auto& msg = m_messages[i];
 
         if (_shouldDisplayMessage(msg)) {
-            _renderMessage(msg, displayedCount);
+            _renderMessage(msg, i);
             displayedCount++;
         }
     }
@@ -119,15 +119,35 @@ void ConsolePanel::_renderMessages() {
 }
 
 void ConsolePanel::_renderMessage(const ConsoleMessage& msg, int index) {
-    // Alternating background colors for readability
-    if (index % 2 == 0) {
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.1f, 0.1f, 0.1f, 0.3f));
+    // Determine background color (selected > hovered > alternating)
+    bool isSelected = (index == m_selectedMessageIndex);
+    bool isHovered = (index == m_hoveredMessageIndex);
+    
+    ImVec4 bgColor;
+    if (isSelected) {
+        bgColor = ImVec4(0.3f, 0.4f, 0.6f, 0.5f); // Blue for selected
+    }
+    else if (isHovered) {
+        bgColor = ImVec4(0.2f, 0.2f, 0.2f, 0.5f); // Darker gray for hover
+    }
+    else if (index % 2 == 0) {
+        bgColor = ImVec4(0.1f, 0.1f, 0.1f, 0.3f); // Alternating background
     }
     else {
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        bgColor = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     }
-
-    ImGui::BeginChild(ImGui::GetID((void*)(intptr_t)index), ImVec2(0, ImGui::GetTextLineHeightWithSpacing()), false);
+    
+    // Calculate text height for wrapping
+    float availableWidth = ImGui::GetContentRegionAvail().x;
+    float timestampWidth = ImGui::CalcTextSize(msg.Timestamp.c_str()).x;
+    float levelBadgeWidth = ImGui::CalcTextSize("[XXX]").x;
+    float messageWidth = availableWidth - timestampWidth - levelBadgeWidth - ImGui::GetStyle().ItemSpacing.x * 2;
+    
+    ImVec2 messageSize = ImGui::CalcTextSize(msg.Content.c_str(), nullptr, false, messageWidth);
+    float messageHeight = messageSize.y + ImGui::GetStyle().ItemSpacing.y * 2;
+    
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, bgColor);
+    ImGui::BeginChild(ImGui::GetID((void*)(intptr_t)index), ImVec2(0, messageHeight), false);
 
     // Timestamp
     ImGui::TextDisabled("%s", msg.Timestamp.c_str());
@@ -145,6 +165,35 @@ void ConsolePanel::_renderMessage(const ConsoleMessage& msg, int index) {
 
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    
+    // Handle hover detection
+    if (ImGui::IsItemHovered()) {
+        m_hoveredMessageIndex = index;
+        
+        // Handle left click for selection
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            m_selectedMessageIndex = index;
+        }
+    }
+    else if (m_hoveredMessageIndex == index) {
+        m_hoveredMessageIndex = -1;
+    }
+    
+    // Handle right-click context menu
+    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        m_selectedMessageIndex = index;
+        ImGui::OpenPopup("MessageContextMenu");
+    }
+    
+    // Render context menu (only if this is the selected message)
+    if (isSelected && ImGui::BeginPopup("MessageContextMenu")) {
+        if (ImGui::MenuItem("Copy")) {
+            // Format the full message text for clipboard
+            std::string fullMessage = msg.Timestamp + " [" + _getLevelText(msg.Level) + "] " + msg.Content;
+            ImGui::SetClipboardText(fullMessage.c_str());
+        }
+        ImGui::EndPopup();
+    }
 }
 
 // -------------------------------------------------------------------------

@@ -91,6 +91,8 @@ private:
     char m_searchBuffer[256] = {};
     bool m_autoScroll = true;
     bool m_scrollToBottom = false;
+    int m_selectedMessageIndex = -1;
+    int m_hoveredMessageIndex = -1;
 
     // Message limits
     static constexpr size_t MAX_MESSAGES = 1000;
