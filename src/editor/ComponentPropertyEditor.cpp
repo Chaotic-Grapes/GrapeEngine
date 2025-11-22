@@ -113,6 +113,30 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
                 }
             }
         }
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                auto tex = RM.Get<Texture>(path);
+                if (tex) {
+                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["TexturePath"] = path;
+                    data["Width"] = tex->Width();
+                    data["Height"] = tex->Height();
+                    dropped = true;
+                    LOG_INFO("Dropped texture: " << path << ", id=" << tex->ID());
+                } else {
+                    LOG_ERROR("Failed to load dropped texture: " << path);
+                }
+                break;
+            }
+        }
         ImGui::EndDragDropTarget();
     }
 
@@ -412,6 +436,30 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
                 }
             }
         }
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                auto tex = RM.Get<Texture>(path);
+                if (tex) {
+                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["TexturePath"] = path;
+                    data["SheetWidth"] = tex->Width();
+                    data["SheetHeight"] = tex->Height();
+                    dropped = true;
+                    LOG_INFO("Dropped sprite sheet: " << path << ", id=" << tex->ID());
+                } else {
+                    LOG_ERROR("Failed to load dropped sprite sheet: " << path);
+                }
+                break;
+            }
+        }
         ImGui::EndDragDropTarget();
     }
 
@@ -544,6 +592,23 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data)
             else {
                 s_showUnsupportedPopup = true;
                 s_unsupportedPath = path.string();
+            }
+        }
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payload->Data);
+            const char* end = dataBuf + payload->DataSize;
+            while (dataBuf < end) {
+                std::string pathStr(dataBuf);
+                dataBuf += pathStr.size() + 1;
+                if (pathStr.empty()) continue;
+                std::filesystem::path p(pathStr);
+                std::string ext = p.extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                bool supported = (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
+                if (!supported) continue;
+                const auto& clipInfo = lib.Register(p.string());
+                data["CueId"] = clipInfo.id;
+                break;
             }
         }
         ImGui::EndDragDropTarget();

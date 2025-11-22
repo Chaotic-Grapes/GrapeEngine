@@ -346,6 +346,20 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     m_statusTimer = 2.0f;
                 }
             }
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                const char* data = static_cast<const char*>(payload->Data);
+                const char* end = data + payload->DataSize;
+                while (data < end) {
+                    std::string path(data);
+                    data += path.size() + 1;
+                    if (path.empty()) continue;
+                    if (std::filesystem::path(path).extension() != ".prefab") continue;
+                    m_world->Add<ECS::Components::PrefabLink>(entity, path);
+                    m_statusMessage = "Prefab linked to entity";
+                    m_statusTimer = 2.0f;
+                    break;
+                }
+            }
             ImGui::EndDragDropTarget();
         }
 
@@ -903,7 +917,7 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
     file << prefabData.dump(4);
     file.close();
 
-    m_statusMessage = "Saved as " + prefabPath.filename().string();
+    m_statusMessage = "Saved as " + prefabPath.filename().string() + " in Assets\\Prefabs";
     m_statusTimer = 3.0f;
     LOG_INFO("Entity saved as prefab: " << prefabPath);
 }

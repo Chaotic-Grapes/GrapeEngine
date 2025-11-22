@@ -878,6 +878,7 @@ void HierarchyPanel::_renderEntityContextMenu() {
                 }
             }
             ImGui::Separator();
+            // Script attachment/detachment - only for single selection
             if (selectionCount == 1) {
                 ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
                 bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
@@ -893,6 +894,7 @@ void HierarchyPanel::_renderEntityContextMenu() {
                 }
             }
             if (ImGui::BeginMenu("Add Component")) {
+                // You can add other component types (Renderer, Rigidbody, etc.) here later
                 ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
                 const auto& registry = ComponentRegistryUI::GetAll();
                 for (const auto& meta : registry) {
@@ -903,7 +905,7 @@ void HierarchyPanel::_renderEntityContextMenu() {
                     }
                     if (hasComponent) ImGui::EndDisabled();
                 }
-                ImGui::EndMenu();
+                ImGui::EndMenu(); // End Add Component menu
             }
         }
         ImGui::EndPopup();
