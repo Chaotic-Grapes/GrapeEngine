@@ -22,10 +22,10 @@ WindowManager::~WindowManager() {
     DestroyAll();
 }
 
-Window* WindowManager::CreateWindow(const std::string& title, const int width, const int height, const Window* parent) {
+Window* WindowManager::CreateWindow(const std::string& title, const int width, const int height, bool vsync, WindowMode::Flags mode, const Window* parent) {
     const auto window = new Window();
     // TODO: Hardware manager before supporting glfwGetPrimaryMonitor()
-    if (window->Create(title, width, height, /*glfwGetPrimaryMonitor()*/ nullptr, parent ? parent->Handle() : nullptr)) { 
+    if (window->Create(title, width, height, vsync, mode, /*glfwGetPrimaryMonitor()*/ nullptr, parent ? parent->Handle() : nullptr)) { 
         m_windows.push_back(window);
         return window;
     }

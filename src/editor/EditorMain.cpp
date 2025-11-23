@@ -51,9 +51,22 @@ public:
             const auto& config = Engine::CORE->GetConfig();
             width = config.WindowSettings.Width;
             height = config.WindowSettings.Height;
+
+            // Create main window based on editor config
+            auto* window = CREATE_WINDOW_EX("Grape Engine Editor", width, height, 
+                config.WindowSettings.VSync,
+                config.WindowSettings.Fullscreen 
+                    ? WindowMode::Fullscreen 
+                    : WindowMode::Windowed
+                );
         }
-        
-        CREATE_WINDOW("Grape Engine Editor", width, height);
+
+        // Check if window is created
+        auto* mainWindow = WindowManager::GetMainWindow();
+        if (!mainWindow) {
+            // Create main window if not already created
+            CREATE_WINDOW("Grape Engine Editor", width, height);
+        }
         
         // Enable level editor without a scene (scene-less editor mode)
         if (auto* overlay = Services::OverlayService::Get()) {

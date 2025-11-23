@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <string>
 #include <glad/glad.h> // DO NOT REMOVE THIS LINE OR IT WILL NOT COMPILE
 #include <GLFW/glfw3.h>
+#include <optional>
 
 #pragma region WindowMode enum
 struct WindowMode {
@@ -54,7 +55,7 @@ public:
 	Window() = default;
 	~Window();
 
-	bool Create(const std::string& title, int width, int height, GLFWmonitor* monitor = nullptr, GLFWwindow* parent = nullptr);
+	bool Create(const std::string& title, int width, int height, bool vsync = true, WindowMode::Flags mode = WindowMode::Windowed, GLFWmonitor* monitor = nullptr, GLFWwindow* parent = nullptr);
 	void Destroy();
 
 	void PollEvents() const;
@@ -77,7 +78,13 @@ public:
 	
 	void Mode(WindowMode::Flags mode, GLFWmonitor* monitor = nullptr);
 	bool HasMode(WindowMode::Flags value) const;
-	void Resize(int width, int height);
+	void Resize(std::optional<int> width, std::optional<int> height);
+
+	void SetVSync(bool enabled);
+	bool IsVSync() const;
+
+	void SetTitle(const std::string& title);
+	std::string GetTitle() const;
 
 	GLFWwindow* Handle() const;
 
@@ -90,6 +97,8 @@ private:
 	// Remember windowed mode size and position for restoring
 	int m_windowedX = 100, m_windowedY = 100;
 	int m_windowedWidth = 1280, m_windowedHeight = 720; // TODO: Scaling?
+
+	bool m_vsync = true;
 
 	WindowMode::Flags m_mode = WindowMode::Windowed;
 };

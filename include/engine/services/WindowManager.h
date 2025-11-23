@@ -18,7 +18,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define WINDOW_MANAGER_H
 
 #define CREATE_WINDOW(title, width, height) WindowManager::CreateWindow(title, width, height)
-#define CREATE_CHILD_WINDOW(title, width, height, parent) WindowManager::CreateWindow(title, width, height, parent)
+#define CREATE_WINDOW_EX(title, width, height, vsync, mode) WindowManager::CreateWindow(title, width, height, vsync, mode)
+#define CREATE_CHILD_WINDOW(title, width, height, vsync, mode, parent) WindowManager::CreateWindow(title, width, height, vsync, mode, parent)
 #define DESTROY_WINDOW(window) WindowManager::DestroyWindow(window)
 #define DESTROY_ALL_WINDOWS() WindowManager::DestroyAll();
 
@@ -34,7 +35,7 @@ public:
     ~WindowManager();
 
     // Create a new window, or a child window
-    static Window* CreateWindow(const std::string& title, int width, int height, const Window* parent = nullptr);
+    static Window* CreateWindow(const std::string& title, int width, int height, bool vsync = true, WindowMode::Flags mode = WindowMode::Windowed, const Window* parent = nullptr);
 
     // Destroy a specific window
     static void DestroyWindow(const Window* window);

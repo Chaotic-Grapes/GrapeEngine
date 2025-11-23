@@ -83,7 +83,7 @@ namespace Serialization {
             json configJson;
             if (!Serializer::LoadJson(configPath, "json", configJson)) {
                 LOG_WARNING("Warning: Could not open config file: " << configPath);
-                LOG_WARNING("Using default configuration.");
+                LOG_WARNING("Creating default configuration to use.");
                 config = GetDefaultConfig();
                 SaveConfig(configPath, config); // Save default config
                 return false;
