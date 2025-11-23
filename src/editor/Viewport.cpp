@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file   ViewportPanel.cpp
-\author Samantha Leong (75%)
-        Foo Rui Qin    (20%)
+\author Samantha Leong (50%)
+        Foo Rui Qin    (45%)
         Muhammad Nur Fadzly Bin Zulkifli (5%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
@@ -354,6 +354,42 @@ void Viewport::_renderViewport() {
     }
 
     ImGui::End();
+}
+
+void Viewport::FocusOnEntity(EntityId entityId) {
+    if (!m_world || !m_rendererSystem) return;
+
+    ECS::Entity entity = m_world->Resolve(entityId);
+    if (!m_world->IsAlive(entity)) return;
+
+    // Get entity position (use WorldTransform if available, else LocalTransform)
+    Vector3D position;
+    if (m_world->Has<ECS::Components::WorldTransform>(entity)) {
+        const auto& wt = m_world->Get<ECS::Components::WorldTransform>(entity);
+        // Extract position from the translation column of the matrix
+        // In a standard 4x4 transformation matrix, translation is in the last column
+        position.X = wt.Matrix.m03;
+        position.Y = wt.Matrix.m13;
+        position.Z = wt.Matrix.m23;
+    }
+    else if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
+        const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
+        position = lt.Position;
+    }
+    else {
+        // No transform component, can't focus
+        LOG_WARNING("Cannot focus on entity " << entityId << " - no transform component");
+        return;
+    }
+
+    // Access editor camera through renderer system and focus on entity
+    auto* editorCam = m_rendererSystem->GetEditorCamera();
+    if (editorCam) {
+        editorCam->Focus(glm::vec3(position.X, position.Y, position.Z));
+    }
+    else {
+        LOG_WARNING("Cannot focus: editor camera not available");
+    }
 }
 
 // -------------------------------------------------------------------------

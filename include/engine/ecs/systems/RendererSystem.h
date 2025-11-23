@@ -97,6 +97,8 @@ namespace ECS {
         bool IsUsingEditorCamera() const { return m_useEditorCamera; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
         uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
+        Engine::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
+
         // Rebind the renderer to a new world (recreate editor camera)
         void BindWorld(World& world);
 

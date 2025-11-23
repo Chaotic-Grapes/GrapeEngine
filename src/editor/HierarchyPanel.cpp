@@ -33,7 +33,7 @@ and supports prefab instantiation by accepting dragged prefab assets.
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
-
+#include "Viewport.h"
 
 namespace {
     // Helper template function to safely add components during deserialization
@@ -636,9 +636,9 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
 
     // Fast double-click to focus camera
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        if (m_entityActions) {
-            // TODO: Implement camera focus functionality
-            // This triggers on fast double-click
+        if (m_viewport) { 
+            // Focus on entity
+            m_viewport->FocusOnEntity(entityId);  
         }
         // Update click tracking
         m_lastClickedEntity = entityId;

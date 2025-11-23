@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file   Viewport.h
-\author Samantha Leong (80%)
-        Foo Rui Qin    (20%)
+\author Samantha Leong (50%)
+        Foo Rui Qin    (50%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
 \date   3rd November 2025
@@ -52,6 +52,7 @@ public:
 
     // Undo System
     void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+    void FocusOnEntity(EntityId entityId);
 
 private:
     void _renderViewport();

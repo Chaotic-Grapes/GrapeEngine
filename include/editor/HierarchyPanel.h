@@ -30,6 +30,9 @@ which entity the user is working with.
 #include <functional>
 #include "EditorEntityActions.h"
 
+// Forward declaration
+class Viewport;
+
 // EntityId is a numeric identifier for entities in the ECS world
 using EntityId = uint32_t;
 
@@ -58,6 +61,7 @@ public:
     void OnSelectionChanged(SelectionCallback callback);
 
     void SetSelectedEntity(EntityId id);
+    void SetViewport(Viewport* viewport) { m_viewport = viewport; }
     const std::unordered_set<EntityId>& GetSelectedEntities() const { return m_selectedEntityIds; }
     EntityId GetPrimarySelectedEntity() const { return m_selectedEntityIds.empty() ? 0 : *m_selectedEntityIds.begin(); }
 
@@ -179,6 +183,7 @@ private:
     // System references
     ECS::World* m_world = nullptr;                  // ECS world containing all entities and components
     EntityActions* m_entityActions = nullptr;       // For entity operations
+    Viewport* m_viewport = nullptr;                 // For entity focus
 
     // Selection state
     std::unordered_set<EntityId> m_selectedEntityIds;   // Currently selected entity IDs (empty = no selection)
