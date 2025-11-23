@@ -80,7 +80,7 @@ namespace {
     bool IsProtectedEntity(ECS::World* world, EntityId entityId) {
         if (!world)
             return false;
-        
+
         // Resolve the entity from its ID
         ECS::Entity entity = world->Resolve(entityId);
 
@@ -97,7 +97,7 @@ namespace {
 }
 
 void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
-    if (entityId == 0) return;
+    if (entityId == ECS::Entity::NPOS32) return;
 
     // 1. Call your external file dialog utility.
 #ifdef _WIN32
@@ -125,14 +125,88 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
         // User selected a file; the path is in the 'filename' buffer
         std::string selectedFilePath(filename);
 
-        // 1. Extract the class name from the file path.
+        // 1. Extract the class name and namespace from the C# file
         std::filesystem::path p(selectedFilePath);
         std::string scriptClassName = p.stem().string();
+        std::string fullTypeName = scriptClassName; // Default to just class name
+        std::string rootNamespace; // e.g. "EchoesBelow" from "EchoesBelow.Scripts"
 
-        // 2. Attach the ScriptInstance component.
-        _attachScriptComponent(entityId, scriptClassName);
+        // Try to parse namespace from the file
+        std::ifstream fileStream(selectedFilePath);
+        if (fileStream.is_open()) {
+            std::string line;
+            std::string namespaceStr;
+            
+            // Look for "namespace" declaration in the file
+            while (std::getline(fileStream, line)) {
+                // Trim whitespace
+                size_t start = line.find_first_not_of(" \t\r\n");
+                if (start == std::string::npos) continue;
+                
+                // Check if line starts with "namespace"
+                if (line.substr(start, 9) == "namespace") {
+                    // Extract namespace (handle both "namespace X;" and "namespace X {")
+                    size_t nsStart = start + 9;
+                    size_t nsEnd = line.find_first_of(";{", nsStart);
+                    
+                    if (nsEnd != std::string::npos) {
+                        namespaceStr = line.substr(nsStart, nsEnd - nsStart);
+                        
+                        // Trim whitespace from namespace
+                        size_t nsFirst = namespaceStr.find_first_not_of(" \t\r\n");
+                        size_t nsLast = namespaceStr.find_last_not_of(" \t\r\n");
+                        if (nsFirst != std::string::npos && nsLast != std::string::npos) {
+                            namespaceStr = namespaceStr.substr(nsFirst, nsLast - nsFirst + 1);
+                            fullTypeName = namespaceStr + "." + scriptClassName;
+                            
+                            // Extract root namespace (e.g., "EchoesBelow" from "EchoesBelow.Scripts")
+                            size_t dotPos = namespaceStr.find('.');
+                            rootNamespace = (dotPos != std::string::npos) 
+                                ? namespaceStr.substr(0, dotPos) 
+                                : namespaceStr;
+                        }
+                        break;
+                    }
+                }
+            }
+            fileStream.close();
+        }
 
-        // 3. Update selection state (using the correct member variable name)
+        // 2. Convert to relative path if within project
+        std::string relativePath = selectedFilePath;
+        try {
+            std::filesystem::path absPath = std::filesystem::absolute(selectedFilePath);
+            std::filesystem::path currentPath = std::filesystem::current_path();
+            relativePath = std::filesystem::relative(absPath, currentPath).string();
+        }
+        catch (const std::exception&) {
+            // If relative path conversion fails, use the original path
+            relativePath = selectedFilePath;
+        }
+
+        // 3. Attempt to load the game assembly if we have a root namespace
+        if (!rootNamespace.empty()) {
+            // Try to find and load the assembly DLL (e.g., EchoesBelow.dll)
+            std::string assemblyName = rootNamespace + ".dll";
+            //std::filesystem::path assemblyPath = std::filesystem::path("build/Debug") / assemblyName;
+            
+            if (std::filesystem::exists(assemblyName)) {
+                // TODO: Call ScriptSystem to load this assembly into the AppDomain
+                // For now, log a warning that the assembly should be loaded
+                LOG_INFO("Script uses assembly: " << assemblyName);
+                LOG_WARNING("Multi-assembly loading not yet implemented - ensure " 
+                    << assemblyName << " is loaded via ScriptSystem");
+            }
+            else {
+                LOG_WARNING("Assembly not found: " << assemblyName 
+                    << " - script may fail to instantiate at runtime");
+            }
+        }
+        
+        // 4. Attach the ScriptInstance component with full type name and path
+        _attachScriptComponent(entityId, fullTypeName, relativePath);
+
+        // 4. Update selection state (using the correct member variable name)
         m_selectedEntityIds.clear();
         m_selectedEntityIds.insert(entityId);
         m_anchorEntityId = entityId;
@@ -222,6 +296,49 @@ void HierarchyPanel::Render() {
     _renderHeader();           // Header with entity creation controls
     _renderEntityTree();       // Main entity tree with drag-drop
     _renderFooterButtons();    // Footer buttons like Clear All
+
+    // Process deferred deletions AFTER tree rendering is complete
+    // This prevents crashes from modifying the hierarchy while iterating it
+    if (!m_deferredDeletions.empty()) {
+        for (EntityId id : m_deferredDeletions) {
+            if (!IsProtectedEntity(m_world, id)) {
+                // Collect all entities that will be deleted (parent + all children recursively)
+                std::vector<EntityId> allDeletedIds;
+                std::function<void(EntityId)> collectRecursive = [&](EntityId deleteId) {
+                    allDeletedIds.push_back(deleteId);
+
+                    // Recursively collect all children
+                    auto children = _getChildren(deleteId);
+                    for (EntityId childId : children) {
+                        collectRecursive(childId);
+                    }
+                    };
+                collectRecursive(id);
+
+                // Perform the deletion (this destroys parent + all children)
+                if (m_entityActions) {
+                    m_entityActions->RemoveEntity(id);
+                }
+
+                // Remove ALL deleted entities from selection
+                for (EntityId deletedId : allDeletedIds) {
+                    m_selectedEntityIds.erase(deletedId);
+                }
+
+                // Update anchor if it was one of the deleted entities
+                if (std::find(allDeletedIds.begin(), allDeletedIds.end(), m_anchorEntityId) != allDeletedIds.end()) {
+                    m_anchorEntityId = m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin();
+                }
+
+                // Notify callback if selection changed
+                if (m_selectedEntityIds.empty()) {
+                    if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
+                }
+            }
+        }
+        m_deferredDeletions.clear();
+        m_contextMenuTarget = ECS::Entity::NPOS32;
+    }
 
     // Handle delete key for selected entities: global keyboard shortcut
     if (Input::IsKeyDown(KEY_DELETE) && !m_selectedEntityIds.empty()) {
@@ -397,6 +514,14 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         oss << " [" << prefabName << "]";
     }
 
+    // Append script indicator if this entity has a script attached
+    if (m_world->Has<ECS::Components::ScriptInstance>(entity)) {
+        const auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(entity);
+        if (strlen(scriptComp.TypeName) > 0) {
+            oss << " {S}";
+        }
+    }
+
     std::string label = oss.str();
 
     // Skip this entity if it doesn't match the search filter
@@ -430,9 +555,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
             ImGui::SetKeyboardFocusHere();
             m_focusRenameInput = false;
         }
-        
+
         ImGui::SetNextItemWidth(-1);
-        if (ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer), 
+        if (ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer),
             ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
             // Apply rename on Enter
             if (strlen(m_renameBuffer) > 0 && m_world->Has<ECS::Components::Name>(entity)) {
@@ -442,9 +567,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
             }
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
-        
+
         // Cancel rename on Escape or click away
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape) || 
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape) ||
             (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsItemHovered())) {
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
@@ -490,7 +615,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
 
     // Get current time for click timing
     float currentTime = ImGui::GetTime();
-    
+
     // Check modifier keys
     bool ctrlPressed = ImGui::GetIO().KeyCtrl;
     bool shiftPressed = ImGui::GetIO().KeyShift;
@@ -523,12 +648,12 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     else if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         // Check if this is a slow second click on the same already-selected entity BEFORE updating times
         bool isAlreadySelected = (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end());
-        bool isSlowSecondClick = (m_lastClickedEntity == entityId && 
-                                   isAlreadySelected &&
-                                   m_selectedEntityIds.size() == 1 &&
-                                   (currentTime - m_lastClickTime) > RENAME_DELAY_THRESHOLD &&
-                                   (currentTime - m_lastClickTime) < 2.0f);
-        
+        bool isSlowSecondClick = (m_lastClickedEntity == entityId &&
+            isAlreadySelected &&
+            m_selectedEntityIds.size() == 1 &&
+            (currentTime - m_lastClickTime) > RENAME_DELAY_THRESHOLD &&
+            (currentTime - m_lastClickTime) < 2.0f);
+
         if (isSlowSecondClick && !ctrlPressed && !shiftPressed) {
             // Start rename mode (only for single selection, no modifiers)
             _startRename(entityId);
@@ -536,7 +661,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
         else if (shiftPressed && m_anchorEntityId != ECS::Entity::NPOS32) {
             // Shift+Click: Range selection from anchor to clicked entity
             m_selectedEntityIds.clear();
-            
+
             // Get all entities in flat list (hierarchy order)
             std::vector<EntityId> allEntities;
             std::function<void(EntityId)> collectEntities = [&](EntityId id) {
@@ -544,25 +669,25 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
                 for (EntityId childId : _getChildren(id)) {
                     collectEntities(childId);
                 }
-            };
+                };
             for (EntityId rootId : _getRootEntities()) {
                 collectEntities(rootId);
             }
-            
+
             // Find indices of anchor and clicked entity
             auto anchorIt = std::find(allEntities.begin(), allEntities.end(), m_anchorEntityId);
             auto clickedIt = std::find(allEntities.begin(), allEntities.end(), entityId);
-            
+
             if (anchorIt != allEntities.end() && clickedIt != allEntities.end()) {
                 // Select range between anchor and clicked (inclusive)
                 auto startIt = (anchorIt < clickedIt) ? anchorIt : clickedIt;
                 auto endIt = (anchorIt < clickedIt) ? clickedIt : anchorIt;
-                
+
                 for (auto it = startIt; it <= endIt; ++it) {
                     m_selectedEntityIds.insert(*it);
                 }
             }
-            
+
             if (m_selectionCallback) m_selectionCallback(entityId);
         }
         else if (ctrlPressed) {
@@ -596,7 +721,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
                 if (m_selectionCallback) m_selectionCallback(entityId);
             }
         }
-        
+
         // Update click tracking for next time
         m_lastClickedEntity = entityId;
         m_lastClickTime = currentTime;
@@ -611,21 +736,21 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
     // Drag source: make this entity draggable
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         // If dragging a selected entity, drag all selected entities (multi-select support)
-        bool isDraggingSelection = m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end() && 
-                                    m_selectedEntityIds.size() > 1;
-        
+        bool isDraggingSelection = m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end() &&
+            m_selectedEntityIds.size() > 1;
+
         if (isDraggingSelection) {
             // Drag all selected entities as a vector
             std::vector<EntityId> selectedVec(m_selectedEntityIds.begin(), m_selectedEntityIds.end());
             ImGui::SetDragDropPayload("ENTITY_IDS", selectedVec.data(), selectedVec.size() * sizeof(EntityId));
-            
+
             // Show count in drag preview
             ImGui::Text("(%zu entities)", selectedVec.size());
-        } 
+        }
         else {
             // Single entity drag
             ImGui::SetDragDropPayload("ENTITY_ID", &entityId, sizeof(EntityId));
-            
+
             // Show entity name as drag preview
             ECS::Entity entity = m_world->Resolve(entityId);
             if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::Name>(entity)) {
@@ -649,12 +774,12 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
                 }
             }
         }
-        
+
         // Handle multiple entities reparenting
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_IDS")) {
             size_t count = payload->DataSize / sizeof(EntityId);
             const EntityId* draggedIds = static_cast<const EntityId*>(payload->Data);
-            
+
             // Reparent all dragged entities
             for (size_t i = 0; i < count; ++i) {
                 EntityId draggedId = draggedIds[i];
@@ -671,10 +796,24 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
-                // Instantiate the prefab as a child of the current entity node
                 EntityId newEntityId = _instantiatePrefabAsChild(droppedPath, entityId);
-
-                // Select the newly created entity so it shows up in inspector immediately
+                if (newEntityId != ECS::Entity::NPOS32) {
+                    m_selectedEntityIds.clear();
+                    m_selectedEntityIds.insert(newEntityId);
+                    m_anchorEntityId = newEntityId;
+                    if (m_selectionCallback) m_selectionCallback(newEntityId);
+                }
+            }
+        }
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* data = static_cast<const char*>(payload->Data);
+            const char* end = data + payload->DataSize;
+            while (data < end) {
+                std::string path(data);
+                data += path.size() + 1;
+                if (path.empty()) continue;
+                if (std::filesystem::path(path).extension() != ".prefab") continue;
+                EntityId newEntityId = _instantiatePrefabAsChild(path, entityId);
                 if (newEntityId != ECS::Entity::NPOS32) {
                     m_selectedEntityIds.clear();
                     m_selectedEntityIds.insert(newEntityId);
@@ -701,12 +840,12 @@ void HierarchyPanel::_handleTreeDragDrop() {
                 }
             }
         }
-        
+
         // Reparent multiple entities to root
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ENTITY_IDS")) {
             size_t count = payload->DataSize / sizeof(EntityId);
             const EntityId* draggedIds = static_cast<const EntityId*>(payload->Data);
-            
+
             // Reparent all dragged entities to root
             for (size_t i = 0; i < count; ++i) {
                 EntityId draggedId = draggedIds[i];
@@ -718,13 +857,27 @@ void HierarchyPanel::_handleTreeDragDrop() {
             }
         }
 
-        // Instantiate prefab as root entity
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
             std::string droppedPath = std::string(static_cast<const char*>(payload->Data));
             if (std::filesystem::path(droppedPath).extension() == ".prefab") {
                 EntityId newEntityId = _instantiatePrefabAsChild(droppedPath, ECS::Entity::NPOS32);
-
-                // Select the newly created entity so it shows up in inspector immediately
+                if (newEntityId != ECS::Entity::NPOS32) {
+                    m_selectedEntityIds.clear();
+                    m_selectedEntityIds.insert(newEntityId);
+                    m_anchorEntityId = newEntityId;
+                    if (m_selectionCallback) m_selectionCallback(newEntityId);
+                }
+            }
+        }
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* data = static_cast<const char*>(payload->Data);
+            const char* end = data + payload->DataSize;
+            while (data < end) {
+                std::string path(data);
+                data += path.size() + 1;
+                if (path.empty()) continue;
+                if (std::filesystem::path(path).extension() != ".prefab") continue;
+                EntityId newEntityId = _instantiatePrefabAsChild(path, ECS::Entity::NPOS32);
                 if (newEntityId != ECS::Entity::NPOS32) {
                     m_selectedEntityIds.clear();
                     m_selectedEntityIds.insert(newEntityId);
@@ -755,7 +908,7 @@ void HierarchyPanel::_renderEntityContextMenu() {
                     _addChildEntity(m_contextMenuTarget);
                 }
             }
-            
+
             // Clone works with multiple selections
             std::string cloneLabel = (selectionCount > 1) ? "Clone (" + std::to_string(selectionCount) + ")" : "Clone";
             if (ImGui::Selectable(cloneLabel.c_str())) {
@@ -766,16 +919,15 @@ void HierarchyPanel::_renderEntityContextMenu() {
                     }
                 }
             }
-            
+
             // Rename only available for single selection
             if (selectionCount == 1) {
                 if (ImGui::Selectable("Rename")) {
                     _startRename(m_contextMenuTarget);
                 }
             }
-            
-            ImGui::Separator();
-            
+
+
             // Delete works with multiple selections
             std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
             if (ImGui::Selectable(deleteLabel.c_str())) {
@@ -787,38 +939,34 @@ void HierarchyPanel::_renderEntityContextMenu() {
                     }
                 }
             }
-
             ImGui::Separator();
-
-            if (ImGui::BeginMenu("Add Component")) {
-
-                // Option 1: Scripting Sub-Menu
-                if (ImGui::BeginMenu("Scripting")) {
-
-                    ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
-
-                    // Check if ScriptInstance component is already attached
-                    bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
-
-                    // If no ScriptInstance component exists, offer to add one
-                    if (!hasScriptComponent) {
-                        if (ImGui::MenuItem("Attach Script")) {
-                            // This attaches a default, empty ScriptInstance component
-                            /*_attachScriptComponent(m_contextMenuTarget, "");
-                            ImGui::CloseCurrentPopup();*/
-                            _importAndAttachScript(m_contextMenuTarget);
-                        }
-                        ImGui::Separator();
+            // Script attachment/detachment - only for single selection
+            if (selectionCount == 1) {
+                ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
+                bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
+                if (!hasScriptComponent) {
+                    if (ImGui::Selectable("Attach Script")) {
+                        _importAndAttachScript(m_contextMenuTarget);
                     }
-
-                    
-
-                    ImGui::EndMenu(); // End Scripting menu
                 }
-
+                else {
+                    if (ImGui::Selectable("Detach Script")) {
+                        m_world->Remove<ECS::Components::ScriptInstance>(targetEntity);
+                    }
+                }
+            }
+            if (ImGui::BeginMenu("Add Component")) {
                 // You can add other component types (Renderer, Rigidbody, etc.) here later
-                // if (ImGui::BeginMenu("Physics")) { ... }
-
+                ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
+                const auto& registry = ComponentRegistryUI::GetAll();
+                for (const auto& meta : registry) {
+                    bool hasComponent = meta.HasComponent(m_world, targetEntity);
+                    if (hasComponent) ImGui::BeginDisabled();
+                    if (ImGui::MenuItem(meta.DisplayName.c_str())) {
+                        meta.AddComponent(m_world, targetEntity, meta.GetDefaults());
+                    }
+                    if (hasComponent) ImGui::EndDisabled();
+                }
                 ImGui::EndMenu(); // End Add Component menu
             }
         }
@@ -830,30 +978,11 @@ void HierarchyPanel::_renderEntityContextMenu() {
 // Entity Operations
 // -------------------------------------------------------------------------
 
-// Delete an entity and update selection
-// Also handles cleanup of selection state
+// Delete an entity - defers actual deletion until after tree rendering
+// This prevents crashes from modifying hierarchy while iterating it
 void HierarchyPanel::_deleteEntity(EntityId entityId) {
-    // Block deletion of protected entities
-    if (IsProtectedEntity(m_world, entityId)) return;
-
-    if (m_entityActions) {
-        m_entityActions->RemoveEntity(entityId);
-    }
-
-    // Remove from selection if deleted entity was selected
-    m_selectedEntityIds.erase(entityId);
-    
-    // Update anchor if it was the deleted entity
-    if (m_anchorEntityId == entityId) {
-        m_anchorEntityId = m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin();
-    }
-    
-    // Notify callback if selection changed
-    if (m_selectedEntityIds.empty()) {
-        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
-    }
-    
-    m_contextMenuTarget = ECS::Entity::NPOS32;
+    // Add to deferred deletion queue
+    m_deferredDeletions.push_back(entityId);
 }
 
 // Clone an entity: creates a duplicate with same components and hierarchy
@@ -891,7 +1020,7 @@ void HierarchyPanel::_startRename(EntityId entityId) {
 
     // Start renaming this entity
     m_renamingEntityId = entityId;
-    
+
     // Copy current name to rename buffer
     ECS::Entity entity = m_world->Resolve(entityId);
     if (m_world->Has<ECS::Components::Name>(entity)) {
@@ -902,38 +1031,56 @@ void HierarchyPanel::_startRename(EntityId entityId) {
     else {
         strncpy_s(m_renameBuffer, "Entity", sizeof(m_renameBuffer) - 1);
     }
-    
+
     m_focusRenameInput = true;
 }
 
 /**
- * @brief Ensures an entity has a ScriptInstance component, and sets its TypeName.
+ * @brief Ensures an entity has a ScriptInstance component, and sets its TypeName and ScriptPath.
  * @param entityId The entity to modify.
- * @param scriptName The C# class name (e.g., "PlayerController").
+ * @param scriptName The fully qualified C# type name including namespace (e.g., "MyGame.PlayerController").
+ * @param scriptPath The relative path to the script file (e.g., "Assets/Scripts/PlayerController.cs").
  */
-void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string& scriptName) {
-    if (entityId == 0 || !m_world) return;
+void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string& scriptName, const std::string& scriptPath) {
+    if (entityId == ECS::Entity::NPOS32 || !m_world) return;
 
     ECS::Entity e = m_world->Resolve(entityId);
     if (e.IsNull() || !m_world->IsAlive(e)) return;
 
-    // 1. Ensure the component exists (Add it if it doesn't)
+    // 1. Ensure the entity has an Active component (required by ScriptSystem)
+    if (!m_world->Has<ECS::Components::Active>(e)) {
+        ECS::Components::Active activeComp;
+        activeComp.Enabled = true;
+        m_world->Add<ECS::Components::Active>(e, activeComp);
+    }
+
+    // 2. Ensure the entity has a LocalTransform component (required by most scripts)
+    if (!m_world->Has<ECS::Components::LocalTransform>(e)) {
+        ECS::Components::LocalTransform transform;
+        transform.Position = Vector3D{0, 0, 0};
+        transform.Rotation = Quaternion{0, 0, 0, 1};
+        transform.Scale = Vector3D{1, 1, 1};
+        m_world->Add<ECS::Components::LocalTransform>(e, transform);
+    }
+
+    // 3. Ensure the ScriptInstance component exists (Add it if it doesn't)
     if (!m_world->Has<ECS::Components::ScriptInstance>(e)) {
         ECS::Components::ScriptInstance newScript;
-        // The default constructor of Text component initializes the font path, 
-        // ensure ScriptInstance also has a sane default or proper initialization.
         m_world->Add<ECS::Components::ScriptInstance>(e, newScript);
     }
 
-    // 2. Update the component's TypeName
+    // 3. Update the component's TypeName and ScriptPath
     auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(e);
 
-    // SetTypeName is not exposed in the provided code, 
-    // but the component has char TypeName[128]. We must manually copy.
+    // Set the fully qualified type name (e.g., "MyGame.PlayerController")
     strncpy_s(scriptComp.TypeName, scriptName.c_str(), sizeof(scriptComp.TypeName) - 1);
     scriptComp.TypeName[sizeof(scriptComp.TypeName) - 1] = '\0'; // Always null-terminate
 
-    // 3. Mark for re-initialization by the ScriptingSystem at runtime
+    // Set the script path
+    strncpy_s(scriptComp.ScriptPath, scriptPath.c_str(), sizeof(scriptComp.ScriptPath) - 1);
+    scriptComp.ScriptPath[sizeof(scriptComp.ScriptPath) - 1] = '\0'; // Always null-terminate
+
+    // 4. Mark for re-initialization by the ScriptingSystem at runtime
     // Setting Initialized = false forces the runtime to load this C# class 
     // and call its Start/Awake method.
     scriptComp.Initialized = false;
@@ -1049,7 +1196,7 @@ std::vector<EntityId> HierarchyPanel::_getRootEntities() const {
         if (m_world->ParentOf(e).IsNull()) {
             roots.push_back(e.Index);
         }
-    });
+        });
 
     return roots;
 }
@@ -1069,7 +1216,7 @@ std::vector<EntityId> HierarchyPanel::_getChildren(EntityId parentId) const {
         if (!ShouldHideFromHierarchy(m_world, child)) {
             children.push_back(child.Index);
         }
-    });
+        });
 
     return children;
 }
@@ -1088,13 +1235,13 @@ bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
     if (m_world->Has<ECS::Components::Name>(entity)) {
         const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
         std::string entityName = nameComp.Value;
-        
+
         // Convert both to lowercase for case-insensitive search
         std::string lowerName = entityName;
         std::string lowerFilter = m_searchFilter;
         std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
         std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(), ::tolower);
-        
+
         // Check if entity name contains the filter string
         return lowerName.find(lowerFilter) != std::string::npos;
     }
@@ -1128,7 +1275,7 @@ void HierarchyPanel::RebuildEntityOrder() {
 void HierarchyPanel::_rebuildEntityOrderRecursive(EntityId entityId) {
     // Add current entity to order
     m_entityOrder.push_back(entityId);
-    
+
     // Recursively add all children
     auto children = _getChildren(entityId);
     for (EntityId childId : children) {
@@ -1143,7 +1290,7 @@ void HierarchyPanel::ClearUIState() {
     m_renamingEntityId = ECS::Entity::NPOS32;
     m_contextMenuTarget = ECS::Entity::NPOS32;
     m_searchFilter.clear();
-    
+
     // Notify selection callback that nothing is selected
     if (m_selectionCallback) {
         m_selectionCallback(ECS::Entity::NPOS32);

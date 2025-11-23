@@ -65,7 +65,7 @@ using std::time_t;
 using std::tm;
 using std::filesystem::path;
 
-namespace Grape_Engine
+namespace Engine
 {
     /**
     * @brief Initializes the crash handler system.

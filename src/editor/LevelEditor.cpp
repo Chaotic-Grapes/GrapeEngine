@@ -31,7 +31,10 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Sce
 }
 
 // Destroy the editor instance without owning the world
-LevelEditor::~LevelEditor() {}
+LevelEditor::~LevelEditor() {
+    // Shutdown console panel to disconnect Logger callback
+    m_console.Shutdown();
+}
 
 // -------------------------------------------------------------------------
 // Panel Registration System
@@ -124,7 +127,8 @@ void LevelEditor::_buildDockLayout() {
     // Map panels to target nodes to realize the layout
     ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
-    ImGui::DockBuilderDockWindow("Viewport", viewportNode);
+    ImGui::DockBuilderDockWindow("Scene", viewportNode);
+    ImGui::DockBuilderDockWindow("Game", viewportNode);
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
@@ -245,7 +249,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         [this](ECS::World* w) { m_assetBrowser.SetWorld(w); }
     );
 
-    _registerPanel("Viewport",
+    _registerPanel("Scene",
         [this]() {
             Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
             m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
@@ -282,9 +286,9 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
             m_console.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
 
             // Connect Logger to Console - use singleton instance
-            Logger::Get().SetConsoleCallback([this](LogLevel level,
+            Logger::Get().SetConsoleCallback([this](LogLevel level, LogSource source,
                 const std::string& timestamp, const std::string& message) {
-                    m_console.AddMessage(level, timestamp, message);
+                    m_console.AddMessage(level, source, timestamp, message);
                 });
         },
         [this]() { m_console.Render(); },

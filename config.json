@@ -1,11 +1,10 @@
 {
-  "application": {
-    "title": "GrapeEngine",
-    "window": {
-      "width": 1600,
-      "height": 900,
-      "fullscreen": false,
-      "vsync": true
-    }
+  "Title": "Grape Engine Editor",
+  "Version": "1.0.0",
+  "WindowSettings": {
+    "Width": 1600,
+    "Height": 900,
+    "Fullscreen": true,
+    "VSync": true
   }
 }

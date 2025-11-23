@@ -26,6 +26,7 @@ through a unified system shared by both entities and prefab templates.
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "EditorFileMenu.h"
+#include "core/ProjectPaths.h"
 #include "UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
@@ -346,6 +347,20 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     m_statusTimer = 2.0f;
                 }
             }
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                const char* data = static_cast<const char*>(payload->Data);
+                const char* end = data + payload->DataSize;
+                while (data < end) {
+                    std::string path(data);
+                    data += path.size() + 1;
+                    if (path.empty()) continue;
+                    if (std::filesystem::path(path).extension() != ".prefab") continue;
+                    m_world->Add<ECS::Components::PrefabLink>(entity, path);
+                    m_statusMessage = "Prefab linked to entity";
+                    m_statusTimer = 2.0f;
+                    break;
+                }
+            }
             ImGui::EndDragDropTarget();
         }
 
@@ -513,8 +528,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
 // Renders the Add Component button row at the bottom of the inspector
 void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
-    ImGui::Separator();
-
     // Button to open the Add Component popup menu
     if (ImGui::Button("Add Component")) {
         ImGui::OpenPopup("AddComponentMenu");
@@ -913,8 +926,8 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
             [](char c) { return !std::isalnum(c) && c != '_' && c != '-'; }, '_');
     }
 
-    // Ensure prefab directory exists
-    std::filesystem::path prefabDir = "assets/prefabs";
+    // Ensure prefab directory exists under the active project assets
+    std::filesystem::path prefabDir = std::filesystem::path(Engine::ProjectPaths::GetAssetsPath()) / "Prefabs";
     std::filesystem::create_directories(prefabDir);
 
     // Pick a file name that does not overwrite an existing prefab
@@ -946,7 +959,7 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
     file << prefabData.dump(4);
     file.close();
 
-    m_statusMessage = "Saved as " + prefabPath.filename().string();
+    m_statusMessage = "Saved as " + prefabPath.filename().string() + " in Assets\\Prefabs";
     m_statusTimer = 3.0f;
     LOG_INFO("Entity saved as prefab: " << prefabPath);
 }

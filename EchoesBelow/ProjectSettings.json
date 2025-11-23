@@ -1,5 +1,5 @@
 {
-  "GameName": "Echoes Below",
+  "Title": "Echoes Below",
   "Version": "1.0.0",
   "StartupScene": "EchoesBelow/Assets/Scenes/MainScene.scn",
   "WindowSettings": {
@@ -9,7 +9,7 @@
     "VSync": true
   },
   "Physics": {
-    "Gravity": -980.0,
+    "Gravity": -9.81,
     "TimeStep": 0.016
   },
   "Audio": {

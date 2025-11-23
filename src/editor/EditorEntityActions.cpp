@@ -92,6 +92,9 @@ void EntityActions::RemoveEntity(EntityId id) {
     ECS::Entity entity = world.Resolve(id);
     if (entity.IsNull() || !world.IsAlive(entity)) return;
 
+    // Record for undo system BEFORE deletion so the entity still exists for snapshotting
+    if (m_undoSystem) { m_undoSystem->RecordEntityDeletion(id); }
+
     // Recursive lambda to delete entity and all children
     std::function<void(EntityId)> deleteRecursive = [&](EntityId entityId) {
         // Collect children first to avoid iterator invalidation
@@ -115,9 +118,6 @@ void EntityActions::RemoveEntity(EntityId id) {
         };
 
     deleteRecursive(id);
-
-    // For undo system
-    if (m_undoSystem) { m_undoSystem->RecordEntityDeletion(id); }
 
     // MARK SCENE AS DIRTY
     MarkSceneDirtyIfNeeded(m_fileMenu);

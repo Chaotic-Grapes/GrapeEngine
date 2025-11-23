@@ -37,8 +37,23 @@ public:
     // Component Rendering
     // -------------------------------------------------------------------------
 
+    // Renders entity name component for identifying entities in hierarchy
+    void RenderName(nlohmann::json& data);
+
+    // Renders active/enabled state toggle for entity activation control
+    void RenderActive(nlohmann::json& data);
+
+    // Renders tag mask bitfield for entity tagging and filtering systems
+    void RenderTagMask(nlohmann::json& data);
+
+    // Renders lifetime timer component for auto-destroying entities
+    void RenderLifetime(nlohmann::json& data);
+
     // Renders transform properties including position, rotation and scale values
     void RenderLocalTransform(nlohmann::json& data);
+
+    // Renders rotator component for automatic rotation animation
+    void RenderRotator(nlohmann::json& data);
 
     // Renders sprite properties including material reference and color tint values
     void RenderSpriteRenderer2D(nlohmann::json& data);
@@ -85,10 +100,23 @@ public:
     // Renders Z-index for controlling 2D rendering order
     void RenderZIndex2D(nlohmann::json& data);
 
+    // Renders 2D light component for lighting effects
+    void RenderLight2D(nlohmann::json& data);
+
+    // Renders text component for displaying text on screen
+    void RenderText(nlohmann::json& data);
+
+    // Renders animation state for sprite sheet animation playback
+    void RenderAnimationState2D(nlohmann::json& data);
+
     // Renders AudioSource for component 
     void RenderAudioSource(nlohmann::json& data);
+    
     // Renders entity layer
     void RenderLayer2D(nlohmann::json& data);
+
+    // Renders script instance component for C# scripting
+    void RenderScriptInstance(nlohmann::json& data);
 
 private:
     // -------------------------------------------------------------------------

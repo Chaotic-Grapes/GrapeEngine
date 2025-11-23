@@ -9,8 +9,6 @@
     <OutputPath>..\..\build\scripts\</OutputPath>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
-  </ItemGroup>
+  <!-- System.Runtime.InteropServices is part of .NET 9 - no package reference needed -->
 
 </Project>

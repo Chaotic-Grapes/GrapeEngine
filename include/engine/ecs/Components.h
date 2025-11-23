@@ -305,6 +305,10 @@ namespace ECS {
             Vector2D Offset{0.0f, 0.0f};
             int Width = 0;
             int Height = 0;
+
+            // Emissive support
+            uint32_t EmissiveTextureId = 0;  // 0 = no emissive map
+            float EmissiveStrength = 5.0f;   // HDR multiplier
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -533,6 +537,7 @@ namespace ECS {
             uint32_t TypeHash = 0;        // Hash of script type name
             bool Initialized = false;     // Whether OnStart() has been called
             char TypeName[128] = {0};     // Script class name (e.g., "MyGame.PlayerController")
+            char ScriptPath[256] = {0};   // Relative path to the script file (e.g., "Assets/Scripts/PlayerController.cs")
         };
         static_assert(std::is_trivially_copyable_v<ScriptInstance>, "ScriptInstance must be trivially copyable");
 

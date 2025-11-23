@@ -78,6 +78,9 @@ namespace Engine {
 
         void OnWindowResize(int newWidth, int newHeight);
 
+        /// Update viewport size (for aspect ratio) independently of window size
+        void SetViewportSize(float width, float height);
+
     private:
         // --------------------------------------------------------------------
         // Internal state
@@ -87,6 +90,7 @@ namespace Engine {
         ECS::Components::LocalTransform* m_transform{};     //!< Pointer to Transform component
         ECS::Components::CameraEditor3D* m_camera{};        //!< Pointer to CameraEditor3D component
         Messaging::SubscriptionHandle m_windowResizedSub{}; //!< Subscription to window resize
+        Messaging::SubscriptionHandle m_viewportResizedSub{}; //!< Subscription to viewport resize
 
         glm::vec3 m_target = { 0.f, 0.f, 0.f };             //!< Orbit center
         glm::vec3 m_cameraPosition = { 0.f, 0.f, 10.f };    //!< Cached position

@@ -22,24 +22,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef RENDERER2D_H
 #define RENDERER2D_H
 
-// ============================================================================
 // Third-Party Includes
-// ============================================================================
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-// ============================================================================
 // Engine Includes
-// ============================================================================
 #include "Color.h"
 #include "ecs/World.h"
 #include "Math/Vector2D.h"
 #include "EditorFileMenu.h"
 
-// ============================================================================
 // Graphics Includes
-// ============================================================================
 #include "graphics/shader.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/debugDraw2D.hpp"
@@ -47,12 +41,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
-
-namespace {
-    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
-        if (fileMenu) { fileMenu->MarkSceneDirty(); }
-    }
-}
 
 namespace Editor {
     // Undo System
@@ -116,6 +104,9 @@ namespace ECS {
         // Enable/disable editor camera input (pan/orbit/zoom) based on viewport hover
         void SetEditorInputEnabled(bool enabled) { m_editorInputEnabled = enabled; }
         void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
+        
+        // Force the renderer to always use scene camera (for game window)
+        void SetForceSceneCamera(bool force) { m_forceSceneCamera = force; }
 
         // ====================================================================
         // Temporary Accessors (For Stress Testing - Remove Later)
@@ -175,6 +166,7 @@ namespace ECS {
 
         bool m_initialized = false;                                 ///< Has Initialize() been called?
         bool m_useEditorCamera = true;                              ///< Use editor vs ECS cameras
+        bool m_forceSceneCamera = false;                            ///< Force use of scene camera (for game window)
         int m_activeCameraIndex = 0;                                ///< Active ECS camera (future use)
         glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();    ///< Projection matrix
         uint16_t m_uiLayerId = 0xFFFF;  // Default invalid value

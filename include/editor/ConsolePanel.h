@@ -17,6 +17,8 @@ clearing. Integrates with Logger to capture all log output in real-time.
 #include <imgui.h>
 #include <vector>
 #include <string>
+#include <mutex>
+#include <atomic>
 #include "core/Logger.h"
 
 struct ConsoleMessage {
@@ -34,6 +36,7 @@ public:
     // Lifecycle
     // -------------------------------------------------------------------------
     void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
+    void Shutdown();
 
     // -------------------------------------------------------------------------
     // Rendering
@@ -43,7 +46,7 @@ public:
     // -------------------------------------------------------------------------
     // Message Management
     // -------------------------------------------------------------------------
-    void AddMessage(LogLevel level, const std::string& timestamp, const std::string& message);
+    void AddMessage(LogLevel level, LogSource source, const std::string& timestamp, const std::string& message);
     void Clear();
 
 private:
@@ -74,8 +77,12 @@ private:
     ImFont* m_symbolsFont = nullptr;
 
     std::vector<ConsoleMessage> m_messages;
+    std::mutex m_messagesMutex;
+    std::atomic<bool> m_initialized{false};
 
-    // Filter settings - Only warnings, errors, and critical
+    // Filter settings
+    bool m_showInfo = true;
+    bool m_showDebug = true;
     bool m_showWarning = true;
     bool m_showError = true;
     bool m_showCritical = true;
@@ -84,6 +91,8 @@ private:
     char m_searchBuffer[256] = {};
     bool m_autoScroll = true;
     bool m_scrollToBottom = false;
+    int m_selectedMessageIndex = -1;
+    int m_hoveredMessageIndex = -1;
 
     // Message limits
     static constexpr size_t MAX_MESSAGES = 1000;
