@@ -29,6 +29,7 @@ Provides:
 #include "services/Input.h"
 #include <fstream>
 #include <cstring>
+#include "EditorStyle.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -177,10 +178,10 @@ void AssetBrowserPanel::_renderNavigationBar() {
             // Previous parts: display as clickable blue buttons
             ImGui::PushID(static_cast<int>(i));
 
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.4f, 0.8f, 0.3f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.4f, 0.8f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Accent);
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::AccentHover, 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::AccentActive, 0.5f));
 
             // When clicked, navigate to that folder level
             if (ImGui::SmallButton(pathParts[i].string().c_str())) {
@@ -411,7 +412,7 @@ void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
     ImGui::PushFont(m_mainFont);
 
     if (!std::filesystem::exists(m_currentPath) || !std::filesystem::is_directory(m_currentPath)) {
-        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Folder not found");
+        ImGui::TextColored(EditorStyle::DangerText, "Folder not found");
     }
     else {
         // Iterate through directory entries
@@ -628,10 +629,10 @@ void AssetBrowserPanel::_renderDeleteButton() {
         // Style the delete button: icon font + transparent background + red text
         ImGui::PushFont(m_symbolsFont);
         // Button: fully transparent; Hover/Active: subtle grays; Text: red to indicate destructive action
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
 
         // Render delete icon button
         if (ImGui::SmallButton("\xEE\xA1\xB2\\##Delete2")) {
@@ -662,8 +663,8 @@ void AssetBrowserPanel::_renderStatusBar() {
 
     // Pick text color based on whether the message indicates failure
     ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-        ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
-        : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+        ? EditorStyle::DangerText
+        : EditorStyle::SuccessText;
     ImGui::SetCursorPosX(3);
     ImGui::TextColored(color, "%s", m_statusMessage.c_str());
 

@@ -34,6 +34,7 @@ through a unified system shared by both entities and prefab templates.
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
+#include "EditorStyle.h"
 
 namespace {
     // Helper template function to safely add components during deserialization
@@ -976,7 +977,7 @@ void InspectorPanel::_renderStatusBar() {
     if (m_statusTimer > 0.0f) {
         // Pick color based on whether the message contains "Failed"
         ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
+            ? EditorStyle::DangerText
             : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
         ImGui::Separator();
         ImGui::TextColored(color, "%s", m_statusMessage.c_str());

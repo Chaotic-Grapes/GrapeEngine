@@ -19,6 +19,7 @@ prefab assets use the same UI path.
 #include "ComponentWidgets.h"
 #include "core/Logger.h"
 #include <imgui.h>
+#include "EditorStyle.h"
 #include <filesystem>
 #include "ecs/Components.h"
 #include "serialization/EntitySerializer.h"
@@ -210,7 +211,7 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
     // If a valid texture was dropped, show a small success message inline
     if (dropped) {
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Texture updated");
+        ImGui::TextColored(EditorStyle::SuccessText, "Texture updated");
     }
 
     // Color tint applied on top of the sprite
@@ -850,14 +851,14 @@ void ComponentUI::RenderScriptInstance(nlohmann::json& data) {
     ImGui::Text("Script Class");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", typeName.empty() ? "None" : typeName.c_str());
+    ImGui::TextColored(EditorStyle::Muted, "%s", typeName.empty() ? "None" : typeName.c_str());
     
     // Display script path (read-only)
     std::string scriptPath = data.value("ScriptPath", std::string(""));
     ImGui::Text("Script Path");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "%s", scriptPath.empty() ? "None" : scriptPath.c_str());
+    ImGui::TextColored(EditorStyle::Muted, "%s", scriptPath.empty() ? "None" : scriptPath.c_str());
     
     // Show initialization status
     bool initialized = data.value("Initialized", false);
@@ -865,7 +866,7 @@ void ComponentUI::RenderScriptInstance(nlohmann::json& data) {
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
     ImGui::TextColored(
-        initialized ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
+        initialized ? EditorStyle::SuccessText : EditorStyle::WarningText,
         "%s", initialized ? "Yes" : "No"
     );
     

@@ -16,6 +16,7 @@ color-coded severity levels.
 #include "ConsolePanel.h"
 #include <algorithm>
 #include <cstring>
+#include "EditorStyle.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -125,16 +126,19 @@ void ConsolePanel::_renderMessage(const ConsoleMessage& msg, int index) {
     
     ImVec4 bgColor;
     if (isSelected) {
-        bgColor = ImVec4(0.3f, 0.4f, 0.6f, 0.5f); // Blue for selected
+        // stronger selection tint
+        bgColor = EditorStyle::Scale(EditorStyle::Selection, 1.4f);
     }
     else if (isHovered) {
-        bgColor = ImVec4(0.2f, 0.2f, 0.2f, 0.5f); // Darker gray for hover
+        // subtle hover
+        bgColor = EditorStyle::Scale(EditorStyle::FrameBgHover, 0.5f);
     }
     else if (index % 2 == 0) {
-        bgColor = ImVec4(0.1f, 0.1f, 0.1f, 0.3f); // Alternating background
+        // alternating row
+        bgColor = EditorStyle::Scale(EditorStyle::FrameBg, 0.6f);
     }
     else {
-        bgColor = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+        bgColor = EditorStyle::Transparent;
     }
     
     // Calculate text height for wrapping
@@ -272,12 +276,12 @@ bool ConsolePanel::_shouldDisplayMessage(const ConsoleMessage& msg) const {
 
 ImVec4 ConsolePanel::_getColorForLevel(LogLevel level) const {
     switch (level) {
-    case LogLevel::INFO:     return ImVec4(0.7f, 0.7f, 0.7f, 1.0f);  // Light Gray
-    case LogLevel::DEBUG:    return ImVec4(0.4f, 0.8f, 1.0f, 1.0f);  // Light Blue
-    case LogLevel::WARNING:  return ImVec4(1.0f, 1.0f, 0.0f, 1.0f);  // Yellow
-    case LogLevel::ERROR:    return ImVec4(1.0f, 0.3f, 0.3f, 1.0f);  // Red
-    case LogLevel::CRITICAL: return ImVec4(1.0f, 0.0f, 1.0f, 1.0f);  // Magenta
-    default:                 return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+    case LogLevel::INFO:     return EditorStyle::LogInfo;
+    case LogLevel::DEBUG:    return EditorStyle::LogDebug;
+    case LogLevel::WARNING:  return EditorStyle::LogWarning;
+    case LogLevel::ERROR:    return EditorStyle::DangerText;
+    case LogLevel::CRITICAL: return EditorStyle::LogCritical;
+    default:                 return EditorStyle::Text;
     }
 }
 

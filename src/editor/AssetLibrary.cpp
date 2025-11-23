@@ -33,6 +33,7 @@ Provides:
 #include "core/ProjectPaths.h"
 #include <vector>
 #include <services/ResourceManager.h>
+#include "EditorStyle.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -89,10 +90,10 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
 
             // Style overrides: make SmallButton look like a link
             // Text: blue; Button: fully transparent; Hover/Active: subtle tinted backgrounds
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.4f, 0.8f, 0.3f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.4f, 0.8f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Accent);
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::AccentHover, 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::AccentActive, 0.5f));
 
             // When clicked, navigate to that folder level
             if (ImGui::SmallButton(pathParts[i].string().c_str())) {
@@ -120,7 +121,7 @@ void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::
 
     // Check if path exists or if path exists but it's a file, not a folder
     if (!std::filesystem::exists(folderPath) || !std::filesystem::is_directory(folderPath)) {
-        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Folder not found");
+        ImGui::TextColored(EditorStyle::DangerText, "Folder not found");
         // Pop the font we pushed above so ImGui stays balanced (files and folders later use icons)
         ImGui::PopFont();
         return;
@@ -218,7 +219,7 @@ void AssetLibrary::_displaySelectedFileInfo(const std::string& selectedAsset) {
 
     // Check if file/folder still exists
     if (!std::filesystem::exists(selectedPath)) {
-        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Selected file no longer exists");
+        ImGui::TextColored(EditorStyle::DangerText, "Selected file no longer exists");
         return;
     }
 
@@ -264,7 +265,7 @@ void AssetLibrary::_displaySelectedFileInfo(const std::string& selectedAsset) {
             }
         }
         catch (const std::exception& e) {
-            ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "Could not get file size");
+            ImGui::TextColored(EditorStyle::WarningText, "Could not get file size");
             LOG_ERROR("Failed to get file size: " << e.what());
         }
     }

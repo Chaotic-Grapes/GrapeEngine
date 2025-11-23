@@ -23,6 +23,7 @@ centralized and consistent with the currently active scene.
 
 #include "EditorFileMenu.h"
 #include "HierarchyPanel.h"
+#include "EditorStyle.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -93,7 +94,14 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
 
         if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S", false, hasActiveScene)) { SaveSceneAsDialog(); }
         ImGui::Separator();
-        if (ImGui::MenuItem("Exit")) {
+        // Make the Exit menu item visually distinct (danger background)
+        ImGui::PushStyleColor(ImGuiCol_Header, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, EditorStyle::DangerButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+        bool exitClicked = ImGui::MenuItem("Exit");
+        ImGui::PopStyleColor(4);
+        if (exitClicked) {
             // If there are unsaved changes prompt the user to save before exiting
             if (m_hasUnsavedChanges) {
                 openExitPopup = true;
@@ -127,10 +135,15 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
         ImGui::SameLine();
 
         // No: Exit without saving
+        // No: Exit without saving (styled as a danger button)
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
         if (ImGui::Button("No", ImVec2(80, 0))) {
             if (Engine::CORE) Engine::CORE->Close();
             ImGui::CloseCurrentPopup();
         }
+        ImGui::PopStyleColor(3);
 
         ImGui::SameLine();
 
@@ -282,7 +295,14 @@ void EditorFileMenu::HandleShortcuts(float& uiScale) {
         if (Input::IsKeyPressed(KEY_MINUS)) uiScale -= 0.10f;
         if (Input::IsKeyPressed(KEY_N)) CreateNewScene();
         if (Input::IsKeyPressed(KEY_O)) OpenSceneDialog();
-        if (Input::IsKeyPressed(KEY_S)) {
+        // Only allow save shortcuts when there is an active scene
+        bool hasActiveScene = false;
+        if (m_sceneManager) {
+            size_t idx = m_sceneManager->GetActiveIndex();
+            hasActiveScene = (idx != static_cast<size_t>(-1));
+        }
+
+        if (Input::IsKeyPressed(KEY_S) && hasActiveScene) {
             if (shiftDown) SaveSceneAsDialog();
             else SaveScene();
         }
