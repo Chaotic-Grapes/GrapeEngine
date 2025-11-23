@@ -1030,7 +1030,6 @@ namespace ECS {
                         m_selectedEntityID = INVALID_ENTITY_ID;  // Use max uint32 to indicate "no selection"
                     }
                 }
-                firstFrame = false;
 
                 // Frame N: Write to PBO 0
                 // Write to current PBO (async transfer starts)
