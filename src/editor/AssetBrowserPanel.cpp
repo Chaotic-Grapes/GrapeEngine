@@ -945,6 +945,7 @@ void AssetBrowserPanel::_renderItemContextMenu() {
 void AssetBrowserPanel::_createScript() {
     // Create in current directory
     std::filesystem::path targetDir = m_currentPath;
+    std::cout << "Creating script in directory: " << targetDir.string() << std::endl;
 
     // Ensure the directory exists
     if (!std::filesystem::exists(targetDir)) {
@@ -968,17 +969,50 @@ void AssetBrowserPanel::_createScript() {
 
     // Create script template
     std::string className = m_newAssetNameBuffer;
+
+    // Create namespace from the target directory by replacing
+    // path separators with '.' and sanitizing invalid characters.
+    std::string ns;
+    try {
+        // Try to make the path relative to the project root so namespaces
+        // are nicer (e.g., "Assets.Scripts") when possible.
+        std::filesystem::path projRoot = Engine::ProjectPaths::GetProjectRoot();
+        std::filesystem::path rel = std::filesystem::relative(targetDir, projRoot);
+        ns = rel.string();
+    }
+    catch (...) {
+        ns = targetDir.string();
+    }
+
+    // Replace separators with dots and sanitize a few problematic chars
+    for (char &c : ns) {
+        if (c == '/' || c == '\\')
+            c = '.';
+        else if (c == ':' || c == ' ')
+            c = '_';
+    }
+
+    // Trim leading/trailing dots if any
+    while (!ns.empty() && ns.front() == '.')
+        ns.erase(ns.begin());
+    while (!ns.empty() && ns.back() == '.')
+        ns.pop_back();
+
+    // Fallback namespace if resulting string is empty
+    if (ns.empty())
+        ns = Engine::ProjectPaths::GetProjectRoot();
+
     std::string scriptContent =
-        "using GrapeEngine.ScriptAPI;\n\n"
-        "namespace GameScripts;\n"
+        "using GrapeEngine.Scripting;\n\n"
+        "namespace " + ns + ";\n"
         "\n"
         "public class " + className + " : ScriptBehaviour\n"
         "{\n"
-        "    protected override void OnStart()\n"
+        "    public override void OnStart()\n"
         "    {\n"
         "        // Called once when the script is initialized\n"
         "    }\n\n"
-        "    protected override void OnUpdate()\n"
+        "    public override void OnUpdate()\n"
         "    {\n"
         "        // Called every frame\n"
         "    }\n"
