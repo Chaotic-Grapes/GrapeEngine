@@ -76,7 +76,7 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     ImGuizmo::SetRect(drawPosX, drawPosY, drawSizeX, drawSizeY);
 
     // ------------------------------------------------------------------------
-    // C. HANDLE TOOL SWITCH INPUT (W = Move, E = Rotate, R = Scale)
+    // C. HANDLE TOOL SWITCH INPUT (T = Move, E = Rotate, R = Scale)
     // ------------------------------------------------------------------------
 
     // Updates the private member m_currentGizmoOperation
