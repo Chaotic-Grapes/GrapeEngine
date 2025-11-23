@@ -35,9 +35,9 @@ namespace Engine {
         Scenes::SceneManager& GetSceneManager() { return m_sceneManager; }
 
         /**
-         * @brief Get the application configuration
+         * @brief Get the editor settings
          */
-        const EditorSettings& GetConfig() const { return m_config; }
+        const EditorSettings& GetEditorSettings() const { return m_editorSettings; }
 
         /**
          * @brief Get the project settings
@@ -90,7 +90,7 @@ namespace Engine {
         Scenes::SceneManager m_sceneManager;
 
         // Editor configuration
-        EditorSettings m_config;
+        EditorSettings m_editorSettings;
 
         // Project settings
         ProjectSettings m_projectSettings;

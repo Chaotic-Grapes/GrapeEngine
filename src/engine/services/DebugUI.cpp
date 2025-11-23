@@ -45,6 +45,7 @@ Features:
 #include "scene/Scene.h"
 #include "services/ResourceManager.h"
 #include "services/UICommon.h"
+#include "services/WindowManager.h"
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
@@ -411,6 +412,8 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
 }
 
 void DebugUI::_showInputDebugWindow() {
+    auto *window = WindowManager::GetMainWindow();
+
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_INPUT);
     ImGui::Begin("Input Debug");
@@ -423,7 +426,7 @@ void DebugUI::_showInputDebugWindow() {
 
     ImGui::Separator();
     ImGui::Text("=== Window ===");
-    ImGui::Text("Size: %dx%d", Input::GetWindowWidth(), Input::GetWindowHeight());
+    ImGui::Text("Size: %dx%d", window->GetWidth(), window->GetHeight());
 
     ImGui::Separator();
     ImGui::Text("=== Keyboard ===");

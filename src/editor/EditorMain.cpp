@@ -47,32 +47,30 @@ public:
             Engine::Physics::SetGravity(Vector2D(0.0f, projectSettings.Physics.Gravity));
             LOG_INFO("Applied physics gravity from ProjectSettings: " << projectSettings.Physics.Gravity);
         }
-        else {
-            const auto& config = Engine::CORE->GetConfig();
-            width = config.WindowSettings.Width;
-            height = config.WindowSettings.Height;
 
-            // Create main window based on editor config
-            auto* window = CREATE_WINDOW_EX("Grape Engine Editor", width, height, 
-                config.WindowSettings.VSync,
-                config.WindowSettings.Fullscreen 
-                    ? WindowMode::Fullscreen 
-                    : WindowMode::Windowed
-                );
-        }
+        const auto& config = Engine::CORE->GetEditorSettings();
+        width = config.WindowSettings.Width;
+        height = config.WindowSettings.Height;
 
-        // Check if window is created
-        auto* mainWindow = WindowManager::GetMainWindow();
-        if (!mainWindow) {
-            // Create main window if not already created
-            CREATE_WINDOW("Grape Engine Editor", width, height);
+        // Create main window based on editor config
+        LOG_INFO("Creating main window from EditorSettings config");
+        auto* window = CREATE_WINDOW_EX("Grape Engine Editor", width, height, 
+            config.WindowSettings.VSync,
+            WindowMode::Windowed
+        );
+
+        if (!window) {
+            LOG_ERROR("Failed to create main window for editor");
+            return;
         }
+        
+        window->SetMaximized(config.WindowSettings.Maximized);
         
         // Enable level editor without a scene (scene-less editor mode)
         if (auto* overlay = Services::OverlayService::Get()) {
             overlay->EnableLevelEditorForScene(nullptr);
             LOG_INFO("Level Editor initialized successfully");
-        } 
+        }
         else {
             LOG_ERROR("Failed to initialize Level Editor: OverlayService not available");
         }

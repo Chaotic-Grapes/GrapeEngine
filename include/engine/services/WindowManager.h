@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define DESTROY_ALL_WINDOWS() WindowManager::DestroyAll();
 
 #include <vector>
+#include <memory>
 #include "Window.h"
 
 #ifdef CreateWindow
@@ -43,11 +44,12 @@ public:
     // Destroy all windows
     static void DestroyAll();
 
-    static const std::vector<Window*>& GetWindows();
+    // Returns a snapshot vector of raw Window pointers (ownership remains with WindowManager)
+    static std::vector<Window*> GetWindows();
     static Window* GetMainWindow();
 
 private:
-    static std::vector<Window*> m_windows;
+    static std::vector<std::unique_ptr<Window>> m_windows;
 };
 
 #endif

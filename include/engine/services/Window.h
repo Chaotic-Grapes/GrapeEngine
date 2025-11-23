@@ -63,25 +63,24 @@ public:
 	bool ShouldClose() const;
 	void Close() const;
 
-	int Width() const;
-	int Height() const;
+	int GetWidth() const;
+	int GetHeight() const;
 
 	bool IsFocused() const;
 	bool IsMinimized() const;
-	void IsMinimized(bool flag) const;
+	void SetMinimized(bool flag) const;
 	bool IsMaximized() const;
-	void IsMaximized(bool flag) const;
+	void SetMaximized(bool flag) const;
 	bool IsVisible() const;
-	void IsVisible(bool flag) const;
+	void SetVisible(bool flag) const;
 	bool IsResizable() const;
-	void IsResizable(bool flag) const;
-	
-	void Mode(WindowMode::Flags mode, GLFWmonitor* monitor = nullptr);
-	bool HasMode(WindowMode::Flags value) const;
-	void Resize(std::optional<int> width, std::optional<int> height);
-
+	void SetResizable(bool flag) const;
 	void SetVSync(bool enabled);
 	bool IsVSync() const;
+	
+	void SetMode(WindowMode::Flags mode, GLFWmonitor* monitor = nullptr);
+	bool HasMode(WindowMode::Flags value) const;
+	void Resize(std::optional<int> width, std::optional<int> height);
 
 	void SetTitle(const std::string& title);
 	std::string GetTitle() const;
@@ -96,11 +95,11 @@ private:
 
 	// Remember windowed mode size and position for restoring
 	int m_windowedX = 100, m_windowedY = 100;
-	int m_windowedWidth = 1280, m_windowedHeight = 720; // TODO: Scaling?
+	int m_windowedWidth = 1600, m_windowedHeight = 900; // TODO: Scaling?
 
 	bool m_vsync = true;
 
-	WindowMode::Flags m_mode = WindowMode::Windowed;
+	WindowMode::Flags m_mode = static_cast<WindowMode::Flags>(0);
 };
 
 #endif // WINDOW_H

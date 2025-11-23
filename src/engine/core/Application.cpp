@@ -50,12 +50,15 @@ namespace Engine {
         CrashDumping::SetDumpCreateState(true);
 
         // Load editor configuration (try working dir, then parent dir fallback)
-        bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
+        bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_editorSettings);
         if (!configLoaded) {
             // Fallback: common scenario when running from build directory
-            if (Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_config)) {
+            if (Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_editorSettings)) {
                 LOG_INFO("Loaded configuration from parent directory: ../config.json");
             }
+        }
+        else {
+            LOG_INFO("Loaded configuration file: " << std::filesystem::current_path().string() + "/config.json");
         }
 
         // Initialize the message system here

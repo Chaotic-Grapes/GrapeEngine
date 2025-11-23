@@ -141,8 +141,8 @@ namespace ECS {
         m_initialized = true;
 
         const auto& mainWindow = WindowManager::GetMainWindow();
-        const int width = mainWindow->Width();
-        const int height = mainWindow->Height();
+        const int width = mainWindow->GetWidth();
+        const int height = mainWindow->GetHeight();
 
         // Shaders
         m_shader = std::make_unique<Shader>(
@@ -418,8 +418,8 @@ namespace ECS {
         // fallback (if no active camera found)
         if (!foundActive) {
             const auto& mainWindow = WindowManager::GetMainWindow();
-            projection = glm::ortho(0.f, static_cast<float>(mainWindow->Width()),
-                0.f, static_cast<float>(mainWindow->Height()),
+            projection = glm::ortho(0.f, static_cast<float>(mainWindow->GetWidth()),
+                0.f, static_cast<float>(mainWindow->GetHeight()),
                 -1.f, 1.f);
         }
 
@@ -427,7 +427,7 @@ namespace ECS {
         // BLOOM RADIUS CALCULATION (world-space consistent)
         // ============================================================
         const auto& win = WindowManager::GetMainWindow();
-        const float bloomBufferHeight = static_cast<float>(win->Height()) / 2.0f;
+        const float bloomBufferHeight = static_cast<float>(win->GetHeight()) / 2.0f;
 
         // How zoomed in we are relative to the default ortho size
         const float zoomScale = kReferenceOrthoSize / m_cameraOrthoSize;
@@ -520,8 +520,8 @@ namespace ECS {
                     if (isUILayer) {
                         const auto& win = WindowManager::GetMainWindow();
                         glm::mat4 uiProjection = glm::ortho(
-                            0.0f, static_cast<float>(win->Width()),
-                            0.0f, static_cast<float>(win->Height()),
+                            0.0f, static_cast<float>(win->GetWidth()),
+                            0.0f, static_cast<float>(win->GetHeight()),
                             -1.0f, 1.0f
                         );
                         layerViewProj = uiProjection;  // No view matrix, just screen-space projection
@@ -679,8 +679,8 @@ namespace ECS {
                         m_textShader->use();
 
                         const auto& win = WindowManager::GetMainWindow();
-                        const float screenWidth = static_cast<float>(win->Width());
-                        const float screenHeight = static_cast<float>(win->Height());
+                        const float screenWidth = static_cast<float>(win->GetWidth());
+                        const float screenHeight = static_cast<float>(win->GetHeight());
 
                         // Calculate UI scale factor (simple calculation each frame)
                         const float uiScaleFactor = screenHeight / kReferenceHeight;
@@ -782,7 +782,7 @@ namespace ECS {
                                 // Calculate constant screen-space thickness
                                 const auto& win = WindowManager::GetMainWindow();
                                 const float desiredPixelThickness = 2.0f; // Always 2 pixels thick
-                                const float worldThickness = (m_cameraOrthoSize / win->Height()) * desiredPixelThickness;
+                                const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPixelThickness;
 
                                 // Draw frustum rectangle with constant screen-space thickness
                                 const glm::vec4 frustumColor(0.0f, 1.0f, 1.0f, 0.6f); // Cyan, semi-transparent
@@ -820,7 +820,7 @@ namespace ECS {
                 glm::vec2 viewportSize;
 
                 const auto& win = WindowManager::GetMainWindow();
-                viewportSize = glm::vec2(win->Width(), win->Height());
+                viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
                 bool useViewportCoords = m_useEditorCamera;
 
                 glm::dvec2 mousePos;
@@ -1055,7 +1055,7 @@ namespace ECS {
                 Framebuffer::Unbind();
 
                 // Restore viewport to full window
-                glViewport(0, 0, win->Width(), win->Height());
+                glViewport(0, 0, win->GetWidth(), win->GetHeight());
             });
 
         // Highlight the currently selected entity (overlay onto HDR)
@@ -1075,7 +1075,7 @@ namespace ECS {
                 // make outline look 2px thick in screen space
                 const auto& win = WindowManager::GetMainWindow();
                 const float desiredPx = 2.0f;
-                const float worldThickness = (m_cameraOrthoSize / win->Height()) * desiredPx;
+                const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPx;
 
                 // selection color (pick whatever you like but it should contrast against viewport)
                 const glm::vec4 selColor(1.0f, 0.85f, 0.15f, 1.0f); // yellow-ish
@@ -1424,7 +1424,7 @@ namespace ECS {
 
                 const auto& win = WindowManager::GetMainWindow();
                 Framebuffer::BindDefault();
-                glViewport(0, 0, win->Width(), win->Height());
+                glViewport(0, 0, win->GetWidth(), win->GetHeight());
 
                 // Use a simple blit shader, NOT bloomCombine
                 m_blitShader->use();
@@ -1446,7 +1446,7 @@ namespace ECS {
         glm::vec2 dragViewportMin(0, 0);
         glm::vec2 dragViewportSize;
 
-        dragViewportSize = glm::vec2(win->Width(), win->Height());
+        dragViewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
 
         // Get viewport bounds if using editor camera
         if (m_useEditorCamera) {
@@ -1550,7 +1550,7 @@ namespace ECS {
 
                 // Calculate drag threshold in world space (5 pixels)
                 const auto& win = WindowManager::GetMainWindow();
-                const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->Height())) * 5.0f;
+                const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->GetHeight())) * 5.0f;
 
                 // Start dragging if moved beyond threshold
                 if (dragDistance > dragThreshold) {

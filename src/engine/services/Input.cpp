@@ -37,15 +37,11 @@ std::unordered_map<int, bool> Input::m_mouseDown{ 0 };
 std::unordered_map<int, bool> Input::m_mousePressed{ 0 };
 std::unordered_map<int, bool> Input::m_mouseUp{ 0 };
 
-int Input::m_windowWidth{ 0 };
-int Input::m_windowHeight{ 0 };
 double Input::m_scrollX{ 0 };
 double Input::m_scrollY{ 0 };
 
 void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;
-    // Get initial window size
-    glfwGetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
 }
 
 // Check if a specific key is currently pressed
@@ -97,13 +93,12 @@ double Input::GetMouseY() {
     return yPos;
 }
 
-// Sets up all GLFW event callbacks (keyboard, mouse, resize)
+// Sets up all GLFW event callbacks (keyboard, mouse)
 void Input::SetupEventCallbacks() {
     glfwSetKeyCallback(m_window, _keyCallback);
     glfwSetMouseButtonCallback(m_window, _mouseButtonCallback);
     glfwSetCursorPosCallback(m_window, _mousePosCallback);
     glfwSetScrollCallback(m_window, _mouseScrollCallback);
-    glfwSetWindowSizeCallback(m_window, _windowSizeCallback);
     glfwSetDropCallback(m_window, _fileDropCallback);
 }
 
@@ -111,15 +106,6 @@ void Input::SetupEventCallbacks() {
 void Input::ErrorCallback(const int error, char const* description) {
     (void)error;
     LOG_ERROR("GLFW error: " << description);
-}
-
-// Called when window is resized
-void Input::_windowSizeCallback(GLFWwindow* pWin, int width, int height) {
-    (void)pWin;
-
-    // Store the new window dimensions
-    m_windowWidth = width;
-    m_windowHeight = height;
 }
 
 // Clear frame-specific input state and poll GLFW events (called once per frame)

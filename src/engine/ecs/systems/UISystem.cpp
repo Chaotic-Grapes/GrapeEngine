@@ -60,7 +60,7 @@ namespace ECS {
         Input::GetMousePosition(mousePos.x, mousePos.y);
 
         const auto& window = WindowManager::GetMainWindow();
-        const float winHeight = static_cast<float>(window->Height());
+        const float winHeight = static_cast<float>(window->GetHeight());
 
         // Convert to bottom-left origin (OpenGL style)
         const float mouseX = static_cast<float>(mousePos.x);
