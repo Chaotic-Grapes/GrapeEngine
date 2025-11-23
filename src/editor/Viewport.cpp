@@ -82,6 +82,7 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
         m_gameRendererSystem->BindWorld(*m_world);
         m_gameRendererSystem->SetForceSceneCamera(true);
         m_gameRendererSystem->SetEditorInputEnabled(false);
+        LOG_INFO("[Viewport] Game renderer initialized with force scene camera");
     }
 }
 
@@ -122,12 +123,14 @@ void Viewport::SetWorld(ECS::World* world) {
         m_gameRendererSystem->BindWorld(*world);
         m_gameRendererSystem->SetForceSceneCamera(true);
         m_gameRendererSystem->SetEditorInputEnabled(false);
+        LOG_INFO("[Viewport] Game renderer created in SetWorld");
     }
     // Rebind existing game renderer to new world
     else if (m_gameRendererSystem && world) {
         m_gameRendererSystem->BindWorld(*world);
         m_gameRendererSystem->SetForceSceneCamera(true);
         m_gameRendererSystem->SetEditorInputEnabled(false);
+        LOG_INFO("[Viewport] Game renderer rebound to new world");
     }
 }
 
@@ -236,20 +239,99 @@ void Viewport::_renderViewport() {
     // Render Game window (scene camera)
     ImGui::Begin("Game");
 
+    // Aspect ratio selector panel
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 4));
+        
+        const char* aspectRatios[] = {
+            "Free Aspect",
+            "16:9",
+            "16:10",
+            "4:3",
+            "5:4",
+            "21:9",
+            "1:1"
+        };
+        
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::Combo("##AspectRatio", &m_selectedAspectRatio, aspectRatios, IM_ARRAYSIZE(aspectRatios))) {
+            m_freeAspect = (m_selectedAspectRatio == 0);
+        }
+        
+        ImGui::PopStyleVar(2);
+        ImGui::Separator();
+    }
+
     // Check if any Camera3D components exist in the world
     bool hasCameraComponent = false;
+    bool hasActiveCamera = false;
+    int cameraCount = 0;
     if (m_world) {
-        m_world->Each<ECS::Components::Camera3D>([&](ECS::Entity, ECS::Components::Camera3D&) {
+        m_world->Each<ECS::Components::Camera3D>([&](ECS::Entity e, ECS::Components::Camera3D& cam) {
             hasCameraComponent = true;
+            cameraCount++;
+            if (cam.Active) {
+                hasActiveCamera = true;
+            }
         });
     }
 
-    if (!hasCameraComponent) {
-        ImGui::TextDisabled("No camera found");
+    if (!m_gameRendererSystem) {
+        ImGui::TextDisabled("No game renderer not initialized");
     }
-    else if (m_gameRendererSystem) {
-        auto size = ImGui::GetContentRegionAvail();
-        auto pos = ImGui::GetCursorScreenPos();
+    else if (!hasCameraComponent) {
+        ImGui::TextDisabled("No camera found");
+        ImGui::TextDisabled("Add a Camera3D component to an entity");
+    }
+    else if (!hasActiveCamera) {
+        ImGui::Text("Found %d camera(s) but none are active", cameraCount);
+        ImGui::TextDisabled("Set Camera3D.Active to true in the inspector");
+    }
+    else {
+        auto availableSize = ImGui::GetContentRegionAvail();
+        
+        // Calculate display size based on aspect ratio
+        ImVec2 displaySize = availableSize;
+        float targetRatio = availableSize.x / availableSize.y;
+        
+        if (!m_freeAspect) {
+            switch (m_selectedAspectRatio) {
+                case 1: targetRatio = 16.0f / 9.0f; break;   // 16:9
+                case 2: targetRatio = 16.0f / 10.0f; break;  // 16:10
+                case 3: targetRatio = 4.0f / 3.0f; break;    // 4:3
+                case 4: targetRatio = 5.0f / 4.0f; break;    // 5:4
+                case 5: targetRatio = 21.0f / 9.0f; break;   // 21:9
+                case 6: targetRatio = 1.0f; break;           // 1:1
+            }
+            
+            float availableRatio = availableSize.x / availableSize.y;
+            
+            if (availableRatio > targetRatio) {
+                // Available space is wider - constrain width
+                displaySize.x = availableSize.y * targetRatio;
+                displaySize.y = availableSize.y;
+            }
+            else {
+                // Available space is taller - constrain height
+                displaySize.x = availableSize.x;
+                displaySize.y = availableSize.x / targetRatio;
+            }
+            
+            // Center the viewport
+            float offsetX = (availableSize.x - displaySize.x) * 0.5f;
+            float offsetY = (availableSize.y - displaySize.y) * 0.5f;
+            ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + offsetX, ImGui::GetCursorPosY() + offsetY));
+        }
+        
+        // Update camera aspect ratio to match display size (prevents squishing)
+        if (m_world) {
+            m_world->Each<ECS::Components::Camera3D>([targetRatio](ECS::Entity e, ECS::Components::Camera3D& cam) {
+                if (cam.Active) {
+                    cam.AspectRatio = targetRatio;
+                }
+            });
+        }
 
         if (m_world) {
             m_gameRendererSystem->Update(*m_world, Time::DeltaTime());
@@ -260,12 +342,15 @@ void Viewport::_renderViewport() {
             ResourceAccessor acc(rg);
             uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
             if (textureId > 0) {
-                ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
+                ImGui::Image((void*)(intptr_t)textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
+            }
+            else {
+                ImGui::TextDisabled("Texture ID is 0 - render graph issue");
             }
         }
-    }
-    else {
-        ImGui::TextDisabled("No renderer available");
+        else {
+            ImGui::TextDisabled("No render graph available");
+        }
     }
 
     ImGui::End();

@@ -42,6 +42,60 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
 // Component Rendering
 // -----------------------------------------------------------------------------
 
+// Renders the Name component properties
+void ComponentUI::RenderName(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Name" });
+    
+    // Get current name value
+    std::string name = data.value("Value", std::string("Entity"));
+    char buffer[256];
+    strncpy_s(buffer, name.c_str(), sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
+    // Render text input for name
+    ImGui::Text("Name");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::InputText("##Name", buffer, sizeof(buffer))) {
+        data["Value"] = std::string(buffer);
+    }
+    
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Active component properties
+void ComponentUI::RenderActive(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Active" });
+    EditorUI::RenderCheckboxProperty("Enabled", data, "Enabled");
+    EditorUI::EndPropertySection();
+}
+
+// Renders the TagMask component properties
+void ComponentUI::RenderTagMask(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Tag Mask" });
+    
+    // Tag mask is a bitfield stored as integer
+    int mask = data.value("Mask", 0);
+    
+    ImGui::Text("Mask");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::InputInt("##Mask", &mask)) {
+        data["Mask"] = mask;
+    }
+    
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Lifetime component properties
+void ComponentUI::RenderLifetime(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Lifetime" });
+    EditorUI::RenderFloatRow("Time##Lifetime", "s", data, "Time", 0.1f);
+    EditorUI::EndPropertySection();
+}
+
 // Renders the LocalTransform component properties
 void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     // Start a grouped section so all three rows share aligned labels
@@ -58,6 +112,19 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::RenderVector3DRow("Local Scale", data["Scale"], "X", "Y", "Z", 0.01f);
 
     // Close the grouped section and restore layout state
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Rotator component properties
+void ComponentUI::RenderRotator(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Rotation Speed", "Rotation Offset" });
+    
+    // RotationSpeed controls how fast the entity rotates (radians per second)
+    EditorUI::RenderFloatRow("Rotation Speed##Rotator", "rad/s", data, "RotationSpeed", 0.1f);
+    
+    // RotationOffset is the initial rotation angle in radians
+    EditorUI::RenderFloatRow("Rotation Offset##Rotator", "rad", data, "RotationOffset", 0.1f);
+    
     EditorUI::EndPropertySection();
 }
 
@@ -504,6 +571,118 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
 
     // Integer Z-order value (can be negative)
     EditorUI::RenderIntProperty("Z-Order", data, "ZOrder");
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Light2D component properties
+void ComponentUI::RenderLight2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Light Type", "Position", "Direction", "Color", "Intensity", "Range", "Casts Shadows" });
+    
+    // Light type selection (Directional = 0, Point = 1)
+    int lightType = data.value("LightType", 0);
+    const char* lightTypes[] = { "Directional", "Point" };
+    
+    ImGui::Text("Light Type");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::Combo("##LightType", &lightType, lightTypes, 2)) {
+        data["LightType"] = lightType;
+    }
+    
+    // Position (used for Point lights)
+    EditorUI::RenderVector3DRow("Position##Light2D", data["Position"], "X", "Y", "Z", 0.1f);
+    
+    // Direction (used for Directional lights)
+    EditorUI::RenderVector3DRow("Direction##Light2D", data["Direction"], "X", "Y", "Z", 0.1f);
+    
+    // Color
+    if (!data.contains("Color")) {
+        data["Color"] = nlohmann::json{ {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    }
+    EditorUI::RenderColorProperty("Color##Light2D", data["Color"]);
+    
+    // Intensity
+    EditorUI::RenderFloatRow("Intensity##Light2D", "", data, "Intensity", 0.1f);
+    
+    // Range (for Point lights)
+    EditorUI::RenderFloatRow("Range##Light2D", "units", data, "Range", 0.5f);
+    
+    // Casts Shadows
+    EditorUI::RenderCheckboxProperty("Casts Shadows##Light2D", data, "CastsShadows");
+    
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Text component properties
+void ComponentUI::RenderText(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Content", "Font Path", "Pixel Size", "Color", "Anchor" });
+    
+    // Text content
+    std::string content = data.value("Content", std::string("Text"));
+    char contentBuffer[256];
+    strncpy_s(contentBuffer, content.c_str(), sizeof(contentBuffer) - 1);
+    contentBuffer[sizeof(contentBuffer) - 1] = '\0';
+    
+    ImGui::Text("Content");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(300.0f);
+    if (ImGui::InputText("##Content", contentBuffer, sizeof(contentBuffer))) {
+        data["Content"] = std::string(contentBuffer);
+    }
+    
+    // Font path
+    std::string fontPath = data.value("FontPath", std::string("assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf"));
+    char fontBuffer[128];
+    strncpy_s(fontBuffer, fontPath.c_str(), sizeof(fontBuffer) - 1);
+    fontBuffer[sizeof(fontBuffer) - 1] = '\0';
+    
+    ImGui::Text("Font Path");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(300.0f);
+    if (ImGui::InputText("##FontPath", fontBuffer, sizeof(fontBuffer))) {
+        data["FontPath"] = std::string(fontBuffer);
+    }
+    
+    // Pixel size
+    EditorUI::RenderFloatRow("Pixel Size##Text", "px", data, "PixelSize", 1.0f);
+    
+    // Color
+    if (!data.contains("Color")) {
+        data["Color"] = nlohmann::json{ {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    }
+    EditorUI::RenderColorProperty("Color##Text", data["Color"]);
+    
+    // Anchor (enum: Absolute, TopLeft, TopRight, BottomLeft, BottomRight, Center)
+    int anchor = data.value("Anchor", 0);
+    const char* anchors[] = { "Absolute", "Top Left", "Top Right", "Bottom Left", "Bottom Right", "Center" };
+    
+    ImGui::Text("Anchor");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::Combo("##Anchor", &anchor, anchors, 6)) {
+        data["Anchor"] = anchor;
+    }
+    
+    EditorUI::EndPropertySection();
+}
+
+// Renders the AnimationState2D component properties
+void ComponentUI::RenderAnimationState2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Current Frame", "Time Accumulator", "Finished" });
+    
+    // Current frame (integer)
+    EditorUI::RenderIntProperty("Current Frame##AnimState", data, "CurrentFrame");
+    
+    // Time accumulator (float)
+    EditorUI::RenderFloatRow("Time Accumulator##AnimState", "s", data, "TimeAccumulator", 0.01f);
+    
+    // Finished (boolean)
+    EditorUI::RenderCheckboxProperty("Finished##AnimState", data, "Finished");
+    
     EditorUI::EndPropertySection();
 }
 

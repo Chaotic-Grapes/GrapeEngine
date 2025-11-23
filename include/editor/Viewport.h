@@ -78,6 +78,10 @@ private:
     // Stores the exact screen position and size of the drawn scene texture. M3<<<<<<<<<<<<<<<<<<<<<<<
     ImVec2 m_sceneDrawPos = { 0.0f, 0.0f };
     ImVec2 m_sceneDrawSize = { 0.0f, 0.0f };
+    
+    // Game window aspect ratio settings
+    int m_selectedAspectRatio = 0; // Index into aspect ratio list
+    bool m_freeAspect = true;      // Whether to use free aspect or fixed ratio
 
     // Event callback
     std::function<void(EntityId)> m_onSelectionChanged;

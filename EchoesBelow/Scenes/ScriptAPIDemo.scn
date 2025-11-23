@@ -500,6 +500,65 @@
                 {
                     "Data": {
                         "Position": {
+                            "X": -3.0,
+                            "Y": 6.0,
+                            "Z": 10.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Active": true,
+                        "AspectRatio": 1.7777777777777777,
+                        "FarPlane": 100.0,
+                        "FOV": 45.0,
+                        "NearPlane": 0.1,
+                        "OrthoSize": 10.0,
+                        "UsePerspective": false
+                    },
+                    "TypeName": "Camera3D"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": "Main Camera"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\CameraFollow.cs",
+                        "TypeHash": 0,
+                        "TypeName": "EchoesBelow.Scripts.CameraFollow"
+                    },
+                    "TypeName": "ScriptInstance"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
                             "X": 0.0,
                             "Y": -3.0,
                             "Z": 0.0
@@ -737,7 +796,7 @@
             ]
         }
     ],
-    "EntityCount": 8,
+    "EntityCount": 9,
     "Hierarchy": [],
     "SceneName": "Scene",
     "Version": "1.0"

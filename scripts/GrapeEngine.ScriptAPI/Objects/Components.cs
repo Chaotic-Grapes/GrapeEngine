@@ -73,12 +73,44 @@ public struct Active
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public struct PrefabLink
+{
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+    public char[] PrefabPath;
+
+    public PrefabLink(string path)
+    {
+        PrefabPath = new char[256];
+        if (!string.IsNullOrEmpty(path))
+        {
+            var chars = path.ToCharArray();
+            Array.Copy(chars, PrefabPath, (int)GMath.Min(chars.Length, 255));
+        }
+    }
+
+    public readonly string GetPath() => new string(PrefabPath).TrimEnd('\0');
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public struct Lifetime
 {
     public float Time;
 }
 
 // ---------------------------------- Transform Components ----------------------------------
+
+[StructLayout(LayoutKind.Sequential)]
+public struct Rotator
+{
+    public float RotationSpeed;
+    public float RotationOffset;
+
+    public Rotator(float speed, float offset = 0f)
+    {
+        RotationSpeed = speed;
+        RotationOffset = offset;
+    }
+}
 
 [StructLayout(LayoutKind.Sequential)]
 public struct LocalTransform
@@ -243,56 +275,6 @@ public struct CircleCollider2D
     }
 }
 
-// ---------------------------------- 3D Physics Components ----------------------------------
-
-[StructLayout(LayoutKind.Sequential)]
-public struct Velocity
-{
-    public Vector3 Value;
-
-    public Velocity(Vector3 value) => Value = value;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-public struct Acceleration
-{
-    public Vector3 Value;
-
-    public Acceleration(Vector3 value) => Value = value;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-public struct AngularVelocity
-{
-    public Vector3 Value;
-
-    public AngularVelocity(Vector3 value) => Value = value;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-public struct Rigidbody
-{
-    public float Mass;
-    public float InverseMass;
-    public float LinearDrag;
-    public float AngularDrag;
-    public uint Flags;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-public struct BoxCollider
-{
-    public Vector3 HalfExtents;
-    public uint LayerMask;
-}
-
-[StructLayout(LayoutKind.Sequential)]
-public struct SphereCollider
-{
-    public float Radius;
-    public uint LayerMask;
-}
-
 // ---------------------------------- Rendering Components ----------------------------------
 
 [StructLayout(LayoutKind.Sequential)]
@@ -302,6 +284,46 @@ public struct SpriteRenderer2D
     public Color Color;
     public Vector2 Tiling;
     public Vector2 Offset;
+    public int Width;
+    public int Height;
+    public uint EmissiveTextureId;
+    public float EmissiveStrength;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct SpriteFlip2D
+{
+    public bool FlipX;
+    public bool FlipY;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct SpriteShader2D
+{
+    public bool Bloom;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct SpriteSheetAnimation2D
+{
+    public uint TextureId;
+    public int FrameWidth;
+    public int FrameHeight;
+    public int SheetWidth;
+    public int SheetHeight;
+    public int StartFrame;
+    public int FrameCount;
+    public float FramesPerSecond;
+    public bool Loop;
+    public bool Playing;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct AnimationState2D
+{
+    public int CurrentFrame;
+    public float TimeAccumulator;
+    public bool Finished;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -339,6 +361,82 @@ public struct ZIndex2D
     public short ZOrder;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+public struct Light2D
+{
+    public enum Type : byte
+    {
+        Directional = 0,
+        Point = 1
+    }
+
+    public Type LightType;
+    public Vector3 Position;
+    public Vector3 Direction;
+    public Color Color;
+    public float Intensity;
+    public float Range;
+    public bool CastsShadows;
+}
+
+public enum TextAnchor : byte
+{
+    Absolute = 0,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+    Center
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct Text
+{
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+    public char[] Content;
+    
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)]
+    public char[] FontPath;
+    
+    public float PixelSize;
+    public Color Color;
+    public TextAnchor Anchor;
+
+    public Text(string content, float pixelSize = 24f, string fontPath = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf")
+    {
+        Content = new char[256];
+        FontPath = new char[128];
+        PixelSize = pixelSize;
+        Color = new Color(1, 1, 1, 1);
+        Anchor = TextAnchor.Absolute;
+
+        if (!string.IsNullOrEmpty(content))
+        {
+            var chars = content.ToCharArray();
+            Array.Copy(chars, Content, (int)GMath.Min(chars.Length, 255));
+        }
+
+        if (!string.IsNullOrEmpty(fontPath))
+        {
+            var chars = fontPath.ToCharArray();
+            Array.Copy(chars, FontPath, (int)GMath.Min(chars.Length, 127));
+        }
+    }
+
+    public readonly string GetContent() => new string(Content).TrimEnd('\0');
+    public readonly string GetFontPath() => new string(FontPath).TrimEnd('\0');
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct UIButton
+{
+    public int ID;
+    public float X, Y, W, H;
+    public bool Hovered;
+    public bool Pressed;
+    public uint ActionID;
+}
+
 // ---------------------------------- Camera Components ----------------------------------
 
 [StructLayout(LayoutKind.Sequential)]
@@ -350,6 +448,35 @@ public struct Camera3D
     public float FarPlane;
     public float OrthoSize;
     public float AspectRatio;
+    public bool Active;
+
+    public static Camera3D Orthographic(float size = 10f, float aspectRatio = 16f/9f)
+    {
+        return new Camera3D
+        {
+            UsePerspective = false,
+            FOV = 45f,
+            NearPlane = 0.1f,
+            FarPlane = 100f,
+            OrthoSize = size,
+            AspectRatio = aspectRatio,
+            Active = true
+        };
+    }
+
+    public static Camera3D Perspective(float fov = 45f, float aspectRatio = 16f/9f)
+    {
+        return new Camera3D
+        {
+            UsePerspective = true,
+            FOV = fov,
+            NearPlane = 0.1f,
+            FarPlane = 100f,
+            OrthoSize = 10f,
+            AspectRatio = aspectRatio,
+            Active = true
+        };
+    }
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -358,6 +485,29 @@ public struct CameraMatrices
     public Matrix4x4 View;
     public Matrix4x4 Projection;
     public Matrix4x4 ViewProjection;
+}
+
+// ---------------------------------- Audio Components ----------------------------------
+
+[StructLayout(LayoutKind.Sequential)]
+public struct AudioSource
+{
+    public uint CueId;
+    public float Volume;
+    public float Pitch;
+    public bool Loop;
+    public bool PlayOnStart;
+    public bool Spatial3D;
+
+    public AudioSource(uint cueId)
+    {
+        CueId = cueId;
+        Volume = 1.0f;
+        Pitch = 1.0f;
+        Loop = false;
+        PlayOnStart = false;
+        Spatial3D = true;
+    }
 }
 
 // ---------------------------------- Additional Types ----------------------------------
