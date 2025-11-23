@@ -54,7 +54,7 @@ SCRIPT_API const char* ScriptAPI_Application_GetName() {
     if (Engine::CORE->HasProjectSettings()) {
         return Engine::CORE->GetProjectSettings().Title.c_str();
     }
-    return Engine::CORE->GetConfig().Title.c_str();
+    return "";
 }
 
 /// <summary>
@@ -84,5 +84,5 @@ SCRIPT_API bool ScriptAPI_Application_IsVSyncEnabled() {
     if (Engine::CORE->HasProjectSettings()) {
         return Engine::CORE->GetProjectSettings().WindowSettings.VSync;
     }
-    return Engine::CORE->GetConfig().WindowSettings.VSync;
+    return Engine::CORE->GetEditorSettings().WindowSettings.VSync;
 }

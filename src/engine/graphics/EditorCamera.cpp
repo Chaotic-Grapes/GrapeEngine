@@ -91,8 +91,8 @@ namespace Engine {
         m_camera->UsePerspective = false;
 
         auto* window = WindowManager::GetMainWindow();
-        const float screenWidth = static_cast<float>(window->Width());
-        const float screenHeight = static_cast<float>(window->Height());
+        const float screenWidth = static_cast<float>(window->GetWidth());
+        const float screenHeight = static_cast<float>(window->GetHeight());
 
         // Set orthographic size in world units
         m_camera->OrthoSize = kDefaultWorldViewHeight;
@@ -168,8 +168,8 @@ namespace Engine {
         m_camera->UsePerspective = false;
 
         auto* window = WindowManager::GetMainWindow();
-        const float screenWidth = static_cast<float>(window->Width());
-        const float screenHeight = static_cast<float>(window->Height());
+        const float screenWidth = static_cast<float>(window->GetWidth());
+        const float screenHeight = static_cast<float>(window->GetHeight());
 
         // Preserve current ortho size target across binds
         m_camera->OrthoSize = m_targetOrthoSize;
@@ -293,8 +293,8 @@ namespace Engine {
             const float worldWidth = worldHeight * m_camera->AspectRatio;
 
             // Screen dimensions in pixels
-            const float screenHeight = static_cast<float>(window->Height());
-            const float screenWidth = static_cast<float>(window->Width());
+            const float screenHeight = static_cast<float>(window->GetHeight());
+            const float screenWidth = static_cast<float>(window->GetWidth());
 
             // Convert pixel delta to world delta
             const float worldDeltaX = -(delta.x / screenWidth) * worldWidth;

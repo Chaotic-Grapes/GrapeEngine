@@ -23,6 +23,7 @@ centralized and consistent with the currently active scene.
 
 #include "EditorFileMenu.h"
 #include "HierarchyPanel.h"
+#include "EditorStyle.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -63,27 +64,95 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
     // Apply the new scale globally so all ImGui text and widgets follow it
     ImGui::GetIO().FontGlobalScale = uiScale;
 
+    // Flag to open popup when exiting with unsaved changes (this some bug with ImGui or something)
+    // Hack
+    static bool openExitPopup = false;
+
     // File menu (New, Open, Save As, Exit)
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Scene", "Ctrl+N")) { CreateNewScene(); }
         if (ImGui::MenuItem("Open Scene", "Ctrl+O")) { OpenSceneDialog(); }
 
+        // Determine whether there is an active scene to enable/disable save actions
+        bool hasActiveScene = false;
+        if (m_sceneManager) {
+            size_t idx = m_sceneManager->GetActiveIndex();
+            hasActiveScene = (idx != static_cast<size_t>(-1));
+        }
+
         // Show "Save Scene*" in BOLD when there are unsaved changes
         if (m_hasUnsavedChanges && m_boldFont) {
             ImGui::PushFont(m_boldFont);
-            bool clicked = ImGui::MenuItem("Save Scene*", "Ctrl+S");
+            bool clicked = ImGui::MenuItem("Save Scene*", "Ctrl+S", false, hasActiveScene);
             ImGui::PopFont();
             if (clicked) SaveScene();
         }
         else {
             // Normal font when no unsaved changes
-            if (ImGui::MenuItem("Save Scene", "Ctrl+S")) { SaveScene(); }
+            if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, hasActiveScene)) { SaveScene(); }
         }
 
-        if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S")) { SaveSceneAsDialog(); }
+        if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S", false, hasActiveScene)) { SaveSceneAsDialog(); }
         ImGui::Separator();
-        if (ImGui::MenuItem("Exit")) { if (Engine::CORE) { Engine::CORE->Close(); } }
+        // Make the Exit menu item visually distinct (danger background)
+        ImGui::PushStyleColor(ImGuiCol_Header, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, EditorStyle::DangerButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+        bool exitClicked = ImGui::MenuItem("Exit");
+        ImGui::PopStyleColor(4);
+        if (exitClicked) {
+            // If there are unsaved changes prompt the user to save before exiting
+            if (m_hasUnsavedChanges) {
+                openExitPopup = true;
+            }
+            else {
+                if (Engine::CORE) { Engine::CORE->Close(); }
+            }
+        }
         ImGui::EndMenu();
+    }
+
+    // Trigger the exit popup if needed
+    // Hack
+    if (openExitPopup) {
+        ImGui::OpenPopup("Unsaved Changes##ExitPopup");
+        openExitPopup = false;
+    }
+
+    // If user attempted to exit while there are unsaved changes show a modal
+    if (ImGui::BeginPopupModal("Unsaved Changes##ExitPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("The current scene has unsaved changes. Do you want to save before exiting?");
+        ImGui::Separator();
+
+        // Yes: Save then Exit
+        if (ImGui::Button("Yes", ImVec2(80, 0))) {
+            SaveScene();
+            if (Engine::CORE) Engine::CORE->Close();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        // No: Exit without saving
+        // No: Exit without saving (styled as a danger button)
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
+        if (ImGui::Button("No", ImVec2(80, 0))) {
+            if (Engine::CORE) Engine::CORE->Close();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+
+        // Cancel: Do nothing and close the popup
+        if (ImGui::Button("Cancel", ImVec2(80, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 
     // View menu (UI scale display + zoom controls)
@@ -226,7 +295,14 @@ void EditorFileMenu::HandleShortcuts(float& uiScale) {
         if (Input::IsKeyPressed(KEY_MINUS)) uiScale -= 0.10f;
         if (Input::IsKeyPressed(KEY_N)) CreateNewScene();
         if (Input::IsKeyPressed(KEY_O)) OpenSceneDialog();
-        if (Input::IsKeyPressed(KEY_S)) {
+        // Only allow save shortcuts when there is an active scene
+        bool hasActiveScene = false;
+        if (m_sceneManager) {
+            size_t idx = m_sceneManager->GetActiveIndex();
+            hasActiveScene = (idx != static_cast<size_t>(-1));
+        }
+
+        if (Input::IsKeyPressed(KEY_S) && hasActiveScene) {
             if (shiftDown) SaveSceneAsDialog();
             else SaveScene();
         }

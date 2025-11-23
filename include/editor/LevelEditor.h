@@ -26,7 +26,7 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 #include <functional>
 #include <vector>
 #include <unordered_set>
-#include "../editor/ConsolePanel.h"
+#include "ConsolePanel.h"
 
 struct LevelEditorConfig {
     float TextFontSize = 23.0f;

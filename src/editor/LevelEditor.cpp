@@ -14,6 +14,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include "LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
+#include "EditorStyle.h"
 #include "graphics/graphicsConfig.hpp"
 #include "ecs/systems/RendererSystem.h"
 #include <imgui_internal.h>
@@ -175,7 +176,7 @@ void LevelEditor::_renderDockSpace() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));     // No padding; dockspace fills fully
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent host background
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, EditorStyle::Transparent);       // Transparent host background
 
     // Begin invisible host window
     ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);

@@ -25,6 +25,7 @@ instantiation and synchronization between live entities and serialized prefab da
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
 #include <imgui.h>
+#include "EditorStyle.h"
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
@@ -278,10 +279,10 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         // ButtonHovered: Dark gray with 30% opacity when mouse over
         // ButtonActive: Medium gray with 50% opacity when clicked
         // Text: Red color if deletable, gray if disabled (Transform component)
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? ImVec4(0.7f, 0.2f, 0.2f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? EditorStyle::DangerText : EditorStyle::TextDisabled);
 
         // Create button with unique ID to avoid ImGui ID conflicts
         // ## ensures each button has distinct identifier
