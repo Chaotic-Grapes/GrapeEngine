@@ -119,6 +119,9 @@ private:
     // Create a new folder
     void _createFolder();
 
+    // Right-click context menu for asset creation
+    bool _renderCreateMenuItems();
+
     // -------------------------------------------------------------------------
     // Copy/Paste Operations
     // -------------------------------------------------------------------------
@@ -181,6 +184,7 @@ private:
 
     // Context menu state
     bool m_showContextMenu = false;
+    bool m_openCreateDialog = false;
     char m_newAssetNameBuffer[128] = "";
     bool m_focusNameInput = false;
     enum class AssetCreationType { None, Script, Scene, Folder };

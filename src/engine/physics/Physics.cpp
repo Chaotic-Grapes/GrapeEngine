@@ -18,7 +18,7 @@
 
 namespace Engine {
 
-    Vector2D Physics::m_gravity = Vector2D(0.0f, -981.f);
+    Vector2D Physics::m_gravity = Vector2D(0.0f, -9.81f);
     bool Physics::m_enabled = true;
     bool Physics::m_worldBoundsEnabled = false;
     Physics::BoundaryConstraint Physics::m_worldBounds = { 0.0f, 1600.0f, 0.0f, 900.0f, false, 0.8f };

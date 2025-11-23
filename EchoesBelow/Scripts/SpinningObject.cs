@@ -38,15 +38,18 @@ public class SpinningObject : ScriptBehaviour
         // Convert to radians for the transform
         var rotationRad = GMath.DegToRad(rotation);
 
+        if (!HasComponent<LocalTransform>()) return;
+
         // Get current transform
         ref var transform = ref GetComponent<LocalTransform>();
         
         // Update rotation (Quaternion from Z-axis rotation)
-        // Note: In actual implementation, you would need to properly update the quaternion
-        // This demonstrates the math conversion
+        // For a Z-axis rotation: q = (0, 0, sin(θ/2), cos(θ/2))
         var halfAngle = rotationRad * 0.5f;
-        transform.Rotation.W = GMath.Cos(halfAngle);
+        transform.Rotation.X = 0.0f;
+        transform.Rotation.Y = 0.0f;
         transform.Rotation.Z = GMath.Sin(halfAngle);
+        transform.Rotation.W = GMath.Cos(halfAngle);
 
         // Apply angular velocity to rigidbody
         // Calculate angular velocity as derivative of rotation

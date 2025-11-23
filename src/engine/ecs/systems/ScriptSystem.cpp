@@ -29,6 +29,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <iostream>
 #include <filesystem>
 #include <cstring>
+// ****************************************************************************
+
+// ************************** EXTERNAL DECLARATIONS ************************** //
+// ScriptAPI functions (defined in ScriptAPI_Component.cpp)
+extern "C" void ScriptAPI_SetWorld(ECS::World* world);
 // **************************************************************************** //
 
 // ******************************* EXPORT MACRO ******************************* //
@@ -300,8 +305,11 @@ namespace ECS {
             std::cout << "[ScriptSystem] Loading game assembly into AppDomain..." << '\n';
             
             // Derive the game assembly path from the script API assembly path
+            // TODO: Remove hardcoded game name
             std::filesystem::path apiPath(assemblyPath);
-            std::filesystem::path gameAssemblyPath = apiPath.parent_path() / "MyGame.dll"; // TODO: Change "MyGame.dll" to actual game assembly name
+            std::filesystem::path gameAssemblyPath = apiPath.parent_path() / "EchoesBelow.dll";
+            
+            std::cout << "[ScriptSystem] Looking for game assembly at: " << gameAssemblyPath << '\n';
             
             if (!std::filesystem::exists(gameAssemblyPath)) {
                 std::cerr << "[ScriptSystem] Game assembly not found: " << gameAssemblyPath << '\n';
@@ -511,11 +519,41 @@ namespace ECS {
     }
 
     void ScriptSystem::OnStart(World& world) {
+        // Set the world pointer for ScriptAPI functions
+        ScriptAPI_SetWorld(&world);
+        
         // Call OnStart for all uninitialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
-            [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
+            [&world](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
                 if (!active.Enabled)
                     return;
+
+                // If script has a TypeName but no ManagedHandle, instantiate it first
+                if (script.ManagedHandle == 0 && std::strlen(script.TypeName) > 0) {
+                    std::cout << "[ScriptSystem] Instantiating script " << script.TypeName 
+                              << " for entity " << entity.Index << '\n';
+
+                    if (!s_instance || !s_instance->m_createInstance) {
+                        std::cerr << "[ScriptSystem] CreateInstance delegate not loaded" << '\n';
+                        return;
+                    }
+
+                    uint64_t entityPacked = EntityUtils::Pack(entity);
+                    script.ManagedHandle = s_instance->m_createInstance(script.TypeName, entityPacked);
+                    
+                    if (script.ManagedHandle == 0) {
+                        std::cerr << "[ScriptSystem] Failed to create script instance for " 
+                                  << script.TypeName << '\n';
+                        std::cerr << "[ScriptSystem] Common causes:" << '\n';
+                        std::cerr << "  - TypeName is not fully qualified (must include namespace)" << '\n';
+                        std::cerr << "  - Assembly containing this type was not loaded" << '\n';
+                        std::cerr << "  - Type does not inherit from ScriptBehaviour" << '\n';
+                        return;
+                    }
+
+                    std::cout << "[ScriptSystem] Script instantiated successfully with handle " 
+                              << script.ManagedHandle << '\n';
+                }
 
                 if (!script.Initialized && script.ManagedHandle != 0) {
                     std::cout << "[ScriptSystem] Calling OnStart for script on entity " 
@@ -532,6 +570,9 @@ namespace ECS {
     }
 
     void ScriptSystem::Update(World& world) {
+        // Set the world pointer for ScriptAPI functions
+        ScriptAPI_SetWorld(&world);
+        
         // Call OnUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
@@ -549,6 +590,9 @@ namespace ECS {
     }
 
     void ScriptSystem::FixedUpdate(World& world) {
+        // Set the world pointer for ScriptAPI functions
+        ScriptAPI_SetWorld(&world);
+        
         // Call OnFixedUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
@@ -566,6 +610,9 @@ namespace ECS {
     }
 
     void ScriptSystem::LateUpdate(World& world) {
+        // Set the world pointer for ScriptAPI functions
+        ScriptAPI_SetWorld(&world);
+        
         // Call OnLateUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {

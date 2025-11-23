@@ -1,13 +1,15 @@
 /* Start Header *****************************************************************/
 /*!
 \file   ViewportPanel.cpp
-\author Samantha Leong (80%)
+\author Samantha Leong (75%)
         Foo Rui Qin    (20%)
+        Muhammad Nur Fadzly Bin Zulkifli (5%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
 \date   3rd November 2025
 \brief
-Implements the ViewportPanel class for core editor functionality and entity management.
+Implements the Viewport and Game classes for core editor functionality and entity management.
 Handles the main menu, viewport rendering, and entity selection with event callbacks.
 */
 /* End Header *******************************************************************/
@@ -72,6 +74,16 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
             m_rendererSystem->SetFileMenu(m_fileMenu);
         }
     }
+    
+    // Create game renderer (always uses scene camera)
+    if (m_world && !m_gameRendererSystem) {
+        m_gameRendererSystem = std::make_shared<ECS::RendererSystem>();
+        m_gameRendererSystem->Initialize(*m_world);
+        m_gameRendererSystem->BindWorld(*m_world);
+        m_gameRendererSystem->SetForceSceneCamera(true);
+        m_gameRendererSystem->SetEditorInputEnabled(false);
+        LOG_INFO("[Viewport] Game renderer initialized with force scene camera");
+    }
 }
 
 void Viewport::SetWorld(ECS::World* world) {
@@ -102,6 +114,23 @@ void Viewport::SetWorld(ECS::World* world) {
         if (m_fileMenu) {
             m_rendererSystem->SetFileMenu(m_fileMenu);
         }
+    }
+    
+    // Create game renderer if it doesn't exist yet
+    if (!m_gameRendererSystem && world) {
+        m_gameRendererSystem = std::make_shared<ECS::RendererSystem>();
+        m_gameRendererSystem->Initialize(*world);
+        m_gameRendererSystem->BindWorld(*world);
+        m_gameRendererSystem->SetForceSceneCamera(true);
+        m_gameRendererSystem->SetEditorInputEnabled(false);
+        LOG_INFO("[Viewport] Game renderer created in SetWorld");
+    }
+    // Rebind existing game renderer to new world
+    else if (m_gameRendererSystem && world) {
+        m_gameRendererSystem->BindWorld(*world);
+        m_gameRendererSystem->SetForceSceneCamera(true);
+        m_gameRendererSystem->SetEditorInputEnabled(false);
+        LOG_INFO("[Viewport] Game renderer rebound to new world");
     }
 }
 
@@ -155,13 +184,19 @@ void Viewport::ShowEditorWindows() {
 // Viewport
 // -------------------------------------------------------------------------
 void Viewport::_renderViewport() {
-    ImGui::Begin("Viewport");
+    // Render Viewport window (editor camera)
+    ImGui::Begin("Scene");
 
-    m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_None);
+    // Check if viewport window is hovered AND focused (not blocked by other windows)
+    m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
+                       && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     if (m_rendererSystem) {
         auto size = ImGui::GetContentRegionAvail();
         auto pos = ImGui::GetCursorScreenPos();
+
+        // Broadcast viewport resize event for camera aspect ratio updates
+        Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
 
         if (m_world) {
             m_rendererSystem->Update(*m_world, Time::DeltaTime());
@@ -187,6 +222,7 @@ void Viewport::_renderViewport() {
             ImVec2 gizmoPos = ImGui::GetItemRectMin(); // Get the top-left corner of the image item
 
             // 2. Call the RendererSystem method to draw the Gizmo overlay
+            // Draw the Gizmo overlay (only in Scene tab)
             m_rendererSystem->DrawEditorGizmo(
                 *m_world,
                 gizmoPos.x, gizmoPos.y,
@@ -196,6 +232,125 @@ void Viewport::_renderViewport() {
     }
     else {
         ImGui::TextDisabled("No renderer available");
+    }
+        
+    ImGui::End();
+
+    // Render Game window (scene camera)
+    ImGui::Begin("Game");
+
+    // Aspect ratio selector panel
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 4));
+        
+        const char* aspectRatios[] = {
+            "Free Aspect",
+            "16:9",
+            "16:10",
+            "4:3",
+            "5:4",
+            "21:9",
+            "1:1"
+        };
+        
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::Combo("##AspectRatio", &m_selectedAspectRatio, aspectRatios, IM_ARRAYSIZE(aspectRatios))) {
+            m_freeAspect = (m_selectedAspectRatio == 0);
+        }
+        
+        ImGui::PopStyleVar(2);
+        ImGui::Separator();
+    }
+
+    // Check if any Camera3D components exist in the world
+    bool hasCameraComponent = false;
+    bool hasActiveCamera = false;
+    int cameraCount = 0;
+    if (m_world) {
+        m_world->Each<ECS::Components::Camera3D>([&](ECS::Entity e, ECS::Components::Camera3D& cam) {
+            hasCameraComponent = true;
+            cameraCount++;
+            if (cam.Active) {
+                hasActiveCamera = true;
+            }
+        });
+    }
+
+    if (!m_gameRendererSystem) {
+        ImGui::TextDisabled("No game renderer not initialized");
+    }
+    else if (!hasCameraComponent) {
+        ImGui::TextDisabled("No camera found");
+        ImGui::TextDisabled("Add a Camera3D component to an entity");
+    }
+    else if (!hasActiveCamera) {
+        ImGui::Text("Found %d camera(s) but none are active", cameraCount);
+        ImGui::TextDisabled("Set Camera3D.Active to true in the inspector");
+    }
+    else {
+        auto availableSize = ImGui::GetContentRegionAvail();
+        
+        // Calculate display size based on aspect ratio
+        ImVec2 displaySize = availableSize;
+        float targetRatio = availableSize.x / availableSize.y;
+        
+        if (!m_freeAspect) {
+            switch (m_selectedAspectRatio) {
+                case 1: targetRatio = 16.0f / 9.0f; break;   // 16:9
+                case 2: targetRatio = 16.0f / 10.0f; break;  // 16:10
+                case 3: targetRatio = 4.0f / 3.0f; break;    // 4:3
+                case 4: targetRatio = 5.0f / 4.0f; break;    // 5:4
+                case 5: targetRatio = 21.0f / 9.0f; break;   // 21:9
+                case 6: targetRatio = 1.0f; break;           // 1:1
+            }
+            
+            float availableRatio = availableSize.x / availableSize.y;
+            
+            if (availableRatio > targetRatio) {
+                // Available space is wider - constrain width
+                displaySize.x = availableSize.y * targetRatio;
+                displaySize.y = availableSize.y;
+            }
+            else {
+                // Available space is taller - constrain height
+                displaySize.x = availableSize.x;
+                displaySize.y = availableSize.x / targetRatio;
+            }
+            
+            // Center the viewport
+            float offsetX = (availableSize.x - displaySize.x) * 0.5f;
+            float offsetY = (availableSize.y - displaySize.y) * 0.5f;
+            ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + offsetX, ImGui::GetCursorPosY() + offsetY));
+        }
+        
+        // Update camera aspect ratio to match display size (prevents squishing)
+        if (m_world) {
+            m_world->Each<ECS::Components::Camera3D>([targetRatio](ECS::Entity e, ECS::Components::Camera3D& cam) {
+                if (cam.Active) {
+                    cam.AspectRatio = targetRatio;
+                }
+            });
+        }
+
+        if (m_world) {
+            m_gameRendererSystem->Update(*m_world, Time::DeltaTime());
+        }
+
+        auto* rg = m_gameRendererSystem->GetRenderGraph();
+        if (rg) {
+            ResourceAccessor acc(rg);
+            uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
+            if (textureId > 0) {
+                ImGui::Image((void*)(intptr_t)textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
+            }
+            else {
+                ImGui::TextDisabled("Texture ID is 0 - render graph issue");
+            }
+        }
+        else {
+            ImGui::TextDisabled("No render graph available");
+        }
     }
 
     ImGui::End();

@@ -42,6 +42,60 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
 // Component Rendering
 // -----------------------------------------------------------------------------
 
+// Renders the Name component properties
+void ComponentUI::RenderName(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Name" });
+    
+    // Get current name value
+    std::string name = data.value("Value", std::string("Entity"));
+    char buffer[256];
+    strncpy_s(buffer, name.c_str(), sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
+    // Render text input for name
+    ImGui::Text("Name");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::InputText("##Name", buffer, sizeof(buffer))) {
+        data["Value"] = std::string(buffer);
+    }
+    
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Active component properties
+void ComponentUI::RenderActive(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Active" });
+    EditorUI::RenderCheckboxProperty("Enabled", data, "Enabled");
+    EditorUI::EndPropertySection();
+}
+
+// Renders the TagMask component properties
+void ComponentUI::RenderTagMask(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Tag Mask" });
+    
+    // Tag mask is a bitfield stored as integer
+    int mask = data.value("Mask", 0);
+    
+    ImGui::Text("Mask");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::InputInt("##Mask", &mask)) {
+        data["Mask"] = mask;
+    }
+    
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Lifetime component properties
+void ComponentUI::RenderLifetime(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Lifetime" });
+    EditorUI::RenderFloatRow("Time##Lifetime", "s", data, "Time", 0.1f);
+    EditorUI::EndPropertySection();
+}
+
 // Renders the LocalTransform component properties
 void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     // Start a grouped section so all three rows share aligned labels
@@ -58,6 +112,19 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::RenderVector3DRow("Local Scale", data["Scale"], "X", "Y", "Z", 0.01f);
 
     // Close the grouped section and restore layout state
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Rotator component properties
+void ComponentUI::RenderRotator(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Rotation Speed", "Rotation Offset" });
+    
+    // RotationSpeed controls how fast the entity rotates (radians per second)
+    EditorUI::RenderFloatRow("Rotation Speed##Rotator", "rad/s", data, "RotationSpeed", 0.1f);
+    
+    // RotationOffset is the initial rotation angle in radians
+    EditorUI::RenderFloatRow("Rotation Offset##Rotator", "rad", data, "RotationOffset", 0.1f);
+    
     EditorUI::EndPropertySection();
 }
 
@@ -111,6 +178,30 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
                 else {
                     LOG_ERROR("Failed to load dropped texture: " << droppedPath);
                 }
+            }
+        }
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                auto tex = RM.Get<Texture>(path);
+                if (tex) {
+                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["TexturePath"] = path;
+                    data["Width"] = tex->Width();
+                    data["Height"] = tex->Height();
+                    dropped = true;
+                    LOG_INFO("Dropped texture: " << path << ", id=" << tex->ID());
+                } else {
+                    LOG_ERROR("Failed to load dropped texture: " << path);
+                }
+                break;
             }
         }
         ImGui::EndDragDropTarget();
@@ -412,6 +503,30 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
                 }
             }
         }
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                auto tex = RM.Get<Texture>(path);
+                if (tex) {
+                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["TexturePath"] = path;
+                    data["SheetWidth"] = tex->Width();
+                    data["SheetHeight"] = tex->Height();
+                    dropped = true;
+                    LOG_INFO("Dropped sprite sheet: " << path << ", id=" << tex->ID());
+                } else {
+                    LOG_ERROR("Failed to load dropped sprite sheet: " << path);
+                }
+                break;
+            }
+        }
         ImGui::EndDragDropTarget();
     }
 
@@ -456,6 +571,118 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
 
     // Integer Z-order value (can be negative)
     EditorUI::RenderIntProperty("Z-Order", data, "ZOrder");
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Light2D component properties
+void ComponentUI::RenderLight2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Light Type", "Position", "Direction", "Color", "Intensity", "Range", "Casts Shadows" });
+    
+    // Light type selection (Directional = 0, Point = 1)
+    int lightType = data.value("LightType", 0);
+    const char* lightTypes[] = { "Directional", "Point" };
+    
+    ImGui::Text("Light Type");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::Combo("##LightType", &lightType, lightTypes, 2)) {
+        data["LightType"] = lightType;
+    }
+    
+    // Position (used for Point lights)
+    EditorUI::RenderVector3DRow("Position##Light2D", data["Position"], "X", "Y", "Z", 0.1f);
+    
+    // Direction (used for Directional lights)
+    EditorUI::RenderVector3DRow("Direction##Light2D", data["Direction"], "X", "Y", "Z", 0.1f);
+    
+    // Color
+    if (!data.contains("Color")) {
+        data["Color"] = nlohmann::json{ {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    }
+    EditorUI::RenderColorProperty("Color##Light2D", data["Color"]);
+    
+    // Intensity
+    EditorUI::RenderFloatRow("Intensity##Light2D", "", data, "Intensity", 0.1f);
+    
+    // Range (for Point lights)
+    EditorUI::RenderFloatRow("Range##Light2D", "units", data, "Range", 0.5f);
+    
+    // Casts Shadows
+    EditorUI::RenderCheckboxProperty("Casts Shadows##Light2D", data, "CastsShadows");
+    
+    EditorUI::EndPropertySection();
+}
+
+// Renders the Text component properties
+void ComponentUI::RenderText(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Content", "Font Path", "Pixel Size", "Color", "Anchor" });
+    
+    // Text content
+    std::string content = data.value("Content", std::string("Text"));
+    char contentBuffer[256];
+    strncpy_s(contentBuffer, content.c_str(), sizeof(contentBuffer) - 1);
+    contentBuffer[sizeof(contentBuffer) - 1] = '\0';
+    
+    ImGui::Text("Content");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(300.0f);
+    if (ImGui::InputText("##Content", contentBuffer, sizeof(contentBuffer))) {
+        data["Content"] = std::string(contentBuffer);
+    }
+    
+    // Font path
+    std::string fontPath = data.value("FontPath", std::string("assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf"));
+    char fontBuffer[128];
+    strncpy_s(fontBuffer, fontPath.c_str(), sizeof(fontBuffer) - 1);
+    fontBuffer[sizeof(fontBuffer) - 1] = '\0';
+    
+    ImGui::Text("Font Path");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(300.0f);
+    if (ImGui::InputText("##FontPath", fontBuffer, sizeof(fontBuffer))) {
+        data["FontPath"] = std::string(fontBuffer);
+    }
+    
+    // Pixel size
+    EditorUI::RenderFloatRow("Pixel Size##Text", "px", data, "PixelSize", 1.0f);
+    
+    // Color
+    if (!data.contains("Color")) {
+        data["Color"] = nlohmann::json{ {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
+    }
+    EditorUI::RenderColorProperty("Color##Text", data["Color"]);
+    
+    // Anchor (enum: Absolute, TopLeft, TopRight, BottomLeft, BottomRight, Center)
+    int anchor = data.value("Anchor", 0);
+    const char* anchors[] = { "Absolute", "Top Left", "Top Right", "Bottom Left", "Bottom Right", "Center" };
+    
+    ImGui::Text("Anchor");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::Combo("##Anchor", &anchor, anchors, 6)) {
+        data["Anchor"] = anchor;
+    }
+    
+    EditorUI::EndPropertySection();
+}
+
+// Renders the AnimationState2D component properties
+void ComponentUI::RenderAnimationState2D(nlohmann::json& data) {
+    EditorUI::BeginPropertySection({ "Current Frame", "Time Accumulator", "Finished" });
+    
+    // Current frame (integer)
+    EditorUI::RenderIntProperty("Current Frame##AnimState", data, "CurrentFrame");
+    
+    // Time accumulator (float)
+    EditorUI::RenderFloatRow("Time Accumulator##AnimState", "s", data, "TimeAccumulator", 0.01f);
+    
+    // Finished (boolean)
+    EditorUI::RenderCheckboxProperty("Finished##AnimState", data, "Finished");
+    
     EditorUI::EndPropertySection();
 }
 
@@ -546,6 +773,23 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data)
                 s_unsupportedPath = path.string();
             }
         }
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payload->Data);
+            const char* end = dataBuf + payload->DataSize;
+            while (dataBuf < end) {
+                std::string pathStr(dataBuf);
+                dataBuf += pathStr.size() + 1;
+                if (pathStr.empty()) continue;
+                std::filesystem::path p(pathStr);
+                std::string ext = p.extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                bool supported = (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
+                if (!supported) continue;
+                const auto& clipInfo = lib.Register(p.string());
+                data["CueId"] = clipInfo.id;
+                break;
+            }
+        }
         ImGui::EndDragDropTarget();
     }
 
@@ -588,4 +832,65 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Layer" });
     EditorUI::RenderIntProperty("Id", data, "Id");
     EditorUI::EndPropertySection();
+}
+
+// Renders the ScriptInstance component properties
+void ComponentUI::RenderScriptInstance(nlohmann::json& data) {
+    // Ensure keys exist with defaults
+    if (!data.contains("TypeName")) data["TypeName"] = "";
+    if (!data.contains("ScriptPath")) data["ScriptPath"] = "";
+    if (!data.contains("Initialized")) data["Initialized"] = false;
+    if (!data.contains("ManagedHandle")) data["ManagedHandle"] = 0;
+    if (!data.contains("TypeHash")) data["TypeHash"] = 0;
+
+    EditorUI::BeginPropertySection({ "Script Class", "Script Path", "Initialized" });
+    
+    // Display script class name (read-only)
+    std::string typeName = data.value("TypeName", std::string(""));
+    ImGui::Text("Script Class");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", typeName.empty() ? "None" : typeName.c_str());
+    
+    // Display script path (read-only)
+    std::string scriptPath = data.value("ScriptPath", std::string(""));
+    ImGui::Text("Script Path");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "%s", scriptPath.empty() ? "None" : scriptPath.c_str());
+    
+    // Show initialization status
+    bool initialized = data.value("Initialized", false);
+    ImGui::Text("Initialized");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::TextColored(
+        initialized ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f) : ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
+        "%s", initialized ? "Yes" : "No"
+    );
+    
+    EditorUI::EndPropertySection();
+    
+    // Modify Script button
+    ImGui::Spacing();
+    if (!typeName.empty() && !scriptPath.empty()) {
+        if (ImGui::Button("Modify Script")) {
+            // Use the stored script path
+            if (std::filesystem::exists(scriptPath)) {
+                // Open the file with the default system editor
+#ifdef _WIN32
+                std::string command = "start \"\" \"" + scriptPath + "\"";
+                system(command.c_str());
+#endif
+            }
+            else {
+                LOG_WARNING("Script file not found: " << scriptPath);
+            }
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("Opens script file in default editor");
+    }
+    else {
+        ImGui::TextDisabled("No script attached. Use 'Attach Script' from hierarchy context menu.");
+    }
 }

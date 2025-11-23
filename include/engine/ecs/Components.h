@@ -537,6 +537,7 @@ namespace ECS {
             uint32_t TypeHash = 0;        // Hash of script type name
             bool Initialized = false;     // Whether OnStart() has been called
             char TypeName[128] = {0};     // Script class name (e.g., "MyGame.PlayerController")
+            char ScriptPath[256] = {0};   // Relative path to the script file (e.g., "Assets/Scripts/PlayerController.cs")
         };
         static_assert(std::is_trivially_copyable_v<ScriptInstance>, "ScriptInstance must be trivially copyable");
 

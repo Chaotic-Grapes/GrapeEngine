@@ -115,8 +115,8 @@ private:
     // Render the right-click context menu for entity operations
     void _renderEntityContextMenu();
 
-    // Ensure entity has a ScriptInstance component and set its script class name 
-    void _attachScriptComponent(EntityId entityId, const std::string& scriptName);
+    // Ensure entity has a ScriptInstance component and set its script class name and path
+    void _attachScriptComponent(EntityId entityId, const std::string& scriptName, const std::string& scriptPath); // scriptName must be fully qualified (e.g., "MyGame.PlayerController")
 
     // -------------------------------------------------------------------------
     // Entity Operations
@@ -206,6 +206,9 @@ private:
     // Entity order for scene serialization (preserves visual hierarchy order)
     // This is a HINT for saving - the ECS World's HierarchyIndex is the source of truth for rendering
     std::vector<EntityId> m_entityOrder;            // Ordered list for serialization
+
+    // DON'T REMOVE: IMPORTANT
+    std::vector<EntityId> m_deferredDeletions;
 };
 
 #endif

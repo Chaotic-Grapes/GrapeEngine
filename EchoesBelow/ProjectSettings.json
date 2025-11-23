@@ -9,7 +9,7 @@
     "VSync": true
   },
   "Physics": {
-    "Gravity": -981.0,
+    "Gravity": -9.81,
     "TimeStep": 0.016
   },
   "Audio": {

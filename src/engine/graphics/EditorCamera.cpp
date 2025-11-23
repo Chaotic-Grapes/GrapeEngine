@@ -28,6 +28,9 @@ WASD keys move the camera, and scroll input zooms in/out.
 // Standard Library
 #include <iostream>
 
+// Application
+#include "core/Application.h"
+
 namespace {
     // Camera initialization constants
     constexpr float kDefaultWorldViewHeight = 9.0f;
@@ -110,17 +113,29 @@ namespace Engine {
             << "  World viewport: " << kDefaultWorldViewHeight << " units tall\n";
 
         // Subscribe to window resize events
-        m_windowResizedSub = Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
-            [this](const Messaging::WindowResized& msg)
-            {
-                OnWindowResize(msg.Width, msg.Height);
-            });
+        if (!CORE->IsInEditorMode())
+            m_windowResizedSub = Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
+                [this](const Messaging::WindowResized& msg)
+                {
+                    OnWindowResize(msg.Width, msg.Height);
+                });
+        
+        // Subscribe to viewport resize events (for aspect ratio updates)
+        else
+            m_viewportResizedSub = Messaging::MessageSystem::Subscribe<Messaging::ViewportResized>(
+                [this](const Messaging::ViewportResized& msg)
+                {
+                    SetViewportSize(msg.Width, msg.Height);
+                });
     }
 
     EditorCamera::~EditorCamera() {
         // Unsubscribe from window resize to prevent callbacks on a destroyed object
         if (m_windowResizedSub.IsValid()) {
             Messaging::MessageSystem::Unsubscribe<Messaging::WindowResized>(m_windowResizedSub);
+        }
+        if (m_viewportResizedSub.IsValid()) {
+            Messaging::MessageSystem::Unsubscribe<Messaging::ViewportResized>(m_viewportResizedSub);
         }
 
         // Proactively destroy the internal camera entity from its world to avoid duplicates
@@ -178,6 +193,15 @@ namespace Engine {
             return;
         }
         m_camera->AspectRatio = static_cast<float>(newWidth) / static_cast<float>(newHeight);
+    }
+
+    void EditorCamera::SetViewportSize(float width, float height) {
+        if (!m_camera) return;
+        if (height <= 0.0f) {
+            // Avoid division by zero; keep current aspect ratio
+            return;
+        }
+        m_camera->AspectRatio = width / height;
     }
 
     void EditorCamera::Update(float dt) {
