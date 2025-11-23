@@ -378,7 +378,7 @@ void Viewport::FocusOnEntity(EntityId entityId) {
     }
     else {
         // No transform component, can't focus
-        LOG_WARNING("Cannot focus on entity " << entityId << " - no transform component");
+        LOG_WARNING("Cannot focus on entity " << entityId << ": no transform component");
         return;
     }
 

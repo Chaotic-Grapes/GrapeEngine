@@ -497,6 +497,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     auto children = _getChildren(entityId);
     bool hasChildren = !children.empty();
 
+    // Check if this is a prefab instance FIRST (needed for color)
+    bool isPrefabInstance = m_world->Has<ECS::Components::PrefabLink>(entity);
+
     // Build display label with entity name
     std::stringstream oss;
     if (m_world->Has<ECS::Components::Name>(entity)) {
@@ -508,7 +511,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     // Append prefab indicator if this is a prefab instance
-    if (m_world->Has<ECS::Components::PrefabLink>(entity)) {
+    if (isPrefabInstance) {
         const auto& link = m_world->Get<ECS::Components::PrefabLink>(entity);
         std::string prefabName = std::filesystem::path(link.getPath()).stem().string();
         oss << " [" << prefabName << "]";
@@ -540,12 +543,17 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     // Highlight if this entity is selected
     if (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end()) nodeFlags |= ImGuiTreeNodeFlags_Selected;
 
-    // Manage expanded state - open if previously expanded
+    // Manage expanded state: open if previously expanded
     bool isExpanded = m_expandedNodes.find(entityId) != m_expandedNodes.end();
     if (isExpanded && hasChildren) ImGui::SetNextItemOpen(true);
 
     // Push ID to ensure unique imgui identifiers
     ImGui::PushID(static_cast<int>(entityId));
+
+    // Push blue color for prefab instances
+    if (isPrefabInstance) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f)); // Light blue
+    }
 
     // Render rename input if this entity is being renamed
     bool nodeOpen = false;
@@ -603,6 +611,11 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     ImGui::PopID();
+
+    // Pop blue color if it was a prefab instance
+    if (isPrefabInstance) {
+        ImGui::PopStyleColor();
+    }
 }
 
 // Handle node interaction (click, right-click, double-click)
