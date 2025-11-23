@@ -309,6 +309,9 @@ namespace ECS {
             // Emissive support
             uint32_t EmissiveTextureId = 0;  // 0 = no emissive map
             float EmissiveStrength = 5.0f;   // HDR multiplier
+
+            // Persistent texture path (don't serialize TextureId)
+            char TexturePath[256] = { 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -344,6 +347,9 @@ namespace ECS {
             float FramesPerSecond = 10.0f;    // Animation speed (FPS)
             bool Loop = true;                 // Whether animation loops
             bool Playing = true;              // Whether animation is currently playing
+
+            // Persistent texture path (don't serialize TextureId)
+            char TexturePath[256] = { 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
 

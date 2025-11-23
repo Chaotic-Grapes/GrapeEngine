@@ -34,6 +34,10 @@ instantiation and synchronization between live entities and serialized prefab da
 using EntityId = uint32_t;
 class EditorFileMenu;
 
+namespace Editor {
+    class UndoSystem;
+}
+
 // Unified inspector panel capable of inspecting both entities and prefabs
 class InspectorPanel {
 public:
@@ -88,6 +92,12 @@ public:
 
     // Set file menu reference for dirty tracking
     void SetFileMenu(EditorFileMenu * fileMenu) { m_fileMenu = fileMenu; }
+
+    // -------------------------------------------------------------------------
+    // Undo system support
+    // -------------------------------------------------------------------------
+
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
 
 private:
     // -------------------------------------------------------------------------
@@ -200,6 +210,7 @@ private:
     ECS::World* m_world = nullptr;
     ComponentUI m_componentUI;
     EditorFileMenu* m_fileMenu = nullptr;
+    Editor::UndoSystem* m_undoSystem = nullptr;
 
     // Selection state
     InspectionMode m_mode = InspectionMode::None;  // Current inspection context
@@ -214,6 +225,16 @@ private:
     std::vector<std::string> m_componentsToDelete; // Components scheduled for removal
     std::string m_statusMessage;                   // Current status message 
     float m_statusTimer = 0.0f;                    // Timer for status message
+
+    // Undo - edit tracking
+    struct EditState {
+        EntityId entityId = 0;
+        Vector3D startPosition;
+        Quaternion startRotation;
+        Vector3D startScale;
+        bool isEditing = false;
+    };
+    EditState m_editState;
 };
 
 // -------------------------------------------------------------------------

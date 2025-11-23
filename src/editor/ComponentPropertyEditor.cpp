@@ -46,13 +46,13 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
 // Renders the Name component properties
 void ComponentUI::RenderName(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Name" });
-    
+
     // Get current name value
     std::string name = data.value("Value", std::string("Entity"));
     char buffer[256];
     strncpy_s(buffer, name.c_str(), sizeof(buffer) - 1);
     buffer[sizeof(buffer) - 1] = '\0';
-    
+
     // Render text input for name
     ImGui::Text("Name");
     ImGui::SameLine();
@@ -61,7 +61,7 @@ void ComponentUI::RenderName(nlohmann::json& data) {
     if (ImGui::InputText("##Name", buffer, sizeof(buffer))) {
         data["Value"] = std::string(buffer);
     }
-    
+
     EditorUI::EndPropertySection();
 }
 
@@ -75,10 +75,10 @@ void ComponentUI::RenderActive(nlohmann::json& data) {
 // Renders the TagMask component properties
 void ComponentUI::RenderTagMask(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Tag Mask" });
-    
+
     // Tag mask is a bitfield stored as integer
     int mask = data.value("Mask", 0);
-    
+
     ImGui::Text("Mask");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
@@ -86,7 +86,7 @@ void ComponentUI::RenderTagMask(nlohmann::json& data) {
     if (ImGui::InputInt("##Mask", &mask)) {
         data["Mask"] = mask;
     }
-    
+
     EditorUI::EndPropertySection();
 }
 
@@ -100,13 +100,13 @@ void ComponentUI::RenderLifetime(nlohmann::json& data) {
 // Renders the LocalTransform component properties
 void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     // Start a grouped section so all three rows share aligned labels
-    EditorUI::BeginPropertySection({ "Local Rotation", "Local Position", "Local Scale" });
-
-    // Draw rotation as a quaternion with X Y Z W components
-    EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
+    EditorUI::BeginPropertySection({ "Local Position", "Local Rotation", "Local Scale" });
 
     // Draw position as a 3D vector with X Y Z fields
     EditorUI::RenderVector3DRow("Local Position", data["Position"], "X", "Y", "Z", 1.0f);
+
+    // Draw rotation as a quaternion with X Y Z W components
+    EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
 
     // Draw scale as a 3D vector with X Y Z fields
     // Smaller dragSpeed so scaling changes are more precise
@@ -116,35 +116,41 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
-// Renders the Rotator component properties
-void ComponentUI::RenderRotator(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Rotation Speed", "Rotation Offset" });
-    
-    // RotationSpeed controls how fast the entity rotates (radians per second)
-    EditorUI::RenderFloatRow("Rotation Speed##Rotator", "rad/s", data, "RotationSpeed", 0.1f);
-    
-    // RotationOffset is the initial rotation angle in radians
-    EditorUI::RenderFloatRow("Rotation Offset##Rotator", "rad", data, "RotationOffset", 0.1f);
-    
-    EditorUI::EndPropertySection();
-}
-
 // Renders the SpriteRenderer2D component properties
 void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
+    // RELOAD TEXTURE FROM PATH ON FIRST RENDER
+    // Build a human readable summary of the current texture
+    std::string texPath = data.value("TexturePath", "");
+    std::string valueText;
+    if (!texPath.empty()) {
+        // Show only the file name instead of the full path for readability
+        valueText = std::filesystem::path(texPath).filename().string();
+
+        // Reload texture from path if TextureId is 0 or invalid
+        // This happens when loading a scene - TexturePath is saved but TextureId is not persistent
+        uint32_t currentId = data.value("TextureId", 0u);
+        if (currentId == 0) {
+            auto tex = RM.Get<Texture>(texPath);
+            if (tex) {
+                data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                data["Width"] = tex->Width();
+                data["Height"] = tex->Height();
+                LOG_DEBUG("Reloaded texture from path: " << texPath << ", id=" << tex->ID());
+            }
+            else {
+                LOG_WARNING("Failed to reload texture from path: " << texPath);
+            }
+        }
+    }
+    else {
+        valueText = "None (drag texture here)";
+    }
+
     // Group all sprite related rows under one aligned section
     EditorUI::BeginPropertySection({ "Sprite", "Color", "Tiling", "Offset" });
 
-    // Build a human readable summary of the current texture
-    // TextureId is numeric and TexturePath is the file path string
-    std::string valueText = "TextureId: " + std::to_string(data.value("TextureId", 0u));
-    std::string texPath = data.value("TexturePath", "");
-    if (!texPath.empty()) {
-        // Show only the file name instead of the full path for readability
-        valueText += " (" + std::filesystem::path(texPath).filename().string() + ")";
-    }
-
     // Show the sprite information in a read only row
-    EditorUI::RenderStaticValueRow("Sprite", valueText);
+    EditorUI::RenderStaticValueRow("Sprite", valueText, texPath.empty());
 
     // Tracks whether a valid texture was dropped this frame
     bool dropped = false;
@@ -199,7 +205,8 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
                     data["Height"] = tex->Height();
                     dropped = true;
                     LOG_INFO("Dropped texture: " << path << ", id=" << tex->ID());
-                } else {
+                }
+                else {
                     LOG_ERROR("Failed to load dropped texture: " << path);
                 }
                 break;
@@ -228,7 +235,7 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
 // Renders the Rigidbody2D physics component properties
 void ComponentUI::RenderRigidbody2D(nlohmann::json& data) {
     // Group all rigidbody fields so labels line up and scrolling feels consistent
-    EditorUI::BeginPropertySection({ "Mass", "Inverse Mass", "Linear Damping", "Angular Damping", 
+    EditorUI::BeginPropertySection({ "Mass", "Inverse Mass", "Linear Damping", "Angular Damping",
         "Gravity Scale", "Flags" });
 
     // Mass in kilograms
@@ -304,7 +311,7 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data) {
 // Renders the BoxCollider2D component
 void ComponentUI::RenderBoxCollider2D(nlohmann::json& data) {
     // Group rows for trigger, offset, size, rotation and layer mask
-    EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Half Extents", "Rotation", 
+    EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Half Extents", "Rotation",
         "Layer Mask" });
 
     // Use the same Flags bit layout as the circle collider
@@ -397,7 +404,7 @@ void ComponentUI::RenderShapeLine2D(nlohmann::json& data) {
 // User can choose between perspective and orthographic modes
 void ComponentUI::RenderCamera3D(nlohmann::json& data) {
     // Group camera mode and projection related settings together
-    EditorUI::BeginPropertySection({ "Mode", "Near Plane", "Far Plane", "Aspect Ratio", "FOV", 
+    EditorUI::BeginPropertySection({ "Mode", "Near Plane", "Far Plane", "Aspect Ratio", "FOV",
         "Ortho Size" });
 
     // Two checkboxes on one row represent properties stored in JSON
@@ -456,18 +463,39 @@ void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data) {
 // Renders the SpriteSheetAnimation2D component properties
 // Controls animated sprite playback from sprite sheets
 void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Sprite Sheet", "Frame Size", "Sheet Size", "Animation", "Playback" });
-
-    // Build a human readable summary of the current texture (same as SpriteRenderer2D)
-    std::string valueText = "TextureId: " + std::to_string(data.value("TextureId", 0u));
+    // RELOAD TEXTURE FROM PATH ON FIRST RENDER
+    // Build a human readable summary of the current texture
     std::string texPath = data.value("TexturePath", "");
+    std::string valueText;
     if (!texPath.empty()) {
         // Show only the file name instead of the full path for readability
-        valueText += " (" + std::filesystem::path(texPath).filename().string() + ")";
+        valueText = std::filesystem::path(texPath).filename().string();
+
+        // Reload texture from path if TextureId is 0 or invalid
+        // This happens when loading a scene - TexturePath is saved but TextureId is not persistent
+        uint32_t currentId = data.value("TextureId", 0u);
+        if (currentId == 0) {
+            auto tex = RM.Get<Texture>(texPath);
+            if (tex) {
+                data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                data["SheetWidth"] = tex->Width();
+                data["SheetHeight"] = tex->Height();
+                LOG_DEBUG("Reloaded sprite sheet from path: " << texPath << ", id=" << tex->ID());
+            }
+            else {
+                LOG_WARNING("Failed to reload sprite sheet from path: " << texPath);
+            }
+        }
+    }
+    else {
+        valueText = "None (drag sprite sheet here)";
     }
 
+    // Group all sprite sheet related rows under one aligned section
+    EditorUI::BeginPropertySection({ "Sprite Sheet", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height", "Start Frame", "Frame Count", "FPS", "Loop", "Playing" });
+
     // Show the sprite sheet information in a read only row
-    EditorUI::RenderStaticValueRow("Sprite Sheet", valueText);
+    EditorUI::RenderStaticValueRow("Sprite Sheet", valueText, texPath.empty());
 
     // Tracks whether a valid texture was dropped this frame
     bool dropped = false;
@@ -522,7 +550,8 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
                     data["SheetHeight"] = tex->Height();
                     dropped = true;
                     LOG_INFO("Dropped sprite sheet: " << path << ", id=" << tex->ID());
-                } else {
+                }
+                else {
                     LOG_ERROR("Failed to load dropped sprite sheet: " << path);
                 }
                 break;
@@ -555,16 +584,6 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
-// Renders the SpriteFlip2D component properties
-// Allows mirroring sprites horizontally and vertically
-void ComponentUI::RenderSpriteFlip2D(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Flip" });
-
-    // Two flip toggles on one row for compact display
-    EditorUI::RenderCheckboxRow("Flip", data, "FlipX", "Horiz.", "FlipY", "Vert.");
-    EditorUI::EndPropertySection();
-}
-
 // Renders the ZIndex2D component properties
 // Controls the rendering order in 2D (higher values render on top)
 void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
@@ -578,11 +597,11 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
 // Renders the Light2D component properties
 void ComponentUI::RenderLight2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Light Type", "Position", "Direction", "Color", "Intensity", "Range", "Casts Shadows" });
-    
+
     // Light type selection (Directional = 0, Point = 1)
     int lightType = data.value("LightType", 0);
     const char* lightTypes[] = { "Directional", "Point" };
-    
+
     ImGui::Text("Light Type");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
@@ -590,41 +609,41 @@ void ComponentUI::RenderLight2D(nlohmann::json& data) {
     if (ImGui::Combo("##LightType", &lightType, lightTypes, 2)) {
         data["LightType"] = lightType;
     }
-    
+
     // Position (used for Point lights)
     EditorUI::RenderVector3DRow("Position##Light2D", data["Position"], "X", "Y", "Z", 0.1f);
-    
+
     // Direction (used for Directional lights)
     EditorUI::RenderVector3DRow("Direction##Light2D", data["Direction"], "X", "Y", "Z", 0.1f);
-    
+
     // Color
     if (!data.contains("Color")) {
         data["Color"] = nlohmann::json{ {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
     }
     EditorUI::RenderColorProperty("Color##Light2D", data["Color"]);
-    
+
     // Intensity
     EditorUI::RenderFloatRow("Intensity##Light2D", "", data, "Intensity", 0.1f);
-    
+
     // Range (for Point lights)
     EditorUI::RenderFloatRow("Range##Light2D", "units", data, "Range", 0.5f);
-    
+
     // Casts Shadows
     EditorUI::RenderCheckboxProperty("Casts Shadows##Light2D", data, "CastsShadows");
-    
+
     EditorUI::EndPropertySection();
 }
 
 // Renders the Text component properties
 void ComponentUI::RenderText(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Content", "Font Path", "Pixel Size", "Color", "Anchor" });
-    
+
     // Text content
     std::string content = data.value("Content", std::string("Text"));
     char contentBuffer[256];
     strncpy_s(contentBuffer, content.c_str(), sizeof(contentBuffer) - 1);
     contentBuffer[sizeof(contentBuffer) - 1] = '\0';
-    
+
     ImGui::Text("Content");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
@@ -632,13 +651,13 @@ void ComponentUI::RenderText(nlohmann::json& data) {
     if (ImGui::InputText("##Content", contentBuffer, sizeof(contentBuffer))) {
         data["Content"] = std::string(contentBuffer);
     }
-    
+
     // Font path
     std::string fontPath = data.value("FontPath", std::string("assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf"));
     char fontBuffer[128];
     strncpy_s(fontBuffer, fontPath.c_str(), sizeof(fontBuffer) - 1);
     fontBuffer[sizeof(fontBuffer) - 1] = '\0';
-    
+
     ImGui::Text("Font Path");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
@@ -646,20 +665,20 @@ void ComponentUI::RenderText(nlohmann::json& data) {
     if (ImGui::InputText("##FontPath", fontBuffer, sizeof(fontBuffer))) {
         data["FontPath"] = std::string(fontBuffer);
     }
-    
+
     // Pixel size
     EditorUI::RenderFloatRow("Pixel Size##Text", "px", data, "PixelSize", 1.0f);
-    
+
     // Color
     if (!data.contains("Color")) {
         data["Color"] = nlohmann::json{ {"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f} };
     }
     EditorUI::RenderColorProperty("Color##Text", data["Color"]);
-    
+
     // Anchor (enum: Absolute, TopLeft, TopRight, BottomLeft, BottomRight, Center)
     int anchor = data.value("Anchor", 0);
     const char* anchors[] = { "Absolute", "Top Left", "Top Right", "Bottom Left", "Bottom Right", "Center" };
-    
+
     ImGui::Text("Anchor");
     ImGui::SameLine();
     ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
@@ -667,23 +686,23 @@ void ComponentUI::RenderText(nlohmann::json& data) {
     if (ImGui::Combo("##Anchor", &anchor, anchors, 6)) {
         data["Anchor"] = anchor;
     }
-    
+
     EditorUI::EndPropertySection();
 }
 
 // Renders the AnimationState2D component properties
 void ComponentUI::RenderAnimationState2D(nlohmann::json& data) {
     EditorUI::BeginPropertySection({ "Current Frame", "Time Accumulator", "Finished" });
-    
+
     // Current frame (integer)
     EditorUI::RenderIntProperty("Current Frame##AnimState", data, "CurrentFrame");
-    
+
     // Time accumulator (float)
     EditorUI::RenderFloatRow("Time Accumulator##AnimState", "s", data, "TimeAccumulator", 0.01f);
-    
+
     // Finished (boolean)
     EditorUI::RenderCheckboxProperty("Finished##AnimState", data, "Finished");
-    
+
     EditorUI::EndPropertySection();
 }
 
@@ -845,7 +864,7 @@ void ComponentUI::RenderScriptInstance(nlohmann::json& data) {
     if (!data.contains("TypeHash")) data["TypeHash"] = 0;
 
     EditorUI::BeginPropertySection({ "Script Class", "Script Path", "Initialized" });
-    
+
     // Display script class name (read-only)
     std::string typeName = data.value("TypeName", std::string(""));
     ImGui::Text("Script Class");
@@ -869,9 +888,9 @@ void ComponentUI::RenderScriptInstance(nlohmann::json& data) {
         initialized ? EditorStyle::SuccessText : EditorStyle::WarningText,
         "%s", initialized ? "Yes" : "No"
     );
-    
+
     EditorUI::EndPropertySection();
-    
+
     // Modify Script button
     ImGui::Spacing();
     if (!typeName.empty() && !scriptPath.empty()) {

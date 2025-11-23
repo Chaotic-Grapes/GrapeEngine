@@ -475,8 +475,22 @@ namespace Engine {
     }
 
     void EditorCamera::Focus(const glm::vec3& target) {
-        m_transform->Position.X = target.x;
-        m_transform->Position.Y = target.y;
+        // Update the orbit center to the new target
+        m_target = target;
+
+        // Recalculate camera position based on current orbit parameters
+        // This maintains the current view angle and distance
+        const float cp = cosf(m_pitch), sp = sinf(m_pitch);
+        const float sy = sinf(m_yaw), cy = cosf(m_yaw);
+
+        // Calculate orbit direction
+        const glm::vec3 dir(cp * sy, sp, -cp * cy);
+
+        // Position camera at distance from new target
+        m_cameraPosition = m_target - dir * m_distance;
+
+        // Update the ECS transform to match
+        UpdateTransform();
     }
 
 } // namespace Engine

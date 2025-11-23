@@ -72,7 +72,7 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     if (parent != ECS::Entity::NPOS32) {
         ECS::Entity p = world.Resolve(parent);
         if (world.IsAlive(p)) {
-            world.Set<ECS::Parent>(e, ECS::Parent{ p });
+            world.Attach(e, p);
         }
     }
 
