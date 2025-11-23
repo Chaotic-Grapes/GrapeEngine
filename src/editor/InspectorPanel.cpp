@@ -546,9 +546,22 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
         ImGui::PopFont();
         ImGui::Separator();
 
-        // Iterate over every component type defined in the registry
+        // Get registry and create sorted list
         const auto& registry = ComponentRegistryUI::GetAll();
-        for (const auto& meta : registry) {
+        std::vector<size_t> sortedIndices;
+        for (size_t i = 0; i < registry.size(); ++i) {
+            sortedIndices.push_back(i);
+        }
+
+        // Sort alphabetically by DisplayName
+        std::sort(sortedIndices.begin(), sortedIndices.end(), [&](size_t a, size_t b) {
+            return registry[a].DisplayName < registry[b].DisplayName;
+            });
+
+        // Iterate over sorted components
+        for (size_t idx : sortedIndices) {
+            const auto& meta = registry[idx];
+
             // Check if the entity already has this component
             bool hasComponent = meta.HasComponent(m_world, entity);
 
@@ -624,9 +637,30 @@ void InspectorPanel::_renderPrefabComponents() {
         std::string typeA = components[a].value("TypeName", "");
         std::string typeB = components[b].value("TypeName", "");
 
-        // Transform always comes first
-        if (typeA == "ECS::Components::LocalTransform" || typeA == "LocalTransform") return true;
-        if (typeB == "ECS::Components::LocalTransform" || typeB == "LocalTransform") return false;
+        // Helper to identify Name
+        auto isName = [](const std::string& type) {
+            return (type == "ECS::Components::Name" || type == "Name");
+        };
+
+        // Helper to identify Transform
+        auto isTransform = [](const std::string& type) {
+            return (type == "ECS::Components::LocalTransform" || type == "LocalTransform");
+        };
+
+        bool aIsName = isName(typeA);
+        bool bIsName = isName(typeB);
+        bool aIsTransform = isTransform(typeA);
+        bool bIsTransform = isTransform(typeB);
+
+        // Transform always first
+        if (aIsTransform && !bIsTransform) return true;
+        if (!aIsTransform && bIsTransform) return false;
+        if (aIsTransform && bIsTransform) return false;
+
+        // Name always second
+        if (aIsName && !bIsName) return true;
+        if (!aIsName && bIsName) return false;
+        if (aIsName && bIsName) return false; 
 
         // Strip "ECS::Components::" prefix for cleaner alphabetical sorting
         auto stripPrefix = [](const std::string& name) -> std::string {
@@ -635,11 +669,11 @@ void InspectorPanel::_renderPrefabComponents() {
                 return name.substr(prefix.length());
             }
             return name;
-            };
+        };
 
         // Everything else alphabetical
         return stripPrefix(typeA) < stripPrefix(typeB);
-        });
+    });
 
     // Draw each component in sorted order using metadata rules
     for (size_t idx : sortedIndices) {
@@ -691,8 +725,22 @@ void InspectorPanel::_renderPrefabActions() {
         ImGui::PopFont();
         ImGui::Separator();
 
-        // Iterate over all registered components
-        for (const auto& meta : ComponentRegistryUI::GetAll()) {
+        // Get registry and create sorted list
+        const auto& registry = ComponentRegistryUI::GetAll();
+        std::vector<size_t> sortedIndices;
+        for (size_t i = 0; i < registry.size(); ++i) {
+            sortedIndices.push_back(i);
+        }
+
+        // Sort alphabetically by DisplayName
+        std::sort(sortedIndices.begin(), sortedIndices.end(), [&](size_t a, size_t b) {
+            return registry[a].DisplayName < registry[b].DisplayName;
+            });
+
+        // Iterate over sorted components
+        for (size_t idx : sortedIndices) {
+            const auto& meta = registry[idx];
+
             // Check if the prefab already defines this component
             bool hasComponent = _prefabHasComponent(meta.TypeName);
 

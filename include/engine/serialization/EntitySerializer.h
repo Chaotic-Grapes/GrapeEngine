@@ -256,12 +256,17 @@ namespace Serialization {
 				sortedComponents.emplace_back(tid, info);
 			}
 
-			// SORT: Transform first, then alphabetical
+			// SORT: Transform first, Name second, then alphabetical
 			std::sort(sortedComponents.begin(), sortedComponents.end(),
 				[](const auto& a, const auto& b) {
-					// Transform always comes first
+				    // Transform always comes first
 					if (a.second.Name == "LocalTransform") return true;
 					if (b.second.Name == "LocalTransform") return false;
+
+					// Name always comes second
+					if (a.second.Name == "Name") return true;
+					if (b.second.Name == "Name") return false;
+
 					// Everything else alphabetical
 					return a.second.Name < b.second.Name;
 				});

@@ -115,19 +115,6 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
-// Renders the Rotator component properties
-void ComponentUI::RenderRotator(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Rotation Speed", "Rotation Offset" });
-    
-    // RotationSpeed controls how fast the entity rotates (radians per second)
-    EditorUI::RenderFloatRow("Rotation Speed##Rotator", "rad/s", data, "RotationSpeed", 0.1f);
-    
-    // RotationOffset is the initial rotation angle in radians
-    EditorUI::RenderFloatRow("Rotation Offset##Rotator", "rad", data, "RotationOffset", 0.1f);
-    
-    EditorUI::EndPropertySection();
-}
-
 // Renders the SpriteRenderer2D component properties
 void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
     // Group all sprite related rows under one aligned section
@@ -551,16 +538,6 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
     EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
     EditorUI::RenderCheckboxProperty("Playing", data, "Playing");
 
-    EditorUI::EndPropertySection();
-}
-
-// Renders the SpriteFlip2D component properties
-// Allows mirroring sprites horizontally and vertically
-void ComponentUI::RenderSpriteFlip2D(nlohmann::json& data) {
-    EditorUI::BeginPropertySection({ "Flip" });
-
-    // Two flip toggles on one row for compact display
-    EditorUI::RenderCheckboxRow("Flip", data, "FlipX", "Horiz.", "FlipY", "Vert.");
     EditorUI::EndPropertySection();
 }
 
