@@ -836,7 +836,7 @@ namespace ECS {
                         // Continue with viewportSize = full window (already set above)
                     }
                     else {
-                        ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
+                        ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Scene");
 
                         if (viewportWindow) {
                             ImVec2 vpMin = viewportWindow->ContentRegionRect.Min;
@@ -1453,7 +1453,7 @@ namespace ECS {
             // SAFETY: Check if ImGui context is valid
             ImGuiContext* ctx = ImGui::GetCurrentContext();
             if (ctx && ctx->Windows.Size > 0) {
-                ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
+                ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Scene");
                 if (viewportWindow) {
                     ImVec2 vpMin = viewportWindow->ContentRegionRect.Min;
                     ImVec2 vpMax = viewportWindow->ContentRegionRect.Max;
@@ -1504,7 +1504,7 @@ namespace ECS {
             if (m_useEditorCamera) {
                 ImGuiContext* ctx = ImGui::GetCurrentContext();
                 if (ctx && ctx->Windows.Size > 0) {
-                    ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
+                    ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Scene");
                     if (viewportWindow) {
                         ImVec2 vpMin = viewportWindow->ContentRegionRect.Min;
                         ImVec2 vpMax = viewportWindow->ContentRegionRect.Max;
