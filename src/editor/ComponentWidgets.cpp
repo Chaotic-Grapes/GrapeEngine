@@ -64,25 +64,17 @@ namespace EditorUI {
 
     // Renders a read-only row showing a static text value
     // Used for things like file paths or IDs that the user should see but cannot edit directly
-    void RenderStaticValueRow(const std::string& label, const std::string& value) {
+    void RenderStaticValueRow(const std::string& label, const std::string& value, bool grayed) {
         ImGui::Text("%s", _displayLabel(label).c_str());
-
         // Move to aligned field column ("W" is the widest character so it's used as reference)
         ImGui::SameLine();
         ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
-        ImGui::Text("%s", value.c_str());
-        
-        // Show appropriate drag hint for texture fields (TextureId)
-        if (value.find("TextureId: ") != std::string::npos) {
-            ImGui::SameLine();
-            // Sprite sheet animation
-            if (label == "Sprite Sheet") {
-                ImGui::TextDisabled("(drag a sprite sheet here)");
-            }
-            // Sprite renderer
-            else if (label == "Sprite") {
-                ImGui::TextDisabled("(drag a texture here)");
-            }
+
+        if (grayed) {
+            ImGui::TextDisabled("%s", value.c_str());
+        }
+        else {
+            ImGui::Text("%s", value.c_str());
         }
     }
 

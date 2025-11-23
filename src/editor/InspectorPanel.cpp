@@ -30,7 +30,6 @@ through a unified system shared by both entities and prefab templates.
 #include "UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
-#include "../editor/UndoSystem.h"
 #include <imgui.h>
 #include <filesystem>
 #include <fstream>
