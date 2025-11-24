@@ -638,8 +638,6 @@ namespace ECS {
         // TODO: Implement active state tracking
         // When Active.Enabled changes from false->true: call m_callEnable
         // When Active.Enabled changes from true->false: call m_callDisable
-        
-        std::cout << "[ScriptSystem] UpdateActiveState placeholder - TODO: Track state changes" << '\n';
     }
 
     void ScriptSystem::OnDestroy(World& world) {

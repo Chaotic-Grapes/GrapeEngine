@@ -85,7 +85,13 @@ namespace Engine {
 #endif
 		// Initialize services
 		_initializeServices();
-        Scenes::SystemRegistry::Disable("Physics"); // Start with physics disabled
+
+        // Start with some systems disabled in editor mode
+        if (IsInEditorMode()) {
+            Scenes::SystemRegistry::Disable("Physics");
+            Scenes::SystemRegistry::Disable("Lifetime");
+            Scenes::SystemRegistry::Disable("Animation");
+        }
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
@@ -278,7 +284,8 @@ namespace Engine {
 
         // Register scripting system
         Scenes::SystemRegistry::Register("Script", [this](ECS::World& w, const float dt) {
-            (void)dt; // Unused - scripts are updated via separate callbacks
+            (void)w;
+            (void)dt;
             if (!m_scriptSystem || !m_scriptSystem->IsInitialized()) return;
             
             // Scripts are updated through ScriptSystem::Update which is called separately
@@ -360,11 +367,28 @@ namespace Engine {
 
         // Editor-only: Enable/disable physics based on play state
         if (IsInEditorMode()) {
+            // Toggle Physics
             if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Physics")) {
                 Scenes::SystemRegistry::Enable("Physics");
             }
             else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Physics")) {
                 Scenes::SystemRegistry::Disable("Physics");
+            }
+
+            // Toggle Lifetime
+            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Lifetime")) {
+                Scenes::SystemRegistry::Enable("Lifetime");
+            }
+            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Lifetime")) {
+                Scenes::SystemRegistry::Disable("Lifetime");
+            }
+
+            // Toggle Animation
+            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Animation")) {
+                Scenes::SystemRegistry::Enable("Animation");
+            }
+            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Animation")) {
+                Scenes::SystemRegistry::Disable("Animation");
             }
         }
 

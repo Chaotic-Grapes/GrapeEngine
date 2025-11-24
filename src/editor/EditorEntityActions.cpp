@@ -65,6 +65,12 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     // Mandatory LocalTransform
     world.Set<ECS::Components::LocalTransform>(e, ECS::Components::LocalTransform{});
 
+    // Ensure WorldTransform exists so hierarchy/system queries that require it see the entity
+    // Initialize as dirty so systems will compute it on the next update
+    ECS::Components::WorldTransform wt{};
+    wt.Dirty = true;
+    world.Set<ECS::Components::WorldTransform>(e, wt);
+
     // Default render layer (0) so the renderer includes the entity
     world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
 
@@ -72,7 +78,8 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     if (parent != ECS::Entity::NPOS32) {
         ECS::Entity p = world.Resolve(parent);
         if (world.IsAlive(p)) {
-            world.Set<ECS::Parent>(e, ECS::Parent{ p });
+            world.Attach(e, p);
+            std::cout << "Attached new entity to parent entity ID " << parent << '\n';
         }
     }
 
@@ -131,12 +138,8 @@ void EntityActions::ClearAllEntities() {
     std::vector<ECS::Entity> allEntities;
     world.Each([&](ECS::Entity e) {
         // Keep editor camera
-        if (world.Has<ECS::Components::Name>(e)) {
-            const auto& name = world.Get<ECS::Components::Name>(e);
-            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
-                std::strcmp(name.Value, "Editor Camera") == 0) {
-                return;
-            }
+        if (world.Has<ECS::Components::CameraEditor3D>(e)) {
+            return;
         }
         allEntities.push_back(e);
         });
@@ -188,13 +191,14 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         if (newParentId != ECS::Entity::NPOS32) {
             ECS::Entity newParent = world.Resolve(newParentId);
             if (!newParent.IsNull() && world.IsAlive(newParent)) {
-                world.Set<ECS::Parent>(clone, ECS::Parent{ newParent });
+                world.Attach(clone, newParent);
+                std::cout << "Attached cloned entity to parent entity ID " << newParentId << '\n';                
             }
         }
         else {
             // Remove parent component if cloning as root
             if (world.Has<ECS::Parent>(clone)) {
-                world.Remove<ECS::Parent>(clone);
+                world.Detach(clone);
             }
         }
 
@@ -220,8 +224,8 @@ EntityId EntityActions::CloneEntity(EntityId id) {
     // Get the parent of the original entity (if any)
     EntityId originalParentId = ECS::Entity::NPOS32;
     if (world.Has<ECS::Parent>(entity)) {
-        const auto& parent = world.Get<ECS::Parent>(entity);
-        originalParentId = parent.ParentEntity.Index;
+        const auto& parent = world.ParentOf(entity);
+        originalParentId = parent.Index;
     }
 
     // Clone the entity hierarchy
@@ -260,6 +264,7 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
         if (!isDescendant) {
             // Use Attach to set the new parent (handles hierarchy index updates automatically)
             world.Attach(childEntity, newParentEntity);
+            std::cout << "Reparented entity ID " << child << " to new parent entity ID " << newParent << '\n';
         }
         else {
             LOG_WARNING("Cannot parent entity to its own descendant: this would create a cyclic hierarchy");
