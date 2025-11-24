@@ -96,6 +96,9 @@ private:
     // Serializes and writes the current scene to the given file path
     void _saveSceneToFile(const std::string& path);
 
+    // Handles closing the editor, saving settings as needed
+    void _closeEditor();
+
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------

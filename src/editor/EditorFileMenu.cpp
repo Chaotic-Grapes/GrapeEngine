@@ -41,6 +41,7 @@ centralized and consistent with the currently active scene.
 #include "services/Input.h"
 #include <filesystem>
 #include <algorithm>
+#include "serialization/ConfigurationSerializer.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -107,7 +108,7 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
                 openExitPopup = true;
             }
             else {
-                if (Engine::CORE) { Engine::CORE->Close(); }
+                _closeEditor();
             }
         }
         ImGui::EndMenu();
@@ -140,8 +141,8 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
         if (ImGui::Button("No", ImVec2(80, 0))) {
-            if (Engine::CORE) Engine::CORE->Close();
             ImGui::CloseCurrentPopup();
+            _closeEditor();
         }
         ImGui::PopStyleColor(3);
 
@@ -393,5 +394,21 @@ void EditorFileMenu::_saveSceneToFile(const std::string& path) {
     }
     else {
         LOG_INFO("Successfully saved scene: " << path);
+    }
+}
+
+void EditorFileMenu::_closeEditor() {
+    if (Engine::CORE) { 
+        // Save configs before exiting
+        auto settings = Engine::CORE->GetEditorSettings();
+
+        settings.WindowSettings.Width = WindowManager::GetMainWindow()->GetWidth();
+        settings.WindowSettings.Height = WindowManager::GetMainWindow()->GetHeight();
+        settings.WindowSettings.Maximized = WindowManager::GetMainWindow()->IsMaximized();
+        settings.WindowSettings.VSync = WindowManager::GetMainWindow()->IsVSync();
+        
+        Serialization::ConfigurationSerializer::SaveConfig("config.json", settings);
+
+        Engine::CORE->Close(); 
     }
 }

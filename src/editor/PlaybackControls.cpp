@@ -28,6 +28,7 @@ Reference:
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include <unordered_map>
+#include <unordered_set>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
@@ -208,104 +209,73 @@ void Playback::Render() {
     ImGui::End();
 }
 
-// Save the current world into a JSON snapshot.
-// Skips editor camera entities to keep the restore clean.
+// Save the current world into a JSON snapshot that preserves entity IDs.
+// Instead of serializing to flat arrays, we save each entity's state by ID.
+// This allows us to restore in-place without destroying/recreating entities.
 void Playback::_saveWorldState() {
     if (!HasValidWorld()) return;
 
     LOG_INFO("Saving world state.");
 
     nlohmann::json worldJson = nlohmann::json::object();
-    nlohmann::json entitiesArray = nlohmann::json::array();
-    nlohmann::json hierarchyArray = nlohmann::json::array();
+    nlohmann::json entitiesMap = nlohmann::json::object(); // Changed from array to object
     
-    // Map to track entity index in save order
-    std::unordered_map<uint32_t, size_t> entityToSaveIndex;
     size_t entityCount = 0;
 
-    // Helper to recursively save entities in hierarchy order (parents before children)
-    std::function<void(ECS::Entity)> saveRecursive = [&](ECS::Entity entity) {
-        if (m_world->Has<ECS::Components::Name>(entity)) {
-            const auto& name = m_world->Get<ECS::Components::Name>(entity);
-            // Skip editor camera
-            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
-                std::strcmp(name.Value, "Editor Camera") == 0) {
-                return;
-            }
+    // Save all entities (except editor camera) with their IDs as keys
+    m_world->Each([&](ECS::Entity entity) {
+        // Skip editor camera
+        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+            return;
         }
 
-        // Track this entity's position in save order
-        entityToSaveIndex[entity.Index] = entityCount;
-
-        // Save entity components (WITHOUT Parent component - we'll rebuild hierarchy separately)
+        // Serialize entity with all its components
         auto entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
         
-        // Remove Parent component from serialization if present
-        if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
-            auto& components = entityJson["Components"];
-            components.erase(
-                std::remove_if(components.begin(), components.end(),
-                    [](const nlohmann::json& comp) {
-                        return comp.contains("TypeName") && comp["TypeName"] == "Parent";
-                    }),
-                components.end()
-            );
-        }
-        
-        entitiesArray.push_back(entityJson);
+        // Store by entity ID (as string key for JSON)
+        std::string entityKey = std::to_string(entity.Index);
+        entitiesMap[entityKey] = entityJson;
         ++entityCount;
-
-        // Save all children recursively
-        m_world->ForChildren(entity, [&](ECS::Entity child) {
-            saveRecursive(child);
-        });
-    };
-
-    // Start with all root entities (those without parents)
-    m_world->Each([&](ECS::Entity entity) {
-        if (m_world->ParentOf(entity).IsNull()) {
-            saveRecursive(entity);
-        }
     });
 
-    // Now save hierarchy relationships separately (as child->parent index mappings)
-    m_world->Each<ECS::Parent>([&](ECS::Entity child, const ECS::Parent& parent) {
-        // Skip editor camera
-        if (m_world->Has<ECS::Components::Name>(child)) {
-            const auto& name = m_world->Get<ECS::Components::Name>(child);
-            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
-                std::strcmp(name.Value, "Editor Camera") == 0) {
-                return;
-            }
+    // Save hierarchy relationships separately
+    nlohmann::json hierarchyArray = nlohmann::json::array();
+    m_world->Each([&](ECS::Entity entity) {
+        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+            return;
         }
         
-        auto childIt = entityToSaveIndex.find(child.Index);
-        auto parentIt = entityToSaveIndex.find(parent.ParentEntity.Index);
-        
-        if (childIt != entityToSaveIndex.end() && parentIt != entityToSaveIndex.end()) {
+        ECS::Entity parent = m_world->ParentOf(entity);
+        if (!parent.IsNull() && m_world->IsAlive(parent)) {
+            // Skip if parent is editor camera
+            if (m_world->Has<ECS::Components::CameraEditor3D>(parent)) {
+                return;
+            }
+            
             nlohmann::json hierarchyEntry;
-            hierarchyEntry["child"] = childIt->second;
-            hierarchyEntry["parent"] = parentIt->second;
+            hierarchyEntry["child"] = entity.Index;
+            hierarchyEntry["parent"] = parent.Index;
             hierarchyArray.push_back(hierarchyEntry);
         }
     });
 
-    worldJson["entities"] = entitiesArray;
+    worldJson["entities"] = entitiesMap;
     worldJson["hierarchy"] = hierarchyArray;
     m_savedWorldState = worldJson;
     
-    LOG_INFO("Saved " << entityCount << " entities with hierarchy in order");
+    LOG_INFO("Saved " << entityCount << " entities with hierarchy preserved");
 }
 
 void Playback::_restoreWorldState() {
     // Restore the world from the previously saved snapshot.
-    // Keeps editor cameras and rebuilds runtime entities.
+    // This version preserves entity IDs by restoring component values in-place
+    // instead of destroying and recreating entities.
     if (!HasValidWorld() || m_savedWorldState.is_null()) {
         LOG_WARNING("No saved state to restore");
         return;
     }
 
-    // Check for new format (object with entities and hierarchy)
+    // Check for new format (object with entities map)
     if (!m_savedWorldState.is_object() || !m_savedWorldState.contains("entities")) {
         LOG_ERROR("Saved world state has invalid format.");
         return;
@@ -313,56 +283,89 @@ void Playback::_restoreWorldState() {
 
     LOG_INFO("Restoring world state.");
 
-    // Destroy all current entities (except editor camera)
+    const auto& entitiesMap = m_savedWorldState["entities"];
+    
+    // Track which entities existed in the snapshot
+    std::unordered_set<uint32_t> snapshotEntityIds;
+    for (auto it = entitiesMap.begin(); it != entitiesMap.end(); ++it) {
+        uint32_t entityId = std::stoul(it.key());
+        snapshotEntityIds.insert(entityId);
+    }
+
+    // First pass: Destroy any entities that were created during play mode
+    // (entities that exist now but weren't in the snapshot)
     std::vector<ECS::Entity> entitiesToDestroy;
     m_world->Each([&](ECS::Entity entity) {
-        if (m_world->Has<ECS::Components::Name>(entity)) {
-            const auto& name = m_world->Get<ECS::Components::Name>(entity);
-            // Skip editor camera
-            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
-                std::strcmp(name.Value, "Editor Camera") == 0) {
-                return;
-            }
+        // Skip editor camera
+        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+            return;
         }
-        entitiesToDestroy.push_back(entity);
+        
+        // If this entity wasn't in the snapshot, it was created during play - destroy it
+        if (snapshotEntityIds.find(entity.Index) == snapshotEntityIds.end()) {
+            entitiesToDestroy.push_back(entity);
+        }
     });
 
     for (auto entity : entitiesToDestroy) {
         m_world->Destroy(entity);
     }
 
-    // Extract entities and hierarchy arrays
-    const auto& entitiesArray = m_savedWorldState["entities"];
-    const auto& hierarchyArray = m_savedWorldState.contains("hierarchy") && m_savedWorldState["hierarchy"].is_array() 
-        ? m_savedWorldState["hierarchy"] 
-        : nlohmann::json::array();
+    // Second pass: Detach all entities from hierarchy (will restore later)
+    m_world->Each([&](ECS::Entity entity) {
+        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+            return;
+        }
+        m_world->Detach(entity);
+    });
 
-    // First pass: Create all entities (without Parent components - those were stripped)
-    std::vector<ECS::Entity> restoredEntities;
-    restoredEntities.reserve(entitiesArray.size());
+    size_t restoredCount = 0;
+    size_t recreatedCount = 0;
 
-    for (const auto& entityJson : entitiesArray) {
-        ECS::Entity newEntity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
-        restoredEntities.push_back(newEntity);
+    // Third pass: Restore or recreate entities from snapshot
+    for (auto it = entitiesMap.begin(); it != entitiesMap.end(); ++it) {
+        uint32_t entityId = std::stoul(it.key());
+        const auto& entityJson = it.value();
+        
+        ECS::Entity entity = m_world->Resolve(entityId);
+        
+        if (m_world->IsAlive(entity)) {
+            // Entity still exists - restore its state in-place
+            // This preserves the entity ID and prevents reference breakage
+            _restoreEntityState(entity, entityJson);
+            ++restoredCount;
+        }
+        else {
+            // Entity was destroyed during play - recreate it with the same ID
+            // This can happen if an entity was explicitly destroyed by game logic
+            entity = _recreateEntityWithId(entityId, entityJson);
+            if (m_world->IsAlive(entity)) {
+                ++recreatedCount;
+            }
+        }
     }
 
-    // Second pass: Rebuild hierarchy from saved relationships
-    for (const auto& hierarchyEntry : hierarchyArray) {
-        if (!hierarchyEntry.contains("child") || !hierarchyEntry.contains("parent")) {
-            continue;
-        }
-        
-        size_t childIndex = hierarchyEntry["child"].get<size_t>();
-        size_t parentIndex = hierarchyEntry["parent"].get<size_t>();
-        
-        if (childIndex < restoredEntities.size() && parentIndex < restoredEntities.size()) {
-            ECS::Entity child = restoredEntities[childIndex];
-            ECS::Entity parent = restoredEntities[parentIndex];
-            m_world->Attach(child, parent);
+    // Fourth pass: Restore hierarchy relationships
+    if (m_savedWorldState.contains("hierarchy") && m_savedWorldState["hierarchy"].is_array()) {
+        const auto& hierarchyArray = m_savedWorldState["hierarchy"];
+        for (const auto& hierarchyEntry : hierarchyArray) {
+            if (!hierarchyEntry.contains("child") || !hierarchyEntry.contains("parent")) {
+                continue;
+            }
+            
+            uint32_t childId = hierarchyEntry["child"].get<uint32_t>();
+            uint32_t parentId = hierarchyEntry["parent"].get<uint32_t>();
+            
+            ECS::Entity child = m_world->Resolve(childId);
+            ECS::Entity parent = m_world->Resolve(parentId);
+            
+            if (m_world->IsAlive(child) && m_world->IsAlive(parent)) {
+                m_world->Attach(child, parent);
+            }
         }
     }
 
-    LOG_INFO("Restored " << restoredEntities.size() << " entities with hierarchy.");
+    LOG_INFO("Restored " << restoredCount << " entities, recreated " << recreatedCount << " entities with hierarchy.");
 }
 
 // Internal state change handler that manages time scale and callbacks
@@ -425,4 +428,122 @@ void Playback::SetWorld(ECS::World* world) {
     m_gameState = GameState::Stopped;
     m_stepRequested = false;
     m_savedWorldState.clear();
+}
+
+// Helper: Restore an entity's state in-place from a JSON snapshot
+void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& entityJson) {
+    if (!entityJson.contains("Components") || !entityJson["Components"].is_array()) {
+        return;
+    }
+
+    const auto& componentsArray = entityJson["Components"];
+    
+    // Build a set of TypeIds that should exist after restore
+    std::unordered_set<TypeId> snapshotComponentIds;
+    auto& registry = Serialization::EntitySerializer::Registry();
+    
+    // Map component names from snapshot to TypeIds
+    for (const auto& comp : componentsArray) {
+        if (comp.contains("TypeName")) {
+            std::string typeName = comp["TypeName"].get<std::string>();
+            // Find the TypeId for this component name
+            for (const auto& [tid, info] : registry) {
+                if (info.Name == typeName) {
+                    snapshotComponentIds.insert(tid);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Get entity's current archetype to see what components it has
+    const auto* location = m_world->LocationOf(entity);
+    if (location && location->ArchetypePtr) {
+        const auto& currentComponents = location->ArchetypePtr->GetComponents();
+        
+        // Check each component on the entity to see if it should be removed
+        std::vector<TypeId> componentsToRemove;
+        for (const auto& compInfo : currentComponents) {
+            // Skip if this component is in the snapshot (we want to keep it)
+            if (snapshotComponentIds.find(compInfo.Id) != snapshotComponentIds.end()) {
+                continue;
+            }
+            
+            // Note: Hierarchy relationships (Parent component) are handled separately
+            // in the restore process, so we don't need to explicitly skip them here
+            
+            // This component exists on entity but not in snapshot - mark for removal
+            componentsToRemove.push_back(compInfo.Id);
+        }
+        
+        // Remove components that exist on entity but not in snapshot
+        for (TypeId tid : componentsToRemove) {
+            // Find component in registry and remove it
+            for (const auto& [regTid, info] : registry) {
+                if (regTid == tid) {
+                    LOG_DEBUG("Removing component added during play: " << info.Name);
+                    info.Remove(*m_world, entity);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Restore each component from the snapshot using the EntitySerializer registry
+    for (const auto& componentJson : componentsArray) {
+        if (!componentJson.contains("TypeName") || !componentJson.contains("Data")) {
+            continue;
+        }
+        
+        std::string typeName = componentJson["TypeName"];
+        const auto& componentData = componentJson["Data"];
+        
+        // Use the EntitySerializer's registry to deserialize components
+        // This leverages the existing REGISTER_COMPONENT_SERIALIZER infrastructure
+        for (const auto& [tid, info] : registry) {
+            if (info.Name == typeName) {
+                try {
+                    // The deserializer will use Set or Add as appropriate
+                    info.Deserialize(*m_world, entity, componentData);
+                } 
+                catch (const std::exception& ex) {
+                    LOG_ERROR("Failed to restore component " << typeName << ": " << ex.what());
+                }
+                break;
+            }
+        }
+    }
+}
+
+// Helper: Recreate an entity with a specific ID from a JSON snapshot
+ECS::Entity Playback::_recreateEntityWithId(uint32_t targetId, const nlohmann::json& entityJson) {
+    // This is a fallback for when an entity was destroyed during play
+    // Use CreateWithId to preserve the exact entity ID from the snapshot
+    
+    ECS::Entity newEntity = m_world->CreateWithId(targetId);
+    
+    // Deserialize components into the newly created entity
+    if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+        auto& registry = Serialization::EntitySerializer::Registry();
+        for (const auto& comp : entityJson["Components"]) {
+            if (!comp.contains("TypeName") || !comp.contains("Data")) {
+                continue;
+            }
+            
+            std::string typeName = comp["TypeName"].get<std::string>();
+            for (const auto& [tid, info] : registry) {
+                if (info.Name == typeName) {
+                    try {
+                        info.Deserialize(*m_world, newEntity, comp["Data"]);
+                    } 
+                    catch (const std::exception& ex) {
+                        LOG_ERROR("Failed to restore component " << typeName << ": " << ex.what());
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    return newEntity;
 }

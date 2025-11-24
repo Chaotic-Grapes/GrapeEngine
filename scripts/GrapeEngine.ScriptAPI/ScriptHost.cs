@@ -97,6 +97,35 @@ public static class ScriptHost
             if (scriptType == null)
             {
                 Logging.Log($"ERROR: Type not found: {typeName}", LogLevel.Error);
+                Logging.Log("Loaded assemblies:", LogLevel.Error);
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Logging.Log($"  - {asm.GetName().Name} ({asm.GetName().Version})", LogLevel.Error);
+                    
+                    // If this looks like a game assembly, list its types
+                    if (!asm.GetName().Name.StartsWith("System") && 
+                        !asm.GetName().Name.StartsWith("Microsoft") &&
+                        !asm.GetName().Name.StartsWith("netstandard") &&
+                        asm.GetName().Name != "GrapeEngine.ScriptAPI")
+                    {
+                        try
+                        {
+                            var types = asm.GetTypes();
+                            Logging.Log($"    Types in {asm.GetName().Name}:", LogLevel.Error);
+                            foreach (var t in types)
+                            {
+                                if (!t.IsNested && t.Namespace != null)
+                                {
+                                    Logging.Log($"      * {t.FullName}", LogLevel.Error);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.Log($"    Could not list types: {ex.Message}", LogLevel.Error);
+                        }
+                    }
+                }
                 return 0;
             }
 
