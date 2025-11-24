@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <string>
 #include <glad/glad.h> // DO NOT REMOVE THIS LINE OR IT WILL NOT COMPILE
 #include <GLFW/glfw3.h>
+#include <optional>
 
 #pragma region WindowMode enum
 struct WindowMode {
@@ -54,7 +55,7 @@ public:
 	Window() = default;
 	~Window();
 
-	bool Create(const std::string& title, int width, int height, GLFWmonitor* monitor = nullptr, GLFWwindow* parent = nullptr);
+	bool Create(const std::string& title, int width, int height, bool vsync = true, WindowMode::Flags mode = WindowMode::Windowed, GLFWmonitor* monitor = nullptr, GLFWwindow* parent = nullptr);
 	void Destroy();
 
 	void PollEvents() const;
@@ -62,22 +63,27 @@ public:
 	bool ShouldClose() const;
 	void Close() const;
 
-	int Width() const;
-	int Height() const;
+	int GetWidth() const;
+	int GetHeight() const;
 
 	bool IsFocused() const;
 	bool IsMinimized() const;
-	void IsMinimized(bool flag) const;
+	void SetMinimized(bool flag) const;
 	bool IsMaximized() const;
-	void IsMaximized(bool flag) const;
+	void SetMaximized(bool flag) const;
 	bool IsVisible() const;
-	void IsVisible(bool flag) const;
+	void SetVisible(bool flag) const;
 	bool IsResizable() const;
-	void IsResizable(bool flag) const;
+	void SetResizable(bool flag) const;
+	void SetVSync(bool enabled);
+	bool IsVSync() const;
 	
-	void Mode(WindowMode::Flags mode, GLFWmonitor* monitor = nullptr);
+	void SetMode(WindowMode::Flags mode, GLFWmonitor* monitor = nullptr);
 	bool HasMode(WindowMode::Flags value) const;
-	void Resize(int width, int height);
+	void Resize(std::optional<int> width, std::optional<int> height);
+
+	void SetTitle(const std::string& title);
+	std::string GetTitle() const;
 
 	GLFWwindow* Handle() const;
 
@@ -89,9 +95,11 @@ private:
 
 	// Remember windowed mode size and position for restoring
 	int m_windowedX = 100, m_windowedY = 100;
-	int m_windowedWidth = 1280, m_windowedHeight = 720; // TODO: Scaling?
+	int m_windowedWidth = 1600, m_windowedHeight = 900; // TODO: Scaling?
 
-	WindowMode::Flags m_mode = WindowMode::Windowed;
+	bool m_vsync = true;
+
+	WindowMode::Flags m_mode = static_cast<WindowMode::Flags>(0);
 };
 
 #endif // WINDOW_H

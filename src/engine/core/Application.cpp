@@ -20,6 +20,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
+#include "ecs/systems/ScriptSystem.h"
+#include "audio/AudioSystem.h"
+#include "audio/AudioSystemRegistry.h"
 #include "scene/Scene.h"
 #include "scene/SystemRegistry.h"
 #include "services/Input.h"
@@ -36,22 +39,26 @@ namespace Engine {
 
     void Application::Run(Game& game, const bool consoleFlag) {
         Time::_initialize();
+        bool wasPlaying = false;
 
         // Set global pointer to this application instance
         CORE = this;
 
         // Initialize crash dumping system
-        Grape_Engine::CrashDumping::Initialize();
-        Grape_Engine::CrashDumping::SetProgramName("GrapeEngine");
-        Grape_Engine::CrashDumping::SetDumpCreateState(true);
+        CrashDumping::Initialize();
+        CrashDumping::SetProgramName("GrapeEngine");
+        CrashDumping::SetDumpCreateState(true);
 
-        // Load configuration first (try working dir, then parent dir fallback)
-        bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
+        // Load editor configuration (try working dir, then parent dir fallback)
+        bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_editorSettings);
         if (!configLoaded) {
             // Fallback: common scenario when running from build directory
-            if (Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_config)) {
+            if (Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_editorSettings)) {
                 LOG_INFO("Loaded configuration from parent directory: ../config.json");
             }
+        }
+        else {
+            LOG_INFO("Loaded configuration file: " << std::filesystem::current_path().string() + "/config.json");
         }
 
         // Initialize the message system here
@@ -79,22 +86,12 @@ namespace Engine {
 		// Initialize services
 		_initializeServices();
 
-        // Register core ECS systems once (Physics at fixed step, others variable)
-        // Physics
-        Scenes::SystemRegistry::Register("Physics", [](ECS::World& w, float dt) {
-            ECS::PhysicsSystem::Update(w, dt);
-        });
-        // Animation
-        Scenes::SystemRegistry::Register("Animation", [](ECS::World& w, float dt) {
-            ECS::AnimationSystem::Update(w, dt);
-        });
-        // Render (non-static system): use a persistent instance
-        Scenes::SystemRegistry::Register("Render", [](ECS::World& w, float dt) {
-            static ECS::RendererSystem s_renderer;
-            s_renderer.Initialize(w);
-            s_renderer.BindWorld(w);
-            s_renderer.Update(w, dt);
-        });
+        // Start with some systems disabled in editor mode
+        if (IsInEditorMode()) {
+            Scenes::SystemRegistry::Disable("Physics");
+            Scenes::SystemRegistry::Disable("Lifetime");
+            Scenes::SystemRegistry::Disable("Animation");
+        }
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
@@ -122,38 +119,25 @@ namespace Engine {
             // --- Scene Update ---
             auto* currentScene = m_sceneManager.GetActive();
             
-            // Fixed timestep accumulator for physics, gated by playback controls
             if (currentScene) {
-                const bool isPlaying = (m_overlay && m_overlay->IsGamePlaying());
+                const bool shouldRun = _shouldRunGameLogic();
                 const bool stepRequested = (m_overlay && m_overlay->IsStepRequested());
-
                 auto& world = currentScene->GetWorld();
-                auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
 
-                if (physicsSystem) {
-                    if (isPlaying) {
-                        m_accumulator += Time::UnscaledDeltaTime();
-
-                        // Prevent fixed delta time from deadlocking(?)
-                        const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
-                        if (m_accumulator > maxAccumulator)
-                            m_accumulator = maxAccumulator;
-
-                        // Run physics at fixed timestep while playing
-                        while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
-                            (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
-                            m_accumulator -= Time::UnscaledFixedDeltaTime();
-                        }
-                    }
-                    else if (stepRequested) {
-                        // Run exactly one fixed-step when paused and step requested
-                        (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
-                        if (m_overlay) m_overlay->ClearStepRequest();
-                    }
-                    else {
-                        // Not playing and no step: do not accumulate or run physics
-                    }
+                // Handle game state transitions (start/stop)
+                if (shouldRun && !wasPlaying) {
+                    LOG_INFO("Game started playing");
+                    _onGameStart(currentScene);
                 }
+                else if (!shouldRun && wasPlaying) {
+                    LOG_INFO("Game stopped/paused");
+                    _onGameStop(currentScene);
+                }
+                wasPlaying = shouldRun;
+
+                // Update physics and scripts
+                _updatePhysics(world, shouldRun, stepRequested);
+                _updateScripts(world, shouldRun);
             }
             
             // Run all non-physics systems at variable timestep
@@ -191,6 +175,11 @@ namespace Engine {
         game.OnShutdown(m_sceneManager);
 
         // Clean up services
+        if (m_scriptSystem) {
+            m_scriptSystem->Shutdown();
+            delete m_scriptSystem;
+            m_scriptSystem = nullptr;
+        }
         delete m_audio;
         delete m_overlay;
 
@@ -201,15 +190,145 @@ namespace Engine {
         m_shouldStop = true;
     }
 
+    bool Application::LoadProjectSettings(const std::string& projectRoot) {
+        std::string settingsPath = projectRoot + "/ProjectSettings.json";
+        m_hasProjectSettings = Serialization::ConfigurationSerializer::LoadProjectSettings(settingsPath, m_projectSettings);
+        if (m_hasProjectSettings) {
+            LOG_INFO("Loaded project settings from: " << settingsPath);
+        }
+        else {
+            LOG_WARNING("Failed to load project settings from: " << settingsPath);
+        }
+        return m_hasProjectSettings;
+    }
+
     void Application::_initializeServices() {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
 
-		m_overlay = new Services::OverlayService(m_sceneManager);
+        m_overlay = new Services::OverlayService(m_sceneManager);
         m_overlay->SetAudio(m_audio->Device());
 		m_overlay->Initialize();
+        
+        // Set editor mode flag (overlay exists = editor mode)
+        m_isInEditorMode = (m_overlay != nullptr);
+
+        // Initialize scripting system
+        m_scriptSystem = new ECS::ScriptSystem();
+        if (!m_scriptSystem->Initialize("GrapeEngine.ScriptAPI.runtimeconfig.json")) {
+            LOG_WARNING("Failed to initialize ScriptSystem");
+        }
+        else {
+            LOG_INFO("ScriptSystem initialized successfully");
+            // Load the script API assembly
+            if (!m_scriptSystem->LoadAssembly("GrapeEngine.ScriptAPI.dll")) {
+                LOG_WARNING("Failed to load ScriptAPI assembly");
+            }
+        }
+
+        // Register all ECS systems
+        _registerSystems();
     }
 
+    void Application::_registerSystems() {
+        // Physics
+        Scenes::SystemRegistry::Register("Physics", [](ECS::World& w, const float dt) {
+            ECS::PhysicsSystem::Update(w, dt);
+        });
+
+        // Lifetime
+        Scenes::SystemRegistry::Register("Lifetime", [](ECS::World& w, const float dt) {
+            ECS::LifetimeSystem::Update(w, dt);
+        });
+
+        // Animation
+        Scenes::SystemRegistry::Register("Animation", [](ECS::World& w, const float dt) {
+            ECS::AnimationSystem::Update(w, dt);
+        });
+        
+        // Render
+        Scenes::SystemRegistry::Register("Render", [this](ECS::World& w, const float dt) {
+            // Only run renderer system in standalone mode
+            // In editor mode, the Viewport handles rendering to avoid double updates
+            if (!IsInEditorMode()) {
+                static ECS::RendererSystem s_renderer;
+                s_renderer.Initialize(w);
+                s_renderer.BindWorld(w);
+                s_renderer.Update(w, dt);
+            }
+        });
+
+        // Register UI System soon
+
+        // Store one AudioSystem instance per world to handle scene switching properly
+        Scenes::SystemRegistry::Register("Audio", [this](ECS::World& w, const float dt) {
+            auto* svc = m_audio;
+            if (!svc) return;
+
+            // Store AudioSystem per world to handle scene switching
+            static std::unordered_map<ECS::World*, std::unique_ptr<AudioSystem>> s_audioSystems;
+
+            auto it = s_audioSystems.find(&w);
+            if (it == s_audioSystems.end()) {
+                auto result = s_audioSystems.emplace(&w, std::make_unique<AudioSystem>(w, *svc));
+                it = result.first;
+                Audio::AUDIO_MAP[&w] = it->second.get();
+                LOG_DEBUG("Audio system: Created AudioSystem for world at " << &w);
+            }
+
+            // Update the audio system
+            if (it->second) {
+                it->second->Update(dt);
+            }
+        });
+
+        // Register scripting system
+        Scenes::SystemRegistry::Register("Script", [this](ECS::World& w, const float dt) {
+            (void)w;
+            (void)dt;
+            if (!m_scriptSystem || !m_scriptSystem->IsInitialized()) return;
+            
+            // Scripts are updated through ScriptSystem::Update which is called separately
+            // This registration mainly ensures the system is tracked
+        });
+    }
+
+    void Application::_onGameStart(Scenes::Scene* scene) {
+        if (!scene) return;
+
+        auto* world = &scene->GetWorld();
+        auto it = Audio::AUDIO_MAP.find(world);
+        if (it != Audio::AUDIO_MAP.end() && it->second) {
+            it->second->OnSceneStart();
+            LOG_DEBUG("AudioSystem: Notified of scene start");
+        }
+
+        // Initialize all scripts when game starts
+        if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
+            ECS::ScriptSystem::OnStart(*world);
+            LOG_DEBUG("ScriptSystem: Initialized all scripts");
+        }
+    }
+
+    void Application::_onGameStop(Scenes::Scene* scene) {
+        if (!scene) return;
+
+        m_accumulator = 0.0f; // Reset accumulator on stop
+
+        auto* world = &scene->GetWorld();
+        auto it = Audio::AUDIO_MAP.find(world);
+        if (it != Audio::AUDIO_MAP.end() && it->second) {
+            it->second->OnSceneStop();
+            LOG_DEBUG("AudioSystem: Notified of scene stop");
+        }
+
+        // Cleanup scripts when game stops
+        if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
+            ECS::ScriptSystem::OnDestroy(*world);
+            LOG_DEBUG("ScriptSystem: Cleaned up scripts");
+        }
+    }
+   
 
     void Application::_enableConsole() {
 #ifdef _WIN32
@@ -227,5 +346,89 @@ namespace Engine {
         if (const HWND console = GetConsoleWindow())
             ShowWindow(console, SW_HIDE);
 #endif
+    }
+
+    // -------------------------------------------------------------------------
+    // Game Loop Helper Methods
+    // -------------------------------------------------------------------------
+
+    bool Application::_shouldRunGameLogic() const {
+        // Standalone build: always run game logic
+        if (!IsInEditorMode())
+            return true;
+        
+        // Editor build: respect play/pause state
+        return m_overlay->IsGamePlaying();
+    }
+
+    void Application::_updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested) {
+        auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
+        if (!physicsSystem) return;
+
+        // Editor-only: Enable/disable physics based on play state
+        if (IsInEditorMode()) {
+            // Toggle Physics
+            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Physics")) {
+                Scenes::SystemRegistry::Enable("Physics");
+            }
+            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Physics")) {
+                Scenes::SystemRegistry::Disable("Physics");
+            }
+
+            // Toggle Lifetime
+            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Lifetime")) {
+                Scenes::SystemRegistry::Enable("Lifetime");
+            }
+            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Lifetime")) {
+                Scenes::SystemRegistry::Disable("Lifetime");
+            }
+
+            // Toggle Animation
+            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Animation")) {
+                Scenes::SystemRegistry::Enable("Animation");
+            }
+            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Animation")) {
+                Scenes::SystemRegistry::Disable("Animation");
+            }
+        }
+
+        // Run physics at fixed timestep when playing
+        if (shouldRun) {
+            m_accumulator += Time::UnscaledDeltaTime();
+
+            const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
+            if (m_accumulator > maxAccumulator)
+                m_accumulator = maxAccumulator;
+
+            while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
+                // (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+                
+                // Run script FixedUpdate during physics step
+                if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
+                    ECS::ScriptSystem::FixedUpdate(world);
+                }
+                
+                m_accumulator -= Time::UnscaledFixedDeltaTime();
+            }
+        }
+        // Editor-only: Single step when paused
+        else if (stepRequested) {
+            (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
+            if (m_overlay) m_overlay->ClearStepRequest();
+        }
+    }
+
+    void Application::_updateScripts(ECS::World& world, bool shouldRun) {
+        if (!shouldRun || !m_scriptSystem || !m_scriptSystem->IsInitialized())
+            return;
+
+        // Regular update
+        ECS::ScriptSystem::Update(world);
+        
+        // Active state changes (OnEnable/OnDisable)
+        ECS::ScriptSystem::UpdateActiveState(world);
+        
+        // Late update
+        ECS::ScriptSystem::LateUpdate(world);
     }
 }

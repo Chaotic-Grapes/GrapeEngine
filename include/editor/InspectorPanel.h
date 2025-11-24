@@ -21,15 +21,22 @@ instantiation and synchronization between live entities and serialized prefab da
 #define INSPECTOR_PANEL_H
 
 #include "ecs/World.h"
-#include "../editor/ComponentPropertyEditor.h"
-#include "../editor/ComponentWidgets.h"
-#include "../editor/EditorComponentRegistry.h"
+#include "ComponentPropertyEditor.h"
+#include "ComponentWidgets.h"
+#include "EditorComponentRegistry.h"
 #include <imgui.h>
+#include "EditorStyle.h"
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include "EditorFileMenu.h"
 
 using EntityId = uint32_t;
+class EditorFileMenu;
+
+namespace Editor {
+    class UndoSystem;
+}
 
 // Unified inspector panel capable of inspecting both entities and prefabs
 class InspectorPanel {
@@ -82,6 +89,15 @@ public:
 
     // Returns the current inspection mode to determine context
     InspectionMode GetMode() const { return m_mode; }
+
+    // Set file menu reference for dirty tracking
+    void SetFileMenu(EditorFileMenu * fileMenu) { m_fileMenu = fileMenu; }
+
+    // -------------------------------------------------------------------------
+    // Undo system support
+    // -------------------------------------------------------------------------
+
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
 
 private:
     // -------------------------------------------------------------------------
@@ -193,6 +209,8 @@ private:
     // System references
     ECS::World* m_world = nullptr;
     ComponentUI m_componentUI;
+    EditorFileMenu* m_fileMenu = nullptr;
+    Editor::UndoSystem* m_undoSystem = nullptr;
 
     // Selection state
     InspectionMode m_mode = InspectionMode::None;  // Current inspection context
@@ -207,6 +225,16 @@ private:
     std::vector<std::string> m_componentsToDelete; // Components scheduled for removal
     std::string m_statusMessage;                   // Current status message 
     float m_statusTimer = 0.0f;                    // Timer for status message
+
+    // Undo - edit tracking
+    struct EditState {
+        EntityId entityId = 0;
+        Vector3D startPosition;
+        Quaternion startRotation;
+        Vector3D startScale;
+        bool isEditing = false;
+    };
+    EditState m_editState;
 };
 
 // -------------------------------------------------------------------------
@@ -251,10 +279,10 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
         // ButtonHovered: Dark gray with 30% opacity when mouse over
         // ButtonActive: Medium gray with 50% opacity when clicked
         // Text: Red color if deletable, gray if disabled (Transform component)
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? ImVec4(0.7f, 0.2f, 0.2f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? EditorStyle::DangerText : EditorStyle::TextDisabled);
 
         // Create button with unique ID to avoid ImGui ID conflicts
         // ## ensures each button has distinct identifier

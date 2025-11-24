@@ -99,8 +99,13 @@ Sprite SpriteAnimation::currentFrame(const glm::vec2& pos, const glm::vec2& size
     s.pos = pos;
     s.size = size;
     s.textureId = m_textureId;
-    s.uv = currentUV();         // {u0, v0, u1, v1}
-    s.color = { 1, 1, 1, 1 };   // default white tint
+    s.uv = currentUV();
+    s.color = { 1, 1, 1, 1 };
+
+    // Pass through emissive data
+    s.emissiveTextureId = m_emissiveTextureId;
+    s.emissiveStrength = m_emissiveStrength;
+
     return s;
 }
 

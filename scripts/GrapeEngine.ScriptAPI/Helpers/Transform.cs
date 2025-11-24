@@ -37,6 +37,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Numerics;
+using GrapeEngine.Math;
 
 namespace GrapeEngine.Scripting;
 
@@ -58,11 +59,11 @@ public static class Transform
     public static void Translate(Entity entity, Vector3 delta)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-        {
-            transform.Position += delta;
-            entity.SetComponent(transform);
-        }
+        if (!hasTransform)
+            return;
+
+        transform.Position += delta;
+        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -73,11 +74,11 @@ public static class Transform
     public static void SetPosition(Entity entity, Vector3 position)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-        {
-            transform.Position = position;
-            entity.SetComponent(transform);
-        }
+        if (!hasTransform)
+            return;
+
+        transform.Position = position;
+        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -88,9 +89,7 @@ public static class Transform
     public static Vector3 GetPosition(Entity entity)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-            return transform.Position;
-        return Vector3.Zero;
+        return hasTransform ? transform.Position : Vector3.Zero;
     }
 
     // ============================================================================
@@ -105,11 +104,11 @@ public static class Transform
     public static void SetScale(Entity entity, Vector3 scale)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-        {
-            transform.Scale = scale;
-            entity.SetComponent(transform);
-        }
+        if (!hasTransform)
+            return;
+
+        transform.Scale = scale;
+        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -130,9 +129,7 @@ public static class Transform
     public static Vector3 GetScale(Entity entity)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-            return transform.Scale;
-        return Vector3.One;
+        return hasTransform ? transform.Scale : Vector3.One;
     }
 
     // ============================================================================
@@ -147,11 +144,11 @@ public static class Transform
     public static void SetRotation(Entity entity, Quaternion rotation)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-        {
-            transform.Rotation = rotation;
-            entity.SetComponent(transform);
-        }
+        if (!hasTransform)
+            return;
+
+        transform.Rotation = rotation;
+        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -162,10 +159,7 @@ public static class Transform
     public static Quaternion GetRotation(Entity entity)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-            return transform.Rotation;
-
-        return Quaternion.Identity;
+        return hasTransform ? transform.Rotation : Quaternion.Identity;
     }
 
     // ============================================================================
@@ -199,12 +193,11 @@ public static class Transform
     {
         ref var transformFrom = ref from.TryGetComponent<LocalTransform>(out var hasFromTransform);
         ref var transformTo = ref to.TryGetComponent<LocalTransform>(out var hasToTransform);
-        if (hasFromTransform && hasToTransform)
-        {
-            Vector3 direction = transformTo.Position - transformFrom.Position;
-            return direction.Normalized;
-        }
-        return Vector3.Zero;
+        if (!hasFromTransform || !hasToTransform)
+            return Vector3.Zero;
+
+        var direction = transformTo.Position - transformFrom.Position;
+        return direction.Normalized;
     }
 
     /// <summary>
@@ -216,23 +209,23 @@ public static class Transform
     public static void LookAt2D(Entity entity, Vector3 target)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-        {
-            Vector3 direction = target - transform.Position;
-            float angle = MathF.Atan2(direction.Y, direction.X);
+        if (!hasTransform)
+            return;
+
+        var direction = target - transform.Position;
+        var angle = MathF.Atan2(direction.Y, direction.X);
             
-            // Convert to quaternion rotation around Z axis
-            // This is a simplified 2D rotation - for full 3D, use proper quaternion math
-            float halfAngle = angle * 0.5f;
-            transform.Rotation = new Quaternion(
-                0,
-                0,
-                MathF.Sin(halfAngle),
-                MathF.Cos(halfAngle)
-            );
+        // Convert to quaternion rotation around Z axis
+        // This is a simplified 2D rotation - for full 3D, use proper quaternion math
+        var halfAngle = angle * 0.5f;
+        transform.Rotation = new Quaternion(
+            0,
+            0,
+            MathF.Sin(halfAngle),
+            MathF.Cos(halfAngle)
+        );
             
-            entity.SetComponent(transform);
-        }
+        entity.SetComponent(transform);
     }
 
     // ============================================================================
@@ -248,11 +241,11 @@ public static class Transform
     public static void LerpPosition(Entity entity, Vector3 target, float t)
     {
         ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (hasTransform)
-        {
-            transform.Position = Lerp(transform.Position, target, t);
-            entity.SetComponent(transform);
-        }
+        if (!hasTransform)
+            return;
+
+        transform.Position = Lerp(transform.Position, target, t);
+        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -265,7 +258,7 @@ public static class Transform
     public static void SmoothMove(Entity entity, Vector3 target, float smoothTime, float deltaTime)
     {
         if (smoothTime <= 0.0f) smoothTime = 0.0001f;
-        float t = 1.0f - MathF.Exp(-deltaTime / smoothTime);
+        var t = 1.0f - MathF.Exp(-deltaTime / smoothTime);
         LerpPosition(entity, target, t);
     }
 
@@ -278,7 +271,7 @@ public static class Transform
     /// </summary>
     private static Vector3 Lerp(Vector3 a, Vector3 b, float t)
     {
-        t = Math.Clamp(t, 0.0f, 1.0f);
+        t = GMath.Clamp(t, 0.0f, 1.0f);
         return new Vector3(
             a.X + (b.X - a.X) * t,
             a.Y + (b.Y - a.Y) * t,

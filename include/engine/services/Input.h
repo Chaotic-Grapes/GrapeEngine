@@ -82,12 +82,6 @@ public:
     // Get the current mouse Y coordinate
     static double GetMouseY();
 
-    // Get the current window width
-    static int GetWindowWidth() { return m_windowWidth; }
-
-    // Get the current window height
-    static int GetWindowHeight() { return m_windowHeight; }
-
     // Get the current horizontal scroll offset
     static double GetScrollX() { return m_scrollX; }
 
@@ -119,14 +113,11 @@ private:
     static std::unordered_map<int, bool> m_mousePressed; // Mouse buttons pressed this frame
     static std::unordered_map<int, bool> m_mouseUp;      // Mouse buttons released this frame
 
-    // Window and mouse tracking
-    static int m_windowWidth;     // Current window width in pixels
-    static int m_windowHeight;    // Current window height in pixels
+    // Mouse wheel tracking
     static double m_scrollX;      // Horizontal scroll offset from last scroll event
     static double m_scrollY;      // Vertical scroll offset from last scroll event
 
     // GLFW callback functions
-    static void _windowSizeCallback(GLFWwindow* pWin, int width, int height);
     static void _keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod);
     static void _mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod);
     static void _mousePosCallback(GLFWwindow* pWin, double xPos, double yPos);

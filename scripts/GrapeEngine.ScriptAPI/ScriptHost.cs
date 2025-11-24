@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Loader;
 
 // *************** !!!!!!!! IMPORTANT !!!!!!!! *************** //
 //                                                             //
@@ -41,6 +42,10 @@ public static class ScriptHost
     // Store all active script instances
     private static readonly Dictionary<ulong, ScriptBehaviour> m_instances = new();
     private static ulong m_nextHandle = 1;
+    
+    // Custom assembly load context to ensure proper type identity
+    private static AssemblyLoadContext? s_loadContext = null;
+    private static bool s_resolverRegistered = false;
 
     /// <summary>
     /// Create a new script instance.
@@ -92,6 +97,35 @@ public static class ScriptHost
             if (scriptType == null)
             {
                 Logging.Log($"ERROR: Type not found: {typeName}", LogLevel.Error);
+                Logging.Log("Loaded assemblies:", LogLevel.Error);
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Logging.Log($"  - {asm.GetName().Name} ({asm.GetName().Version})", LogLevel.Error);
+                    
+                    // If this looks like a game assembly, list its types
+                    if (!asm.GetName().Name.StartsWith("System") && 
+                        !asm.GetName().Name.StartsWith("Microsoft") &&
+                        !asm.GetName().Name.StartsWith("netstandard") &&
+                        asm.GetName().Name != "GrapeEngine.ScriptAPI")
+                    {
+                        try
+                        {
+                            var types = asm.GetTypes();
+                            Logging.Log($"    Types in {asm.GetName().Name}:", LogLevel.Error);
+                            foreach (var t in types)
+                            {
+                                if (!t.IsNested && t.Namespace != null)
+                                {
+                                    Logging.Log($"      * {t.FullName}", LogLevel.Error);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.Log($"    Could not list types: {ex.Message}", LogLevel.Error);
+                        }
+                    }
+                }
                 return 0;
             }
 
@@ -114,18 +148,57 @@ public static class ScriptHost
 
             if (!isScriptBehaviour)
             {
-                Logging.Log($"ERROR: Type {typeName} does not inherit from ScriptBehaviour", LogLevel.Error);
-                Logging.Log($"  Type's base: {scriptType.BaseType?.FullName ?? "none"}", LogLevel.Error);
+                Logging.Log($"ERROR: Type {typeName} does not inherit from ScriptBehaviour" + Environment.NewLine +
+                            $"  Found in assembly: {scriptType.Assembly.FullName}" + Environment.NewLine +
+                            $"  Type's full name: {scriptType.FullName}" + Environment.NewLine +
+                            $"  Type's namespace: {scriptType.Namespace ?? "none"}" + Environment.NewLine +
+                            $"  Type's name: {scriptType.Name}" + Environment.NewLine +
+                            $"  Type's assembly: {scriptType.Assembly.FullName}" + Environment.NewLine +
+                            $"  Type's module: {scriptType.Module.Name}" + Environment.NewLine +
+                            $"  Type's attributes: {scriptType.Attributes}" + Environment.NewLine +
+                            $"  Is class: {scriptType.IsClass}" + Environment.NewLine +
+                            $"  Is public: {scriptType.IsPublic}" + Environment.NewLine +
+                            $"  Is abstract: {scriptType.IsAbstract}" + Environment.NewLine +
+                            $"  Is sealed: {scriptType.IsSealed}" + Environment.NewLine +
+                            $"  Is generic type: {scriptType.IsGenericType}" + Environment.NewLine +
+                            $"  Is nested: {scriptType.IsNested}" + Environment.NewLine +
+                            $"  Is value type: {scriptType.IsValueType}" + Environment.NewLine +
+                            $"  Is interface: {scriptType.IsInterface}" + Environment.NewLine +
+                            $"  Is enum: {scriptType.IsEnum}" + Environment.NewLine +
+                            $"  Is array: {scriptType.IsArray}" + Environment.NewLine +
+                            $"  Is pointer: {scriptType.IsPointer}" + Environment.NewLine +
+                            $"  Is primitive: {scriptType.IsPrimitive}" + Environment.NewLine +
+                            $"  Type's full hierarchy:", LogLevel.Error);
                 return 0;
             }
 
-            // Create instance
-            var instance = (ScriptBehaviour)Activator.CreateInstance(scriptType)!;
-            instance.EntityId = entityId;
+            // Create instance using reflection to avoid type identity issues
+            var instance = Activator.CreateInstance(scriptType)!;
+            
+            // Set EntityId using reflection (avoids casting issues across assembly contexts)
+            var entityIdProp = scriptType.GetProperty("EntityId", 
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            entityIdProp?.SetValue(instance, entityId);
+
+            // Try to cast to ScriptBehaviour
+            // If this fails due to assembly context issues, we need to use reflection-based wrapper
+            ScriptBehaviour? scriptBehaviour = instance as ScriptBehaviour;
+            
+            if (scriptBehaviour == null)
+            {
+                // Assembly context mismatch - the loaded type's ScriptBehaviour is different from ours
+                Logging.Log($"ERROR: Type identity mismatch for {typeName}" + Environment.NewLine +
+                            $"  Instance type: {instance.GetType().FullName}" + Environment.NewLine +
+                            $"  Instance assembly: {instance.GetType().Assembly.FullName}" + Environment.NewLine +
+                            $"  Expected ScriptBehaviour from: {typeof(ScriptBehaviour).Assembly.FullName}" + Environment.NewLine +
+                            $"  Instance's ScriptBehaviour from: {instance.GetType().BaseType?.Assembly.FullName ?? "unknown"}" + Environment.NewLine +
+                            $"SOLUTION: Ensure EchoesBelow.dll references the same GrapeEngine.ScriptAPI.dll that is currently loaded", LogLevel.Error);
+                return 0;
+            }
 
             // Assign handle and store
             var handle = m_nextHandle++;
-            m_instances[handle] = instance;
+            m_instances[handle] = scriptBehaviour;
 
             Logging.Log($"Script instance created successfully. Handle: {handle}", LogLevel.Info);
 
@@ -133,9 +206,8 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            // Honestly could just log ex.ToString() but whatever
-            Logging.Log($"Error creating script instance: {ex.Message}", LogLevel.Error);
-            Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            Logging.Log($"Error creating script instance: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
 
             Marshal.FreeHGlobal(typeNamePtr); // nearly forgot to free the unmanaged string
 
@@ -191,8 +263,8 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnStart: {ex.Message}", LogLevel.Error);
-            Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            Logging.Log($"ERROR in OnStart: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
 
@@ -213,8 +285,8 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnUpdate: {ex.Message}", LogLevel.Error);
-            Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            Logging.Log($"ERROR in OnUpdate: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
 
@@ -235,8 +307,8 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnFixedUpdate: {ex.Message}", LogLevel.Error);
-            Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            Logging.Log($"ERROR in OnFixedUpdate: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
 
@@ -257,8 +329,8 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnLateUpdate: {ex.Message}", LogLevel.Error);
-            Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            Logging.Log($"ERROR in OnLateUpdate: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
 
@@ -278,8 +350,8 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnEnable: {ex.Message}", LogLevel.Error);
-            Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            Logging.Log($"ERROR in OnEnable: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
 
@@ -299,8 +371,8 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnDisable: {ex.Message}", LogLevel.Error);
-            Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            Logging.Log($"ERROR in OnDisable: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
 
@@ -333,21 +405,46 @@ public static class ScriptHost
 
             Logging.Log($"Loading game assembly: {assemblyPath}", LogLevel.Info);
 
-            // Load the assembly using AssemblyLoadContext to avoid type identity issues
-            // First try to load by name if it's already in the same directory
-            var assemblyName = AssemblyName.GetAssemblyName(assemblyPath);
-            Assembly? assembly = null;
-            
-            try
+            // Register assembly resolver to find ScriptAPI in the same directory
+            if (!s_resolverRegistered)
             {
-                // Try loading by name first (better for resolving dependencies)
-                assembly = Assembly.Load(assemblyName);
+                var assemblyDir = Path.GetDirectoryName(assemblyPath);
+                AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
+                {
+                    Logging.Log($"Resolving assembly: {args.Name}", LogLevel.Info);
+                    
+                    // Parse the assembly name
+                    var requestedName = new AssemblyName(args.Name);
+                    
+                    // CRITICAL: If the game assembly is asking for GrapeEngine.ScriptAPI,
+                    // return the ALREADY LOADED ScriptAPI assembly to ensure type identity
+                    if (requestedName.Name == "GrapeEngine.ScriptAPI")
+                    {
+                        var currentScriptAPI = typeof(ScriptBehaviour).Assembly;
+                        Logging.Log($"Redirecting ScriptAPI reference to already loaded assembly: {currentScriptAPI.FullName}", LogLevel.Info);
+                        return currentScriptAPI;
+                    }
+                    
+                    // Try to find other dependencies in the game assembly directory
+                    if (assemblyDir != null)
+                    {
+                        var dllPath = Path.Combine(assemblyDir, requestedName.Name + ".dll");
+                        if (File.Exists(dllPath))
+                        {
+                            Logging.Log($"Loading dependency from: {dllPath}", LogLevel.Info);
+                            return Assembly.LoadFrom(dllPath);
+                        }
+                    }
+                    
+                    return null;
+                };
+                s_resolverRegistered = true;
             }
-            catch
-            {
-                // If that fails, use LoadFrom
-                assembly = Assembly.LoadFrom(assemblyPath);
-            }
+
+            // The ScriptAPI assembly is already loaded into the current AppDomain by CoreCLR hosting.
+            // Use Assembly.LoadFrom which will find dependencies in the same directory
+            var fullPath = Path.GetFullPath(assemblyPath);
+            var assembly = Assembly.LoadFrom(fullPath);
             
             if (assembly == null)
             {
@@ -357,14 +454,38 @@ public static class ScriptHost
 
             Logging.Log($"Successfully loaded assembly: {assembly.FullName}", LogLevel.Info);
             
+            // Check which ScriptAPI this assembly references
+            var scriptApiRef = assembly.GetReferencedAssemblies()
+                .FirstOrDefault(a => a.Name == "GrapeEngine.ScriptAPI");
+            
+            if (scriptApiRef != null)
+            {
+                Logging.Log($"Game assembly references ScriptAPI version: {scriptApiRef.Version}", LogLevel.Info);
+                Logging.Log($"Currently loaded ScriptAPI version: {typeof(ScriptBehaviour).Assembly.GetName().Version}", LogLevel.Info);
+                
+                if (scriptApiRef.Version != typeof(ScriptBehaviour).Assembly.GetName().Version)
+                {
+                    Logging.Log("WARNING: Version mismatch! Game assembly may not work correctly.", LogLevel.Warning);
+                    Logging.Log("SOLUTION: Rebuild the game assembly (EchoesBelow.dll) to reference the current ScriptAPI", LogLevel.Warning);
+                }
+            }
+            
             // Log all types found (for debugging)
             var types = assembly.GetTypes();
             Logging.Log($"Found {types.Length} types in assembly", LogLevel.Info);
             foreach (var type in types)
             {
-                if (type.IsSubclassOf(typeof(ScriptBehaviour)))
+                // Check base type with name comparison to avoid casting issues
+                var baseType = type.BaseType;
+                while (baseType != null)
                 {
-                    Logging.Log($"\t- Script type found: {type.FullName}", LogLevel.Info);
+                    if (baseType.Name == "ScriptBehaviour")
+                    {
+                        Logging.Log($"\t- Script type found: {type.FullName}", LogLevel.Info);
+                        Logging.Log($"\t  Base type assembly: {baseType.Assembly.FullName}", LogLevel.Debug);
+                        break;
+                    }
+                    baseType = baseType.BaseType;
                 }
             }
 
@@ -372,8 +493,8 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"Error loading game assembly: {ex.Message}", LogLevel.Error);
-            Logging.Log($"Stack trace: {ex.StackTrace}", LogLevel.Error);
+            Logging.Log($"Error loading game assembly: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
             return 0;
         }
     }

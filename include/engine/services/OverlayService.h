@@ -30,7 +30,7 @@
 namespace Scenes { class SceneManager; class Scene; }
 
 #include "services/DebugUI.h"
-#include "../editor/LevelEditor.h"
+#include "LevelEditor.h"
 
 namespace Services {
     /**

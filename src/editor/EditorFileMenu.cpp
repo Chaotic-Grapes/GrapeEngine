@@ -21,7 +21,9 @@ centralized and consistent with the currently active scene.
 #include <commdlg.h>
 #endif
 
-#include "../editor/EditorFileMenu.h"
+#include "EditorFileMenu.h"
+#include "HierarchyPanel.h"
+#include "EditorStyle.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -32,16 +34,14 @@ centralized and consistent with the currently active scene.
 
 #include "core/Logger.h"
 #include "core/Application.h"
+#include "core/ProjectPaths.h"
 #include "scene/SceneManager.h"
 #include "scene/Scene.h"
 #include "services/WindowManager.h"
 #include "services/Input.h"
 #include <filesystem>
 #include <algorithm>
-
-// Default directory where scenes are stored on disk
-// The Windows file dialogs will open here first
-static constexpr const char* SCENE_DIR = "assets/scenes/";
+#include "serialization/ConfigurationSerializer.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -65,15 +65,95 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
     // Apply the new scale globally so all ImGui text and widgets follow it
     ImGui::GetIO().FontGlobalScale = uiScale;
 
+    // Flag to open popup when exiting with unsaved changes (this some bug with ImGui or something)
+    // Hack
+    static bool openExitPopup = false;
+
     // File menu (New, Open, Save As, Exit)
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New Scene", "Ctrl+N")) { CreateNewScene(); }
         if (ImGui::MenuItem("Open Scene", "Ctrl+O")) { OpenSceneDialog(); }
-        if (ImGui::MenuItem("Save Scene", "Ctrl+S")) { SaveScene(); }
-        if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S")) { SaveSceneAsDialog(); }
+
+        // Determine whether there is an active scene to enable/disable save actions
+        bool hasActiveScene = false;
+        if (m_sceneManager) {
+            size_t idx = m_sceneManager->GetActiveIndex();
+            hasActiveScene = (idx != static_cast<size_t>(-1));
+        }
+
+        // Show "Save Scene*" in BOLD when there are unsaved changes
+        if (m_hasUnsavedChanges && m_boldFont) {
+            ImGui::PushFont(m_boldFont);
+            bool clicked = ImGui::MenuItem("Save Scene*", "Ctrl+S", false, hasActiveScene);
+            ImGui::PopFont();
+            if (clicked) SaveScene();
+        }
+        else {
+            // Normal font when no unsaved changes
+            if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, hasActiveScene)) { SaveScene(); }
+        }
+
+        if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S", false, hasActiveScene)) { SaveSceneAsDialog(); }
         ImGui::Separator();
-        if (ImGui::MenuItem("Exit")) { if (Engine::CORE) { Engine::CORE->Close(); } }
+        // Make the Exit menu item visually distinct (danger background)
+        ImGui::PushStyleColor(ImGuiCol_Header, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, EditorStyle::DangerButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+        bool exitClicked = ImGui::MenuItem("Exit");
+        ImGui::PopStyleColor(4);
+        if (exitClicked) {
+            // If there are unsaved changes prompt the user to save before exiting
+            if (m_hasUnsavedChanges) {
+                openExitPopup = true;
+            }
+            else {
+                _closeEditor();
+            }
+        }
         ImGui::EndMenu();
+    }
+
+    // Trigger the exit popup if needed
+    // Hack
+    if (openExitPopup) {
+        ImGui::OpenPopup("Unsaved Changes##ExitPopup");
+        openExitPopup = false;
+    }
+
+    // If user attempted to exit while there are unsaved changes show a modal
+    if (ImGui::BeginPopupModal("Unsaved Changes##ExitPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("The current scene has unsaved changes. Do you want to save before exiting?");
+        ImGui::Separator();
+
+        // Yes: Save then Exit
+        if (ImGui::Button("Yes", ImVec2(80, 0))) {
+            SaveScene();
+            if (Engine::CORE) Engine::CORE->Close();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        // No: Exit without saving
+        // No: Exit without saving (styled as a danger button)
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
+        if (ImGui::Button("No", ImVec2(80, 0))) {
+            ImGui::CloseCurrentPopup();
+            _closeEditor();
+        }
+        ImGui::PopStyleColor(3);
+
+        ImGui::SameLine();
+
+        // Cancel: Do nothing and close the popup
+        if (ImGui::Button("Cancel", ImVec2(80, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 
     // View menu (UI scale display + zoom controls)
@@ -110,6 +190,7 @@ void EditorFileMenu::CreateNewScene() {
     // Switch the editor to use this new scene as the active one
     m_sceneManager->SetActive(idx);
     m_currentScenePath.clear();
+    m_hasUnsavedChanges = false;
     LOG_INFO("Created new scene");
 }
 
@@ -133,7 +214,8 @@ void EditorFileMenu::OpenSceneDialog() {
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = SCENE_DIR;
+    // TODO: Remove when editor is separated - use project-relative paths
+    ofn.lpstrInitialDir = Engine::ProjectPaths::GetProjectRoot().c_str();
 
     // OFN_PATHMUSTEXIST: ensures the folder exists
     // OFN_FILEMUSTEXIST: ensures the file exists before returning
@@ -168,7 +250,8 @@ void EditorFileMenu::SaveSceneAsDialog() {
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = SCENE_DIR;
+    // TODO: Remove when editor is separated - use project-relative paths
+    ofn.lpstrInitialDir = Engine::ProjectPaths::GetProjectRoot().c_str();
     ofn.lpstrDefExt = "scn";
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
 
@@ -185,6 +268,7 @@ void EditorFileMenu::SaveSceneAsDialog() {
         // Actually write the active scene to this path
         _saveSceneToFile(savePath);
         m_currentScenePath = savePath;
+        m_hasUnsavedChanges = false;
     }
 #endif
 }
@@ -194,6 +278,7 @@ void EditorFileMenu::SaveScene() {
     if (!m_sceneManager) return;
     if (m_currentScenePath.empty()) { SaveSceneAsDialog(); return; }
     _saveSceneToFile(m_currentScenePath);
+    m_hasUnsavedChanges = false;
 #endif
 }
 
@@ -211,7 +296,14 @@ void EditorFileMenu::HandleShortcuts(float& uiScale) {
         if (Input::IsKeyPressed(KEY_MINUS)) uiScale -= 0.10f;
         if (Input::IsKeyPressed(KEY_N)) CreateNewScene();
         if (Input::IsKeyPressed(KEY_O)) OpenSceneDialog();
-        if (Input::IsKeyPressed(KEY_S)) {
+        // Only allow save shortcuts when there is an active scene
+        bool hasActiveScene = false;
+        if (m_sceneManager) {
+            size_t idx = m_sceneManager->GetActiveIndex();
+            hasActiveScene = (idx != static_cast<size_t>(-1));
+        }
+
+        if (Input::IsKeyPressed(KEY_S) && hasActiveScene) {
             if (shiftDown) SaveSceneAsDialog();
             else SaveScene();
         }
@@ -227,7 +319,27 @@ void EditorFileMenu::_openScene(const std::string& path) {
     // Again we protect against a missing SceneManager pointer
     if (!m_sceneManager) return;
 
-    // Allocate a new empty Scene that will receive the loaded data
+    size_t activeIdx = m_sceneManager->GetActiveIndex();
+    const bool hasActive = (activeIdx != static_cast<size_t>(-1));
+
+    // If opening the SAME scene, reload into the current slot to avoid world rebinding issues
+    if (hasActive && (m_currentScenePath == path)) {
+        std::vector<uint32_t> entityOrder;
+        if (m_sceneManager->LoadScene(activeIdx, path, &entityOrder)) {
+            m_sceneManager->SetActiveImmediate(activeIdx);
+            if (m_hierarchyPanel) {
+                m_hierarchyPanel->ClearUIState();
+                m_hierarchyPanel->SetEntityOrder(entityOrder);
+            }
+            m_hasUnsavedChanges = false;
+            LOG_INFO("Reloaded active scene: " << path);
+        }
+        else {
+            LOG_ERROR("Failed to reload scene: " << path);
+        }
+        return;
+    }
+
     auto newScene = std::make_unique<Scenes::Scene>();
 
     // Register the scene with the SceneManager
@@ -235,9 +347,15 @@ void EditorFileMenu::_openScene(const std::string& path) {
     size_t idx = m_sceneManager->AddScene(newScene.release());
 
     // Ask the SceneManager to read the file and populate the scene
-    if (m_sceneManager->LoadScene(idx, path)) {
+    std::vector<uint32_t> entityOrder;
+    if (m_sceneManager->LoadScene(idx, path, &entityOrder)) {
         m_sceneManager->SetActive(idx);
+        if (m_hierarchyPanel) {
+            m_hierarchyPanel->ClearUIState();
+            m_hierarchyPanel->SetEntityOrder(entityOrder);
+        }
         m_currentScenePath = path;
+        m_hasUnsavedChanges = false;
         LOG_INFO("Opened scene: " << path);
     }
     else {
@@ -250,21 +368,47 @@ void EditorFileMenu::_openScene(const std::string& path) {
 void EditorFileMenu::_saveSceneToFile(const std::string& path) {
     if (!m_sceneManager) return;
 
-    // Query which scene is currently active
     size_t activeIdx = m_sceneManager->GetActiveIndex();
 
-    // Some engines use -1 to mean "no active scene"
-    // We compare against that sentinel after casting
     if (activeIdx == static_cast<size_t>(-1)) {
         LOG_ERROR("No active scene to save");
         return;
     }
 
-    // Ask the SceneManager to serialize and write the scene to disk
-    if (m_sceneManager->SaveScene(activeIdx, path)) {
-        LOG_INFO("Saved scene: " << path);
+    // Rebuild entity order from hierarchy panel to preserve visual order
+    if (m_hierarchyPanel) {
+        m_hierarchyPanel->RebuildEntityOrder();
+    }
+
+    // Get entity order for serialization
+    const std::vector<uint32_t>* entityOrder = nullptr;
+    if (m_hierarchyPanel) {
+        entityOrder = &m_hierarchyPanel->GetEntityOrder();
+    }
+
+    // Save scene (symlink automatically keeps source in sync)
+    LOG_INFO("Saving scene: " << path);
+    if (!m_sceneManager->SaveScene(activeIdx, path, "Scene", "1.0", entityOrder)) {
+        LOG_ERROR("Failed to save scene: " << path);
+        return;
     }
     else {
-        LOG_ERROR("Failed to save scene: " << path);
+        LOG_INFO("Successfully saved scene: " << path);
+    }
+}
+
+void EditorFileMenu::_closeEditor() {
+    if (Engine::CORE) { 
+        // Save configs before exiting
+        auto settings = Engine::CORE->GetEditorSettings();
+
+        settings.WindowSettings.Width = WindowManager::GetMainWindow()->GetWidth();
+        settings.WindowSettings.Height = WindowManager::GetMainWindow()->GetHeight();
+        settings.WindowSettings.Maximized = WindowManager::GetMainWindow()->IsMaximized();
+        settings.WindowSettings.VSync = WindowManager::GetMainWindow()->IsVSync();
+        
+        Serialization::ConfigurationSerializer::SaveConfig("config.json", settings);
+
+        Engine::CORE->Close(); 
     }
 }

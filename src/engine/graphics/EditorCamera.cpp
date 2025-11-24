@@ -5,9 +5,9 @@
 \par    choi.m@digipen.edu
 \date   31st October 2025
 \brief
-Implements a simplified EditorCamera for panning and zooming within the
+Implements a 3D EditorCamera for panning and zooming within the
 editor viewport. Left-click drag pans the view, right-click drag orbits,
-and scroll input zooms in/out.
+WASD keys move the camera, and scroll input zooms in/out.
 */
 /* End Header *******************************************************************/
 
@@ -28,6 +28,9 @@ and scroll input zooms in/out.
 // Standard Library
 #include <iostream>
 
+// Application
+#include "core/Application.h"
+
 namespace {
     // Camera initialization constants
     constexpr float kDefaultWorldViewHeight = 9.0f;
@@ -42,6 +45,7 @@ namespace {
 
     // Panning constants
     constexpr float kPanningMinimumDelta = 0.001f;
+    constexpr float kKeyboardMoveSpeed = 5.0f; // World units per second
 
     // Zoom constants
     constexpr float kZoomFactor = 1.1f;
@@ -77,7 +81,7 @@ namespace Engine {
         m_world = &world;
 
         m_transform = &world.Add<ECS::Components::LocalTransform>(m_cameraEntity);
-        m_camera = &world.Add<ECS::Components::Camera3D>(m_cameraEntity);
+        m_camera = &world.Add<ECS::Components::CameraEditor3D>(m_cameraEntity);
 
         // Ensure the editor camera shows up with a clear name in the hierarchy
         auto& nameComp = world.Add<ECS::Components::Name>(m_cameraEntity);
@@ -87,8 +91,8 @@ namespace Engine {
         m_camera->UsePerspective = false;
 
         auto* window = WindowManager::GetMainWindow();
-        const float screenWidth = static_cast<float>(window->Width());
-        const float screenHeight = static_cast<float>(window->Height());
+        const float screenWidth = static_cast<float>(window->GetWidth());
+        const float screenHeight = static_cast<float>(window->GetHeight());
 
         // Set orthographic size in world units
         m_camera->OrthoSize = kDefaultWorldViewHeight;
@@ -109,17 +113,29 @@ namespace Engine {
             << "  World viewport: " << kDefaultWorldViewHeight << " units tall\n";
 
         // Subscribe to window resize events
-        m_windowResizedSub = Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
-            [this](const Messaging::WindowResized& msg)
-            {
-                OnWindowResize(msg.Width, msg.Height);
-            });
+        if (!CORE->IsInEditorMode())
+            m_windowResizedSub = Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
+                [this](const Messaging::WindowResized& msg)
+                {
+                    OnWindowResize(msg.Width, msg.Height);
+                });
+        
+        // Subscribe to viewport resize events (for aspect ratio updates)
+        else
+            m_viewportResizedSub = Messaging::MessageSystem::Subscribe<Messaging::ViewportResized>(
+                [this](const Messaging::ViewportResized& msg)
+                {
+                    SetViewportSize(msg.Width, msg.Height);
+                });
     }
 
     EditorCamera::~EditorCamera() {
         // Unsubscribe from window resize to prevent callbacks on a destroyed object
         if (m_windowResizedSub.IsValid()) {
             Messaging::MessageSystem::Unsubscribe<Messaging::WindowResized>(m_windowResizedSub);
+        }
+        if (m_viewportResizedSub.IsValid()) {
+            Messaging::MessageSystem::Unsubscribe<Messaging::ViewportResized>(m_viewportResizedSub);
         }
 
         // Proactively destroy the internal camera entity from its world to avoid duplicates
@@ -143,7 +159,7 @@ namespace Engine {
         m_world = &world;
         m_cameraEntity = world.Create();
         m_transform = &world.Add<ECS::Components::LocalTransform>(m_cameraEntity);
-        m_camera = &world.Add<ECS::Components::Camera3D>(m_cameraEntity);
+        m_camera = &world.Add<ECS::Components::CameraEditor3D>(m_cameraEntity);
 
         auto& nameComp = world.Add<ECS::Components::Name>(m_cameraEntity);
         std::strncpy(nameComp.Value, "EditorCamera", sizeof(nameComp.Value) - 1);
@@ -152,8 +168,8 @@ namespace Engine {
         m_camera->UsePerspective = false;
 
         auto* window = WindowManager::GetMainWindow();
-        const float screenWidth = static_cast<float>(window->Width());
-        const float screenHeight = static_cast<float>(window->Height());
+        const float screenWidth = static_cast<float>(window->GetWidth());
+        const float screenHeight = static_cast<float>(window->GetHeight());
 
         // Preserve current ortho size target across binds
         m_camera->OrthoSize = m_targetOrthoSize;
@@ -177,6 +193,15 @@ namespace Engine {
             return;
         }
         m_camera->AspectRatio = static_cast<float>(newWidth) / static_cast<float>(newHeight);
+    }
+
+    void EditorCamera::SetViewportSize(float width, float height) {
+        if (!m_camera) return;
+        if (height <= 0.0f) {
+            // Avoid division by zero; keep current aspect ratio
+            return;
+        }
+        m_camera->AspectRatio = width / height;
     }
 
     void EditorCamera::Update(float dt) {
@@ -215,7 +240,32 @@ namespace Engine {
         }
 
         // ------------------------------
-        // PANNING (LMB drag)
+        // WASD KEYBOARD MOVEMENT (XY plane only)
+        // ------------------------------
+        glm::vec2 moveDirection(0.0f);
+
+        if (Input::IsKeyDown(KEY_W)) moveDirection.y += 1.0f;  // Move up
+        if (Input::IsKeyDown(KEY_S)) moveDirection.y -= 1.0f;  // Move down
+        if (Input::IsKeyDown(KEY_A)) moveDirection.x -= 1.0f;  // Move left
+        if (Input::IsKeyDown(KEY_D)) moveDirection.x += 1.0f;  // Move right
+
+        if (glm::length(moveDirection) > 0.0f) {
+            // Normalize to ensure diagonal movement isn't faster...
+            moveDirection = glm::normalize(moveDirection);
+
+            // Scale movement by current ortho size for zoom-relative speed
+            const float scaledSpeed = kKeyboardMoveSpeed * (m_camera->OrthoSize / kDefaultWorldViewHeight);
+            const glm::vec2 movement = moveDirection * scaledSpeed * dt;
+
+            // Apply movement to both target and camera position
+            m_target.x += movement.x;
+            m_target.y += movement.y;
+            m_cameraPosition.x += movement.x;
+            m_cameraPosition.y += movement.y;
+        }
+
+        // ------------------------------
+        // PANNING (MMB drag)
         // ------------------------------
         if (Input::IsMouseDown(MOUSE_MIDDLE)) {
             if (!m_panning) {
@@ -243,8 +293,8 @@ namespace Engine {
             const float worldWidth = worldHeight * m_camera->AspectRatio;
 
             // Screen dimensions in pixels
-            const float screenHeight = static_cast<float>(window->Height());
-            const float screenWidth = static_cast<float>(window->Width());
+            const float screenHeight = static_cast<float>(window->GetHeight());
+            const float screenWidth = static_cast<float>(window->GetWidth());
 
             // Convert pixel delta to world delta
             const float worldDeltaX = -(delta.x / screenWidth) * worldWidth;
@@ -425,8 +475,22 @@ namespace Engine {
     }
 
     void EditorCamera::Focus(const glm::vec3& target) {
-        m_transform->Position.X = target.x;
-        m_transform->Position.Y = target.y;
+        // Update the orbit center to the new target
+        m_target = target;
+
+        // Recalculate camera position based on current orbit parameters
+        // This maintains the current view angle and distance
+        const float cp = cosf(m_pitch), sp = sinf(m_pitch);
+        const float sy = sinf(m_yaw), cy = cosf(m_yaw);
+
+        // Calculate orbit direction
+        const glm::vec3 dir(cp * sy, sp, -cp * cy);
+
+        // Position camera at distance from new target
+        m_cameraPosition = m_target - dir * m_distance;
+
+        // Update the ECS transform to match
+        UpdateTransform();
     }
 
 } // namespace Engine

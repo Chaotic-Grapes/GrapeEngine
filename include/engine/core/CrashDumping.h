@@ -8,7 +8,7 @@
 #include <Windows.h>
 #endif
 
-namespace Grape_Engine {
+namespace Engine {
     using std::string;
     using std::ostringstream;
     using std::function;

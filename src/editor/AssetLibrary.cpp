@@ -27,11 +27,13 @@ Provides:
 #include <commdlg.h> 
 #endif
 
-#include "../editor/AssetLibrary.h"
-#include "../editor/InspectorPanel.h"
+#include "AssetLibrary.h"
+#include "InspectorPanel.h"
 #include "core/Logger.h"
+#include "core/ProjectPaths.h"
 #include <vector>
 #include <services/ResourceManager.h>
+#include "EditorStyle.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -66,7 +68,7 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
     // Display each part as clickable button with separators
     std::string accumulatedPath;
     for (size_t i = 0; i < pathParts.size(); i++) {
-        // Build accumulated path up to this part (e.g. "assets", "assets\Audio", etc.)
+        // Build accumulated path up to this part (e.g. "Assets", "Assets\Audio", etc.)
         if (i > 0) accumulatedPath += "\\";
         accumulatedPath += pathParts[i].string();
 
@@ -88,10 +90,10 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
 
             // Style overrides: make SmallButton look like a link
             // Text: blue; Button: fully transparent; Hover/Active: subtle tinted backgrounds
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.4f, 0.8f, 0.3f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.4f, 0.8f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Accent);
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::AccentHover, 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::AccentActive, 0.5f));
 
             // When clicked, navigate to that folder level
             if (ImGui::SmallButton(pathParts[i].string().c_str())) {
@@ -119,7 +121,7 @@ void AssetLibrary::_displayFolder(const std::filesystem::path& folderPath, std::
 
     // Check if path exists or if path exists but it's a file, not a folder
     if (!std::filesystem::exists(folderPath) || !std::filesystem::is_directory(folderPath)) {
-        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Folder not found");
+        ImGui::TextColored(EditorStyle::DangerText, "Folder not found");
         // Pop the font we pushed above so ImGui stays balanced (files and folders later use icons)
         ImGui::PopFont();
         return;
@@ -217,7 +219,7 @@ void AssetLibrary::_displaySelectedFileInfo(const std::string& selectedAsset) {
 
     // Check if file/folder still exists
     if (!std::filesystem::exists(selectedPath)) {
-        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Selected file no longer exists");
+        ImGui::TextColored(EditorStyle::DangerText, "Selected file no longer exists");
         return;
     }
 
@@ -263,7 +265,7 @@ void AssetLibrary::_displaySelectedFileInfo(const std::string& selectedAsset) {
             }
         }
         catch (const std::exception& e) {
-            ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "Could not get file size");
+            ImGui::TextColored(EditorStyle::WarningText, "Could not get file size");
             LOG_ERROR("Failed to get file size: " << e.what());
         }
     }
@@ -308,9 +310,11 @@ void AssetLibrary::_importAsset(const std::string& currentPath, std::string& sel
         // Where to copy it: current folder + just the filename (e.g. "assets/player.png")
         std::filesystem::path destPathBuild = std::filesystem::path(currentPath) / sourcePath.filename();
 
-        // Check if path contains "assets"
-        std::string sourceAssetsPath = currentPath;
-        if (sourceAssetsPath.find("assets") != std::string::npos) {
+        // Only operate when inside the project's Assets folder
+        std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();
+        auto absCur = std::filesystem::absolute(currentPath).string();
+        auto absAssets = std::filesystem::absolute(assetsRoot).string();
+        if (absCur.find(absAssets) != std::string::npos) {
             // Use helper function to copy to both locations
             if (_copyFileToBothLocations(sourcePath, destPathBuild, true)) {
                 LOG_INFO("Successfully imported to both locations: " << sourcePath.filename().string());
@@ -396,15 +400,17 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
             return;
         }
 
-        // Check if path contains "assets"
-        std::string sourceAssetsPath = selectedAsset;
-        if (sourceAssetsPath.find("assets") != std::string::npos) {
-            // Use helper function to copy to both locations
-            if (_copyFileToBothLocations(sourcePath, destPathBuild, false)) {
-                // Hot reload: force ResourceManager to reload the texture
-                // Basically update assets while the program is running without restarting it
-                RM.UnloadAsset(selectedAsset);   // Remove old cached version
-                RM.Get<Texture>(selectedAsset);  // Load new version into cache
+    // Only operate when inside the project's Assets folder
+    std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();
+    auto absSel = std::filesystem::absolute(selectedAsset).string();
+    auto absAssets = std::filesystem::absolute(assetsRoot).string();
+    if (absSel.find(absAssets) != std::string::npos) {
+        // Use helper function to copy to both locations
+        if (_copyFileToBothLocations(sourcePath, destPathBuild, false)) {
+            // Hot reload: force ResourceManager to reload the texture
+            // Basically update assets while the program is running without restarting it
+            RM.UnloadAsset(selectedAsset);   // Remove old cached version
+            RM.Get<Texture>(selectedAsset);  // Load new version into cache
 
                 LOG_INFO("Successfully replaced asset in both locations: " << destPathBuild.filename().string());
                 statusMessage = "File replaced: " + destPathBuild.filename().string();
@@ -435,9 +441,11 @@ void AssetLibrary::_handleFileDrop(const std::string& sourcePathStr, const std::
     // Where to copy it: current folder + just the filename
     std::filesystem::path destPathBuild = std::filesystem::path(currentPath) / sourcePath.filename();
 
-    // Check if path contains "assets"
-    std::string sourceAssetsPath = currentPath;
-    if (sourceAssetsPath.find("assets") != std::string::npos) {
+    // Only operate when inside the project's Assets folder
+    std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();
+    auto absCur = std::filesystem::absolute(currentPath).string();
+    auto absAssets = std::filesystem::absolute(assetsRoot).string();
+    if (absCur.find(absAssets) != std::string::npos) {
         // Use helper function to copy to both locations
         if (_copyFileToBothLocations(sourcePath, destPathBuild, true)) {
             LOG_INFO("Successfully imported dropped file to: " << currentPath);
@@ -476,9 +484,11 @@ void AssetLibrary::_deleteSelectedAsset(std::string& selectedAsset, std::string&
     }
     bool isFolder = std::filesystem::is_directory(selectedPath);
 
-    // Check if path is in assets folder before attempting deletion
-    std::string sourceAssetsPath = selectedAsset;
-    if (sourceAssetsPath.find("assets") != std::string::npos) {
+    // Only operate when inside the project's Assets folder
+    std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();
+    auto absSel = std::filesystem::absolute(selectedAsset).string();
+    auto absAssets = std::filesystem::absolute(assetsRoot).string();
+    if (absSel.find(absAssets) != std::string::npos) {
         // Use helper function to delete from both locations
         if (_deleteFromBothLocations(selectedPath, isFolder)) {
             LOG_INFO("Deleted: " << selectedPath.filename().string());
@@ -514,9 +524,11 @@ bool AssetLibrary::_copyFileToBothLocations(const std::filesystem::path& sourceP
         std::filesystem::copy_file(sourcePath, destBuildPath,
             std::filesystem::copy_options::overwrite_existing);
 
-        // Construct source path (../assets/...)
-        std::filesystem::path relativePath = std::filesystem::relative(destBuildPath, "assets");
-        std::filesystem::path destSourcePath = std::filesystem::path("..") / "assets" / relativePath;
+        // Construct project assets path using ProjectPaths
+        std::filesystem::path assetsRoot = std::filesystem::absolute(Engine::ProjectPaths::GetAssetsPath());
+        std::filesystem::path absoluteDest = std::filesystem::absolute(destBuildPath);
+        std::filesystem::path relativePath = std::filesystem::relative(absoluteDest, assetsRoot);
+        std::filesystem::path destSourcePath = assetsRoot / relativePath;
 
         // Ensure parent directories for the source assets exist if needed
         if (createDirs) {
@@ -524,7 +536,8 @@ bool AssetLibrary::_copyFileToBothLocations(const std::filesystem::path& sourceP
         }
 
         // Second copy: write the file into ../assets (source): only if parent exists or we're creating dirs
-        if (createDirs || std::filesystem::exists(destSourcePath.parent_path())) {
+        if (!std::filesystem::equivalent(destSourcePath, destBuildPath) &&
+            (createDirs || std::filesystem::exists(destSourcePath.parent_path()))) {
             // Allow replacing a file with the same name
             std::filesystem::copy_file(sourcePath, destSourcePath,
             std::filesystem::copy_options::overwrite_existing);
@@ -552,12 +565,14 @@ bool AssetLibrary::_deleteFromBothLocations(const std::filesystem::path& pathToD
             std::filesystem::remove(pathToDelete);
         }
 
-        // Construct source path (../assets/...)
-        std::filesystem::path relativePath = std::filesystem::relative(pathToDelete, "assets");
-        std::filesystem::path sourcePathToDelete = std::filesystem::path("..") / "assets" / relativePath;
+        // Construct project assets path using ProjectPaths
+        std::filesystem::path assetsRoot = std::filesystem::absolute(Engine::ProjectPaths::GetAssetsPath());
+        std::filesystem::path absolutePath = std::filesystem::absolute(pathToDelete);
+        std::filesystem::path relativePath = std::filesystem::relative(absolutePath, assetsRoot);
+        std::filesystem::path sourcePathToDelete = assetsRoot / relativePath;
 
         // Delete from ../assets (source) if it exists
-        if (std::filesystem::exists(sourcePathToDelete)) {
+        if (!std::filesystem::equivalent(sourcePathToDelete, pathToDelete) && std::filesystem::exists(sourcePathToDelete)) {
             // Same logic
             if (isFolder) {
                 std::filesystem::remove_all(sourcePathToDelete);

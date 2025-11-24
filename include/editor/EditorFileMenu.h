@@ -25,6 +25,7 @@ active scene.
 
 // Forward declaration so we don't need the full SceneManager here
 namespace Scenes { class SceneManager; }
+class HierarchyPanel;
 
 // Handles File menu UI and scene file operations
 class EditorFileMenu {
@@ -35,6 +36,17 @@ public:
 
     // Connects the File menu to the SceneManager so it can create, load and save scenes
     void Initialize(Scenes::SceneManager* sceneManager);
+    
+    // Set fonts for rendering bold asterisk
+    void SetFonts(ImFont* mainFont, ImFont* boldFont) {
+        m_mainFont = mainFont;
+        m_boldFont = boldFont;
+    }
+
+    // Set hierarchy panel for entity order management during save/load
+    void SetHierarchyPanel(HierarchyPanel* hierarchyPanel) {
+        m_hierarchyPanel = hierarchyPanel;
+    }
 
     // -------------------------------------------------------------------------
     // Rendering
@@ -55,8 +67,16 @@ public:
 
     // Shows a Save As dialog and writes the current scene to disk
     void SaveSceneAsDialog();
+
     // Saves to current scene path if known; otherwise falls back to Save As
     void SaveScene();
+
+    // Mark the scene as having unsaved changes (only if it was loaded from a file)
+    void MarkSceneDirty() {
+        if (!m_currentScenePath.empty()) {
+            m_hasUnsavedChanges = true;
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Keyboard Shortcuts
@@ -76,14 +96,23 @@ private:
     // Serializes and writes the current scene to the given file path
     void _saveSceneToFile(const std::string& path);
 
+    // Handles closing the editor, saving settings as needed
+    void _closeEditor();
+
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
 
     // Scene manager used to create, load, and save scenes
     Scenes::SceneManager* m_sceneManager = nullptr;
+    // Hierarchy panel for entity order preservation
+    HierarchyPanel* m_hierarchyPanel = nullptr;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
+    // Track whether current scene has unsaved changes
+    bool m_hasUnsavedChanges = false;
+    ImFont* m_mainFont = nullptr;
+    ImFont* m_boldFont = nullptr;
 
 };
 
