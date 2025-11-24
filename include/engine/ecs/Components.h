@@ -530,6 +530,20 @@ namespace ECS {
             bool Spatial3D = true;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
+
+        struct UIClickable {
+        public:
+
+            //callback ID for action that is triggered on click
+            uint32_t ClickActionID = 0;
+
+            //useable trackers for UI 
+            bool Enabled = true;
+            bool IsHovered = false;
+            bool WasClicked = false;
+
+        };
+        static_assert(std::is_trivially_copyable_v<UIClickable>, "UIClickable must be trivially copyable");
     }
 }
 
