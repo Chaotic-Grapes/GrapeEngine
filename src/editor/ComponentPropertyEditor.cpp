@@ -212,7 +212,7 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     EditorUI::RenderVector3DRow("Local Position", data["Position"], "X", "Y", "Z", 1.0f);
 
     // Draw rotation as a quaternion with X Y Z W components
-    EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
+    // EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
 
     // Draw scale as a 3D vector with X Y Z fields
     // Smaller dragSpeed so scaling changes are more precise
