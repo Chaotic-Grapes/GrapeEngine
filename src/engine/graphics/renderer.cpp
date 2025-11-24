@@ -49,10 +49,7 @@ void Renderer::ensureCapacity(size_t vNeeded, size_t iNeeded) {
         "Renderer: exceeded batch capacity. Did you forget to flush?");
 }
 
-void Renderer::clearTextureSlots() {
-    albedoTextureSlots.clear();
-    emissiveTextureSlots.clear();
-}
+void Renderer::clearTextureSlots() { textureSlots.clear(); }
 
 void Renderer::flush() {
     flushCountThisFrame++;
@@ -72,69 +69,39 @@ void Renderer::flush() {
 int Renderer::getOrAssignTextureSlot(GLuint textureId, bool& flushed) {
     flushed = false;
 
-    // Check if texture is already bound
-    for (int i = 0; i < (int)albedoTextureSlots.size(); ++i) {
-        if (albedoTextureSlots[i] == textureId) {
-            return i;
-        }
-    }
+    for (int i = 0; i < (int)textureSlots.size(); ++i)
+        if (textureSlots[i] == textureId) return i;
 
-    // Check if we have room for a new texture
-    if ((int)albedoTextureSlots.size() >= MaxAlbedoTextureSlots) {
+    if ((int)textureSlots.size() >= MaxTextureSlots) {
         flushed = true;
-        return -1; // Signal to caller: need to flush before retry
+        return -1; // signal to caller: need to flush before retry (Magic number; change to enum)
     }
 
-    // Add new texture to available slot
-    albedoTextureSlots.push_back(textureId);
-    return (int)albedoTextureSlots.size() - 1;
-}
-
-int Renderer::getOrAssignEmissiveTextureSlot(GLuint textureId, bool& flushed) {
-    flushed = false;
-
-    // Check if texture is already bound
-    for (int i = 0; i < (int)emissiveTextureSlots.size(); ++i) {
-        if (emissiveTextureSlots[i] == textureId) {
-            return i;
-        }
-    }
-
-    // Check if we have room for a new texture
-    if ((int)emissiveTextureSlots.size() >= MaxEmissiveTextureSlots) {
-        flushed = true;
-        return -1; // Signal to caller: need to flush before retry
-    }
-
-    // Add new texture to available slot
-    emissiveTextureSlots.push_back(textureId);
-    return (int)emissiveTextureSlots.size() - 1;
+    textureSlots.push_back(textureId);
+    return (int)textureSlots.size() - 1;
 }
 
 void Renderer::bindTextureSlots() const {
-    // Bind albedo textures to slots 0-23
-    for (int i = 0; i < (int)albedoTextureSlots.size(); ++i) {
+    for (int i = 0; i < (int)textureSlots.size(); ++i) {
         glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, albedoTextureSlots[i]);
-    }
-
-    // Bind emissive textures to slots 24-31
-    for (int i = 0; i < (int)emissiveTextureSlots.size(); ++i) {
-        glActiveTexture(GL_TEXTURE24 + i);  // Start at slot 24
-        glBindTexture(GL_TEXTURE_2D, emissiveTextureSlots[i]);
+        glBindTexture(GL_TEXTURE_2D, textureSlots[i]);
     }
 }
 
 Renderer::Renderer(size_t maxQuads) {
     vboCapacity = maxQuads * 4;
     eboCapacity = maxQuads * 6;
+
     cpuBuffer.reserve(vboCapacity);
     cpuIndices.reserve(eboCapacity);
+
     glCreateVertexArrays(1, &vao);
     glCreateBuffers(1, &vbo);
     glCreateBuffers(1, &ebo);
+
     glNamedBufferData(vbo, vboCapacity * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
     glNamedBufferData(ebo, eboCapacity * sizeof(uint32_t), nullptr, GL_DYNAMIC_DRAW);
+
     glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
     glVertexArrayElementBuffer(vao, ebo);
 
@@ -159,16 +126,6 @@ Renderer::Renderer(size_t maxQuads) {
     glEnableVertexArrayAttrib(vao, 4);
     glVertexArrayAttribFormat(vao, 4, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, strokePx));
     glVertexArrayAttribBinding(vao, 4, 0);
-
-    // emissive texture index
-    glEnableVertexArrayAttrib(vao, 5);
-    glVertexArrayAttribFormat(vao, 5, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, emissiveTexIndex));
-    glVertexArrayAttribBinding(vao, 5, 0);
-
-    // emissive strength
-    glEnableVertexArrayAttrib(vao, 6);
-    glVertexArrayAttribFormat(vao, 6, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, emissiveStrength));
-    glVertexArrayAttribBinding(vao, 6, 0);
 }
 
 Renderer::~Renderer() {
@@ -212,12 +169,9 @@ void Renderer::submitQuad(const glm::vec2& pos,
     const glm::vec4& color,
     float rotation,
     float uniformScale,
-    int /*layer*/,
-    GLuint emissiveTextureId,      // NEW
-    float emissiveStrength)     // NEW
+    int /*layer*/)
     // Depth buffer kinda breaks transparency (Render everything back to front if u have transparent stuff)
 {
-    // Handle albedo texture
     float texIndex = -1.0f;
     if (textureId != 0) {
         bool flushed = false;
@@ -229,26 +183,13 @@ void Renderer::submitQuad(const glm::vec2& pos,
         texIndex = static_cast<float>(slot);
     }
 
-    // Handle emissive texture
-    float emissiveTexIndex = -1.0f;
-    if (emissiveTextureId != 0 && emissiveStrength > 0.0f) {
-        bool flushed = false;
-        int slot = getOrAssignEmissiveTextureSlot(emissiveTextureId, flushed);
-        if (flushed) {
-            flush();
-            slot = getOrAssignEmissiveTextureSlot(emissiveTextureId, flushed);
-        }
-        emissiveTexIndex = static_cast<float>(slot);
-    }
-
-    // Check buffer capacity
     if (cpuBuffer.size() + 4 > vboCapacity || cpuIndices.size() + 6 > eboCapacity) {
         flush();
     }
 
-    // Calculate quad positions
     glm::vec2 half = size * 0.5f * uniformScale;
     glm::vec2 positions[4];
+
     if (rotation == 0.0f) {
         // Fast path for non-rotated quads
         positions[0] = { pos.x - half.x, pos.y - half.y }; // BL
@@ -260,35 +201,25 @@ void Renderer::submitQuad(const glm::vec2& pos,
         // Only calculate sin/cos once per sprite
         float c = cosf(rotation);
         float s = sinf(rotation);
+
         positions[0] = { pos.x + (-half.x * c + half.y * s), pos.y + (-half.x * s - half.y * c) };
         positions[1] = { pos.x + (half.x * c + half.y * s), pos.y + (half.x * s - half.y * c) };
         positions[2] = { pos.x + (half.x * c - half.y * s), pos.y + (half.x * s + half.y * c) };
         positions[3] = { pos.x + (-half.x * c - half.y * s), pos.y + (-half.x * s + half.y * c) };
     }
 
-    // UV coordinates
     glm::vec2 uvs[4] = {
         {uvRect.x, uvRect.y}, {uvRect.z, uvRect.y},
         {uvRect.z, uvRect.w}, {uvRect.x, uvRect.w}
     };
 
-    // Build vertices with emissive data
     size_t base = cpuBuffer.size();
     for (int i = 0; i < 4; ++i)
     {
         glm::vec3 pos3(positions[i], 0.0f); // promote 2D => 3D
-        cpuBuffer.push_back({
-            pos3,
-            uvs[i],
-            color,
-            texIndex,
-            0.0f,
-            emissiveTexIndex,
-            emissiveStrength
-            });
+        cpuBuffer.push_back({ pos3, uvs[i], color, texIndex });
     }
 
-    // Indices
     cpuIndices.insert(cpuIndices.end(), {
         (uint32_t)base, (uint32_t)base + 1, (uint32_t)base + 2,
         (uint32_t)base + 2, (uint32_t)base + 3, (uint32_t)base
@@ -337,10 +268,7 @@ void Renderer::submitTriangles(const Vertex* verts, size_t vCount,
 void Renderer::submitSprite(const Sprite& sprite) {
     submitQuad(sprite.pos, sprite.size, sprite.textureId,
         sprite.uv, sprite.color,
-        sprite.rotation, sprite.uniformScale,
-        0,  // layer (default)
-        sprite.emissiveTextureId,
-        sprite.emissiveStrength);
+        sprite.rotation, sprite.uniformScale);
 }
 
 void Renderer::submitText(const Font& font,

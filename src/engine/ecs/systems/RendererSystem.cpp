@@ -58,11 +58,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Time.h"
 
 // ============================================================================
-// Editor (Undo)
-// ============================================================================
-#include "UndoSystem.h"
-
-// ============================================================================
 // Helpers
 // ============================================================================
 #include "helpers/TransformUtils.h"
@@ -82,15 +77,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include "ImGuizmo.h"
 
-namespace {
-    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
-        if (fileMenu) { fileMenu->MarkSceneDirty(); }
-    }
-}
-
 namespace ECS {
-    static constexpr uint32_t INVALID_ENTITY_ID = ~0u;
-
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
     static void GetRenderTransform(World& world, const Entity entity,
@@ -141,8 +128,8 @@ namespace ECS {
         m_initialized = true;
 
         const auto& mainWindow = WindowManager::GetMainWindow();
-        const int width = mainWindow->GetWidth();
-        const int height = mainWindow->GetHeight();
+        const int width = mainWindow->Width();
+        const int height = mainWindow->Height();
 
         // Shaders
         m_shader = std::make_unique<Shader>(
@@ -170,10 +157,6 @@ namespace ECS {
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_combine.frag");
 
-        m_blitShader = std::make_unique<Shader>(
-            "assets/shaders/blit.vert",
-            "assets/shaders/blit.frag");
-
         // Object Picking
         m_pickingFBO.Create(width, height, false, false, 1);
         m_pbos[0].Create(4, GL_STREAM_READ);
@@ -200,22 +183,19 @@ namespace ECS {
         m_renderGraph->CreateTexture("BloomBlur"
             , { width / 2, height / 2, GL_RGBA16F, false });
 
-        m_renderGraph->CreateTexture("LDR",
-            { width, height, GL_RGBA8, false });
 
         // Resize HDR when window resizes
         Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
             [this](const Messaging::WindowResized& msg)
             {
-                // TODO: Add RenderGraph::ResizeTexture() method to handle this?
+                // TODO: Add RenderGraph::ResizeTexture() method to handle this
                 // For now, recreate the graph on resize
                 m_renderGraph = std::make_unique<RenderGraph>();
 
                 m_renderGraph->CreateTexture("HDR",          { msg.Width,      msg.Height,      GL_RGBA16F, false });
-                m_renderGraph->CreateTexture("Backbuffer",   { msg.Width,      msg.Height,      GL_RGBA8,   true  });
+                m_renderGraph->CreateTexture("Backbuffer",   { msg.Width,      msg.Height,      GL_RGBA8,   true });
                 m_renderGraph->CreateTexture("BloomExtract", { msg.Width / 2,  msg.Height / 2,  GL_RGBA16F, false });
                 m_renderGraph->CreateTexture("BloomBlur",    { msg.Width / 2,  msg.Height / 2,  GL_RGBA16F, false });
-                m_renderGraph->CreateTexture("LDR",          { msg.Width,      msg.Height,      GL_RGBA8, false });
 
                 // Update fallback projection
                 m_projection = glm::ortho(
@@ -254,10 +234,6 @@ namespace ECS {
             m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
             m_cameraOrthoSize = m_editorCamera->GetCameraComponent()->OrthoSize;
         }
-
-        // Reset interaction state when rebinding worlds
-        m_selectedEntityID = 0;
-        m_isDragging = false;
     }
 
     glm::vec2 RendererSystem::CalculateAnchoredPosition(
@@ -362,8 +338,7 @@ namespace ECS {
         // ============================================================
         // 2. Use EditorCamera if active, otherwise ECS camera
         // ============================================================
-        // If force scene camera is enabled (for game window), skip editor camera entirely
-        if (m_useEditorCamera && m_editorCamera && !m_forceSceneCamera) {
+        if (m_useEditorCamera && m_editorCamera) {
             // Respect editor UI hover: only process input when viewport is hovered
             m_editorCamera->SetAllowInput(m_editorInputEnabled);
             m_editorCamera->Update(Time::DeltaTime());
@@ -418,8 +393,8 @@ namespace ECS {
         // fallback (if no active camera found)
         if (!foundActive) {
             const auto& mainWindow = WindowManager::GetMainWindow();
-            projection = glm::ortho(0.f, static_cast<float>(mainWindow->GetWidth()),
-                0.f, static_cast<float>(mainWindow->GetHeight()),
+            projection = glm::ortho(0.f, static_cast<float>(mainWindow->Width()),
+                0.f, static_cast<float>(mainWindow->Height()),
                 -1.f, 1.f);
         }
 
@@ -427,7 +402,7 @@ namespace ECS {
         // BLOOM RADIUS CALCULATION (world-space consistent)
         // ============================================================
         const auto& win = WindowManager::GetMainWindow();
-        const float bloomBufferHeight = static_cast<float>(win->GetHeight()) / 2.0f;
+        const float bloomBufferHeight = static_cast<float>(win->Height()) / 2.0f;
 
         // How zoomed in we are relative to the default ortho size
         const float zoomScale = kReferenceOrthoSize / m_cameraOrthoSize;
@@ -486,8 +461,8 @@ namespace ECS {
                 }
 
                 // Because of tone-mapping, the background will appear slightly lighter.
-                // I chose a slightly brighter neutral gray for a nicer look
-                hdrFbo->BindAndClear(0.025f, 0.028f, 0.032f, 1.0f);
+                // Choose a slightly brighter neutral gray for a nicer look
+                hdrFbo->BindAndClear(0.28f, 0.28f, 0.28f, 1.0f);
 
                 // ---------------------------------------
                 // Layered rendering: SDF first, then batch
@@ -520,8 +495,8 @@ namespace ECS {
                     if (isUILayer) {
                         const auto& win = WindowManager::GetMainWindow();
                         glm::mat4 uiProjection = glm::ortho(
-                            0.0f, static_cast<float>(win->GetWidth()),
-                            0.0f, static_cast<float>(win->GetHeight()),
+                            0.0f, static_cast<float>(win->Width()),
+                            0.0f, static_cast<float>(win->Height()),
                             -1.0f, 1.0f
                         );
                         layerViewProj = uiProjection;  // No view matrix, just screen-space projection
@@ -663,9 +638,7 @@ namespace ECS {
                                 ToGlm(sr.Color),
                                 sr.TextureId,
                                 angleZ,
-                                1.0f,
-                                sr.EmissiveTextureId,
-                                sr.EmissiveStrength
+                                1.0f
                                 });
                         }
                     }
@@ -679,8 +652,8 @@ namespace ECS {
                         m_textShader->use();
 
                         const auto& win = WindowManager::GetMainWindow();
-                        const float screenWidth = static_cast<float>(win->GetWidth());
-                        const float screenHeight = static_cast<float>(win->GetHeight());
+                        const float screenWidth = static_cast<float>(win->Width());
+                        const float screenHeight = static_cast<float>(win->Height());
 
                         // Calculate UI scale factor (simple calculation each frame)
                         const float uiScaleFactor = screenHeight / kReferenceHeight;
@@ -782,7 +755,7 @@ namespace ECS {
                                 // Calculate constant screen-space thickness
                                 const auto& win = WindowManager::GetMainWindow();
                                 const float desiredPixelThickness = 2.0f; // Always 2 pixels thick
-                                const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPixelThickness;
+                                const float worldThickness = (m_cameraOrthoSize / win->Height()) * desiredPixelThickness;
 
                                 // Draw frustum rectangle with constant screen-space thickness
                                 const glm::vec4 frustumColor(0.0f, 1.0f, 1.0f, 0.6f); // Cyan, semi-transparent
@@ -804,14 +777,18 @@ namespace ECS {
             [this, &world, &viewProj, &buckets](ResourceAccessor& res)
             {
               
-                static bool prevMouseDown = false;
-                bool currMouseDown = Input::IsMouseDown(MOUSE_LEFT);
-                bool mouseJustReleased = (!currMouseDown && prevMouseDown);
-                prevMouseDown = currMouseDown;
+                bool leftMouseButtonDownThisFrame;
+                {
+                    static bool prev_frame = false;
+                    bool curr_frame = Input::IsMousePressed(MOUSE_LEFT);
+                    leftMouseButtonDownThisFrame = curr_frame == 1 && prev_frame == 0;
+                    prev_frame = curr_frame;
+                } 
 
                 (void)res;
+                // Dont pick while dragging.
                 if (m_isDragging) return;
-                if (!currMouseDown && !mouseJustReleased) return;
+                if (!Input::IsMousePressed(MOUSE_LEFT)) return;
 
                 // ============================================================
                 // GET VIEWPORT BOUNDS
@@ -820,7 +797,7 @@ namespace ECS {
                 glm::vec2 viewportSize;
 
                 const auto& win = WindowManager::GetMainWindow();
-                viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
+                viewportSize = glm::vec2(win->Width(), win->Height());
                 bool useViewportCoords = m_useEditorCamera;
 
                 glm::dvec2 mousePos;
@@ -836,7 +813,7 @@ namespace ECS {
                         // Continue with viewportSize = full window (already set above)
                     }
                     else {
-                        ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Scene");
+                        ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
 
                         if (viewportWindow) {
                             ImVec2 vpMin = viewportWindow->ContentRegionRect.Min;
@@ -908,7 +885,7 @@ namespace ECS {
                         if (!world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                         // Encode entity ID as RGB
-                        uint32_t id = entity.Index + 1;
+                        uint32_t id = entity.Index;
                         glm::vec4 idColor(
                             ((id >> 0) & 0xFF) / 255.0f,
                             ((id >> 8) & 0xFF) / 255.0f,
@@ -957,7 +934,7 @@ namespace ECS {
                         if (world.Has<Components::ShapeCircle2D>(entity)) continue;
 
                         // Encode entity ID as RGB
-                        uint32_t id = entity.Index + 1;
+                        uint32_t id = entity.Index;
                         glm::vec4 idColor(
                             ((id >> 0) & 0xFF) / 255.0f,
                             ((id >> 8) & 0xFF) / 255.0f,
@@ -999,9 +976,7 @@ namespace ECS {
                                 idColor,
                                 sr.TextureId,
                                 angleZ,
-                                1.0f,
-                                0,      // emissiveTextureId (no emissive in picking pass)
-                                0.0f    // emissiveStrength (no emissive in picking pass)
+                                1.0f
                                 });
                         }
                     }
@@ -1023,30 +998,35 @@ namespace ECS {
                 LOG_DEBUG("[PICKING] FBO size: " << vpWidth << "x" << vpHeight);
                 LOG_DEBUG("[PICKING] Reading pixel: (" << x << ", " << y << ")");
 
-                if (mouseJustReleased) {
-                    int readPBO = 1 - m_currentPBO;
-                    uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
+                static bool firstFrame = true;
+                if (leftMouseButtonDownThisFrame)
+                {
+                    if (!firstFrame) {
+                        int readPBO = 1 - m_currentPBO;
+                        uint32_t pickedID = m_pbos[readPBO].ReadUInt32() & 0x00FFFFFF;
 
-                    LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
+                        LOG_DEBUG("[PICKING] Picked ID: " << pickedID);
 
-                    if (pickedID > 0) {
-                        m_selectedEntityID = pickedID - 1;
-                        LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
-                    }
-                    else {
-                        m_selectedEntityID = INVALID_ENTITY_ID;  // Use max uint32 to indicate "no selection"
+                        if (pickedID > 0) {
+                            m_selectedEntityID = pickedID;
+                            LOG_DEBUG("[PICKING] Selected entity: " << pickedID);
+                        }
+                        else {
+                            m_selectedEntityID = 0;
+                        }
                     }
                 }
+                firstFrame = false;
+
+                // Frame N: Swap for next frame
+                // Swap PBOs FIRST
+                m_currentPBO = 1 - m_currentPBO;
 
                 // Frame N: Write to PBO 0
                 // Write to current PBO (async transfer starts)
                 m_pbos[m_currentPBO].Bind(GL_PIXEL_PACK_BUFFER);
                 glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
                 m_pbos[m_currentPBO].Unbind(GL_PIXEL_PACK_BUFFER);
-
-                // Frame N: Swap for next frame
-                // Swap PBOs FIRST
-                m_currentPBO = 1 - m_currentPBO;
 
 
                 // Restore blending state
@@ -1055,7 +1035,7 @@ namespace ECS {
                 Framebuffer::Unbind();
 
                 // Restore viewport to full window
-                glViewport(0, 0, win->GetWidth(), win->GetHeight());
+                glViewport(0, 0, win->Width(), win->Height());
             });
 
         // Highlight the currently selected entity (overlay onto HDR)
@@ -1064,7 +1044,7 @@ namespace ECS {
             [this, &world, &viewProj, &buckets, &transformedCorners, &polyPoints](ResourceAccessor& res)
             {
                 // nothing selected this frame
-                if (m_selectedEntityID == INVALID_ENTITY_ID) return;  // Check for sentinel value
+                if (m_selectedEntityID == 0) return;
 
                 auto* hdrFbo = res.GetFramebuffer("HDR");
                 if (!hdrFbo) return;
@@ -1075,7 +1055,7 @@ namespace ECS {
                 // make outline look 2px thick in screen space
                 const auto& win = WindowManager::GetMainWindow();
                 const float desiredPx = 2.0f;
-                const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPx;
+                const float worldThickness = (m_cameraOrthoSize / win->Height()) * desiredPx;
 
                 // selection color (pick whatever you like but it should contrast against viewport)
                 const glm::vec4 selColor(1.0f, 0.85f, 0.15f, 1.0f); // yellow-ish
@@ -1390,47 +1370,26 @@ namespace ECS {
                 Framebuffer::Unbind();
             });
 
-        // ToneMap pass -> writes final color to LDR texture
-        m_renderGraph->AddPass("ToneMap", { "HDR", "BloomExtract" }, { "LDR" },
+        // Pass 2: Blit HDR to backbuffer
+        m_renderGraph->AddPass("Composite", { "HDR", "BloomExtract" }, { "Backbuffer" },
             [this](ResourceAccessor& res)
             {
                 auto* hdr = res.GetFramebuffer("HDR");
                 auto* bloom = res.GetFramebuffer("BloomExtract");
-                auto* ldr = res.GetFramebuffer("LDR");
-                if (!hdr || !bloom || !ldr) return;
+                if (!hdr || !bloom) return;
 
-                ldr->BindAndClear(0, 0, 0, 1);
+                const auto& win = WindowManager::GetMainWindow();
+                Framebuffer::BindDefault();
+                glViewport(0, 0, win->Width(), win->Height());
 
                 m_bloomCombineShader->use();
                 m_bloomCombineShader->setUniform("uScene", 0);
                 m_bloomCombineShader->setUniform("uBloomBlur", 1);
-                m_bloomCombineShader->setUniform("uExposure", 1.3f);
-                m_bloomCombineShader->setUniform("uBloomStrength", 5.2f);
+                m_bloomCombineShader->setUniform("uExposure", 1.3f);      // Or 0.8f if still too bright?
+                m_bloomCombineShader->setUniform("uBloomStrength", 5.2f); // Control bloom intensity
                 m_bloomCombineShader->setUniform("uGamma", 1.5f);
-
                 hdr->BindColorTexture(0, 0);
                 bloom->BindColorTexture(0, 1);
-
-                m_renderer->drawFullscreenQuad();
-                Framebuffer::Unbind();
-            });
-
-        // Blit LDR to backbuffer
-        m_renderGraph->AddPass("Composite", { "LDR" }, { "Backbuffer" },
-            [this](ResourceAccessor& res)
-            {
-                auto* ldr = res.GetFramebuffer("LDR");
-                if (!ldr) return;
-
-                const auto& win = WindowManager::GetMainWindow();
-                Framebuffer::BindDefault();
-                glViewport(0, 0, win->GetWidth(), win->GetHeight());
-
-                // Use a simple blit shader, NOT bloomCombine
-                m_blitShader->use();
-                m_blitShader->setUniform("uTex", 0);
-                ldr->BindColorTexture(0, 0);
-
                 m_renderer->drawFullscreenQuad();
             });
 
@@ -1446,14 +1405,14 @@ namespace ECS {
         glm::vec2 dragViewportMin(0, 0);
         glm::vec2 dragViewportSize;
 
-        dragViewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
+        dragViewportSize = glm::vec2(win->Width(), win->Height());
 
         // Get viewport bounds if using editor camera
         if (m_useEditorCamera) {
             // SAFETY: Check if ImGui context is valid
             ImGuiContext* ctx = ImGui::GetCurrentContext();
             if (ctx && ctx->Windows.Size > 0) {
-                ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Scene");
+                ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Viewport");
                 if (viewportWindow) {
                     ImVec2 vpMin = viewportWindow->ContentRegionRect.Min;
                     ImVec2 vpMax = viewportWindow->ContentRegionRect.Max;
@@ -1465,32 +1424,29 @@ namespace ECS {
             }
             // If ImGui not available or viewport not found, use full window (already set)
         }
+        
         static bool wasMouseDownLastFrame = false;
         static uint32_t lastSelectedEntityID = 0;
 
 
-        if (m_selectedEntityID != INVALID_ENTITY_ID) {
-            // ----------------------------------------------------------
-            // CANCEL DRAG IF MOUSE LEAVES THE VIEWPORT CONTENT REGION
-            // ----------------------------------------------------------
-            glm::dvec2 mpos;
-            Input::GetMousePosition(mpos.x, mpos.y);
-
-            bool mouseOutside =
-                (mpos.x < dragViewportMin.x) ||
-                (mpos.y < dragViewportMin.y) ||
-                (mpos.x > dragViewportMin.x + dragViewportSize.x) ||
-                (mpos.y > dragViewportMin.y + dragViewportSize.y);
-
-            if (mouseOutside) {
+        if (m_selectedEntityID != 0) {
+#if 1
+            // ------------------------------------------------------------------
+            // <<<< IMGUIZMO BYPASS CHECK STARTS >>>>
+            // ------------------------------------------------------------------
+            if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+                // If ImGuizmo is currently manipulating the entity,
+                // we must disable the custom drag-to-move logic immediately.
                 m_isDragging = false;
-                // Do NOT early return; still allow selection updates
-                // Just skip drag logic
+                wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT); // Update mouse state
+                // Skip the rest of the custom drag logic
+                lastSelectedEntityID = m_selectedEntityID; // Keep selection tracking consistent
+              //  return; // Exit the block early
             }
-
-            {
-            bool bypassDrag = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
-            if (!bypassDrag) {
+            // ------------------------------------------------------------------
+            // <<<< IMGUIZMO BYPASS CHECK ENDS >>>>
+            // ------------------------------------------------------------------
+#else
             glm::dvec2 mousePos;
             Input::GetMousePosition(mousePos.x, mousePos.y);
             glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection,
@@ -1498,22 +1454,6 @@ namespace ECS {
 
             bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
             bool mouseJustPressed = isMouseDownThisFrame && !wasMouseDownLastFrame;
-
-            // Check if mouse is currently in viewport
-            bool isMouseInViewport = true;
-            if (m_useEditorCamera) {
-                ImGuiContext* ctx = ImGui::GetCurrentContext();
-                if (ctx && ctx->Windows.Size > 0) {
-                    ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Scene");
-                    if (viewportWindow) {
-                        ImVec2 vpMin = viewportWindow->ContentRegionRect.Min;
-                        ImVec2 vpMax = viewportWindow->ContentRegionRect.Max;
-
-                        isMouseInViewport = (mousePos.x >= vpMin.x && mousePos.x <= vpMax.x &&
-                            mousePos.y >= vpMin.y && mousePos.y <= vpMax.y);
-                    }
-                }
-            }
 
             // Check if selection changed
             bool selectionChanged = (m_selectedEntityID != lastSelectedEntityID);
@@ -1526,14 +1466,11 @@ namespace ECS {
             }
 
             // Capture entity position on initial press OR when selection changes
-            // ONLY if mouse is in viewport
-            if ((mouseJustPressed || selectionChanged) && !m_isDragging && isMouseInViewport) {
+            if ((mouseJustPressed || selectionChanged) && !m_isDragging) {
                 // Store the entity's starting position
                 world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
                     if (e.Index == m_selectedEntityID) {
                         m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
-                        m_dragStartEntityRot = lt.Rotation;     // Store rotation
-                        m_dragStartEntityScale = lt.Scale;      // Store scale
                         LOG_DEBUG("[DRAG] Captured entity pos: " << lt.Position.X << ", " << lt.Position.Y);
                     }
                     });
@@ -1543,14 +1480,12 @@ namespace ECS {
             }
 
             // During mouse hold - check if we should start dragging
-            // ONLY start drag if mouse is in viewport
-            if (isMouseDownThisFrame && !m_isDragging && isMouseInViewport) {
+            if (isMouseDownThisFrame && !m_isDragging) {
                 glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
                 float dragDistance = glm::length(dragDelta);
 
                 // Calculate drag threshold in world space (5 pixels)
-                const auto& win = WindowManager::GetMainWindow();
-                const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->GetHeight())) * 5.0f;
+                const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->Height())) * 5.0f;
 
                 // Start dragging if moved beyond threshold
                 if (dragDistance > dragThreshold) {
@@ -1564,7 +1499,6 @@ namespace ECS {
             }
 
             // Update position while dragging
-            // NO viewport check - allow dragging anywhere once started!
             if (m_isDragging && isMouseDownThisFrame) {
                 glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
 
@@ -1573,66 +1507,45 @@ namespace ECS {
                     if (e.Index == m_selectedEntityID) {
                         lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
                         lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
-
-                        // Mark scene as dirty when transform changes
-                        MarkSceneDirtyIfNeeded(m_fileMenu);
                     }
                     });
             }
 
             // End drag when mouse released
-            if (m_isDragging && !isMouseDownThisFrame) {
+            if (m_isDragging && !isMouseDownThisFrame) {\
                 LOG_DEBUG("[DRAG] Drag ended");
-
-                // Record the transform change for undo
-                if (m_undoSystem) {
-                    world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
-                        if (e.Index == m_selectedEntityID) {
-                            // Create undo command with old and new transforms
-                            Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
-                            Vector3D newPos = lt.Position;
-
-                            // Only record if position actually changed
-                            if (oldPos != newPos) {
-                                m_undoSystem->RecordTransformChange(e.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale, newPos, lt.Rotation, lt.Scale);
-                                LOG_DEBUG("[UNDO] Recorded transform change");
-                            }
-                        }
-                    });
-                }
                 m_isDragging = false;
             }
 
             wasMouseDownLastFrame = isMouseDownThisFrame;
-            } else {
-                m_isDragging = false;
-                wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
-                lastSelectedEntityID = m_selectedEntityID;
-            }
-            }
+#endif
 
         }
         else {
             // Nothing selected, reset tracking
-            lastSelectedEntityID = INVALID_ENTITY_ID;  // Use sentinel value
+            lastSelectedEntityID = 0;
             wasMouseDownLastFrame = false;
         }
 
         // Performance logging
-        if (Time::FrameCount() % 120 == 0)
+        if (Time::FrameCount() % 60 == 0)
         {
             static int previousFlushTotal = 0;
             int currentTotal = GetFlushCount();
             int flushes = currentTotal - previousFlushTotal;
             previousFlushTotal = currentTotal;
-
-            std::stringstream ss;
+            LOG_DEBUG("=== RENDERER ANALYSIS ===");
+            LOG_DEBUG("Flushes this frame: " << flushes);
             if (flushes > 10)
-                ss << " Too many flushes! Likely texture switches or buffer overflows...";
+            {
+                LOG_DEBUG("Too many flushes! Likely texture switches or buffer overflows...");
+            }
             else if (flushes == 1)
-                ss << " Single batch, bottleneck is CPU-side or GPU fillrate";
-
-            LOG_DEBUG("Flushes this frame: " << flushes << ss.str() << " | " << "FPS: " <<  static_cast<int>(1.0f / Time::DeltaTime()));
+            {
+                LOG_DEBUG("Single batch, bottleneck is CPU-side or GPU fillrate");
+            }
+            LOG_DEBUG("FPS: " << (1.0f / Time::DeltaTime()));
+            LOG_DEBUG("=========================");
         }
     }
 }

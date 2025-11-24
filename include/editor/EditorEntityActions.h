@@ -23,8 +23,6 @@ Stores the current scene so actions stay consistent across scene loads.
 #include "Scene/Scene.h"
 #include "Scene/SceneManager.h"
 #include "ecs/Entity.h"
-#include "EditorFileMenu.h"
-#include "UndoSystem.h"
 
 // Provides editor-side operations for creating, deleting, cloning and reparenting 
 // entities in the active scene
@@ -63,19 +61,9 @@ public:
     // Moves an entity under a new parent in the hierarchy
     void ReparentEntity(EntityId child, EntityId newParent);
 
-    // Set file menu reference for dirty tracking
-    void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
-
-    // Undo System
-    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
-
 private:
     // The currently edited scene (world + hierarchy)
     Scenes::Scene* m_scene;
-    EditorFileMenu* m_fileMenu = nullptr;
-
-    // Undo System
-    Editor::UndoSystem* m_undoSystem = nullptr;
 };
 
 #endif

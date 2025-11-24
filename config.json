@@ -1,8 +1,11 @@
 {
-  "WindowSettings": {
-    "Width": 1600,
-    "Height": 900,
-    "Maximized": true,
-    "VSync": true
+  "application": {
+    "title": "GrapeEngine",
+    "window": {
+      "width": 1600,
+      "height": 900,
+      "fullscreen": false,
+      "vsync": true
+    }
   }
 }

@@ -10,7 +10,7 @@ for editor viewports. It supports orbit, pan, and zoom interactions around a
 target point and prevents external modification of its underlying entity.
 
 The EditorCamera encapsulates an internal ECS entity that owns both a
-Transform and a CameraEditor3D component. No additional components can be attached
+Transform and a Camera3D component. No additional components can be attached
 to ensure that the editor view remains isolated from gameplay logic.
 
 Responsibilities:
@@ -57,15 +57,15 @@ namespace Engine {
         /// Returns the view matrix derived from the camera�s transform.
         [[nodiscard]] glm::mat4 GetViewMatrix() const;
 
-        /// Returns the projection matrix from the internal CameraEditor3D component.
+        /// Returns the projection matrix from the internal Camera3D component.
         [[nodiscard]] glm::mat4 GetProjectionMatrix() const;
 
 
         /// Focuses the camera on a given world-space point.
         void Focus(const glm::vec3& target);
 
-        /// Accessor for the internal CameraEditor3D component.
-        ECS::Components::CameraEditor3D* GetCameraComponent() const { return m_camera; }
+        /// Accessor for the internal Camera3D component.
+        ECS::Components::Camera3D* GetCameraComponent() const { return m_camera; }
 
         /// Accessor for the internal Transform component.
         ECS::Components::LocalTransform* GetTransform() const { return m_transform; }
@@ -78,9 +78,6 @@ namespace Engine {
 
         void OnWindowResize(int newWidth, int newHeight);
 
-        /// Update viewport size (for aspect ratio) independently of window size
-        void SetViewportSize(float width, float height);
-
     private:
         // --------------------------------------------------------------------
         // Internal state
@@ -88,9 +85,8 @@ namespace Engine {
         ECS::World* m_world = nullptr;                      //!< Owning ECS world (for cleanup)
         ECS::Entity m_cameraEntity;                         //!< Wrapped ECS entity
         ECS::Components::LocalTransform* m_transform{};     //!< Pointer to Transform component
-        ECS::Components::CameraEditor3D* m_camera{};        //!< Pointer to CameraEditor3D component
+        ECS::Components::Camera3D* m_camera{};              //!< Pointer to Camera3D component
         Messaging::SubscriptionHandle m_windowResizedSub{}; //!< Subscription to window resize
-        Messaging::SubscriptionHandle m_viewportResizedSub{}; //!< Subscription to viewport resize
 
         glm::vec3 m_target = { 0.f, 0.f, 0.f };             //!< Orbit center
         glm::vec3 m_cameraPosition = { 0.f, 0.f, 10.f };    //!< Cached position

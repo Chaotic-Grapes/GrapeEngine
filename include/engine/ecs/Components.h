@@ -305,13 +305,6 @@ namespace ECS {
             Vector2D Offset{0.0f, 0.0f};
             int Width = 0;
             int Height = 0;
-
-            // Emissive support
-            uint32_t EmissiveTextureId = 0;  // 0 = no emissive map
-            float EmissiveStrength = 5.0f;   // HDR multiplier
-
-            // Persistent texture path (don't serialize TextureId)
-            char TexturePath[256] = { 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -347,9 +340,6 @@ namespace ECS {
             float FramesPerSecond = 10.0f;    // Animation speed (FPS)
             bool Loop = true;                 // Whether animation loops
             bool Playing = true;              // Whether animation is currently playing
-
-            // Persistent texture path (don't serialize TextureId)
-            char TexturePath[256] = { 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
 
@@ -428,22 +418,6 @@ namespace ECS {
             bool  Active        = false;
         };
         static_assert(std::is_trivially_copyable_v<Camera3D>, "Camera3D must be trivially copyable");
-
-        // Editor camera component (separate from gameplay cameras)
-        // DO NOT USE UNLESS IT IS FOR EDITOR CAMERA ONLY!!!
-        // DO NOT EXPOSE THIS TO COMPONENT LIST THAT CAN BE ADDED TO ENTITIES
-        // DO NOT EXPOSE THIS TO C# SCRIPTS EITHER
-        struct CameraEditor3D {
-        public: 
-            bool UsePerspective = false;
-            float FOV           = 45.f;
-            float NearPlane     = 0.1f;
-            float FarPlane      = 100.f;
-            float OrthoSize     = 10.f;
-            float AspectRatio   = 16.f / 9.f;
-            bool  Active        = false;
-        };
-        static_assert(std::is_trivially_copyable_v<CameraEditor3D>, "CameraEditor3D must be trivially copyable");
 
         // Optional matrices output for cameras (computed by CameraSystem)
         struct CameraMatrices {
@@ -543,7 +517,6 @@ namespace ECS {
             uint32_t TypeHash = 0;        // Hash of script type name
             bool Initialized = false;     // Whether OnStart() has been called
             char TypeName[128] = {0};     // Script class name (e.g., "MyGame.PlayerController")
-            char ScriptPath[256] = {0};   // Relative path to the script file (e.g., "Assets/Scripts/PlayerController.cs")
         };
         static_assert(std::is_trivially_copyable_v<ScriptInstance>, "ScriptInstance must be trivially copyable");
 
@@ -553,8 +526,6 @@ namespace ECS {
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
-            bool PlayOnStart = false;
-            bool Spatial3D = true;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
     }

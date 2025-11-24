@@ -22,9 +22,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
 
-// Forward declarations
+// Forward declaration
 namespace Services { class OverlayService; }
-namespace ECS { class ScriptSystem; }
 
 namespace Engine {
     class Application {
@@ -35,19 +34,9 @@ namespace Engine {
         Scenes::SceneManager& GetSceneManager() { return m_sceneManager; }
 
         /**
-         * @brief Get the editor settings
+         * @brief Get the application configuration
          */
-        const EditorSettings& GetEditorSettings() const { return m_editorSettings; }
-
-        /**
-         * @brief Get the project settings
-         */
-        const ProjectSettings& GetProjectSettings() const { return m_projectSettings; }
-
-        /**
-         * @brief Check if project settings have been loaded
-         */
-        bool HasProjectSettings() const { return m_hasProjectSettings; }
+        const ApplicationConfig& GetConfig() const { return m_config; }
 
         /**
          * @brief Starts the engine
@@ -58,30 +47,12 @@ namespace Engine {
         void Run(Game& game, bool consoleFlag);
 
         /**
-         * @brief Load project-specific settings from ProjectSettings.json
-         * @param projectRoot Path to the project root directory
-         * @return true if project settings were loaded successfully
-         */
-        bool LoadProjectSettings(const std::string& projectRoot);
-
-        /**
          * @brief Close worlds and release resources.
          */
         void Close();
 
-        /**
-         * @brief Check if running in editor mode (with overlay/level editor)
-         * @return true if editor is active, false for standalone builds
-         */
-        bool IsInEditorMode() const { return m_isInEditorMode; }
-
-        // Getters for services
         Services::AudioService* GetAudioService() { return m_audio; }
         const Services::AudioService* GetAudioService() const { return m_audio; }
-
-        Services::OverlayService* GetOverlayService() { return m_overlay; }
-        const Services::OverlayService* GetOverlayService() const { return m_overlay; }
-
     private:
         // Flag to indicate if application should stop
         static bool m_shouldStop;
@@ -89,38 +60,21 @@ namespace Engine {
         // Scene manager
         Scenes::SceneManager m_sceneManager;
 
-        // Editor configuration
-        EditorSettings m_editorSettings;
-
-        // Project settings
-        ProjectSettings m_projectSettings;
-        bool m_hasProjectSettings = false;
+        // Application configuration
+        ApplicationConfig m_config;
 
 		// Functions to enable/disable console output
         static void _enableConsole();
         static void _disableConsole();
 
         void _initializeServices();
-        void _registerSystems();
 
         // Services
         Services::AudioService* m_audio = nullptr;
 		Services::OverlayService* m_overlay = nullptr;
-        ECS::ScriptSystem* m_scriptSystem = nullptr;
-
-        // Editor mode flag
-        bool m_isInEditorMode = false;
 
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
-
-        void _onGameStart(Scenes::Scene* scene);
-        void _onGameStop(Scenes::Scene* scene);
-        
-        // Helper methods for cleaner game loop logic
-        bool _shouldRunGameLogic() const;
-        void _updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested);
-        void _updateScripts(ECS::World& world, bool shouldRun);
     };
 
     extern Application* CORE;

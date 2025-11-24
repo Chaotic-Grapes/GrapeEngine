@@ -13,7 +13,7 @@ so both entities and prefab files use the same UI drawing path.
 */
 /* End Header *******************************************************************/
 
-#include "ComponentWidgets.h"
+#include "../editor/ComponentWidgets.h"
 #include <imgui.h>
 
 namespace EditorUI {
@@ -64,17 +64,25 @@ namespace EditorUI {
 
     // Renders a read-only row showing a static text value
     // Used for things like file paths or IDs that the user should see but cannot edit directly
-    void RenderStaticValueRow(const std::string& label, const std::string& value, bool grayed) {
+    void RenderStaticValueRow(const std::string& label, const std::string& value) {
         ImGui::Text("%s", _displayLabel(label).c_str());
+
         // Move to aligned field column ("W" is the widest character so it's used as reference)
         ImGui::SameLine();
         ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
-
-        if (grayed) {
-            ImGui::TextDisabled("%s", value.c_str());
-        }
-        else {
-            ImGui::Text("%s", value.c_str());
+        ImGui::Text("%s", value.c_str());
+        
+        // Show appropriate drag hint for texture fields (TextureId)
+        if (value.find("TextureId: ") != std::string::npos) {
+            ImGui::SameLine();
+            // Sprite sheet animation
+            if (label == "Sprite Sheet") {
+                ImGui::TextDisabled("(drag a sprite sheet here)");
+            }
+            // Sprite renderer
+            else if (label == "Sprite") {
+                ImGui::TextDisabled("(drag a texture here)");
+            }
         }
     }
 
@@ -277,7 +285,7 @@ namespace EditorUI {
         // NoLabel: prevents ImGui from drawing a label (we draw ours)
         // PickerHueWheel: circular color wheel (more intuitive)
         // HDR: enables brightness values above 1.0
-        // Float: treats color values as float (not 0ï¿½255)
+        // Float: treats color values as float (not 0–255)
         if (ImGui::ColorEdit4(("##" + label).c_str(), col,
             ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar |
             ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_PickerHueWheel |

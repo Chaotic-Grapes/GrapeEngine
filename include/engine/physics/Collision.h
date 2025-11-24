@@ -48,34 +48,6 @@ namespace Engine {
             bool Valid = false;
         };
 
-        // Extended contact manifold with multiple points
-        struct ContactManifold {
-            Vector2D normal;              // Collision normal (A to B)
-            float penetration;            // Penetration depth
-
-            // Contact points (up to 2 in 2D)
-            Vector2D points[2];           // World-space contact positions
-            int pointCount;               // Number of valid points (1 or 2)
-
-            // Feature IDs for contact tracking
-            struct FeaturePair {
-                uint8_t inEdge1;          // Edge index on shape 1
-                uint8_t outEdge1;         // Edge index on shape 1
-                uint8_t inEdge2;          // Edge index on shape 2
-                uint8_t outEdge2;         // Edge index on shape 2
-            };
-            FeaturePair ids[2];           // Feature IDs per contact point
-
-            ContactManifold() : normal(0, 0), penetration(0), pointCount(0) {}
-        };
-
-        // Clip segment structure for Sutherland-Hodgman
-        struct ClipVertex {
-            Vector2D v;                   // Vertex position
-            uint8_t edgeIndex;            // Which edge this came from
-        };
-
-
         struct SweepHit {
             float TimeOfImpact = 1.0f; 
             Vector2D Normal;           
@@ -132,31 +104,6 @@ namespace Engine {
 
         static SweepHit Sweep(const Circle& a, const Vector2D& aEnd,
             const AABB& b, const Vector2D& bEnd);
-
-        // Box-box manifold generation with clipping
-        static ContactManifold GenerateBoxBoxManifold(
-            const Vector2D& centerA,
-            const Vector2D& halfExtentsA,
-            const Vector2D& centerB,
-            const Vector2D& halfExtentsB,
-            const Vector2D& normal,
-            float penetration);
-
-        // Helper: Clip a line segment against a plane
-        static int ClipSegmentToLine(
-            ClipVertex outVertices[2],
-            const ClipVertex inVertices[2],
-            const Vector2D& normal,
-            float offset,
-            uint8_t clipEdge);
-
-        // Helper: Get edge vertices for an AABB face
-        static void GetEdgeVertices(
-            const Vector2D& center,
-            const Vector2D& halfExtents,
-            int edgeIndex,
-            Vector2D& v1,
-            Vector2D& v2);
 
     private:
         static bool _solveQuadratic(float a, float b, float c, float& t0, float& t1);

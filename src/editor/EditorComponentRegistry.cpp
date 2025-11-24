@@ -17,8 +17,8 @@ To add a new component:
 */
 /* End Header *******************************************************************/
 
-#include "EditorComponentRegistry.h"
-#include "ComponentPropertyEditor.h"
+#include "../editor/EditorComponentRegistry.h"
+#include "../editor/ComponentPropertyEditor.h"
 #include "serialization/EntitySerializer.h" 
 
 /* 
@@ -86,38 +86,6 @@ static std::vector<ComponentUIMetadata> m_registry = {
         COMPONENT_OPS(ECS::Components::LocalTransform)
     },
 
-    // Name
-    {
-        "Name", "Name", "ECS::Components::Name", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderName(d); },
-        []() { return nlohmann::json{{"Value", "Entity"}}; },
-        COMPONENT_OPS(ECS::Components::Name)
-    },
-
-    // Active
-    {
-        "Active", "Active", "ECS::Components::Active", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderActive(d); },
-        []() { return nlohmann::json{{"Enabled", true}}; },
-        COMPONENT_OPS(ECS::Components::Active)
-    },
-
-    // Tag Mask
-    {
-        "Tag Mask", "TagMask", "ECS::Components::TagMask", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderTagMask(d); },
-        []() { return nlohmann::json{{"Mask", 0}}; },
-        COMPONENT_OPS(ECS::Components::TagMask)
-    },
-
-    // Lifetime
-    {
-        "Lifetime", "Lifetime", "ECS::Components::Lifetime", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLifetime(d); },
-        []() { return nlohmann::json{{"Time", 0.0f}}; },
-        COMPONENT_OPS(ECS::Components::Lifetime)
-    },
-
     // Camera 3D
     // EVERYTHING FROM THIS POINT IS JUST THE SAME THING
     {
@@ -143,6 +111,16 @@ static std::vector<ComponentUIMetadata> m_registry = {
             {"Width", 0}, {"Height", 0}
         }; },
         COMPONENT_OPS(ECS::Components::SpriteRenderer2D)
+    },
+
+    // Sprite Flip 2D
+    {
+        "Sprite Flip 2D", "SpriteFlip2D", "ECS::Components::SpriteFlip2D", true,
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderSpriteFlip2D(d); },
+        []() { return nlohmann::json{
+            {"FlipX", false}, {"FlipY", false}
+        }; },
+        COMPONENT_OPS(ECS::Components::SpriteFlip2D)
     },
 
     // Sprite Sheet Animation 2D
@@ -248,14 +226,14 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Shape Circle 2D
     {
         "Shape Circle", "ShapeCircle2D", "ECS::Components::ShapeCircle2D", true,
-            [](ComponentUI& ui, nlohmann::json& d) { ui.RenderShapeCircle2D(d); },
-            []() { return nlohmann::json{
-                {"Radius", 0.5f},
-                {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
-                {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-                {"Thickness", 1.0f}, {"Filled", false}
+        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderShapeCircle2D(d); },
+        []() { return nlohmann::json{
+            {"Radius", 0.5f},
+            {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
+            {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
+            {"Thickness", 1.0f}, {"Filled", false}
         }; },
-            COMPONENT_OPS(ECS::Components::ShapeCircle2D)
+        COMPONENT_OPS(ECS::Components::ShapeCircle2D)
     },
 
     // Shape Box 2D
@@ -284,98 +262,6 @@ static std::vector<ComponentUIMetadata> m_registry = {
         COMPONENT_OPS(ECS::Components::ShapeLine2D)
     },
 
-    // Light 2D
-    {
-        "Light 2D", "Light2D", "ECS::Components::Light2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLight2D(d); },
-        []() { return nlohmann::json{
-            {"LightType", 0},
-            {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
-            {"Direction", {{"X", 0.0f}, {"Y", -1.0f}, {"Z", 0.0f}}},
-            {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-            {"Intensity", 1.0f}, {"Range", 10.0f}, {"CastsShadows", false}
-        }; },
-        COMPONENT_OPS(ECS::Components::Light2D)
-    },
-
-    // Text
-    {
-        "Text", "Text", "ECS::Components::Text", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderText(d); },
-        []() { return nlohmann::json{
-            {"Content", "Text"},
-            {"FontPath", "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf"},
-            {"PixelSize", 24.0f},
-            {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-            {"Anchor", 0}
-        }; },
-        COMPONENT_OPS(ECS::Components::Text)
-    },
-
-    // Animation State 2D
-    {
-        "Animation State 2D", "AnimationState2D", "ECS::Components::AnimationState2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderAnimationState2D(d); },
-        []() { return nlohmann::json{
-            {"CurrentFrame", 0}, {"TimeAccumulator", 0.0f}, {"Finished", false}
-        }; },
-        COMPONENT_OPS(ECS::Components::AnimationState2D)
-    },
-
-    // Audio Source
-    {
-        "Audio Source",                    // DisplayName 
-        "AudioSource",                     // TypeName in JSON *match entityserializerzz
-        "ECS::Components::AudioSource",    // FullTypeName (for clarity)
-        true,                              // Can byebye
-
-        // RenderUI -> use ComponentUI's RenderAudioSource
-        [](ComponentUI& ui, nlohmann::json& data)
-        {
-            ui.RenderAudioSource(data);
-        },
-
-    // Defaults -> initial JSON for a new AudioSource
-    []() -> nlohmann::json
-    {
-        return nlohmann::json{
-            { "CueId",       0 },
-            { "Volume",      1.0f },
-            { "Pitch",       1.0f },
-            { "Loop",        false },
-            { "PlayOnStart", false },
-            { "Spatial3D",   false }
-        };
-    },
-
-    // Has Component
-    [](ECS::World* world, ECS::Entity e) -> bool
-    {
-        return world->Has<ECS::Components::AudioSource>(e);
-    },
-
-    // Add Component
-    [](ECS::World* world, ECS::Entity e, const nlohmann::json& data)
-    {
-        ECS::Components::AudioSource comp{};
-        from_json(data, comp);  // uses your NLOHMANN_DEFINE_TYPE_* mapping
-        world->Add<ECS::Components::AudioSource>(e, comp);
-    },
-
-    // Remove Component
-    [](ECS::World* world, ECS::Entity e)
-    {
-        world->Remove<ECS::Components::AudioSource>(e);
-    },
-
-    // Apply To Entity (update existing component from JSON)
-    [](ECS::World* world, ECS::Entity e, const nlohmann::json& data)
-    {
-        auto& comp = world->Get<ECS::Components::AudioSource>(e);
-        from_json(data, comp);
-    }
-    },
-
     // Layer
     {
         "Layer 2D", "Layer", "ECS::Components::Layer", true,
@@ -383,23 +269,8 @@ static std::vector<ComponentUIMetadata> m_registry = {
             []() { return nlohmann::json{
                 {"Id", 0}}; },
             COMPONENT_OPS(ECS::Components::Layer)
-    },
-
-    // Script Instance
-    {
-        "Script Instance", "ScriptInstance", "ECS::Components::ScriptInstance", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderScriptInstance(d); },
-        []() { return nlohmann::json{
-            {"TypeName", ""},
-            {"ScriptPath", ""},
-            {"ManagedHandle", 0},
-            {"TypeHash", 0},
-            {"Initialized", false}
-        }; },
-        COMPONENT_OPS(ECS::Components::ScriptInstance)
     }
 };
-
 
 // -----------------------------------------------------------------------------
 // Registry Class

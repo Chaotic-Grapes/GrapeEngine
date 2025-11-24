@@ -75,17 +75,9 @@ Logger::~Logger() {
  * @param level   The severity level of the message.
  * @param message The text message to log.
  */
-void Logger::Log(const LogLevel level, const std::string& message, LogSource source) {
+void Logger::Log(const LogLevel level, const std::string& message) {
 	if (!m_LogConsoleEnabled && !m_infoStream.is_open() && !m_errorStream.is_open()) {
 		return; // No logging destination available
-	}
-
-	// Get timestamp once for this log call
-	std::string timestamp = _getCurrentTimestamp("%H:%M:%S");
-
-	// Forward to console callback if registered
-	if (m_consoleCallback) {
-		m_consoleCallback(level, source, timestamp, message);
 	}
 
 	switch (level) {
@@ -99,8 +91,8 @@ void Logger::Log(const LogLevel level, const std::string& message, LogSource sou
 }
 
 
-void Logger::Log(const LogLevel level, const std::stringstream& oss, LogSource source) {
-	Log(level, oss.str(), source); // forward to the string version
+void Logger::Log(const LogLevel level, const std::stringstream& oss) {
+	Log(level, oss.str()); // forward to the string version
 }
 
 /**

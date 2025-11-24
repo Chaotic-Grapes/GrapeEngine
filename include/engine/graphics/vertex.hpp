@@ -25,8 +25,4 @@ struct Vertex {
     glm::vec4 color;
     float     texIndex; // filled by renderer when you pass a textureId
     float     strokePx; // stroke width in pixels (0 = filled)
-
-    // Attributes for emissive vertices
-    float emissiveTexIndex; // (location 5)
-    float emissiveStrength; // (location 5)
 };

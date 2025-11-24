@@ -11,17 +11,14 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 */
 /* End Header *******************************************************************/
 
-#include "LevelEditor.h"
+#include "../../include/editor/LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
-#include "EditorStyle.h"
 #include "graphics/graphicsConfig.hpp"
 #include "ecs/systems/RendererSystem.h"
 #include <imgui_internal.h>
 #include <core/Application.h>
 #include "services/Time.h"
-#include "AudioAssetLibrary.h"
-#include "UndoSystem.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
@@ -32,10 +29,7 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Sce
 }
 
 // Destroy the editor instance without owning the world
-LevelEditor::~LevelEditor() {
-    // Shutdown console panel to disconnect Logger callback
-    m_console.Shutdown();
-}
+LevelEditor::~LevelEditor() {}
 
 // -------------------------------------------------------------------------
 // Panel Registration System
@@ -103,37 +97,30 @@ void LevelEditor::_buildDockLayout() {
     // Target layout: left hierarchy, center viewport with controls on top,
     // bottom asset browser, right strip for inspector/prefab editors
 
-    // First split: toolbar at the very top (calculate ratio from config)
-    float toolbarRatio = m_config.ToolbarHeight / vp->Size.y;
-    ImGuiID toolbarNode, mainAreaNode;
-    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Up, toolbarRatio, &toolbarNode, &mainAreaNode);
-
-    // Hide tab bar and disable resizing on toolbar node
-    ImGuiDockNode* toolbarDockNode = ImGui::DockBuilderGetNode(toolbarNode);
-    toolbarDockNode->LocalFlags |= ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_NoResize;
-
     ImGuiID leftCenterNode, rightNode;
-    // Split main area: carve right strip (25% width) for inspectors
+    // Split root: carve right strip (25% width) for inspectors
     // Params: (source_node, direction, size_ratio, out_id_primary, out_id_remaining)
-    ImGui::DockBuilderSplitNode(mainAreaNode, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
+    ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Right, 0.25f, &rightNode, &leftCenterNode);  // Reserve right strip
 
     ImGuiID topSection, assetBrowserNode;
-    // Split left-center area vertically: top work area (65%), bottom asset browser (35%)
+    // Split main area vertically: top work area (65%), bottom asset browser (35%)
     ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.65f, &topSection, &assetBrowserNode); // Split for assets
 
-    ImGuiID leftTopNode, viewportNode;
-    // Split top work area horizontally: left hierarchy (33%), center viewport (67%)
-    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &viewportNode); // Hierarchy strip
+    ImGuiID leftTopNode, centerTopSection;
+    // Split top work area horizontally: left hierarchy (33%), center viewport/controls (67%)
+    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &centerTopSection); // Hierarchy strip
+
+    ImGuiID centerControlsNode, centerViewportNode;
+    // Split center area vertically: controls bar (~15.4%), viewport below
+    ImGui::DockBuilderSplitNode(centerTopSection, ImGuiDir_Up, 0.154f, &centerControlsNode, &centerViewportNode); // Controls above viewport
 
     // Map panels to target nodes to realize the layout
-    ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
-    ImGui::DockBuilderDockWindow("Scene", viewportNode);
-    ImGui::DockBuilderDockWindow("Game", viewportNode);
+    ImGui::DockBuilderDockWindow("Game Controls", centerControlsNode);
+    ImGui::DockBuilderDockWindow("Viewport", centerViewportNode);
+    ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
-    ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
-    ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
 
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
     m_dockLayoutBuilt = true;                // Mark layout as built
@@ -176,7 +163,7 @@ void LevelEditor::_renderDockSpace() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));     // No padding; dockspace fills fully
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, EditorStyle::Transparent);       // Transparent host background
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent host background
 
     // Begin invisible host window
     ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);
@@ -198,40 +185,19 @@ void LevelEditor::_renderDockSpace() {
 void LevelEditor::Initialize(GLFWwindow* pWin) {
     if (!pWin) return;
 
+    auto& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
-
-    // Initialize audio asset library:
-    // this will scan for folder assets/Audio
-    AudioAssetLibrary::Get().Refresh("assets/Audio");
-
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
     _loadFonts();
 
     Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
     m_fileMenu.Initialize(sm);
 
-    // Wire up fonts to file menu so it can render bold asterisk
-    m_fileMenu.SetFonts(m_mainFont, m_boldFont);
-
-    // Wire up hierarchy panel to file menu for entity order preservation
-    m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);
-
-    // Wire up file menu to entity actions for dirty tracking
-    m_entityActions.SetFileMenu(&m_fileMenu);
-
-    // Undo system
-    m_entityActions.SetUndoSystem(&m_undoSystem);
-
-    if (m_world) {
-        m_undoSystem.Initialize(m_world, 50);
-        // LOG_INFO("[LevelEditor] Undo system initialized with world");
-    }
-
     // Register all panels with their initialization and render callbacks.
     // Centralizes panel lifecycle management and reduces code duplication.
     _registerPanel("Playback Controls",
         [this]() {
-            m_playback.Initialize(m_mainFont, m_symbolsFont, m_config.ToolbarHeight);
+            m_playback.Initialize(m_mainFont, m_symbolsFont);
             // Register playback state change callback
             m_playback.OnStateChanged([this](Playback::GameState oldState, Playback::GameState newState) {
                 _onPlaybackStateChanged(oldState, newState);
@@ -250,59 +216,33 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         [this](ECS::World* w) { m_assetBrowser.SetWorld(w); }
     );
 
-    _registerPanel("Scene",
+    _registerPanel("Editor Core",
         [this]() {
             Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
             m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
-            m_viewport.SetUndoSystem(&m_undoSystem);
             // Register viewport selection callback
             m_viewport.OnSelectionChanged([this](EntityId id) {
                 _onViewportSelectionChanged(id);
                 });
         },
         [this]() { m_viewport.ShowEditorWindows(); },
-        [this](ECS::World* w) { m_viewport.SetWorld(w); m_viewport.SetUndoSystem(&m_undoSystem); }
+        [this](ECS::World* w) { m_viewport.SetWorld(w); }
     );
 
     _registerPanel("Hierarchy",
-        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); 
-                   m_hierarchyWindow.SetViewport(&m_viewport); 
-        },
+        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); },
         [this]() { m_hierarchyWindow.Render(); },
         [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
     );
 
     _registerPanel("Inspector",
-        [this]() {
-            m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
-            // WIRE UP FILE MENU to inspector
-            m_inspector.SetFileMenu(&m_fileMenu);
-            m_inspector.SetUndoSystem(&m_undoSystem);
-        },
+        [this]() { m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world); },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
     );
 
-    // Register Console Panel
-    _registerPanel("Console",
-        [this]() {
-            m_console.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
-
-            // Connect Logger to Console - use singleton instance
-            Logger::Get().SetConsoleCallback([this](LogLevel level, LogSource source,
-                const std::string& timestamp, const std::string& message) {
-                    m_console.AddMessage(level, source, timestamp, message);
-                });
-        },
-        [this]() { m_console.Render(); },
-        nullptr
-    );
-
     // Initialize all registered panels
     _initializePanels();
-
-    // Wire up file menu to viewport after panels are initialized
-    m_viewport.SetFileMenu(&m_fileMenu);
 
     // Set up hierarchy selection callback to sync with inspector
     m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
@@ -384,7 +324,7 @@ void LevelEditor::Update() {
     // Apply global shortcuts
     m_fileMenu.HandleShortcuts(m_uiScale);
 
-    // Auto-sync to active scene world if it changed (e.g. via File > New Scene)
+    // Auto-sync to active scene world if it changed (e.g., via File > New Scene)
     if (Engine::CORE) {
         auto& sm = Engine::CORE->GetSceneManager();
         auto* active = sm.GetActive();
@@ -397,11 +337,6 @@ void LevelEditor::Update() {
 
     m_playback.ProcessInput(); // Handle playback hotkeys and actions
     m_viewport.HandleInWorldInteraction(); // Handle viewport interactions and camera input control
-
-    if (m_playback.IsPlaying()) {
-        Engine::CORE->GetSceneManager().Update(); // Updates scenemanager to run Audio
-    }
-
 }
 
 // -------------------------------------------------------------------------
@@ -411,31 +346,20 @@ void LevelEditor::Update() {
 void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback::GameState newState) {
     // Any editor-specific logic that needs to happen on state change goes here
     // (The time scale is already handled by Playback itself)
+
+    // Example: You could emit events to other systems, update UI, etc.
     LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
-
-    // Handle state transitions
-    if (newState == Playback::GameState::Stopped) {
-        // Note: Entity IDs are now preserved during restore, so selection can remain valid
-        // However, we still clear selection as a safe UX pattern when stopping play mode
-        m_hierarchyWindow.SetSelectedEntity(0);
-        m_inspector.ClearSelection();
-
-        // Rebuild entity order to reflect restored hierarchy
-        m_hierarchyWindow.RebuildEntityOrder();
-    }
 }
 
 // Handle viewport selection changes (called by Viewport via callback)
 void LevelEditor::_onViewportSelectionChanged(EntityId id) {
     if (!m_world) {
         m_inspector.ClearSelection();
-        m_hierarchyWindow.SetSelectedEntity(0);
         return;
     }
 
     if (id == 0 || id == ECS::Entity::NPOS32) {
         m_inspector.ClearSelection();
-        m_hierarchyWindow.SetSelectedEntity(0);
         return;
     }
 
@@ -443,11 +367,10 @@ void LevelEditor::_onViewportSelectionChanged(EntityId id) {
     ECS::Entity e = m_world->Resolve(id);
     if (m_world->IsAlive(e)) {
         m_inspector.InspectEntity(id);
-        m_hierarchyWindow.SetSelectedEntity(id);
+        // Optionally: m_hierarchyWindow.HighlightEntity(id);
     }
     else {
         m_inspector.ClearSelection();
-        m_hierarchyWindow.SetSelectedEntity(0);
     }
 }
 
@@ -485,9 +408,6 @@ void LevelEditor::Render() {
 // Update the world reference and propagate it to all editor panels
 void LevelEditor::SetWorld(ECS::World* world) {
     m_world = world; // Store new world
-
-    // Undo system
-    if (world) { m_undoSystem.Initialize(world, 50); }
 
     // Propagate world to all registered panels using centralized system
     _updatePanelWorlds(world);

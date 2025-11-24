@@ -49,50 +49,7 @@
                     "Data": {
                         "Position": {
                             "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "AspectRatio": 1.7777777910232544,
-                        "FOV": 45.0,
-                        "FarPlane": 100.0,
-                        "NearPlane": 0.10000000149011612,
-                        "OrthoSize": 10.0,
-                        "UsePerspective": false
-                    },
-                    "TypeName": "Camera3D"
-                },
-                {
-                    "Data": {
-                        "Value": "EditorCamera"
-                    },
-                    "TypeName": "Name"
-                }
-            ],
-            "EntityId": 6
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 7.619999885559082,
-                            "Y": 0.0,
+                            "Y": -4.400000095367432,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -114,7 +71,7 @@
                         "Flags": 1,
                         "HalfExtents": {
                             "X": 16.0,
-                            "Y": 4.5
+                            "Y": 0.10000000149011612
                         },
                         "LayerMask": 4294967295,
                         "Offset": {
@@ -133,7 +90,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "Right Wall"
+                        "Value": "Bottom Wall"
                     },
                     "TypeName": "Name"
                 },
@@ -147,8 +104,8 @@
                         },
                         "Filled": true,
                         "HalfExtents": {
-                            "X": 0.10000000149011612,
-                            "Y": 4.5
+                            "X": 16.0,
+                            "Y": 0.10000000149011612
                         },
                         "Offset": {
                             "X": 0.0,
@@ -159,15 +116,15 @@
                     "TypeName": "ShapeBox2D"
                 }
             ],
-            "EntityId": 206158430209
+            "EntityId": 4294967297
         },
         {
             "Components": [
                 {
                     "Data": {
                         "Position": {
-                            "X": 0.6260800361633301,
-                            "Y": 7.966901779174805,
+                            "X": 0.0,
+                            "Y": 4.400000095367432,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -234,7 +191,7 @@
                     "TypeName": "ShapeBox2D"
                 }
             ],
-            "EntityId": 206158430210
+            "EntityId": 4294967298
         },
         {
             "Components": [
@@ -309,15 +266,15 @@
                     "TypeName": "ShapeBox2D"
                 }
             ],
-            "EntityId": 206158430211
+            "EntityId": 3
         },
         {
             "Components": [
                 {
                     "Data": {
                         "Position": {
-                            "X": -0.13180653750896454,
-                            "Y": 4.760547637939453,
+                            "X": 7.619999885559082,
+                            "Y": 0.0,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -333,523 +290,13 @@
                         }
                     },
                     "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
                 },
                 {
                     "Data": {
                         "Flags": 1,
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.4000000059604645
-                    },
-                    "TypeName": "CircleCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.8845645785331726,
-                            "G": 0.3584303557872772,
-                            "R": 0.27080151438713074
-                        },
-                        "Filled": true,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.4000000059604645,
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeCircle2D"
-                }
-            ],
-            "EntityId": 206158430212
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -2.3785078525543213,
-                            "Y": 4.64263391494751,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 1,
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.4000000059604645
-                    },
-                    "TypeName": "CircleCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.8845645785331726,
-                            "G": 0.3584303557872772,
-                            "R": 0.27080151438713074
-                        },
-                        "Filled": true,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.4000000059604645,
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeCircle2D"
-                }
-            ],
-            "EntityId": 206158430213
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -1.9043049812316895,
-                            "Y": 6.143561840057373,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 1,
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.4000000059604645
-                    },
-                    "TypeName": "CircleCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.8845645785331726,
-                            "G": 0.3584303557872772,
-                            "R": 0.27080151438713074
-                        },
-                        "Filled": true,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.4000000059604645,
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeCircle2D"
-                }
-            ],
-            "EntityId": 73014444039
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -1.2701354026794434,
-                            "Y": 4.701592922210693,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 1,
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.4000000059604645
-                    },
-                    "TypeName": "CircleCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.8845645785331726,
-                            "G": 0.3584303557872772,
-                            "R": 0.27080151438713074
-                        },
-                        "Filled": true,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.4000000059604645,
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeCircle2D"
-                }
-            ],
-            "EntityId": 73014444040
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 3.762476921081543,
-                            "Y": 4.7310686111450195,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 1,
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.6000000238418579
-                    },
-                    "TypeName": "CircleCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.8845645785331726,
-                            "G": 0.3584303557872772,
-                            "R": 0.27080151438713074
-                        },
-                        "Filled": true,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Radius": 0.6000000238418579,
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeCircle2D"
-                }
-            ],
-            "EntityId": 73014444041
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -0.42966747283935547,
-                            "Y": -1.7020132541656494,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
                         "HalfExtents": {
                             "X": 16.0,
-                            "Y": 0.699999988079071
+                            "Y": 0.10000000149011612
                         },
                         "LayerMask": 4294967295,
                         "Offset": {
@@ -868,28 +315,9 @@
                 },
                 {
                     "Data": {
-                        "Value": "Bottom Wall"
+                        "Value": "Right Wall"
                     },
                     "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.10000000149011612,
-                        "PositionCorrectPercent": 0.20000000298023224,
-                        "Restitution": 0.0
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 1,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 0.0,
-                        "Mass": 0.0
-                    },
-                    "TypeName": "Rigidbody2D"
                 },
                 {
                     "Data": {
@@ -901,8 +329,8 @@
                         },
                         "Filled": true,
                         "HalfExtents": {
-                            "X": 16.0,
-                            "Y": 0.699999988079071
+                            "X": 0.10000000149011612,
+                            "Y": 4.5
                         },
                         "Offset": {
                             "X": 0.0,
@@ -913,15 +341,15 @@
                     "TypeName": "ShapeBox2D"
                 }
             ],
-            "EntityId": 73014444042
+            "EntityId": 4
         },
         {
             "Components": [
                 {
                     "Data": {
                         "Position": {
-                            "X": 2.5043225288391113,
-                            "Y": 4.7310686111450195,
+                            "X": 0.0,
+                            "Y": 1.5503358840942383,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -940,25 +368,15 @@
                 },
                 {
                     "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 0.5,
-                            "Y": 0.5
-                        },
+                        "Flags": 1,
                         "LayerMask": 4294967295,
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "Rotation": 0.0
+                        "Radius": 0.4000000059604645
                     },
-                    "TypeName": "BoxCollider2D"
+                    "TypeName": "CircleCollider2D"
                 },
                 {
                     "Data": {
@@ -968,143 +386,17 @@
                 },
                 {
                     "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone)"
+                        "Value": "Ball"
                     },
                     "TypeName": "Name"
                 },
                 {
                     "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
                         "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.185486301779747,
-                            "G": 0.185486301779747,
-                            "R": 0.7730671167373657
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 0.5,
-                            "Y": 0.5
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.10000000149011612
-                    },
-                    "TypeName": "ShapeBox2D"
-                }
-            ],
-            "EntityId": 73014444043
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -3.8463516235351563,
-                            "Y": 4.701589107513428,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
                         "Flags": 0,
-                        "HalfExtents": {
-                            "X": 0.800000011920929,
-                            "Y": 0.5
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone) (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
                         "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
+                        "InverseMass": 1.0,
+                        "LinearDamping": 0.0,
                         "Mass": 3.0
                     },
                     "TypeName": "Rigidbody2D"
@@ -1113,464 +405,25 @@
                     "Data": {
                         "Color": {
                             "A": 1.0,
-                            "B": 0.21518303453922272,
-                            "G": 0.21518303453922272,
-                            "R": 0.7848169803619385
+                            "B": 0.8845645785331726,
+                            "G": 0.3584303557872772,
+                            "R": 0.27080151438713074
                         },
                         "Filled": true,
-                        "HalfExtents": {
-                            "X": 0.800000011920929,
-                            "Y": 0.5
-                        },
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "Thickness": 0.10000000149011612
+                        "Radius": 0.4000000059604645,
+                        "Thickness": 1.0
                     },
-                    "TypeName": "ShapeBox2D"
+                    "TypeName": "ShapeCircle2D"
                 }
             ],
-            "EntityId": 73014444044
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -1.8992092609405518,
-                            "Y": 3.267860174179077,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 1.5,
-                            "Y": 0.5
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone) (Clone) (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.21518303453922272,
-                            "G": 0.21518303453922272,
-                            "R": 0.7848169803619385
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 1.5,
-                            "Y": 0.5
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.10000000149011612
-                    },
-                    "TypeName": "ShapeBox2D"
-                }
-            ],
-            "EntityId": 64424509453
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 1.6385724544525146,
-                            "Y": 6.32478141784668,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 1.5,
-                            "Y": 0.5
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone) (Clone) (Clone) (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.21518303453922272,
-                            "G": 0.21518303453922272,
-                            "R": 0.7848169803619385
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 1.5,
-                            "Y": 0.5
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.10000000149011612
-                    },
-                    "TypeName": "ShapeBox2D"
-                }
-            ],
-            "EntityId": 51539607566
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -5.162108898162842,
-                            "Y": 6.231790542602539,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 0.800000011920929,
-                            "Y": 0.5
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone) (Clone) (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.21518303453922272,
-                            "G": 0.21518303453922272,
-                            "R": 0.7848169803619385
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 0.800000011920929,
-                            "Y": 0.5
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.10000000149011612
-                    },
-                    "TypeName": "ShapeBox2D"
-                }
-            ],
-            "EntityId": 47244640271
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -5.919666767120361,
-                            "Y": 3.7599270343780518,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 0.800000011920929,
-                            "Y": 0.5
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Value": "Ball (Clone) (Clone) (Clone) (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.20000000298023224,
-                        "PositionCorrectPercent": 0.4000000059604645,
-                        "Restitution": 0.800000011920929
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 2,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 3.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.21518303453922272,
-                            "G": 0.21518303453922272,
-                            "R": 0.7848169803619385
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 0.800000011920929,
-                            "Y": 0.5
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.10000000149011612
-                    },
-                    "TypeName": "ShapeBox2D"
-                }
-            ],
-            "EntityId": 38654705680
+            "EntityId": 4294967301
         }
     ],
-    "EntityCount": 17,
+    "EntityCount": 6,
     "SceneName": "Scene",
     "SystemProfile": {
         "Systems": []

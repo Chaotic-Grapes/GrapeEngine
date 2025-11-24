@@ -14,7 +14,7 @@ direct ECS manipulation.
 */
 /* End Header *******************************************************************/
 
-#include "EditorEntityActions.h"
+#include "../editor/EditorEntityActions.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
 #include "ecs/Hierarchy.h" 
@@ -23,14 +23,6 @@ direct ECS manipulation.
 #include <functional>
 #include <unordered_map>
 #include <vector>
-
-namespace {
-    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
-        if (fileMenu) {
-            fileMenu->MarkSceneDirty();
-        }
-    }
-}
 
 // -----------------------------------------------------------------------------
 // Construction
@@ -65,12 +57,6 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     // Mandatory LocalTransform
     world.Set<ECS::Components::LocalTransform>(e, ECS::Components::LocalTransform{});
 
-    // Ensure WorldTransform exists so hierarchy/system queries that require it see the entity
-    // Initialize as dirty so systems will compute it on the next update
-    ECS::Components::WorldTransform wt{};
-    wt.Dirty = true;
-    world.Set<ECS::Components::WorldTransform>(e, wt);
-
     // Default render layer (0) so the renderer includes the entity
     world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
 
@@ -78,15 +64,10 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     if (parent != ECS::Entity::NPOS32) {
         ECS::Entity p = world.Resolve(parent);
         if (world.IsAlive(p)) {
-            world.Attach(e, p);
+            world.Set<ECS::Parent>(e, ECS::Parent{ p });
         }
     }
 
-    // For undo system
-    if (m_undoSystem) { m_undoSystem->RecordEntityCreation(e.Index); }
-
-    // MARK SCENE AS DIRTY
-    MarkSceneDirtyIfNeeded(m_fileMenu);
     return e.Index;
 }
 
@@ -97,9 +78,6 @@ void EntityActions::RemoveEntity(EntityId id) {
 
     ECS::Entity entity = world.Resolve(id);
     if (entity.IsNull() || !world.IsAlive(entity)) return;
-
-    // Record for undo system BEFORE deletion so the entity still exists for snapshotting
-    if (m_undoSystem) { m_undoSystem->RecordEntityDeletion(id); }
 
     // Recursive lambda to delete entity and all children
     std::function<void(EntityId)> deleteRecursive = [&](EntityId entityId) {
@@ -124,9 +102,6 @@ void EntityActions::RemoveEntity(EntityId id) {
         };
 
     deleteRecursive(id);
-
-    // MARK SCENE AS DIRTY
-    MarkSceneDirtyIfNeeded(m_fileMenu);
 }
 
 // Remove every entity in the scene
@@ -137,8 +112,12 @@ void EntityActions::ClearAllEntities() {
     std::vector<ECS::Entity> allEntities;
     world.Each([&](ECS::Entity e) {
         // Keep editor camera
-        if (world.Has<ECS::Components::CameraEditor3D>(e)) {
-            return;
+        if (world.Has<ECS::Components::Name>(e)) {
+            const auto& name = world.Get<ECS::Components::Name>(e);
+            if (std::strcmp(name.Value, "EditorCamera") == 0 ||
+                std::strcmp(name.Value, "Editor Camera") == 0) {
+                return;
+            }
         }
         allEntities.push_back(e);
         });
@@ -146,9 +125,6 @@ void EntityActions::ClearAllEntities() {
     for (const auto& e : allEntities) {
         world.Destroy(e);
     }
-
-    // MARK SCENE AS DIRTY
-    MarkSceneDirtyIfNeeded(m_fileMenu);
 }
 
 // -----------------------------------------------------------------------------
@@ -190,13 +166,13 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         if (newParentId != ECS::Entity::NPOS32) {
             ECS::Entity newParent = world.Resolve(newParentId);
             if (!newParent.IsNull() && world.IsAlive(newParent)) {
-                world.Attach(clone, newParent);
+                world.Set<ECS::Parent>(clone, ECS::Parent{ newParent });
             }
         }
         else {
             // Remove parent component if cloning as root
             if (world.Has<ECS::Parent>(clone)) {
-                world.Detach(clone);
+                world.Remove<ECS::Parent>(clone);
             }
         }
 
@@ -222,15 +198,13 @@ EntityId EntityActions::CloneEntity(EntityId id) {
     // Get the parent of the original entity (if any)
     EntityId originalParentId = ECS::Entity::NPOS32;
     if (world.Has<ECS::Parent>(entity)) {
-        const auto& parent = world.ParentOf(entity);
-        originalParentId = parent.Index;
+        const auto& parent = world.Get<ECS::Parent>(entity);
+        originalParentId = parent.ParentEntity.Index;
     }
 
     // Clone the entity hierarchy
     ECS::Entity cloned = cloneRecursive(id, originalParentId);
 
-    // MARK SCENE AS DIRTY
-    MarkSceneDirtyIfNeeded(m_fileMenu);
     return cloned.Index;
 }
 
@@ -260,18 +234,17 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
         }
 
         if (!isDescendant) {
-            // Use Attach to set the new parent (handles hierarchy index updates automatically)
-            world.Attach(childEntity, newParentEntity);
+            // Set the new parent
+            world.Set<ECS::Parent>(childEntity, ECS::Parent{ newParentEntity });
         }
         else {
             LOG_WARNING("Cannot parent entity to its own descendant: this would create a cyclic hierarchy");
         }
     }
     else {
-        // Use Detach to remove parent (make root entity)
-        world.Detach(childEntity);
+        // Remove parent (make root entity)
+        if (world.Has<ECS::Parent>(childEntity)) {
+            world.Remove<ECS::Parent>(childEntity);
+        }
     }
-
-    // MARK SCENE AS DIRTY (only if operation succeeded)
-    MarkSceneDirtyIfNeeded(m_fileMenu);
 }

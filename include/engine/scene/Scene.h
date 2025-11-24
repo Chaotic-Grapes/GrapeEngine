@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Hierarchy.h"
 #include "ecs/World.h"
 #include "scene/LayerManager.h"
+#include "scene/SystemProfile.h"
 #include <memory>
 #include <string>
 
@@ -102,6 +103,18 @@ namespace Scenes {
          * @return Const reference to the LayerManager instance.
          */
         const LayerManager& GetLayers() const { return m_layers; }
+
+        /**
+         * @brief Access the SystemProfile for this scene.
+         * @return Reference to the SystemProfile instance.
+         */
+        SystemProfile& GetSystemProfile()             { return m_systemProfile; }
+
+        /**
+         * @brief Access the SystemProfile for this scene (const version).
+         * @return Const reference to the SystemProfile instance.
+         */
+        const SystemProfile& GetSystemProfile() const { return m_systemProfile; }
 
         // ********************** Entity Management ********************** //
 
@@ -180,6 +193,7 @@ namespace Scenes {
         std::string m_path;                         ///< Scene file path
         ECS::World m_world;                         ///< ECS world containing all entities
         LayerManager m_layers;                      ///< Layer management
+        SystemProfile m_systemProfile;              ///< System execution configuration
     };
 }
 

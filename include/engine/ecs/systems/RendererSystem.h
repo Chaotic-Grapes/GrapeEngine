@@ -22,18 +22,23 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef RENDERER2D_H
 #define RENDERER2D_H
 
+// ============================================================================
 // Third-Party Includes
+// ============================================================================
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
+// ============================================================================
 // Engine Includes
+// ============================================================================
 #include "Color.h"
 #include "ecs/World.h"
 #include "Math/Vector2D.h"
-#include "EditorFileMenu.h"
 
+// ============================================================================
 // Graphics Includes
+// ============================================================================
 #include "graphics/shader.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/debugDraw2D.hpp"
@@ -42,10 +47,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
 
-namespace Editor {
-    // Undo System
-    class UndoSystem;
-}
 // ============================================================================
 // ImGuizmo Includes
 // ============================================================================
@@ -97,18 +98,12 @@ namespace ECS {
         bool IsUsingEditorCamera() const { return m_useEditorCamera; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
         uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
-        Engine::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
-
         // Rebind the renderer to a new world (recreate editor camera)
         void BindWorld(World& world);
 
 
         // Enable/disable editor camera input (pan/orbit/zoom) based on viewport hover
         void SetEditorInputEnabled(bool enabled) { m_editorInputEnabled = enabled; }
-        void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
-        
-        // Force the renderer to always use scene camera (for game window)
-        void SetForceSceneCamera(bool force) { m_forceSceneCamera = force; }
 
         // ====================================================================
         // Temporary Accessors (For Stress Testing - Remove Later)
@@ -127,7 +122,6 @@ namespace ECS {
 
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
 
-        void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
         /**
         * @brief Renders the ImGuizmo overlay and allows manipulation of the selected entity.
         * * This function must be called within the ImGui window context that displays the scene texture.
@@ -168,7 +162,6 @@ namespace ECS {
 
         bool m_initialized = false;                                 ///< Has Initialize() been called?
         bool m_useEditorCamera = true;                              ///< Use editor vs ECS cameras
-        bool m_forceSceneCamera = false;                            ///< Force use of scene camera (for game window)
         int m_activeCameraIndex = 0;                                ///< Active ECS camera (future use)
         glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();    ///< Projection matrix
         uint16_t m_uiLayerId = 0xFFFF;  // Default invalid value
@@ -198,7 +191,6 @@ namespace ECS {
         std::unique_ptr<Renderer> m_renderer;                   ///< Low-level batch renderer
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         std::unique_ptr<Engine::EditorCamera> m_editorCamera;   ///< Editor camera
-        EditorFileMenu* m_fileMenu = nullptr;
 
         // Whether editor camera should process input this frame (set by editor viewport hover)
         bool m_editorInputEnabled = true;
@@ -210,7 +202,6 @@ namespace ECS {
         std::unique_ptr<Shader> m_shader;          ///< Main batched geometry shader
         std::unique_ptr<Shader> m_textShader;      ///< SDF text rendering shader
         std::unique_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
-        std::unique_ptr<Shader> m_blitShader;
 
         // Post-process shaders
         std::unique_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass
@@ -266,14 +257,6 @@ namespace ECS {
             float screenWidth,
             float screenHeight,
             float scaleFactor) const;
-
-        // ====================================================================
-        // Undo System
-        // ==================================================================== 
-        Editor::UndoSystem* m_undoSystem = nullptr;
-
-        Quaternion m_dragStartEntityRot;
-        Vector3D m_dragStartEntityScale;
     };
 
 } // namespace ECS

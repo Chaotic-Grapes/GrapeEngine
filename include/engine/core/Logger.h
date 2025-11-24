@@ -9,7 +9,7 @@
     do {											\
         std::ostringstream ossMacro;				\
         ossMacro << msg;                            \
-        Logger::Get().Log(level, ossMacro.str(), LogSource::ENGINE);   \
+        Logger::Get().Log(level, ossMacro.str());   \
     } while(0)
 
 #define LOG_TRACE(msg)    LOG_STREAM(LogLevel::TRACE, msg)
@@ -24,12 +24,6 @@
 #include <fstream>
 #include <sstream>
 #include <mutex>
-#include <functional>
-
-enum class LogSource {
-	ENGINE,
-	SCRIPT
-};
 
 enum class LogLevel {
 	TRACE,
@@ -62,17 +56,15 @@ public:
 	 * @brief Log a message with a specific log level
 	 * @param level The severity level of the log
 	 * @param message The message to log
-	 * @param source The source of the log (ENGINE or SCRIPT)
 	 */
-	void Log(LogLevel level, const std::string& message, LogSource source = LogSource::ENGINE);
+	void Log(LogLevel level, const std::string& message);
 
 	/**
 	 * @brief Log a message from a stringstream with a specific log level
 	 * @param level The severity level of the log
 	 * @param oss The stringstream containing the message to log
-	 * @param source The source of the log (ENGINE or SCRIPT)
 	 */
-	void Log(LogLevel level, const std::stringstream& oss, LogSource source = LogSource::ENGINE);
+	void Log(LogLevel level, const std::stringstream& oss);
 
 	/**
 	 * @brief Set the log file name
@@ -86,11 +78,6 @@ public:
 	 * @param enable True to enable console logging, false to disable
 	 */
 	void SetLogConsole(bool enable);
-	void EnableDebug(bool enable) { m_debugEnabled = enable; }
-
-	// Console callback for editor integration
-	using ConsoleCallback = std::function<void(LogLevel, LogSource, const std::string&, const std::string&)>;
-	void SetConsoleCallback(ConsoleCallback callback) { m_consoleCallback = callback; }
 
 private:
 	// void _writeCrashLog(LogLevel level, const std::string& message);
@@ -122,9 +109,6 @@ private:
 
 	bool m_LogConsoleEnabled{ true }; // Default to log to console
 	bool m_debugEnabled{ true }; // Default to log debug messages
-
-	// Console callback for editor
-	ConsoleCallback m_consoleCallback;
 };
 
 #endif

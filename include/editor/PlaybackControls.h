@@ -28,7 +28,7 @@ public:
     Playback(ECS::World* world);
     ~Playback();
 
-    void Initialize(ImFont* mainFont, ImFont* symbolsFont, float toolbarHeight = 60.0f);
+    void Initialize(ImFont* mainFont, ImFont* symbolsFont);
     void ProcessInput();
     void Render();
 
@@ -49,10 +49,6 @@ private:
     void _saveWorldState();
     void _restoreWorldState();
     void _changeState(GameState newState);
-    
-    // Helper methods for in-place entity restoration
-    void _restoreEntityState(ECS::Entity entity, const nlohmann::json& entityJson);
-    ECS::Entity _recreateEntityWithId(uint32_t targetId, const nlohmann::json& entityJson);
 
     ECS::World* m_world = nullptr;
     GameState m_gameState = GameState::Stopped;
@@ -62,7 +58,6 @@ private:
     // UI fonts
     ImFont* m_mainFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
-    float m_toolbarHeight = 26.0f;
 
     // Event callback
     std::function<void(GameState, GameState)> m_onStateChanged;

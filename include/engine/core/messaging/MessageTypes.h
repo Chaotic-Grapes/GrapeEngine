@@ -279,17 +279,6 @@ namespace Messaging {
     struct FileDropped {
         std::string filePath;
     };
-
-    // Sent when the editor viewport panel is resized (for camera aspect ratio updates)
-    struct ViewportResized {
-        float Width;
-        float Height;
-        float AspectRatio;
-        
-        ViewportResized(float w, float h)
-            : Width(w), Height(h), AspectRatio(w / h) {
-        }
-    };
 }
 
 #endif // MESSAGETYPES_H

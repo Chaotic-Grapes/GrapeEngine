@@ -61,6 +61,15 @@ internal static partial class InputAPI
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial double GetScrollY();
 
+    // Window dimensions
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetWindowWidth")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int GetWindowWidth();
+
+    [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetWindowHeight")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int GetWindowHeight();
+
     //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_IsKeyPressed", CallingConvention = CallingConvention.Cdecl)]
     //public static extern bool IsKeyPressed(int key);
 
@@ -84,4 +93,10 @@ internal static partial class InputAPI
 
     //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetScrollY", CallingConvention = CallingConvention.Cdecl)]
     //public static extern double GetScrollY();
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetWindowWidth", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern int GetWindowWidth();
+
+    //[DllImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_GetWindowHeight", CallingConvention = CallingConvention.Cdecl)]
+    //public static extern int GetWindowHeight();
 }

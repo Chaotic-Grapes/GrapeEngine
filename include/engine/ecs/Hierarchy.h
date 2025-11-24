@@ -38,28 +38,11 @@ namespace ECS {
          */
         static void UpdateTransforms(World& world) {
             std::vector<Entity> roots; // Entities without parents
-            std::vector<Entity> needsWorldTransform; // Entities missing WorldTransform
 
-            // First pass: Collect entities that need WorldTransform
-            // Don't modify world structure during iteration!
-            world.Each<Components::LocalTransform>([&](const Entity e, Components::LocalTransform&) {
-                if (!world.Has<Components::WorldTransform>(e)) {
-                    needsWorldTransform.push_back(e);
-                }
-            });
-
-            // Add WorldTransform to entities that need it (outside of iteration)
-            for (Entity e : needsWorldTransform) {
-                Components::WorldTransform wt{};
-                wt.Dirty = true;
-                world.Add<Components::WorldTransform>(e, wt);
-            }
-
-            // Find all root entities using World's ParentOf API
-            // Entities are root if they have no parent in the hierarchy index
+            // Find all root entities
+            // Then recursively process their subtrees
             world.Each<Components::LocalTransform, Components::WorldTransform>([&](const Entity e, Components::LocalTransform&, Components::WorldTransform&) {
-                Entity parent = world.ParentOf(e);
-                if (parent.IsNull()) {
+                if (!world.Has<Parent>(e) || world.Get<Parent>(e).ParentEntity.IsNull()) {
                     roots.push_back(e); // No parent, it's a root
                 }
             });
