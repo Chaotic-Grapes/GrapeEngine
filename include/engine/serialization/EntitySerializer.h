@@ -204,11 +204,15 @@ namespace Serialization {
 	public:
 		using SerializeFn = std::function<void(const ECS::World&, ECS::Entity, json&)>;
 		using DeserializeFn = std::function<void(ECS::World&, ECS::Entity, const json&)>;
+		using HasFn = std::function<bool(const ECS::World&, ECS::Entity)>;
+		using RemoveFn = std::function<void(ECS::World&, ECS::Entity)>;
 
 		struct ComponentInfo {
 			std::string Name;
 			SerializeFn Serialize;
 			DeserializeFn Deserialize;
+			HasFn Has;
+			RemoveFn Remove;
 		};
 
 		// Registry: TypeId -> ComponentInfo
@@ -240,6 +244,16 @@ namespace Serialization {
 					}
 					else {
 						world.template Add<T>(e, Serialization::from_json_adl<T>(j));
+					}
+				},
+				// Has
+				[](const ECS::World& world, ECS::Entity e) -> bool {
+					return world.Has<T>(e);
+				},
+				// Remove
+				[](ECS::World& world, ECS::Entity e) {
+					if (world.Has<T>(e)) {
+						world.Remove<T>(e);
 					}
 				}
 			};

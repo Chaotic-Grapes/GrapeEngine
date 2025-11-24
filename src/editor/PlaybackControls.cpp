@@ -238,10 +238,32 @@ void Playback::_saveWorldState() {
         ++entityCount;
     });
 
+    // Save hierarchy relationships separately
+    nlohmann::json hierarchyArray = nlohmann::json::array();
+    m_world->Each([&](ECS::Entity entity) {
+        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+            return;
+        }
+        
+        ECS::Entity parent = m_world->ParentOf(entity);
+        if (!parent.IsNull() && m_world->IsAlive(parent)) {
+            // Skip if parent is editor camera
+            if (m_world->Has<ECS::Components::CameraEditor3D>(parent)) {
+                return;
+            }
+            
+            nlohmann::json hierarchyEntry;
+            hierarchyEntry["child"] = entity.Index;
+            hierarchyEntry["parent"] = parent.Index;
+            hierarchyArray.push_back(hierarchyEntry);
+        }
+    });
+
     worldJson["entities"] = entitiesMap;
+    worldJson["hierarchy"] = hierarchyArray;
     m_savedWorldState = worldJson;
     
-    LOG_INFO("Saved " << entityCount << " entities with IDs preserved");
+    LOG_INFO("Saved " << entityCount << " entities with hierarchy preserved");
 }
 
 void Playback::_restoreWorldState() {
@@ -289,10 +311,18 @@ void Playback::_restoreWorldState() {
         m_world->Destroy(entity);
     }
 
+    // Second pass: Detach all entities from hierarchy (will restore later)
+    m_world->Each([&](ECS::Entity entity) {
+        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+            return;
+        }
+        m_world->Detach(entity);
+    });
+
     size_t restoredCount = 0;
     size_t recreatedCount = 0;
 
-    // Second pass: Restore or recreate entities from snapshot
+    // Third pass: Restore or recreate entities from snapshot
     for (auto it = entitiesMap.begin(); it != entitiesMap.end(); ++it) {
         uint32_t entityId = std::stoul(it.key());
         const auto& entityJson = it.value();
@@ -315,7 +345,27 @@ void Playback::_restoreWorldState() {
         }
     }
 
-    LOG_INFO("Restored " << restoredCount << " entities, recreated " << recreatedCount << " entities.");
+    // Fourth pass: Restore hierarchy relationships
+    if (m_savedWorldState.contains("hierarchy") && m_savedWorldState["hierarchy"].is_array()) {
+        const auto& hierarchyArray = m_savedWorldState["hierarchy"];
+        for (const auto& hierarchyEntry : hierarchyArray) {
+            if (!hierarchyEntry.contains("child") || !hierarchyEntry.contains("parent")) {
+                continue;
+            }
+            
+            uint32_t childId = hierarchyEntry["child"].get<uint32_t>();
+            uint32_t parentId = hierarchyEntry["parent"].get<uint32_t>();
+            
+            ECS::Entity child = m_world->Resolve(childId);
+            ECS::Entity parent = m_world->Resolve(parentId);
+            
+            if (m_world->IsAlive(child) && m_world->IsAlive(parent)) {
+                m_world->Attach(child, parent);
+            }
+        }
+    }
+
+    LOG_INFO("Restored " << restoredCount << " entities, recreated " << recreatedCount << " entities with hierarchy.");
 }
 
 // Internal state change handler that manages time scale and callbacks
@@ -386,10 +436,58 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
         return;
     }
 
-    // Strategy: Deserialize each component from the snapshot
-    // The EntitySerializer's deserializers use Set/Add appropriately
-    
     const auto& componentsArray = entityJson["Components"];
+    
+    // Build a set of TypeIds that should exist after restore
+    std::unordered_set<TypeId> snapshotComponentIds;
+    auto& registry = Serialization::EntitySerializer::Registry();
+    
+    // Map component names from snapshot to TypeIds
+    for (const auto& comp : componentsArray) {
+        if (comp.contains("TypeName")) {
+            std::string typeName = comp["TypeName"].get<std::string>();
+            // Find the TypeId for this component name
+            for (const auto& [tid, info] : registry) {
+                if (info.Name == typeName) {
+                    snapshotComponentIds.insert(tid);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Get entity's current archetype to see what components it has
+    const auto* location = m_world->LocationOf(entity);
+    if (location && location->ArchetypePtr) {
+        const auto& currentComponents = location->ArchetypePtr->GetComponents();
+        
+        // Check each component on the entity to see if it should be removed
+        std::vector<TypeId> componentsToRemove;
+        for (const auto& compInfo : currentComponents) {
+            // Skip if this component is in the snapshot (we want to keep it)
+            if (snapshotComponentIds.find(compInfo.Id) != snapshotComponentIds.end()) {
+                continue;
+            }
+            
+            // Note: Hierarchy relationships (Parent component) are handled separately
+            // in the restore process, so we don't need to explicitly skip them here
+            
+            // This component exists on entity but not in snapshot - mark for removal
+            componentsToRemove.push_back(compInfo.Id);
+        }
+        
+        // Remove components that exist on entity but not in snapshot
+        for (TypeId tid : componentsToRemove) {
+            // Find component in registry and remove it
+            for (const auto& [regTid, info] : registry) {
+                if (regTid == tid) {
+                    LOG_DEBUG("Removing component added during play: " << info.Name);
+                    info.Remove(*m_world, entity);
+                    break;
+                }
+            }
+        }
+    }
     
     // Restore each component from the snapshot using the EntitySerializer registry
     for (const auto& componentJson : componentsArray) {
@@ -402,7 +500,6 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
         
         // Use the EntitySerializer's registry to deserialize components
         // This leverages the existing REGISTER_COMPONENT_SERIALIZER infrastructure
-        auto& registry = Serialization::EntitySerializer::Registry();
         for (const auto& [tid, info] : registry) {
             if (info.Name == typeName) {
                 try {
@@ -421,15 +518,32 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
 // Helper: Recreate an entity with a specific ID from a JSON snapshot
 ECS::Entity Playback::_recreateEntityWithId(uint32_t targetId, const nlohmann::json& entityJson) {
     // This is a fallback for when an entity was destroyed during play
-    // We need to create a new entity but try to reuse the same ID if possible
+    // Use CreateWithId to preserve the exact entity ID from the snapshot
     
-    // For now, just create a new entity and deserialize into it
-    // The ID might be different, but this is rare (only if entity was destroyed)
-    ECS::Entity newEntity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+    ECS::Entity newEntity = m_world->CreateWithId(targetId);
     
-    // Note: Ideally we'd want to reserve the specific ID, but the World class
-    // doesn't expose that functionality. This is a limitation we can address later
-    // by extending the World API with a CreateWithId() method.
+    // Deserialize components into the newly created entity
+    if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
+        auto& registry = Serialization::EntitySerializer::Registry();
+        for (const auto& comp : entityJson["Components"]) {
+            if (!comp.contains("TypeName") || !comp.contains("Data")) {
+                continue;
+            }
+            
+            std::string typeName = comp["TypeName"].get<std::string>();
+            for (const auto& [tid, info] : registry) {
+                if (info.Name == typeName) {
+                    try {
+                        info.Deserialize(*m_world, newEntity, comp["Data"]);
+                    } 
+                    catch (const std::exception& ex) {
+                        LOG_ERROR("Failed to restore component " << typeName << ": " << ex.what());
+                    }
+                    break;
+                }
+            }
+        }
+    }
     
     return newEntity;
 }

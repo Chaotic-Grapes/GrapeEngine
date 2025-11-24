@@ -106,6 +106,39 @@ namespace ECS {
         }
 
         /**
+		 * @brief Create an entity with a specific ID (for state restoration).
+		 * This allows perfect ID preservation when restoring destroyed entities.
+		 * @param targetId The desired entity ID
+		 * @return ECS::Entity The created entity with the specified ID, or a new entity if ID cannot be reused
+         * @warning Do not use this function unless you know what you're doing! This is meant for advanced use cases like state restoration.
+         */
+        Entity CreateWithId(EntityId targetId) {
+            // Ensure generations and locations vectors are large enough
+            if (targetId >= m_generations.size()) {
+                m_generations.resize(targetId + 1, 0);
+                m_locations.resize(targetId + 1, Location{});
+            }
+
+            // Check if this ID is in the free list (entity was destroyed)
+            auto it = std::find(m_free.begin(), m_free.end(), targetId);
+            if (it != m_free.end()) {
+                // Remove from free list and reuse with current generation
+                m_free.erase(it);
+                return Entity{ targetId, m_generations[targetId] };
+            }
+
+            // Check if entity with this ID is already alive
+            Entity testEntity{ targetId, m_generations[targetId] };
+            if (IsAlive(testEntity)) {
+                // Cannot reuse this ID - fall back to normal Create()
+                return Create();
+            }
+
+            // ID is available, use it
+            return Entity{ targetId, m_generations[targetId] };
+        }
+
+        /**
 		 * @brief Create an entity with the specified components in the world.
 		 * @tparam Ts Component types to add to the entity
 		 * @param comps Component instances to add to the entity
