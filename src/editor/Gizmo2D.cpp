@@ -47,7 +47,7 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     // ------------------------------------------------------------------------
 
     // Pre-check: Stop if the current selected entity is invalid
-    if (m_selectedEntityID == 0)
+    if (m_selectedEntityID == Entity::NPOS32)
         return;
 
     ECS::Entity entity = world.Resolve(m_selectedEntityID);
