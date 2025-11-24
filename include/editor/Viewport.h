@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file   Viewport.h
-\author Samantha Leong (80%)
-        Foo Rui Qin    (20%)
+\author Samantha Leong (50%)
+        Foo Rui Qin    (50%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
 \date   3rd November 2025
@@ -18,7 +18,9 @@ Header for Viewport class handling viewport rendering and entity selection with 
 #include "ecs/Entity.h"
 #include "EditorFileMenu.h"
 #include "graphics/EditorCamera.hpp"
+#include "UndoSystem.h"
 #include <imgui.h>
+#include "ImGuizmo.h"
 #include <memory>
 #include <functional>
 
@@ -48,6 +50,9 @@ public:
     bool IsViewportHovered() const;
     bool HasValidWorld() const { return m_world != nullptr; }
 
+    // Undo System
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+    void FocusOnEntity(EntityId entityId);
 
 private:
     void _renderViewport();
@@ -62,13 +67,28 @@ private:
 
     // Renderer (manages EditorCamera internally)
     std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
+    
+    // Game window renderer (always uses scene camera)
+    std::shared_ptr<ECS::RendererSystem> m_gameRendererSystem;
 
     // State
     EntityId m_selectedEntityId = 0;
     bool m_isViewportHovered = false;
+    int m_activeTab = 0; // 0 = Scene, 1 = Game
+
+    // Stores the exact screen position and size of the drawn scene texture. M3<<<<<<<<<<<<<<<<<<<<<<<
+    ImVec2 m_sceneDrawPos = { 0.0f, 0.0f };
+    ImVec2 m_sceneDrawSize = { 0.0f, 0.0f };
+    
+    // Game window aspect ratio settings
+    int m_selectedAspectRatio = 0; // Index into aspect ratio list
+    bool m_freeAspect = true;      // Whether to use free aspect or fixed ratio
 
     // Event callback
     std::function<void(EntityId)> m_onSelectionChanged;
+
+    // Undo system
+    Editor::UndoSystem* m_undoSystem = nullptr;
 };
 
 #endif // VIEWPORT_H

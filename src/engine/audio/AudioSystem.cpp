@@ -1,12 +1,12 @@
-#include "../engine/audio/AudioSystem.h"
-#include "../editor/AudioAssetLibrary.h"
-#include "../engine/services/AudioService.h"
+#include "audio/AudioSystem.h"
+#include "AudioAssetLibrary.h"
+#include "services/AudioService.h"
 #include "audio/FmodAudioDevice.h"
 #include <iostream>
 #include "core/Logger.h"
 #include <set>
-#include "../engine/core/Application.h"
-#include "../engine/services/OverlayService.h"
+#include "core/Application.h"
+#include "services/OverlayService.h"
 
 /*
     Update(dt)
@@ -85,9 +85,9 @@ void AudioSystem::Update(float /*dt*/)
             // Load the sound if not already loaded
             // ----------------------------------------------------------------
             Audio::SoundParams params{};
-            params.stream = false;
-            params.is3D = src.Spatial3D;
-            params.defaultVolume = src.Volume;
+            params.Stream = false;
+            params.Is3D = src.Spatial3D;
+            params.DefaultVolume = src.Volume;
 
             if (!m_audioService.LoadCue(cueKey, clip->path, params)) {
                 static std::set<std::string> s_failedCues;
@@ -138,9 +138,9 @@ void AudioSystem::Update(float /*dt*/)
             // ----------------------------------------------------------------
             if (shouldPlay && !hasInstance) {
                 Audio::PlaySettings settings{};
-                settings.volume = src.Volume;
-                settings.pitch = src.Pitch;
-                settings.loop = src.Loop;
+                settings.Volume = src.Volume;
+                settings.Pitch = src.Pitch;
+                settings.Loop = src.Loop;
 
                 LOG_DEBUG("AudioSystem: Starting playback for entity " << e.Index
                     << " cue: " << cueKey

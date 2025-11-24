@@ -29,6 +29,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <iostream>
 #include <filesystem>
 #include <cstring>
+// ****************************************************************************
+
+// ************************** EXTERNAL DECLARATIONS ************************** //
+// ScriptAPI functions (defined in ScriptAPI_Component.cpp)
+extern "C" void ScriptAPI_SetWorld(ECS::World* world);
 // **************************************************************************** //
 
 // ******************************* EXPORT MACRO ******************************* //
@@ -300,8 +305,11 @@ namespace ECS {
             std::cout << "[ScriptSystem] Loading game assembly into AppDomain..." << '\n';
             
             // Derive the game assembly path from the script API assembly path
+            // TODO: Remove hardcoded game name
             std::filesystem::path apiPath(assemblyPath);
-            std::filesystem::path gameAssemblyPath = apiPath.parent_path() / "MyGame.dll"; // TODO: Change "MyGame.dll" to actual game assembly name
+            std::filesystem::path gameAssemblyPath = apiPath.parent_path() / "EchoesBelow.dll";
+            
+            std::cout << "[ScriptSystem] Looking for game assembly at: " << gameAssemblyPath << '\n';
             
             if (!std::filesystem::exists(gameAssemblyPath)) {
                 std::cerr << "[ScriptSystem] Game assembly not found: " << gameAssemblyPath << '\n';
@@ -511,11 +519,41 @@ namespace ECS {
     }
 
     void ScriptSystem::OnStart(World& world) {
+        // Set the world pointer for ScriptAPI functions
+        ScriptAPI_SetWorld(&world);
+        
         // Call OnStart for all uninitialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
-            [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
+            [&world](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
                 if (!active.Enabled)
                     return;
+
+                // If script has a TypeName but no ManagedHandle, instantiate it first
+                if (script.ManagedHandle == 0 && std::strlen(script.TypeName) > 0) {
+                    std::cout << "[ScriptSystem] Instantiating script " << script.TypeName 
+                              << " for entity " << entity.Index << '\n';
+
+                    if (!s_instance || !s_instance->m_createInstance) {
+                        std::cerr << "[ScriptSystem] CreateInstance delegate not loaded" << '\n';
+                        return;
+                    }
+
+                    uint64_t entityPacked = EntityUtils::Pack(entity);
+                    script.ManagedHandle = s_instance->m_createInstance(script.TypeName, entityPacked);
+                    
+                    if (script.ManagedHandle == 0) {
+                        std::cerr << "[ScriptSystem] Failed to create script instance for " 
+                                  << script.TypeName << '\n';
+                        std::cerr << "[ScriptSystem] Common causes:" << '\n';
+                        std::cerr << "  - TypeName is not fully qualified (must include namespace)" << '\n';
+                        std::cerr << "  - Assembly containing this type was not loaded" << '\n';
+                        std::cerr << "  - Type does not inherit from ScriptBehaviour" << '\n';
+                        return;
+                    }
+
+                    std::cout << "[ScriptSystem] Script instantiated successfully with handle " 
+                              << script.ManagedHandle << '\n';
+                }
 
                 if (!script.Initialized && script.ManagedHandle != 0) {
                     std::cout << "[ScriptSystem] Calling OnStart for script on entity " 
@@ -532,6 +570,9 @@ namespace ECS {
     }
 
     void ScriptSystem::Update(World& world) {
+        // Set the world pointer for ScriptAPI functions
+        ScriptAPI_SetWorld(&world);
+        
         // Call OnUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
@@ -549,6 +590,9 @@ namespace ECS {
     }
 
     void ScriptSystem::FixedUpdate(World& world) {
+        // Set the world pointer for ScriptAPI functions
+        ScriptAPI_SetWorld(&world);
+        
         // Call OnFixedUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
@@ -566,6 +610,9 @@ namespace ECS {
     }
 
     void ScriptSystem::LateUpdate(World& world) {
+        // Set the world pointer for ScriptAPI functions
+        ScriptAPI_SetWorld(&world);
+        
         // Call OnLateUpdate for all initialized scripts
         world.Each<Components::ScriptInstance, Components::Active>(
             [](Entity entity, Components::ScriptInstance& script, const Components::Active& active) {
@@ -591,8 +638,6 @@ namespace ECS {
         // TODO: Implement active state tracking
         // When Active.Enabled changes from false->true: call m_callEnable
         // When Active.Enabled changes from true->false: call m_callDisable
-        
-        std::cout << "[ScriptSystem] UpdateActiveState placeholder - TODO: Track state changes" << '\n';
     }
 
     void ScriptSystem::OnDestroy(World& world) {
@@ -976,133 +1021,14 @@ namespace {
     }
 }
 
-// Consideration: Move to their respective headers
 // ============================================================================
-// Exported C Functions for P/Invoke
+// Note: Script API exports have been refactored into separate files:
+// - ScriptAPI_Component.cpp - Component operations (Get, Add, Set, Has, Remove)
+// - ScriptAPI_Entity.cpp - Entity lifecycle (Create, Destroy, IsAlive)
+// - ScriptAPI_Input.cpp - Input handling (Keyboard, Mouse, Window)
+// - ScriptAPI_Time.cpp - Time functions (DeltaTime, TimeScale, etc.)
+//
+// The implementation details (helper functions and dispatch tables) remain
+// in this file but are no longer exported directly. The global world pointer
+// g_scriptWorld is now extern and defined in ScriptAPI_Component.cpp.
 // ============================================================================
-
-#ifndef SCRIPT_API
-#ifdef _WIN32
-    // __declspec(dllexport) means the function is exported from DLL
-	// This is necessary for P/Invoke in C# to find the functions
-    #define SCRIPT_API extern "C" __declspec(dllexport)
-#endif
-#endif
-
-SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize) {
-    return GetComponentGeneric(entityId, typeHash, outBuffer, bufferSize);
-}
-
-SCRIPT_API void *ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash) {
-    return GetComponentPtr(entityId, typeHash);
-}
-
-SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
-    return AddComponentGeneric(entityId, typeHash, componentData, dataSize, outBuffer);
-}
-
-SCRIPT_API void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize) {
-    SetComponentGeneric(entityId, typeHash, componentData, dataSize);
-}
-
-SCRIPT_API bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash) {
-    return HasComponentGeneric(entityId, typeHash);
-}
-
-SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash) {
-    RemoveComponentGeneric(entityId, typeHash);
-}
-
-SCRIPT_API void ScriptAPI_DestroyEntity(uint64_t entityId) {
-    ECS::World* world = GetScriptWorld();
-    if (!world) {
-        std::cerr << "[ScriptAPI] No world set for script access" << '\n';
-        return;
-    }
-
-    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
-    if (world->IsAlive(entity)) {
-        world->Destroy(entity);
-    }
-}
-
-SCRIPT_API uint64_t ScriptAPI_CreateEntity() {
-    ECS::World* world = GetScriptWorld();
-    if (!world) {
-        std::cerr << "[ScriptAPI] No world set for script access" << '\n';
-        return 0;
-    }
-
-    ECS::Entity entity = world->Create();
-    // Ensure new entities always have a default transform
-    world->Add<ECS::Components::LocalTransform>(entity);
-    return ECS::EntityUtils::Pack(entity);
-}
-
-SCRIPT_API bool ScriptAPI_IsAlive(uint64_t entityId) {
-    ECS::World* world = GetScriptWorld();
-    if (!world) {
-        std::cerr << "[ScriptAPI] No world set for script access" << '\n';
-        return false;
-    }
-
-    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
-    return world->IsAlive(entity);
-}
-
-// World management - must be called before using script API
-SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world) {
-    SetScriptWorld(world);
-}
-
-// ============================================================================
-// Input API - Keyboard
-// ============================================================================
-
-SCRIPT_API bool ScriptAPI_IsKeyPressed(int key) {
-    return Input::IsKeyPressed(key);
-}
-
-SCRIPT_API bool ScriptAPI_IsKeyDown(int key) {
-    return Input::IsKeyDown(key);
-}
-
-SCRIPT_API bool ScriptAPI_IsKeyUp(int key) {
-    return Input::IsKeyUp(key);
-}
-
-// ============================================================================
-// Input API - Mouse
-// ============================================================================
-
-SCRIPT_API bool ScriptAPI_IsMousePressed(int button) {
-    return Input::IsMousePressed(button);
-}
-
-SCRIPT_API double ScriptAPI_GetMouseX() {
-    return Input::GetMouseX();
-}
-
-SCRIPT_API double ScriptAPI_GetMouseY() {
-    return Input::GetMouseY();
-}
-
-SCRIPT_API double ScriptAPI_GetScrollX() {
-    return Input::GetScrollX();
-}
-
-SCRIPT_API double ScriptAPI_GetScrollY() {
-    return Input::GetScrollY();
-}
-
-// ============================================================================
-// Input API - Window
-// ============================================================================
-
-SCRIPT_API int ScriptAPI_GetWindowWidth() {
-    return Input::GetWindowWidth();
-}
-
-SCRIPT_API int ScriptAPI_GetWindowHeight() {
-    return Input::GetWindowHeight();
-}

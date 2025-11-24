@@ -91,8 +91,8 @@ namespace Audio {
 
         // Fallback: create from file path
         FMOD::Sound* s = nullptr;
-        auto mode = params.stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
-        mode |= params.is3D ? FMOD_3D : FMOD_2D;
+        auto mode = params.Stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
+        mode |= params.Is3D ? FMOD_3D : FMOD_2D;
         if (m_system->createSound(filePath.c_str(), mode, nullptr, &s) != FMOD_OK || !s)
             return false;
 
@@ -122,15 +122,15 @@ namespace Audio {
         if (!snd) return {};
 
         // Configure looping on the sound
-        snd->setMode(s.loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
-        snd->setLoopCount(s.loop ? -1 : 0);
+        snd->setMode(s.Loop ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
+        snd->setLoopCount(s.Loop ? -1 : 0);
 
         FMOD::Channel* ch = nullptr;
         if (!FMOD_OK_OR_LOG(m_system->playSound(snd, nullptr, true, &ch), "playSound") || !ch)
             return {};
 
-        ch->setVolume(s.volume);
-        ch->setPitch(s.pitch);
+        ch->setVolume(s.Volume);
+        ch->setPitch(s.Pitch);
         ch->setPaused(false);
 
         PlaybackHandle h{ m_nextId++ };
@@ -158,13 +158,13 @@ namespace Audio {
                 case PlayPolicy::SingleInstanceRestart:
                     ch->setPosition(0, FMOD_TIMEUNIT_MS);
                     ch->setPaused(false);
-                    ch->setVolume(s.volume);
-                    ch->setPitch(s.pitch);
+                    ch->setVolume(s.Volume);
+                    ch->setPitch(s.Pitch);
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceResume:
                     if (!playing) ch->setPaused(false);
-                    ch->setVolume(s.volume);
-                    ch->setPitch(s.pitch);
+                    ch->setVolume(s.Volume);
+                    ch->setPitch(s.Pitch);
                     return PlaybackHandle{ it->second };
                 case PlayPolicy::SingleInstanceIgnore:
                     if (playing) return PlaybackHandle{ it->second };
@@ -219,10 +219,10 @@ namespace Audio {
 
     void FmodAudioDevice::SetListener(const ListenerParams& l) {
         if (!m_system) return;
-        const FMOD_VECTOR pos{ l.position.x, l.position.y, l.position.z };
-        const FMOD_VECTOR vel{ l.velocity.x, l.velocity.y, l.velocity.z };
-        const FMOD_VECTOR fwd{ l.forward.x, l.forward.y, l.forward.z };
-        const FMOD_VECTOR up{ l.up.x,      l.up.y,      l.up.z };
+        const FMOD_VECTOR pos{ l.Position.x, l.Position.y, l.Position.z };
+        const FMOD_VECTOR vel{ l.Velocity.x, l.Velocity.y, l.Velocity.z };
+        const FMOD_VECTOR fwd{ l.Forward.x, l.Forward.y, l.Forward.z };
+        const FMOD_VECTOR up{ l.Up.x,      l.Up.y,      l.Up.z };
         m_system->set3DListenerAttributes(0, &pos, &vel, &fwd, &up);
     }
 
@@ -251,8 +251,8 @@ namespace Audio {
             return it->second.Sound;
 
         FMOD::Sound* s = nullptr;
-        auto mode = params.stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
-        mode |= params.is3D ? FMOD_3D : FMOD_2D;
+        auto mode = params.Stream ? FMOD_CREATESTREAM : FMOD_DEFAULT;
+        mode |= params.Is3D ? FMOD_3D : FMOD_2D;
         if (m_system->createSound(path.c_str(), mode, nullptr, &s) != FMOD_OK || !s)
             return nullptr;
 
@@ -281,7 +281,7 @@ namespace Audio {
         exinfo.cbsize = sizeof(FMOD_CREATESOUNDEXINFO);
         exinfo.length = static_cast<unsigned int>(audioBytes->Data.size());
 
-        unsigned int mode = FMOD_OPENMEMORY | (params.is3D ? FMOD_3D : FMOD_2D);
+        unsigned int mode = FMOD_OPENMEMORY | (params.Is3D ? FMOD_3D : FMOD_2D);
 
         FMOD::Sound* s = nullptr;
         const FMOD_RESULT r = m_system->createSound(

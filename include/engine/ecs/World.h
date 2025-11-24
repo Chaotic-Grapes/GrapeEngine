@@ -105,6 +105,39 @@ namespace ECS {
         }
 
         /**
+		 * @brief Create an entity with a specific ID (for state restoration).
+		 * This allows perfect ID preservation when restoring destroyed entities.
+		 * @param targetId The desired entity ID
+		 * @return ECS::Entity The created entity with the specified ID, or a new entity if ID cannot be reused
+         * @warning Do not use this function unless you know what you're doing! This is meant for advanced use cases like state restoration.
+         */
+        Entity CreateWithId(EntityId targetId) {
+            // Ensure generations and locations vectors are large enough
+            if (targetId >= m_generations.size()) {
+                m_generations.resize(targetId + 1, 0);
+                m_locations.resize(targetId + 1, Location{});
+            }
+
+            // Check if this ID is in the free list (entity was destroyed)
+            auto it = std::find(m_free.begin(), m_free.end(), targetId);
+            if (it != m_free.end()) {
+                // Remove from free list and reuse with current generation
+                m_free.erase(it);
+                return Entity{ targetId, m_generations[targetId] };
+            }
+
+            // Check if entity with this ID is already alive
+            Entity testEntity{ targetId, m_generations[targetId] };
+            if (IsAlive(testEntity)) {
+                // Cannot reuse this ID - fall back to normal Create()
+                return Create();
+            }
+
+            // ID is available, use it
+            return Entity{ targetId, m_generations[targetId] };
+        }
+
+        /**
 		 * @brief Create an entity with the specified components in the world.
 		 * @tparam Ts Component types to add to the entity
 		 * @param comps Component instances to add to the entity
@@ -1138,19 +1171,31 @@ namespace ECS {
                 if (p.ParentEntity.IsNull())
                     return;
 
-                // Link into new parent's child list
-                const Entity oldFirst = m_hierarchy.FirstChild[p.ParentEntity];
-                m_hierarchy.FirstChild[p.ParentEntity] = e; // New first child
-
-                // Update sibling links
-                if (!oldFirst.IsNull()) {
-                    m_hierarchy.PrevSibling[oldFirst] = e;
+                // Get first child of the new parent, if it exists 
+                const Entity firstChild = m_hierarchy.FirstChild[p.ParentEntity];
+                
+                if (firstChild.IsNull()) {
+                    // No existing children, make this the first child
+                    m_hierarchy.FirstChild[p.ParentEntity] = e;
+                    m_hierarchy.NextSibling[e] = NULL_ENTITY;
+                    m_hierarchy.PrevSibling[e] = NULL_ENTITY;
                 }
-
-                // Update new child's links
-                m_hierarchy.NextSibling[e] = oldFirst;      // New child's next sibling is old first
-                m_hierarchy.PrevSibling[e] = NULL_ENTITY;   // New child's prev sibling is NULL_ENTITY
-                m_hierarchy.ParentOf[e] = p.ParentEntity;   // New child's parent is p.ParentEntity
+                else {
+                    // Find the last child in the sibling list
+                    Entity lastChild = firstChild;
+                    auto it = m_hierarchy.NextSibling.find(lastChild);
+                    while (it != m_hierarchy.NextSibling.end() && !it->second.IsNull()) {
+                        lastChild = it->second;
+                        it = m_hierarchy.NextSibling.find(lastChild);
+                    }
+                    
+                    // Append new child after the last child
+                    m_hierarchy.NextSibling[lastChild] = e;
+                    m_hierarchy.PrevSibling[e] = lastChild;
+                    m_hierarchy.NextSibling[e] = NULL_ENTITY;
+                }
+                
+                m_hierarchy.ParentOf[e] = p.ParentEntity;   // Set parent mapping
             }
         }
 
@@ -1164,6 +1209,10 @@ namespace ECS {
         // Component removing hook
         void _onComponentRemoving(const Entity e, const TypeId t) {
             if (t == TypeIdOf<Parent>()) {
+                // Log removal for diagnostics
+                if (Has<Parent>(e)) {
+                    const auto& p = Get<Parent>(e);
+                }
                 // Unlink from hierarchy indices
                 _unlinkChild(e);
 

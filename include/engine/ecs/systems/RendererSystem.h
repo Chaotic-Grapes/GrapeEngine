@@ -22,24 +22,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef RENDERER2D_H
 #define RENDERER2D_H
 
-// ============================================================================
 // Third-Party Includes
-// ============================================================================
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-// ============================================================================
 // Engine Includes
-// ============================================================================
 #include "Color.h"
 #include "ecs/World.h"
 #include "Math/Vector2D.h"
-#include "../editor/EditorFileMenu.h"
+#include "EditorFileMenu.h"
 
-// ============================================================================
 // Graphics Includes
-// ============================================================================
 #include "graphics/shader.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/debugDraw2D.hpp"
@@ -48,11 +42,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
 
-namespace {
-    void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
-        if (fileMenu) { fileMenu->MarkSceneDirty(); }
-    }
+namespace Editor {
+    // Undo System
+    class UndoSystem;
 }
+// ============================================================================
+// ImGuizmo Includes
+// ============================================================================
+#include <imgui.h>
+#include "ImGuizmo.h"
 
 namespace ECS {
 
@@ -99,6 +97,8 @@ namespace ECS {
         bool IsUsingEditorCamera() const { return m_useEditorCamera; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
         uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
+        Engine::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
+
         // Rebind the renderer to a new world (recreate editor camera)
         void BindWorld(World& world);
 
@@ -106,6 +106,9 @@ namespace ECS {
         // Enable/disable editor camera input (pan/orbit/zoom) based on viewport hover
         void SetEditorInputEnabled(bool enabled) { m_editorInputEnabled = enabled; }
         void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
+        
+        // Force the renderer to always use scene camera (for game window)
+        void SetForceSceneCamera(bool force) { m_forceSceneCamera = force; }
 
         // ====================================================================
         // Temporary Accessors (For Stress Testing - Remove Later)
@@ -123,6 +126,20 @@ namespace ECS {
         const glm::mat4& GetProjection() const { return m_projection; }
 
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
+
+        void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+        /**
+        * @brief Renders the ImGuizmo overlay and allows manipulation of the selected entity.
+        * * This function must be called within the ImGui window context that displays the scene texture.
+        * It handles input for tool switching (W, E, R) and updates the selected entity's
+        * LocalTransform component if the gizmo is being used.
+        * * @param world The current ECS world instance, used to access entity data and scene settings.
+        * @param drawPosX The screen X-coordinate of the top-left corner of the rendered scene image.
+        * @param drawPosY The screen Y-coordinate of the top-left corner of the rendered scene image.
+        * @param drawSizeX The width of the rendered scene image (in pixels).
+        * @param drawSizeY The height of the rendered scene image (in pixels).
+        */
+        void DrawEditorGizmo(ECS::World& world, float drawPosX, float drawPosY, float drawSizeX, float drawSizeY);
 
     private:
         // ====================================================================
@@ -151,6 +168,7 @@ namespace ECS {
 
         bool m_initialized = false;                                 ///< Has Initialize() been called?
         bool m_useEditorCamera = true;                              ///< Use editor vs ECS cameras
+        bool m_forceSceneCamera = false;                            ///< Force use of scene camera (for game window)
         int m_activeCameraIndex = 0;                                ///< Active ECS camera (future use)
         glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();    ///< Projection matrix
         uint16_t m_uiLayerId = 0xFFFF;  // Default invalid value
@@ -213,6 +231,12 @@ namespace ECS {
         glm::vec3 m_dragStartEntityPos = { 0, 0, 0};
 
         // ====================================================================
+        // NEW: Member Variables - ImGuizmo State
+        // ====================================================================
+        ImGuizmo::OPERATION m_currentGizmoOperation = ImGuizmo::TRANSLATE;
+        ImGuizmo::MODE m_currentGizmoMode = ImGuizmo::WORLD;
+
+        // ====================================================================
         // Member Variables - UI Scaling
         // ====================================================================
 
@@ -242,6 +266,14 @@ namespace ECS {
             float screenWidth,
             float screenHeight,
             float scaleFactor) const;
+
+        // ====================================================================
+        // Undo System
+        // ==================================================================== 
+        Editor::UndoSystem* m_undoSystem = nullptr;
+
+        Quaternion m_dragStartEntityRot;
+        Vector3D m_dragStartEntityScale;
     };
 
 } // namespace ECS

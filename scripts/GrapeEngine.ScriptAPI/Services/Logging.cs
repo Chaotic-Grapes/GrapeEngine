@@ -20,6 +20,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using GrapeEngine.ScriptAPI.Unsafe;
+
 namespace GrapeEngine;
 
 public enum LogLevel
@@ -34,27 +36,19 @@ internal static class Logging
 {
     internal static void Log(string message, LogLevel level)
     {
-        // Change color based on log level:
-        // Info     = default
-        // Warning  = Yellow
-        // Error    = Red
         switch (level)
         {
             case LogLevel.Info:
-                Console.WriteLine($"[INF] {message}");
+                DebugAPI.LogInfo(message);
                 break;
             case LogLevel.Debug:
-                Console.WriteLine($"[DBG] {message}");
+                DebugAPI.LogDebug(message);
                 break;
             case LogLevel.Warning:
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[WRN] {message}");
-                Console.ResetColor();
+                DebugAPI.LogWarning(message);
                 break;
             case LogLevel.Error:
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[ERR] {message}");
-                Console.ResetColor();
+                DebugAPI.LogError(message);
                 break;
         }
     }

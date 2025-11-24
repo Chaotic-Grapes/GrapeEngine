@@ -18,15 +18,18 @@ Provides:
 */
 /* End Header *******************************************************************/
 
-#include "../editor/AssetBrowserPanel.h"
+#include "AssetBrowserPanel.h"
 #include "core/Logger.h"
+#include "core/ProjectPaths.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/Entity.h"
-#include "../editor/InspectorPanel.h"
+#include "InspectorPanel.h"
 #include "services/Input.h"
 #include <fstream>
+#include <cstring>
+#include "EditorStyle.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -39,6 +42,10 @@ void AssetBrowserPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* s
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
     m_world = world;
+
+    // TODO: Remove when editor is separated - use project-relative paths
+    // Set initial path to game project root folder
+    m_currentPath = Engine::ProjectPaths::GetProjectRoot();
 
     // Initialize helper modules
     m_assetLibrary.Initialize(mainFont, boldFont, symbolsFont);
@@ -81,9 +88,34 @@ void AssetBrowserPanel::Render() {
     _renderActionButtons();
     _renderContentArea();
 
-    // Handle DELETE key press to delete selected asset
-    if (!m_selectedAsset.empty() && Input::IsKeyDown(KEY_DELETE)) {
-        m_assetLibrary._deleteSelectedAsset(m_selectedAsset, m_statusMessage, m_statusTimer);
+    // Handle keyboard shortcuts - ONLY when Asset Browser window is focused
+    // This prevents conflicts with other panels (e.g., Hierarchy) that also use DELETE key
+    if (!m_selectedAssets.empty() && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+        // DELETE key: delete selected assets
+        if (Input::IsKeyDown(KEY_DELETE)) {
+            _deleteSelectedAssets();
+        }
+
+        // Ctrl+C: copy
+        if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C)) {
+            _copySelectedAssets();
+        }
+
+        // Ctrl+X: cut (copy + mark for deletion after paste)
+        if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_X)) {
+            _copySelectedAssets();
+            m_clipboardIsCut = true;
+        }
+    }
+
+    // Ctrl+V: paste (works even with no selection)
+    if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V)) {
+        _pasteAssets();
+    }
+
+    // F2: rename (single selection only)
+    if (m_selectedAssets.size() == 1 && ImGui::IsKeyPressed(ImGuiKey_F2)) {
+        _startRename();
     }
 
     // Click on empty space in parent Asset Browser window to clear everything
@@ -106,16 +138,72 @@ void AssetBrowserPanel::Render() {
 
 // Render the breadcrumb navigation bar at the top
 void AssetBrowserPanel::_renderNavigationBar() {
-    // Display clickable breadcrumb navigation
-    std::string newPath;
-    m_assetLibrary._displayBreadcrumbs(m_currentPath, m_selectedAsset, newPath);
-    if (!newPath.empty() && newPath != m_currentPath) {
-        m_currentPath = newPath;
-        // Navigating to a different folder clears file selection and inspector
-        if (!m_selectedAsset.empty()) {
-            m_selectedAsset.clear();
+    // Display clickable breadcrumb navigation with drop target support
+    std::filesystem::path pathObj(m_currentPath);
+    std::vector<std::filesystem::path> pathParts;
+
+    // Build path parts from root to current
+    for (const auto& part : pathObj) {
+        std::string partStr = part.string();
+        if (!partStr.empty() && partStr != "." && partStr != ".." && partStr != "/" && partStr != "\\") {
+            pathParts.push_back(partStr);
         }
     }
+
+    // Display each part as clickable button with separators and drop targets
+    std::string accumulatedPath;
+    for (size_t i = 0; i < pathParts.size(); i++) {
+        // Build accumulated path up to this part
+        if (i > 0) accumulatedPath += "\\";
+        accumulatedPath += pathParts[i].string();
+
+        // Add ">" separator between breadcrumb parts
+        if (i > 0) {
+            ImGui::SameLine();
+            ImGui::TextDisabled(">");
+            ImGui::SameLine();
+        }
+
+        // Display breadcrumb part
+        if (i == pathParts.size() - 1) {
+            // Last part (current directory): display as plain text
+            ImGui::Text("%s", pathParts[i].string().c_str());
+
+            // Make current directory text a drop target
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+                _handleFolderDropTarget(m_currentPath);
+            }
+        }
+        else {
+            // Previous parts: display as clickable blue buttons
+            ImGui::PushID(static_cast<int>(i));
+
+            ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Accent);
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::AccentHover, 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::AccentActive, 0.5f));
+
+            // When clicked, navigate to that folder level
+            if (ImGui::SmallButton(pathParts[i].string().c_str())) {
+                m_currentPath = accumulatedPath;
+                m_selectedAssets.clear();
+                m_selectedAsset.clear();
+            }
+
+            ImGui::PopStyleColor(4);
+
+            // Make breadcrumb button a drop target
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+                _handleFolderDropTarget(accumulatedPath);
+            }
+
+            ImGui::PopID();
+        }
+    }
+
+    // Add spacing after breadcrumbs
+    ImGui::Dummy(ImVec2(0, 2));
+    ImGui::Separator();
 }
 
 // Render the action buttons (import, replace, prefab management)
@@ -178,54 +266,119 @@ void AssetBrowserPanel::_renderActionButtons() {
 
     ImGui::SameLine();
     // UI things
-    _renderPrefabButton();
+    _renderPrefabButton();;
 }
 
 // Render the prefab management button and popup
 void AssetBrowserPanel::_renderPrefabButton() {
-    // Prefab button (only enabled if a prefab is selected)
-    // Only enable prefab popup when a .prefab file is selected
-    bool isPrefab = !m_selectedAsset.empty() && std::filesystem::path(m_selectedAsset).extension() == ".prefab";
-    if (!isPrefab) ImGui::BeginDisabled();
-
-    // Contains load and edit prefab buttons
+    // Plus button - always enabled now (for Create + Prefab management)
     ImGui::PushFont(m_symbolsFont);
     if (ImGui::Button("\xEE\x85\x85\xEE\x8C\x93")) {
-        ImGui::OpenPopup("Prefabs");
+        ImGui::OpenPopup("CreateAndPrefabs");
     }
 
     ImGui::PopFont();
-    if (!isPrefab) ImGui::EndDisabled();
 
-    // Tooltip for prefab button
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        if (isPrefab) {
-            ImGui::SetTooltip("Prefab management (load/edit)");
-        }
-        else {
-            ImGui::SetTooltip("Prefab management (disabled)");
-        }
+    // Tooltip for button
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Create new assets and manage prefabs");
     }
 
     // UI things
     _renderPrefabPopup();
 }
 
-// Render the prefab popup menu with load/edit options
+// Render the combined create/prefab popup menu
 void AssetBrowserPanel::_renderPrefabPopup() {
-    // Open ImGui popup named "Prefabs"
-    // Begin a modal-style popup to choose prefab actions
-    if (ImGui::BeginPopup("Prefabs")) {
-        // Display selectable option "Load Prefab" in the popup
-        if (ImGui::Selectable("Load Prefab")) {
+    // Check if a prefab is selected for conditional enabling
+    bool isPrefab = !m_selectedAsset.empty() && std::filesystem::path(m_selectedAsset).extension() == ".prefab";
+
+    if (ImGui::BeginPopup("CreateAndPrefabs")) {
+        ImGui::PushFont(m_mainFont);
+
+        // Load Prefab - only enabled when prefab is selected
+        if (!isPrefab) ImGui::BeginDisabled();
+        if (ImGui::MenuItem("Load Prefab")) {
             _loadPrefab();
         }
+        if (!isPrefab) ImGui::EndDisabled();
 
-        // Edit prefab option: open in unified Inspector
-        if (ImGui::Selectable("Edit Prefab")) {
+        // Edit Prefab - only enabled when prefab is selected
+        if (!isPrefab) ImGui::BeginDisabled();
+        if (ImGui::MenuItem("Edit Prefab")) {
             _editPrefab();
         }
+        if (!isPrefab) ImGui::EndDisabled();
 
+        ImGui::Separator();
+
+        // Create submenu - uses the same menu items as right-click context menu
+        if (ImGui::BeginMenu("Create")) {
+            // Use shared helper function
+            if (_renderCreateMenuItems()) {
+                m_openCreateDialog = true;
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::PopFont();
+        ImGui::EndPopup();
+    }
+
+    // Open create dialog if flagged
+    if (m_openCreateDialog) {
+        ImGui::OpenPopup("CreateAssetDialog");
+        m_openCreateDialog = false;
+    }
+
+    // Asset creation dialog (modal) - shared with context menu
+    if (ImGui::BeginPopupModal("CreateAssetDialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::PushFont(m_mainFont);
+
+        const char* dialogTitle = "Create Asset";
+        if (m_creationType == AssetCreationType::Script) dialogTitle = "Create Script";
+        else if (m_creationType == AssetCreationType::Scene) dialogTitle = "Create Scene";
+        else if (m_creationType == AssetCreationType::Folder) dialogTitle = "Create Folder";
+        ImGui::Text("%s", dialogTitle);
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(0, 5));
+
+        // Name input
+        ImGui::Text("Name:");
+        ImGui::SameLine();
+        if (m_focusNameInput) {
+            ImGui::SetKeyboardFocusHere();
+            m_focusNameInput = false;
+        }
+
+        bool enterPressed = ImGui::InputText("##AssetName", m_newAssetNameBuffer, sizeof(m_newAssetNameBuffer),
+            ImGuiInputTextFlags_EnterReturnsTrue);
+
+        ImGui::Dummy(ImVec2(0, 5));
+
+        // Buttons
+        bool createClicked = ImGui::Button("Create") || enterPressed;
+        ImGui::SameLine();
+        bool cancelClicked = ImGui::Button("Cancel");
+
+        if (createClicked && strlen(m_newAssetNameBuffer) > 0) {
+            if (m_creationType == AssetCreationType::Script) {
+                _createScript();
+            }
+            else if (m_creationType == AssetCreationType::Scene) {
+                _createScene();
+            }
+            else if (m_creationType == AssetCreationType::Folder) {
+                _createFolder();
+            }
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (cancelClicked) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::PopFont();
         ImGui::EndPopup();
     }
 }
@@ -254,7 +407,186 @@ void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
     // Left side: File/folder list (65% width)
     // Left list child; third arg 'true' draws a frame (border) around the child
     ImGui::BeginChild("FileList", ImVec2(windowWidth * 0.65f, 0), true);
-    m_assetLibrary._displayFolder(m_currentPath, m_selectedAsset, m_currentPath);
+
+    // Custom folder display with multi-selection support
+    ImGui::PushFont(m_mainFont);
+
+    if (!std::filesystem::exists(m_currentPath) || !std::filesystem::is_directory(m_currentPath)) {
+        ImGui::TextColored(EditorStyle::DangerText, "Folder not found");
+    }
+    else {
+        // Iterate through directory entries
+        for (const auto& entry : std::filesystem::directory_iterator(m_currentPath)) {
+            std::string entryPath = entry.path().string();
+            std::string entryName = entry.path().filename().string();
+            bool isSelected = m_selectedAssets.find(entryPath) != m_selectedAssets.end();
+
+            // Render icon
+            ImGui::PushFont(m_symbolsFont);
+            if (entry.is_directory()) {
+                ImGui::Text("\xEE\x8B\x87"); // Folder icon
+            }
+            else {
+                ImGui::Text("\xEE\xA1\xB3"); // File icon
+            }
+            ImGui::PopFont();
+
+            ImGui::SameLine();
+
+            // Handle rename mode
+            if (m_renamingAsset == entryPath) {
+                ImGui::PushItemWidth(-1);
+                if (m_focusRenameInput) {
+                    ImGui::SetKeyboardFocusHere();
+                    m_focusRenameInput = false;
+                }
+
+                if (ImGui::InputText("##Rename", m_renameBuffer, sizeof(m_renameBuffer),
+                    ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    // Apply rename
+                    try {
+                        std::filesystem::path newPath = entry.path().parent_path() / m_renameBuffer;
+                        std::filesystem::rename(entry.path(), newPath);
+                        m_selectedAssets.erase(entryPath);
+                        m_selectedAssets.insert(newPath.string());
+                        m_selectedAsset = newPath.string();
+                        m_statusMessage = "Renamed to: " + std::string(m_renameBuffer);
+                        m_statusTimer = 2.0f;
+                    }
+                    catch (const std::exception& e) {
+                        m_statusMessage = "Rename failed: " + std::string(e.what());
+                        m_statusTimer = 3.0f;
+                    }
+                    m_renamingAsset.clear();
+                }
+
+                if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                    m_renamingAsset.clear();
+                }
+
+                ImGui::PopItemWidth();
+            }
+            else {
+                // Normal selectable
+                if (ImGui::Selectable(entryName.c_str(), isSelected,
+                    ImGuiSelectableFlags_AllowDoubleClick)) {
+
+                    bool ctrlPressed = ImGui::GetIO().KeyCtrl;
+                    bool shiftPressed = ImGui::GetIO().KeyShift;
+
+                    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && entry.is_directory()) {
+                        // Double-click folder: navigate
+                        m_currentPath = entryPath;
+                        m_selectedAssets.clear();
+                        m_selectedAsset.clear();
+                    }
+                    else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+                        entry.path().extension() == ".prefab" && m_inspector) {
+                        // Double-click prefab: open in inspector
+                        m_inspector->InspectPrefab(entryPath);
+                    }
+                    else if (ctrlPressed) {
+                        // Ctrl+click: toggle selection
+                        if (isSelected) {
+                            m_selectedAssets.erase(entryPath);
+                        }
+                        else {
+                            m_selectedAssets.insert(entryPath);
+                            m_anchorAsset = entryPath;
+                        }
+                        m_selectedAsset = m_selectedAssets.empty() ? "" : *m_selectedAssets.begin();
+                    }
+                    else if (shiftPressed && !m_anchorAsset.empty()) {
+                        // Shift+click: range selection (simplified - select all between anchor and current)
+                        m_selectedAssets.clear();
+                        bool inRange = false;
+                        for (const auto& e : std::filesystem::directory_iterator(m_currentPath)) {
+                            std::string path = e.path().string();
+                            if (path == m_anchorAsset || path == entryPath) {
+                                m_selectedAssets.insert(path);
+                                inRange = !inRange;
+                                if (!inRange) break;
+                            }
+                            else if (inRange) {
+                                m_selectedAssets.insert(path);
+                            }
+                        }
+                        m_selectedAsset = entryPath;
+                    }
+                    else {
+                        // Normal click: single selection
+                        m_selectedAssets.clear();
+                        m_selectedAssets.insert(entryPath);
+                        m_selectedAsset = entryPath;
+                        m_anchorAsset = entryPath;
+                    }
+                }
+
+                // Handle right-click on item
+                if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                    // Select this item if not already selected
+                    if (m_selectedAssets.find(entryPath) == m_selectedAssets.end()) {
+                        m_selectedAssets.clear();
+                        m_selectedAssets.insert(entryPath);
+                        m_selectedAsset = entryPath;
+                        m_anchorAsset = entryPath;
+                    }
+                    ImGui::OpenPopup("ItemContextMenu");
+                }
+
+                // Handle drag-drop
+                _handleAssetDragDrop(entryPath);
+
+                // Handle drop target for folders and auto-navigation
+                if (entry.is_directory()) {
+                    // Check if dragging over this folder for auto-navigation (only during drag)
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
+                        ImGui::GetDragDropPayload() != nullptr) {
+                        static std::string s_hoveredFolder;
+                        static float s_hoverStartTime = 0.0f;
+
+                        if (s_hoveredFolder != entryPath) {
+                            s_hoveredFolder = entryPath;
+                            s_hoverStartTime = ImGui::GetTime();
+                        }
+                        else if (ImGui::GetTime() - s_hoverStartTime > 0.75f) {
+                            // Auto-navigate after hovering for 0.75 seconds
+                            m_currentPath = entryPath;
+                            m_selectedAssets.clear();
+                            m_selectedAsset.clear();
+                            s_hoveredFolder.clear();
+                        }
+                    }
+                    else {
+                        // Not hovering or not dragging - reset state
+                        static std::string s_hoveredFolder;
+                        s_hoveredFolder.clear();
+                    }
+
+                    _handleFolderDropTarget(entryPath);
+                }
+            }
+        }
+    }
+
+    ImGui::PopFont();
+
+    // Create invisible button covering remaining empty space as drop target
+    ImVec2 contentAvail = ImGui::GetContentRegionAvail();
+    if (contentAvail.y > 0) {
+        ImGui::InvisibleButton("##EmptySpaceDropTarget", contentAvail);
+
+        // Right-click on empty space to create new assets
+        if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+            ImGui::OpenPopup("AssetContextMenu");
+        }
+
+        _handleFolderDropTarget(m_currentPath);
+    }
+
+    // Render both context menus
+    _renderContextMenu();
+    _renderItemContextMenu();
 
     // Clicking empty space in file list clears EVERYTHING (File/folder list)
     AssetBrowserPanel::_selectEmptySpace();
@@ -265,7 +597,19 @@ void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
 void AssetBrowserPanel::_renderFileInfoPanel() {
     // Right side: File info panel (35% width)
     ImGui::BeginChild("FileInfo", ImVec2(0, 0), true);
-    m_assetLibrary._displaySelectedFileInfo(m_selectedAsset);
+
+    // Show multi-selection info or single file info
+    if (m_selectedAssets.size() > 1) {
+        ImGui::Text("Multiple Selection");
+        ImGui::Separator();
+        ImGui::Text("%zu items selected", m_selectedAssets.size());
+    }
+    else if (!m_selectedAsset.empty()) {
+        m_assetLibrary._displaySelectedFileInfo(m_selectedAsset);
+    }
+    else {
+        ImGui::TextDisabled("No file selected");
+    }
 
     // Clicking empty space in file info clears EVERYTHING (File info)
     AssetBrowserPanel::_selectEmptySpace();
@@ -277,37 +621,36 @@ void AssetBrowserPanel::_renderFileInfoPanel() {
 // Render the delete button for selected assets
 void AssetBrowserPanel::_renderDeleteButton() {
     // Only show delete button if something is selected
-    if (!m_selectedAsset.empty()) {
-        std::filesystem::path selectedPath(m_selectedAsset);
+    if (!m_selectedAssets.empty()) {
+        ImGui::Dummy(ImVec2(0, 5));
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(0, 5));
 
-        // Check if file/folder still exists
-        if (std::filesystem::exists(selectedPath)) {
-            bool isFolder = std::filesystem::is_directory(selectedPath);
+        // Style the delete button: icon font + transparent background + red text
+        ImGui::PushFont(m_symbolsFont);
+        // Button: fully transparent; Hover/Active: subtle grays; Text: red to indicate destructive action
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
 
-            ImGui::Dummy(ImVec2(0, 5));
-            ImGui::Separator();
-            ImGui::Dummy(ImVec2(0, 5));
+        // Render delete icon button
+        if (ImGui::SmallButton("\xEE\xA1\xB2\\##Delete2")) {
+            _deleteSelectedAssets();
+        }
 
-            // Style the delete button: icon font + transparent background + red text
-            ImGui::PushFont(m_symbolsFont);
-            // Button: fully transparent; Hover/Active: subtle grays; Text: red to indicate destructive action
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
+        // Restore style overrides and font state
+        ImGui::PopStyleColor(4);
+        ImGui::PopFont();
 
-            // Render delete icon button
-            if (ImGui::SmallButton("\xEE\xA1\xB2\##Delete2")) {
-                m_assetLibrary._deleteSelectedAsset(m_selectedAsset, m_statusMessage, m_statusTimer);
-            }
-
-            // Restore style overrides and font state
-            ImGui::PopStyleColor(4);
-            ImGui::PopFont();
-
-            // Show tooltip on hover
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        // Show tooltip on hover
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            if (m_selectedAssets.size() == 1) {
+                bool isFolder = std::filesystem::is_directory(*m_selectedAssets.begin());
                 ImGui::SetTooltip(isFolder ? "Delete selected folder and all contents" : "Delete selected file");
+            }
+            else {
+                ImGui::SetTooltip("Delete %zu selected items", m_selectedAssets.size());
             }
         }
     }
@@ -320,8 +663,8 @@ void AssetBrowserPanel::_renderStatusBar() {
 
     // Pick text color based on whether the message indicates failure
     ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-        ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
-        : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+        ? EditorStyle::DangerText
+        : EditorStyle::SuccessText;
     ImGui::SetCursorPosX(3);
     ImGui::TextColored(color, "%s", m_statusMessage.c_str());
 
@@ -436,12 +779,601 @@ void AssetBrowserPanel::_selectEmptySpace() {
         && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
         && !ImGui::IsAnyItemHovered()) {
 
-        // Clear currently selected asset
+        // Clear currently selected assets
         m_selectedAsset.clear();
+        m_selectedAssets.clear();
+        m_anchorAsset.clear();
 
         // Clear prefab editor if it exists (no need to clear property inspector here)
         if (m_inspector) {
             m_inspector->ClearSelection();
         }
     }
+}
+
+// -------------------------------------------------------------------------
+// Context Menu
+// -------------------------------------------------------------------------
+
+// Helper function to render create menu items (used by both context menu and + button submenu)
+bool AssetBrowserPanel::_renderCreateMenuItems() {
+    bool openDialog = false;
+
+    // Create Script option
+    if (ImGui::MenuItem("C# Script")) {
+        m_creationType = AssetCreationType::Script;
+        strcpy_s(m_newAssetNameBuffer, "NewScript");
+        m_focusNameInput = true;
+        openDialog = true;
+    }
+
+    // Create Scene option
+    if (ImGui::MenuItem("Scene")) {
+        m_creationType = AssetCreationType::Scene;
+        strcpy_s(m_newAssetNameBuffer, "NewScene");
+        m_focusNameInput = true;
+        openDialog = true;
+    }
+
+    // Create Folder option
+    if (ImGui::MenuItem("Folder")) {
+        m_creationType = AssetCreationType::Folder;
+        strcpy_s(m_newAssetNameBuffer, "NewFolder");
+        m_focusNameInput = true;
+        openDialog = true;
+    }
+
+    return openDialog;
+}
+
+void AssetBrowserPanel::_renderContextMenu() {
+    bool openCreateDialog = false;
+
+    if (ImGui::BeginPopup("AssetContextMenu")) {
+        ImGui::PushFont(m_mainFont);
+        ImGui::Text("Create");
+        ImGui::Separator();
+
+        // Use shared helper function
+        openCreateDialog = _renderCreateMenuItems();
+
+        ImGui::PopFont();
+        ImGui::EndPopup();
+    }
+
+    // Open the dialog outside of the popup to avoid nesting issues
+    if (openCreateDialog) {
+        ImGui::OpenPopup("CreateAssetDialog");
+    }
+
+    // Asset creation dialog (modal)
+    if (ImGui::BeginPopupModal("CreateAssetDialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::PushFont(m_mainFont);
+
+        const char* dialogTitle = "Create Asset";
+        if (m_creationType == AssetCreationType::Script) dialogTitle = "Create Script";
+        else if (m_creationType == AssetCreationType::Scene) dialogTitle = "Create Scene";
+        else if (m_creationType == AssetCreationType::Folder) dialogTitle = "Create Folder";
+        ImGui::Text("%s", dialogTitle);
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(0, 5));
+
+        // Name input
+        ImGui::Text("Name:");
+        ImGui::SameLine();
+        if (m_focusNameInput) {
+            ImGui::SetKeyboardFocusHere();
+            m_focusNameInput = false;
+        }
+
+        bool enterPressed = ImGui::InputText("##AssetName", m_newAssetNameBuffer, sizeof(m_newAssetNameBuffer),
+            ImGuiInputTextFlags_EnterReturnsTrue);
+
+        ImGui::Dummy(ImVec2(0, 5));
+
+        // Buttons
+        bool createClicked = ImGui::Button("Create") || enterPressed;
+        ImGui::SameLine();
+        bool cancelClicked = ImGui::Button("Cancel");
+
+        if (createClicked && strlen(m_newAssetNameBuffer) > 0) {
+            if (m_creationType == AssetCreationType::Script) {
+                _createScript();
+            }
+            else if (m_creationType == AssetCreationType::Scene) {
+                _createScene();
+            }
+            else if (m_creationType == AssetCreationType::Folder) {
+                _createFolder();
+            }
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (cancelClicked) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::PopFont();
+        ImGui::EndPopup();
+    }
+}
+
+void AssetBrowserPanel::_renderItemContextMenu() {
+    if (ImGui::BeginPopup("ItemContextMenu")) {
+        ImGui::PushFont(m_mainFont);
+
+        // Show selected count
+        if (m_selectedAssets.size() > 1) {
+            ImGui::Text("%zu items selected", m_selectedAssets.size());
+            ImGui::Separator();
+        }
+
+        // Rename (only for single selection)
+        if (m_selectedAssets.size() == 1) {
+            if (ImGui::MenuItem("Rename", "F2")) {
+                _startRename();
+            }
+        }
+
+        // Copy
+        if (ImGui::MenuItem("Copy", "Ctrl+C")) {
+            _copySelectedAssets();
+        }
+
+        // Cut
+        if (ImGui::MenuItem("Cut", "Ctrl+X")) {
+            _copySelectedAssets();
+            m_clipboardIsCut = true;
+        }
+
+        // Paste (if clipboard has items)
+        if (!m_clipboardAssets.empty()) {
+            if (ImGui::MenuItem("Paste", "Ctrl+V")) {
+                _pasteAssets();
+            }
+        }
+
+        // Delete
+        if (ImGui::MenuItem("Delete", "Del")) {
+            _deleteSelectedAssets();
+        }
+
+        ImGui::PopFont();
+        ImGui::EndPopup();
+    }
+}
+
+void AssetBrowserPanel::_createScript() {
+    // Create in current directory
+    std::filesystem::path targetDir = m_currentPath;
+    std::cout << "Creating script in directory: " << targetDir.string() << std::endl;
+
+    // Ensure the directory exists
+    if (!std::filesystem::exists(targetDir)) {
+        std::filesystem::create_directories(targetDir);
+    }
+
+    // Create file path with .cs extension
+    std::string fileName = m_newAssetNameBuffer;
+    if (fileName.find(".cs") == std::string::npos) {
+        fileName += ".cs";
+    }
+    std::filesystem::path filePath = targetDir / fileName;
+
+    // Check if file already exists
+    if (std::filesystem::exists(filePath)) {
+        m_statusMessage = "Script already exists: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Script file already exists: " << filePath.string());
+        return;
+    }
+
+    // Create script template
+    std::string className = m_newAssetNameBuffer;
+
+    // Create namespace from the target directory by replacing
+    // path separators with '.' and sanitizing invalid characters.
+    std::string ns;
+    try {
+        // Try to make the path relative to the project root so namespaces
+        // are nicer (e.g., "Assets.Scripts") when possible.
+        std::filesystem::path projRoot = Engine::ProjectPaths::GetProjectRoot();
+        std::filesystem::path rel = std::filesystem::relative(targetDir, projRoot);
+        ns = rel.string();
+    }
+    catch (...) {
+        ns = targetDir.string();
+    }
+
+    // Replace separators with dots and sanitize a few problematic chars
+    for (char &c : ns) {
+        if (c == '/' || c == '\\')
+            c = '.';
+        else if (c == ':' || c == ' ')
+            c = '_';
+    }
+
+    // Trim leading/trailing dots if any
+    while (!ns.empty() && ns.front() == '.')
+        ns.erase(ns.begin());
+    while (!ns.empty() && ns.back() == '.')
+        ns.pop_back();
+
+    // Fallback namespace if resulting string is empty
+    if (ns.empty())
+        ns = Engine::ProjectPaths::GetProjectRoot();
+
+    std::string scriptContent =
+        "using GrapeEngine.Scripting;\n\n"
+        "namespace " + ns + ";\n"
+        "\n"
+        "public class " + className + " : ScriptBehaviour\n"
+        "{\n"
+        "    public override void OnStart()\n"
+        "    {\n"
+        "        // Called once when the script is initialized\n"
+        "    }\n\n"
+        "    public override void OnUpdate()\n"
+        "    {\n"
+        "        // Called every frame\n"
+        "    }\n"
+        "}\n"
+        "\n";
+
+    // Write file
+    try {
+        std::ofstream file(filePath);
+        if (!file.is_open()) {
+            m_statusMessage = "Failed to create script: " + fileName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create script file: " << filePath.string());
+            return;
+        }
+
+        file << scriptContent;
+        file.close();
+
+        m_statusMessage = "Created script: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_INFO("Created script: " << filePath.string());
+
+        // Select the newly created file
+        m_selectedAsset = filePath.string();
+
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating script: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating script: " << e.what());
+    }
+}
+
+void AssetBrowserPanel::_createScene() {
+    // Create file path with .scn extension
+    std::string fileName = m_newAssetNameBuffer;
+    if (fileName.find(".scn") == std::string::npos) {
+        fileName += ".scn";
+    }
+    std::filesystem::path filePath = std::filesystem::path(m_currentPath) / fileName;
+
+    // Check if file already exists
+    if (std::filesystem::exists(filePath)) {
+        m_statusMessage = "Scene already exists: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Scene file already exists: " << filePath.string());
+        return;
+    }
+
+    // Create empty scene template
+    std::string sceneContent =
+        "{\n"
+        "  \"Version\": \"1.0\",\n"
+        "  \"Name\": \"" + std::string(m_newAssetNameBuffer) + "\",\n"
+        "  \"Entities\": []\n"
+        "}\n";
+
+    // Write file
+    try {
+        std::ofstream file(filePath);
+        if (!file.is_open()) {
+            m_statusMessage = "Failed to create scene: " + fileName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create scene file: " << filePath.string());
+            return;
+        }
+
+        file << sceneContent;
+        file.close();
+
+        m_statusMessage = "Created scene: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_INFO("Created scene: " << filePath.string());
+
+        // Select the newly created file
+        m_selectedAsset = filePath.string();
+
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating scene: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating scene: " << e.what());
+    }
+}
+
+void AssetBrowserPanel::_createFolder() {
+    // Create folder path
+    std::string folderName = m_newAssetNameBuffer;
+    std::filesystem::path folderPath = std::filesystem::path(m_currentPath) / folderName;
+
+    // Check if folder already exists
+    if (std::filesystem::exists(folderPath)) {
+        m_statusMessage = "Folder already exists: " + folderName;
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Folder already exists: " << folderPath.string());
+        return;
+    }
+
+    // Create the folder
+    try {
+        if (std::filesystem::create_directory(folderPath)) {
+            m_statusMessage = "Created folder: " + folderName;
+            m_statusTimer = 3.0f;
+            LOG_INFO("Created folder: " << folderPath.string());
+
+            // Select the newly created folder
+            m_selectedAsset = folderPath.string();
+        }
+        else {
+            m_statusMessage = "Failed to create folder: " + folderName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create folder: " << folderPath.string());
+        }
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating folder: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating folder: " << e.what());
+    }
+}
+
+// -------------------------------------------------------------------------
+// Copy/Paste Operations
+// -------------------------------------------------------------------------
+
+void AssetBrowserPanel::_copySelectedAssets() {
+    m_clipboardAssets.clear();
+    m_clipboardAssets.assign(m_selectedAssets.begin(), m_selectedAssets.end());
+    m_clipboardIsCut = false;
+
+    m_statusMessage = "Copied " + std::to_string(m_clipboardAssets.size()) + " item(s)";
+    m_statusTimer = 2.0f;
+}
+
+void AssetBrowserPanel::_pasteAssets() {
+    if (m_clipboardAssets.empty()) {
+        m_statusMessage = "Clipboard is empty";
+        m_statusTimer = 2.0f;
+        return;
+    }
+
+    try {
+        if (m_clipboardIsCut) {
+            // Move operation
+            _moveAssetsToDirectory(m_clipboardAssets, m_currentPath);
+            m_clipboardAssets.clear();
+            m_clipboardIsCut = false;
+        }
+        else {
+            // Copy operation
+            _copyAssetsToDirectory(m_clipboardAssets, m_currentPath);
+        }
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Paste failed: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Paste operation failed: " << e.what());
+    }
+}
+
+void AssetBrowserPanel::_deleteSelectedAssets() {
+    if (m_selectedAssets.empty()) return;
+
+    size_t deleteCount = 0;
+    for (const auto& assetPath : m_selectedAssets) {
+        try {
+            std::filesystem::path path(assetPath);
+            if (std::filesystem::exists(path)) {
+                if (std::filesystem::is_directory(path)) {
+                    std::filesystem::remove_all(path);
+                }
+                else {
+                    std::filesystem::remove(path);
+                }
+                deleteCount++;
+            }
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to delete " << assetPath << ": " << e.what());
+        }
+    }
+
+    m_selectedAssets.clear();
+    m_selectedAsset.clear();
+    m_statusMessage = "Deleted " + std::to_string(deleteCount) + " item(s)";
+    m_statusTimer = 2.0f;
+}
+
+void AssetBrowserPanel::_startRename() {
+    if (m_selectedAssets.size() != 1) return;
+
+    m_renamingAsset = *m_selectedAssets.begin();
+    std::filesystem::path path(m_renamingAsset);
+    std::string filename = path.filename().string();
+
+    strncpy_s(m_renameBuffer, filename.c_str(), sizeof(m_renameBuffer) - 1);
+    m_renameBuffer[sizeof(m_renameBuffer) - 1] = '\0';
+    m_focusRenameInput = true;
+}
+
+// -------------------------------------------------------------------------
+// Drag-Drop Operations
+// -------------------------------------------------------------------------
+
+void AssetBrowserPanel::_handleAssetDragDrop(const std::string& assetPath) {
+    // Drag source: make selected assets draggable
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+        // If this asset is part of selection, drag all selected assets
+        std::vector<std::string> draggedAssets;
+        if (m_selectedAssets.find(assetPath) != m_selectedAssets.end()) {
+            draggedAssets.assign(m_selectedAssets.begin(), m_selectedAssets.end());
+        }
+        else {
+            draggedAssets.push_back(assetPath);
+        }
+
+        // Serialize paths as null-terminated strings concatenated together
+        std::string serialized;
+        for (const auto& path : draggedAssets) {
+            serialized += path;
+            serialized += '\0';
+        }
+
+        // Set payload with serialized string buffer
+        ImGui::SetDragDropPayload("ASSET_PATHS", serialized.data(), serialized.size());
+
+        // Drag preview
+        ImGui::PushFont(m_symbolsFont);
+        ImGui::Text("\xEF\x8E\xB2");
+        ImGui::PopFont();
+        ImGui::SameLine();
+        if (draggedAssets.size() == 1) {
+            std::filesystem::path path(draggedAssets[0]);
+            ImGui::Text("%s", path.filename().string().c_str());
+        }
+        else {
+            ImGui::Text("%zu items", draggedAssets.size());
+        }
+
+        ImGui::EndDragDropSource();
+    }
+}
+
+void AssetBrowserPanel::_handleFolderDropTarget(const std::string& folderPath) {
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            // Deserialize null-terminated strings from payload
+            std::vector<std::string> draggedAssets;
+            const char* data = static_cast<const char*>(payload->Data);
+            const char* end = data + payload->DataSize;
+
+            while (data < end) {
+                std::string path(data);
+                if (!path.empty()) {
+                    draggedAssets.push_back(path);
+                }
+                data += path.size() + 1; // Move past null terminator
+            }
+
+            try {
+                if (ImGui::GetIO().KeyCtrl) {
+                    // Ctrl: copy
+                    _copyAssetsToDirectory(draggedAssets, folderPath);
+                }
+                else {
+                    // No modifier: move
+                    _moveAssetsToDirectory(draggedAssets, folderPath);
+                }
+            }
+            catch (const std::exception& e) {
+                m_statusMessage = "Drop failed: " + std::string(e.what());
+                m_statusTimer = 3.0f;
+                LOG_ERROR("Drop operation failed: " << e.what());
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+}
+
+void AssetBrowserPanel::_moveAssetsToDirectory(const std::vector<std::string>& assets,
+    const std::string& targetDir) {
+    size_t moveCount = 0;
+
+    for (const auto& assetPath : assets) {
+        try {
+            std::filesystem::path srcPath(assetPath);
+            std::filesystem::path destPath = std::filesystem::path(targetDir) / srcPath.filename();
+
+            // Skip if source and destination are the same
+            if (std::filesystem::equivalent(srcPath.parent_path(), targetDir)) {
+                continue;
+            }
+
+            // Handle name conflicts
+            if (std::filesystem::exists(destPath)) {
+                std::string baseName = destPath.stem().string();
+                std::string extension = destPath.extension().string();
+                int counter = 1;
+
+                do {
+                    destPath = std::filesystem::path(targetDir) /
+                        (baseName + "_" + std::to_string(counter) + extension);
+                    counter++;
+                } while (std::filesystem::exists(destPath));
+            }
+
+            std::filesystem::rename(srcPath, destPath);
+            moveCount++;
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to move " << assetPath << ": " << e.what());
+        }
+    }
+
+    m_statusMessage = "Moved " + std::to_string(moveCount) + " item(s)";
+    m_statusTimer = 2.0f;
+}
+
+void AssetBrowserPanel::_copyAssetsToDirectory(const std::vector<std::string>& assets,
+    const std::string& targetDir) {
+    size_t copyCount = 0;
+
+    for (const auto& assetPath : assets) {
+        try {
+            std::filesystem::path srcPath(assetPath);
+            std::filesystem::path destPath = std::filesystem::path(targetDir) / srcPath.filename();
+
+            // Skip if source and destination are the same
+            if (std::filesystem::equivalent(srcPath.parent_path(), targetDir)) {
+                continue;
+            }
+
+            // Handle name conflicts
+            if (std::filesystem::exists(destPath)) {
+                std::string baseName = destPath.stem().string();
+                std::string extension = destPath.extension().string();
+                int counter = 1;
+
+                do {
+                    destPath = std::filesystem::path(targetDir) /
+                        (baseName + "_copy" + std::to_string(counter) + extension);
+                    counter++;
+                } while (std::filesystem::exists(destPath));
+            }
+
+            if (std::filesystem::is_directory(srcPath)) {
+                std::filesystem::copy(srcPath, destPath,
+                    std::filesystem::copy_options::recursive);
+            }
+            else {
+                std::filesystem::copy_file(srcPath, destPath);
+            }
+            copyCount++;
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to copy " << assetPath << ": " << e.what());
+        }
+    }
+
+    m_statusMessage = "Copied " + std::to_string(copyCount) + " item(s)";
+    m_statusTimer = 2.0f;
 }

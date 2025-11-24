@@ -1,11 +1,11 @@
 #pragma once
 
 #include "ecs/World.h"
-#include "../editor/AudioAssetLibrary.h"
+#include "AudioAssetLibrary.h"
 #include "services/AudioService.h"
 #include <unordered_map>
 #include "ecs/Components.h"
-#include "../engine/audio/FmodAudioDevice.h"
+#include "audio/FmodAudioDevice.h"
 
 /*
    AudioSystem

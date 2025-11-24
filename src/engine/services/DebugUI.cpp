@@ -45,6 +45,7 @@ Features:
 #include "scene/Scene.h"
 #include "services/ResourceManager.h"
 #include "services/UICommon.h"
+#include "services/WindowManager.h"
 
 #ifdef max
 #undef max  // Undefine macro to avoid conflicts with std::max
@@ -273,7 +274,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
         ImGui::BeginDisabled(cueName.empty() || filePath.empty());
 
         if (ImGui::Button("Load Cue")) {
-            Audio::SoundParams p{}; p.stream = true; p.is3D = false; // music
+            Audio::SoundParams p{}; p.Stream = true; p.Is3D = false; // music
             if (!device->LoadCue(cueName, filePath, p)) {
                 LOG_ERROR("LoadCue failed. Path=" << filePath.c_str() << " Cue=" << cueName.c_str());
             }
@@ -285,7 +286,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
         ImGui::SameLine();
 
         if (ImGui::Button("Play")) {
-            Audio::PlaySettings s{}; s.loop = loop; s.volume = 1.0f; s.pitch = 1.0f;
+            Audio::PlaySettings s{}; s.Loop = loop; s.Volume = 1.0f; s.Pitch = 1.0f;
             auto h = device->PlaySingle(cueName, s, Audio::PlayPolicy::SingleInstanceRestart);
             if (!h) LOG_ERROR("Play failed. Cue may not be loaded. Cue=" << cueName.c_str());
         }
@@ -327,7 +328,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
                     std::string stopLbl = "Stop##" + cueId;
 
                     if (ImGui::SmallButton(playLbl.c_str())) {
-                        Audio::PlaySettings s{}; s.loop = false; s.volume = 1.0f; s.pitch = 1.0f;
+                        Audio::PlaySettings s{}; s.Loop = false; s.Volume = 1.0f; s.Pitch = 1.0f;
                         device->PlaySingle(cueId, s, Audio::PlayPolicy::SingleInstanceRestart);
                     }
                     ImGui::SameLine();
@@ -382,7 +383,7 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
                     std::string playLbl = "Load+Play##" + std::to_string(i);
 
                     if (ImGui::SmallButton(loadLbl.c_str())) {
-                        Audio::SoundParams p{}; p.stream = true; p.is3D = false;
+                        Audio::SoundParams p{}; p.Stream = true; p.Is3D = false;
                         if (!device->LoadCue(editCue, path, p)) {
                             LOG_ERROR("LoadCue failed for cached path: " << path.c_str());
                         }
@@ -392,12 +393,12 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
                     }
                     ImGui::SameLine();
                     if (ImGui::SmallButton(playLbl.c_str())) {
-                        Audio::SoundParams p{}; p.stream = true; p.is3D = false;
+                        Audio::SoundParams p{}; p.Stream = true; p.Is3D = false;
                         if (!device->LoadCue(editCue, path, p)) {
                             LOG_ERROR("LoadCue failed for cached path: " << path.c_str());
                         }
                         else {
-                            Audio::PlaySettings s{}; s.loop = false; s.volume = 1.0f; s.pitch = 1.0f;
+                            Audio::PlaySettings s{}; s.Loop = false; s.Volume = 1.0f; s.Pitch = 1.0f;
                             device->PlaySingle(editCue, s, Audio::PlayPolicy::SingleInstanceRestart);
                         }
                     }
@@ -411,6 +412,8 @@ void DebugUI::_showAudioWindow(Audio::FmodAudioDevice* device)
 }
 
 void DebugUI::_showInputDebugWindow() {
+    auto *window = WindowManager::GetMainWindow();
+
     // Use config values
     UICommon::ApplyLayout(UICommon::WindowId::DEBUG_INPUT);
     ImGui::Begin("Input Debug");
@@ -423,7 +426,7 @@ void DebugUI::_showInputDebugWindow() {
 
     ImGui::Separator();
     ImGui::Text("=== Window ===");
-    ImGui::Text("Size: %dx%d", Input::GetWindowWidth(), Input::GetWindowHeight());
+    ImGui::Text("Size: %dx%d", window->GetWidth(), window->GetHeight());
 
     ImGui::Separator();
     ImGui::Text("=== Keyboard ===");

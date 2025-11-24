@@ -79,20 +79,6 @@ public static class Input
     /// Get the current vertical scroll offset.
     /// </summary>
     public static double ScrollY => InputAPI.GetScrollY();
-
-    // ============================================================================
-    // Window Information
-    // ============================================================================
-
-    /// <summary>
-    /// Get the current window width in pixels.
-    /// </summary>
-    public static int WindowWidth => InputAPI.GetWindowWidth();
-
-    /// <summary>
-    /// Get the current window height in pixels.
-    /// </summary>
-    public static int WindowHeight => InputAPI.GetWindowHeight();
 }
 
 // ============================================================================
