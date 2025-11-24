@@ -335,45 +335,45 @@ static std::vector<ComponentUIMetadata> m_registry = {
             ui.RenderAudioSource(data);
         },
 
-    // Defaults -> initial JSON for a new AudioSource
-    []() -> nlohmann::json
-    {
-        return nlohmann::json{
-            { "CueId",       0 },
-            { "Volume",      1.0f },
-            { "Pitch",       1.0f },
-            { "Loop",        false },
-            { "PlayOnStart", false },
-            { "Spatial3D",   false }
-        };
-    },
+        // Defaults -> initial JSON for a new AudioSource
+        []() -> nlohmann::json
+        {
+            return nlohmann::json{
+                { "CueId",       0 },
+                { "Volume",      1.0f },
+                { "Pitch",       1.0f },
+                { "Loop",        false },
+                { "PlayOnStart", false },
+                { "Spatial3D",   false }
+            };
+        },
 
-    // Has Component
-    [](ECS::World* world, ECS::Entity e) -> bool
-    {
-        return world->Has<ECS::Components::AudioSource>(e);
-    },
+        // Has Component
+        [](ECS::World* world, ECS::Entity e) -> bool
+        {
+            return world->Has<ECS::Components::AudioSource>(e);
+        },
 
-    // Add Component
-    [](ECS::World* world, ECS::Entity e, const nlohmann::json& data)
-    {
-        ECS::Components::AudioSource comp{};
-        from_json(data, comp);  // uses your NLOHMANN_DEFINE_TYPE_* mapping
-        world->Add<ECS::Components::AudioSource>(e, comp);
-    },
+        // Add Component
+        [](ECS::World* world, ECS::Entity e, const nlohmann::json& data)
+        {
+            ECS::Components::AudioSource comp{};
+            from_json(data, comp);  // uses your NLOHMANN_DEFINE_TYPE_* mapping
+            world->Add<ECS::Components::AudioSource>(e, comp);
+        },
 
-    // Remove Component
-    [](ECS::World* world, ECS::Entity e)
-    {
-        world->Remove<ECS::Components::AudioSource>(e);
-    },
+        // Remove Component
+        [](ECS::World* world, ECS::Entity e)
+        {
+            world->Remove<ECS::Components::AudioSource>(e);
+        },
 
-    // Apply To Entity (update existing component from JSON)
-    [](ECS::World* world, ECS::Entity e, const nlohmann::json& data)
-    {
-        auto& comp = world->Get<ECS::Components::AudioSource>(e);
-        from_json(data, comp);
-    }
+        // Apply To Entity (update existing component from JSON)
+        [](ECS::World* world, ECS::Entity e, const nlohmann::json& data)
+        {
+            auto& comp = world->Get<ECS::Components::AudioSource>(e);
+            from_json(data, comp);
+        }
     },
 
     // Layer
@@ -399,7 +399,6 @@ static std::vector<ComponentUIMetadata> m_registry = {
         COMPONENT_OPS(ECS::Components::ScriptInstance)
     }
 };
-
 
 // -----------------------------------------------------------------------------
 // Registry Class

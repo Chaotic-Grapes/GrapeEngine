@@ -216,7 +216,17 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio, Active)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraEditor3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PrefabLink, prefabPath)
+		
+		// Custom serialization for PrefabLink component (char array needs special handling)
+		inline void to_json(nlohmann::json& j, const PrefabLink& link) {
+			j = nlohmann::json{ {"prefabPath", std::string(link.prefabPath)} };
+		}
+
+		inline void from_json(const nlohmann::json& j, PrefabLink& link) {
+			std::string path = j.at("prefabPath").get<std::string>();
+			strncpy_s(link.prefabPath, path.c_str(), sizeof(link.prefabPath) - 1);
+			link.prefabPath[sizeof(link.prefabPath) - 1] = '\0';
+		}
 
 		// Custom serialization for Light2D enum
 		inline void to_json(nlohmann::json& j, const Light2D& light) {
