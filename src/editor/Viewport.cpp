@@ -151,6 +151,11 @@ void Viewport::HandleInWorldInteraction() {
         m_undoSystem->Update();
     }
 
+    // Toggle FPS overlay in the Scene viewport (editor-only)
+    if (Input::IsKeyPressed(KEY_F)) {
+        m_showSceneFpsOverlay = !m_showSceneFpsOverlay;
+    }
+
     // Control editor camera input based on viewport hover state
     // RendererSystem will call EditorCamera::Update() in its own Update()
     if (m_rendererSystem) {
@@ -189,7 +194,7 @@ void Viewport::_renderViewport() {
 
     // Check if viewport window is hovered AND focused (not blocked by other windows)
     m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
-                       && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+        && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     if (m_rendererSystem) {
         auto size = ImGui::GetContentRegionAvail();
@@ -221,6 +226,11 @@ void Viewport::_renderViewport() {
             // 1. Get the drawing position of the image we just rendered
             ImVec2 gizmoPos = ImGui::GetItemRectMin(); // Get the top-left corner of the image item
 
+            // Draw FPS overlay if enabled (before gizmo so it appears behind)
+            if (m_showSceneFpsOverlay) {
+                _drawFpsOverlay(gizmoPos, size);
+            }
+
             // 2. Call the RendererSystem method to draw the Gizmo overlay
             // Draw the Gizmo overlay (only in Scene tab)
             m_rendererSystem->DrawEditorGizmo(
@@ -233,7 +243,7 @@ void Viewport::_renderViewport() {
     else {
         ImGui::TextDisabled("No renderer available");
     }
-        
+
     ImGui::End();
 
     // Render Game window (scene camera)
@@ -374,4 +384,62 @@ void Viewport::SetFileMenu(EditorFileMenu* fileMenu) {
     if (m_rendererSystem) {
         m_rendererSystem->SetFileMenu(fileMenu);
     }
+}
+
+void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize) {
+    if (!m_rendererSystem) return;
+
+    // Get FPS data from Profiler
+    float currentFps = Profiler::GetFPS();
+    float frameTimeMs = Profiler::GetFrameTimeMs();
+    int flushCount = m_rendererSystem->GetFlushCount();
+
+    // Position overlay in top-left corner of viewport with padding
+    const float padding = 10.0f;
+    ImVec2 overlayPos(viewportPos.x + padding, viewportPos.y + padding);
+
+    // Setup overlay window
+    ImGui::SetNextWindowPos(overlayPos, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.75f); // Semi-transparent background
+
+    ImGuiWindowFlags overlayFlags =
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoMove;
+
+    if (ImGui::Begin("##SceneFpsOverlay", nullptr, overlayFlags)) {
+        // Determine FPS color
+        ImVec4 fpsColor;
+        if (currentFps >= 60.0f) {
+            fpsColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // Green
+        }
+        else if (currentFps >= 30.0f) {
+            fpsColor = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); // Yellow
+        }
+        else {
+            fpsColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
+        }
+
+        // Current FPS (bold font, colored)
+        if (m_boldFont) ImGui::PushFont(m_boldFont);
+        ImGui::TextColored(fpsColor, "%.1f FPS", currentFps);
+        if (m_boldFont) ImGui::PopFont();
+
+        // Frame time in milliseconds
+        ImGui::Text("%.2f ms", frameTimeMs);
+
+        // Batch flush count (optional performance metric)
+        if (flushCount >= 0) {
+            ImGui::Separator();
+            ImGui::Text("Batches: %d", flushCount);
+        }
+
+        // Toggle hint
+        ImGui::Separator();
+        ImGui::TextDisabled("Press F to toggle");
+    }
+    ImGui::End();
 }

@@ -78,6 +78,10 @@ private:
     // Stores the exact screen position and size of the drawn scene texture. M3<<<<<<<<<<<<<<<<<<<<<<<
     ImVec2 m_sceneDrawPos = { 0.0f, 0.0f };
     ImVec2 m_sceneDrawSize = { 0.0f, 0.0f };
+
+    // Toggleable FPS overlay for the Scene viewport (editor-only)
+    void _drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize);
+    bool m_showSceneFpsOverlay = false;
     
     // Game window aspect ratio settings
     int m_selectedAspectRatio = 0; // Index into aspect ratio list
