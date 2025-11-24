@@ -415,7 +415,8 @@ void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback
 
     // Handle state transitions
     if (newState == Playback::GameState::Stopped) {
-        // Clear selection (entity IDs have changed after restore)
+        // Note: Entity IDs are now preserved during restore, so selection can remain valid
+        // However, we still clear selection as a safe UX pattern when stopping play mode
         m_hierarchyWindow.SetSelectedEntity(0);
         m_inspector.ClearSelection();
 

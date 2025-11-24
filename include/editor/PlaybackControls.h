@@ -49,6 +49,10 @@ private:
     void _saveWorldState();
     void _restoreWorldState();
     void _changeState(GameState newState);
+    
+    // Helper methods for in-place entity restoration
+    void _restoreEntityState(ECS::Entity entity, const nlohmann::json& entityJson);
+    ECS::Entity _recreateEntityWithId(uint32_t targetId, const nlohmann::json& entityJson);
 
     ECS::World* m_world = nullptr;
     GameState m_gameState = GameState::Stopped;

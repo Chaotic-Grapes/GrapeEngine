@@ -1619,24 +1619,20 @@ namespace ECS {
         }
 
         // Performance logging
-        if (Time::FrameCount() % 60 == 0)
+        if (Time::FrameCount() % 120 == 0)
         {
             static int previousFlushTotal = 0;
             int currentTotal = GetFlushCount();
             int flushes = currentTotal - previousFlushTotal;
             previousFlushTotal = currentTotal;
-            LOG_DEBUG("=== RENDERER ANALYSIS ===");
-            LOG_DEBUG("Flushes this frame: " << flushes);
+
+            std::stringstream ss;
             if (flushes > 10)
-            {
-                LOG_DEBUG("Too many flushes! Likely texture switches or buffer overflows...");
-            }
+                ss << " Too many flushes! Likely texture switches or buffer overflows...";
             else if (flushes == 1)
-            {
-                LOG_DEBUG("Single batch, bottleneck is CPU-side or GPU fillrate");
-            }
-            LOG_DEBUG("FPS: " << (1.0f / Time::DeltaTime()));
-            LOG_DEBUG("=========================");
+                ss << " Single batch, bottleneck is CPU-side or GPU fillrate";
+
+            LOG_DEBUG("Flushes this frame: " << flushes << ss.str() << " | " << "FPS: " <<  static_cast<int>(1.0f / Time::DeltaTime()));
         }
     }
 }
