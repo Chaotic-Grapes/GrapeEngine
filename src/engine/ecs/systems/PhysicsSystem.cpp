@@ -47,6 +47,7 @@
 #include "helpers/EntityUtils.h"
 #include <iostream>
 #include "../engine/audio/FmodAudioDevice.h"
+#include "../engine/ecs/systems/BoundaryCheckSystem.h"
 
 extern Audio::FmodAudioDevice* gAudioDevice;
 
@@ -318,6 +319,7 @@ namespace ECS {
         // Running frame counter to reset per-frame SFX dedupe
         static uint64_t s_frameCounter = 0;
         ++s_frameCounter;
+
 
         // 1) Collect entity sets ONCE per frame (usually fine).
         //    If your scene can add/remove colliders mid-frame, you can also

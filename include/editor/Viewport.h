@@ -54,6 +54,13 @@ public:
     void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
     void FocusOnEntity(EntityId entityId);
 
+    // Get viewport bounds for UI click detection
+    ImVec2 GetSceneDrawPos() const { return m_sceneDrawPos; }
+    ImVec2 GetSceneDrawSize() const { return m_sceneDrawSize; }
+
+    // Get the editor camera from renderer system
+    Engine::EditorCamera* GetEditorCamera() const;
+
 private:
     void _renderViewport();
 
