@@ -19,6 +19,7 @@ prefab assets use the same UI path.
 #include "ComponentWidgets.h"
 #include "core/Logger.h"
 #include <imgui.h>
+#include <cmath>
 #include "EditorStyle.h"
 #include <filesystem>
 #include "ecs/Components.h"
@@ -102,8 +103,110 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
     // Start a grouped section so all three rows share aligned labels
     EditorUI::BeginPropertySection({ "Local Rotation", "Local Position", "Local Scale" });
 
-    // Draw rotation as a quaternion with X Y Z W components
-    EditorUI::RenderQuaternionRow("Local Rotation", data["Rotation"], "X", "Y", "Z", "W", 0.1f);
+    // Draw rotation as Euler angles for the editor UI (degrees).
+    // Internal storage remains a quaternion (X,Y,Z,W). We convert back-and-forth.
+    {
+        // Ensure rotation object exists
+        if (!data.contains("Rotation") || !data["Rotation"].is_object())
+            data["Rotation"] = nlohmann::json::object();
+
+        // Read quaternion components (default identity)
+        float qx = data["Rotation"].value("X", 0.0f);
+        float qy = data["Rotation"].value("Y", 0.0f);
+        float qz = data["Rotation"].value("Z", 0.0f);
+        float qw = data["Rotation"].value("W", 1.0f);
+
+        // Convert quaternion -> rotation matrix elements
+        // Using standard conversion: matrix elements m_ij
+        float m00 = 1.0f - 2.0f * (qy * qy + qz * qz);
+        float m01 = 2.0f * (qx * qy - qz * qw);
+        float m02 = 2.0f * (qx * qz + qy * qw);
+        float m10 = 2.0f * (qx * qy + qz * qw);
+        float m11 = 1.0f - 2.0f * (qx * qx + qz * qz);
+        float m12 = 2.0f * (qy * qz - qx * qw);
+        float m20 = 2.0f * (qx * qz - qy * qw);
+        float m21 = 2.0f * (qy * qz + qx * qw);
+        float m22 = 1.0f - 2.0f * (qx * qx + qy * qy);
+
+        // Decompose assuming rotation order: apply X (pitch), then Y (yaw), then Z (roll)
+        // This matches Quaternion::FromEulerRad(pitch, yaw, roll) used elsewhere.
+        auto clampf = [](float v, float lo, float hi) {
+            if (v < lo) return lo;
+            if (v > hi) return hi;
+            return v;
+        };
+
+        float yawRad = std::asin(clampf(-m20, -1.0f, 1.0f));
+        float cosy = std::cos(yawRad);
+        float pitchRad = 0.0f;
+        float rollRad = 0.0f;
+        const float EPS = 1e-6f;
+        if (std::fabs(cosy) > EPS) {
+            pitchRad = std::atan2(m21, m22);
+            rollRad  = std::atan2(m10, m00);
+        }
+        else {
+            // Gimbal lock: set pitch to 0, compute roll from alternative terms
+            pitchRad = 0.0f;
+            rollRad = std::atan2(-m01, m11);
+        }
+
+        // Convert to degrees for display
+        const float RAD_TO_DEG = 180.0f / 3.14159265358979323846f;
+        float degX = pitchRad * RAD_TO_DEG;
+        float degY = yawRad   * RAD_TO_DEG;
+        float degZ = rollRad  * RAD_TO_DEG;
+
+        // Draw three degree fields aligned like Vector3DRow
+        ImGui::Text("%s", "Local Rotation");
+
+        const float fieldWidth = 90.0f;
+        const float axisLabelWidth = ImGui::CalcTextSize("W").x;
+        const float valueStart = EditorUI::GetContentStartX();
+
+        // X (Pitch)
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStart);
+        ImGui::Text("X");
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStart + axisLabelWidth + 6.0f);
+        ImGui::SetNextItemWidth(fieldWidth);
+        bool changed = false;
+        if (ImGui::DragFloat("##LocalRotX", &degX, 0.1f, -360.0f, 360.0f, "%.2f")) changed = true;
+
+        // Y (Yaw)
+        float yStartX = valueStart + (axisLabelWidth + 6.0f + fieldWidth + 20.0f);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(yStartX);
+        ImGui::Text("Y");
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(yStartX + axisLabelWidth + 6.0f);
+        ImGui::SetNextItemWidth(fieldWidth);
+        if (ImGui::DragFloat("##LocalRotY", &degY, 0.1f, -360.0f, 360.0f, "%.2f")) changed = true;
+
+        // Z (Roll)
+        float zStartX = valueStart + 2 * (axisLabelWidth + 6.0f + fieldWidth + 20.0f);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(zStartX);
+        ImGui::Text("Z");
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(zStartX + axisLabelWidth + 6.0f);
+        ImGui::SetNextItemWidth(fieldWidth);
+        if (ImGui::DragFloat("##LocalRotZ", &degZ, 0.1f, -360.0f, 360.0f, "%.2f")) changed = true;
+
+        // If user changed Euler degrees, convert back to quaternion (radians) and write into JSON
+        if (changed) {
+            const float DEG_TO_RAD = 3.14159265358979323846f / 180.0f;
+            float p = degX * DEG_TO_RAD;
+            float y = degY * DEG_TO_RAD;
+            float r = degZ * DEG_TO_RAD;
+            Quaternion nq = Quaternion::FromEulerRad(p, y, r);
+            data["Rotation"]["X"] = nq.X;
+            data["Rotation"]["Y"] = nq.Y;
+            data["Rotation"]["Z"] = nq.Z;
+            data["Rotation"]["W"] = nq.W;
+        }
+    }
 
     // Draw position as a 3D vector with X Y Z fields
     EditorUI::RenderVector3DRow("Local Position", data["Position"], "X", "Y", "Z", 1.0f);
