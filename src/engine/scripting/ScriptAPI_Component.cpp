@@ -18,6 +18,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "helpers/EntityUtils.h"
 #include <cstring>
 #include "core/Logger.h"
+#include "ecs/systems/BoundaryCheckSystem.h"
 
 // Export macro
 #ifndef SCRIPT_API
@@ -100,6 +101,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
+        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE
 
@@ -147,6 +149,7 @@ namespace {
         HANDLE_COMPONENT_TYPE_PTR(Name, "Name")
         HANDLE_COMPONENT_TYPE_PTR(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE_PTR(Lifetime, "Lifetime")
+        HANDLE_COMPONENT_TYPE_PTR(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE_PTR
 
@@ -208,6 +211,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
+        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE
 
@@ -272,6 +276,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
+        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE
 
@@ -320,6 +325,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
+        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE
 
@@ -369,7 +375,8 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
-
+        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
+                
         #undef HANDLE_COMPONENT_TYPE
     }
 }
