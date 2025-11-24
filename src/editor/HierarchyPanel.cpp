@@ -534,7 +534,7 @@ void HierarchyPanel::_renderEntityContextMenu() {
 
             ImGui::Separator();
 
-            if (ImGui::BeginMenu("Add Component")) {
+            if (ImGui::BeginMenu("Add Custom Component")) {
 
                 // Option 1: Scripting Sub-Menu
                 if (ImGui::BeginMenu("Scripting")) {
