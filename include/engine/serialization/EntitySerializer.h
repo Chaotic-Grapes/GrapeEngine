@@ -108,6 +108,7 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Rigidbody2D, Mass, InverseMass, LinearDamping, AngularDamping, GravityScale, Flags)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxCollider2D, HalfExtents, Offset, Rotation, LayerMask, Flags)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CircleCollider2D, Radius, Offset, LayerMask, Flags)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(UIClickable, ClickActionID, Enabled, IsHovered, WasClicked)
 
 		// Custom serialization for SpriteRenderer2D (char array needs special handling)
 		inline void to_json(nlohmann::json& j, const SpriteRenderer2D& sprite) {
@@ -496,6 +497,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices, "CameraMatrices")
 	REGISTER_COMPONENT_SERIALIZER(ScriptInstance, ECS::Components::ScriptInstance, "ScriptInstance")
 	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource, "AudioSource")
+	REGISTER_COMPONENT_SERIALIZER(UIClickable, ECS::Components::UIClickable, "UIClickable")
 	REGISTER_COMPONENT_SERIALIZER(PrefabLink, ECS::Components::PrefabLink, "PrefabLink")
 }
 

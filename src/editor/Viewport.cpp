@@ -86,6 +86,10 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
     }
 }
 
+Engine::EditorCamera* Viewport::GetEditorCamera() const {
+    return m_rendererSystem ? m_rendererSystem->GetEditorCamera() : nullptr;
+}
+
 void Viewport::SetWorld(ECS::World* world) {
     m_world = world;
 
@@ -194,6 +198,9 @@ void Viewport::_renderViewport() {
     if (m_rendererSystem) {
         auto size = ImGui::GetContentRegionAvail();
         auto pos = ImGui::GetCursorScreenPos();
+
+        m_sceneDrawPos = pos;
+        m_sceneDrawSize = size;
 
         // Broadcast viewport resize event for camera aspect ratio updates
         Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));

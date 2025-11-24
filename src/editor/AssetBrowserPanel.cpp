@@ -547,7 +547,7 @@ void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
 
                         if (s_hoveredFolder != entryPath) {
                             s_hoveredFolder = entryPath;
-                            s_hoverStartTime = ImGui::GetTime();
+                            s_hoverStartTime = static_cast<float>(ImGui::GetTime());
                         }
                         else if (ImGui::GetTime() - s_hoverStartTime > 0.75f) {
                             // Auto-navigate after hovering for 0.75 seconds

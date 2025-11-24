@@ -573,6 +573,4 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<UIClickable>, "UIClickable must be trivially copyable");
     }
 }
-
-
 #endif

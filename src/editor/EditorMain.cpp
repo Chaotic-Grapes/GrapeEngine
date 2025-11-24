@@ -79,6 +79,7 @@ public:
     void OnUpdate(Scenes::SceneManager& sceneManager) override {
         (void)sceneManager;
         // Editor updates are handled by the overlay service
+
     }
 
     void OnShutdown(Scenes::SceneManager& sceneManager) override {
