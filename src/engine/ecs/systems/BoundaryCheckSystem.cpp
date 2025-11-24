@@ -20,6 +20,8 @@ namespace ECS {
     Entity BoundaryCheckSystem::s_hoveredEntity = NULL_ENTITY;
     Entity BoundaryCheckSystem::s_previousHoveredEntity = NULL_ENTITY;
     bool BoundaryCheckSystem::s_anyClicked = false;
+    uint32_t BoundaryCheckSystem::s_lastClickedActionID = 0;
+    Entity BoundaryCheckSystem::s_lastClickedEntity = NULL_ENTITY;
 
     // =========================================================================
     // Lifecycle
@@ -37,6 +39,10 @@ namespace ECS {
 
         // reset for every click
         s_anyClicked = false;
+
+        // Callback entity clicked tracking
+        s_lastClickedActionID = 0;       
+        s_lastClickedEntity = NULL_ENTITY;
 
         // Get mouse position in screen space
         double mouseX, mouseY;
@@ -117,6 +123,8 @@ namespace ECS {
                 if (Input::IsMousePressed(MOUSE_LEFT)) {
                     clickable->WasClicked = true;
                     s_anyClicked = true;
+                    s_lastClickedActionID = clickable->ClickActionID;  
+                    s_lastClickedEntity = candidate.entity;           
 
                     // Fire click callbacks
                     UIClickEvent event;
@@ -150,6 +158,14 @@ namespace ECS {
 
     void BoundaryCheckSystem::ClearCallbacks() {
         s_clickCallbacks.clear();
+    }
+
+    uint32_t BoundaryCheckSystem::GetLastClickedActionID() {
+        return s_lastClickedActionID;
+    }
+
+    Entity BoundaryCheckSystem::GetLastClickedEntity() {
+        return s_lastClickedEntity;
     }
 
     // =========================================================================

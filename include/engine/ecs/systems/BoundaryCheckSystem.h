@@ -62,6 +62,9 @@ namespace ECS {
 
         static bool WasAnyUIClicked();
 
+        static uint32_t GetLastClickedActionID();
+        static Entity GetLastClickedEntity();
+
         // Test if a point is inside an entity's bounds
         // Uses the entity's CircleCollider2D or BoxCollider2D
         static bool TestPointInEntity(World* world, Entity entity, const Vector2D& worldPoint);
@@ -96,6 +99,10 @@ namespace ECS {
         // Current frame state
         static bool s_mouseOverUI;
         static Entity s_hoveredEntity;
+
+        static uint32_t s_lastClickedActionID;
+        static Entity s_lastClickedEntity;
+
 
         // Previous frame state for edge detection
         static Entity s_previousHoveredEntity;
