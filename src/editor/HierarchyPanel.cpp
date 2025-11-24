@@ -129,7 +129,6 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
         std::filesystem::path p(selectedFilePath);
         std::string scriptClassName = p.stem().string();
         std::string fullTypeName = scriptClassName; // Default to just class name
-        std::string rootNamespace; // e.g. "EchoesBelow" from "EchoesBelow.Scripts"
 
         // Try to parse namespace from the file
         std::ifstream fileStream(selectedFilePath);
@@ -158,12 +157,6 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
                         if (nsFirst != std::string::npos && nsLast != std::string::npos) {
                             namespaceStr = namespaceStr.substr(nsFirst, nsLast - nsFirst + 1);
                             fullTypeName = namespaceStr + "." + scriptClassName;
-                            
-                            // Extract root namespace (e.g., "EchoesBelow" from "EchoesBelow.Scripts")
-                            size_t dotPos = namespaceStr.find('.');
-                            rootNamespace = (dotPos != std::string::npos) 
-                                ? namespaceStr.substr(0, dotPos) 
-                                : namespaceStr;
                         }
                         break;
                     }
@@ -183,27 +176,8 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
             // If relative path conversion fails, use the original path
             relativePath = selectedFilePath;
         }
-
-        // 3. Attempt to load the game assembly if we have a root namespace
-        if (!rootNamespace.empty()) {
-            // Try to find and load the assembly DLL (e.g., EchoesBelow.dll)
-            std::string assemblyName = rootNamespace + ".dll";
-            //std::filesystem::path assemblyPath = std::filesystem::path("build/Debug") / assemblyName;
-            
-            if (std::filesystem::exists(assemblyName)) {
-                // TODO: Call ScriptSystem to load this assembly into the AppDomain
-                // For now, log a warning that the assembly should be loaded
-                LOG_INFO("Script uses assembly: " << assemblyName);
-                LOG_WARNING("Multi-assembly loading not yet implemented - ensure " 
-                    << assemblyName << " is loaded via ScriptSystem");
-            }
-            else {
-                LOG_WARNING("Assembly not found: " << assemblyName 
-                    << " - script may fail to instantiate at runtime");
-            }
-        }
         
-        // 4. Attach the ScriptInstance component with full type name and path
+        // 3. Attach the ScriptInstance component with full type name and path
         _attachScriptComponent(entityId, fullTypeName, relativePath);
 
         // 4. Update selection state (using the correct member variable name)
