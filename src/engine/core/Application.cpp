@@ -172,6 +172,19 @@ namespace Engine {
             }
         }
 
+        // Save configs before exiting
+        if (IsInEditorMode()) {
+            m_editorSettings.WindowSettings.Width = WindowManager::GetMainWindow()->GetWidth();
+            m_editorSettings.WindowSettings.Height = WindowManager::GetMainWindow()->GetHeight();
+            m_editorSettings.WindowSettings.Maximized = WindowManager::GetMainWindow()->IsMaximized();
+            m_editorSettings.WindowSettings.VSync = WindowManager::GetMainWindow()->IsVSync();
+            
+            Serialization::ConfigurationSerializer::SaveConfig("config.json", m_editorSettings);
+        }
+        else {
+            // TODO: Save standalone later
+        }
+
         game.OnShutdown(m_sceneManager);
 
         // Clean up services
