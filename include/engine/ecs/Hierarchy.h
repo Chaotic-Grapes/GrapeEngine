@@ -24,7 +24,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "helpers/TransformUtils.h"
 #include <vector>
 #include <optional>
-#include "core/Logger.h"
 
 namespace ECS {
     // Hierarchy class for managing entity transforms in a parent-child hierarchy
@@ -39,13 +38,29 @@ namespace ECS {
          */
         static void UpdateTransforms(World& world) {
             std::vector<Entity> roots; // Entities without parents
+            std::vector<Entity> needsWorldTransform; // Entities missing WorldTransform
 
-            // Find all root entities
-            // Then recursively process their subtrees
+            // First pass: Collect entities that need WorldTransform
+            // Don't modify world structure during iteration!
+            world.Each<Components::LocalTransform>([&](const Entity e, Components::LocalTransform&) {
+                if (!world.Has<Components::WorldTransform>(e)) {
+                    needsWorldTransform.push_back(e);
+                }
+            });
+
+            // Add WorldTransform to entities that need it (outside of iteration)
+            for (Entity e : needsWorldTransform) {
+                Components::WorldTransform wt{};
+                wt.Dirty = true;
+                world.Add<Components::WorldTransform>(e, wt);
+            }
+
+            // Find all root entities using World's ParentOf API
+            // Entities are root if they have no parent in the hierarchy index
             world.Each<Components::LocalTransform, Components::WorldTransform>([&](const Entity e, Components::LocalTransform&, Components::WorldTransform&) {
-                if (!world.Has<Parent>(e) || world.Get<Parent>(e).ParentEntity.IsNull()) {
+                Entity parent = world.ParentOf(e);
+                if (parent.IsNull()) {
                     roots.push_back(e); // No parent, it's a root
-                    LOG_CRITICAL("Found root entity: " << e.Index);
                 }
             });
             
@@ -54,7 +69,6 @@ namespace ECS {
             // This will propagate down the hierarchy correctly
             for (Entity r : roots) {
                 _updateSubtree(world, r, std::nullopt);
-                LOG_CRITICAL("Updated hierarchy for root entity: " << r.Index);
             }
         }
 
@@ -84,7 +98,6 @@ namespace ECS {
             // This propagates the transform down the hierarchy
             world.ForChildren(e, [&](const Entity c) {
                 _updateSubtree(world, c, worldM);
-                LOG_CRITICAL("Updated hierarchy for child entity: " << c.Index);
             });
         }
     };

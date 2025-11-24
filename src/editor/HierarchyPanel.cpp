@@ -1159,7 +1159,6 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
             if (!parent.IsNull() && m_world->IsAlive(parent)) {
                 // Use Attach to properly update hierarchy indices
                 m_world->Attach(entity, parent);
-                std::cout << "Attached prefab instance to parent entity ID " << parentId << '\n';
             }
         }
 

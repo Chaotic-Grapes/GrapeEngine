@@ -41,7 +41,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Signature.h"
 #include "ecs/ComponentRegistry.h"
 #include "math/Matrix4x4.h"
-#include "core/Logger.h"
 
 namespace ECS {
     // Relationship component for hierarchy
@@ -1156,7 +1155,6 @@ namespace ECS {
                 // Get Parent component
                 // Then find existing parent in index
                 const auto& p = Get<Parent>(e);
-                LOG_CRITICAL("_onComponentAdded: Parent component added for child=" << e.Index << " parent=" << p.ParentEntity.Index);
                 const auto found = m_hierarchy.ParentOf.find(e);
 
                 // If already has a parent, unlink first
@@ -1214,9 +1212,6 @@ namespace ECS {
                 // Log removal for diagnostics
                 if (Has<Parent>(e)) {
                     const auto& p = Get<Parent>(e);
-                    LOG_CRITICAL("_onComponentRemoving: Removing Parent for child=" << e.Index << " parent=" << p.ParentEntity.Index);
-                } else {
-                    LOG_CRITICAL("_onComponentRemoving: Removing Parent for child=" << e.Index << " (no Parent data available)");
                 }
                 // Unlink from hierarchy indices
                 _unlinkChild(e);

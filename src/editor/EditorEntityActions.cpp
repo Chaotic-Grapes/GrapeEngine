@@ -79,7 +79,6 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
         ECS::Entity p = world.Resolve(parent);
         if (world.IsAlive(p)) {
             world.Attach(e, p);
-            std::cout << "Attached new entity to parent entity ID " << parent << '\n';
         }
     }
 
@@ -192,7 +191,6 @@ EntityId EntityActions::CloneEntity(EntityId id) {
             ECS::Entity newParent = world.Resolve(newParentId);
             if (!newParent.IsNull() && world.IsAlive(newParent)) {
                 world.Attach(clone, newParent);
-                std::cout << "Attached cloned entity to parent entity ID " << newParentId << '\n';                
             }
         }
         else {
@@ -264,7 +262,6 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
         if (!isDescendant) {
             // Use Attach to set the new parent (handles hierarchy index updates automatically)
             world.Attach(childEntity, newParentEntity);
-            std::cout << "Reparented entity ID " << child << " to new parent entity ID " << newParent << '\n';
         }
         else {
             LOG_WARNING("Cannot parent entity to its own descendant: this would create a cyclic hierarchy");
