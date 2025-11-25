@@ -219,12 +219,16 @@ namespace Engine {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
 
+    #ifdef USE_IMGUI
         m_overlay = new Services::OverlayService(m_sceneManager);
         m_overlay->SetAudio(m_audio->Device());
-		m_overlay->Initialize();
-        
+        m_overlay->Initialize();
         // Set editor mode flag (overlay exists = editor mode)
         m_isInEditorMode = (m_overlay != nullptr);
+    #else
+        m_overlay = nullptr;
+        m_isInEditorMode = false;
+    #endif
 
         // Initialize scripting system
         m_scriptSystem = new ECS::ScriptSystem();

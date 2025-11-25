@@ -22,8 +22,13 @@ cd GrapeEngine
 
 ### Building the Engine
 
-1. **Build:** Run `script_build.bat` (configures for Visual Studio 2022 x64 Debug)
-2. **Run:** Execute `script_run.bat` or run `build/Debug/GrapeEngine.exe`
+**Editor Build (with level editor and ImGui):**
+1. Run `script_build.bat` 
+2. Execute `script_run.bat` or run `build/Debug/GrapeEngine.exe`
+
+**Standalone Game Build (no editor, no ImGui):**
+1. Run `script_build_game.bat`
+2. Execute `script_run_game.bat` or run `build_game/Debug/GrapeGame.exe`
 
 ---
 

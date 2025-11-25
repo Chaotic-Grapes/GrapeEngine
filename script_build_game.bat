@@ -8,15 +8,15 @@ if "%JOBS%"=="" set JOBS=%NUMBER_OF_PROCESSORS%
 
 echo.
 echo ===============================================
-echo      Building Editor (%CONFIG%)
+echo     Building Standalone Game (%CONFIG%)
 echo ===============================================
 
 REM Create build folder if it doesn't exist
-if not exist build mkdir build
-cd build
+if not exist build_game mkdir build_game
+cd build_game
 
-REM Configure with CMake for EDITOR (default - includes ImGui)
-cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=ON -DBUILD_GAME=OFF
+REM Configure with CMake for GAME ONLY (no editor, no ImGui)
+cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON
 if %errorlevel% neq 0 (
     echo ERROR: CMake configuration failed
     cd ..
@@ -35,6 +35,6 @@ if %errorlevel% neq 0 (
 
 cd ..
 echo.
-echo Editor build %CONFIG% completed successfully!
-echo Executable location: build\%CONFIG%\GrapeEngine.exe
+echo Standalone Game build %CONFIG% completed successfully!
+echo Executable location: build_game\%CONFIG%\GrapeGame.exe
 pause

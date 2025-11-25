@@ -23,16 +23,19 @@ Features:
 #include "services/OverlayService.h"
 #include "scene/SceneManager.h"
 #include "services/WindowManager.h"
-#include "services/DebugUI.h"
 #include "services/Input.h"
+#include "core/messaging/MessageTypes.h"
+#include "core/messaging/MessageSystem.h"
+#include "serialization/EntitySerializer.h"
+#include "services/UICommon.h"
+
+#ifdef USE_IMGUI
+#include "services/DebugUI.h"
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_internal.h>
-#include "core/messaging/MessageTypes.h"
-#include "core/messaging/MessageSystem.h"
 #include "LevelEditor.h"
-#include "serialization/EntitySerializer.h"
-#include "services/UICommon.h"
+#endif
 
 #ifdef USE_IMGUI
 
@@ -239,16 +242,17 @@ namespace Services {
         LOG_DEBUG("LevelEditor disabled");
     }
 
-#else 
-void OverlayService::Update() {}
-void OverlayService::Render() {}
-void OverlayService::Terminate() {}
-void OverlayService::EnableLevelEditorForScene(Scenes::Scene* scene) {}
-void OverlayService::DisableLevelEditor() {}
-// In non-IMGUI builds, no playback UI is available; report not playing.
-bool OverlayService::IsGamePlaying() const { return false; }
-bool OverlayService::IsStepRequested() const { return false; }
-void OverlayService::ClearStepRequest() const {}
-void OverlayService::SetWorld(ECS::World* world) { m_world = world; }
+#else
+namespace Services {
+    void OverlayService::Update() {}
+    void OverlayService::Render() {}
+    void OverlayService::Terminate() {}
+    void OverlayService::EnableLevelEditorForScene(Scenes::Scene* /*scene*/) {}
+    void OverlayService::DisableLevelEditor() {}
+    // In non-IMGUI builds, no playback UI is available; report not playing.
+    bool OverlayService::IsGamePlaying() const { return false; }
+    bool OverlayService::IsStepRequested() const { return false; }
+    void OverlayService::ClearStepRequest() const {}
+    void OverlayService::SetWorld(ECS::World* world) { /* store world if needed */ (void)world; }
+} // namespace Services
 #endif
-}

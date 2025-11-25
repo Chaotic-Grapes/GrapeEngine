@@ -28,9 +28,16 @@
 
 // Forward declarations
 namespace Scenes { class SceneManager; class Scene; }
+namespace ECS { class World; }
 
+#ifdef USE_IMGUI
 #include "services/DebugUI.h"
 #include "LevelEditor.h"
+#else
+// Forward declarations for non-ImGui builds to avoid pulling editor headers
+class DebugUI;
+class LevelEditor;
+#endif
 
 namespace Services {
     /**
