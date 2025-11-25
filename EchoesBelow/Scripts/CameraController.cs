@@ -11,6 +11,9 @@ public class CameraController : ScriptBehaviour
     private const float OffsetX = 0.0f;
     private const float OffsetY = 0.0f;
 
+    //static public fields
+    public static Vector3 cameraPos;
+
     private Entity? _targetEntity;
     public override void OnUpdate()
     {
@@ -32,6 +35,8 @@ public class CameraController : ScriptBehaviour
 
         // Update camera position (keep Z the same)
         cameraTransform.Position = new Vector3(smoothX, smoothY, cameraTransform.Position.Z);
+        // Store camera Position
+        cameraPos = cameraTransform.Position;
     }
 }
 
