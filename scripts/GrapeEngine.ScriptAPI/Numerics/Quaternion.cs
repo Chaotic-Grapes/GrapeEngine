@@ -14,6 +14,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
+using GrapeEngine.Math;
 
 namespace GrapeEngine.Numerics;
 
@@ -93,15 +94,15 @@ public struct Quaternion(float x, float y, float z, float w)
     {
         // ensure axis normalized
         var nx = axis.X; var ny = axis.Y; var nz = axis.Z;
-        var mag = MathF.Sqrt(nx * nx + ny * ny + nz * nz);
+        var mag = GMath.Sqrt(nx * nx + ny * ny + nz * nz);
         if (mag > 0f)
         {
             nx /= mag; ny /= mag; nz /= mag;
         }
 
         var half = angleRadians * 0.5f;
-        var s = MathF.Sin(half);
-        var c = MathF.Cos(half);
+        var s = GMath.Sin(half);
+        var c = GMath.Cos(half);
         return new Quaternion(nx * s, ny * s, nz * s, c);
     }
 
@@ -112,9 +113,9 @@ public struct Quaternion(float x, float y, float z, float w)
         var hy = yawY * 0.5f;
         var hz = rollZ * 0.5f;
 
-        var sx = MathF.Sin(hx); var cx = MathF.Cos(hx);
-        var sy = MathF.Sin(hy); var cy = MathF.Cos(hy);
-        var sz = MathF.Sin(hz); var cz = MathF.Cos(hz);
+        var sx = GMath.Sin(hx); var cx = GMath.Cos(hx);
+        var sy = GMath.Sin(hy); var cy = GMath.Cos(hy);
+        var sz = GMath.Sin(hz); var cz = GMath.Cos(hz);
 
         var w = cz * cx * cy + sz * sx * sy;
         var x = sz * cx * cy - cz * sx * sy;
@@ -153,12 +154,12 @@ public struct Quaternion(float x, float y, float z, float w)
             return outQ;
         }
 
-        var theta0 = MathF.Acos(MathF.Clamp(dot, -1f, 1f)); // angle between input
+        var theta0 = GMath.Acos(GMath.Clamp(dot, -1f, 1f)); // angle between input
         var theta = theta0 * t;
-        var sinTheta = MathF.Sin(theta);
-        var sinTheta0 = MathF.Sin(theta0);
+        var sinTheta = GMath.Sin(theta);
+        var sinTheta0 = GMath.Sin(theta0);
 
-        var s0 = MathF.Cos(theta) - dot * sinTheta / sinTheta0;
+        var s0 = GMath.Cos(theta) - dot * sinTheta / sinTheta0;
         var s1 = sinTheta / sinTheta0;
 
         return new Quaternion(

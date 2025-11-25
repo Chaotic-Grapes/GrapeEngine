@@ -16,7 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.ScriptAPI.Unsafe;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting;
 
 /// <summary>
 /// Provides access to keyboard and mouse input.
@@ -185,9 +185,4 @@ public static class MouseButton
     public const int Left = 0;
     public const int Right = 1;
     public const int Middle = 2;
-    public const int Button4 = 3;
-    public const int Button5 = 4;
-    public const int Button6 = 5;
-    public const int Button7 = 6;
-    public const int Button8 = 7;
 }

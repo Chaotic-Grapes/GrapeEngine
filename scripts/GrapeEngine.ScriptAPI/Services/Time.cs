@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.ScriptAPI.Unsafe;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting;
 
 /// <summary>
 /// Provides access to time-related information in the game engine.

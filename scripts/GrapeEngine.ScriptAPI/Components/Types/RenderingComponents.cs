@@ -9,6 +9,7 @@ Rendering and UI-related ECS component types.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Numerics;
+using GrapeEngine.Math;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting;
