@@ -551,6 +551,15 @@ public struct Matrix4x4
     public float M41, M42, M43, M44;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+public struct UIClickable
+{
+    public uint ClickActionID;
+    public bool IsClickable;
+    public bool IsHovered;
+    public bool IsPressed;
+}
+
 /// <summary>
 /// Component type registry using compile-time hash matching.
 /// Type hashes MUST match the C++ side component type IDs.

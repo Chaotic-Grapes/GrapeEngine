@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "helpers/EntityUtils.h"
+#include "physics/CollisionEvents.h"
 #include <cstring>
 #include "core/Logger.h"
 #include "ecs/systems/BoundaryCheckSystem.h"
@@ -473,4 +474,86 @@ SCRIPT_API bool ScriptAPI_UI_WasAnyClicked() {
  */
 SCRIPT_API uint32_t ScriptAPI_UI_GetClickedActionID() {
     return ECS::BoundaryCheckSystem::GetLastClickedActionID();
+}
+
+/**
+ * @brief Get the number of collision events for an entity this frame
+ * @param entityId Packed entity id (Index+Generation)
+ * @return Number of collision events recorded for this entity
+ */
+SCRIPT_API uint32_t ScriptAPI_Collision_GetEventCount(uint64_t entityId) {
+    ECS::World* world = GetScriptWorld();
+    if (!world) {
+        LOG_ERROR("[ScriptAPI] World not set");
+        return 0;
+    }
+
+    ECS::Entity e = ECS::EntityUtils::Unpack(entityId);
+    if (!world->IsAlive(e)) {
+        return 0;
+    }
+
+    const auto& events = ECS::CollisionEventQueue::GetEvents(e);
+    return static_cast<uint32_t>(events.size());
+}
+
+/**
+ * @brief Retrieve a collision event for an entity by index
+ * @param entityId Packed entity id (Index+Generation)
+ * @param index Zero-based index into the event list
+ * @param outOtherEntity Packed entity id of the other entity involved (output)
+ * @param outEventType Integer value of the CollisionEventType enum (output)
+ * @return True if the event was retrieved, false otherwise
+ */
+SCRIPT_API bool ScriptAPI_Collision_GetEvent(uint64_t entityId, uint32_t index, uint64_t* outOtherEntity, int* outEventType) {
+    ECS::World* world = GetScriptWorld();
+    if (!world) {
+        LOG_ERROR("[ScriptAPI] World not set");
+        return false;
+    }
+
+    ECS::Entity e = ECS::EntityUtils::Unpack(entityId);
+    if (!world->IsAlive(e)) {
+        return false;
+    }
+
+    const auto& events = ECS::CollisionEventQueue::GetEvents(e);
+    if (index >= events.size()) return false;
+
+    const auto& ev = events[index];
+    if (outOtherEntity) *outOtherEntity = ECS::EntityUtils::Pack(ev.OtherEntity);
+    if (outEventType) *outEventType = static_cast<int>(ev.Type);
+    return true;
+}
+
+/**
+ * @brief Bulk export collision events into provided buffers.
+ * @param entityId Packed entity id
+ * @param outOtherEntities Pointer to pre-allocated buffer for other-entity packed ids
+ * @param outEventTypes Pointer to pre-allocated buffer for event type ints
+ * @param capacity Number of elements available in the output buffers
+ * @return Total number of events available (may be > capacity). Caller should call again with larger buffers if needed.
+ */
+SCRIPT_API uint32_t ScriptAPI_Collision_GetEventsBulk(uint64_t entityId, uint64_t* outOtherEntities, int* outEventTypes, uint32_t capacity) {
+    ECS::World* world = GetScriptWorld();
+    if (!world) {
+        LOG_ERROR("[ScriptAPI] World not set");
+        return 0;
+    }
+
+    ECS::Entity e = ECS::EntityUtils::Unpack(entityId);
+    if (!world->IsAlive(e)) {
+        return 0;
+    }
+
+    const auto& events = ECS::CollisionEventQueue::GetEvents(e);
+    uint32_t total = static_cast<uint32_t>(events.size());
+    uint32_t toWrite = std::min<uint32_t>(capacity, total);
+
+    for (uint32_t i = 0; i < toWrite; ++i) {
+        if (outOtherEntities) outOtherEntities[i] = ECS::EntityUtils::Pack(events[i].OtherEntity);
+        if (outEventTypes) outEventTypes[i] = static_cast<int>(events[i].Type);
+    }
+
+    return total;
 }

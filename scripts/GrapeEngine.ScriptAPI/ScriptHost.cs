@@ -23,6 +23,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using GrapeEngine.ScriptAPI.Unsafe;
 
 // *************** !!!!!!!! IMPORTANT !!!!!!!! *************** //
 //                                                             //
@@ -330,6 +331,81 @@ public static class ScriptHost
         catch (Exception ex)
         {
             Logging.Log($"ERROR in OnLateUpdate: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call collision callbacks on a script instance
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    public static void CallCollisionCallbacks(ulong handle)
+    {
+        try
+        {
+            if (!m_instances.TryGetValue(handle, out var instance)) return;
+
+            // Use a small fixed buffer
+            // if more events exist we'll re-query
+            const int BUFFER_CAPACITY = 32;
+            var otherEntities = new ulong[BUFFER_CAPACITY];
+            var eventTypes = new int[BUFFER_CAPACITY];
+
+            var total = CollisionAPI.GetEventsBulk(instance.EntityId, otherEntities, eventTypes, BUFFER_CAPACITY);
+            var toProcess = (int)Math.Min(total, (uint)BUFFER_CAPACITY);
+
+            // Process the initial batch
+            for (var i = 0; i < toProcess; ++i)
+            {
+                var other = otherEntities[i];
+                switch (eventTypes[i])
+                {
+                    case 0:
+                        instance.OnCollisionEnter(other);
+                        break;
+                    case 1:
+                        instance.OnCollisionStay(other);
+                        break;
+                    case 2:
+                        instance.OnCollisionExit(other);
+                        break;
+                }
+            }
+
+            // If there are more events than our buffer, process the remainder in a loop
+            if (total > BUFFER_CAPACITY)
+            {
+                var remaining = total - BUFFER_CAPACITY;
+                var offset = BUFFER_CAPACITY;
+
+                // allocate exactly remaining now
+                var moreOther = new ulong[remaining];
+                var moreTypes = new int[remaining];
+                var got = CollisionAPI.GetEventsBulk(instance.EntityId, moreOther, moreTypes, remaining);
+                var gotCount = (int)Math.Min(got, remaining);
+                
+                // process them
+                for (var i = 0; i < gotCount; ++i)
+                {
+                    var other = moreOther[i];
+                    switch (moreTypes[i])
+                    {
+                        case 0:
+                            instance.OnCollisionEnter(other);
+                            break;
+                        case 1:
+                            instance.OnCollisionStay(other);
+                            break;
+                        case 2:
+                            instance.OnCollisionExit(other);
+                            break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.Log($"ERROR in collision callback: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
