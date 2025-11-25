@@ -36,6 +36,9 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Sce
 LevelEditor::~LevelEditor() {
     // Shutdown console panel to disconnect Logger callback
     m_console.Shutdown();
+    
+    // Shutdown performance panel
+    m_performancePanel.Shutdown();
 }
 
 // -------------------------------------------------------------------------
@@ -135,6 +138,7 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
+    ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
 
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
     m_dockLayoutBuilt = true;                // Mark layout as built
@@ -297,6 +301,15 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         },
         [this]() { m_console.Render(); },
         nullptr
+    );
+
+    // Register Performance panel (monitoring)
+    _registerPanel("Performance",
+        [this]() {
+            m_performancePanel.Initialize(m_mainFont, m_boldFont);
+        },
+        [this]() { m_performancePanel.Render(m_playback.IsPlaying()); },
+        [this](ECS::World* w) { m_performancePanel.SetWorld(w); }
     );
 
     // Initialize all registered panels
