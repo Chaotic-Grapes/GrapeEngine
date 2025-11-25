@@ -2,6 +2,7 @@
 /*!
 \file   UIAPI.cs
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
 \date   25th November 2025
 \brief
 P/Invoke declarations for the UI API used in scripting. Internal use only.
@@ -14,12 +15,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using System.Runtime.InteropServices;
 
-namespace GrapeEngine.Scripting.Unsafe;
+namespace GrapeEngine.ScriptAPI.Unsafe;
 
 /// <summary>
 /// Internal use only. P/Invoke declarations for the UI API.
 /// </summary>
-internal static partial class UIAPI
+internal partial class UIAPI
 {
     [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_UI_WasAnyClicked")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]

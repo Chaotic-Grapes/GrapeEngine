@@ -24,6 +24,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using GrapeEngine.ScriptAPI.Unsafe;
+using GrapeEngine.Math;
 
 // *************** !!!!!!!! IMPORTANT !!!!!!!! *************** //
 //                                                             //
@@ -352,7 +353,7 @@ public static class ScriptHost
             var eventTypes = new int[BUFFER_CAPACITY];
 
             var total = CollisionAPI.GetEventsBulk(instance.EntityId, otherEntities, eventTypes, BUFFER_CAPACITY);
-            var toProcess = (int)Math.Min(total, (uint)BUFFER_CAPACITY);
+            var toProcess = (int)GMath.Min(total, (uint)BUFFER_CAPACITY);
 
             // Process the initial batch
             for (var i = 0; i < toProcess; ++i)
@@ -382,7 +383,7 @@ public static class ScriptHost
                 var moreOther = new ulong[remaining];
                 var moreTypes = new int[remaining];
                 var got = CollisionAPI.GetEventsBulk(instance.EntityId, moreOther, moreTypes, remaining);
-                var gotCount = (int)Math.Min(got, remaining);
+                var gotCount = (int)GMath.Min(got, remaining);
                 
                 // process them
                 for (var i = 0; i < gotCount; ++i)

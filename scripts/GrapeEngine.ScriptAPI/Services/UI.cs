@@ -2,6 +2,7 @@
 /*!
 \file   UI.cs
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
 \date   25th November 2025
 \brief
 High-level UI service wrapper for scripts.
@@ -12,7 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.ScriptAPI.Unsafe;
 
 namespace GrapeEngine.Scripting;
 
