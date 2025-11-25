@@ -20,6 +20,7 @@ namespace ECS {
     class PhysicsSystem {
     public:
         static void Update(World& world, float dt);
+        static std::unordered_set<uint64_t> s_previousCollisions;
     private: 
 
     };
