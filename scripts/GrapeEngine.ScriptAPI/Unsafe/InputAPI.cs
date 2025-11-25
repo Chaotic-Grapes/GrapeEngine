@@ -13,10 +13,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.ScriptAPI.Unsafe;
 using System.Runtime.InteropServices;
 
-namespace GrapeEngine.Scripting.Unsafe;
+namespace GrapeEngine.ScriptAPI.Unsafe;
 
 /// <summary>
 /// Internal use only. P/Invoke declarations for the Input API.
