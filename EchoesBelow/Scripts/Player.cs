@@ -8,7 +8,7 @@ namespace Scripts;
 public class Player : ScriptBehaviour
 {
     //Constant Parameters
-    const float moveSpeed = 1f;
+    const float moveSpeed = 3f;
     const float maxSpeed = 50f;
     const float rotateSpeed = 70f;
     
