@@ -89,6 +89,15 @@ private:
 
     // Undo system
     Editor::UndoSystem* m_undoSystem = nullptr;
+
+    // Gizmo Icons
+    ImGuizmo::OPERATION m_currentGizmoOperation = ImGuizmo::TRANSLATE;
+    void _renderGizmoToolbar();
+
+    void SyncGizmoOperation();
+
+    bool m_toolbarClickedThisFrame = false;
+
 };
 
 #endif // VIEWPORT_H

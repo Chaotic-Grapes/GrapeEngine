@@ -813,6 +813,12 @@ namespace ECS {
                 if (m_isDragging) return;
                 if (!currMouseDown && !mouseJustReleased) return;
 
+                // Skip picking if mouse is over any ImGui widget
+                if (ImGui::IsAnyItemHovered() || ImGui::IsAnyItemActive()) {
+                    LOG_DEBUG("[PICKING] Skipping - mouse over ImGui widget");
+                    return;
+                }
+
                 // ============================================================
                 // GET VIEWPORT BOUNDS
                 // ============================================================

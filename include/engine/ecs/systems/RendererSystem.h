@@ -141,6 +141,14 @@ namespace ECS {
         */
         void DrawEditorGizmo(ECS::World& world, float drawPosX, float drawPosY, float drawSizeX, float drawSizeY);
 
+        // ====================================================================
+        // Gizmo Icons
+        // ==================================================================== 
+
+        void SetGizmoOperation(ImGuizmo::OPERATION op) { m_currentGizmoOperation = op; }
+
+        ImGuizmo::OPERATION GetGizmoOperation() const { return m_currentGizmoOperation; }
+
     private:
         // ====================================================================
         // Conversion Helpers

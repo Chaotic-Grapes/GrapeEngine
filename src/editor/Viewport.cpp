@@ -184,12 +184,22 @@ void Viewport::ShowEditorWindows() {
 // Viewport
 // -------------------------------------------------------------------------
 void Viewport::_renderViewport() {
+    // Reset toolbar click flag at start of frame
+    m_toolbarClickedThisFrame = false;
+
+    // Sync gizmo operation from renderer (handles T/E/R hotkeys)
+    SyncGizmoOperation();
+
     // Render Viewport window (editor camera)
     ImGui::Begin("Scene");
 
     // Check if viewport window is hovered AND focused (not blocked by other windows)
     m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
-                       && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+                       && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)
+                       && !ImGui::IsAnyItemHovered();
+
+    _renderGizmoToolbar();
+    ImGui::Spacing();
 
     if (m_rendererSystem) {
         auto size = ImGui::GetContentRegionAvail();
@@ -389,6 +399,80 @@ void Viewport::FocusOnEntity(EntityId entityId) {
     }
     else {
         LOG_WARNING("Cannot focus: editor camera not available");
+    }
+}
+
+void Viewport::_renderGizmoToolbar() {
+    // style the buttons to look like a toolbar
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 6));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 0));
+
+    // helper lambda to render a toolbar button
+    auto toolbarButton = [&](const char* label, ImGuizmo::OPERATION op, const char* tooltip) {
+        bool isActive = (m_currentGizmoOperation == op);
+
+        // highlight active tool
+        if (isActive) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.5f, 0.8f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.6f, 0.9f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.4f, 0.7f, 1.0f));
+        }
+
+        // draw button with text label
+        ImGui::PushFont(m_boldFont);
+        bool clicked = ImGui::Button(label, ImVec2(40, 30));
+        ImGui::PopFont();
+
+        // show tooltip on hover
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushFont(m_mainFont);
+            ImGui::Text("%s", tooltip);
+            ImGui::PopFont();
+            ImGui::EndTooltip();
+        }
+
+        if (isActive) {
+            ImGui::PopStyleColor(3);
+        }
+
+        //handle click
+        if (clicked) {
+            m_currentGizmoOperation = op;
+
+            // sync to renderer system if it exists
+            if (m_rendererSystem) {
+                m_rendererSystem->SetGizmoOperation(op);
+            }
+
+            // indicate that toolbar was clicked this frame
+            m_toolbarClickedThisFrame = true;
+        }
+
+        return clicked;
+        };
+
+    // render the toolbar buttons
+    ImGui::PushFont(m_mainFont);
+    ImGui::Text("Transform:");
+    ImGui::PopFont();
+    ImGui::SameLine();
+
+    toolbarButton("T", ImGuizmo::TRANSLATE, "Translate (T)");
+    ImGui::SameLine();
+
+    toolbarButton("E", ImGuizmo::ROTATE, "Rotate (E)");
+    ImGui::SameLine();
+
+    toolbarButton("R", ImGuizmo::SCALE, "Scale (R)");
+
+    ImGui::PopStyleVar(2);
+    ImGui::Separator();
+}
+
+void Viewport::SyncGizmoOperation() {
+    if (m_rendererSystem) {
+        m_currentGizmoOperation = m_rendererSystem->GetGizmoOperation();
     }
 }
 
