@@ -42,6 +42,7 @@ centralized and consistent with the currently active scene.
 #include <filesystem>
 #include <algorithm>
 #include "serialization/ConfigurationSerializer.h"
+#include <filesystem>
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -94,6 +95,8 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
         }
 
         if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S", false, hasActiveScene)) { SaveSceneAsDialog(); }
+        // Build game option - launches the repository build script in a new console
+        if (ImGui::MenuItem("Build Game")) { BuildGame(); }
         ImGui::Separator();
         // Make the Exit menu item visually distinct (danger background)
         ImGui::PushStyleColor(ImGuiCol_Header, EditorStyle::DangerButton);
@@ -165,6 +168,67 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
         if (ImGui::MenuItem("Reset Scale")) { uiScale = 1.0f; }
         ImGui::EndMenu();
     }
+}
+
+// -------------------------------------------------------------------------
+// Build helpers
+// -------------------------------------------------------------------------
+
+// Launch the repository build script in a new console.
+// Uses ProjectPaths to resolve the project folder; the script is expected
+// to live next to the engine root (../script_build.bat relative to project root).
+void EditorFileMenu::BuildGame() {
+#ifdef _WIN32
+    // Prepare script path relative to the current project (EchoesBelow)
+    std::string scriptRel = "../script_build.bat";
+    std::string scriptPath = Engine::ProjectPaths::ToAbsolutePath(scriptRel);
+
+    // Fallback: if the file doesn't exist try the repository-relative path
+    if (!std::filesystem::exists(scriptPath)) {
+        // Try direct repository root candidate
+        std::filesystem::path alt = std::filesystem::absolute("script_build_game.bat");
+        if (std::filesystem::exists(alt)) scriptPath = alt.string();
+    }
+
+    if (!std::filesystem::exists(scriptPath)) {
+        LOG_ERROR("Build script not found: " << scriptPath);
+        return;
+    }
+
+    // Launch using cmd.exe so batch file runs in its own console window
+    std::string cmd = "cmd.exe /c \"" + scriptPath + "\" Release";
+
+    STARTUPINFOA si = {};
+    PROCESS_INFORMATION pi = {};
+    si.cb = sizeof(si);
+
+    // This is a C function - const_cast to remove constness from cmd string
+    BOOL ok = CreateProcessA(
+        NULL,
+        const_cast<char*>(cmd.c_str()),
+        NULL,
+        NULL,
+        FALSE,
+        CREATE_NEW_CONSOLE,
+        NULL,
+        NULL,
+        &si,
+        &pi
+    );
+
+    if (ok) {
+        LOG_INFO("Started build script: " << scriptPath);
+        // We don't wait for the build to finish; close handles and return
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+    else {
+        DWORD err = GetLastError();
+        LOG_ERROR("Failed to start build script (error " << err << ")");
+    }
+#else
+    LOG_CRITICAL("BuildGame is only implemented on Windows");
+#endif
 }
 
 // -------------------------------------------------------------------------

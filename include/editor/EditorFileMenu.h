@@ -85,6 +85,9 @@ public:
     // Respond to keyboard shortcuts that trigger file menu actions like new open or save
     void HandleShortcuts(float& uiScale);
 
+    // Build the current game project using the repository build script
+    void BuildGame();
+
 private:
     // -------------------------------------------------------------------------
     // Internal Helpers
