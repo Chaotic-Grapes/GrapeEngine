@@ -88,6 +88,13 @@ public:
     // Build the current game project using the repository build script
     void BuildGame();
 
+    // Build with explicit configuration and optionally run after build
+    void BuildGameWithConfig(const std::string& config);
+
+private:
+    // Start the build process and capture output into the editor console
+    void StartBuildProcess(const std::string& scriptPath, const std::string& config);
+
 private:
     // -------------------------------------------------------------------------
     // Internal Helpers
