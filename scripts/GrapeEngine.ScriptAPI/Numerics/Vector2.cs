@@ -5,7 +5,7 @@
 \par    muhammadnurfadzly.b@digipen.edu
 \date   26th October 2025
 \brief
-Defines the Vector2 struct for 2D vectors.
+Defines the Vector2 struct for 2D vectors. Direct conversion from C++.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the

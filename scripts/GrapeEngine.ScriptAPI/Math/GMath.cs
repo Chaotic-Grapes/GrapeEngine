@@ -27,6 +27,7 @@ public static class GMath
     public const float Tau = 6.28318530718f;
     public const float Deg2Rad = 0.0174532925f;
     public const float Rad2Deg = 57.2957795131f;
+    public const float Epsilon = 1e-6f;
 
     // ============================================================================
     // Random

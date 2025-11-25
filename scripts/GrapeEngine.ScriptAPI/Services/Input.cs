@@ -14,9 +14,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.ScriptAPI.Unsafe;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine;
 
 /// <summary>
 /// Provides access to keyboard and mouse input.
