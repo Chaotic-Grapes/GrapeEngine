@@ -20,7 +20,7 @@ namespace GrapeEngine.ScriptAPI.Unsafe;
 /// <summary>
 /// Internal P/Invoke declarations for collision event access.
 /// </summary>
-internal static class CollisionAPI
+internal partial class CollisionAPI
 {
     [LibraryImport(UnsafeApiHelper.NativeLib, EntryPoint = "ScriptAPI_Collision_GetEventCount")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]

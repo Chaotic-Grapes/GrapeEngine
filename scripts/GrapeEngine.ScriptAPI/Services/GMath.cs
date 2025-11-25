@@ -103,7 +103,7 @@ public static class GMath
     /// <summary>
     /// Round up to nearest integer.
     /// </summary>
-    public static float Ceil(float value) => MathAPI.Ceil(value);
+    public static float Ceiling(float value) => MathAPI.Ceil(value);
 
     /// <summary>
     /// Get the minimum of two values.
