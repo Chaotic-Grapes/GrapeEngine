@@ -160,7 +160,7 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
             t.Position.Y = translation.y;
             t.Position.Z = translation.z;
 
-            // Update the entity's Local Scaleomponent
+            // Update the entity's Local Scale component
             t.Scale.X = scale.x;
             t.Scale.Y = scale.y;
             t.Scale.Z = scale.z;
