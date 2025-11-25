@@ -565,6 +565,11 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         _handleNodeDragDrop(entityId);
     }
 
+    // Pop blue color if it was a prefab instance
+    if (isPrefabInstance) {
+        ImGui::PopStyleColor();
+    }
+
     // Render context menu if opened
     _renderEntityContextMenu();
 
@@ -585,11 +590,6 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     ImGui::PopID();
-
-    // Pop blue color if it was a prefab instance
-    if (isPrefabInstance) {
-        ImGui::PopStyleColor();
-    }
 }
 
 // Handle node interaction (click, right-click, double-click)
@@ -914,6 +914,13 @@ void HierarchyPanel::_renderEntityContextMenu() {
                 }
             }
 
+            // Detach Prefab: only for prefab instances (single selection)
+            if (selectionCount == 1 && m_world->Has<ECS::Components::PrefabLink>(entity)) {
+                if (ImGui::Selectable("Detach Prefab")) {
+                    m_world->Remove<ECS::Components::PrefabLink>(entity);
+                    LOG_INFO("Detached prefab link from entity");
+                }
+            }
 
             // Delete works with multiple selections
             std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
