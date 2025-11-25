@@ -5,8 +5,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -2.7097837924957275,
-                            "Y": 1.791700005531311,
+                            "X": -3.4120354652404785,
+                            "Y": 4.64263391494751,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -49,7 +49,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 19
                     },
                     "TypeName": "Layer"
                 },
@@ -112,11 +112,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -2.7097837924957275,
+                            "m03": -3.4120354652404785,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 1.791700005531311,
+                            "m13": 4.64263391494751,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -136,8 +136,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -1.5194125175476074,
-                            "Y": 1.7564979791641235,
+                            "X": -4.571602821350098,
+                            "Y": 4.64263391494751,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -180,7 +180,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 19
                     },
                     "TypeName": "Layer"
                 },
@@ -243,11 +243,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -1.5194125175476074,
+                            "m03": -4.571602821350098,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 1.7564979791641235,
+                            "m13": 4.64263391494751,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -267,8 +267,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -3.8571503162384033,
-                            "Y": 1.879514455795288,
+                            "X": -2.3785078525543213,
+                            "Y": 4.64263391494751,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -311,7 +311,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 19
                     },
                     "TypeName": "Layer"
                 },
@@ -374,11 +374,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -3.8571503162384033,
+                            "m03": -2.3785078525543213,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 1.879514455795288,
+                            "m13": 4.64263391494751,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -564,7 +564,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 20
                     },
                     "TypeName": "Layer"
                 },
@@ -653,7 +653,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.757462739944458,
+                        "AspectRatio": 2.8807339668273926,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -741,7 +741,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 30
                     },
                     "TypeName": "Layer"
                 },
@@ -839,6 +839,12 @@
                 },
                 {
                     "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
                         "Flags": 0,
                         "HalfExtents": {
                             "X": 0.5,
@@ -855,9 +861,19 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 30
                     },
                     "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\UIClickableTest.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.UIClickableTest"
+                    },
+                    "TypeName": "ScriptInstance"
                 },
                 {
                     "Data": {
@@ -981,240 +997,6 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -0.42966747283935547,
-                            "Y": -3.609606981277466,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "Bottom Wall"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 16.0,
-                            "Y": 0.699999988079071
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.10000000149011612,
-                        "PositionCorrectPercent": 0.20000000298023224,
-                        "Restitution": 0.0
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 1,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 0.0,
-                        "Mass": 0.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 1.0,
-                            "R": 1.0
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 16.0,
-                            "Y": 0.699999988079071
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeBox2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": -0.42966747283935547,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": -3.609606981277466,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -8.278566360473633,
-                            "Y": 10.634759902954102,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "BlueBox (Clone) (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 0
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.10000000149011612,
-                        "PositionCorrectPercent": 0.20000000298023224,
-                        "Restitution": 0.0
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 1,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 0.0,
-                        "Mass": 0.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.1329784393310547,
-                            "R": 0.0
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeBox2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": -8.278566360473633,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 10.634759902954102,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
                             "X": 6.442473411560059,
                             "Y": 8.852737426757813,
                             "Z": 0.0
@@ -1257,7 +1039,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 19
                     },
                     "TypeName": "Layer"
                 },
@@ -1332,8 +1114,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -9.711931228637695,
-                            "Y": 2.421968460083008,
+                            "X": -8.278566360473633,
+                            "Y": 10.634759902954102,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -1352,7 +1134,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "BlueBox (Clone)"
+                        "Value": "BlueBox (Clone) (Clone)"
                     },
                     "TypeName": "Name"
                 },
@@ -1374,7 +1156,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 19
                     },
                     "TypeName": "Layer"
                 },
@@ -1425,11 +1207,245 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -9.711931228637695,
+                            "m03": -8.278566360473633,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 2.421968460083008,
+                            "m13": 10.634759902954102,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -0.42966747283935547,
+                            "Y": -3.609606981277466,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Bottom Wall"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 16.0,
+                            "Y": 0.699999988079071
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 19
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.10000000149011612,
+                        "PositionCorrectPercent": 0.20000000298023224,
+                        "Restitution": 0.0
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 1,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.0,
+                        "Mass": 0.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 16.0,
+                            "Y": 0.699999988079071
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -0.42966747283935547,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -3.609606981277466,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 6.829867362976074,
+                            "Y": 2.3832292556762695,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "BlueBox (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 19
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.10000000149011612,
+                        "PositionCorrectPercent": 0.20000000298023224,
+                        "Restitution": 0.0
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 1,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.0,
+                        "Mass": 0.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.4702122211456299,
+                            "R": 0.0
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 6.829867362976074,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 2.3832292556762695,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1491,7 +1507,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 19
                     },
                     "TypeName": "Layer"
                 },
@@ -1566,8 +1582,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 6.829867362976074,
-                            "Y": 2.3832292556762695,
+                            "X": -9.711931228637695,
+                            "Y": 2.421968460083008,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -1608,7 +1624,7 @@
                 },
                 {
                     "Data": {
-                        "Id": 0
+                        "Id": 19
                     },
                     "TypeName": "Layer"
                 },
@@ -1636,7 +1652,7 @@
                         "Color": {
                             "A": 1.0,
                             "B": 1.0,
-                            "G": 0.4702122211456299,
+                            "G": 0.1329784393310547,
                             "R": 0.0
                         },
                         "Filled": true,
@@ -1659,11 +1675,115 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 6.829867362976074,
+                            "m03": -9.711931228637695,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 2.3832292556762695,
+                            "m13": 2.421968460083008,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 14.0,
+                            "Y": 8.539999961853027,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "BG"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\FollowLeader.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.FollowLeader"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 4,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Player Essentials\\OceanBG_00@4x.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Mask": 2
+                    },
+                    "TypeName": "TagMask"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 14.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 8.539999961853027,
+                            "m12": 0.0,
+                            "m13": 0.0,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1679,15 +1799,11 @@
             ]
         }
     ],
-    "EntityCount": 15,
+    "EntityCount": 16,
     "Hierarchy": [
         {
             "child": 4,
             "parent": 3
-        },
-        {
-            "child": 7,
-            "parent": 6
         },
         {
             "child": 11,
@@ -1712,6 +1828,10 @@
         {
             "child": 14,
             "parent": 8
+        },
+        {
+            "child": 7,
+            "parent": 6
         }
     ],
     "SceneName": "Scene",

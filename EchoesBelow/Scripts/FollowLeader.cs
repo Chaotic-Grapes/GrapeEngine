@@ -14,7 +14,6 @@ public class FollowLeader : ScriptBehaviour
         // For UI Tag: Follow active Cam
         if (tag.Mask == (uint)Tags.UI) transform.Position = CameraController.cameraPos;
         
-
         //Example Below
         // For ___ Tag: Follow ___
         //if (tag.Mask == (uint)Tags.___)
