@@ -89,7 +89,7 @@ namespace {
 }
 
 namespace ECS {
-    static constexpr uint32_t INVALID_ENTITY_ID = ~0u;
+    static constexpr uint32_t INVALID_ENTITY_ID = Entity::NPOS32;
 
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
@@ -1616,6 +1616,23 @@ namespace ECS {
             // Nothing selected, reset tracking
             lastSelectedEntityID = INVALID_ENTITY_ID;  // Use sentinel value
             wasMouseDownLastFrame = false;
+        }
+
+        // ============================================================
+        // DELETE SELECTED ENTITY
+        // ============================================================
+        if (m_selectedEntityID != INVALID_ENTITY_ID && Input::IsKeyPressed(KEY_DELETE)) {
+            world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+                (void)lt;
+                if (e.Index == m_selectedEntityID) {
+                    world.Destroy(e);
+                    m_selectedEntityID = INVALID_ENTITY_ID;     // Clear selection
+                    m_isDragging = false;                       // Cancel any drag operation
+
+                    // Mark scene as dirty when entity is deleted
+                    MarkSceneDirtyIfNeeded(m_fileMenu);
+                }
+                });
         }
 
         // Performance logging
