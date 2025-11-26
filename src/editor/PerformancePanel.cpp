@@ -21,6 +21,7 @@ polling system counters while the game is not running.
 #include "core/Profiler.h"
 #include "core/Logger.h"
 #include <imgui.h>
+#include <algorithm>
 
 void PerformancePanel::Initialize(ImFont* mainFont, ImFont* boldFont) {
     m_mainFont = mainFont;
@@ -90,20 +91,58 @@ void PerformancePanel::Render(bool isPlaying) {
     ImGui::PopFont();
     ImGui::Spacing();
 
-    // Use cached total time
+    // Use cached total time. Ensure it's not smaller than the frame time
+    // (some profilers report scope totals that are smaller due to sampling
+    // or nested/overlapping scopes). Using at least the frame time prevents
+    // usage percentages from exceeding 100% unexpectedly.
     double totalTime = m_cachedTotalTime;
     if (totalTime < 0.001)
         totalTime = frameMs; // Fallback to frame time if no scopes
+    else
+        totalTime = std::max(totalTime, static_cast<double>(frameMs));
 
     // List each system with cached formatting
+    // Compute sum of scoped averages so we can show any "unattributed" time
+    double sumScopeAvgMs = 0.0;
+    for (const auto &kv : m_cachedScopes) {
+        sumScopeAvgMs += static_cast<double>(kv.second.AverageTimeMs);
+    }
+
+    double unaccountedMs = totalTime - sumScopeAvgMs;
+    if (unaccountedMs < 0.0)
+        unaccountedMs = 0.0; // avoid negative due to rounding
+
+    // Show a short summary of attributed vs unattributed time
+    {
+        double attributedPercent = 0.0;
+        double unaccountedPercent = 0.0;
+        if (totalTime > 0.001) {
+            attributedPercent = (sumScopeAvgMs / totalTime) * 100.0;
+            unaccountedPercent = (unaccountedMs / totalTime) * 100.0;
+            if (attributedPercent < 0.0) attributedPercent = 0.0;
+            if (attributedPercent > 100.0) attributedPercent = 100.0;
+            if (unaccountedPercent < 0.0) unaccountedPercent = 0.0;
+            if (unaccountedPercent > 100.0) unaccountedPercent = 100.0;
+        }
+
+        ImGui::PushFont(m_boldFont);
+        ImGui::Text("Breakdown: Attributed %.2f ms (%.1f%%)  Unattributed %.2f ms (%.1f%%)",
+                    sumScopeAvgMs, attributedPercent, unaccountedMs, unaccountedPercent);
+        ImGui::PopFont();
+        ImGui::Spacing();
+    }
+
     for (const auto &kv : m_cachedScopes) {
         const std::string &name = kv.first;
         const auto &data = kv.second;
         
-        // Calculate usage percentage
+        // Calculate usage percentage and clamp to [0, 100].
         float usagePercent = 0.0f;
-        if (totalTime > 0.001f) {
-            usagePercent = (data.AverageTimeMs / static_cast<float>(totalTime)) * 100.0f;
+        if (totalTime > 0.001) {
+            double percent = (static_cast<double>(data.AverageTimeMs) / totalTime) * 100.0;
+            if (percent < 0.0) percent = 0.0;
+            if (percent > 100.0) percent = 100.0;
+            usagePercent = static_cast<float>(percent);
         }
         
         // System name header
@@ -138,6 +177,22 @@ void PerformancePanel::Render(bool isPlaying) {
         // Detailed stats on one line
         ImGui::Text("  %.1f%% | Avg: %.2f ms | Max: %.2f ms", usagePercent, data.AverageTimeMs, data.MaxTimeMs);
         
+        ImGui::Spacing();
+    }
+
+    // If there's unaccounted time, show it as "Other / Unattributed"
+    if (unaccountedMs > 0.001) {
+        double unaccountedPercent = (unaccountedMs / totalTime) * 100.0;
+        if (unaccountedPercent < 0.0) unaccountedPercent = 0.0;
+        if (unaccountedPercent > 100.0) unaccountedPercent = 100.0;
+
+        ImGui::PushFont(m_boldFont);
+        ImGui::Text("Others / Unattributed (e.g., underlying system calls)");
+        ImGui::PopFont();
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::ProgressBar(static_cast<float>(unaccountedPercent / 100.0), ImVec2(-1.0f, 0.0f));
+        ImGui::PopStyleColor();
+        ImGui::Text("  %.1f%% | %.2f ms", static_cast<float>(unaccountedPercent), unaccountedMs);
         ImGui::Spacing();
     }
 
