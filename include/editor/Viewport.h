@@ -50,6 +50,11 @@ public:
     bool IsViewportHovered() const;
     bool HasValidWorld() const { return m_world != nullptr; }
 
+    // Set the currently selected entity programmatically (e.g. when selection
+    // is changed from the hierarchy). This updates internal state and the
+    // renderer's selected entity so the gizmo / outline appear.
+    void SetSelectedEntity(EntityId id);
+
     // Undo System
     void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
     void FocusOnEntity(EntityId entityId);

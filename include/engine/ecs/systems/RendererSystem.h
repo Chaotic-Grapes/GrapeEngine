@@ -99,6 +99,9 @@ namespace ECS {
         uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
         Engine::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
 
+        // Allow external systems (editor panels) to set the currently selected entity
+        void SetSelectedEntityID(uint32_t id) { m_selectedEntityID = id; }
+
         // Rebind the renderer to a new world (recreate editor camera)
         void BindWorld(World& world);
 
