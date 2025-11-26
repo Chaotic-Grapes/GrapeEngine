@@ -320,12 +320,28 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     // Set up hierarchy selection callback to sync with inspector
     m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
-        if (!m_world) { m_inspector.ClearSelection(); return; } // Clear when no world
-        if (id == ECS::Entity::NPOS32) { m_inspector.ClearSelection(); return; } // Clear when no entity
+        if (!m_world) {
+            m_inspector.ClearSelection();
+            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            return;
+        } // Clear when no world
+
+        if (id == ECS::Entity::NPOS32) {
+            m_inspector.ClearSelection();
+            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            return;
+        } // Clear when no entity
+
         // Resolve the entity to the current generation before checking aliveness
         ECS::Entity e = m_world->Resolve(id);
-        if (m_world->IsAlive(e)) m_inspector.InspectEntity(id); // Inspect when valid
-        else m_inspector.ClearSelection(); // Clear when entity is dead
+        if (m_world->IsAlive(e)) {
+            m_inspector.InspectEntity(id); // Inspect when valid
+            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(id);
+        }
+        else {
+            m_inspector.ClearSelection(); // Clear when entity is dead
+            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+        }
         });
 }
 

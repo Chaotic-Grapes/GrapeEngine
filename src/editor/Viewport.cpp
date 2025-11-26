@@ -429,6 +429,16 @@ void Viewport::SetFileMenu(EditorFileMenu* fileMenu) {
     }
 }
 
+void Viewport::SetSelectedEntity(EntityId id) {
+    // Keep local state in sync
+    m_selectedEntityId = id;
+
+    // Forward to renderer system so gizmo and selection outline update
+    if (m_rendererSystem) {
+        m_rendererSystem->SetSelectedEntityID(id);
+    }
+}
+
 void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize) {
     if (!m_rendererSystem) return;
 
