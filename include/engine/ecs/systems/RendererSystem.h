@@ -229,6 +229,8 @@ namespace ECS {
         bool m_isDragging = false;
         glm::vec2 m_dragStartMouseWorld = {0, 0};
         glm::vec3 m_dragStartEntityPos = { 0, 0, 0};
+        uint32_t m_lastSelectedEntityID = Entity::NPOS32;
+        bool m_wasMouseDownLastFrame = false;
 
         // ====================================================================
         // NEW: Member Variables - ImGuizmo State
@@ -241,7 +243,7 @@ namespace ECS {
         // ====================================================================
 
         /*!
-        \brief Reference resolution for UI design (1920�1080).
+        \brief Reference resolution for UI design (1920x1080).
         All UI elements are designed at this resolution and scaled proportionally.
         */
         static constexpr float kReferenceWidth = 1920.0f;

@@ -256,7 +256,8 @@ namespace ECS {
         }
 
         // Reset interaction state when rebinding worlds
-        m_selectedEntityID = 0;
+        // ALERT
+        m_selectedEntityID = INVALID_ENTITY_ID;
         m_isDragging = false;
     }
 
@@ -1470,6 +1471,8 @@ namespace ECS {
 
 
         if (m_selectedEntityID != INVALID_ENTITY_ID) {
+            LOG_DEBUG("[DRAG] Frame start: m_selectedEntityID=" << m_selectedEntityID
+                << ", lastSelectedEntityID=" << m_lastSelectedEntityID);
             // ----------------------------------------------------------
             // CANCEL DRAG IF MOUSE LEAVES THE VIEWPORT CONTENT REGION
             // ----------------------------------------------------------
@@ -1497,7 +1500,7 @@ namespace ECS {
                 dragViewportMin, dragViewportSize);
 
             bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
-            bool mouseJustPressed = isMouseDownThisFrame && !wasMouseDownLastFrame;
+            bool mouseJustPressed = isMouseDownThisFrame && !m_wasMouseDownLastFrame;
 
             // Check if mouse is currently in viewport
             bool isMouseInViewport = true;
@@ -1525,9 +1528,9 @@ namespace ECS {
                 lastSelectedEntityID = m_selectedEntityID;
             }
 
-            // Capture entity position on initial press OR when selection changes
+            // Capture entity position on initial press ONLY
             // ONLY if mouse is in viewport
-            if ((mouseJustPressed || selectionChanged) && !m_isDragging && isMouseInViewport) {
+            if (mouseJustPressed && !m_isDragging && isMouseInViewport) {
                 // Store the entity's starting position
                 world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
                     if (e.Index == m_selectedEntityID) {
@@ -1603,19 +1606,21 @@ namespace ECS {
                 m_isDragging = false;
             }
 
-            wasMouseDownLastFrame = isMouseDownThisFrame;
+            m_wasMouseDownLastFrame = isMouseDownThisFrame;
             } else {
                 m_isDragging = false;
-                wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
-                lastSelectedEntityID = m_selectedEntityID;
+                m_wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
             }
             }
-
+            LOG_DEBUG("[DRAG] About to update lastSelectedEntityID from "
+                << m_lastSelectedEntityID << " to " << m_selectedEntityID);
+            // Update lastSelectedEntityID unconditionally
+            m_lastSelectedEntityID = m_selectedEntityID;
         }
         else {
             // Nothing selected, reset tracking
-            lastSelectedEntityID = INVALID_ENTITY_ID;  // Use sentinel value
-            wasMouseDownLastFrame = false;
+            m_lastSelectedEntityID = INVALID_ENTITY_ID;
+            m_wasMouseDownLastFrame = false;
         }
 
         // ============================================================
