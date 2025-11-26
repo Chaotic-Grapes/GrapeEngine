@@ -55,8 +55,6 @@ namespace Engine {
         CrashDumping::Initialize();
         CrashDumping::SetProgramName("GrapeEngine");
         CrashDumping::SetDumpCreateState(true);
-        // Init UI events system
-        ECS::UIEventSystem::Initialize();
 
         // Load editor configuration (try working dir, then parent dir fallback)
         bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_editorSettings);
@@ -111,6 +109,11 @@ namespace Engine {
             const double rawDelta = frameStart - m_lastFrameTime;
             m_lastFrameTime = frameStart;
 
+            // IMPORTANT NOTE: Anything to do with the UIEventQueue in this while loop
+            // is only temporary! The proper handling of UI events should be done
+            // by a centralized event system that is registered as a PROPER system.
+            // TODO: Make centralized event system for UI events and others, and as
+            // as a proper system
             ECS::UIEventQueue::Clear();
             
             Time::_update(rawDelta, frameStart);
@@ -353,6 +356,10 @@ namespace Engine {
             // Scripts are updated through ScriptSystem::Update which is called separately
             // This registration mainly ensures the system is tracked
         });
+
+        // For now, the UIEventSystem is initialized like this
+        // Init UI events system
+        ECS::UIEventSystem::Initialize();
     }
 
     void Application::_onGameStart(Scenes::Scene* scene) {
