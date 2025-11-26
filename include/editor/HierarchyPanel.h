@@ -1,10 +1,12 @@
 /* Start Header *****************************************************************/
 /*!
 \file   HierarchyPanel.h
-\author Foo Rui Qin    (50%)
-        Samantha Leong (50%)
+\author Foo Rui Qin    (45%)
+        Samantha Leong (45%)
+        Muhammad Nur Fadzly Bin Zulkifli (10%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
 \date   5th November 2025
 
 \brief

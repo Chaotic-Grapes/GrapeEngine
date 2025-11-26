@@ -1,10 +1,12 @@
 /* Start Header *****************************************************************/
 /*!
 \file   HierarchyPanel.cpp
-\author Foo Rui Qin    (50%)
-        Samantha Leong (50%)
+\author Foo Rui Qin    (45%)
+        Samantha Leong (45%)
+        Muhammad Nur Fadzly Bin Zulkifli (10%)
 \par    ruiqin.foo@digipen.edu
         s.leong@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
 \date   5th November 2025
 \brief
 Implements the Hierarchy panel that shows all scene entities as a tree.
@@ -583,7 +585,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
             // Draw the prefab icon with blue color (matching prefab text color)
             ImGui::GetWindowDrawList()->AddText(
                 m_symbolsFont,
-                22.0f,
+                26.0f,
                 iconPos,
                 ImGui::GetColorU32(ImVec4(0.4f, 0.7f, 1.0f, 1.0f)), // Light blue matching prefab text
                 prefabIcon
@@ -613,7 +615,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
             // Draw the icon with a subtle color using the symbols font
             ImGui::GetWindowDrawList()->AddText(
                 m_symbolsFont,
-                22.f, // Font size
+                26.f, // Font size
                 iconPos,
                 ImGui::GetColorU32(ImVec4(0.7f, 0.8f, 0.9f, 0.9f)), // Subtle blue-gray
                 scriptIcon

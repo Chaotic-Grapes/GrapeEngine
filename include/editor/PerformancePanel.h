@@ -7,6 +7,13 @@
 
 \brief
 Declares the in-editor performance monitoring panel used by the Level Editor.
+
+\details
+The PerformancePanel class provides a UI panel within the editor that displays
+real-time performance metrics such as FPS, frame time, and profiling scope
+data. It integrates with the engine's profiling system to gather timing data
+and presents it in an organized manner for developers to monitor and analyze
+the performance of their scenes during play mode.
 */
 /* End Header *******************************************************************/
 
