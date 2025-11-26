@@ -10,16 +10,16 @@ if not exist build (
 )
 
 REM Check if executable exists
-if not exist build\%CONFIG%\GrapeEditor.exe (
+if not exist build\%CONFIG%\GrapeEngine.exe (
     echo ERROR: Executable not found! Build first.
     pause
     exit /b 1
 )
 
-echo Running GrapeEditor...
+echo Running GrapeEngine...
 echo.
 cd build\%CONFIG%
-GrapeEditor.exe
+GrapeEngine.exe
 if %errorlevel% neq 0 (
     echo.
     echo Application exited with error code: %errorlevel%
