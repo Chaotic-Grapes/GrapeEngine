@@ -60,6 +60,13 @@ public static class ScriptHost
     private static AssemblyLoadContext? s_loadContext = null;
     private static bool s_resolverRegistered = false;
 
+    static ScriptHost()
+    {
+        // Initialize the P/Invoke resolver early to ensure it's set up
+        // before any native calls are made from script code
+        UnsafeApiHelper.Initialize();
+    }
+
     /// <summary>
     /// Create a new script instance.
     /// Called from C++ when attaching a script to an entity.

@@ -193,6 +193,14 @@ namespace ECS {
         // --- Editor Camera ---
         m_editorCamera = std::make_unique<Engine::EditorCamera>(world);
 
+        // In standalone game mode, default to using scene camera instead of editor camera
+        if (!Engine::CORE->IsInEditorMode()) {
+            m_useEditorCamera = false;
+            if (m_editorCamera) {
+                m_editorCamera->GetCameraComponent()->Active = false;
+            }
+        }
+
         // RenderGraph now owns all framebuffers (no more m_fbos!)
         m_renderGraph = std::make_unique<RenderGraph>();
 
@@ -332,9 +340,9 @@ namespace ECS {
         m_cameraOrthoSize = kReferenceOrthoSize; // default fallback (world-space 1080p)
 
         // ============================================================
-        // 1. Toggle or cycle camera
+        // 1. Toggle or cycle camera (Editor-only)
         // ============================================================
-        if (Input::IsKeyPressed(KEY_C)) {
+        if (Engine::CORE && Engine::CORE->IsInEditorMode() && Input::IsKeyPressed(KEY_C)) {
             // Count available cameras
             bool hasSceneCamera = false;
 
@@ -1651,9 +1659,9 @@ namespace ECS {
         }
 
         // ============================================================
-        // DELETE SELECTED ENTITY
+        // DELETE SELECTED ENTITY (Editor-only)
         // ============================================================
-        if (m_selectedEntityID != INVALID_ENTITY_ID && Input::IsKeyPressed(KEY_DELETE)) {
+        if (Engine::CORE && Engine::CORE->IsInEditorMode() && m_selectedEntityID != INVALID_ENTITY_ID && Input::IsKeyPressed(KEY_DELETE)) {
             world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
                 (void)lt;
                 if (e.Index == m_selectedEntityID) {

@@ -247,17 +247,18 @@ if(BUILD_GAME)
             COMMAND ${CMAKE_COMMAND} -E rename "$<TARGET_FILE:GrapeGame>" "$<TARGET_FILE_DIR:GrapeGame>/${GAME_FINAL_OUTPUT_NAME}.exe"
             COMMENT "Normalize game executable name"
         )
+        
+        # Also provide a copy named GrapeEngine.exe for P/Invoke compatibility
+        # Many managed LibraryImport declarations reference "GrapeEngine.exe" as the native
+        # library. When building a standalone game the exe name differs, so copy the
+        # produced game executable to "GrapeEngine.exe" in the same output folder.
+        # This must happen AFTER the rename above so the source file exists.
+        add_custom_command(TARGET GrapeGame POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E echo "Providing GrapeEngine.exe alias for scripting interop"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE_DIR:GrapeGame>/${GAME_FINAL_OUTPUT_NAME}.exe" "$<TARGET_FILE_DIR:GrapeGame>/GrapeEngine.exe"
+            COMMENT "Create GrapeEngine.exe alias in game output directory"
+        )
     endif()
-    
-    # Also provide a copy named GrapeEngine.exe for P/Invoke compatibility
-    # Many managed LibraryImport declarations reference "GrapeEngine.exe" as the native
-    # library. When building a standalone game the exe name differs, so copy the
-    # produced game executable to "GrapeEngine.exe" in the same output folder.
-    add_custom_command(TARGET GrapeGame POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E echo "Providing GrapeEngine.exe alias for scripting interop"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:GrapeGame>" "$<TARGET_FILE_DIR:GrapeGame>/GrapeEngine.exe"
-        COMMENT "Create GrapeEngine.exe alias in game output directory"
-    )
     
     # NO USE_IMGUI definition - this disables all ImGui code
     # target_compile_definitions(GrapeGame PRIVATE ...) - intentionally empty
