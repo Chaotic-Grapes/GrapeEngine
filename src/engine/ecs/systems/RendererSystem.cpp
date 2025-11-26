@@ -758,7 +758,8 @@ namespace ECS {
                     // ============================================================
                     // --- DEBUG: Draw Non-Editor Camera Frustum ---
                     // ============================================================
-                    if (m_useEditorCamera) { // Only show when using editor camera
+                    // Only show when using editor camera AND not forcing scene camera (i.e., in Scene viewport, not Game viewport)
+                    if (m_useEditorCamera && !m_forceSceneCamera) {
                         m_shader->use();
                         m_shader->setMat4("uViewProj", viewProj);
                         m_renderer->beginFrame();
@@ -802,7 +803,7 @@ namespace ECS {
                         );
 
                         m_renderer->endFrame();
-                    } // if m_useEditorCamera
+                    } // if m_useEditorCamera && !m_forceSceneCamera
 
                 }
                 Framebuffer::Unbind();
