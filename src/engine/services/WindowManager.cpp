@@ -75,6 +75,16 @@ void WindowManager::DestroyAll() {
 
     // Terminate GLFW when all windows are destroyed
     if (s_glfwInitialized) {
+        // Clear GLFW callbacks and any stored window pointer so that any code
+        // running after termination does not trigger GLFW error callbacks
+        // (which would report "The GLFW library is not initialized").
+        // Reset the global Input window pointer first to avoid callbacks
+        // using a destroyed window handle.
+        Input::Initialize(nullptr);
+        
+        // Remove our error callback so GLFW won't call back into our logger
+        // after termination.
+        glfwSetErrorCallback(nullptr);
         glfwTerminate();
         s_glfwInitialized = false;
     }
