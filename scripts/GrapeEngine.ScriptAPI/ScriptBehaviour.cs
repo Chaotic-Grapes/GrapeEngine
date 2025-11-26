@@ -112,17 +112,17 @@ public abstract class ScriptBehaviour
     /// <summary>
     /// Called when this entity starts colliding with another entity
     /// </summary>
-    internal virtual void OnCollisionEnter(ulong otherEntity) { }
+    public virtual void OnCollisionEnter(ulong otherEntity) { }
 
     /// <summary>
     /// Called every frame while colliding with another entity
     /// </summary>
-    internal virtual void OnCollisionStay(ulong otherEntity) { }
+    public virtual void OnCollisionStay(ulong otherEntity) { }
 
     /// <summary>
     /// Called when this entity stops colliding with another entity
     /// </summary>
-    internal virtual void OnCollisionExit(ulong otherEntity) { }
+    public virtual void OnCollisionExit(ulong otherEntity) { }
 
     // ============================================================================
     // Component Access
