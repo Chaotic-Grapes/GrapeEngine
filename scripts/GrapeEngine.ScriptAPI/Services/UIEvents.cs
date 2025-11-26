@@ -35,9 +35,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.ScriptAPI.Unsafe;
-using GrapeEngine.Math;
+using GrapeEngine.Numerics;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Events;
 
 /// <summary>
 /// Type of UI event that occurred
@@ -57,13 +57,19 @@ public enum UIEventType
 /// </summary>
 public struct UIEvent
 {
-    /// <summary>Type of event that occurred</summary>
+    /// <summary>
+    /// Type of event that occurred
+    /// </summary>
     public UIEventType Type;
     
-    /// <summary>Mouse button involved (or -1 for hover events)</summary>
+    /// <summary>
+    /// Mouse button involved (or -1 for hover events)
+    /// </summary>
     public int Button;
     
-    /// <summary>Screen position where the event occurred</summary>
+    /// <summary>
+    /// Screen position where the event occurred
+    /// </summary>
     public Vector2 ScreenPosition;
 
     /// <summary>
