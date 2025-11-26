@@ -21,46 +21,46 @@ public class UIClickableTest : ScriptBehaviour
     
     public override void OnUpdate()
     {
-<<<<<<< Updated upstream
-        // // Called every frame
-        // ref UIClickable click = ref GetComponent<UIClickable>();
-        // ref SpriteRenderer2D sr = ref GetComponent<SpriteRenderer2D>();
+//<<<<<<< Updated upstream
+//        // // Called every frame
+//        // ref UIClickable click = ref GetComponent<UIClickable>();
+//        // ref SpriteRenderer2D sr = ref GetComponent<SpriteRenderer2D>();
 
-<<<<<<< Updated upstream
-        // if (click.IsPressed)
-        // {
-        //     sr.Color = new Color(1,0,0,1);
-        // }
-        // else if (click.IsHovered)
-        // {
-        //     sr.Color = new Color(0, 1, 0, 1);
-        // }
-        // else
-        // {
-        //     sr.Color = startCol;
-        // }
-        // //Log("UIClickable ID: " + click.ClickActionID);
-=======
-=======
-        // Called every frame
-        ref UIClickable click = ref GetComponent<UIClickable>();
-        ref SpriteRenderer2D sr = ref GetComponent<SpriteRenderer2D>();
+//<<<<<<< Updated upstream
+//        // if (click.IsPressed)
+//        // {
+//        //     sr.Color = new Color(1,0,0,1);
+//        // }
+//        // else if (click.IsHovered)
+//        // {
+//        //     sr.Color = new Color(0, 1, 0, 1);
+//        // }
+//        // else
+//        // {
+//        //     sr.Color = startCol;
+//        // }
+//        // //Log("UIClickable ID: " + click.ClickActionID);
+//=======
+//=======
+//        // Called every frame
+//        ref UIClickable click = ref GetComponent<UIClickable>();
+//        ref SpriteRenderer2D sr = ref GetComponent<SpriteRenderer2D>();
         
->>>>>>> Stashed changes
-        if (click.IsPressed)
-        {
-            sr.Color = new Color(255,0,0,255);
-        }
-        else if (click.IsHovered)
-        {
-            sr.Color = new Color(0, 255, 0, 255);
-        }
-        else 
-        {
-            sr.Color = startCol;            
-        }
-        //Log("UIClickable ID: " + click.ClickActionID);
->>>>>>> Stashed changes
+//>>>>>>> Stashed changes
+//        if (click.IsPressed)
+//        {
+//            sr.Color = new Color(255,0,0,255);
+//        }
+//        else if (click.IsHovered)
+//        {
+//            sr.Color = new Color(0, 255, 0, 255);
+//        }
+//        else 
+//        {
+//            sr.Color = startCol;            
+//        }
+//        //Log("UIClickable ID: " + click.ClickActionID);
+//>>>>>>> Stashed changes
 
 
     }
