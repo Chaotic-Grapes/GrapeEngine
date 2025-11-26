@@ -103,6 +103,10 @@ namespace ECS {
         bool IsUsingEditorCamera() const { return m_useEditorCamera; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
         uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
+
+        // Static accessor for global access
+        static RendererSystem* GetInstance() { return s_instance; }
+
         Engine::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
 
         // Allow external systems (editor panels) to set the currently selected entity
@@ -247,6 +251,9 @@ namespace ECS {
         PixelBufferObject m_pbos[2];
         int m_currentPBO = 0;
         uint32_t m_selectedEntityID = 0;  // Currently selected entity
+
+        // Static instance pointer
+        static RendererSystem* s_instance;
 
         // Drag-to-move state
         bool m_isDragging = false;
