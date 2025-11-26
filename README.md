@@ -23,8 +23,8 @@ cd GrapeEngine
 ### Building the Engine
 
 **Editor Build (with level editor and ImGui):**
-1. Run `script_build.bat` 
-2. Execute `script_run.bat` or run `build/Debug/GrapeEngine.exe`
+1. Run `script_build_editor.bat`
+2. Execute `script_run_editor.bat` or run `build/Debug/GrapeEngine.exe`
 
 **Standalone Game Build (no editor, no ImGui):**
 1. Run `script_build_game.bat`

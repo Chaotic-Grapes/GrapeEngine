@@ -43,19 +43,19 @@ echo.
 set /p choice=Enter your choice (1-8): 
 
 if "%choice%"=="1" call script_clean.bat pause
-if "%choice%"=="2" call script_build.bat Debug
-if "%choice%"=="3" call script_build.bat Release
-if "%choice%"=="4" script_run.bat Debug
-if "%choice%"=="5" script_run.bat Release
+if "%choice%"=="2" call script_build_editor.bat Debug
+if "%choice%"=="3" call script_build_editor.bat Release
+if "%choice%"=="4" script_run_editor.bat Debug
+if "%choice%"=="5" script_run_editor.bat Release
 if "%choice%"=="6" (
     call script_clean.bat
-    call script_build.bat Debug
-    call script_run.bat Debug
+    call script_build_editor.bat Debug
+    call script_run_editor.bat Debug
 )
 if "%choice%"=="7" (
     call script_clean.bat
-    call script_build.bat Release
-    call script_run.bat Release
+    call script_build_editor.bat Release
+    call script_run_editor.bat Release
 )
 if "%choice%"=="8" exit /b
 goto MENU

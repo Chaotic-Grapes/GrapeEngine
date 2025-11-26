@@ -76,10 +76,10 @@ STEP 3: GENERATE VISUAL STUDIO SOLUTION
 
 METHOD 1: Using the Provided Script (Easiest)
 ----------------------------------------------
-1. In the GrapeEngine directory, double-click: script_build.bat
+1. In the GrapeEngine directory, double-click: script_build_editor.bat
    OR
    Open Command Prompt in the project directory and run:
-   script_build.bat
+   script_build_editor.bat
 
 This will automatically:
 - Create a 'build' directory
@@ -122,8 +122,8 @@ OPTION A: From Visual Studio
 
 OPTION B: Using the Run Script
 ------------------------------
-- Double-click: script_run.bat
-- OR run from command line: script_run.bat
+ - Double-click: script_run_editor.bat
+ - OR run from command line: script_run_editor.bat
 
 OPTION C: Direct Execution
 --------------------------
@@ -159,11 +159,11 @@ CLEAN BUILD:
 
 REGENERATE SOLUTION:
 - Delete the 'build' folder
-- Run script_build.bat again
+ - Run script_build_editor.bat again
 - Or use the manual CMake commands above
 
 BUILD AND RUN IN ONE STEP:
-- Run: script_build_and_run.bat
+- Run: script_build_editor_and_run.bat
 
 ================================================================================
 PROJECT STRUCTURE
