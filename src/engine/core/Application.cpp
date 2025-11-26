@@ -30,6 +30,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/WindowManager.h"
 #include "services/OverlayService.h"
 #include <thread>
+#include <filesystem>
+
+// Undefine potential Windows macros that conflict with enum names
+#ifdef ERROR
+#undef ERROR
+#endif
 
 
 namespace Engine {
@@ -213,6 +219,32 @@ namespace Engine {
             LOG_WARNING("Failed to load project settings from: " << settingsPath);
         }
         return m_hasProjectSettings;
+    }
+
+    bool Application::SaveProjectSettings(const std::string& projectRoot) {
+        try {
+            std::filesystem::path settingsPath = std::filesystem::path(projectRoot) / "ProjectSettings.json";
+
+            // Ensure parent directories exist
+            std::filesystem::path parent = settingsPath.parent_path();
+            if (!parent.empty() && !std::filesystem::exists(parent)) {
+                std::filesystem::create_directories(parent);
+            }
+
+            const std::string settingsPathStr = settingsPath.string();
+            if (Serialization::ConfigurationSerializer::SaveProjectSettings(settingsPathStr, m_projectSettings)) {
+                LOG_INFO("Saved project settings to: " << settingsPathStr);
+                return true;
+            }
+            else {
+                LOG_ERROR("Failed to save project settings to: " << settingsPathStr);
+                return false;
+            }
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Exception saving project settings: " << e.what());
+            return false;
+        }
     }
 
     void Application::_initializeServices() {

@@ -519,7 +519,10 @@ void LevelEditor::_onViewportSelectionChanged(EntityId id) {
 // Render dock space and editor panels with a fallback when world is missing
 void LevelEditor::Render() {
     if (ImGui::BeginMainMenuBar()) {
-        m_fileMenu.RenderFileMenu(m_uiScale);
+        m_fileMenu.RenderFileMenu();
+        m_fileMenu.RenderEditMenu();
+        m_fileMenu.RenderBuildMenu();
+        m_fileMenu.RenderViewMenu(m_uiScale);
         ImGui::EndMainMenuBar();
     }
     _renderDockSpace();

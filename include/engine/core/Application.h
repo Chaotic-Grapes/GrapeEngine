@@ -40,14 +40,26 @@ namespace Engine {
         const EditorSettings& GetEditorSettings() const { return m_editorSettings; }
 
         /**
-         * @brief Get the project settings
+         * @brief Get the project settings (const)
          */
         const ProjectSettings& GetProjectSettings() const { return m_projectSettings; }
+
+        /**
+         * @brief Get the project settings (mutable)
+         */
+        ProjectSettings& GetProjectSettings() { return m_projectSettings; }
 
         /**
          * @brief Check if project settings have been loaded
          */
         bool HasProjectSettings() const { return m_hasProjectSettings; }
+
+        /**
+         * @brief Save project settings to ProjectSettings.json
+         * @param projectRoot Path to the project root directory
+         * @return true if project settings were saved successfully
+         */
+        bool SaveProjectSettings(const std::string& projectRoot);
 
         /**
          * @brief Starts the engine

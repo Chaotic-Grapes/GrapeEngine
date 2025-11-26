@@ -36,6 +36,7 @@ namespace EditorStyle {
     static const ImVec4 SuccessText        = ImVec4(0.10f, 0.72f, 0.30f, 1.0f);
     static const ImVec4 SuccessButton      = ImVec4(0.08f, 0.62f, 0.26f, 1.0f);
     static const ImVec4 SuccessButtonHover = ImVec4(0.12f, 0.78f, 0.36f, 1.0f);
+    static const ImVec4 SuccessButtonActive = ImVec4(0.06f, 0.50f, 0.20f, 1.0f);
 
     // Warning / caution
     static const ImVec4 WarningText        = ImVec4(0.95f, 0.70f, 0.10f, 1.0f);
