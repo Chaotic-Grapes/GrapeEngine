@@ -10,32 +10,54 @@ echo.
 echo ===============================================
 echo   Building Both Editor and Game (%CONFIG%)
 echo ===============================================
-
-REM Create build folder if it doesn't exist
-if not exist build_both mkdir build_both
-cd build_both
-
-REM Configure with CMake for BOTH editor and game
-cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=ON -DBUILD_GAME=ON
+REM Build Editor (into `build`)
+echo.
+echo --- Configuring and building Editor ---
+if not exist build mkdir build
+pushd build
+cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=ON -DBUILD_GAME=OFF
 if %errorlevel% neq 0 (
-    echo ERROR: CMake configuration failed
-    cd ..
+    echo ERROR: CMake configuration for Editor failed
+    popd
     pause
     exit /b 1
 )
 
-REM Build the project
 cmake --build . --config %CONFIG% --parallel %JOBS%
 if %errorlevel% neq 0 (
-    echo ERROR: Build failed
-    cd ..
+    echo ERROR: Editor build failed
+    popd
+    pause
+    exit /b 1
+)
+popd
+
+REM Build Game (into `build_game`)
+echo.
+echo --- Configuring and building Game ---
+if not exist build_game mkdir build_game
+pushd build_game
+cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON
+if %errorlevel% neq 0 (
+    echo ERROR: CMake configuration for Game failed
+    popd
     pause
     exit /b 1
 )
 
-cd ..
+cmake --build . --config %CONFIG% --parallel %JOBS%
+if %errorlevel% neq 0 (
+    echo ERROR: Game build failed
+    popd
+    pause
+    exit /b 1
+)
+popd
+
 echo.
 echo Build %CONFIG% completed successfully!
-echo Editor location: build_both\%CONFIG%\GrapeEngine.exe
-echo Game location: build_both\%CONFIG%\GrapeGame.exe
+echo Editor location: build\%CONFIG%\GrapeEngine.exe
+echo Game location: build_game\%CONFIG%\GrapeGame.exe
+echo.
+echo Note: the game executable name may be overridden by CMake variable GAME_OUTPUT_NAME
 pause

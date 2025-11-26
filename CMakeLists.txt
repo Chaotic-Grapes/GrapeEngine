@@ -17,6 +17,16 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(ImportDependencies)
 importDependencies()
 
+# Prevent ImGui (and any editor-only UI libs) from being built into the
+# standalone game output directory. If an `imgui` target exists, mark it
+# excluded when `BUILD_GAME` is enabled so it won't produce `imgui.lib`/`imgui.pdb`
+# in game-only builds.
+if(BUILD_GAME)
+    if(TARGET imgui)
+        set_target_properties(imgui PROPERTIES EXCLUDE_FROM_ALL TRUE)
+    endif()
+endif()
+
 # Find .NET SDK
 find_program(DOTNET_EXECUTABLE dotnet REQUIRED)
 
@@ -82,8 +92,6 @@ if(BUILD_GAME)
     list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/ImGuizmo\\.cpp$")
     # Exclude DebugUI implementation from standalone game (editor-only)
     list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/DebugUI\\.cpp$")
-    # Exclude audio implementation for now (audio will be fixed separately)
-    list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/engine/audio/.*\\.cpp$")
 endif()
 
 # ======================= EDITOR BUILD =========================
@@ -147,6 +155,58 @@ if(BUILD_GAME)
     # Set C++ standard
     set_property(TARGET GrapeGame PROPERTY CXX_STANDARD 23)
     set_property(TARGET GrapeGame PROPERTY CXX_STANDARD_REQUIRED ON)
+
+    # ------------------------------------------------------------------
+    # Auto-detect or override output name for the game executable
+    # If -DGAME_OUTPUT_NAME=<name> is provided, it will be used.
+    # Otherwise attempt to find the first top-level project folder
+    # (a folder containing `ProjectSettings.json`) and use its name.
+    # Falls back to "GrapeGame" if nothing is found.
+    # ------------------------------------------------------------------
+    set(GAME_OUTPUT_NAME "" CACHE STRING "Name for the game executable (auto-detected from first game project if empty)")
+
+    if(GAME_OUTPUT_NAME STREQUAL "")
+        file(GLOB PROJECT_SETTINGS_FILES "${CMAKE_CURRENT_LIST_DIR}/*/ProjectSettings.json")
+        if(PROJECT_SETTINGS_FILES)
+            list(GET PROJECT_SETTINGS_FILES 0 FIRST_SETTINGS)
+            get_filename_component(FIRST_PROJECT_DIR ${FIRST_SETTINGS} DIRECTORY)
+            get_filename_component(FIRST_PROJECT_NAME ${FIRST_PROJECT_DIR} NAME)
+            if(NOT FIRST_PROJECT_NAME STREQUAL "")
+                set(GAME_OUTPUT_NAME "${FIRST_PROJECT_NAME}")
+            else()
+                set(GAME_OUTPUT_NAME "GrapeGame")
+            endif()
+        else()
+            set(GAME_OUTPUT_NAME "GrapeGame")
+        endif()
+    endif()
+
+    # Append suffix "Game" to the base project name unless it already ends
+    # with "game" (case-insensitive). This makes the standalone executable
+    # name explicit (e.g. EchoesBelow -> EchoesBelowGame).
+    set(_GAME_NAME_BASE "${GAME_OUTPUT_NAME}")
+    string(TOLOWER _GAME_NAME_LOWER "${_GAME_NAME_BASE}")
+    string(LENGTH _game_name_len "${_GAME_NAME_LOWER}")
+    if(_game_name_len GREATER_EQUAL 4)
+        math(EXPR _start_idx "${_game_name_len} - 4")
+        string(SUBSTRING _GAME_NAME_LOWER ${_start_idx} 4 _GAME_NAME_TAIL)
+    else()
+        set(_GAME_NAME_TAIL "")
+    endif()
+
+    if(NOT _GAME_NAME_TAIL STREQUAL "game")
+        set(GAME_FINAL_OUTPUT_NAME "${_GAME_NAME_BASE}Game")
+    else()
+        set(GAME_FINAL_OUTPUT_NAME "${_GAME_NAME_BASE}")
+    endif()
+
+    # Apply the chosen name to the built executable and MSVC PDBs
+    set_target_properties(GrapeGame PROPERTIES
+        OUTPUT_NAME "${GAME_FINAL_OUTPUT_NAME}"
+        PDB_NAME "${GAME_FINAL_OUTPUT_NAME}"
+        COMPILE_PDB_NAME "${GAME_FINAL_OUTPUT_NAME}"
+        COMPILE_PDB_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:GrapeGame>"
+    )
     
     # NO USE_IMGUI definition - this disables all ImGui code
     # target_compile_definitions(GrapeGame PRIVATE ...) - intentionally empty

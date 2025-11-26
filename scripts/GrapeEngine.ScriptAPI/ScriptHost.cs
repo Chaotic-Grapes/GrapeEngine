@@ -476,80 +476,78 @@ public static class ScriptHost
             var assemblyPath = Marshal.PtrToStringAnsi(assemblyPathPtr);
             if (string.IsNullOrWhiteSpace(assemblyPath))
             {
-                Logging.Log("Null or empty assembly path", LogLevel.Error);
+                Console.Error.WriteLine("[ScriptHost] ERROR: Null or empty assembly path");
                 return 0;
             }
 
-            Logging.Log($"Loading game assembly: {assemblyPath}", LogLevel.Info);
+            Console.WriteLine($"[ScriptHost] INFO: Loading game assembly: {assemblyPath}");
 
             // Register assembly resolver to find ScriptAPI in the same directory
-            if (!s_resolverRegistered)
-            {
-                var assemblyDir = Path.GetDirectoryName(assemblyPath);
-                AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
+                if (!s_resolverRegistered)
                 {
-                    Logging.Log($"Resolving assembly: {args.Name}", LogLevel.Info);
-                    
-                    // Parse the assembly name
+                var assemblyDir = Path.GetDirectoryName(assemblyPath);
+                    AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
+                {
+                    // Avoid performing any logging here: calling into the engine's
+                    // logging from the resolver can trigger native->managed roundtrips
+                    // and re-enter the assembly resolution process, causing recursion
+                    // and stack overflows. Keep the resolver logic minimal.
+
                     var requestedName = new AssemblyName(args.Name);
-                    
-                    // CRITICAL: If the game assembly is asking for GrapeEngine.ScriptAPI,
-                    // return the ALREADY LOADED ScriptAPI assembly to ensure type identity
+
+                    // If the game assembly asks for the ScriptAPI, return the already
+                    // loaded ScriptAPI assembly to ensure type identity.
                     if (requestedName.Name == "GrapeEngine.ScriptAPI")
                     {
-                        var currentScriptAPI = typeof(ScriptBehaviour).Assembly;
-                        Logging.Log($"Redirecting ScriptAPI reference to already loaded assembly: {currentScriptAPI.FullName}", LogLevel.Info);
-                        return currentScriptAPI;
+                        return typeof(ScriptBehaviour).Assembly;
                     }
-                    
-                    // Try to find other dependencies in the game assembly directory
+
                     if (assemblyDir != null)
                     {
                         var dllPath = Path.Combine(assemblyDir, requestedName.Name + ".dll");
                         if (File.Exists(dllPath))
                         {
-                            Logging.Log($"Loading dependency from: {dllPath}", LogLevel.Info);
+                            // Load dependency from the game assembly directory without logging
                             return Assembly.LoadFrom(dllPath);
                         }
                     }
-                    
+
                     return null;
-                };
+                    };
                 s_resolverRegistered = true;
             }
-
             // The ScriptAPI assembly is already loaded into the current AppDomain by CoreCLR hosting.
             // Use Assembly.LoadFrom which will find dependencies in the same directory
             var fullPath = Path.GetFullPath(assemblyPath);
             var assembly = Assembly.LoadFrom(fullPath);
-            
+
             if (assembly == null)
             {
-                Logging.Log($"Failed to load assembly from {assemblyPath}", LogLevel.Error);
+                Console.Error.WriteLine($"[ScriptHost] ERROR: Failed to load assembly from {assemblyPath}");
                 return 0;
             }
 
-            Logging.Log($"Successfully loaded assembly: {assembly.FullName}", LogLevel.Info);
+            Console.WriteLine($"[ScriptHost] INFO: Successfully loaded assembly: {assembly.FullName}");
             
             // Check which ScriptAPI this assembly references
             var scriptApiRef = assembly.GetReferencedAssemblies()
                 .FirstOrDefault(a => a.Name == "GrapeEngine.ScriptAPI");
             
-            if (scriptApiRef != null)
-            {
-                Logging.Log($"Game assembly references ScriptAPI version: {scriptApiRef.Version}", LogLevel.Info);
-                Logging.Log($"Currently loaded ScriptAPI version: {typeof(ScriptBehaviour).Assembly.GetName().Version}", LogLevel.Info);
-                
-                if (scriptApiRef.Version != typeof(ScriptBehaviour).Assembly.GetName().Version)
+                if (scriptApiRef != null)
                 {
-                    Logging.Log("WARNING: Version mismatch! Game assembly may not work correctly.", LogLevel.Warning);
-                    Logging.Log("SOLUTION: Rebuild the game assembly (EchoesBelow.dll) to reference the current ScriptAPI", LogLevel.Warning);
+                    Console.WriteLine($"[ScriptHost] INFO: Game assembly references ScriptAPI version: {scriptApiRef.Version}");
+                    Console.WriteLine($"[ScriptHost] INFO: Currently loaded ScriptAPI version: {typeof(ScriptBehaviour).Assembly.GetName().Version}");
+
+                    if (scriptApiRef.Version != typeof(ScriptBehaviour).Assembly.GetName().Version)
+                    {
+                        Console.Error.WriteLine("[ScriptHost] WARNING: Version mismatch! Game assembly may not work correctly.");
+                        Console.Error.WriteLine("[ScriptHost] SOLUTION: Rebuild the game assembly (EchoesBelow.dll) to reference the current ScriptAPI");
+                    }
                 }
-            }
             
             // Log all types found (for debugging)
             var types = assembly.GetTypes();
-            Logging.Log($"Found {types.Length} types in assembly", LogLevel.Info);
+            Console.WriteLine($"[ScriptHost] INFO: Found {types.Length} types in assembly");
             foreach (var type in types)
             {
                 // Check base type with name comparison to avoid casting issues
@@ -558,8 +556,8 @@ public static class ScriptHost
                 {
                     if (baseType.Name == "ScriptBehaviour")
                     {
-                        Logging.Log($"\t- Script type found: {type.FullName}", LogLevel.Info);
-                        Logging.Log($"\t  Base type assembly: {baseType.Assembly.FullName}", LogLevel.Debug);
+                        Console.WriteLine($"\t- Script type found: {type.FullName}");
+                        Console.WriteLine($"\t  Base type assembly: {baseType.Assembly.FullName}");
                         break;
                     }
                     baseType = baseType.BaseType;
