@@ -18,23 +18,23 @@ public class UIClickableTest : ScriptBehaviour
 
     public override void OnUpdate()
     {
-        // Called every frame
-        ref UIClickable click = ref GetComponent<UIClickable>();
-        ref SpriteRenderer2D sr = ref GetComponent<SpriteRenderer2D>();
+        // // Called every frame
+        // ref UIClickable click = ref GetComponent<UIClickable>();
+        // ref SpriteRenderer2D sr = ref GetComponent<SpriteRenderer2D>();
 
-        if (click.IsPressed)
-        {
-            sr.Color = new Color(1,0,0,1);
-        }
-        else if (click.IsHovered)
-        {
-            sr.Color = new Color(0, 1, 0, 1);
-        }
-        else
-        {
-            sr.Color = startCol;
-        }
-        //Log("UIClickable ID: " + click.ClickActionID);
+        // if (click.IsPressed)
+        // {
+        //     sr.Color = new Color(1,0,0,1);
+        // }
+        // else if (click.IsHovered)
+        // {
+        //     sr.Color = new Color(0, 1, 0, 1);
+        // }
+        // else
+        // {
+        //     sr.Color = startCol;
+        // }
+        // //Log("UIClickable ID: " + click.ClickActionID);
 
 
     }

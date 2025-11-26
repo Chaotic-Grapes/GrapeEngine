@@ -653,7 +653,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 2.8807339668273926,
+                        "AspectRatio": 1.5155038833618164,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -898,15 +898,6 @@
                 },
                 {
                     "Data": {
-                        "ClickActionID": 0,
-                        "Enabled": true,
-                        "IsHovered": false,
-                        "WasClicked": false
-                    },
-                    "TypeName": "UIClickable"
-                },
-                {
-                    "Data": {
                         "Dirty": false,
                         "Matrix": {
                             "m00": 1.0,
@@ -997,8 +988,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 6.442473411560059,
-                            "Y": 8.852737426757813,
+                            "X": -0.42966747283935547,
+                            "Y": -3.609606981277466,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -1017,16 +1008,22 @@
                 },
                 {
                     "Data": {
-                        "Value": "BlueBox"
+                        "Value": "Bottom Wall"
                     },
                     "TypeName": "Name"
                 },
                 {
                     "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
                         "Flags": 0,
                         "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
+                            "X": 16.0,
+                            "Y": 0.699999988079071
                         },
                         "LayerMask": 4294967295,
                         "Offset": {
@@ -1064,16 +1061,26 @@
                 },
                 {
                     "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\BottomWall.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.BottomWall"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
                         "Color": {
                             "A": 1.0,
                             "B": 1.0,
-                            "G": 0.1329784393310547,
-                            "R": 0.0
+                            "G": 1.0,
+                            "R": 1.0
                         },
                         "Filled": true,
                         "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
+                            "X": 16.0,
+                            "Y": 0.699999988079071
                         },
                         "Offset": {
                             "X": 0.0,
@@ -1090,11 +1097,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 6.442473411560059,
+                            "m03": -0.42966747283935547,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 8.852737426757813,
+                            "m13": -3.609606981277466,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1231,8 +1238,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -0.42966747283935547,
-                            "Y": -3.609606981277466,
+                            "X": 6.442473411560059,
+                            "Y": 8.852737426757813,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -1251,7 +1258,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "Bottom Wall"
+                        "Value": "BlueBox"
                     },
                     "TypeName": "Name"
                 },
@@ -1259,8 +1266,8 @@
                     "Data": {
                         "Flags": 0,
                         "HalfExtents": {
-                            "X": 16.0,
-                            "Y": 0.699999988079071
+                            "X": 1.0,
+                            "Y": 1.0
                         },
                         "LayerMask": 4294967295,
                         "Offset": {
@@ -1301,13 +1308,13 @@
                         "Color": {
                             "A": 1.0,
                             "B": 1.0,
-                            "G": 1.0,
-                            "R": 1.0
+                            "G": 0.1329784393310547,
+                            "R": 0.0
                         },
                         "Filled": true,
                         "HalfExtents": {
-                            "X": 16.0,
-                            "Y": 0.699999988079071
+                            "X": 1.0,
+                            "Y": 1.0
                         },
                         "Offset": {
                             "X": 0.0,
@@ -1324,11 +1331,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -0.42966747283935547,
+                            "m03": 6.442473411560059,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": -3.609606981277466,
+                            "m13": 8.852737426757813,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1802,11 +1809,7 @@
     "EntityCount": 16,
     "Hierarchy": [
         {
-            "child": 4,
-            "parent": 3
-        },
-        {
-            "child": 11,
+            "child": 14,
             "parent": 8
         },
         {
@@ -1814,7 +1817,7 @@
             "parent": 8
         },
         {
-            "child": 9,
+            "child": 11,
             "parent": 8
         },
         {
@@ -1826,12 +1829,16 @@
             "parent": 8
         },
         {
-            "child": 14,
-            "parent": 8
-        },
-        {
             "child": 7,
             "parent": 6
+        },
+        {
+            "child": 4,
+            "parent": 3
+        },
+        {
+            "child": 9,
+            "parent": 8
         }
     ],
     "SceneName": "Scene",
