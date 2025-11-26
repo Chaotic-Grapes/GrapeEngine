@@ -19,7 +19,6 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include "ecs/systems/RendererSystem.h"
 #include <imgui_internal.h>
 #include <core/Application.h>
-#include "../engine/ecs/systems/BoundaryCheckSystem.h"
 #include "services/Time.h"
 #include "AudioAssetLibrary.h"
 #include "UndoSystem.h"
@@ -418,34 +417,6 @@ void LevelEditor::Update() {
 
     if (m_playback.IsPlaying()) {
         Engine::CORE->GetSceneManager().Update(); // Updates scenemanager to run Audio
-    }
-
-    // Get viewport bounds
-    if (m_world) {
-        ImVec2 drawPos = m_viewport.GetSceneDrawPos();
-        ImVec2 drawSize = m_viewport.GetSceneDrawSize();
-
-
-        if (drawSize.x > 0.0f && drawSize.y > 0.0f) {
-            ECS::ViewportInfo viewportInfo;
-            viewportInfo.MinX = drawPos.x;
-            viewportInfo.MinY = drawPos.y;
-            viewportInfo.Width = drawSize.x;
-            viewportInfo.Height = drawSize.y;
-
-            Engine::EditorCamera* camera = m_viewport.GetEditorCamera();
-      
-            ECS::BoundaryCheckSystem::Update(m_world, viewportInfo, camera);  // NEW - 3 parameters
-
-            if (ECS::BoundaryCheckSystem::WasAnyUIClicked()) {
-                LOG_INFO("<CLICKED>");
-                LOG_INFO("<CLICKED>");
-                LOG_INFO("<CLICKED>");
-                LOG_INFO("<CLICKED>");
-                LOG_INFO("<CLICKED>");
-                LOG_INFO("<CLICKED>");
-            }
-        }
     }
 }
 

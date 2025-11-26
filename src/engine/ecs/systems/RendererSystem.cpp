@@ -1466,8 +1466,6 @@ namespace ECS {
             }
             // If ImGui not available or viewport not found, use full window (already set)
         }
-        static bool wasMouseDownLastFrame = false;
-        static uint32_t lastSelectedEntityID = 0;
 
 
         if (m_selectedEntityID != INVALID_ENTITY_ID) {
@@ -1519,13 +1517,12 @@ namespace ECS {
             }
 
             // Check if selection changed
-            bool selectionChanged = (m_selectedEntityID != lastSelectedEntityID);
+            bool selectionChanged = (m_selectedEntityID != m_lastSelectedEntityID);
             if (selectionChanged) {
-                LOG_DEBUG("[DRAG] Selection changed from " << lastSelectedEntityID
+                LOG_DEBUG("[DRAG] Selection changed from " << m_lastSelectedEntityID
                     << " to " << m_selectedEntityID);
                 // Cancel any ongoing drag
                 m_isDragging = false;
-                lastSelectedEntityID = m_selectedEntityID;
             }
 
             // Capture entity position on initial press ONLY

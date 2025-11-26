@@ -47,7 +47,6 @@
 #include "helpers/EntityUtils.h"
 #include <iostream>
 #include "../engine/audio/FmodAudioDevice.h"
-#include "../engine/ecs/systems/BoundaryCheckSystem.h"
 #include "../engine/physics/CollisionEvents.h"
 
 extern Audio::FmodAudioDevice* gAudioDevice;
