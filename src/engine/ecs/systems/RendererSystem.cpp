@@ -91,6 +91,8 @@ namespace {
 namespace ECS {
     static constexpr uint32_t INVALID_ENTITY_ID = Entity::NPOS32;
 
+    RendererSystem* RendererSystem::s_instance = nullptr;
+
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
     static void GetRenderTransform(World& world, const Entity entity,
@@ -139,6 +141,9 @@ namespace ECS {
             return;
 
         m_initialized = true;
+
+        //set static instance pointer
+        s_instance = this;
 
         const auto& mainWindow = WindowManager::GetMainWindow();
         const int width = mainWindow->GetWidth();

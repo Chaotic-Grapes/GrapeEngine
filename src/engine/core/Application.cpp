@@ -30,7 +30,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/WindowManager.h"
 #include "services/OverlayService.h"
 #include <thread>
-
+#include "ecs/systems/UIEventSystem.h"
+#include "../engine/services/UIEvents.h"
 
 namespace Engine {
     // Global pointer to the core engine
@@ -48,6 +49,8 @@ namespace Engine {
         CrashDumping::Initialize();
         CrashDumping::SetProgramName("GrapeEngine");
         CrashDumping::SetDumpCreateState(true);
+        // Init UI events system
+        ECS::UIEventSystem::Initialize();
 
         // Load editor configuration (try working dir, then parent dir fallback)
         bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_editorSettings);
@@ -101,6 +104,8 @@ namespace Engine {
             const double frameStart = glfwGetTime();
             const double rawDelta = frameStart - m_lastFrameTime;
             m_lastFrameTime = frameStart;
+
+            ECS::UIEventQueue::Clear();
             
             Time::_update(rawDelta, frameStart);
             Profiler::UpdateTime();
@@ -134,6 +139,14 @@ namespace Engine {
                     _onGameStop(currentScene);
                 }
                 wasPlaying = shouldRun;
+
+                uint32_t pickedEntityID = 0;  // TODO: Get from renderer
+
+                double mouseX, mouseY;
+                Input::GetMousePosition(mouseX, mouseY);
+                Vector2D mousePos(static_cast<float>(mouseX), static_cast<float>(mouseY));
+
+                ECS::UIEventSystem::Update(&world, pickedEntityID, mousePos);
 
                 // Update physics and scripts
                 _updatePhysics(world, shouldRun, stepRequested);
