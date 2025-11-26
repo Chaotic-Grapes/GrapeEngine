@@ -1495,6 +1495,12 @@ namespace ECS {
             }
             // If ImGui not available or viewport not found, use full window (already set)
         }
+#else
+        (void)m_useEditorCamera; // silence unused variable warnings in game builds
+#endif
+        static bool wasMouseDownLastFrame = false;
+        static uint32_t lastSelectedEntityID = 0;
+
 
         if (m_selectedEntityID != INVALID_ENTITY_ID) {
             LOG_DEBUG("[DRAG] Frame start: m_selectedEntityID=" << m_selectedEntityID
