@@ -29,6 +29,7 @@ Provides:
 #include "services/Input.h"
 #include <fstream>
 #include <cstring>
+#include "EditorStyle.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -177,10 +178,10 @@ void AssetBrowserPanel::_renderNavigationBar() {
             // Previous parts: display as clickable blue buttons
             ImGui::PushID(static_cast<int>(i));
 
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.4f, 0.8f, 0.3f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.2f, 0.4f, 0.8f, 0.5f));
+            ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Accent);
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::AccentHover, 0.3f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::AccentActive, 0.5f));
 
             // When clicked, navigate to that folder level
             if (ImGui::SmallButton(pathParts[i].string().c_str())) {
@@ -411,7 +412,7 @@ void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
     ImGui::PushFont(m_mainFont);
 
     if (!std::filesystem::exists(m_currentPath) || !std::filesystem::is_directory(m_currentPath)) {
-        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Folder not found");
+        ImGui::TextColored(EditorStyle::DangerText, "Folder not found");
     }
     else {
         // Iterate through directory entries
@@ -546,7 +547,7 @@ void AssetBrowserPanel::_renderFileListPanel(float windowWidth) {
 
                         if (s_hoveredFolder != entryPath) {
                             s_hoveredFolder = entryPath;
-                            s_hoverStartTime = ImGui::GetTime();
+                            s_hoverStartTime = static_cast<float>(ImGui::GetTime());
                         }
                         else if (ImGui::GetTime() - s_hoverStartTime > 0.75f) {
                             // Auto-navigate after hovering for 0.75 seconds
@@ -628,10 +629,10 @@ void AssetBrowserPanel::_renderDeleteButton() {
         // Style the delete button: icon font + transparent background + red text
         ImGui::PushFont(m_symbolsFont);
         // Button: fully transparent; Hover/Active: subtle grays; Text: red to indicate destructive action
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.3f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::DangerText);
 
         // Render delete icon button
         if (ImGui::SmallButton("\xEE\xA1\xB2\\##Delete2")) {
@@ -662,8 +663,8 @@ void AssetBrowserPanel::_renderStatusBar() {
 
     // Pick text color based on whether the message indicates failure
     ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-        ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
-        : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
+        ? EditorStyle::DangerText
+        : EditorStyle::SuccessText;
     ImGui::SetCursorPosX(3);
     ImGui::TextColored(color, "%s", m_statusMessage.c_str());
 
@@ -945,6 +946,7 @@ void AssetBrowserPanel::_renderItemContextMenu() {
 void AssetBrowserPanel::_createScript() {
     // Create in current directory
     std::filesystem::path targetDir = m_currentPath;
+    std::cout << "Creating script in directory: " << targetDir.string() << std::endl;
 
     // Ensure the directory exists
     if (!std::filesystem::exists(targetDir)) {
@@ -968,17 +970,50 @@ void AssetBrowserPanel::_createScript() {
 
     // Create script template
     std::string className = m_newAssetNameBuffer;
+
+    // Create namespace from the target directory by replacing
+    // path separators with '.' and sanitizing invalid characters.
+    std::string ns;
+    try {
+        // Try to make the path relative to the project root so namespaces
+        // are nicer (e.g., "Assets.Scripts") when possible.
+        std::filesystem::path projRoot = Engine::ProjectPaths::GetProjectRoot();
+        std::filesystem::path rel = std::filesystem::relative(targetDir, projRoot);
+        ns = rel.string();
+    }
+    catch (...) {
+        ns = targetDir.string();
+    }
+
+    // Replace separators with dots and sanitize a few problematic chars
+    for (char &c : ns) {
+        if (c == '/' || c == '\\')
+            c = '.';
+        else if (c == ':' || c == ' ')
+            c = '_';
+    }
+
+    // Trim leading/trailing dots if any
+    while (!ns.empty() && ns.front() == '.')
+        ns.erase(ns.begin());
+    while (!ns.empty() && ns.back() == '.')
+        ns.pop_back();
+
+    // Fallback namespace if resulting string is empty
+    if (ns.empty())
+        ns = Engine::ProjectPaths::GetProjectRoot();
+
     std::string scriptContent =
-        "using GrapeEngine.ScriptAPI;\n\n"
-        "namespace GameScripts;\n"
+        "using GrapeEngine.Scripting;\n\n"
+        "namespace " + ns + ";\n"
         "\n"
         "public class " + className + " : ScriptBehaviour\n"
         "{\n"
-        "    protected override void OnStart()\n"
+        "    public override void OnStart()\n"
         "    {\n"
         "        // Called once when the script is initialized\n"
         "    }\n\n"
-        "    protected override void OnUpdate()\n"
+        "    public override void OnUpdate()\n"
         "    {\n"
         "        // Called every frame\n"
         "    }\n"

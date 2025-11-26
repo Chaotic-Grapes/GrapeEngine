@@ -50,12 +50,15 @@ namespace Engine {
         CrashDumping::SetDumpCreateState(true);
 
         // Load editor configuration (try working dir, then parent dir fallback)
-        bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_config);
+        bool configLoaded = Serialization::ConfigurationSerializer::LoadConfig("config.json", m_editorSettings);
         if (!configLoaded) {
             // Fallback: common scenario when running from build directory
-            if (Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_config)) {
+            if (Serialization::ConfigurationSerializer::LoadConfig("../config.json", m_editorSettings)) {
                 LOG_INFO("Loaded configuration from parent directory: ../config.json");
             }
+        }
+        else {
+            LOG_INFO("Loaded configuration file: " << std::filesystem::current_path().string() + "/config.json");
         }
 
         // Initialize the message system here
@@ -82,7 +85,13 @@ namespace Engine {
 #endif
 		// Initialize services
 		_initializeServices();
-        Scenes::SystemRegistry::Disable("Physics"); // Start with physics disabled
+
+        // Start with some systems disabled in editor mode
+        if (IsInEditorMode()) {
+            Scenes::SystemRegistry::Disable("Physics");
+            Scenes::SystemRegistry::Disable("Lifetime");
+            Scenes::SystemRegistry::Disable("Animation");
+        }
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
@@ -161,6 +170,19 @@ namespace Engine {
                     );
                 }
             }
+        }
+
+        // Save configs before exiting
+        if (IsInEditorMode()) {
+            m_editorSettings.WindowSettings.Width = WindowManager::GetMainWindow()->GetWidth();
+            m_editorSettings.WindowSettings.Height = WindowManager::GetMainWindow()->GetHeight();
+            m_editorSettings.WindowSettings.Maximized = WindowManager::GetMainWindow()->IsMaximized();
+            m_editorSettings.WindowSettings.VSync = WindowManager::GetMainWindow()->IsVSync();
+            
+            Serialization::ConfigurationSerializer::SaveConfig("config.json", m_editorSettings);
+        }
+        else {
+            // TODO: Save standalone later
         }
 
         game.OnShutdown(m_sceneManager);
@@ -275,7 +297,8 @@ namespace Engine {
 
         // Register scripting system
         Scenes::SystemRegistry::Register("Script", [this](ECS::World& w, const float dt) {
-            (void)dt; // Unused - scripts are updated via separate callbacks
+            (void)w;
+            (void)dt;
             if (!m_scriptSystem || !m_scriptSystem->IsInitialized()) return;
             
             // Scripts are updated through ScriptSystem::Update which is called separately
@@ -357,11 +380,28 @@ namespace Engine {
 
         // Editor-only: Enable/disable physics based on play state
         if (IsInEditorMode()) {
+            // Toggle Physics
             if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Physics")) {
                 Scenes::SystemRegistry::Enable("Physics");
             }
             else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Physics")) {
                 Scenes::SystemRegistry::Disable("Physics");
+            }
+
+            // Toggle Lifetime
+            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Lifetime")) {
+                Scenes::SystemRegistry::Enable("Lifetime");
+            }
+            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Lifetime")) {
+                Scenes::SystemRegistry::Disable("Lifetime");
+            }
+
+            // Toggle Animation
+            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Animation")) {
+                Scenes::SystemRegistry::Enable("Animation");
+            }
+            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Animation")) {
+                Scenes::SystemRegistry::Disable("Animation");
             }
         }
 

@@ -97,6 +97,11 @@ namespace ECS {
         bool IsUsingEditorCamera() const { return m_useEditorCamera; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
         uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
+        Engine::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
+
+        // Allow external systems (editor panels) to set the currently selected entity
+        void SetSelectedEntityID(uint32_t id) { m_selectedEntityID = id; }
+
         // Rebind the renderer to a new world (recreate editor camera)
         void BindWorld(World& world);
 
@@ -227,6 +232,8 @@ namespace ECS {
         bool m_isDragging = false;
         glm::vec2 m_dragStartMouseWorld = {0, 0};
         glm::vec3 m_dragStartEntityPos = { 0, 0, 0};
+        uint32_t m_lastSelectedEntityID = Entity::NPOS32;
+        bool m_wasMouseDownLastFrame = false;
 
         // ====================================================================
         // NEW: Member Variables - ImGuizmo State
@@ -239,7 +246,7 @@ namespace ECS {
         // ====================================================================
 
         /*!
-        \brief Reference resolution for UI design (1920�1080).
+        \brief Reference resolution for UI design (1920x1080).
         All UI elements are designed at this resolution and scaled proportionally.
         */
         static constexpr float kReferenceWidth = 1920.0f;

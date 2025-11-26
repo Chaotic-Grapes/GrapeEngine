@@ -141,8 +141,8 @@ namespace ECS {
         m_initialized = true;
 
         const auto& mainWindow = WindowManager::GetMainWindow();
-        const int width = mainWindow->Width();
-        const int height = mainWindow->Height();
+        const int width = mainWindow->GetWidth();
+        const int height = mainWindow->GetHeight();
 
         // Shaders
         m_shader = std::make_unique<Shader>(
@@ -256,7 +256,8 @@ namespace ECS {
         }
 
         // Reset interaction state when rebinding worlds
-        m_selectedEntityID = 0;
+        // ALERT
+        m_selectedEntityID = INVALID_ENTITY_ID;
         m_isDragging = false;
     }
 
@@ -418,8 +419,8 @@ namespace ECS {
         // fallback (if no active camera found)
         if (!foundActive) {
             const auto& mainWindow = WindowManager::GetMainWindow();
-            projection = glm::ortho(0.f, static_cast<float>(mainWindow->Width()),
-                0.f, static_cast<float>(mainWindow->Height()),
+            projection = glm::ortho(0.f, static_cast<float>(mainWindow->GetWidth()),
+                0.f, static_cast<float>(mainWindow->GetHeight()),
                 -1.f, 1.f);
         }
 
@@ -427,7 +428,7 @@ namespace ECS {
         // BLOOM RADIUS CALCULATION (world-space consistent)
         // ============================================================
         const auto& win = WindowManager::GetMainWindow();
-        const float bloomBufferHeight = static_cast<float>(win->Height()) / 2.0f;
+        const float bloomBufferHeight = static_cast<float>(win->GetHeight()) / 2.0f;
 
         // How zoomed in we are relative to the default ortho size
         const float zoomScale = kReferenceOrthoSize / m_cameraOrthoSize;
@@ -520,8 +521,8 @@ namespace ECS {
                     if (isUILayer) {
                         const auto& win = WindowManager::GetMainWindow();
                         glm::mat4 uiProjection = glm::ortho(
-                            0.0f, static_cast<float>(win->Width()),
-                            0.0f, static_cast<float>(win->Height()),
+                            0.0f, static_cast<float>(win->GetWidth()),
+                            0.0f, static_cast<float>(win->GetHeight()),
                             -1.0f, 1.0f
                         );
                         layerViewProj = uiProjection;  // No view matrix, just screen-space projection
@@ -679,8 +680,8 @@ namespace ECS {
                         m_textShader->use();
 
                         const auto& win = WindowManager::GetMainWindow();
-                        const float screenWidth = static_cast<float>(win->Width());
-                        const float screenHeight = static_cast<float>(win->Height());
+                        const float screenWidth = static_cast<float>(win->GetWidth());
+                        const float screenHeight = static_cast<float>(win->GetHeight());
 
                         // Calculate UI scale factor (simple calculation each frame)
                         const float uiScaleFactor = screenHeight / kReferenceHeight;
@@ -782,7 +783,7 @@ namespace ECS {
                                 // Calculate constant screen-space thickness
                                 const auto& win = WindowManager::GetMainWindow();
                                 const float desiredPixelThickness = 2.0f; // Always 2 pixels thick
-                                const float worldThickness = (m_cameraOrthoSize / win->Height()) * desiredPixelThickness;
+                                const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPixelThickness;
 
                                 // Draw frustum rectangle with constant screen-space thickness
                                 const glm::vec4 frustumColor(0.0f, 1.0f, 1.0f, 0.6f); // Cyan, semi-transparent
@@ -820,7 +821,7 @@ namespace ECS {
                 glm::vec2 viewportSize;
 
                 const auto& win = WindowManager::GetMainWindow();
-                viewportSize = glm::vec2(win->Width(), win->Height());
+                viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
                 bool useViewportCoords = m_useEditorCamera;
 
                 glm::dvec2 mousePos;
@@ -1055,7 +1056,7 @@ namespace ECS {
                 Framebuffer::Unbind();
 
                 // Restore viewport to full window
-                glViewport(0, 0, win->Width(), win->Height());
+                glViewport(0, 0, win->GetWidth(), win->GetHeight());
             });
 
         // Highlight the currently selected entity (overlay onto HDR)
@@ -1075,7 +1076,7 @@ namespace ECS {
                 // make outline look 2px thick in screen space
                 const auto& win = WindowManager::GetMainWindow();
                 const float desiredPx = 2.0f;
-                const float worldThickness = (m_cameraOrthoSize / win->Height()) * desiredPx;
+                const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPx;
 
                 // selection color (pick whatever you like but it should contrast against viewport)
                 const glm::vec4 selColor(1.0f, 0.85f, 0.15f, 1.0f); // yellow-ish
@@ -1424,7 +1425,7 @@ namespace ECS {
 
                 const auto& win = WindowManager::GetMainWindow();
                 Framebuffer::BindDefault();
-                glViewport(0, 0, win->Width(), win->Height());
+                glViewport(0, 0, win->GetWidth(), win->GetHeight());
 
                 // Use a simple blit shader, NOT bloomCombine
                 m_blitShader->use();
@@ -1446,7 +1447,7 @@ namespace ECS {
         glm::vec2 dragViewportMin(0, 0);
         glm::vec2 dragViewportSize;
 
-        dragViewportSize = glm::vec2(win->Width(), win->Height());
+        dragViewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
 
         // Get viewport bounds if using editor camera
         if (m_useEditorCamera) {
@@ -1465,11 +1466,11 @@ namespace ECS {
             }
             // If ImGui not available or viewport not found, use full window (already set)
         }
-        static bool wasMouseDownLastFrame = false;
-        static uint32_t lastSelectedEntityID = 0;
 
 
         if (m_selectedEntityID != INVALID_ENTITY_ID) {
+            LOG_DEBUG("[DRAG] Frame start: m_selectedEntityID=" << m_selectedEntityID
+                << ", lastSelectedEntityID=" << m_lastSelectedEntityID);
             // ----------------------------------------------------------
             // CANCEL DRAG IF MOUSE LEAVES THE VIEWPORT CONTENT REGION
             // ----------------------------------------------------------
@@ -1497,7 +1498,7 @@ namespace ECS {
                 dragViewportMin, dragViewportSize);
 
             bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
-            bool mouseJustPressed = isMouseDownThisFrame && !wasMouseDownLastFrame;
+            bool mouseJustPressed = isMouseDownThisFrame && !m_wasMouseDownLastFrame;
 
             // Check if mouse is currently in viewport
             bool isMouseInViewport = true;
@@ -1516,18 +1517,17 @@ namespace ECS {
             }
 
             // Check if selection changed
-            bool selectionChanged = (m_selectedEntityID != lastSelectedEntityID);
+            bool selectionChanged = (m_selectedEntityID != m_lastSelectedEntityID);
             if (selectionChanged) {
-                LOG_DEBUG("[DRAG] Selection changed from " << lastSelectedEntityID
+                LOG_DEBUG("[DRAG] Selection changed from " << m_lastSelectedEntityID
                     << " to " << m_selectedEntityID);
                 // Cancel any ongoing drag
                 m_isDragging = false;
-                lastSelectedEntityID = m_selectedEntityID;
             }
 
-            // Capture entity position on initial press OR when selection changes
+            // Capture entity position on initial press ONLY
             // ONLY if mouse is in viewport
-            if ((mouseJustPressed || selectionChanged) && !m_isDragging && isMouseInViewport) {
+            if (mouseJustPressed && !m_isDragging && isMouseInViewport) {
                 // Store the entity's starting position
                 world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
                     if (e.Index == m_selectedEntityID) {
@@ -1550,7 +1550,7 @@ namespace ECS {
 
                 // Calculate drag threshold in world space (5 pixels)
                 const auto& win = WindowManager::GetMainWindow();
-                const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->Height())) * 5.0f;
+                const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->GetHeight())) * 5.0f;
 
                 // Start dragging if moved beyond threshold
                 if (dragDistance > dragThreshold) {
@@ -1603,19 +1603,38 @@ namespace ECS {
                 m_isDragging = false;
             }
 
-            wasMouseDownLastFrame = isMouseDownThisFrame;
+            m_wasMouseDownLastFrame = isMouseDownThisFrame;
             } else {
                 m_isDragging = false;
-                wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
-                lastSelectedEntityID = m_selectedEntityID;
+                m_wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
             }
             }
-
+            LOG_DEBUG("[DRAG] About to update lastSelectedEntityID from "
+                << m_lastSelectedEntityID << " to " << m_selectedEntityID);
+            // Update lastSelectedEntityID unconditionally
+            m_lastSelectedEntityID = m_selectedEntityID;
         }
         else {
             // Nothing selected, reset tracking
-            lastSelectedEntityID = INVALID_ENTITY_ID;  // Use sentinel value
-            wasMouseDownLastFrame = false;
+            m_lastSelectedEntityID = INVALID_ENTITY_ID;
+            m_wasMouseDownLastFrame = false;
+        }
+
+        // ============================================================
+        // DELETE SELECTED ENTITY
+        // ============================================================
+        if (m_selectedEntityID != INVALID_ENTITY_ID && Input::IsKeyPressed(KEY_DELETE)) {
+            world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+                (void)lt;
+                if (e.Index == m_selectedEntityID) {
+                    world.Destroy(e);
+                    m_selectedEntityID = INVALID_ENTITY_ID;     // Clear selection
+                    m_isDragging = false;                       // Cancel any drag operation
+
+                    // Mark scene as dirty when entity is deleted
+                    MarkSceneDirtyIfNeeded(m_fileMenu);
+                }
+                });
         }
 
         // ============================================================
@@ -1636,24 +1655,20 @@ namespace ECS {
         }
 
         // Performance logging
-        if (Time::FrameCount() % 60 == 0)
+        if (Time::FrameCount() % 120 == 0)
         {
             static int previousFlushTotal = 0;
             int currentTotal = GetFlushCount();
             int flushes = currentTotal - previousFlushTotal;
             previousFlushTotal = currentTotal;
-            LOG_DEBUG("=== RENDERER ANALYSIS ===");
-            LOG_DEBUG("Flushes this frame: " << flushes);
+
+            std::stringstream ss;
             if (flushes > 10)
-            {
-                LOG_DEBUG("Too many flushes! Likely texture switches or buffer overflows...");
-            }
+                ss << " Too many flushes! Likely texture switches or buffer overflows...";
             else if (flushes == 1)
-            {
-                LOG_DEBUG("Single batch, bottleneck is CPU-side or GPU fillrate");
-            }
-            LOG_DEBUG("FPS: " << (1.0f / Time::DeltaTime()));
-            LOG_DEBUG("=========================");
+                ss << " Single batch, bottleneck is CPU-side or GPU fillrate";
+
+            LOG_DEBUG("Flushes this frame: " << flushes << ss.str() << " | " << "FPS: " <<  static_cast<int>(1.0f / Time::DeltaTime()));
         }
     }
 }

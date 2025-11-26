@@ -19,12 +19,9 @@ struct EditorSettings {
     struct Window {
         int Width = 1600;           // Window width in pixels
         int Height = 900;           // Window height in pixels
-        bool Fullscreen = false;    // Whether to start in fullscreen mode
+        bool Maximized = true;      // Whether to start maximized
         bool VSync = true;          // Whether to enable vertical sync
     } WindowSettings;
-
-    std::string Title = "GrapeEngine";           // Application name
-    std::string Version = "1.0.0";                  // Version string
 };
 
 /**
@@ -39,7 +36,7 @@ struct ProjectSettings {
     struct Window {
         int Width = 1600;           // Window width in pixels
         int Height = 900;           // Window height in pixels
-        bool Fullscreen = false;    // Whether to start in fullscreen mode
+        bool Fullscreen = true;     // Whether to start in fullscreen mode
         bool VSync = true;          // Whether to enable vertical sync
     } WindowSettings;
 
@@ -47,7 +44,7 @@ struct ProjectSettings {
      * @brief Physics-specific configuration settings
      */
     struct Physics {
-        float Gravity = -980.0f;    // Gravity acceleration
+        float Gravity = -9.81f;    // Gravity acceleration
         float TimeStep = 0.016f;    // Physics time step
     } Physics;
 
@@ -58,7 +55,7 @@ struct ProjectSettings {
         float MasterVolume = 1.0f;  // Master volume (0.0 to 1.0)
     } Audio;
 
-    std::string Title = "GrapeEngine";           // Game/project name
+    std::string Title = "GrapeEngine Game Project"; // Game/project name
     std::string Version = "1.0.0";                  // Version string
     std::string StartupScene = "";                  // Path to startup scene
 };
@@ -83,18 +80,10 @@ namespace Serialization {
             json configJson;
             if (!Serializer::LoadJson(configPath, "json", configJson)) {
                 LOG_WARNING("Warning: Could not open config file: " << configPath);
-                LOG_WARNING("Using default configuration.");
+                LOG_WARNING("Creating default configuration to use.");
                 config = GetDefaultConfig();
                 SaveConfig(configPath, config); // Save default config
                 return false;
-            }
-
-            // Parse root-level fields
-            if (configJson.contains("Title")) {
-                config.Title = configJson["Title"].get<std::string>();
-            }
-            if (configJson.contains("Version")) {
-                config.Version = configJson["Version"].get<std::string>();
             }
 
             // Parse WindowSettings
@@ -114,12 +103,10 @@ namespace Serialization {
          */
         static bool SaveConfig(const std::string& configPath, const EditorSettings& config) {
             json configJson;
-            configJson["Title"] = config.Title;
-            configJson["Version"] = config.Version;
-            
+
             configJson["WindowSettings"]["Width"] = config.WindowSettings.Width;
             configJson["WindowSettings"]["Height"] = config.WindowSettings.Height;
-            configJson["WindowSettings"]["Fullscreen"] = config.WindowSettings.Fullscreen;
+            configJson["WindowSettings"]["Maximized"] = config.WindowSettings.Maximized;
             configJson["WindowSettings"]["VSync"] = config.WindowSettings.VSync;
 
             return Serializer::SaveJson(configPath, "json", configJson);
@@ -211,8 +198,6 @@ namespace Serialization {
             // Basic validation: width/height positive, name non-empty
             if (config.WindowSettings.Width <= 0 || config.WindowSettings.Height <= 0)
                 return false;
-            if (config.Title.empty())
-                return false;
             return true;
         }
 
@@ -241,8 +226,10 @@ namespace Serialization {
             if (configJson.contains("Height")) {
                 window.Height = configJson["Height"].get<int>();
             }
-            if (configJson.contains("Fullscreen")) {
-                window.Fullscreen = configJson["Fullscreen"].get<bool>();
+            if (configJson.contains("Maximized")) {
+                std::cout << "Maximized field found in config: " << configJson["Maximized"] << "\n";
+                window.Maximized = configJson["Maximized"].get<bool>();
+                std::cout << "Set Maximized to: " << window.Maximized << "\n";
             }
             if (configJson.contains("VSync")) {
                 window.VSync = configJson["VSync"].get<bool>();

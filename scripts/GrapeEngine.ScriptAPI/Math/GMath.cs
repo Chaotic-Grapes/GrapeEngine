@@ -27,6 +27,7 @@ public static class GMath
     public const float Tau = 6.28318530718f;
     public const float Deg2Rad = 0.0174532925f;
     public const float Rad2Deg = 57.2957795131f;
+    public const float Epsilon = 1e-6f;
 
     // ============================================================================
     // Random
@@ -103,7 +104,7 @@ public static class GMath
     /// <summary>
     /// Round up to nearest integer.
     /// </summary>
-    public static float Ceil(float value) => MathAPI.Ceil(value);
+    public static float Ceiling(float value) => MathAPI.Ceil(value);
 
     /// <summary>
     /// Get the minimum of two values.

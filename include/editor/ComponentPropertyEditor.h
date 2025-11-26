@@ -52,9 +52,6 @@ public:
     // Renders transform properties including position, rotation and scale values
     void RenderLocalTransform(nlohmann::json& data);
 
-    // Renders rotator component for automatic rotation animation
-    void RenderRotator(nlohmann::json& data);
-
     // Renders sprite properties including material reference and color tint values
     void RenderSpriteRenderer2D(nlohmann::json& data);
 
@@ -94,9 +91,6 @@ public:
     // Renders sprite sheet animation properties including frame data and playback settings
     void RenderSpriteSheetAnimation2D(nlohmann::json& data);
 
-    // Renders sprite flip properties for mirroring sprites horizontally or vertically
-    void RenderSpriteFlip2D(nlohmann::json& data);
-
     // Renders Z-index for controlling 2D rendering order
     void RenderZIndex2D(nlohmann::json& data);
 
@@ -117,6 +111,7 @@ public:
 
     // Renders script instance component for C# scripting
     void RenderScriptInstance(nlohmann::json& data);
+
 
 private:
     // -------------------------------------------------------------------------

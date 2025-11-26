@@ -47,6 +47,7 @@
 #include "helpers/EntityUtils.h"
 #include <iostream>
 #include "../engine/audio/FmodAudioDevice.h"
+#include "../engine/physics/CollisionEvents.h"
 
 extern Audio::FmodAudioDevice* gAudioDevice;
 
@@ -156,6 +157,9 @@ private:
  */
 
 namespace ECS {
+
+    // Initialize static previous collsion member
+    std::unordered_set<uint64_t> PhysicsSystem::s_previousCollisions;
 
     // =====================================================================
     // Narrow-phase helpers
@@ -299,6 +303,16 @@ namespace ECS {
         return false;
     }
 
+    // Helper to create unique collision pair ID
+    static uint64_t MakeCollisionPairID(Entity a, Entity b) {
+        uint32_t idA = a.Index;
+        uint32_t idB = b.Index;
+        // Ensure consistent ordering (smaller ID first)
+        if (idA > idB) std::swap(idA, idB);
+        return (static_cast<uint64_t>(idA) << 32) | idB;
+    }
+
+
     // =====================================================================
     // PhysicsSystem::Update - main per-frame step
     // =====================================================================
@@ -315,9 +329,16 @@ namespace ECS {
         const int   substeps = 8;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
 
+        //refresh event queue 
+        CollisionEventQueue::Clear();
+        //to clock currentcollision pairs between A and B entities
+        std::unordered_set<uint64_t> currentCollisions;
+      
+
         // Running frame counter to reset per-frame SFX dedupe
         static uint64_t s_frameCounter = 0;
         ++s_frameCounter;
+
 
         // 1) Collect entity sets ONCE per frame (usually fine).
         //    If your scene can add/remove colliders mid-frame, you can also
@@ -544,6 +565,15 @@ namespace ECS {
 
                     if (!hasCollision) continue;
 
+                    uint64_t pairID = MakeCollisionPairID(A, B);
+                    currentCollisions.insert(pairID);
+
+                    bool isNewCollision = (s_previousCollisions.find(pairID) == s_previousCollisions.end());
+                    CollisionEventType type = isNewCollision ? CollisionEventType::Enter : CollisionEventType::Stay;
+
+                    CollisionEventQueue::AddEvent({ A, B, type });
+                    CollisionEventQueue::AddEvent({ B, A, type });
+
                     // Gather physics state (by value) and current velocities; some may be missing.
                     Components::Rigidbody2D      rbA{ 0 }, rbB{ 0 };
                     Components::LinearVelocity2D vA{ {0,0} }, vB{ {0,0} };
@@ -620,6 +650,24 @@ namespace ECS {
 
                 if (resolved == 0) break;
             }
+
+            for (uint64_t pairID : s_previousCollisions) {
+                if (currentCollisions.find(pairID) == currentCollisions.end()) {
+                    // Collision ended
+                    uint32_t idA = (pairID >> 32);
+                    uint32_t idB = (pairID & 0xFFFFFFFF);
+
+                    Entity entityA{ idA, 0 };
+                    Entity entityB{ idB, 0 };
+
+                    if (world.IsAlive(entityA) && world.IsAlive(entityB)) {
+                        CollisionEventQueue::AddEvent({ entityA, entityB, CollisionEventType::Exit });
+                        CollisionEventQueue::AddEvent({ entityB, entityA, CollisionEventType::Exit });
+                    }
+                }
+            }
+
+            s_previousCollisions = std::move(currentCollisions);
 
             // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
         }

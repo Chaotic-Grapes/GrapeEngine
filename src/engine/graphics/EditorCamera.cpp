@@ -91,8 +91,8 @@ namespace Engine {
         m_camera->UsePerspective = false;
 
         auto* window = WindowManager::GetMainWindow();
-        const float screenWidth = static_cast<float>(window->Width());
-        const float screenHeight = static_cast<float>(window->Height());
+        const float screenWidth = static_cast<float>(window->GetWidth());
+        const float screenHeight = static_cast<float>(window->GetHeight());
 
         // Set orthographic size in world units
         m_camera->OrthoSize = kDefaultWorldViewHeight;
@@ -168,8 +168,8 @@ namespace Engine {
         m_camera->UsePerspective = false;
 
         auto* window = WindowManager::GetMainWindow();
-        const float screenWidth = static_cast<float>(window->Width());
-        const float screenHeight = static_cast<float>(window->Height());
+        const float screenWidth = static_cast<float>(window->GetWidth());
+        const float screenHeight = static_cast<float>(window->GetHeight());
 
         // Preserve current ortho size target across binds
         m_camera->OrthoSize = m_targetOrthoSize;
@@ -293,8 +293,8 @@ namespace Engine {
             const float worldWidth = worldHeight * m_camera->AspectRatio;
 
             // Screen dimensions in pixels
-            const float screenHeight = static_cast<float>(window->Height());
-            const float screenWidth = static_cast<float>(window->Width());
+            const float screenHeight = static_cast<float>(window->GetHeight());
+            const float screenWidth = static_cast<float>(window->GetWidth());
 
             // Convert pixel delta to world delta
             const float worldDeltaX = -(delta.x / screenWidth) * worldWidth;
@@ -475,8 +475,22 @@ namespace Engine {
     }
 
     void EditorCamera::Focus(const glm::vec3& target) {
-        m_transform->Position.X = target.x;
-        m_transform->Position.Y = target.y;
+        // Update the orbit center to the new target
+        m_target = target;
+
+        // Recalculate camera position based on current orbit parameters
+        // This maintains the current view angle and distance
+        const float cp = cosf(m_pitch), sp = sinf(m_pitch);
+        const float sy = sinf(m_yaw), cy = cosf(m_yaw);
+
+        // Calculate orbit direction
+        const glm::vec3 dir(cp * sy, sp, -cp * cy);
+
+        // Position camera at distance from new target
+        m_cameraPosition = m_target - dir * m_distance;
+
+        // Update the ECS transform to match
+        UpdateTransform();
     }
 
 } // namespace Engine

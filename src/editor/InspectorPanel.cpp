@@ -34,6 +34,7 @@ through a unified system shared by both entities and prefab templates.
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
+#include "EditorStyle.h"
 
 namespace {
     // Helper template function to safely add components during deserialization
@@ -389,6 +390,23 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         static nlohmann::json editStartState;
         static bool isEditing = false;
 
+        // Capture initial state when starting to edit
+        if (!m_editState.isEditing) {
+            // Check if any ImGui widget is active (isit being edited?)
+            if (ImGui::IsAnyItemActive()) {
+                m_editState.isEditing = true;
+                m_editState.entityId = entity.Index;
+
+                // Capture initial transform state
+                if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
+                    const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
+                    m_editState.startPosition = lt.Position;
+                    m_editState.startRotation = lt.Rotation;
+                    m_editState.startScale = lt.Scale;
+                }
+            }
+        }
+
         // First pass: draw every component using registry metadata
         for (auto& componentEntry : entityJson["Components"]) {
             // Basic validation
@@ -473,6 +491,30 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             }
         }
 
+        // Record undo when editing finishes
+        if (m_editState.isEditing && !ImGui::IsAnyItemActive()) {
+            // Editing just finished - record the change
+            if (m_undoSystem && m_world->Has<ECS::Components::LocalTransform>(entity)) {
+                const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
+
+                // Only record if something actually changed
+                bool posChanged = (m_editState.startPosition != lt.Position);
+                bool rotChanged = (m_editState.startRotation != lt.Rotation);
+                bool scaleChanged = (m_editState.startScale != lt.Scale);
+
+                if (posChanged || rotChanged || scaleChanged) {
+                    m_undoSystem->RecordTransformChange(
+                        entity.Index,
+                        m_editState.startPosition, m_editState.startRotation, m_editState.startScale,
+                        lt.Position, lt.Rotation, lt.Scale
+                    );
+                    LOG_DEBUG("[Inspector] Recorded transform change for undo");
+                }
+            }
+
+            m_editState.isEditing = false;
+        }
+
         // MARK SCENE AS DIRTY if anything was edited
         if (wasEdited) {
             MarkSceneDirtyIfNeeded(m_fileMenu);
@@ -504,9 +546,22 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
         ImGui::PopFont();
         ImGui::Separator();
 
-        // Iterate over every component type defined in the registry
+        // Get registry and create sorted list
         const auto& registry = ComponentRegistryUI::GetAll();
-        for (const auto& meta : registry) {
+        std::vector<size_t> sortedIndices;
+        for (size_t i = 0; i < registry.size(); ++i) {
+            sortedIndices.push_back(i);
+        }
+
+        // Sort alphabetically by DisplayName
+        std::sort(sortedIndices.begin(), sortedIndices.end(), [&](size_t a, size_t b) {
+            return registry[a].DisplayName < registry[b].DisplayName;
+            });
+
+        // Iterate over sorted components
+        for (size_t idx : sortedIndices) {
+            const auto& meta = registry[idx];
+
             // Check if the entity already has this component
             bool hasComponent = meta.HasComponent(m_world, entity);
 
@@ -582,9 +637,30 @@ void InspectorPanel::_renderPrefabComponents() {
         std::string typeA = components[a].value("TypeName", "");
         std::string typeB = components[b].value("TypeName", "");
 
-        // Transform always comes first
-        if (typeA == "ECS::Components::LocalTransform" || typeA == "LocalTransform") return true;
-        if (typeB == "ECS::Components::LocalTransform" || typeB == "LocalTransform") return false;
+        // Helper to identify Name
+        auto isName = [](const std::string& type) {
+            return (type == "ECS::Components::Name" || type == "Name");
+        };
+
+        // Helper to identify Transform
+        auto isTransform = [](const std::string& type) {
+            return (type == "ECS::Components::LocalTransform" || type == "LocalTransform");
+        };
+
+        bool aIsName = isName(typeA);
+        bool bIsName = isName(typeB);
+        bool aIsTransform = isTransform(typeA);
+        bool bIsTransform = isTransform(typeB);
+
+        // Transform always first
+        if (aIsTransform && !bIsTransform) return true;
+        if (!aIsTransform && bIsTransform) return false;
+        if (aIsTransform && bIsTransform) return false;
+
+        // Name always second
+        if (aIsName && !bIsName) return true;
+        if (!aIsName && bIsName) return false;
+        if (aIsName && bIsName) return false; 
 
         // Strip "ECS::Components::" prefix for cleaner alphabetical sorting
         auto stripPrefix = [](const std::string& name) -> std::string {
@@ -593,11 +669,11 @@ void InspectorPanel::_renderPrefabComponents() {
                 return name.substr(prefix.length());
             }
             return name;
-            };
+        };
 
         // Everything else alphabetical
         return stripPrefix(typeA) < stripPrefix(typeB);
-        });
+    });
 
     // Draw each component in sorted order using metadata rules
     for (size_t idx : sortedIndices) {
@@ -649,8 +725,22 @@ void InspectorPanel::_renderPrefabActions() {
         ImGui::PopFont();
         ImGui::Separator();
 
-        // Iterate over all registered components
-        for (const auto& meta : ComponentRegistryUI::GetAll()) {
+        // Get registry and create sorted list
+        const auto& registry = ComponentRegistryUI::GetAll();
+        std::vector<size_t> sortedIndices;
+        for (size_t i = 0; i < registry.size(); ++i) {
+            sortedIndices.push_back(i);
+        }
+
+        // Sort alphabetically by DisplayName
+        std::sort(sortedIndices.begin(), sortedIndices.end(), [&](size_t a, size_t b) {
+            return registry[a].DisplayName < registry[b].DisplayName;
+            });
+
+        // Iterate over sorted components
+        for (size_t idx : sortedIndices) {
+            const auto& meta = registry[idx];
+
             // Check if the prefab already defines this component
             bool hasComponent = _prefabHasComponent(meta.TypeName);
 
@@ -976,7 +1066,7 @@ void InspectorPanel::_renderStatusBar() {
     if (m_statusTimer > 0.0f) {
         // Pick color based on whether the message contains "Failed"
         ImVec4 color = (m_statusMessage.find("Failed") != std::string::npos)
-            ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f)
+            ? EditorStyle::DangerText
             : ImVec4(0.3f, 1.0f, 0.3f, 1.0f);
         ImGui::Separator();
         ImGui::TextColored(color, "%s", m_statusMessage.c_str());

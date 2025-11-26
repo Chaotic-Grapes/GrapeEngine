@@ -106,6 +106,25 @@ public abstract class ScriptBehaviour
     public virtual void OnDestroy() { }
 
     // ============================================================================
+    // Collision Callbacks (Override these in game scripts)
+    // ============================================================================
+
+    /// <summary>
+    /// Called when this entity starts colliding with another entity
+    /// </summary>
+    public virtual void OnCollisionEnter(ulong otherEntity) { }
+
+    /// <summary>
+    /// Called every frame while colliding with another entity
+    /// </summary>
+    public virtual void OnCollisionStay(ulong otherEntity) { }
+
+    /// <summary>
+    /// Called when this entity stops colliding with another entity
+    /// </summary>
+    public virtual void OnCollisionExit(ulong otherEntity) { }
+
+    // ============================================================================
     // Component Access
     // ============================================================================
 

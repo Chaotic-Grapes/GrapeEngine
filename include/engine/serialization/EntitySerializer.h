@@ -36,6 +36,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <helpers/EntityUtils.h>
 #include "Serializer.h"
 #include <string.h>
+#include "services/ResourceManager.h"  // For texture loading during deserialization
 
 using json = nlohmann::json;
 
@@ -71,22 +72,22 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Color, R, G, B, A)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Matrix4x4, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33)
 
 // --- ECS Component Serialization Definitions ---
-namespace ECS { 
+namespace ECS {
 	namespace Components {
 		// Place component-specific NLOHMANN macros inside the component namespace so ADL
 		// can locate the generated to_json/from_json overloads for these types.
-		
+
 		// Custom serialization for Name component (char array needs special handling)
 		inline void to_json(nlohmann::json& j, const Name& n) {
 			j = nlohmann::json{ {"Value", std::string(n.Value)} }; // convert char array to std::string
 		}
-		
+
 		inline void from_json(const nlohmann::json& j, Name& n) {
 			std::string value = j.at("Value").get<std::string>(); // get as std::string
 			strncpy_s(n.Value, value.c_str(), sizeof(n.Value) - 1); // copy to char array
 			n.Value[sizeof(n.Value) - 1] = '\0'; // null terminator
 		}
-		
+
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TagMask, Mask)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Active, Enabled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Lifetime, Time)
@@ -107,9 +108,106 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Rigidbody2D, Mass, InverseMass, LinearDamping, AngularDamping, GravityScale, Flags)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxCollider2D, HalfExtents, Offset, Rotation, LayerMask, Flags)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CircleCollider2D, Radius, Offset, LayerMask, Flags)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteRenderer2D, TextureId, Color, Tiling, Offset)
+
+		// Custom serialization for SpriteRenderer2D (char array needs special handling)
+		inline void to_json(nlohmann::json& j, const SpriteRenderer2D& sprite) {
+			j = nlohmann::json{
+				{"TextureId", sprite.TextureId},
+				{"TexturePath", std::string(sprite.TexturePath)},  // Convert char[] to string
+				{"Color", sprite.Color},
+				{"Tiling", sprite.Tiling},
+				{"Offset", sprite.Offset}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, SpriteRenderer2D& sprite) {
+			// Handle TexturePath (char array) first
+			std::string texPath = j.value("TexturePath", std::string());
+			strncpy_s(sprite.TexturePath, texPath.c_str(), sizeof(sprite.TexturePath) - 1);
+			sprite.TexturePath[sizeof(sprite.TexturePath) - 1] = '\0';
+
+			// CRITICAL: Reload texture from path if available
+			// TextureId is a runtime value that doesn't persist across sessions
+			if (!texPath.empty()) {
+				auto tex = RM.Get<Texture>(texPath);
+				if (tex) {
+					sprite.TextureId = static_cast<uint32_t>(tex->ID());
+					sprite.Width = tex->Width();
+					sprite.Height = tex->Height();
+				}
+				else {
+					sprite.TextureId = 0; // Invalid texture
+					std::cerr << "[EntitySerializer] Warning: Failed to load texture from path: " << texPath << std::endl;
+				}
+			}
+			else {
+				sprite.TextureId = 0; // No texture path provided
+			}
+
+			sprite.Color = j.value("Color", ::Color{ 1.0f, 1.0f, 1.0f, 1.0f });
+			sprite.Tiling = j.value("Tiling", Vector2D{ 1, 1 });
+			sprite.Offset = j.value("Offset", Vector2D{ 0, 0 });
+		}
+
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteFlip2D, FlipX, FlipY)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteSheetAnimation2D, TextureId, FrameWidth, FrameHeight, SheetWidth, SheetHeight, StartFrame, FrameCount, FramesPerSecond, Loop, Playing)
+
+		// Custom serialization for SpriteSheetAnimation2D (char array needs special handling)
+		inline void to_json(nlohmann::json& j, const SpriteSheetAnimation2D& anim) {
+			j = nlohmann::json{
+				{"TextureId", anim.TextureId},
+				{"TexturePath", std::string(anim.TexturePath)},  // Convert char[] to string
+				{"FrameWidth", anim.FrameWidth},
+				{"FrameHeight", anim.FrameHeight},
+				{"SheetWidth", anim.SheetWidth},
+				{"SheetHeight", anim.SheetHeight},
+				{"StartFrame", anim.StartFrame},
+				{"FrameCount", anim.FrameCount},
+				{"FramesPerSecond", anim.FramesPerSecond},
+				{"Loop", anim.Loop},
+				{"Playing", anim.Playing}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, SpriteSheetAnimation2D& anim) {
+			// Handle TexturePath (char array) first
+			std::string texPath = j.value("TexturePath", std::string());
+			strncpy_s(anim.TexturePath, texPath.c_str(), sizeof(anim.TexturePath) - 1);
+			anim.TexturePath[sizeof(anim.TexturePath) - 1] = '\0';
+
+			// CRITICAL: Reload texture from path if available
+			// TextureId is a runtime value that doesn't persist across sessions
+			if (!texPath.empty()) {
+				auto tex = RM.Get<Texture>(texPath);
+				if (tex) {
+					anim.TextureId = static_cast<uint32_t>(tex->ID());
+					// Update sheet dimensions from actual texture if not specified
+					if (!j.contains("SheetWidth") || j["SheetWidth"].get<int>() == 0) {
+						anim.SheetWidth = tex->Width();
+					}
+					if (!j.contains("SheetHeight") || j["SheetHeight"].get<int>() == 0) {
+						anim.SheetHeight = tex->Height();
+					}
+				}
+				else {
+					anim.TextureId = 0; // Invalid texture
+					std::cerr << "[EntitySerializer] Warning: Failed to load sprite sheet from path: " << texPath << std::endl;
+				}
+			}
+			else {
+				anim.TextureId = 0; // No texture path provided
+			}
+
+			anim.FrameWidth = j.value("FrameWidth", 0);
+			anim.FrameHeight = j.value("FrameHeight", 0);
+			anim.SheetWidth = j.value("SheetWidth", 0);
+			anim.SheetHeight = j.value("SheetHeight", 0);
+			anim.StartFrame = j.value("StartFrame", 0);
+			anim.FrameCount = j.value("FrameCount", 0);
+			anim.FramesPerSecond = j.value("FramesPerSecond", 0.0f);
+			anim.Loop = j.value("Loop", false);
+			anim.Playing = j.value("Playing", false);
+		}
+
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AnimationState2D, CurrentFrame, TimeAccumulator, Finished)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeCircle2D, Radius, Offset, Color, Thickness, Filled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ShapeBox2D, HalfExtents, Offset, Color, Thickness, Filled)
@@ -118,8 +216,18 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Camera3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio, Active)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraEditor3D, UsePerspective, FOV, NearPlane, FarPlane, OrthoSize, AspectRatio)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PrefabLink, prefabPath)
 		
+		// Custom serialization for PrefabLink component (char array needs special handling)
+		inline void to_json(nlohmann::json& j, const PrefabLink& link) {
+			j = nlohmann::json{ {"prefabPath", std::string(link.prefabPath)} };
+		}
+
+		inline void from_json(const nlohmann::json& j, PrefabLink& link) {
+			std::string path = j.at("prefabPath").get<std::string>();
+			strncpy_s(link.prefabPath, path.c_str(), sizeof(link.prefabPath) - 1);
+			link.prefabPath[sizeof(link.prefabPath) - 1] = '\0';
+		}
+
 		// Custom serialization for Light2D enum
 		inline void to_json(nlohmann::json& j, const Light2D& light) {
 			j = nlohmann::json{
@@ -132,7 +240,7 @@ namespace ECS {
 				{"CastsShadows", light.CastsShadows}
 			};
 		}
-		
+
 		inline void from_json(const nlohmann::json& j, Light2D& light) {
 			light.LightType = static_cast<Light2D::Type>(j.at("LightType").get<uint8_t>());
 			light.Position = j.at("Position").get<Vector3D>();
@@ -142,7 +250,7 @@ namespace ECS {
 			light.Range = j.at("Range").get<float>();
 			light.CastsShadows = j.at("CastsShadows").get<bool>();
 		}
-		
+
 		// Custom serialization for Text component (char arrays need special handling)
 		inline void to_json(nlohmann::json& j, const Text& text) {
 			j = nlohmann::json{
@@ -153,21 +261,21 @@ namespace ECS {
 				{"Anchor", static_cast<uint8_t>(text.Anchor)}
 			};
 		}
-		
+
 		inline void from_json(const nlohmann::json& j, Text& text) {
 			std::string content = j.at("Content").get<std::string>();
 			strncpy_s(text.Content, content.c_str(), sizeof(text.Content) - 1);
 			text.Content[sizeof(text.Content) - 1] = '\0';
-			
+
 			std::string fontPath = j.at("FontPath").get<std::string>();
 			strncpy_s(text.FontPath, fontPath.c_str(), sizeof(text.FontPath) - 1);
 			text.FontPath[sizeof(text.FontPath) - 1] = '\0';
-			
+
 			text.PixelSize = j.at("PixelSize").get<float>();
 			text.Color = j.at("Color").get<::Color>();
 			text.Anchor = static_cast<TextAnchor>(j.at("Anchor").get<uint8_t>());
 		}
-		
+
 		// Custom serialization for ScriptInstance component (char array needs special handling)
 		inline void to_json(nlohmann::json& j, const ScriptInstance& s) {
 			j = nlohmann::json{ // convert char array to std::string
@@ -178,7 +286,7 @@ namespace ECS {
 				{"ScriptPath", std::string(s.ScriptPath)}
 			};
 		}
-		
+
 		inline void from_json(const nlohmann::json& j, ScriptInstance& s) {
 			s.ManagedHandle = j.at("ManagedHandle").get<uint64_t>(); // get managed handle as uint64_t
 			s.TypeHash = j.at("TypeHash").get<uint32_t>(); // get type hash as uint32_t
@@ -186,7 +294,7 @@ namespace ECS {
 			std::string typeName = j.at("TypeName").get<std::string>(); // get type name as std::string
 			strncpy_s(s.TypeName, typeName.c_str(), sizeof(s.TypeName) - 1); // copy to char array
 			s.TypeName[sizeof(s.TypeName) - 1] = '\0';
-			
+
 			// Handle ScriptPath (may not exist in older save files)
 			if (j.contains("ScriptPath")) {
 				std::string scriptPath = j.at("ScriptPath").get<std::string>();
@@ -194,9 +302,9 @@ namespace ECS {
 				s.ScriptPath[sizeof(s.ScriptPath) - 1] = '\0';
 			}
 		}
-		
+
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D)
-	} 
+	}
 }
 
 namespace Serialization {
@@ -204,11 +312,15 @@ namespace Serialization {
 	public:
 		using SerializeFn = std::function<void(const ECS::World&, ECS::Entity, json&)>;
 		using DeserializeFn = std::function<void(ECS::World&, ECS::Entity, const json&)>;
+		using HasFn = std::function<bool(const ECS::World&, ECS::Entity)>;
+		using RemoveFn = std::function<void(ECS::World&, ECS::Entity)>;
 
 		struct ComponentInfo {
 			std::string Name;
 			SerializeFn Serialize;
 			DeserializeFn Deserialize;
+			HasFn Has;
+			RemoveFn Remove;
 		};
 
 		// Registry: TypeId -> ComponentInfo
@@ -241,6 +353,16 @@ namespace Serialization {
 					else {
 						world.template Add<T>(e, Serialization::from_json_adl<T>(j));
 					}
+				},
+				// Has
+				[](const ECS::World& world, ECS::Entity e) -> bool {
+					return world.Has<T>(e);
+				},
+				// Remove
+				[](ECS::World& world, ECS::Entity e) {
+					if (world.Has<T>(e)) {
+						world.Remove<T>(e);
+					}
 				}
 			};
 		}
@@ -256,12 +378,17 @@ namespace Serialization {
 				sortedComponents.emplace_back(tid, info);
 			}
 
-			// SORT: Transform first, then alphabetical
+			// SORT: Transform first, Name second, then alphabetical
 			std::sort(sortedComponents.begin(), sortedComponents.end(),
 				[](const auto& a, const auto& b) {
 					// Transform always comes first
 					if (a.second.Name == "LocalTransform") return true;
 					if (b.second.Name == "LocalTransform") return false;
+
+					// Name always comes second
+					if (a.second.Name == "Name") return true;
+					if (b.second.Name == "Name") return false;
+
 					// Everything else alphabetical
 					return a.second.Name < b.second.Name;
 				});
@@ -287,14 +414,14 @@ namespace Serialization {
 					if (!comp.contains("TypeName") || !comp.contains("Data")) {
 						continue; // Skip malformed component entries
 					}
-					
+
 					std::string typeName = comp["TypeName"].get<std::string>();
 					// Find component by name instead of TypeId
 					for (const auto& [tid, info] : Registry()) {
 						if (info.Name == typeName) {
 							try {
 								info.Deserialize(world, e, comp["Data"]);
-							} 
+							}
 							catch (const std::exception& ex) {
 								// Log error but continue with other components
 								std::cerr << "Failed to deserialize component " << typeName << ": " << ex.what() << std::endl;
@@ -308,35 +435,35 @@ namespace Serialization {
 		}
 
 		/**
-         * @brief Save an entity as a prefab file (.prefab)
-         * @param filename Path to write (must end with .prefab)
-         * @param world World containing the entity
-         * @param e Entity to serialize
-         * @return true on success
-         */
-        static bool SavePrefab(const std::string& filename, const ECS::World& world, const ECS::Entity e) {
-            json j = SerializeEntity(world, e);
-            return Serializer::SaveJson(filename, "prefab", j);
-        }
+		 * @brief Save an entity as a prefab file (.prefab)
+		 * @param filename Path to write (must end with .prefab)
+		 * @param world World containing the entity
+		 * @param e Entity to serialize
+		 * @return true on success
+		 */
+		static bool SavePrefab(const std::string& filename, const ECS::World& world, const ECS::Entity e) {
+			json j = SerializeEntity(world, e);
+			return Serializer::SaveJson(filename, "prefab", j);
+		}
 
-        /**
-         * @brief Load a prefab file and instantiate it into the provided world
-         * @param filename Path to read (must end with .prefab)
-         * @param world World to instantiate into
-         * @param outEntity Optional out param to receive created entity
-         * @return true on success
-         */
-        static bool LoadPrefab(const std::string& filename, ECS::World& world, ECS::Entity* outEntity = nullptr) {
-            json j;
-            if (!Serializer::LoadJson(filename, "prefab", j))
+		/**
+		 * @brief Load a prefab file and instantiate it into the provided world
+		 * @param filename Path to read (must end with .prefab)
+		 * @param world World to instantiate into
+		 * @param outEntity Optional out param to receive created entity
+		 * @return true on success
+		 */
+		static bool LoadPrefab(const std::string& filename, ECS::World& world, ECS::Entity* outEntity = nullptr) {
+			json j;
+			if (!Serializer::LoadJson(filename, "prefab", j))
 				return false;
-            
+
 			ECS::Entity e = DeserializeEntity(world, j);
 			if (outEntity)
 				*outEntity = e;
-            
-				return true;
-        }
+
+			return true;
+		}
 	};
 
 	// --- Register all component serializers ---

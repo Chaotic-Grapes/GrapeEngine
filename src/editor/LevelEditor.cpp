@@ -14,6 +14,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include "LevelEditor.h"
 #include "core/Logger.h"
 #include <imgui.h>
+#include "EditorStyle.h"
 #include "graphics/graphicsConfig.hpp"
 #include "ecs/systems/RendererSystem.h"
 #include <imgui_internal.h>
@@ -175,7 +176,7 @@ void LevelEditor::_renderDockSpace() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));     // No padding; dockspace fills fully
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f)); // Transparent host background
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, EditorStyle::Transparent);       // Transparent host background
 
     // Begin invisible host window
     ImGui::Begin("MainDockSpaceHost", nullptr, hostFlags);
@@ -264,7 +265,9 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     );
 
     _registerPanel("Hierarchy",
-        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); },
+        [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); 
+                   m_hierarchyWindow.SetViewport(&m_viewport); 
+        },
         [this]() { m_hierarchyWindow.Render(); },
         [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
     );
@@ -274,6 +277,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
             m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
             // WIRE UP FILE MENU to inspector
             m_inspector.SetFileMenu(&m_fileMenu);
+            m_inspector.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
@@ -302,12 +306,28 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     // Set up hierarchy selection callback to sync with inspector
     m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
-        if (!m_world) { m_inspector.ClearSelection(); return; } // Clear when no world
-        if (id == ECS::Entity::NPOS32) { m_inspector.ClearSelection(); return; } // Clear when no entity
+        if (!m_world) {
+            m_inspector.ClearSelection();
+            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            return;
+        } // Clear when no world
+
+        if (id == ECS::Entity::NPOS32) {
+            m_inspector.ClearSelection();
+            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            return;
+        } // Clear when no entity
+
         // Resolve the entity to the current generation before checking aliveness
         ECS::Entity e = m_world->Resolve(id);
-        if (m_world->IsAlive(e)) m_inspector.InspectEntity(id); // Inspect when valid
-        else m_inspector.ClearSelection(); // Clear when entity is dead
+        if (m_world->IsAlive(e)) {
+            m_inspector.InspectEntity(id); // Inspect when valid
+            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(id);
+        }
+        else {
+            m_inspector.ClearSelection(); // Clear when entity is dead
+            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+        }
         });
 }
 
@@ -377,6 +397,7 @@ void LevelEditor::_loadFonts() {
 // -------------------------------------------------------------------------
 // Process input and in world interactions for editor panels
 void LevelEditor::Update() {
+
     // Apply global shortcuts
     m_fileMenu.HandleShortcuts(m_uiScale);
 
@@ -397,7 +418,6 @@ void LevelEditor::Update() {
     if (m_playback.IsPlaying()) {
         Engine::CORE->GetSceneManager().Update(); // Updates scenemanager to run Audio
     }
-
 }
 
 // -------------------------------------------------------------------------
@@ -411,7 +431,8 @@ void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback
 
     // Handle state transitions
     if (newState == Playback::GameState::Stopped) {
-        // Clear selection (entity IDs have changed after restore)
+        // Note: Entity IDs are now preserved during restore, so selection can remain valid
+        // However, we still clear selection as a safe UX pattern when stopping play mode
         m_hierarchyWindow.SetSelectedEntity(0);
         m_inspector.ClearSelection();
 

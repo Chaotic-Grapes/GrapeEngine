@@ -39,7 +39,7 @@ namespace EditorUI {
     // -------------------------------------------------------------------------
    
     // Displays a read-only value row that cannot be edited by user
-    void RenderStaticValueRow(const std::string& label, const std::string& value);
+    void RenderStaticValueRow(const std::string& label, const std::string& value, bool grayed = false);
 
     // Renders a float property editor with drag control and label
     void RenderFloatRow(const std::string& label, const std::string& fieldLabel, 

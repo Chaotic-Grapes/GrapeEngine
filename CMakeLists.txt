@@ -385,12 +385,24 @@ foreach(SETTINGS_FILE ${ALL_PROJECT_SETTINGS_FOR_COPY})
     get_filename_component(PROJECT_NAME ${PROJECT_DIR} NAME)
     
     # Create symlink instead of copying for faster builds and real-time file access
-    add_custom_command(TARGET GrapeEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E create_symlink
-        "${PROJECT_DIR}"
-        "$<TARGET_FILE_DIR:GrapeEngine>/${PROJECT_NAME}"
-        COMMENT "Creating symlink to ${PROJECT_NAME} project"
-    )
+    if(WIN32)
+        # Use PowerShell to create a junction on Windows. Convert the project
+        # directory to a native path to ensure backslashes (avoids mklink
+        # treating "/" as switches e.g. "Users" being parsed as /Users).
+        file(TO_NATIVE_PATH "${PROJECT_DIR}" PROJECT_DIR_NATIVE)
+        add_custom_command(TARGET GrapeEngine POST_BUILD
+            COMMAND powershell -NoProfile -Command
+                "if (-not (Test-Path -Path '$<TARGET_FILE_DIR:GrapeEngine>\\${PROJECT_NAME}')) { New-Item -ItemType Junction -Path '$<TARGET_FILE_DIR:GrapeEngine>\\${PROJECT_NAME}' -Target '${PROJECT_DIR_NATIVE}' -Force } else { Write-Host 'Junction exists: $<TARGET_FILE_DIR:GrapeEngine>\\${PROJECT_NAME}' }"
+            COMMENT "Creating junction to ${PROJECT_NAME} project"
+        )
+    else()
+        add_custom_command(TARGET GrapeEngine POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E create_symlink
+            "${PROJECT_DIR}"
+            "$<TARGET_FILE_DIR:GrapeEngine>/${PROJECT_NAME}"
+            COMMENT "Creating symlink to ${PROJECT_NAME} project"
+        )
+    endif()
     message(STATUS "Symlink to '${PROJECT_NAME}' will be created in build directory")
 endforeach()
 

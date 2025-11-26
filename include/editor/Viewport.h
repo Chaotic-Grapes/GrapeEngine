@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file   Viewport.h
-\author Samantha Leong (80%)
-        Foo Rui Qin    (20%)
+\author Samantha Leong (50%)
+        Foo Rui Qin    (50%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
 \date   3rd November 2025
@@ -50,8 +50,21 @@ public:
     bool IsViewportHovered() const;
     bool HasValidWorld() const { return m_world != nullptr; }
 
+    // Set the currently selected entity programmatically (e.g. when selection
+    // is changed from the hierarchy). This updates internal state and the
+    // renderer's selected entity so the gizmo / outline appear.
+    void SetSelectedEntity(EntityId id);
+
     // Undo System
     void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+    void FocusOnEntity(EntityId entityId);
+
+    // Get viewport bounds for UI click detection
+    ImVec2 GetSceneDrawPos() const { return m_sceneDrawPos; }
+    ImVec2 GetSceneDrawSize() const { return m_sceneDrawSize; }
+
+    // Get the editor camera from renderer system
+    Engine::EditorCamera* GetEditorCamera() const;
 
 private:
     void _renderViewport();

@@ -37,7 +37,7 @@ SCRIPT_API int ScriptAPI_Window_GetWidth() {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return 0;
     }
-    return window->Width();
+    return window->GetWidth();
 }
 
 /// <summary>
@@ -49,7 +49,7 @@ SCRIPT_API int ScriptAPI_Window_GetHeight() {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return 0;
     }
-    return window->Height();
+    return window->GetHeight();
 }
 
 /// <summary>
@@ -110,7 +110,7 @@ SCRIPT_API void ScriptAPI_Window_SetMinimized(bool minimized) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
     }
-    window->IsMinimized(minimized);
+    window->SetMinimized(minimized);
 }
 
 /// <summary>
@@ -133,7 +133,7 @@ SCRIPT_API void ScriptAPI_Window_SetMaximized(bool maximized) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
     }
-    window->IsMaximized(maximized);
+    window->SetMaximized(maximized);
 }
 
 /// <summary>
@@ -156,7 +156,7 @@ SCRIPT_API void ScriptAPI_Window_SetVisible(bool visible) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
     }
-    window->IsVisible(visible);
+    window->SetVisible(visible);
 }
 
 /// <summary>
@@ -179,7 +179,7 @@ SCRIPT_API void ScriptAPI_Window_SetResizable(bool resizable) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
     }
-    window->IsResizable(resizable);
+    window->SetResizable(resizable);
 }
 
 // ============================================================================
@@ -195,7 +195,7 @@ SCRIPT_API void ScriptAPI_Window_SetMode(int mode) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
     }
-    window->Mode(static_cast<WindowMode::Flags>(mode), nullptr);
+    window->SetMode(static_cast<WindowMode::Flags>(mode), nullptr);
 }
 
 /// <summary>
@@ -218,5 +218,6 @@ SCRIPT_API void ScriptAPI_Window_Resize(int width, int height) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
     }
+    LOG_INFO("[ScriptAPI] Resize requested from script: " << width << "x" << height);
     window->Resize(width, height);
 }

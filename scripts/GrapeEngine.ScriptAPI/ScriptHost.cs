@@ -23,6 +23,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using GrapeEngine.ScriptAPI.Unsafe;
+using GrapeEngine.Math;
 
 // *************** !!!!!!!! IMPORTANT !!!!!!!! *************** //
 //                                                             //
@@ -97,6 +99,35 @@ public static class ScriptHost
             if (scriptType == null)
             {
                 Logging.Log($"ERROR: Type not found: {typeName}", LogLevel.Error);
+                Logging.Log("Loaded assemblies:", LogLevel.Error);
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Logging.Log($"  - {asm.GetName().Name} ({asm.GetName().Version})", LogLevel.Error);
+                    
+                    // If this looks like a game assembly, list its types
+                    if (!asm.GetName().Name.StartsWith("System") && 
+                        !asm.GetName().Name.StartsWith("Microsoft") &&
+                        !asm.GetName().Name.StartsWith("netstandard") &&
+                        asm.GetName().Name != "GrapeEngine.ScriptAPI")
+                    {
+                        try
+                        {
+                            var types = asm.GetTypes();
+                            Logging.Log($"    Types in {asm.GetName().Name}:", LogLevel.Error);
+                            foreach (var t in types)
+                            {
+                                if (!t.IsNested && t.Namespace != null)
+                                {
+                                    Logging.Log($"      * {t.FullName}", LogLevel.Error);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.Log($"    Could not list types: {ex.Message}", LogLevel.Error);
+                        }
+                    }
+                }
                 return 0;
             }
 
@@ -301,6 +332,81 @@ public static class ScriptHost
         catch (Exception ex)
         {
             Logging.Log($"ERROR in OnLateUpdate: {ex.Message}" + Environment.NewLine +
+                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call collision callbacks on a script instance
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    public static void CallCollisionCallbacks(ulong handle)
+    {
+        try
+        {
+            if (!m_instances.TryGetValue(handle, out var instance)) return;
+
+            // Use a small fixed buffer
+            // if more events exist we'll re-query
+            const int BUFFER_CAPACITY = 32;
+            var otherEntities = new ulong[BUFFER_CAPACITY];
+            var eventTypes = new int[BUFFER_CAPACITY];
+
+            var total = CollisionAPI.GetEventsBulk(instance.EntityId, otherEntities, eventTypes, BUFFER_CAPACITY);
+            var toProcess = (int)GMath.Min(total, (uint)BUFFER_CAPACITY);
+
+            // Process the initial batch
+            for (var i = 0; i < toProcess; ++i)
+            {
+                var other = otherEntities[i];
+                switch (eventTypes[i])
+                {
+                    case 0:
+                        instance.OnCollisionEnter(other);
+                        break;
+                    case 1:
+                        instance.OnCollisionStay(other);
+                        break;
+                    case 2:
+                        instance.OnCollisionExit(other);
+                        break;
+                }
+            }
+
+            // If there are more events than our buffer, process the remainder in a loop
+            if (total > BUFFER_CAPACITY)
+            {
+                var remaining = total - BUFFER_CAPACITY;
+                var offset = BUFFER_CAPACITY;
+
+                // allocate exactly remaining now
+                var moreOther = new ulong[remaining];
+                var moreTypes = new int[remaining];
+                var got = CollisionAPI.GetEventsBulk(instance.EntityId, moreOther, moreTypes, remaining);
+                var gotCount = (int)GMath.Min(got, remaining);
+                
+                // process them
+                for (var i = 0; i < gotCount; ++i)
+                {
+                    var other = moreOther[i];
+                    switch (moreTypes[i])
+                    {
+                        case 0:
+                            instance.OnCollisionEnter(other);
+                            break;
+                        case 1:
+                            instance.OnCollisionStay(other);
+                            break;
+                        case 2:
+                            instance.OnCollisionExit(other);
+                            break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.Log($"ERROR in collision callback: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }

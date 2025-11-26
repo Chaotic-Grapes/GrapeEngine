@@ -33,7 +33,7 @@ and supports prefab instantiation by accepting dragged prefab assets.
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
-
+#include "Viewport.h"
 
 namespace {
     // Helper template function to safely add components during deserialization
@@ -129,7 +129,6 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
         std::filesystem::path p(selectedFilePath);
         std::string scriptClassName = p.stem().string();
         std::string fullTypeName = scriptClassName; // Default to just class name
-        std::string rootNamespace; // e.g. "EchoesBelow" from "EchoesBelow.Scripts"
 
         // Try to parse namespace from the file
         std::ifstream fileStream(selectedFilePath);
@@ -158,12 +157,6 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
                         if (nsFirst != std::string::npos && nsLast != std::string::npos) {
                             namespaceStr = namespaceStr.substr(nsFirst, nsLast - nsFirst + 1);
                             fullTypeName = namespaceStr + "." + scriptClassName;
-                            
-                            // Extract root namespace (e.g., "EchoesBelow" from "EchoesBelow.Scripts")
-                            size_t dotPos = namespaceStr.find('.');
-                            rootNamespace = (dotPos != std::string::npos) 
-                                ? namespaceStr.substr(0, dotPos) 
-                                : namespaceStr;
                         }
                         break;
                     }
@@ -183,27 +176,8 @@ void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
             // If relative path conversion fails, use the original path
             relativePath = selectedFilePath;
         }
-
-        // 3. Attempt to load the game assembly if we have a root namespace
-        if (!rootNamespace.empty()) {
-            // Try to find and load the assembly DLL (e.g., EchoesBelow.dll)
-            std::string assemblyName = rootNamespace + ".dll";
-            //std::filesystem::path assemblyPath = std::filesystem::path("build/Debug") / assemblyName;
-            
-            if (std::filesystem::exists(assemblyName)) {
-                // TODO: Call ScriptSystem to load this assembly into the AppDomain
-                // For now, log a warning that the assembly should be loaded
-                LOG_INFO("Script uses assembly: " << assemblyName);
-                LOG_WARNING("Multi-assembly loading not yet implemented - ensure " 
-                    << assemblyName << " is loaded via ScriptSystem");
-            }
-            else {
-                LOG_WARNING("Assembly not found: " << assemblyName 
-                    << " - script may fail to instantiate at runtime");
-            }
-        }
         
-        // 4. Attach the ScriptInstance component with full type name and path
+        // 3. Attach the ScriptInstance component with full type name and path
         _attachScriptComponent(entityId, fullTypeName, relativePath);
 
         // 4. Update selection state (using the correct member variable name)
@@ -497,6 +471,18 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     auto children = _getChildren(entityId);
     bool hasChildren = !children.empty();
 
+    // Check if this is a prefab instance FIRST (needed for color)
+    bool isPrefabInstance = m_world->Has<ECS::Components::PrefabLink>(entity);
+
+    // Check if this entity has a script attached
+    bool hasScript = false;
+    if (m_world->Has<ECS::Components::ScriptInstance>(entity)) {
+        const auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(entity);
+        if (strlen(scriptComp.TypeName) > 0) {
+            hasScript = true;
+        }
+    }
+
     // Build display label with entity name
     std::stringstream oss;
     if (m_world->Has<ECS::Components::Name>(entity)) {
@@ -508,18 +494,10 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     // Append prefab indicator if this is a prefab instance
-    if (m_world->Has<ECS::Components::PrefabLink>(entity)) {
+    if (isPrefabInstance) {
         const auto& link = m_world->Get<ECS::Components::PrefabLink>(entity);
         std::string prefabName = std::filesystem::path(link.getPath()).stem().string();
         oss << " [" << prefabName << "]";
-    }
-
-    // Append script indicator if this entity has a script attached
-    if (m_world->Has<ECS::Components::ScriptInstance>(entity)) {
-        const auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(entity);
-        if (strlen(scriptComp.TypeName) > 0) {
-            oss << " {S}";
-        }
     }
 
     std::string label = oss.str();
@@ -540,12 +518,17 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     // Highlight if this entity is selected
     if (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end()) nodeFlags |= ImGuiTreeNodeFlags_Selected;
 
-    // Manage expanded state - open if previously expanded
+    // Manage expanded state: open if previously expanded
     bool isExpanded = m_expandedNodes.find(entityId) != m_expandedNodes.end();
     if (isExpanded && hasChildren) ImGui::SetNextItemOpen(true);
 
     // Push ID to ensure unique imgui identifiers
     ImGui::PushID(static_cast<int>(entityId));
+
+    // Push blue color for prefab instances
+    if (isPrefabInstance) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.7f, 1.0f, 1.0f)); // Light blue
+    }
 
     // Render rename input if this entity is being renamed
     bool nodeOpen = false;
@@ -578,9 +561,73 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         // Render the actual tree node
         nodeOpen = ImGui::TreeNodeEx(label.c_str(), nodeFlags);
 
+        // Render prefab icon to the left of the name if this is a prefab instance
+        if (isPrefabInstance && m_symbolsFont) {
+            ImVec2 itemRectMin = ImGui::GetItemRectMin();
+            ImVec2 itemRectMax = ImGui::GetItemRectMax();
+            
+            const float iconPadding = 4.0f;
+            const char* prefabIcon = "\xEE\xA6\xA4"; // Material Symbols: deployed_code icon (U+E9A4)
+            
+            // Calculate icon size using symbols font
+            ImGui::PushFont(m_symbolsFont);
+            ImVec2 iconSize = ImGui::CalcTextSize(prefabIcon);
+            ImGui::PopFont();
+            
+            // Position to the left of the tree node text (after the arrow)
+            ImVec2 iconPos = ImVec2(
+                ImGui::GetCursorScreenPos().x - iconSize.x - iconPadding,
+                itemRectMin.y + (itemRectMax.y - itemRectMin.y - iconSize.y) * 0.5f
+            );
+            
+            // Draw the prefab icon with blue color (matching prefab text color)
+            ImGui::GetWindowDrawList()->AddText(
+                m_symbolsFont,
+                22.0f,
+                iconPos,
+                ImGui::GetColorU32(ImVec4(0.4f, 0.7f, 1.0f, 1.0f)), // Light blue matching prefab text
+                prefabIcon
+            );
+        }
+
+        // Render script icon on the right side if entity has a script
+        if (hasScript && m_symbolsFont) {
+            // Get the position and size of the tree node item
+            ImVec2 itemRectMin = ImGui::GetItemRectMin();
+            ImVec2 itemRectMax = ImGui::GetItemRectMax();
+            
+            // Calculate position for the script icon (right-aligned with some padding)
+            const float iconPadding = 8.0f;
+            const char* scriptIcon = "\xEE\xA1\xAF"; // Material Symbols: description/script icon (U+E86F)
+            
+            // Calculate icon size using symbols font
+            ImGui::PushFont(m_symbolsFont);
+            ImVec2 iconSize = ImGui::CalcTextSize(scriptIcon);
+            ImGui::PopFont();
+            
+            ImVec2 iconPos = ImVec2(
+                itemRectMax.x - iconSize.x - iconPadding,
+                itemRectMin.y + (itemRectMax.y - itemRectMin.y - iconSize.y) * 0.5f
+            );
+            
+            // Draw the icon with a subtle color using the symbols font
+            ImGui::GetWindowDrawList()->AddText(
+                m_symbolsFont,
+                22.f, // Font size
+                iconPos,
+                ImGui::GetColorU32(ImVec4(0.7f, 0.8f, 0.9f, 0.9f)), // Subtle blue-gray
+                scriptIcon
+            );
+        }
+
         // Handle interactions like clicks and drag-drop
         _handleNodeInteraction(entityId);
         _handleNodeDragDrop(entityId);
+    }
+
+    // Pop blue color if it was a prefab instance
+    if (isPrefabInstance) {
+        ImGui::PopStyleColor();
     }
 
     // Render context menu if opened
@@ -636,9 +683,9 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
 
     // Fast double-click to focus camera
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        if (m_entityActions) {
-            // TODO: Implement camera focus functionality
-            // This triggers on fast double-click
+        if (m_viewport) { 
+            // Focus on entity
+            m_viewport->FocusOnEntity(entityId);  
         }
         // Update click tracking
         m_lastClickedEntity = entityId;
@@ -647,12 +694,13 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     // Handle single clicks (for selection and rename detection)
     else if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         // Check if this is a slow second click on the same already-selected entity BEFORE updating times
+        // Only trigger rename if second click is within a reasonable time window (0.3s - 1.0s)
         bool isAlreadySelected = (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end());
         bool isSlowSecondClick = (m_lastClickedEntity == entityId &&
             isAlreadySelected &&
             m_selectedEntityIds.size() == 1 &&
             (currentTime - m_lastClickTime) > RENAME_DELAY_THRESHOLD &&
-            (currentTime - m_lastClickTime) < 2.0f);
+            (currentTime - m_lastClickTime) < 1.0f);
 
         if (isSlowSecondClick && !ctrlPressed && !shiftPressed) {
             // Start rename mode (only for single selection, no modifiers)
@@ -927,6 +975,13 @@ void HierarchyPanel::_renderEntityContextMenu() {
                 }
             }
 
+            // Detach Prefab: only for prefab instances (single selection)
+            if (selectionCount == 1 && m_world->Has<ECS::Components::PrefabLink>(entity)) {
+                if (ImGui::Selectable("Detach Prefab")) {
+                    m_world->Remove<ECS::Components::PrefabLink>(entity);
+                    LOG_INFO("Detached prefab link from entity");
+                }
+            }
 
             // Delete works with multiple selections
             std::string deleteLabel = (selectionCount > 1) ? "Delete (" + std::to_string(selectionCount) + ")" : "Delete";
