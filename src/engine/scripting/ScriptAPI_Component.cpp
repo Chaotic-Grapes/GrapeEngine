@@ -19,7 +19,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "physics/CollisionEvents.h"
 #include <cstring>
 #include "core/Logger.h"
-#include "ecs/systems/BoundaryCheckSystem.h"
 
 // Export macro
 #ifndef SCRIPT_API
@@ -102,7 +101,6 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
-        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE
 
@@ -150,7 +148,6 @@ namespace {
         HANDLE_COMPONENT_TYPE_PTR(Name, "Name")
         HANDLE_COMPONENT_TYPE_PTR(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE_PTR(Lifetime, "Lifetime")
-        HANDLE_COMPONENT_TYPE_PTR(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE_PTR
 
@@ -212,7 +209,6 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
-        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE
 
@@ -277,7 +273,7 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
-        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
+
 
         #undef HANDLE_COMPONENT_TYPE
 
@@ -326,7 +322,6 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
-        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
 
         #undef HANDLE_COMPONENT_TYPE
 
@@ -376,7 +371,6 @@ namespace {
         HANDLE_COMPONENT_TYPE(Name, "Name")
         HANDLE_COMPONENT_TYPE(TagMask, "TagMask")
         HANDLE_COMPONENT_TYPE(Lifetime, "Lifetime")
-        HANDLE_COMPONENT_TYPE(UIClickable, "UIClickable")
                 
         #undef HANDLE_COMPONENT_TYPE
     }
@@ -457,23 +451,6 @@ SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash) 
  */
 SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world) {
     g_scriptWorld = world;
-}
-
-
-/**
- * @brief Check if any UI element was clicked this frame
- * @return True if a UI element was clicked; false otherwise
- */
-SCRIPT_API bool ScriptAPI_UI_WasAnyClicked() {
-    return ECS::BoundaryCheckSystem::WasAnyUIClicked();
-}
-
-/**
- * @brief Get the ActionID of the last clicked UI element
- * @return The ActionID of the clicked UI (0 if nothing was clicked)
- */
-SCRIPT_API uint32_t ScriptAPI_UI_GetClickedActionID() {
-    return ECS::BoundaryCheckSystem::GetLastClickedActionID();
 }
 
 /**

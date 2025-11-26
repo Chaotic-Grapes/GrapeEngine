@@ -112,8 +112,6 @@ public:
     // Renders script instance component for C# scripting
     void RenderScriptInstance(nlohmann::json& data);
 
-    // Renders ClickableUI component for onClicktracking
-    void RenderUIClickable(nlohmann::json& data);
 
 private:
     // -------------------------------------------------------------------------

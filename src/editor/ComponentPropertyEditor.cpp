@@ -692,49 +692,6 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
     EditorUI::EndPropertySection();
 }
 
-// Renders the UIclickable component properties
-void ComponentUI::RenderUIClickable(nlohmann::json& data) {
-    ImGui::PushFont(m_mainFont);
-
-    // Enabled toggle
-    bool enabled = data.value("Enabled", true);
-    if (ImGui::Checkbox("Enabled", &enabled)) {
-        data["Enabled"] = enabled;
-    }
-
-    // Is Hovered (read-only display)
-    bool isHovered = data.value("IsHovered", false);
-    ImGui::BeginDisabled();
-    ImGui::Checkbox("Is Hovered", &isHovered);
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Read-only: Updated by BoundaryCheckSystem");
-    }
-
-    // Was Clicked (read-only display)
-    bool wasClicked = data.value("WasClicked", false);
-    ImGui::BeginDisabled();
-    ImGui::Checkbox("Was Clicked", &wasClicked);
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("Read-only: True for one frame after click");
-    }
-
-    // Click Action ID
-    uint32_t actionId = data.value("ClickActionID", 1.0f);
-    int actionIdInt = static_cast<int>(actionId);
-    if (ImGui::InputInt("Action ID", &actionIdInt)) {
-        if (actionIdInt >= 0) {
-            data["ClickActionID"] = static_cast<uint32_t>(actionIdInt);
-        }
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Unique identifier for this UI element's action");
-    }
-
-    ImGui::PopFont();
-}
-
 // Renders the ZIndex2D component properties
 // Controls the rendering order in 2D (higher values render on top)
 void ComponentUI::RenderZIndex2D(nlohmann::json& data) {

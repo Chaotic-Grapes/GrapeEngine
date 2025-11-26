@@ -397,19 +397,8 @@ static std::vector<ComponentUIMetadata> m_registry = {
             {"Initialized", false}
         }; },
         COMPONENT_OPS(ECS::Components::ScriptInstance)
-    },
-        // UI Clickable
-    {
-        "UI Clickable", "UIClickable", "ECS::Components::UIClickable", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderUIClickable(d); },
-        []() { return nlohmann::json{
-            {"Enabled", true},
-            {"IsHovered", false},
-            {"WasClicked", false},
-            {"ClickActionID", 0}
-        }; },
-        COMPONENT_OPS(ECS::Components::UIClickable)
     }
+
 };
 
 // -----------------------------------------------------------------------------
