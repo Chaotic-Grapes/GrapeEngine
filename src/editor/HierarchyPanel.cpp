@@ -474,6 +474,15 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     // Check if this is a prefab instance FIRST (needed for color)
     bool isPrefabInstance = m_world->Has<ECS::Components::PrefabLink>(entity);
 
+    // Check if this entity has a script attached
+    bool hasScript = false;
+    if (m_world->Has<ECS::Components::ScriptInstance>(entity)) {
+        const auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(entity);
+        if (strlen(scriptComp.TypeName) > 0) {
+            hasScript = true;
+        }
+    }
+
     // Build display label with entity name
     std::stringstream oss;
     if (m_world->Has<ECS::Components::Name>(entity)) {
@@ -489,14 +498,6 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         const auto& link = m_world->Get<ECS::Components::PrefabLink>(entity);
         std::string prefabName = std::filesystem::path(link.getPath()).stem().string();
         oss << " [" << prefabName << "]";
-    }
-
-    // Append script indicator if this entity has a script attached
-    if (m_world->Has<ECS::Components::ScriptInstance>(entity)) {
-        const auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(entity);
-        if (strlen(scriptComp.TypeName) > 0) {
-            oss << " {S}";
-        }
     }
 
     std::string label = oss.str();
@@ -559,6 +560,65 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     else {
         // Render the actual tree node
         nodeOpen = ImGui::TreeNodeEx(label.c_str(), nodeFlags);
+
+        // Render prefab icon to the left of the name if this is a prefab instance
+        if (isPrefabInstance && m_symbolsFont) {
+            ImVec2 itemRectMin = ImGui::GetItemRectMin();
+            ImVec2 itemRectMax = ImGui::GetItemRectMax();
+            
+            const float iconPadding = 4.0f;
+            const char* prefabIcon = "\xEE\xA6\xA4"; // Material Symbols: deployed_code icon (U+E9A4)
+            
+            // Calculate icon size using symbols font
+            ImGui::PushFont(m_symbolsFont);
+            ImVec2 iconSize = ImGui::CalcTextSize(prefabIcon);
+            ImGui::PopFont();
+            
+            // Position to the left of the tree node text (after the arrow)
+            ImVec2 iconPos = ImVec2(
+                ImGui::GetCursorScreenPos().x - iconSize.x - iconPadding,
+                itemRectMin.y + (itemRectMax.y - itemRectMin.y - iconSize.y) * 0.5f
+            );
+            
+            // Draw the prefab icon with blue color (matching prefab text color)
+            ImGui::GetWindowDrawList()->AddText(
+                m_symbolsFont,
+                22.0f,
+                iconPos,
+                ImGui::GetColorU32(ImVec4(0.4f, 0.7f, 1.0f, 1.0f)), // Light blue matching prefab text
+                prefabIcon
+            );
+        }
+
+        // Render script icon on the right side if entity has a script
+        if (hasScript && m_symbolsFont) {
+            // Get the position and size of the tree node item
+            ImVec2 itemRectMin = ImGui::GetItemRectMin();
+            ImVec2 itemRectMax = ImGui::GetItemRectMax();
+            
+            // Calculate position for the script icon (right-aligned with some padding)
+            const float iconPadding = 8.0f;
+            const char* scriptIcon = "\xEE\xA1\xAF"; // Material Symbols: description/script icon (U+E86F)
+            
+            // Calculate icon size using symbols font
+            ImGui::PushFont(m_symbolsFont);
+            ImVec2 iconSize = ImGui::CalcTextSize(scriptIcon);
+            ImGui::PopFont();
+            
+            ImVec2 iconPos = ImVec2(
+                itemRectMax.x - iconSize.x - iconPadding,
+                itemRectMin.y + (itemRectMax.y - itemRectMin.y - iconSize.y) * 0.5f
+            );
+            
+            // Draw the icon with a subtle color using the symbols font
+            ImGui::GetWindowDrawList()->AddText(
+                m_symbolsFont,
+                22.f, // Font size
+                iconPos,
+                ImGui::GetColorU32(ImVec4(0.7f, 0.8f, 0.9f, 0.9f)), // Subtle blue-gray
+                scriptIcon
+            );
+        }
 
         // Handle interactions like clicks and drag-drop
         _handleNodeInteraction(entityId);
@@ -634,12 +694,13 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     // Handle single clicks (for selection and rename detection)
     else if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         // Check if this is a slow second click on the same already-selected entity BEFORE updating times
+        // Only trigger rename if second click is within a reasonable time window (0.3s - 1.0s)
         bool isAlreadySelected = (m_selectedEntityIds.find(entityId) != m_selectedEntityIds.end());
         bool isSlowSecondClick = (m_lastClickedEntity == entityId &&
             isAlreadySelected &&
             m_selectedEntityIds.size() == 1 &&
             (currentTime - m_lastClickTime) > RENAME_DELAY_THRESHOLD &&
-            (currentTime - m_lastClickTime) < 2.0f);
+            (currentTime - m_lastClickTime) < 1.0f);
 
         if (isSlowSecondClick && !ctrlPressed && !shiftPressed) {
             // Start rename mode (only for single selection, no modifiers)
