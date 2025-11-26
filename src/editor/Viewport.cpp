@@ -351,6 +351,10 @@ void Viewport::_renderViewport() {
         }
 
         if (m_world) {
+            LOG_DEBUG("[Viewport] Game renderer update - forceSceneCamera should be true");
+            // Ensure game renderer always uses scene camera and has no editor input
+            m_gameRendererSystem->SetForceSceneCamera(true);
+            m_gameRendererSystem->SetEditorInputEnabled(false);
             m_gameRendererSystem->Update(*m_world, Time::DeltaTime());
         }
 
