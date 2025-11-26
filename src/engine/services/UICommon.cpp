@@ -21,6 +21,7 @@ Features:
 #include "services/UICommon.h"
 #include <unordered_map>
 
+#ifdef USE_IMGUI
 namespace UICommon {
 namespace {
     struct Rect { float x, y, w, h; };
@@ -68,3 +69,11 @@ void InitializeDefaultLayouts() {
     RegisterLayout(WindowId::EDITOR_PREFAB_EDITOR, 1150.0f, 1.0f, 450.0f, 900.0f);
 }
 } // namespace UICommon
+#else
+namespace UICommon {
+    void RegisterLayout(WindowId, float, float, float, float) { }
+    bool ApplyLayout(WindowId, ImGuiCond) { return false; }
+    void ClearLayouts() { }
+    void InitializeDefaultLayouts() { }
+} // namespace UICommon
+#endif

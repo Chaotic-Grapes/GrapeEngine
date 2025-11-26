@@ -35,6 +35,9 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Sce
 LevelEditor::~LevelEditor() {
     // Shutdown console panel to disconnect Logger callback
     m_console.Shutdown();
+    
+    // Shutdown performance panel
+    m_performancePanel.Shutdown();
 }
 
 // -------------------------------------------------------------------------
@@ -134,8 +137,13 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
+    ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
 
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
+    
+    // Programmatically select Asset Browser tab by default
+    ImGui::SetWindowFocus("Asset Browser");
+    
     m_dockLayoutBuilt = true;                // Mark layout as built
 }
 
@@ -296,6 +304,15 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         },
         [this]() { m_console.Render(); },
         nullptr
+    );
+
+    // Register Performance panel (monitoring)
+    _registerPanel("Performance",
+        [this]() {
+            m_performancePanel.Initialize(m_mainFont, m_boldFont);
+        },
+        [this]() { m_performancePanel.Render(m_playback.IsPlaying()); },
+        nullptr//[this](ECS::World* w) { void(*w); } // No world needed
     );
 
     // Initialize all registered panels
@@ -473,7 +490,9 @@ void LevelEditor::_onViewportSelectionChanged(EntityId id) {
 // Render dock space and editor panels with a fallback when world is missing
 void LevelEditor::Render() {
     if (ImGui::BeginMainMenuBar()) {
-        m_fileMenu.RenderFileMenu(m_uiScale);
+        m_fileMenu.RenderFileMenu();
+        m_fileMenu.RenderEditMenu();
+        m_fileMenu.RenderViewMenu(m_uiScale);
         ImGui::EndMainMenuBar();
     }
     _renderDockSpace();
@@ -507,6 +526,9 @@ void LevelEditor::SetWorld(ECS::World* world) {
 
     // Propagate world to all registered panels using centralized system
     _updatePanelWorlds(world);
+    
+    // Reset performance panel to show paused message for new scene
+    m_performancePanel.ResetForNewScene();
 }
 
 // -------------------------------------------------------------------------

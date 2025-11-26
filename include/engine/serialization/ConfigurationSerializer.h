@@ -48,13 +48,6 @@ struct ProjectSettings {
         float TimeStep = 0.016f;    // Physics time step
     } Physics;
 
-    /**
-     * @brief Audio-specific configuration settings
-     */
-    struct Audio {
-        float MasterVolume = 1.0f;  // Master volume (0.0 to 1.0)
-    } Audio;
-
     std::string Title = "GrapeEngine Game Project"; // Game/project name
     std::string Version = "1.0.0";                  // Version string
     std::string StartupScene = "";                  // Path to startup scene
@@ -152,14 +145,6 @@ namespace Serialization {
                 }
             }
 
-            // Parse Audio
-            if (settingsJson.contains("Audio")) {
-                const auto& audio = settingsJson["Audio"];
-                if (audio.contains("MasterVolume")) {
-                    settings.Audio.MasterVolume = audio["MasterVolume"].get<float>();
-                }
-            }
-
             LOG_DEBUG("Project settings loaded successfully from: " << settingsPath << '\n');
             return true;
         }
@@ -183,8 +168,6 @@ namespace Serialization {
             
             settingsJson["Physics"]["Gravity"] = settings.Physics.Gravity;
             settingsJson["Physics"]["TimeStep"] = settings.Physics.TimeStep;
-            
-            settingsJson["Audio"]["MasterVolume"] = settings.Audio.MasterVolume;
 
             return Serializer::SaveJson(settingsPath, "json", settingsJson);
         }

@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorFileMenu.h
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin    (100%)
 \par    ruiqin.foo@digipen.edu
 \date   16th November 2025
 
@@ -21,7 +21,9 @@ active scene.
 #define EDITOR_FILE_MENU_H
 
 #include <string>
+#include <vector>
 #include <imgui.h>
+#include "serialization/ConfigurationSerializer.h"
 
 // Forward declaration so we don't need the full SceneManager here
 namespace Scenes { class SceneManager; }
@@ -53,7 +55,13 @@ public:
     // -------------------------------------------------------------------------
 
     // Draws the "File" dropdown menu in the menu bar
-    void RenderFileMenu(float& uiScale);
+    void RenderFileMenu();
+
+    // Draws the "Edit" dropdown menu with undo/redo and project settings
+    void RenderEditMenu();
+
+    // Draws the "View" dropdown menu with UI scale controls
+    void RenderViewMenu(float& uiScale);
 
     // -------------------------------------------------------------------------
     // Public Operations (callable from keyboard shortcuts)
@@ -111,6 +119,12 @@ private:
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;
 
+    // Project settings editor state
+    bool m_showProjectSettings = false;
+    bool m_projectSettingsDirty = false;
+    // Helper to render project settings modal
+    void _renderProjectSettingsModal();
+    
 };
 
 #endif

@@ -112,21 +112,23 @@ namespace Engine {
             << "  Scale: 1 world unit = " << graphicsConfig::PIXELS_PER_WORLD_UNIT << " pixels\n"
             << "  World viewport: " << kDefaultWorldViewHeight << " units tall\n";
 
-        // Subscribe to window resize events
-        if (!CORE->IsInEditorMode())
+        // In standalone game mode, disable editor camera input controls
+        if (!CORE->IsInEditorMode()) {
+            m_allowInput = false;
             m_windowResizedSub = Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
                 [this](const Messaging::WindowResized& msg)
                 {
                     OnWindowResize(msg.Width, msg.Height);
                 });
-        
-        // Subscribe to viewport resize events (for aspect ratio updates)
-        else
+        }
+        // Subscribe to viewport resize events (for aspect ratio updates) in editor mode
+        else {
             m_viewportResizedSub = Messaging::MessageSystem::Subscribe<Messaging::ViewportResized>(
                 [this](const Messaging::ViewportResized& msg)
                 {
                     SetViewportSize(msg.Width, msg.Height);
                 });
+        }
     }
 
     EditorCamera::~EditorCamera() {

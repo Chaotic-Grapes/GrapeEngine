@@ -20,7 +20,13 @@ Features:
 #ifndef UICOMMON_H
 #define UICOMMON_H
 
+#ifdef USE_IMGUI
 #include <imgui.h>
+#else
+// Provide minimal substitutes so UICommon can be included in non-ImGui builds
+using ImGuiCond = int;
+static constexpr ImGuiCond ImGuiCond_Once = 1;
+#endif
 
 namespace UICommon {
 

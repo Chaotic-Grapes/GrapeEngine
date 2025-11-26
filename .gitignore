@@ -6,6 +6,10 @@
 # Ignore build directories
 build/
 Build/
+build_game/
+Build_game/
+build_Game/
+Build_Game/
 bin/
 Bin/
 
