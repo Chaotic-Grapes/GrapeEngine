@@ -1,4 +1,5 @@
 @echo off
+TITLE Clean Build Folders
 REM Check if we should pause
 set PAUSEFLAG=%1
 

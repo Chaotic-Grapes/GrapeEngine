@@ -2,6 +2,8 @@
 set CONFIG=%1
 if "%CONFIG%"=="" set CONFIG=Debug
 
+TITLE Build Editor (%CONFIG%)
+
 REM Optional second arg: number of parallel jobs (defaults to number of processors)
 set JOBS=%2
 if "%JOBS%"=="" set JOBS=%NUMBER_OF_PROCESSORS%

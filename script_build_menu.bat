@@ -1,5 +1,5 @@
 @echo off
-title GrapeEngine Build Menu
+TITLE GrapeEngine Build Menu
 call :CHECK_CMAKE
 call :CHECK_CL
 goto MENU
