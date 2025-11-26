@@ -178,15 +178,6 @@ void EditorFileMenu::RenderEditMenu() {
     }
 }
 
-// Draws the "Build" menu
-void EditorFileMenu::RenderBuildMenu() {
-    if (ImGui::BeginMenu("Build")) {
-        if (ImGui::MenuItem("Build (Debug)")) { BuildGameWithConfig("Debug"); }
-        if (ImGui::MenuItem("Build (Release)")) { BuildGameWithConfig("Release"); }
-        ImGui::EndMenu();
-    }
-}
-
 // Draws the "View" menu with UI scale controls
 void EditorFileMenu::RenderViewMenu(float& uiScale) {
     // Clamp UI scale so users can't shrink or enlarge the UI too much
@@ -289,7 +280,7 @@ void EditorFileMenu::_renderProjectSettingsModal() {
         if (pushedSaveStyle) {
             ImGui::PopStyleColor(3);
         }
-        
+
         ImGui::SameLine();
         if (ImGui::Button("Close", ImVec2(120, 0))) {
             if (m_projectSettingsDirty) {
@@ -300,183 +291,6 @@ void EditorFileMenu::_renderProjectSettingsModal() {
     }
     ImGui::End();
 }
-
-// -------------------------------------------------------------------------
-// Build helpers
-// -------------------------------------------------------------------------
-
-// Launch the repository build script in a new console.
-// Uses ProjectPaths to resolve the project folder; the script is expected
-// to live next to the engine root (../script_build_editor.bat relative to project root).
-void EditorFileMenu::BuildGame() {
-    // Default to Release build without running
-    BuildGameWithConfig("Release");
-}
-
-void EditorFileMenu::BuildGameWithConfig(const std::string& config) {
-#ifdef _WIN32
-    // For building the standalone game we only use script_build_game.bat
-    const std::string scriptFile = "script_build_game.bat";
-    std::string scriptPath;
-
-    // First try project-relative: <projectRoot>/../script_build_game.bat
-    std::string rel = "../" + scriptFile;
-    std::string p = Engine::ProjectPaths::ToAbsolutePath(rel);
-
-    if (std::filesystem::exists(p)) {
-        scriptPath = p;
-    }
-    else {
-        // Fallback: repository root (workspace) script_build_game.bat
-        std::filesystem::path alt = std::filesystem::absolute(scriptFile);
-        if (std::filesystem::exists(alt)) scriptPath = alt.string();
-    }
-
-    if (scriptPath.empty()) {
-        LOG_ERROR("Build script not found: script_build_game.bat");
-        return;
-    }
-
-    StartBuildProcess(scriptPath, config);
-#else
-    LOG_CRITICAL("BuildGame is only implemented on Windows");
-#endif
-}
-
-// Start the build process and capture stdout/stderr into the editor console
-void EditorFileMenu::StartBuildProcess(const std::string& scriptPath, const std::string& config) {
-#ifdef _WIN32
-    // Run cmd.exe /c "<scriptPath>" <config>
-    std::string cmdLine = "cmd.exe /c \"" + scriptPath + "\" " + config;
-
-    // Set up security attributes to allow handle inheritance
-    // This is necessary for the child process to inherit the pipe handles
-    SECURITY_ATTRIBUTES saAttr = {};
-    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
-    saAttr.bInheritHandle = TRUE;
-    saAttr.lpSecurityDescriptor = NULL;
-
-    // Create a pipe for the child process's STDOUT and STDERR
-    HANDLE hStdOutRead = NULL;
-    HANDLE hStdOutWrite = NULL;
-    if (!CreatePipe(&hStdOutRead, &hStdOutWrite, &saAttr, 0)) {
-        LOG_ERROR("Failed to create pipe for build output");
-        return;
-    }
-
-    // Ensure the read handle isn't inherited
-    SetHandleInformation(hStdOutRead, HANDLE_FLAG_INHERIT, 0);
-
-    // Set up STARTUPINFO to redirect stdout and stderr to the pipe
-    // This allows capturing the output of the build script
-    STARTUPINFOA si = {};
-    PROCESS_INFORMATION pi = {};
-    si.cb = sizeof(si);
-    si.dwFlags |= STARTF_USESTDHANDLES;
-    si.hStdOutput = hStdOutWrite;
-    si.hStdError = hStdOutWrite;
-
-    // Create the process without creating a new window
-    BOOL ok = CreateProcessA(
-        NULL, // application name
-        const_cast<char*>(cmdLine.c_str()), // command line
-        NULL, // default process security
-        NULL, // default process & thread security
-        TRUE, // inherit handles so child gets the pipe write end
-        CREATE_NO_WINDOW, // no new window
-        NULL, // environment
-        NULL, // current directory
-        &si, // startup info
-        &pi // process information
-    );
-
-    // Close the write handle in the parent; the child has its own copy
-    CloseHandle(hStdOutWrite);
-
-    // Check if process creation succeeded
-    if (!ok) {
-        // If process creation failed, retrieve the error code
-        DWORD err = GetLastError();
-        CloseHandle(hStdOutRead);
-
-        // Log the error with the retrieved error code
-        LOG_ERROR("Failed to start build script (error " << err << ")");
-        return;
-    }
-
-    LOG_INFO("Started build script: " << scriptPath << " (config=" << config << ")");
-
-    // Read output in a background thread and forward to Logger as SCRIPT info
-    std::thread reader([hStdOutRead, pi]() mutable {
-        const DWORD bufSize = 4096;
-        std::string buffer;
-        buffer.reserve(4096);
-        char readBuf[bufSize];
-        DWORD bytesRead = 0;
-
-        while (true) {
-            // Read from the pipe
-            BOOL success = ReadFile(hStdOutRead, readBuf, bufSize - 1, &bytesRead, NULL);
-            if (!success || bytesRead == 0)
-                break;
-
-            // Null-terminate and append to buffer
-            readBuf[bytesRead] = '\0';
-            buffer.append(readBuf, bytesRead);
-
-            // Split into lines and log them
-            size_t pos = 0;
-            while (true) {
-                size_t nl = buffer.find('\n', pos);
-                if (nl == std::string::npos)
-                    break;
-                std::string line = buffer.substr(pos, nl - pos);
-
-                // Trim carriage return
-                if (!line.empty() && line.back() == '\r')
-                    line.pop_back();
-                if (!line.empty())
-                    Logger::Get().Log(LogLevel::INFO, line, LogSource::SCRIPT);
-                pos = nl + 1;
-            }
-
-            // Erase processed portion
-            if (pos > 0) 
-                buffer.erase(0, pos);
-        }
-
-        // Flush any remaining partial line
-        if (!buffer.empty()) {
-            // Trim trailing CR
-            if (!buffer.empty() && buffer.back() == '\r')
-                buffer.pop_back();
-
-            Logger::Get().Log(LogLevel::INFO, buffer, LogSource::SCRIPT);
-        }
-
-        // Close the read handle
-        CloseHandle(hStdOutRead);
-
-        // Wait for process to finish and close handles
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-
-        // Signal completion
-        Logger::Get().Log(LogLevel::INFO, std::string("Build process finished."), LogSource::SCRIPT);
-    });
-
-    reader.detach();
-
-#else
-    (void)scriptPath; (void)config; (void)runAfter;
-    LOG_CRITICAL("StartBuildProcess is only implemented on Windows");
-#endif
-}
-
-// -------------------------------------------------------------------------
-// Public Operations
-// -------------------------------------------------------------------------
 
 // Creates a brand new scene and makes it the active one in the SceneManager
 // Does not show any dialog, just starts from a fresh "New Scene"

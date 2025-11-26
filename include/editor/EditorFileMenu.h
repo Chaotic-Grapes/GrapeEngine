@@ -1,7 +1,7 @@
 /* Start Header *****************************************************************/
 /*!
 \file   EditorFileMenu.h
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin    (100%)
 \par    ruiqin.foo@digipen.edu
 \date   16th November 2025
 
@@ -21,6 +21,7 @@ active scene.
 #define EDITOR_FILE_MENU_H
 
 #include <string>
+#include <vector>
 #include <imgui.h>
 #include "serialization/ConfigurationSerializer.h"
 
@@ -59,9 +60,6 @@ public:
     // Draws the "Edit" dropdown menu with undo/redo and project settings
     void RenderEditMenu();
 
-    // Draws the "Build" dropdown menu
-    void RenderBuildMenu();
-
     // Draws the "View" dropdown menu with UI scale controls
     void RenderViewMenu(float& uiScale);
 
@@ -95,16 +93,6 @@ public:
     // Respond to keyboard shortcuts that trigger file menu actions like new open or save
     void HandleShortcuts(float& uiScale);
 
-    // Build the current game project using the repository build script
-    void BuildGame();
-
-    // Build with explicit configuration and optionally run after build
-    void BuildGameWithConfig(const std::string& config);
-
-private:
-    // Start the build process and capture output into the editor console
-    void StartBuildProcess(const std::string& scriptPath, const std::string& config);
-
 private:
     // -------------------------------------------------------------------------
     // Internal Helpers
@@ -134,10 +122,9 @@ private:
     // Project settings editor state
     bool m_showProjectSettings = false;
     bool m_projectSettingsDirty = false;
-
     // Helper to render project settings modal
     void _renderProjectSettingsModal();
-
+    
 };
 
 #endif

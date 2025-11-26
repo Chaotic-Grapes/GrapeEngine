@@ -521,7 +521,6 @@ void LevelEditor::Render() {
     if (ImGui::BeginMainMenuBar()) {
         m_fileMenu.RenderFileMenu();
         m_fileMenu.RenderEditMenu();
-        m_fileMenu.RenderBuildMenu();
         m_fileMenu.RenderViewMenu(m_uiScale);
         ImGui::EndMainMenuBar();
     }
