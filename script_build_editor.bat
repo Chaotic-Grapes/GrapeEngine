@@ -38,5 +38,6 @@ if %errorlevel% neq 0 (
 cd ..
 echo.
 echo Editor build %CONFIG% completed successfully!
-echo Executable location: build\%CONFIG%\GrapeEngine.exe
+echo Executable location: build\%CONFIG%\GrapeEditor.exe
+echo Engine DLL location: build\%CONFIG%\GrapeEngine.dll
 pause

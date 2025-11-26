@@ -87,16 +87,75 @@ file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS
 )
 
 # Exclude editor-only external sources when building standalone game
-if(BUILD_GAME)
+set(ENGINE_SOURCES_FOR_LIB ${ENGINE_SOURCES})
+if(BUILD_GAME AND NOT BUILD_EDITOR)
     # Exclude ImGuizmo (editor gizmo) which depends on ImGui
-    list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/ImGuizmo\\.cpp$")
+    list(FILTER ENGINE_SOURCES_FOR_LIB EXCLUDE REGEX ".*/ImGuizmo\\.cpp$")
     # Exclude DebugUI implementation from standalone game (editor-only)
-    list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/DebugUI\\.cpp$")
+    list(FILTER ENGINE_SOURCES_FOR_LIB EXCLUDE REGEX ".*/DebugUI\\.cpp$")
+endif()
+
+# ======================= ENGINE DLL =========================
+message(STATUS "Configuring GrapeEngine as shared library (DLL)...")
+
+# Create the engine as a shared library (DLL)
+add_library(GrapeEngineLib SHARED ${ENGINE_SOURCES_FOR_LIB} ${ENGINE_HEADERS})
+
+# Set C++ standard
+set_property(TARGET GrapeEngineLib PROPERTY CXX_STANDARD 23)
+set_property(TARGET GrapeEngineLib PROPERTY CXX_STANDARD_REQUIRED ON)
+
+# Output name is always GrapeEngine.dll
+set_target_properties(GrapeEngineLib PROPERTIES
+    OUTPUT_NAME "GrapeEngine"
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+)
+
+# Conditional ImGui support based on build configuration
+if(BUILD_EDITOR)
+    target_compile_definitions(GrapeEngineLib PUBLIC USE_IMGUI)
+endif()
+
+# Include directories
+target_include_directories(GrapeEngineLib PUBLIC 
+    ${CMAKE_CURRENT_LIST_DIR}/include/engine
+    ${CMAKE_CURRENT_LIST_DIR}/include/externals
+)
+
+# Link libraries
+if(BUILD_EDITOR)
+    target_link_libraries(GrapeEngineLib
+        PUBLIC
+            glfw
+            glad
+            imgui
+            glm
+            freetype
+            fmod
+            ${NETHOST_LIB}
+    )
+else()
+    target_link_libraries(GrapeEngineLib
+        PUBLIC
+            glfw
+            glad
+            glm
+            freetype
+            fmod
+            ${NETHOST_LIB}
+    )
+endif()
+
+message(STATUS "  Target: GrapeEngine.dll (Shared Library)")
+if(BUILD_EDITOR)
+    message(STATUS "  ImGui: Enabled")
+else()
+    message(STATUS "  ImGui: Disabled")
 endif()
 
 # ======================= EDITOR BUILD =========================
 if(BUILD_EDITOR)
-    message(STATUS "Configuring Editor Build...")
+    message(STATUS "Configuring Editor Executable...")
     
     # Collect editor source files
     file(GLOB_RECURSE EDITOR_SOURCES CONFIGURE_DEPENDS 
@@ -109,37 +168,24 @@ if(BUILD_EDITOR)
         ${CMAKE_CURRENT_LIST_DIR}/include/editor/*.hpp
     )
     
-    # Create editor executable
-    add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${EDITOR_SOURCES} ${EDITOR_HEADERS})
+    # Create editor executable (links to engine DLL)
+    add_executable(GrapeEditor ${EDITOR_SOURCES} ${EDITOR_HEADERS})
     
     # Set C++ standard
-    set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 23)
-    set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD_REQUIRED ON)
-    
-    # Compile definitions - USE_IMGUI enables ImGui
-    target_compile_definitions(GrapeEngine PRIVATE USE_IMGUI)
+    set_property(TARGET GrapeEditor PROPERTY CXX_STANDARD 23)
+    set_property(TARGET GrapeEditor PROPERTY CXX_STANDARD_REQUIRED ON)
     
     # Include directories
-    target_include_directories(GrapeEngine PRIVATE 
+    target_include_directories(GrapeEditor PRIVATE 
         ${CMAKE_CURRENT_LIST_DIR}/include/engine
         ${CMAKE_CURRENT_LIST_DIR}/include/editor
         ${CMAKE_CURRENT_LIST_DIR}/include/externals
     )
     
-    # Link libraries (includes ImGui)
-    target_link_libraries(GrapeEngine
-        PRIVATE
-            glfw
-            glad
-            imgui
-            glm
-            freetype
-            fmod
-            ${NETHOST_LIB}
-    )
+    # Link to engine DLL
+    target_link_libraries(GrapeEditor PRIVATE GrapeEngineLib)
     
-    message(STATUS "  Target: GrapeEngine (Editor)")
-    message(STATUS "  ImGui: Enabled")
+    message(STATUS "  Target: GrapeEditor.exe (Editor Executable)")
 endif()
 
 # ======================= STANDALONE GAME BUILD =========================
@@ -149,8 +195,8 @@ if(BUILD_GAME)
     # Game entry point
     set(GAME_SOURCES ${CMAKE_CURRENT_LIST_DIR}/src/game/GameMain.cpp)
     
-    # Create game executable (NO editor sources, NO ImGui)
-    add_executable(GrapeGame ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${GAME_SOURCES})
+    # Create game executable (links to engine DLL, NO editor sources)
+    add_executable(GrapeGame ${GAME_SOURCES})
     
     # Set C++ standard
     set_property(TARGET GrapeGame PROPERTY CXX_STANDARD 23)
@@ -258,41 +304,27 @@ if(BUILD_GAME)
         ${CMAKE_CURRENT_LIST_DIR}/include/externals
     )
     
-    # Link libraries (NO ImGui)
-    target_link_libraries(GrapeGame
-        PRIVATE
-            glfw
-            glad
-            glm
-            freetype
-            fmod
-            ${NETHOST_LIB}
-    )
+    # Link to engine DLL
+    target_link_libraries(GrapeGame PRIVATE GrapeEngineLib)
     
     message(STATUS "  Target: ${GAME_FINAL_OUTPUT_NAME} (Standalone)")
-    message(STATUS "  ImGui: Disabled")
+    message(STATUS "  Linked to: GrapeEngine.dll")
 endif()
 
 # Set the primary target based on what's being built
 if(BUILD_EDITOR)
-    set(PRIMARY_TARGET GrapeEngine)
+    set(PRIMARY_TARGET GrapeEditor)
+    set(PRIMARY_LIB GrapeEngineLib)
 else()
     set(PRIMARY_TARGET GrapeGame)
+    set(PRIMARY_LIB GrapeEngineLib)
 endif()
 
 # ======================= SCRIPT API EXPORTS =========================
-# Export functions from executables for C# P/Invoke
-# Note: This is temporary until we refactor to a DLL!
-set(SCRIPT_EXPORTS "/EXPORT:ScriptAPI_GetComponent /EXPORT:ScriptAPI_GetComponentPtr /EXPORT:ScriptAPI_AddComponent /EXPORT:ScriptAPI_SetComponent /EXPORT:ScriptAPI_HasComponent /EXPORT:ScriptAPI_RemoveComponent /EXPORT:ScriptAPI_CreateEntity /EXPORT:ScriptAPI_DestroyEntity /EXPORT:ScriptAPI_IsAlive /EXPORT:ScriptAPI_SetWorld /EXPORT:ScriptAPI_IsKeyPressed /EXPORT:ScriptAPI_IsKeyDown /EXPORT:ScriptAPI_IsKeyUp /EXPORT:ScriptAPI_IsMousePressed /EXPORT:ScriptAPI_GetMouseX /EXPORT:ScriptAPI_GetMouseY /EXPORT:ScriptAPI_GetScrollX /EXPORT:ScriptAPI_GetScrollY /EXPORT:ScriptAPI_Time_GetDeltaTime /EXPORT:ScriptAPI_Time_GetUnscaledDeltaTime /EXPORT:ScriptAPI_Time_GetFixedDeltaTime /EXPORT:ScriptAPI_Time_GetUnscaledFixedDeltaTime /EXPORT:ScriptAPI_Time_GetElapsedTime /EXPORT:ScriptAPI_Time_GetFrameCount /EXPORT:ScriptAPI_Time_GetTimeScale /EXPORT:ScriptAPI_Time_SetTimeScale /EXPORT:ScriptAPI_Time_GetMaximumDeltaTime /EXPORT:ScriptAPI_Time_SetMaximumDeltaTime /EXPORT:ScriptAPI_Audio_LoadCue /EXPORT:ScriptAPI_Audio_UnloadCue /EXPORT:ScriptAPI_Audio_HasCue /EXPORT:ScriptAPI_Audio_Play /EXPORT:ScriptAPI_Audio_PlaySingle /EXPORT:ScriptAPI_Audio_Stop /EXPORT:ScriptAPI_Audio_StopCue /EXPORT:ScriptAPI_Audio_IsCuePlaying /EXPORT:ScriptAPI_Audio_SetInstanceVolume /EXPORT:ScriptAPI_Audio_SetInstancePitch /EXPORT:ScriptAPI_Audio_SetInstancePosition /EXPORT:ScriptAPI_Audio_SetMasterVolume /EXPORT:ScriptAPI_Audio_GetMasterVolume /EXPORT:ScriptAPI_Audio_SetListener /EXPORT:ScriptAPI_Physics_SetGravity /EXPORT:ScriptAPI_Physics_GetGravity /EXPORT:ScriptAPI_Physics_SetEnabled /EXPORT:ScriptAPI_Physics_IsEnabled /EXPORT:ScriptAPI_Physics_ApplyForce /EXPORT:ScriptAPI_Physics_ApplyImpulse /EXPORT:ScriptAPI_Physics_GetVelocity /EXPORT:ScriptAPI_Physics_SetVelocity /EXPORT:ScriptAPI_Math_RandomInt /EXPORT:ScriptAPI_Math_RandomFloat /EXPORT:ScriptAPI_Math_RandomIntSeeded /EXPORT:ScriptAPI_Math_RandomFloatSeeded /EXPORT:ScriptAPI_Math_Clamp /EXPORT:ScriptAPI_Math_ClampInt /EXPORT:ScriptAPI_Math_Lerp /EXPORT:ScriptAPI_Math_Abs /EXPORT:ScriptAPI_Math_Sqrt /EXPORT:ScriptAPI_Math_Pow /EXPORT:ScriptAPI_Math_Round /EXPORT:ScriptAPI_Math_Floor /EXPORT:ScriptAPI_Math_Ceil /EXPORT:ScriptAPI_Math_Min /EXPORT:ScriptAPI_Math_Max /EXPORT:ScriptAPI_Math_Sin /EXPORT:ScriptAPI_Math_Cos /EXPORT:ScriptAPI_Math_Tan /EXPORT:ScriptAPI_Math_Asin /EXPORT:ScriptAPI_Math_Acos /EXPORT:ScriptAPI_Math_Atan /EXPORT:ScriptAPI_Math_Atan2 /EXPORT:ScriptAPI_Math_DegToRad /EXPORT:ScriptAPI_Math_RadToDeg /EXPORT:ScriptAPI_Math_Distance2D /EXPORT:ScriptAPI_Math_DistanceSquared2D /EXPORT:ScriptAPI_Math_Length2D /EXPORT:ScriptAPI_Math_LengthSquared2D /EXPORT:ScriptAPI_Math_Normalize2D /EXPORT:ScriptAPI_Math_Dot2D /EXPORT:ScriptAPI_Math_Cross2D /EXPORT:ScriptAPI_Math_Lerp2D /EXPORT:ScriptAPI_Math_ClampVector2D /EXPORT:ScriptAPI_Math_AngleTo /EXPORT:ScriptAPI_Math_DirectionFromAngle /EXPORT:ScriptAPI_Math_Rotate2D /EXPORT:ScriptAPI_Debug_LogInfo /EXPORT:ScriptAPI_Debug_LogDebug /EXPORT:ScriptAPI_Debug_LogWarning /EXPORT:ScriptAPI_Debug_LogError /EXPORT:ScriptAPI_Window_GetWidth /EXPORT:ScriptAPI_Window_GetHeight /EXPORT:ScriptAPI_Window_ShouldClose /EXPORT:ScriptAPI_Window_Close /EXPORT:ScriptAPI_Window_IsFocused /EXPORT:ScriptAPI_Window_IsMinimized /EXPORT:ScriptAPI_Window_SetMinimized /EXPORT:ScriptAPI_Window_IsMaximized /EXPORT:ScriptAPI_Window_SetMaximized /EXPORT:ScriptAPI_Window_IsVisible /EXPORT:ScriptAPI_Window_SetVisible /EXPORT:ScriptAPI_Window_IsResizable /EXPORT:ScriptAPI_Window_SetResizable /EXPORT:ScriptAPI_Window_SetMode /EXPORT:ScriptAPI_Window_HasMode /EXPORT:ScriptAPI_Window_Resize /EXPORT:ScriptAPI_Application_Quit /EXPORT:ScriptAPI_Application_GetName /EXPORT:ScriptAPI_Application_GetFixedTimeStep /EXPORT:ScriptAPI_Application_IsVSyncEnabled")
-
-if(MSVC)
-    if(BUILD_EDITOR)
-        set_target_properties(GrapeEngine PROPERTIES LINK_FLAGS "${SCRIPT_EXPORTS}")
-    endif()
-    if(BUILD_GAME)
-        set_target_properties(GrapeGame PROPERTIES LINK_FLAGS "${SCRIPT_EXPORTS}")
-    endif()
-endif()
+# Export functions from the engine DLL for C# P/Invoke
+# With WINDOWS_EXPORT_ALL_SYMBOLS ON, all SCRIPT_API functions are automatically exported.
+# No manual /EXPORT flags needed - the DLL exports symbols naturally.
+message(STATUS "Script API will be exported from GrapeEngine.dll")
 
 # ======================= IDE ORGANIZATION & WARNINGS =========================
 # Preserve folder structure in Visual Studio for both targets
@@ -321,9 +353,9 @@ if(BUILD_EDITOR)
     
     # Compiler warnings for editor
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(GrapeEngine PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        target_compile_options(GrapeEditor PRIVATE -Wall -Wextra -Wpedantic -Werror)
     elseif (MSVC)
-        target_compile_options(GrapeEngine PRIVATE /W4)
+        target_compile_options(GrapeEditor PRIVATE /W4)
     endif()
 endif()
 
@@ -362,13 +394,13 @@ endif()
 
 # Copy assets to build directory for editor
 if(BUILD_EDITOR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
-    add_custom_command(TARGET GrapeEngine POST_BUILD
+    add_custom_command(TARGET GrapeEditor POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_LIST_DIR}/assets"
-        "$<TARGET_FILE_DIR:GrapeEngine>/assets"
+        "$<TARGET_FILE_DIR:GrapeEditor>/assets"
         COMMENT "Copying assets to editor build directory"
     )
-    add_custom_command(TARGET GrapeEngine POST_BUILD
+    add_custom_command(TARGET GrapeEditor POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_LIST_DIR}/assets"
         "${CMAKE_BINARY_DIR}/assets"
@@ -388,10 +420,10 @@ endif()
 
 # Copy FMOD DLL (Windows) for editor
 if(BUILD_EDITOR)
-    add_custom_command(TARGET GrapeEngine POST_BUILD
+    add_custom_command(TARGET GrapeEditor POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_LIST_DIR}/lib/fmod/fmod.dll"
-            "$<TARGET_FILE_DIR:GrapeEngine>"
+            "$<TARGET_FILE_DIR:GrapeEditor>"
         COMMENT "Copying FMOD DLL to editor output directory"
     )
 endif()
@@ -408,10 +440,10 @@ endif()
 
 # Copy nethost.dll for CoreCLR hosting (Windows) for editor
 if(BUILD_EDITOR AND EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
-    add_custom_command(TARGET GrapeEngine POST_BUILD
+    add_custom_command(TARGET GrapeEditor POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CORECLR_LIB_DIR}/nethost.dll"
-            "$<TARGET_FILE_DIR:GrapeEngine>"
+            "$<TARGET_FILE_DIR:GrapeEditor>"
         COMMENT "Copying nethost.dll to editor output directory"
     )
 endif()
@@ -603,7 +635,7 @@ if(DOTNET_EXECUTABLE)
     
     # Make targets depend on all script builds
     if(BUILD_EDITOR)
-        add_dependencies(GrapeEngine BuildScriptAPI ${GAME_SCRIPT_TARGETS})
+        add_dependencies(GrapeEditor BuildScriptAPI ${GAME_SCRIPT_TARGETS})
     endif()
     if(BUILD_GAME)
         add_dependencies(GrapeGame BuildScriptAPI ${GAME_SCRIPT_TARGETS})
@@ -614,10 +646,10 @@ if(DOTNET_EXECUTABLE)
 
     # Copy runtimeconfig.json for .NET hosting (editor)
     if(BUILD_EDITOR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")
-        add_custom_command(TARGET GrapeEngine POST_BUILD
+        add_custom_command(TARGET GrapeEditor POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json"
-                "$<TARGET_FILE_DIR:GrapeEngine>"
+                "$<TARGET_FILE_DIR:GrapeEditor>"
             COMMENT "Copying runtimeconfig.json to editor output directory"
         )
     endif()
@@ -657,17 +689,17 @@ foreach(SETTINGS_FILE ${ALL_PROJECT_SETTINGS_FOR_COPY})
     if(BUILD_EDITOR)
         if(WIN32)
             # Use directory junction on Windows (mklink /J) to avoid requiring developer-mode symlink privileges
-            add_custom_command(TARGET GrapeEngine POST_BUILD
+            add_custom_command(TARGET GrapeEditor POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E echo "Creating junction to ${PROJECT_NAME} (Editor)"
-                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GrapeEngine>"
-                COMMAND cmd /C "if not exist \"$<TARGET_FILE_DIR:GrapeEngine>\\${PROJECT_NAME}\" mklink /J \"$<TARGET_FILE_DIR:GrapeEngine>\\${PROJECT_NAME}\" \"${PROJECT_DIR}\""
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GrapeEditor>"
+                COMMAND cmd /C "if not exist \"$<TARGET_FILE_DIR:GrapeEditor>\\${PROJECT_NAME}\" mklink /J \"$<TARGET_FILE_DIR:GrapeEditor>\\${PROJECT_NAME}\" \"${PROJECT_DIR}\""
                 COMMENT "Creating junction to ${PROJECT_NAME} project (Editor)"
             )
         else()
-            add_custom_command(TARGET GrapeEngine POST_BUILD
+            add_custom_command(TARGET GrapeEditor POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E create_symlink
                 "${PROJECT_DIR}"
-                "$<TARGET_FILE_DIR:GrapeEngine>/${PROJECT_NAME}"
+                "$<TARGET_FILE_DIR:GrapeEditor>/${PROJECT_NAME}"
                 COMMENT "Creating symlink to ${PROJECT_NAME} project (Editor)"
             )
         endif()
@@ -695,13 +727,18 @@ foreach(SETTINGS_FILE ${ALL_PROJECT_SETTINGS_FOR_COPY})
     message(STATUS "Symlink to '${PROJECT_NAME}' will be created in build directory")
 endforeach()
 
-if(BUILD_EDITOR AND BUILD_GAME)
-    message(STATUS "GrapeEngine configured successfully! (Editor + Game)")
-elseif(BUILD_EDITOR)
-    message(STATUS "GrapeEngine configured successfully! (Editor only)")
-elseif(BUILD_GAME)
-    message(STATUS "GrapeEngine configured successfully! (Game only)")
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "GrapeEngine Build Configuration:")
+message(STATUS "  Engine: GrapeEngine.dll (Shared Library)")
+if(BUILD_EDITOR)
+    message(STATUS "  Editor: GrapeEditor.exe")
 endif()
+if(BUILD_GAME)
+    message(STATUS "  Game: ${GAME_FINAL_OUTPUT_NAME}.exe")
+endif()
+message(STATUS "========================================")
+message(STATUS "")
 
 # ======================= DOCUMENTATION GENERATION =========================
 find_package(Doxygen OPTIONAL_COMPONENTS dot)

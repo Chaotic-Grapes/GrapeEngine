@@ -17,7 +17,8 @@ namespace GrapeEngine.ScriptAPI.Unsafe;
 
 internal class UnsafeApiHelper
 {
-    // Use macros when needed but right now we only have one target
-    // TODO: To build as NOT .exe
-    public const string NativeLib = "GrapeEngine.exe";
+
+    // Native library name constant
+    // Used for DllImport attributes (we're actually using LibraryImport)
+    public const string NativeLib = "GrapeEngine.dll";
 }
