@@ -628,7 +628,7 @@
                             "W": 1.0,
                             "X": 0.0,
                             "Y": 0.0,
-                            "Z": 15.600000381469727
+                            "Z": 0.0
                         },
                         "Scale": {
                             "X": 1.0,
@@ -653,7 +653,11 @@
                 {
                     "Data": {
                         "Active": true,
+<<<<<<< Updated upstream
                         "AspectRatio": 1.5155038833618164,
+=======
+                        "AspectRatio": 2.3374691009521484,
+>>>>>>> Stashed changes
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -682,12 +686,12 @@
                     "Data": {
                         "Dirty": false,
                         "Matrix": {
-                            "m00": -0.9918155670166016,
-                            "m01": -0.1276804804801941,
+                            "m00": 1.0,
+                            "m01": 0.0,
                             "m02": 0.0,
                             "m03": -1.8626448161640496e-09,
-                            "m10": 0.1276804804801941,
-                            "m11": -0.9918155670166016,
+                            "m10": 0.0,
+                            "m11": 1.0,
                             "m12": 0.0,
                             "m13": 0.0,
                             "m20": 0.0,
@@ -709,8 +713,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -1.862645149230957e-09,
-                            "Y": -7.450580596923828e-09,
+                            "X": 0.0,
+                            "Y": 0.0,
                             "Z": 56.0
                         },
                         "Rotation": {
@@ -789,11 +793,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -1.862645149230957e-09,
+                            "m03": 0.0,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": -7.450580596923828e-09,
+                            "m13": 0.0,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1259,6 +1263,7 @@
                 {
                     "Data": {
                         "Value": "BlueBox"
+<<<<<<< Updated upstream
                     },
                     "TypeName": "Name"
                 },
@@ -1376,6 +1381,8 @@
                 {
                     "Data": {
                         "Value": "BlueBox (Clone)"
+=======
+>>>>>>> Stashed changes
                     },
                     "TypeName": "Name"
                 },
@@ -1425,7 +1432,7 @@
                         "Color": {
                             "A": 1.0,
                             "B": 1.0,
-                            "G": 0.4702122211456299,
+                            "G": 0.1329784393310547,
                             "R": 0.0
                         },
                         "Filled": true,
@@ -1448,128 +1455,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 6.829867362976074,
+                            "m03": 6.442473411560059,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 2.3832292556762695,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -2.1577138900756836,
-                            "Y": 6.412145137786865,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "BlueBox (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 19
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.10000000149011612,
-                        "PositionCorrectPercent": 0.20000000298023224,
-                        "Restitution": 0.0
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 1,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 0.0,
-                        "Mass": 0.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.0,
-                            "R": 0.20353364944458008
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeBox2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": -2.1577138900756836,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 6.412145137786865,
+                            "m13": 8.852737426757813,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1706,8 +1596,428 @@
                 {
                     "Data": {
                         "Position": {
+                            "X": -2.1577138900756836,
+                            "Y": 6.412145137786865,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
                             "X": 0.0,
                             "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "BlueBox (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 19
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.10000000149011612,
+                        "PositionCorrectPercent": 0.20000000298023224,
+                        "Restitution": 0.0
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 1,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.0,
+                        "Mass": 0.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.0,
+                            "R": 0.20353364944458008
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -2.1577138900756836,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 6.412145137786865,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 6.829867362976074,
+                            "Y": 2.3662548065185547,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "BlueBox (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 19
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.10000000149011612,
+                        "PositionCorrectPercent": 0.20000000298023224,
+                        "Restitution": 0.0
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 1,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.0,
+                        "Mass": 0.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.4702122211456299,
+                            "R": 0.0
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 6.829867362976074,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 2.3662548065185547,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": -9.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "AudioManager"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\AudioScripts\\AudioManager.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.AudioManager"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.8135457038879395,
+                            "G": 0.0,
+                            "R": 0.8777738213539124
+                        },
+                        "Filled": false,
+                        "HalfExtents": {
+                            "X": 0.5,
+                            "Y": 0.5
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.10000000149011612
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -9.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "AudioClip 1"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "CueId": 2357300755,
+                        "Loop": false,
+                        "Pitch": 1.0,
+                        "PlayOnStart": false,
+                        "Spatial3D": false,
+                        "Volume": 1.0
+                    },
+                    "TypeName": "AudioSource"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\AudioScripts\\AddToAudioManager.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.AudioScripts.AddToAudioManager"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -9.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 1.4398150444030762,
+                            "Y": 0.08072658628225327,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -1786,11 +2096,11 @@
                             "m00": 14.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 0.0,
+                            "m03": 1.4398150444030762,
                             "m10": 0.0,
                             "m11": 8.539999961853027,
                             "m12": 0.0,
-                            "m13": 0.0,
+                            "m13": 0.08072658628225327,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1806,10 +2116,26 @@
             ]
         }
     ],
-    "EntityCount": 16,
+    "EntityCount": 18,
     "Hierarchy": [
         {
+<<<<<<< Updated upstream
             "child": 14,
+=======
+            "child": 4,
+            "parent": 3
+        },
+        {
+            "child": 16,
+            "parent": 15
+        },
+        {
+            "child": 7,
+            "parent": 6
+        },
+        {
+            "child": 11,
+>>>>>>> Stashed changes
             "parent": 8
         },
         {
@@ -1829,6 +2155,7 @@
             "parent": 8
         },
         {
+<<<<<<< Updated upstream
             "child": 7,
             "parent": 6
         },
@@ -1838,6 +2165,9 @@
         },
         {
             "child": 9,
+=======
+            "child": 14,
+>>>>>>> Stashed changes
             "parent": 8
         }
     ],
