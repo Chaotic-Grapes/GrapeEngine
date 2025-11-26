@@ -1,5 +1,4 @@
 #include "audio/AudioSystem.h"
-#include "AudioAssetLibrary.h"
 #include "services/AudioService.h"
 #include "audio/FmodAudioDevice.h"
 #include <iostream>
@@ -8,18 +7,63 @@
 #include "core/Application.h"
 #include "services/OverlayService.h"
 
-/*
-    Update(dt)
-    ----------
-    Runtime audio update:
 
-    For every entity with AudioSource + WorldTransform:
-      - Resolve CueId -> clip (path) via AudioAssetLibrary
-      - Ensure the cue is loaded into the audio device
-      - If this entity has no active PlaybackHandle yet -> Play
-      - If it does have one -> update volume/pitch every frame
-      - If CueId becomes 0 or clip disappears -> Stop and clear handle
-*/
+namespace {
+    // Simple CueId -> Path cache
+    std::unordered_map<uint32_t, std::string> g_cueCache;
+    bool g_cacheBuilt = false;
+
+    // Build the cache by scanning audio folder once
+    void BuildCueCache(const std::string& audioRoot = "assets/Audio") {
+        if (g_cacheBuilt) return;
+
+        namespace fs = std::filesystem;
+
+        if (!fs::exists(audioRoot) || !fs::is_directory(audioRoot)) {
+            LOG_WARNING("Audio folder not found: " << audioRoot);
+            g_cacheBuilt = true;
+            return;
+        }
+
+        // Scan all audio files recursively
+        for (auto& entry : fs::recursive_directory_iterator(audioRoot)) {
+            if (!entry.is_regular_file()) continue;
+
+            auto ext = entry.path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            if (ext != ".wav" && ext != ".ogg" && ext != ".mp3" && ext != ".flac")
+                continue;
+
+            // Normalize path (\ to /)
+            std::string path = entry.path().string();
+            std::replace(path.begin(), path.end(), '\\', '/');
+
+            // Generate CueId from path hash
+            uint32_t cueId = static_cast<uint32_t>(std::hash<std::string>{}(path));
+
+            g_cueCache[cueId] = path;
+        }
+
+        LOG_INFO("AudioSystem: Cached " << g_cueCache.size() << " audio files");
+        g_cacheBuilt = true;
+    }
+
+    // Resolve CueId to path
+    const std::string* ResolveCueId(uint32_t cueId) {
+        // Build cache on first call
+        if (!g_cacheBuilt) {
+            BuildCueCache();
+        }
+
+        auto it = g_cueCache.find(cueId);
+        if (it != g_cueCache.end()) {
+            return &it->second;
+        }
+
+        return nullptr;
+    }
+}
 
 AudioSystem::AudioSystem(ECS::World& world, Services::AudioService& audioService)
     : m_world(world)
@@ -41,8 +85,7 @@ void AudioSystem::Update(float /*dt*/)
         return;
     }
 
-    // Get audio clip registry
-    auto& lib = AudioAssetLibrary::Get();
+
 
     // Check if game is playing (for editor mode)
     bool isPlaying = _isGamePlaying();
@@ -67,19 +110,20 @@ void AudioSystem::Update(float /*dt*/)
             // ----------------------------------------------------------------
             // Resolve cueId -> clip info
             // ----------------------------------------------------------------
-            const auto* clip = lib.FindById(src.CueId);
-            if (!clip) {
+            const std::string* pathPtr = ResolveCueId(src.CueId);
+            if (!pathPtr) {
                 static std::set<uint32_t> s_warnedCues;
                 if (s_warnedCues.find(src.CueId) == s_warnedCues.end()) {
                     LOG_WARNING("AudioSystem: Entity " << e.Index
-                        << " has invalid CueId " << src.CueId);
+                        << " has invalid CueId " << src.CueId
+                        << " (audio file not found in assets/Audio)");
                     s_warnedCues.insert(src.CueId);
                 }
                 _stopSound(e);
                 return;
             }
 
-            const std::string cueKey = clip->path;
+            const std::string& cueKey = *pathPtr;
 
             // ----------------------------------------------------------------
             // Load the sound if not already loaded
@@ -89,7 +133,7 @@ void AudioSystem::Update(float /*dt*/)
             params.Is3D = src.Spatial3D;
             params.DefaultVolume = src.Volume;
 
-            if (!m_audioService.LoadCue(cueKey, clip->path, params)) {
+            if (!m_audioService.LoadCue(cueKey, cueKey, params)) {
                 static std::set<std::string> s_failedCues;
                 if (s_failedCues.find(cueKey) == s_failedCues.end()) {
                     LOG_ERROR("AudioSystem: Failed to load cue: " << cueKey);
