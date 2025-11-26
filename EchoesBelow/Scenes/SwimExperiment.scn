@@ -653,11 +653,7 @@
                 {
                     "Data": {
                         "Active": true,
-<<<<<<< Updated upstream
                         "AspectRatio": 1.5155038833618164,
-=======
-                        "AspectRatio": 2.3374691009521484,
->>>>>>> Stashed changes
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -1263,7 +1259,6 @@
                 {
                     "Data": {
                         "Value": "BlueBox"
-<<<<<<< Updated upstream
                     },
                     "TypeName": "Name"
                 },
@@ -1381,8 +1376,6 @@
                 {
                     "Data": {
                         "Value": "BlueBox (Clone)"
-=======
->>>>>>> Stashed changes
                     },
                     "TypeName": "Name"
                 },
@@ -2119,23 +2112,7 @@
     "EntityCount": 18,
     "Hierarchy": [
         {
-<<<<<<< Updated upstream
             "child": 14,
-=======
-            "child": 4,
-            "parent": 3
-        },
-        {
-            "child": 16,
-            "parent": 15
-        },
-        {
-            "child": 7,
-            "parent": 6
-        },
-        {
-            "child": 11,
->>>>>>> Stashed changes
             "parent": 8
         },
         {
@@ -2155,7 +2132,6 @@
             "parent": 8
         },
         {
-<<<<<<< Updated upstream
             "child": 7,
             "parent": 6
         },
@@ -2165,9 +2141,6 @@
         },
         {
             "child": 9,
-=======
-            "child": 14,
->>>>>>> Stashed changes
             "parent": 8
         }
     ],
