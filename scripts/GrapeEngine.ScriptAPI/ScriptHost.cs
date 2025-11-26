@@ -41,6 +41,17 @@ namespace GrapeEngine.Scripting;
 /// </summary>
 public static class ScriptHost
 {
+    // Use Console-based logging inside unmanaged entry points to avoid
+    // causing native->managed->native re-entrancy (which can recurse).
+    // Managed `Logging.Log` calls into native logging which may call
+    // back into managed code; avoid that from UnmanagedCallersOnly methods.
+    private static void NativeLog(string message, LogLevel level = LogLevel.Info)
+    {
+        if (level == LogLevel.Error || level == LogLevel.Warning)
+            Console.Error.WriteLine(message);
+        else
+            Console.WriteLine(message);
+    }
     // Store all active script instances
     private static readonly Dictionary<ulong, ScriptBehaviour> m_instances = new();
     private static ulong m_nextHandle = 1;
@@ -77,11 +88,11 @@ public static class ScriptHost
             // string.IsNullOrWhiteSpace is better than IsNullOrEmpty in most cases
             if (string.IsNullOrWhiteSpace(typeName))
             {
-                Logging.Log("ERROR: Null or empty type name", LogLevel.Error);
+                NativeLog("ERROR: Null or empty type name", LogLevel.Error);
                 return 0;
             }
 
-            Logging.Log($"Creating script instance: {typeName} for entity {entityId}", LogLevel.Info);
+            NativeLog($"Creating script instance: {typeName} for entity {entityId}", LogLevel.Info);
 
             // Find the type
             var scriptType = Type.GetType(typeName);
@@ -98,11 +109,11 @@ public static class ScriptHost
 
             if (scriptType == null)
             {
-                Logging.Log($"ERROR: Type not found: {typeName}", LogLevel.Error);
-                Logging.Log("Loaded assemblies:", LogLevel.Error);
+                NativeLog($"ERROR: Type not found: {typeName}", LogLevel.Error);
+                NativeLog("Loaded assemblies:", LogLevel.Error);
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    Logging.Log($"  - {asm.GetName().Name} ({asm.GetName().Version})", LogLevel.Error);
+                    NativeLog($"  - {asm.GetName().Name} ({asm.GetName().Version})", LogLevel.Error);
                     
                     // If this looks like a game assembly, list its types
                     if (!asm.GetName().Name.StartsWith("System") && 
@@ -113,26 +124,26 @@ public static class ScriptHost
                         try
                         {
                             var types = asm.GetTypes();
-                            Logging.Log($"    Types in {asm.GetName().Name}:", LogLevel.Error);
+                            NativeLog($"    Types in {asm.GetName().Name}:", LogLevel.Error);
                             foreach (var t in types)
                             {
                                 if (!t.IsNested && t.Namespace != null)
                                 {
-                                    Logging.Log($"      * {t.FullName}", LogLevel.Error);
+                                    NativeLog($"      * {t.FullName}", LogLevel.Error);
                                 }
                             }
                         }
                         catch (Exception ex)
                         {
-                            Logging.Log($"    Could not list types: {ex.Message}", LogLevel.Error);
+                            NativeLog($"    Could not list types: {ex.Message}", LogLevel.Error);
                         }
                     }
                 }
                 return 0;
             }
 
-            Logging.Log($"Found type: {scriptType.FullName}", LogLevel.Info);
-            Logging.Log($"Base type: {scriptType.BaseType?.FullName ?? "null"}", LogLevel.Info);
+            NativeLog($"Found type: {scriptType.FullName}", LogLevel.Info);
+            NativeLog($"Base type: {scriptType.BaseType?.FullName ?? "null"}", LogLevel.Info);
 
             // Verify it's a ScriptBehaviour
             // Use name-based check to avoid assembly context issues
@@ -150,7 +161,7 @@ public static class ScriptHost
 
             if (!isScriptBehaviour)
             {
-                Logging.Log($"ERROR: Type {typeName} does not inherit from ScriptBehaviour" + Environment.NewLine +
+                NativeLog($"ERROR: Type {typeName} does not inherit from ScriptBehaviour" + Environment.NewLine +
                             $"  Found in assembly: {scriptType.Assembly.FullName}" + Environment.NewLine +
                             $"  Type's full name: {scriptType.FullName}" + Environment.NewLine +
                             $"  Type's namespace: {scriptType.Namespace ?? "none"}" + Environment.NewLine +
@@ -189,7 +200,7 @@ public static class ScriptHost
             if (scriptBehaviour == null)
             {
                 // Assembly context mismatch - the loaded type's ScriptBehaviour is different from ours
-                Logging.Log($"ERROR: Type identity mismatch for {typeName}" + Environment.NewLine +
+                NativeLog($"ERROR: Type identity mismatch for {typeName}" + Environment.NewLine +
                             $"  Instance type: {instance.GetType().FullName}" + Environment.NewLine +
                             $"  Instance assembly: {instance.GetType().Assembly.FullName}" + Environment.NewLine +
                             $"  Expected ScriptBehaviour from: {typeof(ScriptBehaviour).Assembly.FullName}" + Environment.NewLine +
@@ -202,17 +213,14 @@ public static class ScriptHost
             var handle = m_nextHandle++;
             m_instances[handle] = scriptBehaviour;
 
-            Logging.Log($"Script instance created successfully. Handle: {handle}", LogLevel.Info);
+            NativeLog($"Script instance created successfully. Handle: {handle}", LogLevel.Info);
 
             return handle;
         }
         catch (Exception ex)
         {
-            Logging.Log($"Error creating script instance: {ex.Message}" + Environment.NewLine +
+            NativeLog($"Error creating script instance: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
-
-            Marshal.FreeHGlobal(typeNamePtr); // nearly forgot to free the unmanaged string
-
             return 0;
         }
     }
@@ -229,18 +237,18 @@ public static class ScriptHost
         {
             if (m_instances.TryGetValue(handle, out var instance))
             {
-                Logging.Log($"Destroying script instance. Handle: {handle}", LogLevel.Info);
+                    NativeLog($"Destroying script instance. Handle: {handle}", LogLevel.Info);
                 instance.OnDestroy();
                 m_instances.Remove(handle);
             }
             else
             {
-                Logging.Log($"Tried to destroy non-existent handle: {handle}", LogLevel.Warning);
+                    NativeLog($"Tried to destroy non-existent handle: {handle}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Logging.Log($"Error destroying script: {ex.Message}", LogLevel.Error);
+                NativeLog($"Error destroying script: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -260,13 +268,13 @@ public static class ScriptHost
             }
             else
             {
-                Logging.Log($"CallStart on invalid handle: {handle}", LogLevel.Warning);
+                    NativeLog($"CallStart on invalid handle: {handle}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnStart: {ex.Message}" + Environment.NewLine +
-                        $"Stack trace: {ex.StackTrace}", LogLevel.Error);
+                NativeLog($"ERROR in OnStart: {ex.Message}" + Environment.NewLine +
+                            $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
 
@@ -287,7 +295,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnUpdate: {ex.Message}" + Environment.NewLine +
+            NativeLog($"ERROR in OnUpdate: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
@@ -309,7 +317,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnFixedUpdate: {ex.Message}" + Environment.NewLine +
+            NativeLog($"ERROR in OnFixedUpdate: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
@@ -331,7 +339,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnLateUpdate: {ex.Message}" + Environment.NewLine +
+            NativeLog($"ERROR in OnLateUpdate: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
@@ -406,7 +414,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in collision callback: {ex.Message}" + Environment.NewLine +
+            NativeLog($"ERROR in collision callback: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
@@ -427,7 +435,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnEnable: {ex.Message}" + Environment.NewLine +
+            NativeLog($"ERROR in OnEnable: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
@@ -448,7 +456,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"ERROR in OnDisable: {ex.Message}" + Environment.NewLine +
+            NativeLog($"ERROR in OnDisable: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
         }
     }
@@ -568,7 +576,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Logging.Log($"Error loading game assembly: {ex.Message}" + Environment.NewLine +
+            NativeLog($"Error loading game assembly: {ex.Message}" + Environment.NewLine +
                         $"Stack trace: {ex.StackTrace}", LogLevel.Error);
             return 0;
         }
