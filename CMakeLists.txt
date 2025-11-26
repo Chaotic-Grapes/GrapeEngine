@@ -167,18 +167,45 @@ if(BUILD_GAME)
 
     if(GAME_OUTPUT_NAME STREQUAL "")
         file(GLOB PROJECT_SETTINGS_FILES "${CMAKE_CURRENT_LIST_DIR}/*/ProjectSettings.json")
-        if(PROJECT_SETTINGS_FILES)
-            list(GET PROJECT_SETTINGS_FILES 0 FIRST_SETTINGS)
-            get_filename_component(FIRST_PROJECT_DIR ${FIRST_SETTINGS} DIRECTORY)
-            get_filename_component(FIRST_PROJECT_NAME ${FIRST_PROJECT_DIR} NAME)
-            if(NOT FIRST_PROJECT_NAME STREQUAL "")
+        # Prefer a project folder that contains a .csproj (explicit game project).
+        # Failing that, prefer a folder whose name starts with a letter (avoid numeric/tooling folders).
+        set(_preferred_with_csproj "")
+        set(_preferred_alpha_name "")
+        foreach(_settings_file ${PROJECT_SETTINGS_FILES})
+            get_filename_component(_proj_dir ${_settings_file} DIRECTORY)
+            get_filename_component(_proj_name ${_proj_dir} NAME)
+            # Check for a .csproj in the project dir
+            file(GLOB _csproj_files "${_proj_dir}/*.csproj")
+            if(_csproj_files)
+                set(_preferred_with_csproj "${_proj_name}")
+                break()
+            endif()
+            # If no csproj yet, remember first name that starts with a letter
+            if(_preferred_alpha_name STREQUAL "")
+                string(REGEX MATCH "^[A-Za-z]" _starts_letter "${_proj_name}")
+                if(_starts_letter)
+                    set(_preferred_alpha_name "${_proj_name}")
+                endif()
+            endif()
+        endforeach()
+
+        if(NOT _preferred_with_csproj STREQUAL "")
+            set(GAME_OUTPUT_NAME "${_preferred_with_csproj}")
+        elseif(NOT _preferred_alpha_name STREQUAL "")
+            set(GAME_OUTPUT_NAME "${_preferred_alpha_name}")
+        else()
+            # Fallback to first found project settings file's parent folder name
+            if(PROJECT_SETTINGS_FILES)
+                list(GET PROJECT_SETTINGS_FILES 0 FIRST_SETTINGS)
+                get_filename_component(FIRST_PROJECT_DIR ${FIRST_SETTINGS} DIRECTORY)
+                get_filename_component(FIRST_PROJECT_NAME ${FIRST_PROJECT_DIR} NAME)
                 set(GAME_OUTPUT_NAME "${FIRST_PROJECT_NAME}")
             else()
                 set(GAME_OUTPUT_NAME "GrapeGame")
             endif()
-        else()
-            set(GAME_OUTPUT_NAME "GrapeGame")
         endif()
+
+        message(STATUS "Auto-detected game project name: ${GAME_OUTPUT_NAME}")
     endif()
 
     # Append suffix "Game" to the base project name unless it already ends
@@ -207,6 +234,20 @@ if(BUILD_GAME)
         COMPILE_PDB_NAME "${GAME_FINAL_OUTPUT_NAME}"
         COMPILE_PDB_OUTPUT_DIRECTORY "$<TARGET_FILE_DIR:GrapeGame>"
     )
+
+    # MSVC / Visual Studio generator sometimes produces project-level TargetName
+    # values with numeric prefixes which end up in the .exe filename (e.g.
+    # "14EchoesBelowGame.exe") even when OUTPUT_NAME is set. To normalize the
+    # on-disk executable name across generators, add a post-build rename step
+    # that forces the final exe to match ${GAME_FINAL_OUTPUT_NAME}. This is a
+    # harmless safety measure and only affects the standalone game target.
+    if(MSVC)
+        add_custom_command(TARGET GrapeGame POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E echo "Normalizing game executable name to ${GAME_FINAL_OUTPUT_NAME}.exe"
+            COMMAND ${CMAKE_COMMAND} -E rename "$<TARGET_FILE:GrapeGame>" "$<TARGET_FILE_DIR:GrapeGame>/${GAME_FINAL_OUTPUT_NAME}.exe"
+            COMMENT "Normalize game executable name"
+        )
+    endif()
     
     # NO USE_IMGUI definition - this disables all ImGui code
     # target_compile_definitions(GrapeGame PRIVATE ...) - intentionally empty
@@ -228,7 +269,7 @@ if(BUILD_GAME)
             ${NETHOST_LIB}
     )
     
-    message(STATUS "  Target: GrapeGame (Standalone)")
+    message(STATUS "  Target: ${GAME_FINAL_OUTPUT_NAME} (Standalone)")
     message(STATUS "  ImGui: Disabled")
 endif()
 

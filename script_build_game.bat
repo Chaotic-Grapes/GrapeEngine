@@ -38,5 +38,18 @@ if %errorlevel% neq 0 (
 cd ..
 echo.
 echo Standalone Game build %CONFIG% completed successfully!
-echo Executable location: build_game\%CONFIG%\GrapeGame.exe
+REM Try to detect the produced executable name (prefer *Game.exe)
+set "EXE_DIR=build_game\%CONFIG%"
+set "EXE_NAME="
+
+for /f "delims=" %%F in ('dir "%EXE_DIR%\*Game.exe" /b 2^>nul') do if not defined EXE_NAME set "EXE_NAME=%%F"
+if not defined EXE_NAME (
+    for /f "delims=" %%F in ('dir "%EXE_DIR%\*.exe" /b 2^>nul') do if not defined EXE_NAME set "EXE_NAME=%%F"
+)
+
+if defined EXE_NAME (
+    echo Executable location: %EXE_DIR%\%EXE_NAME%
+) else (
+    echo Executable location: %EXE_DIR%\^<not found^>
+)
 pause
