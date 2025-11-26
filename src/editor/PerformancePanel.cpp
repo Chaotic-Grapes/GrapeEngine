@@ -10,8 +10,7 @@ Implements the in-editor performance monitoring panel used by the Level Editor.
 
 Displays realtime performance metrics while the editor is in Play mode:
 - FPS and frame time (from the engine Profiler)
-- System-wide CPU and memory usage (percentage)
-- A compact listing of profiler scopes with avg/last/max timings
+- System usage breakdown per registered profiling scope
 
 Monitoring is paused when the editor is not in Play state to avoid
 polling system counters while the game is not running.
@@ -23,80 +22,20 @@ polling system counters while the game is not running.
 #include "core/Logger.h"
 #include <imgui.h>
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
 void PerformancePanel::Initialize(ImFont* mainFont, ImFont* boldFont) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_initialized = true;
-
-#ifdef _WIN32
-    // Initialize previous times
-    FILETIME idle, kernel, user;
-
-    // Get initial system times
-    if (GetSystemTimes(&idle, &kernel, &user)) {
-        ULARGE_INTEGER ulIdle, ulKernel, ulUser;
-        ulIdle.LowPart = idle.dwLowDateTime; ulIdle.HighPart = idle.dwHighDateTime;
-        ulKernel.LowPart = kernel.dwLowDateTime; ulKernel.HighPart = kernel.dwHighDateTime;
-        ulUser.LowPart = user.dwLowDateTime; ulUser.HighPart = user.dwHighDateTime;
-        m_prevIdle = ulIdle.QuadPart;
-        m_prevKernel = ulKernel.QuadPart;
-        m_prevUser = ulUser.QuadPart;
-    }
-#endif
 }
 
 void PerformancePanel::Shutdown() {
     m_initialized = false;
+    m_hasCollectedData = false;
 }
 
-#ifdef _WIN32
-static unsigned long long FileTimeToULL(const FILETIME &ft) {
-    ULARGE_INTEGER ul;
-    ul.LowPart = ft.dwLowDateTime;
-    ul.HighPart = ft.dwHighDateTime;
-    return ul.QuadPart;
+void PerformancePanel::ResetForNewScene() {
+    m_hasCollectedData = false;
 }
-
-static float GetSystemMemoryUsagePercent() {
-    MEMORYSTATUSEX mem = {};
-    mem.dwLength = sizeof(mem);
-    if (GlobalMemoryStatusEx(&mem)) {
-        DWORDLONG used = mem.ullTotalPhys - mem.ullAvailPhys;
-        double pct = (double)used / (double)mem.ullTotalPhys * 100.0;
-        return static_cast<float>(pct);
-    }
-    return 0.0f;
-}
-
-static float GetCpuUsagePercent(unsigned long long &prevIdle, unsigned long long &prevKernel, unsigned long long &prevUser) {
-    FILETIME idleTime, kernelTime, userTime;
-    if (!GetSystemTimes(&idleTime, &kernelTime, &userTime)) return 0.0f;
-
-    unsigned long long id = FileTimeToULL(idleTime);
-    unsigned long long kr = FileTimeToULL(kernelTime);
-    unsigned long long ur = FileTimeToULL(userTime);
-
-    unsigned long long sys = (kr + ur) - (prevKernel + prevUser);
-    unsigned long long idle = id - prevIdle;
-
-    float cpuPercent = 0.0f;
-    if (sys > 0) cpuPercent = 100.0f * (1.0f - (double)idle / (double)sys);
-
-    prevIdle = id;
-    prevKernel = kr;
-    prevUser = ur;
-
-    if (cpuPercent < 0.0f) cpuPercent = 0.0f;
-    if (cpuPercent > 100.0f) cpuPercent = 100.0f;
-
-    return cpuPercent;
-}
-#endif
 
 void PerformancePanel::Render(bool isPlaying) {
     if (!m_initialized) return;
@@ -104,52 +43,102 @@ void PerformancePanel::Render(bool isPlaying) {
     ImGui::PushFont(m_mainFont);
     ImGui::Begin("Performance");
 
-    if (!isPlaying) {
+    // Show paused message only if we haven't collected any data yet
+    if (!isPlaying && !m_hasCollectedData) {
         ImGui::TextColored(ImVec4(1,1,0,1), "Monitoring paused — enter Play (Run) to collect data");
         ImGui::End();
         ImGui::PopFont();
         return;
     }
+    
+    // Mark that we've collected data once play mode is active
+    if (isPlaying) {
+        m_hasCollectedData = true;
+        
+        // Cache live data while playing
+        try {
+            m_cachedFps = Profiler::GetFPS();
+            m_cachedFrameMs = Profiler::GetFrameTimeMs();
+            m_cachedTotalTime = Profiler::GetTotalScopeTimes();
+            
+            // Cache scope data
+            const auto &liveScopes = Profiler::GetAllScopeData();
+            m_cachedScopes.clear();
+            for (const auto &kv : liveScopes) {
+                CachedScopeData cached;
+                cached.AverageTimeMs = kv.second.AverageTimeMs;
+                cached.MaxTimeMs = kv.second.MaxTimeMs;
+                m_cachedScopes[kv.first] = cached;
+            }
+        }
+        catch (...) {
+            // Keep existing cached values on error
+        }
+    }
 
-    // FPS from Profiler
-    float fps = 0.0f;
-    float frameMs = 0.0f;
-    // Use Profiler static accessor if available
-    try {
-        fps = Profiler::GetFPS();
-        frameMs = Profiler::GetFrameTimeMs();
-    }
-    catch (...) {
-        // Fallback: show zeros
-        fps = 0.0f;
-        frameMs = 0.0f;
-    }
+    // Use cached values (frozen when stopped, live when playing)
+    float fps = m_cachedFps;
+    float frameMs = m_cachedFrameMs;
 
     ImGui::Text("FPS: %.1f", fps);
     ImGui::SameLine(150);
     ImGui::Text("Frame: %.2f ms", frameMs);
 
-#ifdef _WIN32
-    float cpu = GetCpuUsagePercent(m_prevIdle, m_prevKernel, m_prevUser);
-    float mem = GetSystemMemoryUsagePercent();
-
-    ImGui::Text("CPU Usage: %.1f %%", cpu);
-    ImGui::SameLine(150);
-    ImGui::Text("Memory Usage: %.1f %%", mem);
-#else
-    ImGui::Text("CPU Usage: N/A on this platform");
-    ImGui::Text("Memory Usage: N/A on this platform");
-#endif
-
     ImGui::Separator();
-    ImGui::TextWrapped("Profiler Scopes:");
+    ImGui::PushFont(m_boldFont);
+    ImGui::Text("System Usage");
+    ImGui::PopFont();
+    ImGui::Spacing();
 
-    // List top-level scope info if available
-    const auto &scopes = Profiler::GetAllScopeData();
-    for (const auto &kv : scopes) {
+    // Use cached total time
+    double totalTime = m_cachedTotalTime;
+    if (totalTime < 0.001)
+        totalTime = frameMs; // Fallback to frame time if no scopes
+
+    // List each system with cached formatting
+    for (const auto &kv : m_cachedScopes) {
         const std::string &name = kv.first;
         const auto &data = kv.second;
-        ImGui::Text("%s: avg=%.2f ms, last=%.2f ms, max=%.2f ms", name.c_str(), data.AverageTimeMs, data.LastTimeMs, data.MaxTimeMs);
+        
+        // Calculate usage percentage
+        float usagePercent = 0.0f;
+        if (totalTime > 0.001f) {
+            usagePercent = (data.AverageTimeMs / static_cast<float>(totalTime)) * 100.0f;
+        }
+        
+        // System name header
+        ImGui::PushFont(m_boldFont);
+        ImGui::Text("%s", name.c_str());
+        ImGui::PopFont();
+        
+        // Determine bar color based on usage percentage
+        ImVec4 barColor;
+        if (usagePercent >= 80.0f) {
+            // Red for very high usage (>= 80%)
+            barColor = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
+        }
+        else if (usagePercent >= 60.0f) {
+            // Orange for high usage (60-79%)
+            barColor = ImVec4(0.9f, 0.6f, 0.2f, 1.0f);
+        }
+        else if (usagePercent >= 40.0f) {
+            // Yellow for moderate usage (40-59%)
+            barColor = ImVec4(0.9f, 0.9f, 0.2f, 1.0f);
+        }
+        else {
+            // Green for low usage (< 40%)
+            barColor = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
+        }
+        
+        // Bar graph showing usage
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
+        ImGui::ProgressBar(usagePercent / 100.0f, ImVec2(-1.0f, 0.0f));
+        ImGui::PopStyleColor();
+        
+        // Detailed stats on one line
+        ImGui::Text("  %.1f%% | Avg: %.2f ms | Max: %.2f ms", usagePercent, data.AverageTimeMs, data.MaxTimeMs);
+        
+        ImGui::Spacing();
     }
 
     ImGui::End();

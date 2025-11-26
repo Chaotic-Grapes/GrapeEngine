@@ -241,7 +241,7 @@ namespace Services {
 
         LOG_DEBUG("LevelEditor disabled");
     }
-
+}
 #else
 namespace Services {
     void OverlayService::Update() {}

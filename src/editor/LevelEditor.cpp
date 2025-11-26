@@ -141,6 +141,10 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
 
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
+    
+    // Programmatically select Asset Browser tab by default
+    ImGui::SetWindowFocus("Asset Browser");
+    
     m_dockLayoutBuilt = true;                // Mark layout as built
 }
 
@@ -309,7 +313,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
             m_performancePanel.Initialize(m_mainFont, m_boldFont);
         },
         [this]() { m_performancePanel.Render(m_playback.IsPlaying()); },
-        [this](ECS::World* w) { m_performancePanel.SetWorld(w); }
+        nullptr//[this](ECS::World* w) { void(*w); } // No world needed
     );
 
     // Initialize all registered panels
@@ -549,6 +553,9 @@ void LevelEditor::SetWorld(ECS::World* world) {
 
     // Propagate world to all registered panels using centralized system
     _updatePanelWorlds(world);
+    
+    // Reset performance panel to show paused message for new scene
+    m_performancePanel.ResetForNewScene();
 }
 
 // -------------------------------------------------------------------------
