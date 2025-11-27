@@ -25,24 +25,21 @@ public class MS_ObjPool : ScriptBehaviour
                 Entity fromIdEntity = Entity.FromId(obj.objID);
                 //Declare and assign a new reference to the according Obj thru ID
                 ref LocalTransform transform3 = ref fromIdEntity.GetComponent<LocalTransform>();
-                //Get the relavant ref component u need 
-                transform3.Position.Y += 0.4f;
                 Log("Entity FromId(): " + transform3.Position);
-
             }
         }
-        if (Input.IsKeyPressed(KeyCode.L))
-        {
-            foreach (MS_MarineSnow obj in ms_Objs)
-            {
-                Entity fromIdEntity = Entity.FromId(obj.objID);
-                //Declare and assign a new reference to the according Obj thru ID
-                ref Active active = ref fromIdEntity.GetComponent<Active>();
-                //Get the relavant ref component u need 
-                active.Enabled = !active.Enabled;
-                //toggle enabled
-            }
-        }
+        //if (Input.IsKeyPressed(KeyCode.L))
+        //{
+        //    foreach (MS_MarineSnow obj in ms_Objs)
+        //    {
+        //        Entity fromIdEntity = Entity.FromId(obj.objID);
+        //        //Declare and assign a new reference to the according Obj thru ID
+        //        ref Active active = ref fromIdEntity.GetComponent<Active>();
+        //        //Get the relavant ref component u need 
+        //        active.Enabled = !active.Enabled;
+        //        //toggle enabled
+        //    }
+        //}
     }
 }
 
