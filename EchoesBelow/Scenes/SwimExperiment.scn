@@ -5,8 +5,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -3.4120354652404785,
-                            "Y": 4.64263391494751,
+                            "X": -3.3364109992980957,
+                            "Y": 5.548984527587891,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -112,11 +112,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -3.4120354652404785,
+                            "m03": -3.3364109992980957,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 4.64263391494751,
+                            "m13": 5.548984527587891,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -136,8 +136,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -4.571602821350098,
-                            "Y": 4.64263391494751,
+                            "X": -4.243899822235107,
+                            "Y": 5.682884216308594,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -243,11 +243,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -4.571602821350098,
+                            "m03": -4.243899822235107,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 4.64263391494751,
+                            "m13": 5.682884216308594,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -267,8 +267,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -2.3785078525543213,
-                            "Y": 4.64263391494751,
+                            "X": -2.2272591590881348,
+                            "Y": 5.582054138183594,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -374,11 +374,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -2.3785078525543213,
+                            "m03": -2.2272591590881348,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 4.64263391494751,
+                            "m13": 5.582054138183594,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -398,230 +398,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 0.0,
-                            "Y": -0.045832276344299316,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "Player"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Enabled": true
-                    },
-                    "TypeName": "Active"
-                },
-                {
-                    "Data": {
-                        "Value": 0.0
-                    },
-                    "TypeName": "AngularVelocity2D"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 0.27000001072883606,
-                            "Y": 0.47999998927116394
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.05000000074505806
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 2
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Value": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        }
-                    },
-                    "TypeName": "LinearVelocity2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.699999988079071,
-                        "Flags": 2,
-                        "GravityScale": 0.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 1.0,
-                        "Mass": 1.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Initialized": false,
-                        "ManagedHandle": 0,
-                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\Player.cs",
-                        "TypeHash": 0,
-                        "TypeName": "Scripts.Player"
-                    },
-                    "TypeName": "ScriptInstance"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 0.19839359819889069,
-                            "G": 0.8718132376670837,
-                            "R": 0.0
-                        },
-                        "Filled": false,
-                        "HalfExtents": {
-                            "X": 0.27000001072883606,
-                            "Y": 0.47999998927116394
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.05000000074505806
-                        },
-                        "Thickness": 0.009999999776482582
-                    },
-                    "TypeName": "ShapeBox2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": -0.045832276344299316,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": 0.0,
-                            "Y": 2.3283064365386963e-10,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "GrainSprite"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Id": 20
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 1.0,
-                            "R": 1.0
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "TextureId": 2,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Idle_000.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
-                    },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": -0.045832276344299316,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -1.8626448161640496e-09,
-                            "Y": 0.0,
+                            "X": -0.45802855491638184,
+                            "Y": 1.1491422653198242,
                             "Z": 56.0
                         },
                         "Rotation": {
@@ -653,7 +431,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.5155038833618164,
+                        "AspectRatio": 1.203991174697876,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -685,11 +463,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -1.8626448161640496e-09,
+                            "m03": -0.45802855491638184,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 0.0,
+                            "m13": 1.1491422653198242,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -709,8 +487,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 0.0,
-                            "Y": 0.0,
+                            "X": -0.45802855491638184,
+                            "Y": 1.1491422653198242,
                             "Z": 56.0
                         },
                         "Rotation": {
@@ -789,11 +567,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 0.0,
+                            "m03": -0.45802855491638184,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 0.0,
+                            "m13": 1.1491422653198242,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -887,7 +665,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 3,
+                        "TextureId": 2,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\Placeholder Sprites\\ButtonWireFrame.png",
                         "Tiling": {
                             "X": 1.0,
@@ -903,11 +681,1109 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 3.4603679180145264,
+                            "m03": 3.0023393630981445,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 1.6270610094070435,
+                            "m13": 2.776203155517578,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 56.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "ObjPoolTest"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\ObjectPool\\MS_ObjPool.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.ObjectPool.MS_ObjPool"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -17.074464797973633,
+                            "Y": -0.10198080539703369,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Obj A (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 0.25,
+                            "Y": 0.25
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 20
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 2,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 5.0,
+                        "Mass": 1.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\ObjectPool\\MS_MarineSnow.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.ObjectPool.MS_MarineSnow"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.0,
+                            "G": 1.0,
+                            "R": 0.13733482360839844
+                        },
+                        "Filled": false,
+                        "HalfExtents": {
+                            "X": 0.30000001192092896,
+                            "Y": 0.30000001192092896
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.029999999329447746
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -17.074464797973633,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -0.10198080539703369,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.5,
+                            "Y": 0.5,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS_Sprite (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Id": 21
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 3,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\MarineSnow\\MarineSnow_Square.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.5,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -17.074464797973633,
+                            "m10": 0.0,
+                            "m11": 0.5,
+                            "m12": 0.0,
+                            "m13": -0.10198080539703369,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -18.877113342285156,
+                            "Y": -0.051201991736888885,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Obj A"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 0.25,
+                            "Y": 0.25
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 20
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 2,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 5.0,
+                        "Mass": 1.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\ObjectPool\\MS_MarineSnow.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.ObjectPool.MS_MarineSnow"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.0,
+                            "G": 1.0,
+                            "R": 0.13733482360839844
+                        },
+                        "Filled": false,
+                        "HalfExtents": {
+                            "X": 0.30000001192092896,
+                            "Y": 0.30000001192092896
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.029999999329447746
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -18.877113342285156,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -0.051201991736888885,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.5,
+                            "Y": 0.5,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS_Sprite"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Id": 21
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 3,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\MarineSnow\\MarineSnow_Square.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.5,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -18.877113342285156,
+                            "m10": 0.0,
+                            "m11": 0.5,
+                            "m12": 0.0,
+                            "m13": -0.051201991736888885,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -17.93770408630371,
+                            "Y": 0.3211764097213745,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Obj A (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Value": 0.0
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 0.25,
+                            "Y": 0.25
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 20
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 2,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 5.0,
+                        "Mass": 1.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\ObjectPool\\MS_MarineSnow.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.ObjectPool.MS_MarineSnow"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.0,
+                            "G": 1.0,
+                            "R": 0.13733482360839844
+                        },
+                        "Filled": false,
+                        "HalfExtents": {
+                            "X": 0.30000001192092896,
+                            "Y": 0.30000001192092896
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.029999999329447746
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -17.93770408630371,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.3211764097213745,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.5,
+                            "Y": 0.5,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS_Sprite (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Id": 21
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 3,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\MarineSnow\\MarineSnow_Square.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.5,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -17.93770408630371,
+                            "m10": 0.0,
+                            "m11": 0.5,
+                            "m12": 0.0,
+                            "m13": 0.3211764097213745,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -0.4580284655094147,
+                            "Y": 1.1491426229476929,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": -0.5962154269218445,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": -0.8031903505325317
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "Player"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Value": 1.821688003622262e-43
+                    },
+                    "TypeName": "AngularVelocity2D"
+                },
+                {
+                    "Data": {
+                        "CueId": 1670846282,
+                        "Loop": true,
+                        "Pitch": 1.0,
+                        "PlayOnStart": true,
+                        "Spatial3D": false,
+                        "Volume": 1.0
+                    },
+                    "TypeName": "AudioSource"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 0.27000001072883606,
+                            "Y": 0.47999998927116394
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.05000000074505806
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 2
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Value": {
+                            "X": -9.528829557408756e-44,
+                            "Y": -9.528829557408756e-44
+                        }
+                    },
+                    "TypeName": "LinearVelocity2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.699999988079071,
+                        "Flags": 2,
+                        "GravityScale": 0.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 1.0,
+                        "Mass": 1.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\Player.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.Player"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 0.19839359819889069,
+                            "G": 0.8718132376670837,
+                            "R": 0.0
+                        },
+                        "Filled": false,
+                        "HalfExtents": {
+                            "X": 0.27000001072883606,
+                            "Y": 0.47999998927116394
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.05000000074505806
+                        },
+                        "Thickness": 0.009999999776482582
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": -0.2894718647003174,
+                            "m01": -0.9571864604949951,
+                            "m02": 0.0,
+                            "m03": -0.4580284655094147,
+                            "m10": 0.9571864604949951,
+                            "m11": -0.2894718647003174,
+                            "m12": 0.0,
+                            "m13": 1.1491426229476929,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 2.3283064365386963e-10,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "GrainSprite"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 20
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 5,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Idle_000.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": -0.2894718647003174,
+                            "m01": -0.9571864604949951,
+                            "m02": 0.0,
+                            "m03": -0.4580284655094147,
+                            "m10": 0.9571864604949951,
+                            "m11": -0.2894718647003174,
+                            "m12": 0.0,
+                            "m13": 1.1491426229476929,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -0.45802855491638184,
+                            "Y": 1.1491422653198242,
+                            "Z": 56.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 14.0,
+                            "Y": 8.539999961853027,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "BG"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\FollowLeader.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.FollowLeader"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 4,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Player Essentials\\OceanBG_00@4x.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Mask": 2
+                    },
+                    "TypeName": "TagMask"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 14.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -0.45802855491638184,
+                            "m10": 0.0,
+                            "m11": 8.539999961853027,
+                            "m12": 0.0,
+                            "m13": 1.1491422653198242,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -988,8 +1864,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -0.42966747283935547,
-                            "Y": -3.609606981277466,
+                            "X": 6.829867362976074,
+                            "Y": 2.3832292556762695,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -1008,22 +1884,16 @@
                 },
                 {
                     "Data": {
-                        "Value": "Bottom Wall"
+                        "Value": "BlueBox (Clone)"
                     },
                     "TypeName": "Name"
                 },
                 {
                     "Data": {
-                        "Enabled": true
-                    },
-                    "TypeName": "Active"
-                },
-                {
-                    "Data": {
                         "Flags": 0,
                         "HalfExtents": {
-                            "X": 16.0,
-                            "Y": 0.699999988079071
+                            "X": 1.0,
+                            "Y": 1.0
                         },
                         "LayerMask": 4294967295,
                         "Offset": {
@@ -1061,26 +1931,16 @@
                 },
                 {
                     "Data": {
-                        "Initialized": false,
-                        "ManagedHandle": 0,
-                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\BottomWall.cs",
-                        "TypeHash": 0,
-                        "TypeName": "Scripts.BottomWall"
-                    },
-                    "TypeName": "ScriptInstance"
-                },
-                {
-                    "Data": {
                         "Color": {
                             "A": 1.0,
                             "B": 1.0,
-                            "G": 1.0,
-                            "R": 1.0
+                            "G": 0.1329784393310547,
+                            "R": 0.0
                         },
                         "Filled": true,
                         "HalfExtents": {
-                            "X": 16.0,
-                            "Y": 0.699999988079071
+                            "X": 1.0,
+                            "Y": 1.0
                         },
                         "Offset": {
                             "X": 0.0,
@@ -1097,11 +1957,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -0.42966747283935547,
+                            "m03": 6.829867362976074,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": -3.609606981277466,
+                            "m13": 2.3832292556762695,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1121,7 +1981,124 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -8.278566360473633,
+                            "X": -10.978799819946289,
+                            "Y": 7.168385028839111,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "BlueBox (Clone)"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "HalfExtents": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        },
+                        "LayerMask": 4294967295,
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Rotation": 0.0
+                    },
+                    "TypeName": "BoxCollider2D"
+                },
+                {
+                    "Data": {
+                        "Id": 19
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Friction": 0.10000000149011612,
+                        "PositionCorrectPercent": 0.20000000298023224,
+                        "Restitution": 0.0
+                    },
+                    "TypeName": "PhysicsMaterial2D"
+                },
+                {
+                    "Data": {
+                        "AngularDamping": 0.0,
+                        "Flags": 1,
+                        "GravityScale": 1.0,
+                        "InverseMass": 0.0,
+                        "LinearDamping": 0.0,
+                        "Mass": 0.0
+                    },
+                    "TypeName": "Rigidbody2D"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 0.0,
+                            "R": 0.20353364944458008
+                        },
+                        "Filled": true,
+                        "HalfExtents": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        },
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "Thickness": 0.0
+                    },
+                    "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": -10.978799819946289,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 7.168385028839111,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": -10.555999755859375,
                             "Y": 10.634759902954102,
                             "Z": 0.0
                         },
@@ -1214,7 +2191,7 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -8.278566360473633,
+                            "m03": -10.555999755859375,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
@@ -1355,8 +2332,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 6.829867362976074,
-                            "Y": 2.3832292556762695,
+                            "X": -0.42966747283935547,
+                            "Y": -3.609606981277466,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -1375,16 +2352,22 @@
                 },
                 {
                     "Data": {
-                        "Value": "BlueBox (Clone)"
+                        "Value": "Bottom Wall"
                     },
                     "TypeName": "Name"
                 },
                 {
                     "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
                         "Flags": 0,
                         "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
+                            "X": 32.0,
+                            "Y": 0.699999988079071
                         },
                         "LayerMask": 4294967295,
                         "Offset": {
@@ -1422,16 +2405,26 @@
                 },
                 {
                     "Data": {
+                        "Initialized": false,
+                        "ManagedHandle": 0,
+                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\BottomWall.cs",
+                        "TypeHash": 0,
+                        "TypeName": "Scripts.BottomWall"
+                    },
+                    "TypeName": "ScriptInstance"
+                },
+                {
+                    "Data": {
                         "Color": {
                             "A": 1.0,
                             "B": 1.0,
-                            "G": 0.1329784393310547,
-                            "R": 0.0
+                            "G": 1.0,
+                            "R": 1.0
                         },
                         "Filled": true,
                         "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
+                            "X": 32.0,
+                            "Y": 0.699999988079071
                         },
                         "Offset": {
                             "X": 0.0,
@@ -1448,11 +2441,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 6.442473411560059,
+                            "m03": -0.42966747283935547,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 8.852737426757813,
+                            "m13": -3.609606981277466,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1472,8 +2465,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": -9.711931228637695,
-                            "Y": 2.421968460083008,
+                            "X": -9.68265438079834,
+                            "Y": -0.2773202657699585,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -1528,24 +2521,13 @@
                 },
                 {
                     "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 1,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 0.0,
-                        "Mass": 0.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
                         "Color": {
-                            "A": 1.0,
+                            "A": 0.4483985900878906,
                             "B": 1.0,
-                            "G": 0.1329784393310547,
+                            "G": 0.8681132793426514,
                             "R": 0.0
                         },
-                        "Filled": true,
+                        "Filled": false,
                         "HalfExtents": {
                             "X": 1.0,
                             "Y": 1.0
@@ -1554,7 +2536,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "Thickness": 0.0
+                        "Thickness": 0.20000000298023224
                     },
                     "TypeName": "ShapeBox2D"
                 },
@@ -1565,128 +2547,11 @@
                             "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": -9.711931228637695,
+                            "m03": -9.68265438079834,
                             "m10": 0.0,
                             "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 2.421968460083008,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
-                }
-            ]
-        },
-        {
-            "Components": [
-                {
-                    "Data": {
-                        "Position": {
-                            "X": -2.1577138900756836,
-                            "Y": 6.412145137786865,
-                            "Z": 0.0
-                        },
-                        "Rotation": {
-                            "W": 1.0,
-                            "X": 0.0,
-                            "Y": 0.0,
-                            "Z": 0.0
-                        },
-                        "Scale": {
-                            "X": 1.0,
-                            "Y": 1.0,
-                            "Z": 1.0
-                        }
-                    },
-                    "TypeName": "LocalTransform"
-                },
-                {
-                    "Data": {
-                        "Value": "BlueBox (Clone)"
-                    },
-                    "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Flags": 0,
-                        "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        },
-                        "LayerMask": 4294967295,
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Rotation": 0.0
-                    },
-                    "TypeName": "BoxCollider2D"
-                },
-                {
-                    "Data": {
-                        "Id": 19
-                    },
-                    "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Friction": 0.10000000149011612,
-                        "PositionCorrectPercent": 0.20000000298023224,
-                        "Restitution": 0.0
-                    },
-                    "TypeName": "PhysicsMaterial2D"
-                },
-                {
-                    "Data": {
-                        "AngularDamping": 0.0,
-                        "Flags": 1,
-                        "GravityScale": 1.0,
-                        "InverseMass": 0.0,
-                        "LinearDamping": 0.0,
-                        "Mass": 0.0
-                    },
-                    "TypeName": "Rigidbody2D"
-                },
-                {
-                    "Data": {
-                        "Color": {
-                            "A": 1.0,
-                            "B": 1.0,
-                            "G": 0.0,
-                            "R": 0.20353364944458008
-                        },
-                        "Filled": true,
-                        "HalfExtents": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        },
-                        "Offset": {
-                            "X": 0.0,
-                            "Y": 0.0
-                        },
-                        "Thickness": 0.0
-                    },
-                    "TypeName": "ShapeBox2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": -2.1577138900756836,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 6.412145137786865,
+                            "m13": -0.2773202657699585,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -1861,16 +2726,6 @@
                 },
                 {
                     "Data": {
-                        "Initialized": false,
-                        "ManagedHandle": 0,
-                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\AudioScripts\\AudioManager.cs",
-                        "TypeHash": 0,
-                        "TypeName": "Scripts.AudioManager"
-                    },
-                    "TypeName": "ScriptInstance"
-                },
-                {
-                    "Data": {
                         "Color": {
                             "A": 1.0,
                             "B": 0.8135457038879395,
@@ -1889,6 +2744,84 @@
                         "Thickness": 0.10000000149011612
                     },
                     "TypeName": "ShapeBox2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": -9.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 1.0,
+                            "Y": 1.0,
+                            "Z": 1.0
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "AudioClip"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Enabled": true
+                    },
+                    "TypeName": "Active"
+                },
+                {
+                    "Data": {
+                        "CueId": 2357300755,
+                        "Loop": false,
+                        "Pitch": 1.0,
+                        "PlayOnStart": false,
+                        "Spatial3D": false,
+                        "Volume": 1.0
+                    },
+                    "TypeName": "AudioSource"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
                 },
                 {
                     "Data": {
@@ -1970,16 +2903,6 @@
                 },
                 {
                     "Data": {
-                        "Initialized": false,
-                        "ManagedHandle": 0,
-                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\AudioScripts\\AddToAudioManager.cs",
-                        "TypeHash": 0,
-                        "TypeName": "Scripts.AudioScripts.AddToAudioManager"
-                    },
-                    "TypeName": "ScriptInstance"
-                },
-                {
-                    "Data": {
                         "Dirty": false,
                         "Matrix": {
                             "m00": 1.0,
@@ -2009,8 +2932,8 @@
                 {
                     "Data": {
                         "Position": {
-                            "X": 1.4398150444030762,
-                            "Y": 0.08072658628225327,
+                            "X": 0.0,
+                            "Y": 14.25233268737793,
                             "Z": 0.0
                         },
                         "Rotation": {
@@ -2020,8 +2943,8 @@
                             "Z": 0.0
                         },
                         "Scale": {
-                            "X": 14.0,
-                            "Y": 8.539999961853027,
+                            "X": 1.0,
+                            "Y": 1.0,
                             "Z": 1.0
                         }
                     },
@@ -2029,15 +2952,9 @@
                 },
                 {
                     "Data": {
-                        "Value": "BG"
+                        "Value": "MS_Spawner"
                     },
                     "TypeName": "Name"
-                },
-                {
-                    "Data": {
-                        "Enabled": true
-                    },
-                    "TypeName": "Active"
                 },
                 {
                     "Data": {
@@ -2047,53 +2964,37 @@
                 },
                 {
                     "Data": {
-                        "Initialized": false,
-                        "ManagedHandle": 0,
-                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\FollowLeader.cs",
-                        "TypeHash": 0,
-                        "TypeName": "Scripts.FollowLeader"
-                    },
-                    "TypeName": "ScriptInstance"
-                },
-                {
-                    "Data": {
                         "Color": {
                             "A": 1.0,
-                            "B": 1.0,
-                            "G": 1.0,
+                            "B": 0.0,
+                            "G": 0.0,
                             "R": 1.0
+                        },
+                        "Filled": false,
+                        "HalfExtents": {
+                            "X": 12.5,
+                            "Y": 0.5
                         },
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 4,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\Player Essentials\\OceanBG_00@4x.png",
-                        "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
-                        }
+                        "Thickness": 0.10000000149011612
                     },
-                    "TypeName": "SpriteRenderer2D"
-                },
-                {
-                    "Data": {
-                        "Mask": 2
-                    },
-                    "TypeName": "TagMask"
+                    "TypeName": "ShapeBox2D"
                 },
                 {
                     "Data": {
                         "Dirty": false,
                         "Matrix": {
-                            "m00": 14.0,
+                            "m00": 1.0,
                             "m01": 0.0,
                             "m02": 0.0,
-                            "m03": 1.4398150444030762,
+                            "m03": 0.0,
                             "m10": 0.0,
-                            "m11": 8.539999961853027,
+                            "m11": 1.0,
                             "m12": 0.0,
-                            "m13": 0.08072658628225327,
+                            "m13": 14.25233268737793,
                             "m20": 0.0,
                             "m21": 0.0,
                             "m22": 1.0,
@@ -2109,39 +3010,71 @@
             ]
         }
     ],
-    "EntityCount": 18,
+    "EntityCount": 28,
     "Hierarchy": [
         {
+            "child": 18,
+            "parent": 16
+        },
+        {
+            "child": 17,
+            "parent": 16
+        },
+        {
+            "child": 19,
+            "parent": 16
+        },
+        {
+            "child": 20,
+            "parent": 16
+        },
+        {
+            "child": 5,
+            "parent": 4
+        },
+        {
             "child": 14,
-            "parent": 8
+            "parent": 13
+        },
+        {
+            "child": 21,
+            "parent": 16
+        },
+        {
+            "child": 22,
+            "parent": 16
+        },
+        {
+            "child": 25,
+            "parent": 24
+        },
+        {
+            "child": 26,
+            "parent": 24
+        },
+        {
+            "child": 8,
+            "parent": 7
         },
         {
             "child": 10,
-            "parent": 8
-        },
-        {
-            "child": 11,
-            "parent": 8
+            "parent": 9
         },
         {
             "child": 12,
-            "parent": 8
-        },
-        {
-            "child": 13,
-            "parent": 8
+            "parent": 11
         },
         {
             "child": 7,
             "parent": 6
         },
         {
-            "child": 4,
-            "parent": 3
+            "child": 9,
+            "parent": 6
         },
         {
-            "child": 9,
-            "parent": 8
+            "child": 11,
+            "parent": 6
         }
     ],
     "SceneName": "Scene",
