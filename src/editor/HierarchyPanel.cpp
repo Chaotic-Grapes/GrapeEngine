@@ -473,8 +473,22 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     auto children = _getChildren(entityId);
     bool hasChildren = !children.empty();
 
-    // Check if this is a prefab instance FIRST (needed for color)
+    // Check if this is a prefab instance FIRST (needed for color, both parent and child)
     bool isPrefabInstance = m_world->Has<ECS::Components::PrefabLink>(entity);
+    if (m_world->Has<ECS::Components::PrefabLink>(entity)) {
+        isPrefabInstance = true;
+    }
+    else {
+        // Check if any parent has PrefabLink
+        ECS::Entity parent = m_world->ParentOf(entity);
+        while (!parent.IsNull()) {
+            if (m_world->Has<ECS::Components::PrefabLink>(parent)) {
+                isPrefabInstance = true;
+                break;
+            }
+            parent = m_world->ParentOf(parent);
+        }
+    }
 
     // Check if this entity has a script attached
     bool hasScript = false;
@@ -496,7 +510,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     // Append prefab indicator if this is a prefab instance
-    if (isPrefabInstance) {
+    if (isPrefabInstance && m_world->Has<ECS::Components::PrefabLink>(entity)) {
         const auto& link = m_world->Get<ECS::Components::PrefabLink>(entity);
         std::string prefabName = std::filesystem::path(link.getPath()).stem().string();
         oss << " [" << prefabName << "]";
@@ -567,21 +581,28 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         if (isPrefabInstance && m_symbolsFont) {
             ImVec2 itemRectMin = ImGui::GetItemRectMin();
             ImVec2 itemRectMax = ImGui::GetItemRectMax();
-            
+
             const float iconPadding = 4.0f;
             const char* prefabIcon = "\xEE\xA6\xA4"; // Material Symbols: deployed_code icon (U+E9A4)
-            
+
             // Calculate icon size using symbols font
             ImGui::PushFont(m_symbolsFont);
             ImVec2 iconSize = ImGui::CalcTextSize(prefabIcon);
             ImGui::PopFont();
-            
-            // Position to the left of the tree node text (after the arrow)
+
+            // Position to the RIGHT of the tree node text (before script icon)
+            float scriptIconWidth = 0.0f;
+            if (hasScript) {
+                ImGui::PushFont(m_symbolsFont);
+                scriptIconWidth = ImGui::CalcTextSize("\xEE\xA1\xAF").x + iconPadding * 2;
+                ImGui::PopFont();
+            }
+
             ImVec2 iconPos = ImVec2(
-                ImGui::GetCursorScreenPos().x - iconSize.x - iconPadding,
+                itemRectMax.x - iconSize.x - scriptIconWidth - iconPadding,
                 itemRectMin.y + (itemRectMax.y - itemRectMin.y - iconSize.y) * 0.5f
             );
-            
+
             // Draw the prefab icon with blue color (matching prefab text color)
             ImGui::GetWindowDrawList()->AddText(
                 m_symbolsFont,
@@ -1163,7 +1184,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         // Open and read prefab file
         std::ifstream file(prefabPath);
         if (!file.is_open()) {
-            LOG_ERROR("Cannot open prefab: " << prefabPath);
+            LOG_ERROR("Cannot open prefab: {}", prefabPath);
             return ECS::Entity::NPOS32;
         }
 
@@ -1172,65 +1193,60 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         file >> prefabJson;
         file.close();
 
-        // Validate prefab structure
-        if (!prefabJson.contains("Components") || !prefabJson["Components"].is_array()) {
-            LOG_ERROR("Invalid prefab format: missing Components array");
+        ECS::Entity rootEntity;
+
+        // Check if this is new hierarchical format or old single-entity format
+        if (prefabJson.contains("Entity")) {
+            // New format with hierarchy: use DeserializeEntityHierarchy
+            rootEntity = Serialization::EntitySerializer::DeserializeEntityHierarchy(*m_world, prefabJson["Entity"], parentId);
+        }
+        else if (prefabJson.contains("Components")) {
+            // Old format: single entity
+            // Create new entity
+            rootEntity = Serialization::EntitySerializer::DeserializeEntity(*m_world, prefabJson);
+
+            // Set parent relationship if not creating as root
+            // NPOS32 is a special value meaning "no parent" (root entity)
+            if (parentId != ECS::Entity::NPOS32) {
+                // Convert EntityId to ECS::Entity object for world operations
+                ECS::Entity parent = m_world->Resolve(parentId);
+                // Only set parent if the parent entity exists and is valid
+                if (!parent.IsNull() && m_world->IsAlive(parent)) {
+                    // Use Attach to properly update hierarchy indices
+                    m_world->Attach(rootEntity, parent);
+                }
+            }
+        }
+        else {
+            LOG_ERROR("Invalid prefab format: missing Entity or Components");
             return ECS::Entity::NPOS32;
         }
 
-        // Create new entity
-        ECS::Entity entity = m_world->Create();
-
-        // Set entity name from prefab filename (Unity-like behavior)
-        std::filesystem::path p(prefabPath);
-        std::string prefabName = p.stem().string();
-
-        // Create Name component and copy prefab name into it
-        ECS::Components::Name nameComp;
-        strncpy_s(nameComp.Value, prefabName.c_str(), sizeof(nameComp.Value) - 1);
-        nameComp.Value[sizeof(nameComp.Value) - 1] = '\0'; // Ensure null termination
-        m_world->Set<ECS::Components::Name>(entity, nameComp);
-
-        // Apply all components from prefab data using ComponentRegistryUI
-        // This automatically handles all component types without repetitive code
-        for (const auto& componentEntry : prefabJson["Components"]) {
-            // Validate component entry structure
-            if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
-            if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
-
-            std::string typeName = componentEntry["TypeName"];
-            const auto* meta = ComponentRegistryUI::Find(typeName);
-
-            // Use registry's AddComponent function to create and deserialize the component
-            if (meta) {
-                meta->AddComponent(m_world, entity, componentEntry["Data"]);
-            }
-        }
-
-        // Set parent relationship if not creating as root
-        // NPOS32 is a special value meaning "no parent" (root entity)
-        if (parentId != ECS::Entity::NPOS32) {
-            // Convert EntityId to ECS::Entity object for world operations
-            ECS::Entity parent = m_world->Resolve(parentId);
-            // Only set parent if the parent entity exists and is valid
-            if (!parent.IsNull() && m_world->IsAlive(parent)) {
-                // Use Attach to properly update hierarchy indices
-                m_world->Attach(entity, parent);
-            }
+        if (rootEntity.IsNull() || !m_world->IsAlive(rootEntity)) {
+            LOG_ERROR("Failed to instantiate prefab: {}", prefabPath);
+            return ECS::Entity::NPOS32;
         }
 
         // Add prefab link component to track prefab relationship
         // This component connects the instance back to the prefab template file
+        std::filesystem::path p(prefabPath);
         std::string linkPath = p.lexically_normal().string();
-        m_world->Set<ECS::Components::PrefabLink>(entity, ECS::Components::PrefabLink(linkPath));
+        m_world->Set<ECS::Components::PrefabLink>(rootEntity, ECS::Components::PrefabLink(linkPath));
 
-        LOG_INFO("Instantiated prefab: " << prefabName);
+        // Mark scene as dirty
+        if (m_fileMenu) {
+            m_fileMenu->MarkSceneDirty();
+        }
+
+        // Set entity name from prefab filename
+        std::string prefabName = p.stem().string();
+        LOG_INFO("Instantiated prefab: {}", prefabName);
 
         // Return the entity ID so caller can select it
-        return entity.Index;
+        return rootEntity.Index;
     }
     catch (const std::exception& e) {
-        LOG_ERROR("Failed to instantiate prefab: " << e.what());
+        LOG_ERROR("Failed to instantiate prefab: {}", e.what());
         return ECS::Entity::NPOS32;
     }
 }

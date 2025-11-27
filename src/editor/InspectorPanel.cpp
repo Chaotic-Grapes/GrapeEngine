@@ -990,9 +990,17 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
     }
 
     // Convert entity to JSON and extract just the Components list
-    nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+    nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntityHierarchy(*m_world, entity);
+
     nlohmann::json prefabData;
-    prefabData["Components"] = entityJson.contains("Components") ? entityJson["Components"] : nlohmann::json::array();
+    // If entity has children, save the full hierarchy in new format
+    if (entityJson.contains("Children")) {
+        prefabData["Entity"] = entityJson;
+    }
+    // No children, use old format
+    else {
+        prefabData["Components"] = entityJson["Components"];
+    }
 
     // Write the prefab file
     std::ofstream file(prefabPath);

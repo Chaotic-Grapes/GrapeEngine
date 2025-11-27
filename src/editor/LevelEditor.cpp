@@ -275,6 +275,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     _registerPanel("Hierarchy",
         [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); 
                    m_hierarchyWindow.SetViewport(&m_viewport); 
+                   m_hierarchyWindow.SetFileMenu(&m_fileMenu);
         },
         [this]() { m_hierarchyWindow.Render(); },
         [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
