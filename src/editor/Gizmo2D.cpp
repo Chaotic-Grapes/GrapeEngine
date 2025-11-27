@@ -20,6 +20,7 @@
 #include "math/Matrix4x4.h"
 #include "math/Quaternion.h"
 #include "math/Vector3D.h"
+#include <glm/gtc/type_ptr.hpp>
 
 using namespace ECS;
 
@@ -116,41 +117,14 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
         return; //< Cannot manipulate without a camera
     }
 
-    // Build view and projection using engine math so we avoid glm here.
-    // Use the editor camera's transform and camera component to compute matrices.
-    Matrix4x4 viewMat = Matrix4x4::Identity();
-    Matrix4x4 projMat = Matrix4x4::Identity();
+    // Get view and projection matrices directly from EditorCamera.
+    // This ensures the gizmo uses the exact same matrices as the renderer.
+    glm::mat4 viewMatrix = m_editorCamera->GetViewMatrix();
+    glm::mat4 projectionMatrix = m_editorCamera->GetProjectionMatrix();
 
-    if (auto camTransform = m_editorCamera->GetTransform()) {
-        // Camera eye position
-        Vector3D eye{ camTransform->Position.X, camTransform->Position.Y, camTransform->Position.Z };
-
-        // Use GLM-like LookAt construction to match EditorCamera::GetViewMatrix()
-        Vector3D up{ 0.0f, 1.0f, 0.0f };
-
-        // Derive forward from stored rotation (canonical OpenGL forward is -Z)
-        Vector3D forward = camTransform->Rotation.Rotate(Vector3D{ 0.0f, 0.0f, -1.0f });
-        Vector3D target = eye + forward;
-
-        Vector3D f = (target - eye).Normalized();
-        Vector3D s = Vector3D::Cross(f, up).Normalized();
-        Vector3D u = Vector3D::Cross(s, f);
-
-        // Construct matrix in the same style glm::lookAt produces (column-major basis)
-        // Fill row-major Matrix4x4 so MatToColMajor will yield the same column-major memory as glm
-        viewMat = Matrix4x4(
-            s.X, u.X, -f.X, 0.0f,
-            s.Y, u.Y, -f.Y, 0.0f,
-            s.Z, u.Z, -f.Z, 0.0f,
-            -Vector3D::Dot(s, eye), -Vector3D::Dot(u, eye), Vector3D::Dot(f, eye), 1.0f
-        );
-    }
-
+    // Set ImGuizmo orthographic mode based on camera component
     if (auto camComp = m_editorCamera->GetCameraComponent()) {
-        float aspect = camComp->AspectRatio;
-        float halfSize = camComp->OrthoSize * 0.5f;
-        projMat = Matrix4x4::Orthographic(-halfSize * aspect, halfSize * aspect,
-            -halfSize, halfSize, camComp->NearPlane, camComp->FarPlane);
+        ImGuizmo::SetOrthographic(!camComp->UsePerspective);
     }
 
     // ------------------------------------------------------------------------
@@ -158,9 +132,7 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     // ------------------------------------------------------------------------
 
     // This call draws the gizmo and modifies modelMatrix based on mouse input.
-    // Convert engine matrices to column-major float arrays for ImGuizmo
-    float viewArr[16];
-    float projArr[16];
+    // Convert engine Matrix4x4 to column-major float array for ImGuizmo
     float modelArr[16];
 
     auto MatToColMajor = [](const Matrix4x4& M, float out[16]) {
@@ -170,15 +142,13 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
         out[12] = M.m03; out[13] = M.m13; out[14] = M.m23; out[15] = M.m33;
     };
 
-    MatToColMajor(viewMat, viewArr);
-    MatToColMajor(projMat, projArr);
     MatToColMajor(modelMatrix, modelArr);
 
     ImGuizmo::Manipulate(
-        viewArr,
-        projArr,
-        m_currentGizmoOperation,
-        m_currentGizmoMode,
+        glm::value_ptr(viewMatrix),
+        glm::value_ptr(projectionMatrix),
+        static_cast<ImGuizmo::OPERATION>(m_currentGizmoOperation),
+        static_cast<ImGuizmo::MODE>(m_currentGizmoMode),
         modelArr
     );
 
