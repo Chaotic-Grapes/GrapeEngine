@@ -134,6 +134,8 @@ void PerformancePanel::Render(bool isPlaying) {
 
     for (const auto &kv : m_cachedScopes) {
         const std::string &name = kv.first;
+        // TODO: Fix Render system to follow usual pattern, then remove this line
+        if (name == "Render") continue; // Skip, because it's not following the usual system pattern for now
         const auto &data = kv.second;
         
         // Calculate usage percentage and clamp to [0, 100].
@@ -181,13 +183,15 @@ void PerformancePanel::Render(bool isPlaying) {
     }
 
     // If there's unaccounted time, show it as "Other / Unattributed"
+    // Usually, this is renderer
     if (unaccountedMs > 0.001) {
         double unaccountedPercent = (unaccountedMs / totalTime) * 100.0;
         if (unaccountedPercent < 0.0) unaccountedPercent = 0.0;
         if (unaccountedPercent > 100.0) unaccountedPercent = 100.0;
 
         ImGui::PushFont(m_boldFont);
-        ImGui::Text("Others / Unattributed (e.g., underlying system calls)");
+        //ImGui::Text("Others / Unattributed (e.g., underlying system calls)");
+        ImGui::Text("Render");
         ImGui::PopFont();
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
         ImGui::ProgressBar(static_cast<float>(unaccountedPercent / 100.0), ImVec2(-1.0f, 0.0f));
