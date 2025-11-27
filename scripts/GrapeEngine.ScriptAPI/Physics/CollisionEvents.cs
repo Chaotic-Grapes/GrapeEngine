@@ -13,13 +13,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using System;
-using System.Collections.Generic;
 using GrapeEngine.ScriptAPI.Unsafe;
 using GrapeEngine.Scripting;
 using GrapeEngine.Math;
 
-namespace GrapeEngine.Physics;
+namespace GrapeEngine.Events;
 
 /// <summary>
 /// Managed representation of a collision event for scripting code.

@@ -45,7 +45,35 @@ bool Window::Create(const std::string& title, const int width, const int height,
 	glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	
-	m_windowHandle = glfwCreateWindow(width, height, title.c_str(), monitor, parent);
+	// If an invalid size was supplied (0 or negative), fall back to the monitor's resolution
+	int createWidth = width;
+	int createHeight = height;
+	if (createWidth <= 0 || createHeight <= 0) {
+		if (!monitor)
+			monitor = glfwGetPrimaryMonitor();
+		
+		// Query monitor video mode
+		const GLFWvidmode* vm = monitor ? glfwGetVideoMode(monitor) : nullptr;
+
+		// Fallback to monitor resolution if available
+		if (vm) {
+			createWidth = vm->width;
+			createHeight = vm->height;
+			this->m_width = createWidth;
+			this->m_height = createHeight;
+			LOG_WARNING("Invalid window size provided, using monitor resolution: " << createWidth << "x" << createHeight);
+		}
+		else {
+			// Critical because if monitor query fails, who knows in the long run we may run into further issues
+			LOG_CRITICAL("Invalid window size and failed to query monitor resolution; using default 1600x900");
+			createWidth = createWidth > 0 ? createWidth : 1600;
+			createHeight = createHeight > 0 ? createHeight : 900;
+			this->m_width = createWidth;
+			this->m_height = createHeight;
+		}
+	}
+
+	m_windowHandle = glfwCreateWindow(createWidth, createHeight, title.c_str(), monitor, parent);
 	m_title = title;
 
 	if (!m_windowHandle) {
@@ -72,7 +100,7 @@ bool Window::Create(const std::string& title, const int width, const int height,
 	// Register all GLFW input and framebuffer callbacks
 	Input::SetupEventCallbacks();
 
-	glViewport(0, 0, width, height);
+	glViewport(0, 0, this->m_width, this->m_height);
 
 	// Store the pointer to this instance for use in callbacks
 	// because GLFW does not know context

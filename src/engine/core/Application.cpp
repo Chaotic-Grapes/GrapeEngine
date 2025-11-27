@@ -30,7 +30,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/WindowManager.h"
 #include "services/OverlayService.h"
 #include <thread>
+#include <filesystem>
+#include "ecs/systems/UIEventSystem.h"
+#include "services/UIEvents.h"
 
+// Undefine potential Windows macros that conflict with enum names
+#ifdef ERROR
+#undef ERROR
+#endif
 
 namespace Engine {
     // Global pointer to the core engine
@@ -101,6 +108,13 @@ namespace Engine {
             const double frameStart = glfwGetTime();
             const double rawDelta = frameStart - m_lastFrameTime;
             m_lastFrameTime = frameStart;
+
+            // IMPORTANT NOTE: Anything to do with the UIEventQueue in this while loop
+            // is only temporary! The proper handling of UI events should be done
+            // by a centralized event system that is registered as a PROPER system.
+            // TODO: Make centralized event system for UI events and others, and as
+            // as a proper system
+            ECS::UIEventQueue::Clear();
             
             Time::_update(rawDelta, frameStart);
             Profiler::UpdateTime();
@@ -134,6 +148,14 @@ namespace Engine {
                     _onGameStop(currentScene);
                 }
                 wasPlaying = shouldRun;
+
+                uint32_t pickedEntityID = 0;  // TODO: Get from renderer
+
+                double mouseX, mouseY;
+                Input::GetMousePosition(mouseX, mouseY);
+                Vector2D mousePos(static_cast<float>(mouseX), static_cast<float>(mouseY));
+
+                ECS::UIEventSystem::Update(&world, pickedEntityID, mousePos);
 
                 // Update physics and scripts
                 _updatePhysics(world, shouldRun, stepRequested);
@@ -215,16 +237,46 @@ namespace Engine {
         return m_hasProjectSettings;
     }
 
+    bool Application::SaveProjectSettings(const std::string& projectRoot) {
+        try {
+            std::filesystem::path settingsPath = std::filesystem::path(projectRoot) / "ProjectSettings.json";
+
+            // Ensure parent directories exist
+            std::filesystem::path parent = settingsPath.parent_path();
+            if (!parent.empty() && !std::filesystem::exists(parent)) {
+                std::filesystem::create_directories(parent);
+            }
+
+            const std::string settingsPathStr = settingsPath.string();
+            if (Serialization::ConfigurationSerializer::SaveProjectSettings(settingsPathStr, m_projectSettings)) {
+                LOG_INFO("Saved project settings to: " << settingsPathStr);
+                return true;
+            }
+            else {
+                LOG_ERROR("Failed to save project settings to: " << settingsPathStr);
+                return false;
+            }
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Exception saving project settings: " << e.what());
+            return false;
+        }
+    }
+
     void Application::_initializeServices() {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
 
+    #ifdef USE_IMGUI
         m_overlay = new Services::OverlayService(m_sceneManager);
         m_overlay->SetAudio(m_audio->Device());
-		m_overlay->Initialize();
-        
+        m_overlay->Initialize();
         // Set editor mode flag (overlay exists = editor mode)
         m_isInEditorMode = (m_overlay != nullptr);
+    #else
+        m_overlay = nullptr;
+        m_isInEditorMode = false;
+    #endif
 
         // Initialize scripting system
         m_scriptSystem = new ECS::ScriptSystem();
@@ -304,6 +356,10 @@ namespace Engine {
             // Scripts are updated through ScriptSystem::Update which is called separately
             // This registration mainly ensures the system is tracked
         });
+
+        // For now, the UIEventSystem is initialized like this
+        // Init UI events system
+        ECS::UIEventSystem::Initialize();
     }
 
     void Application::_onGameStart(Scenes::Scene* scene) {

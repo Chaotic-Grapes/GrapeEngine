@@ -1,4 +1,4 @@
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Events;
 
 /// <summary>
 /// Mirror of native ECS::CollisionEventType for script code.

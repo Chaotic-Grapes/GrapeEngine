@@ -42,6 +42,7 @@ centralized and consistent with the currently active scene.
 #include <filesystem>
 #include <algorithm>
 #include "serialization/ConfigurationSerializer.h"
+#include <filesystem>
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -58,12 +59,7 @@ void EditorFileMenu::Initialize(Scenes::SceneManager* sceneManager) {
 
 // Draws the "File" menu in the menu bar and handles user actions such as
 // New Scene, Open Scene and Save Scene As
-void EditorFileMenu::RenderFileMenu(float& uiScale) {
-    // Clamp UI scale so users can't shrink or enlarge the UI too much
-    uiScale = std::clamp(uiScale, 0.75f, 2.0f);
-
-    // Apply the new scale globally so all ImGui text and widgets follow it
-    ImGui::GetIO().FontGlobalScale = uiScale;
+void EditorFileMenu::RenderFileMenu() {
 
     // Flag to open popup when exiting with unsaved changes (this some bug with ImGui or something)
     // Hack
@@ -155,8 +151,41 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
 
         ImGui::EndPopup();
     }
+}
 
-    // View menu (UI scale display + zoom controls)
+// Draws the "Edit" menu with Undo/Redo and Project Settings
+void EditorFileMenu::RenderEditMenu() {
+    if (ImGui::BeginMenu("Edit")) {
+        // TODO: Implement undo/redo functionality
+        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false)) {
+            // Placeholder for undo
+        }
+        if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {
+            // Placeholder for redo
+        }
+        ImGui::Separator();
+        
+        if (ImGui::MenuItem("Project Settings...")) {
+            m_showProjectSettings = true;
+            m_projectSettingsDirty = false;
+        }
+        ImGui::EndMenu();
+    }
+
+    // Render project settings modal if open
+    if (m_showProjectSettings) {
+        _renderProjectSettingsModal();
+    }
+}
+
+// Draws the "View" menu with UI scale controls
+void EditorFileMenu::RenderViewMenu(float& uiScale) {
+    // Clamp UI scale so users can't shrink or enlarge the UI too much
+    uiScale = std::clamp(uiScale, 0.75f, 2.0f);
+
+    // Apply the new scale globally so all ImGui text and widgets follow it
+    ImGui::GetIO().FontGlobalScale = uiScale;
+
     if (ImGui::BeginMenu("View")) {
         ImGui::Text("UI Scale: %.2f", uiScale);
         ImGui::Separator();
@@ -168,8 +197,100 @@ void EditorFileMenu::RenderFileMenu(float& uiScale) {
 }
 
 // -------------------------------------------------------------------------
-// Public Operations
+// Project Settings
 // -------------------------------------------------------------------------
+
+void EditorFileMenu::_renderProjectSettingsModal() {
+    if (!Engine::CORE) return;
+    
+    ProjectSettings& settings = Engine::CORE->GetProjectSettings();
+    ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Project Settings", &m_showProjectSettings, ImGuiWindowFlags_NoCollapse)) {
+        // Title
+        ImGui::Text("Project Information");
+        ImGui::Separator();
+        
+        char titleBuf[256];
+        strncpy_s(titleBuf, settings.Title.c_str(), sizeof(titleBuf) - 1);
+        if (ImGui::InputText("Title", titleBuf, sizeof(titleBuf))) {
+            settings.Title = titleBuf;
+            m_projectSettingsDirty = true;
+        }
+        
+        char versionBuf[64];
+        strncpy_s(versionBuf, settings.Version.c_str(), sizeof(versionBuf) - 1);
+        if (ImGui::InputText("Version", versionBuf, sizeof(versionBuf))) {
+            settings.Version = versionBuf;
+            m_projectSettingsDirty = true;
+        }
+        
+        char sceneBuf[512];
+        strncpy_s(sceneBuf, settings.StartupScene.c_str(), sizeof(sceneBuf) - 1);
+        if (ImGui::InputText("Startup Scene", sceneBuf, sizeof(sceneBuf))) {
+            settings.StartupScene = sceneBuf;
+            m_projectSettingsDirty = true;
+        }
+        
+        ImGui::Spacing();
+        ImGui::Text("Window Settings");
+        ImGui::Separator();
+        
+        if (ImGui::InputInt("Width", &settings.WindowSettings.Width)) {
+            m_projectSettingsDirty = true;
+        }
+        if (ImGui::InputInt("Height", &settings.WindowSettings.Height)) {
+            m_projectSettingsDirty = true;
+        }
+        if (ImGui::Checkbox("Fullscreen", &settings.WindowSettings.Fullscreen)) {
+            m_projectSettingsDirty = true;
+        }
+        if (ImGui::Checkbox("VSync", &settings.WindowSettings.VSync)) {
+            m_projectSettingsDirty = true;
+        }
+        
+        ImGui::Spacing();
+        ImGui::Text("Physics Settings");
+        ImGui::Separator();
+        
+        if (ImGui::InputFloat("Gravity", &settings.Physics.Gravity)) {
+            m_projectSettingsDirty = true;
+        }
+        if (ImGui::InputFloat("Time Step", &settings.Physics.TimeStep, 0.001f, 0.01f, "%.4f")) {
+            m_projectSettingsDirty = true;
+        }
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        
+        // Save/Cancel buttons
+        const bool pushedSaveStyle = m_projectSettingsDirty;
+        if (pushedSaveStyle) {
+            ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SuccessButton);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SuccessButtonHover);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SuccessButtonActive);
+        }
+
+        if (ImGui::Button(m_projectSettingsDirty ? "Save*" : "Save", ImVec2(120, 0))) {
+            std::string projectRoot = Engine::ProjectPaths::GetProjectRoot();
+            if (Engine::CORE->SaveProjectSettings(projectRoot)) {
+                m_projectSettingsDirty = false;
+            }
+        }
+
+        if (pushedSaveStyle) {
+            ImGui::PopStyleColor(3);
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Close", ImVec2(120, 0))) {
+            if (m_projectSettingsDirty) {
+                // TODO: Add unsaved changes warning
+            }
+            m_showProjectSettings = false;
+        }
+    }
+    ImGui::End();
+}
 
 // Creates a brand new scene and makes it the active one in the SceneManager
 // Does not show any dialog, just starts from a fresh "New Scene"

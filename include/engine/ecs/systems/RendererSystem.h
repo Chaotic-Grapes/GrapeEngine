@@ -31,7 +31,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Color.h"
 #include "ecs/World.h"
 #include "Math/Vector2D.h"
+
+// Editor-only UI
+#ifdef USE_IMGUI
 #include "EditorFileMenu.h"
+#endif
 
 // Graphics Includes
 #include "graphics/shader.hpp"
@@ -42,15 +46,17 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
 
+#ifdef USE_IMGUI
 namespace Editor {
     // Undo System
     class UndoSystem;
 }
-// ============================================================================
-// ImGuizmo Includes
-// ============================================================================
+#endif
+// ImGuizmo / ImGui includes - editor only
+#ifdef USE_IMGUI
 #include <imgui.h>
 #include "ImGuizmo.h"
+#endif
 
 namespace ECS {
 
@@ -97,6 +103,10 @@ namespace ECS {
         bool IsUsingEditorCamera() const { return m_useEditorCamera; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
         uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
+
+        // Static accessor for global access
+        static RendererSystem* GetInstance() { return s_instance; }
+
         Engine::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
 
         // Allow external systems (editor panels) to set the currently selected entity
@@ -108,7 +118,9 @@ namespace ECS {
 
         // Enable/disable editor camera input (pan/orbit/zoom) based on viewport hover
         void SetEditorInputEnabled(bool enabled) { m_editorInputEnabled = enabled; }
+    #ifdef USE_IMGUI
         void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
+    #endif
         
         // Force the renderer to always use scene camera (for game window)
         void SetForceSceneCamera(bool force) { m_forceSceneCamera = force; }
@@ -130,7 +142,11 @@ namespace ECS {
 
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
 
+    #ifdef USE_IMGUI
         void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; }
+    #else
+        void SetUndoSystem(void* /*undoSystem*/) { }
+    #endif
         /**
         * @brief Renders the ImGuizmo overlay and allows manipulation of the selected entity.
         * * This function must be called within the ImGui window context that displays the scene texture.
@@ -142,7 +158,11 @@ namespace ECS {
         * @param drawSizeX The width of the rendered scene image (in pixels).
         * @param drawSizeY The height of the rendered scene image (in pixels).
         */
+    #ifdef USE_IMGUI
         void DrawEditorGizmo(ECS::World& world, float drawPosX, float drawPosY, float drawSizeX, float drawSizeY);
+    #else
+        void DrawEditorGizmo(ECS::World& /*world*/, float /*drawPosX*/, float /*drawPosY*/, float /*drawSizeX*/, float /*drawSizeY*/) { }
+    #endif
 
     private:
         // ====================================================================
@@ -201,7 +221,11 @@ namespace ECS {
         std::unique_ptr<Renderer> m_renderer;                   ///< Low-level batch renderer
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         std::unique_ptr<Engine::EditorCamera> m_editorCamera;   ///< Editor camera
+    #ifdef USE_IMGUI
         EditorFileMenu* m_fileMenu = nullptr;
+    #else
+        void* m_fileMenu = nullptr;
+    #endif
 
         // Whether editor camera should process input this frame (set by editor viewport hover)
         bool m_editorInputEnabled = true;
@@ -228,6 +252,9 @@ namespace ECS {
         int m_currentPBO = 0;
         uint32_t m_selectedEntityID = 0;  // Currently selected entity
 
+        // Static instance pointer
+        static RendererSystem* s_instance;
+
         // Drag-to-move state
         bool m_isDragging = false;
         glm::vec2 m_dragStartMouseWorld = {0, 0};
@@ -236,10 +263,15 @@ namespace ECS {
         bool m_wasMouseDownLastFrame = false;
 
         // ====================================================================
-        // NEW: Member Variables - ImGuizmo State
+        // NEW: Member Variables - ImGuizmo State (editor only)
         // ====================================================================
+    #ifdef USE_IMGUI
         ImGuizmo::OPERATION m_currentGizmoOperation = ImGuizmo::TRANSLATE;
         ImGuizmo::MODE m_currentGizmoMode = ImGuizmo::WORLD;
+    #else
+        int m_currentGizmoOperation = 0;
+        int m_currentGizmoMode = 0;
+    #endif
 
         // ====================================================================
         // Member Variables - UI Scaling
@@ -273,9 +305,13 @@ namespace ECS {
             float scaleFactor) const;
 
         // ====================================================================
-        // Undo System
+        // Undo System (editor only)
         // ==================================================================== 
+    #ifdef USE_IMGUI
         Editor::UndoSystem* m_undoSystem = nullptr;
+    #else
+        void* m_undoSystem = nullptr;
+    #endif
 
         Quaternion m_dragStartEntityRot;
         Vector3D m_dragStartEntityScale;

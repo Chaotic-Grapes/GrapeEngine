@@ -15,7 +15,8 @@ public class Player : ScriptBehaviour
 
     //For Testing Purposes
     
-    
+    // static reference that can be editted in this file.
+    public static ulong playerEntityId = 0;
 
     //These are publicly available fields
     public static Vector3 playerPos;
@@ -25,7 +26,8 @@ public class Player : ScriptBehaviour
     public override void OnStart()
     {
         // Called once when the script is initialized
-
+     playerEntityId = EntityId;  
+     Log($"Player initialized with Entity ID: {playerEntityId}"); 
         //av = GetComponent<AngularVelocity2D>();
         //try another day
     }

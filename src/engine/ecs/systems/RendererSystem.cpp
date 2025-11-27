@@ -60,7 +60,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // ============================================================================
 // Editor (Undo)
 // ============================================================================
+#ifdef USE_IMGUI
 #include "UndoSystem.h"
+#endif
 
 // ============================================================================
 // Helpers
@@ -78,6 +80,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Third-Party Libraries
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
+#ifdef USE_IMGUI
 #include <imgui_internal.h>
 #include <imgui.h>
 #include "ImGuizmo.h"
@@ -87,9 +90,16 @@ namespace {
         if (fileMenu) { fileMenu->MarkSceneDirty(); }
     }
 }
+#else
+namespace {
+    inline void MarkSceneDirtyIfNeeded(void* /*fileMenu*/) { }
+}
+#endif
 
 namespace ECS {
     static constexpr uint32_t INVALID_ENTITY_ID = Entity::NPOS32;
+
+    RendererSystem* RendererSystem::s_instance = nullptr;
 
     // Helper function to get the effective transform for rendering
     // Uses WorldTransform if available, otherwise falls back to LocalTransform
@@ -140,6 +150,9 @@ namespace ECS {
 
         m_initialized = true;
 
+        //set static instance pointer
+        s_instance = this;
+
         const auto& mainWindow = WindowManager::GetMainWindow();
         const int width = mainWindow->GetWidth();
         const int height = mainWindow->GetHeight();
@@ -184,6 +197,14 @@ namespace ECS {
 
         // --- Editor Camera ---
         m_editorCamera = std::make_unique<Engine::EditorCamera>(world);
+
+        // In standalone game mode, default to using scene camera instead of editor camera
+        if (!Engine::CORE->IsInEditorMode()) {
+            m_useEditorCamera = false;
+            if (m_editorCamera) {
+                m_editorCamera->GetCameraComponent()->Active = false;
+            }
+        }
 
         // RenderGraph now owns all framebuffers (no more m_fbos!)
         m_renderGraph = std::make_unique<RenderGraph>();
@@ -324,9 +345,9 @@ namespace ECS {
         m_cameraOrthoSize = kReferenceOrthoSize; // default fallback (world-space 1080p)
 
         // ============================================================
-        // 1. Toggle or cycle camera
+        // 1. Toggle or cycle camera (Editor-only)
         // ============================================================
-        if (Input::IsKeyPressed(KEY_C)) {
+        if (Engine::CORE && Engine::CORE->IsInEditorMode() && Input::IsKeyPressed(KEY_C)) {
             // Count available cameras
             bool hasSceneCamera = false;
 
@@ -750,7 +771,8 @@ namespace ECS {
                     // ============================================================
                     // --- DEBUG: Draw Non-Editor Camera Frustum ---
                     // ============================================================
-                    if (m_useEditorCamera) { // Only show when using editor camera
+                    // Only show when using editor camera AND not forcing scene camera (i.e., in Scene viewport, not Game viewport)
+                    if (m_useEditorCamera && !m_forceSceneCamera) {
                         m_shader->use();
                         m_shader->setMat4("uViewProj", viewProj);
                         m_renderer->beginFrame();
@@ -794,7 +816,7 @@ namespace ECS {
                         );
 
                         m_renderer->endFrame();
-                    } // if m_useEditorCamera
+                    } // if m_useEditorCamera && !m_forceSceneCamera
 
                 }
                 Framebuffer::Unbind();
@@ -832,6 +854,7 @@ namespace ECS {
                 glm::dvec2 mousePos;
                 Input::GetMousePosition(mousePos.x, mousePos.y);
 
+#ifdef USE_IMGUI
                 if (useViewportCoords) {
                     // SAFETY: Check if ImGui context is valid
                     ImGuiContext* ctx = ImGui::GetCurrentContext();
@@ -873,6 +896,11 @@ namespace ECS {
                         }
                     }
                 }
+#else
+                // ImGui not available in game build — force viewport coords off
+                (void)mousePos;
+                useViewportCoords = false;
+#endif
 
                 // ============================================================
                 // RESIZE PICKING FBO IF NEEDED
@@ -1454,6 +1482,7 @@ namespace ECS {
 
         dragViewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
 
+#ifdef USE_IMGUI
         // Get viewport bounds if using editor camera
         if (m_useEditorCamera && !m_forceSceneCamera) {
             // SAFETY: Check if ImGui context is valid
@@ -1471,6 +1500,11 @@ namespace ECS {
             }
             // If ImGui not available or viewport not found, use full window (already set)
         }
+#else
+        (void)m_useEditorCamera; // silence unused variable warnings in game builds
+#endif
+        static bool wasMouseDownLastFrame = false;
+        static uint32_t lastSelectedEntityID = 0;
 
         bool allowInteraction = !m_forceSceneCamera && (m_editorInputEnabled || m_isDragging);
 
@@ -1496,7 +1530,11 @@ namespace ECS {
             }
 
             {
+#ifdef USE_IMGUI
                 bool bypassDrag = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
+#else
+                bool bypassDrag = false;
+#endif
                 if (!bypassDrag) {
                     glm::dvec2 mousePos;
                     Input::GetMousePosition(mousePos.x, mousePos.y);
@@ -1509,6 +1547,7 @@ namespace ECS {
                     // Check if mouse is currently in viewport
                     bool isMouseInViewport = true;
                     if (m_useEditorCamera) {
+#ifdef USE_IMGUI
                         ImGuiContext* ctx = ImGui::GetCurrentContext();
                         if (ctx && ctx->Windows.Size > 0) {
                             ImGuiWindow* viewportWindow = ImGui::FindWindowByName("Scene");
@@ -1520,7 +1559,8 @@ namespace ECS {
                                     mousePos.y >= vpMin.y && mousePos.y <= vpMax.y);
                             }
                         }
-                    }
+#endif
+            }
 
                     // Check if selection changed
                     bool selectionChanged = (m_selectedEntityID != m_lastSelectedEntityID);
@@ -1590,6 +1630,7 @@ namespace ECS {
                     if (m_isDragging && !isMouseDownThisFrame) {
                         LOG_DEBUG("[DRAG] Drag ended");
 
+#ifdef USE_IMGUI
                         // Record the transform change for undo
                         if (m_undoSystem) {
                             world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
@@ -1606,6 +1647,7 @@ namespace ECS {
                                 }
                                 });
                         }
+#endif
                         m_isDragging = false;
                     }
 
@@ -1628,9 +1670,9 @@ namespace ECS {
         }
 
         // ============================================================
-        // DELETE SELECTED ENTITY
+        // DELETE SELECTED ENTITY (Editor-only)
         // ============================================================
-        if (m_selectedEntityID != INVALID_ENTITY_ID && Input::IsKeyPressed(KEY_DELETE)) {
+        if (Engine::CORE && Engine::CORE->IsInEditorMode() && m_selectedEntityID != INVALID_ENTITY_ID && Input::IsKeyPressed(KEY_DELETE)) {
             world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
                 (void)lt;
                 if (e.Index == m_selectedEntityID) {

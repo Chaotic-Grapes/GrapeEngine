@@ -10,7 +10,7 @@ public class FollowLeader : ScriptBehaviour
         ref LocalTransform transform = ref GetComponent<LocalTransform>();
         // Find the attached Entity Tag
         TagMask tag = GetComponent<TagMask>();
-
+        
         // For UI Tag: Follow active Cam
         if (tag.Mask == (uint)Tags.UI) transform.Position = CameraController.cameraPos;
         
@@ -20,7 +20,7 @@ public class FollowLeader : ScriptBehaviour
         //{
             //transform.Position = ___
         //}
-
+        
 
     }
 }

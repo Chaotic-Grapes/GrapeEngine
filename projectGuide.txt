@@ -12,7 +12,7 @@ PREREQUISITES
 1. VISUAL STUDIO 2022
    - Download: https://visualstudio.microsoft.com/downloads/
    - Install "Desktop development with C++" workload
-   - Ensure C++17 support is included
+   - Ensure **C++23** support is available
 
 2. GIT
    - Download: https://git-scm.com/downloads
@@ -74,17 +74,23 @@ STEP 2: CLONE THE REPOSITORY
 STEP 3: GENERATE VISUAL STUDIO SOLUTION
 ================================================================================
 
-METHOD 1: Using the Provided Script (Easiest)
-----------------------------------------------
-1. In the GrapeEngine directory, double-click: script_build.bat
-   OR
-   Open Command Prompt in the project directory and run:
-   script_build.bat
+METHOD 1: Using the Provided Script Menu (Easiest)
+-------------------------------------------------
+1. In the GrapeEngine directory, double-click: `script_build_menu.bat`
+   OR run from command line: `script_build_menu.bat`
 
-This will automatically:
-- Create a 'build' directory
-- Generate Visual Studio 2022 solution files
-- Configure for x64 Debug build
+The menu script provides quick access to all common tasks:
+- Clean build folders
+- Build/Run the Editor (Debug/Release)
+- Build/Run the Standalone Game (Debug/Release)
+- Build both targets
+
+Each option will configure and build into separate folders:
+- Editor builds use the `build` folder (e.g. `build\Debug`)
+- Game builds use the `build_game` folder (e.g. `build_game\Debug`)
+
+You can still use `script_build_editor.bat`, `script_build_game.bat`, and
+`script_build_all.bat` directly if you prefer.
 
 METHOD 2: Manual CMake Commands
 -------------------------------
@@ -122,8 +128,8 @@ OPTION A: From Visual Studio
 
 OPTION B: Using the Run Script
 ------------------------------
-- Double-click: script_run.bat
-- OR run from command line: script_run.bat
+ - Double-click: script_run_editor.bat
+ - OR run from command line: script_run_editor.bat
 
 OPTION C: Direct Execution
 --------------------------
@@ -159,11 +165,11 @@ CLEAN BUILD:
 
 REGENERATE SOLUTION:
 - Delete the 'build' folder
-- Run script_build.bat again
+ - Run script_build_editor.bat again
 - Or use the manual CMake commands above
 
 BUILD AND RUN IN ONE STEP:
-- Run: script_build_and_run.bat
+- Run: script_build_editor_and_run.bat
 
 ================================================================================
 PROJECT STRUCTURE

@@ -27,6 +27,7 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 #include <vector>
 #include <unordered_set>
 #include "ConsolePanel.h"
+#include "PerformancePanel.h"
 
 struct LevelEditorConfig {
     float TextFontSize = 23.0f;
@@ -92,6 +93,7 @@ private:
     InspectorPanel m_inspector;
     EntityActions m_entityActions;
     ConsolePanel m_console;
+    PerformancePanel m_performancePanel;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;

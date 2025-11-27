@@ -22,8 +22,23 @@ cd GrapeEngine
 
 ### Building the Engine
 
-1. **Build:** Run `script_build.bat` (configures for Visual Studio 2022 x64 Debug)
-2. **Run:** Execute `script_run.bat` or run `build/Debug/GrapeEngine.exe`
+You can build using the provided per-target scripts or the interactive menu.
+
+Interactive Menu (recommended):
+1. Run `script_build_menu.bat` and choose Editor, Game, Build All, or Clean.
+2. The menu supports Debug and Release builds and will pause so you can
+   inspect output.
+
+Per-target scripts:
+- Editor: `script_build_editor.bat` → outputs to `build\<Config>` (e.g. `build\Debug\GrapeEngine.exe`)
+- Game: `script_build_game.bat` → outputs to `build_game\<Config>` (e.g. `build_game\Debug\<GameName>.exe`)
+- Build All: `script_build_all.bat` will build Editor into `build` and Game into `build_game`
+
+Notes:
+- The CMake configuration requests **C++23**.
+- The standalone game executable name may be auto-detected from the first
+  game project folder found (a folder containing `ProjectSettings.json`).
+  You can override this with the CMake cache variable `GAME_OUTPUT_NAME`.
 
 ---
 

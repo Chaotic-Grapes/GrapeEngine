@@ -1,18 +1,15 @@
 {
-  "Title": "Echoes Below",
-  "Version": "1.0.0",
-  "StartupScene": "EchoesBelow/Assets/Scenes/MainScene.scn",
-  "WindowSettings": {
-    "Width": 1600,
-    "Height": 900,
-    "Fullscreen": false,
-    "VSync": true
-  },
-  "Physics": {
-    "Gravity": -9.81,
-    "TimeStep": 0.016
-  },
-  "Audio": {
-    "MasterVolume": 1.0
-  }
+    "Physics": {
+        "Gravity": -9.8100004196167,
+        "TimeStep": 0.01600000075995922
+    },
+    "StartupScene": "EchoesBelow/Scenes/MainScene.scn",
+    "Title": "Echoes Below",
+    "Version": "1.0.0",
+    "WindowSettings": {
+        "Fullscreen": true,
+        "Height": 900,
+        "VSync": true,
+        "Width": 1600
+    }
 }

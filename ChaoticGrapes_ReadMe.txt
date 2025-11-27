@@ -8,7 +8,7 @@ GrapeEngine is a custom game engine developed for academic and personal projects
 
 ### Prerequisites
 
-- **C++ Compiler** (Visual Studio 2022 or equivalent)
+- **C++ Compiler** (Visual Studio 2022 or equivalent) — the project requests **C++23**
 - **CMake:** Version 3.13 or later
 - **.NET SDK:** Version 9.0 or later (for C# scripting support)
 - **Git:** (for cloning the repository)
@@ -22,8 +22,20 @@ cd GrapeEngine
 
 ### Building the Engine
 
-1. **Build:** Run `script_build.bat` (configures for Visual Studio 2022 x64 Debug)
-2. **Run:** Execute `script_run.bat` or run `build/Debug/GrapeEngine.exe`
+Recommended: use the interactive build menu:
+
+1. Run `script_build_menu.bat` and follow the prompts to build Editor, Game, or Both (Debug/Release).
+
+Direct scripts:
+- Editor: `script_build_editor.bat` → outputs to `build\<Config>` (e.g. `build\Debug\GrapeEngine.exe`)
+- Game: `script_build_game.bat` → outputs to `build_game\<Config>` (e.g. `build_game\Debug\<GameName>.exe`)
+- Build All: `script_build_all.bat` builds Editor into `build` and Game into `build_game`
+
+Notes:
+- CMake requests **C++23** for compilation.
+- The standalone game executable name is auto-detected from the first game
+  project folder (a folder containing `ProjectSettings.json`). Override with
+  `-DGAME_OUTPUT_NAME=<Name>` when running CMake if you want a specific name.
 
 ---
 
