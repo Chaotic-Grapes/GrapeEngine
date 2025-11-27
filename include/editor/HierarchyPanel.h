@@ -160,8 +160,8 @@ private:
     EntityActions* m_entityActions = nullptr; // For entity operations
 
     // Selection state
-    EntityId m_selectedEntityId = 0;                // Currently selected entity ID (0 = no selection)
-    EntityId m_contextMenuTarget = 0;               // Entity targeted for context menu operations
+    public : EntityId m_selectedEntityId = 0;                // Currently selected entity ID (0 = no selection)
+    private: EntityId m_contextMenuTarget = 0;               // Entity targeted for context menu operations
 
     // UI state
     std::unordered_set<EntityId> m_expandedNodes;   // Track which tree nodes are expanded

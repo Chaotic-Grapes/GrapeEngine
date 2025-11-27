@@ -21,6 +21,7 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 #include "../editor/HierarchyPanel.h"
 #include "../editor/InspectorPanel.h"
 #include "../editor/EditorEntityActions.h"
+#include "../editor/AABBGenerator.h"
 #include <imgui.h>
 #include <GLFW/glfw3.h>
 #include <functional>
@@ -89,6 +90,7 @@ private:
     HierarchyPanel m_hierarchyWindow;
     InspectorPanel m_inspector;
     EntityActions m_entityActions;
+    SpriteImportPanel m_spriteImportPanel;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;

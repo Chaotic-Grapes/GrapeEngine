@@ -22,6 +22,12 @@ to C++ components.
 #include <nlohmann/json.hpp>
 #include <imgui.h>
 
+class HierarchyPanel;
+namespace ECS
+{
+    class World;
+}
+
 // Handles rendering of all component UIs in the inspector
 class ComponentUI {
 public:
@@ -31,7 +37,7 @@ public:
 
     // Sets fonts for component UI rendering to maintain visual consistency across 
     // all inspectors
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, HierarchyPanel* hierarchyPanel);
 
     // -------------------------------------------------------------------------
     // Component Rendering
@@ -92,6 +98,8 @@ private:
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
+    ECS::World* m_world = nullptr;
+    HierarchyPanel* m_hierarchyPanel = nullptr;
 
     // Font references for UI styling
     ImFont* m_mainFont;

@@ -1,8 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
 \file   ComponentPropertyEditor.cpp
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin (90%)
+        Samantha Leong (10%)
 \par    ruiqin.foo@digipen.edu
+        s.leong@digipen.edu
 \date   3rd November 2025
 
 \brief
@@ -17,6 +19,8 @@ prefab assets use the same UI path.
 
 #include "../editor/ComponentPropertyEditor.h"
 #include "../editor/ComponentWidgets.h"
+#include "../editor/HierarchyPanel.h"
+#include "../engine/ecs/World.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include <filesystem>
@@ -31,10 +35,12 @@ prefab assets use the same UI path.
 
 // Sets the fonts used for all component property UIs
 // We keep these pointers so every widget uses a consistent visual style
-void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
+void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, HierarchyPanel* hierarchyPanel) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
+    m_world = world;
+    m_hierarchyPanel = hierarchyPanel;
 }
 
 // -----------------------------------------------------------------------------
@@ -235,6 +241,30 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data) {
 
     // Layer mask selects which collision layers the box interacts with
     EditorUI::RenderIntProperty("Layer Mask##Box", data, "LayerMask");
+
+    if (ImGui::Button("Generate AABB")){ // Sam
+        using namespace ECS::Components;
+        // get the current selected entity (HierarchyPanel::m_selectedEntityId), get sprite component, 
+        // get textureId, using textureId ask resource manager to return the texture object. 
+        // from there can get the texture data and plug into the auto generation function.
+        //return 0;
+        //autogenerate should simply modify selected entity's collider2d
+        // 
+        // get the sprite component, get the width and height
+        //ECS::Entity entity = HierarchyPanel->m_selectedEntityId;
+
+        ECS::Entity entity{
+            m_hierarchyPanel->m_selectedEntityId
+        };
+        
+        auto& sprite = m_world->Get<SpriteRenderer2D>(entity);
+
+        int pixelWidth = sprite.Width;
+        int pixelHeight = sprite.Height;
+
+        auto& col = m_world->Get<BoxCollider2D>(entity);
+        col.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+   }
     EditorUI::EndPropertySection();
 }
 

@@ -68,14 +68,14 @@ namespace {
 // -------------------------------------------------------------------------
 
 // Set up fonts and world pointer so the inspector can render UI and talk to ECS
-void InspectorPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world) {
+void InspectorPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, HierarchyPanel* hierarchyPanel) {
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
     m_world = world;
 
     // Forward fonts into the smaller ComponentUI helper so it can draw fields
-    m_componentUI.Initialize(mainFont, boldFont, symbolsFont);
+    m_componentUI.Initialize(mainFont, boldFont, symbolsFont, world, hierarchyPanel);
 }
 
 // Update the world context and clear any stale selection from a previous world

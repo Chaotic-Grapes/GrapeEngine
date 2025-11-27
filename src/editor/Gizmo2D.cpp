@@ -14,9 +14,10 @@
 
 
 #include "../engine/ecs/systems/RendererSystem.h"
+#include "ecs/Hierarchy.h"
 #include "core/Logger.h"
 #include <imgui.h>
-#include "ImGuizmo.h"
+#include <ImGuizmo.h>
 #include "ecs/World.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp> 
@@ -51,6 +52,7 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     if (m_selectedEntityID == Entity::NPOS32)
         return;
 
+    // Resolve raw ID
     ECS::Entity entity = world.Resolve(m_selectedEntityID);
 
     // Skip if entity doesn't exist or was destroyed
@@ -60,6 +62,8 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     // Check if entity has transform
     if (!world.Has<ECS::Components::LocalTransform>(entity))
         return;
+
+    auto& local = world.Get<ECS::Components::LocalTransform>(entity);
 
     // ------------------------------------------------------------------------
     // B. SETUP IMGUIZMO CONTEXT
@@ -91,27 +95,38 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     // ------------------------------------------------------------------------
     // D. BUILD MODEL MATRIX FROM ENTITY TRANSFORM (T * R * S)
     // ------------------------------------------------------------------------
-
-    ECS::Components::LocalTransform& t = world.Get<ECS::Components::LocalTransform>(entity);
-    glm::mat4 modelMatrix = glm::mat4(1.0f);
-
-    // Build the matrix using the entity's current position, rotation, and scale.
-    //modelMatrix = glm::translate(modelMatrix, glm::vec3(t.Position.X, t.Position.Y, 0.0f));
-    //modelMatrix = glm::rotate(modelMatrix, glm::radians(t.Rotation), glm::vec3(0, 0, 1)); // Z-axis rotation for 2D
-    //modelMatrix = glm::scale(modelMatrix, glm::vec3(t.Scale.X, t.Scale.Y, 1.0f));
-
-    // 1. Translate (T)
-    modelMatrix = glm::translate(modelMatrix, glm::vec3(t.Position.X, t.Position.Y, t.Position.Z)); 
     
 
-    // 2. Rotate (R) - Apply the existing quaternion rotation
-    //    glm::mat4_cast converts the quaternion directly to a rotation matrix
-    glm::quat glmQuat(t.Rotation.W, t.Rotation.X, t.Rotation.Y, t.Rotation.Z);
-    modelMatrix *= glm::mat4_cast(glmQuat);
+std::vector<Entity> hierarchy;
+Entity current = world.ParentOf(entity);  // Start from parent, not self
+while (!current.IsNull())
+{
+    hierarchy.push_back(current);
+    current = world.ParentOf(current);
+}
 
-    // 3. Scale (S)
-    modelMatrix = glm::scale(modelMatrix, glm::vec3(t.Scale.X, t.Scale.Y, t.Scale.Z));
+// Build parent world matrix from root down to immediate parent
+glm::mat4 worldMatrix(1.0f);
+for (auto it = hierarchy.rbegin(); it != hierarchy.rend(); ++it)
+{
+    if (world.Has<Components::LocalTransform>(*it))
+    {
+        const auto& lt = world.Get<Components::LocalTransform>(*it);
+        glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z));
+        glm::mat4 R = glm::mat4_cast(glm::quat(lt.Rotation.W, lt.Rotation.X, lt.Rotation.Y, lt.Rotation.Z));
+        glm::mat4 S = glm::scale(glm::mat4(1.0f), glm::vec3(lt.Scale.X, lt.Scale.Y, lt.Scale.Z));
+        worldMatrix = worldMatrix * T * R * S;
+    }
+}
 
+// Now apply the selected entity's local transform on top
+ECS::Components::LocalTransform& t = world.Get<ECS::Components::LocalTransform>(entity);
+glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(t.Position.X, t.Position.Y, t.Position.Z));
+glm::mat4 R = glm::mat4_cast(glm::quat(t.Rotation.W, t.Rotation.X, t.Rotation.Y, t.Rotation.Z));
+glm::mat4 S = glm::scale(glm::mat4(1.0f), glm::vec3(t.Scale.X, t.Scale.Y, t.Scale.Z));
+worldMatrix = worldMatrix * T * R * S;
+
+    
     // ------------------------------------------------------------------------
     // E. BUILD CAMERA MATRICES REQUIRED BY IMGUIZMO
     // ------------------------------------------------------------------------
@@ -134,7 +149,7 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
         glm::value_ptr(projectionMatrix),
         m_currentGizmoOperation,        //< translate / rotate / scale
         m_currentGizmoMode,            //< local / world
-        glm::value_ptr(modelMatrix)
+        glm::value_ptr(worldMatrix)
     );
 
     // ------------------------------------------------------------------------
@@ -145,32 +160,58 @@ void RendererSystem::DrawEditorGizmo(ECS::World& world, float drawPosX, float dr
     {
         LOG_DEBUG("GIZMO IS USING: Applying changes!");
 
-        glm::vec3 scale, translation, skew;
-        glm::quat rotation;
-        glm::vec4 perspective;
-
-        // Decompose the modified matrix back into T, R, S components
-        if (glm::decompose(modelMatrix, scale, rotation, translation, skew, perspective))
+        // Build parent world matrix (identity if no parent)
+        glm::mat4 parentWorld(1.0f);
+        Entity parent = world.ParentOf(entity);
+        if (!parent.IsNull())
         {
-            //glm::vec3 euler = glm::eulerAngles(rotation);
-            //float newRotation = glm::degrees(euler.z); // Extract Z-axis rotation
+            // Collect parent hierarchy
+            std::vector<Entity> parentHierarchy;
+            Entity p = parent;
+            while (!p.IsNull())
+            {
+                parentHierarchy.push_back(p);
+                p = world.ParentOf(p);
+            }
 
-            // Update the entity's Local Transform component
-            t.Position.X = translation.x;
-            t.Position.Y = translation.y;
-            t.Position.Z = translation.z;
-
-            // Update the entity's Local Scale component
-            t.Scale.X = scale.x;
-            t.Scale.Y = scale.y;
-            t.Scale.Z = scale.z;
-
-            // Update the entity's Local Rotation component
-            t.Rotation.X = rotation.x;
-            t.Rotation.Y = rotation.y;
-            t.Rotation.Z = rotation.z;
-            t.Rotation.W = rotation.w;
-            
+            // Apply from root down to immediate parent
+            for (auto it = parentHierarchy.rbegin(); it != parentHierarchy.rend(); ++it)
+            {
+                if (world.Has<Components::LocalTransform>(*it))
+                {
+                    const auto& lt = world.Get<Components::LocalTransform>(*it);
+                    glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z));  
+                    glm::mat4 R = glm::mat4_cast(glm::quat(lt.Rotation.W, lt.Rotation.X, lt.Rotation.Y, lt.Rotation.Z));
+                    glm::mat4 S = glm::scale(glm::mat4(1.0f), glm::vec3(lt.Scale.X, lt.Scale.Y, lt.Scale.Z));  
+                    parentWorld = parentWorld * T * R * S;
+                }
+            }
         }
+
+        // Convert modified world matrix back to local space
+        glm::mat4 localMatrix = glm::inverse(parentWorld) * worldMatrix;
+
+        glm::vec3 pos, scale, skew;
+        glm::vec4 perspective;
+        glm::quat rot;
+
+        if (glm::decompose(localMatrix, scale, rot, pos, skew, perspective))
+        {
+            // Write back to LocalTransform
+            local.Position = { pos.x, pos.y, pos.z };
+            local.Scale = { scale.x, scale.y, scale.z };
+            local.Rotation = { rot.x, rot.y, rot.z, rot.w };
+
+            // Mark this entity + all children dirty using only existing ForChildren
+            std::function<void(Entity)> markDirty = [&](Entity e)
+                {
+                    if (world.Has<Components::WorldTransform>(e))
+                        world.Get<Components::WorldTransform>(e).Dirty = true;
+
+                    world.ForChildren(e, markDirty);
+                };
+            markDirty(entity);
+        }
+        
     }
 }

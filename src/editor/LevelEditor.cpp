@@ -236,7 +236,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     );
 
     _registerPanel("Inspector",
-        [this]() { m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world); },
+        [this]() { m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_hierarchyWindow); },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
     );

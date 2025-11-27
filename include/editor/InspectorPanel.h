@@ -46,7 +46,7 @@ public:
     // -------------------------------------------------------------------------
 
     // Initializes the inspector panel with required fonts and world reference
-    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world);
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, HierarchyPanel* hierarchyPanel);
 
     // Updates the world context for entity operations (so inspector can work on
     // different world instances dynamically)
