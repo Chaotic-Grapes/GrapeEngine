@@ -33,10 +33,6 @@ public class Player : ScriptBehaviour
         //try another day
 
     }
-    public override void OnCollisionEnter(ulong otherEntity)
-    {
-        Log("Collided with: " + Entity.FromId(otherEntity));
-    }
     public override void OnUpdate()
     {
         //Declare and initialize components
@@ -48,7 +44,7 @@ public class Player : ScriptBehaviour
         if (Input.IsKeyDown(KeyCode.W))
         {   //Up
             //linearVelocity.Value = playerDir * moveSpeed * Time.DeltaTime;
-            Log("MOVING!");
+            
             AddForce(ref linearVelocity);
         }
         if (Input.IsKeyDown(KeyCode.S))
@@ -57,12 +53,12 @@ public class Player : ScriptBehaviour
         }   
         if (Input.IsKeyDown(KeyCode.D))
         {   //Right Key
-            Log("Rotating Right");
+            
             AddTorque(ref angularVelocity, -1); //positive rotate direction
         }
         if (Input.IsKeyDown(KeyCode.A))
         {   //Left Key
-            Log("Rotating Left");
+            
             AddTorque(ref angularVelocity, 1);//negative rotate direction
         }
 
