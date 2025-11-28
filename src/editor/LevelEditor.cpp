@@ -19,6 +19,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include <imgui_internal.h>
 #include <core/Application.h>
 #include "services/Time.h"
+#include <algorithm>
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
@@ -239,6 +240,13 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         [this]() { m_inspector.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_hierarchyWindow); },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
+    );
+
+    // Register Sprite Importer panel so it receives world updates and renders in the editor
+    _registerPanel("Sprite Importer",
+        [this]() { m_spriteImportPanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont); },
+        [this]() { m_spriteImportPanel.Render(); },
+        [this](ECS::World* w) { m_spriteImportPanel.SetWorld(w); }
     );
 
     // Initialize all registered panels
