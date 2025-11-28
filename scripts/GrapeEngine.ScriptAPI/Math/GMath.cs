@@ -36,22 +36,38 @@ public static class GMath
     /// <summary>
     /// Generate a random integer in the range [min, max].
     /// </summary>
-    public static int RandomInt(int min, int max) => MathAPI.RandomInt(min, max);
+    public static int RandomInt(int min, int max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomInt(min, max);
+    }
 
     /// <summary>
     /// Generate a random float in the range [min, max].
     /// </summary>
-    public static float RandomFloat(float min, float max) => MathAPI.RandomFloat(min, max);
+    public static float RandomFloat(float min, float max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomFloat(min, max);
+    }
 
     /// <summary>
     /// Generate a random integer with a seed.
     /// </summary>
-    public static int RandomInt(int min, int max, uint seed) => MathAPI.RandomIntSeeded(min, max, seed);
+    public static int RandomInt(int min, int max, uint seed)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomIntSeeded(min, max, seed);
+    }
 
     /// <summary>
     /// Generate a random float with a seed.
     /// </summary>
-    public static float RandomFloat(float min, float max, uint seed) => MathAPI.RandomFloatSeeded(min, max, seed);
+    public static float RandomFloat(float min, float max, uint seed)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomFloatSeeded(min, max, seed);
+    }
 
     // ============================================================================
     // Clamp / Lerp
@@ -60,12 +76,20 @@ public static class GMath
     /// <summary>
     /// Clamp a value between min and max.
     /// </summary>
-    public static float Clamp(float value, float min, float max) => MathAPI.Clamp(value, min, max);
+    public static float Clamp(float value, float min, float max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.Clamp(value, min, max);
+    }
 
     /// <summary>
     /// Clamp an integer value between min and max.
     /// </summary>
-    public static int Clamp(int value, int min, int max) => MathAPI.ClampInt(value, min, max);
+    public static int Clamp(int value, int min, int max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampInt(value, min, max);
+    }
 
     /// <summary>
     /// Linearly interpolate between a and b by t.
@@ -250,5 +274,32 @@ public static class GMath
         float x = v.X, y = v.Y;
         MathAPI.Rotate2D(ref x, ref y, angle);
         return new Vector2(x, y);
+    }
+
+    // Helper to swap min and max if min > max
+    private static void SwapMinMax(ref int min, ref int max)
+    {
+        // Swap if min is greater than max
+        if (min > max)
+        {
+            // Swap values with Min and Max
+            var temp = min;
+
+            min = max;
+            max = temp;
+        }
+    }
+
+    private static void SwapMinMax(ref float min, ref float max)
+    {
+        // Swap if min is greater than max
+        if (min > max)
+        {
+            // Swap values with Min and Max
+            var temp = min;
+
+            min = max;
+            max = temp;
+        }
     }
 }
