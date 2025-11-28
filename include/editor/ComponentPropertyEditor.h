@@ -21,6 +21,8 @@ to C++ components.
 
 #include <nlohmann/json.hpp>
 #include <imgui.h>
+#include "ecs/Entity.h"
+#include "ecs/World.h"
 
 // Handles rendering of all component UIs in the inspector
 class ComponentUI {
