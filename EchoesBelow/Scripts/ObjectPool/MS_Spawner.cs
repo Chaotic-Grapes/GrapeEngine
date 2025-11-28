@@ -12,7 +12,7 @@ public class MS_Spawner : ScriptBehaviour
     float xBoundaryMax, xBoundaryMin;
     float xValue;
 
-    //test
+    //iterator limiter
     static int i = 0;
     public override void OnStart()
     {
@@ -56,6 +56,7 @@ public class MS_Spawner : ScriptBehaviour
     }
     ulong PullFromObjPool()
     {
+        //In the future, please use List.Remove
         i++;
         int inPoolCount = MS_ObjPool.ms_Objs.Count;
         int poolLastIndex = inPoolCount - 1; //index of last obj in list

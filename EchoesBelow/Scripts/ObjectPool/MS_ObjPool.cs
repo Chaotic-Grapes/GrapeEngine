@@ -16,6 +16,7 @@ public class MS_ObjPool : ScriptBehaviour
     public override void OnUpdate()
     {
         // Called every frame
+        //dev key for checking whats in the pool
         if (Input.IsKeyPressed(KeyCode.P))
         {
             foreach (MS_MarineSnow obj in ms_Objs)
@@ -41,5 +42,7 @@ public class MS_ObjPool : ScriptBehaviour
         //    }
         //}
     }
+
+    //create add and remove from list functions here in the future
 }
 
