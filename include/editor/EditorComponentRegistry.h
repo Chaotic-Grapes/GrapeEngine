@@ -36,8 +36,10 @@ struct ComponentUIMetadata {
     bool CanDelete;             // Whether component can be removed from entities
 
     // std::function wraps any callable object (function pointer, lambda, functor)
-    // Takes ComponentUI reference and JSON data, renders the component properties
-    std::function<void(ComponentUI&, nlohmann::json&)> RenderUI;
+    // Takes ComponentUI reference, JSON data, the entity being inspected and
+    // the world pointer (may be null for prefab editing) so renderers can
+    // access live ECS data when available.
+    std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)> RenderUI;
 
     // Returns default JSON values for creating new component instances
     std::function<nlohmann::json()> GetDefaults;

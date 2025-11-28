@@ -73,7 +73,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
 
         // UI renderer callback: the Inspector calls this function, which forwards 
         // to ComponentWidgets to draw the UI
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLocalTransform(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLocalTransform(d, e, w); },
 
         // Default values: created when adding a Transform to a new entity
         []() { return nlohmann::json{
@@ -89,7 +89,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Name
     {
         "Name", "Name", "ECS::Components::Name", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderName(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderName(d, e, w); },
         []() { return nlohmann::json{{"Value", "Entity"}}; },
         COMPONENT_OPS(ECS::Components::Name)
     },
@@ -97,7 +97,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Active
     {
         "Active", "Active", "ECS::Components::Active", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderActive(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderActive(d, e, w); },
         []() { return nlohmann::json{{"Enabled", true}}; },
         COMPONENT_OPS(ECS::Components::Active)
     },
@@ -105,7 +105,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Tag Mask
     {
         "Tag Mask", "TagMask", "ECS::Components::TagMask", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderTagMask(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTagMask(d, e, w); },
         []() { return nlohmann::json{{"Mask", 0}}; },
         COMPONENT_OPS(ECS::Components::TagMask)
     },
@@ -113,7 +113,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Lifetime
     {
         "Lifetime", "Lifetime", "ECS::Components::Lifetime", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLifetime(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLifetime(d, e, w); },
         []() { return nlohmann::json{{"Time", 0.0f}}; },
         COMPONENT_OPS(ECS::Components::Lifetime)
     },
@@ -122,7 +122,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // EVERYTHING FROM THIS POINT IS JUST THE SAME THING
     {
         "Camera 3D", "Camera3D", "ECS::Components::Camera3D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderCamera3D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCamera3D(d, e, w); },
         []() { return nlohmann::json{
             {"UsePerspective", false}, {"FOV", 45.0f}, {"NearPlane", 0.1f},
             {"FarPlane", 100.0f}, {"OrthoSize", 10.0f},
@@ -134,7 +134,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Sprite Renderer 2D
     {
         "Sprite Renderer 2D", "SpriteRenderer2D", "ECS::Components::SpriteRenderer2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderSpriteRenderer2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteRenderer2D(d, e, w); },
         []() { return nlohmann::json{
             {"TextureId", 0},
             {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
@@ -148,7 +148,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Sprite Sheet Animation 2D
     {
         "Sprite Sheet Animation 2D", "SpriteSheetAnimation2D", "ECS::Components::SpriteSheetAnimation2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderSpriteSheetAnimation2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteSheetAnimation2D(d, e, w); },
         []() { return nlohmann::json{
             {"TextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
             {"SheetWidth", 256}, {"SheetHeight", 256},
@@ -161,7 +161,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Z-Index 2D
     {
         "Z-Index 2D", "ZIndex2D", "ECS::Components::ZIndex2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderZIndex2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderZIndex2D(d, e, w); },
         []() { return nlohmann::json{
             {"ZOrder", 0}
         }; },
@@ -171,7 +171,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Rigidbody 2D
     {
         "Rigidbody 2D", "Rigidbody2D", "ECS::Components::Rigidbody2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderRigidbody2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderRigidbody2D(d, e, w); },
         []() { return nlohmann::json{
             {"Mass", 1.0f}, {"InverseMass", 1.0f},
             {"LinearDamping", 0.0f}, {"AngularDamping", 0.0f},
@@ -183,7 +183,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Linear Velocity 2D
     {
         "Linear Velocity 2D", "LinearVelocity2D", "ECS::Components::LinearVelocity2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLinearVelocity2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLinearVelocity2D(d, e, w); },
         []() { return nlohmann::json{
             {"Value", {{"X", 0.0f}, {"Y", 0.0f}}}
         }; },
@@ -193,7 +193,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Angular Velocity 2D
     {
         "Angular Velocity 2D", "AngularVelocity2D", "ECS::Components::AngularVelocity2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderAngularVelocity2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAngularVelocity2D(d, e, w); },
         []() { return nlohmann::json{
             {"Value", 0.0f}
         }; },
@@ -203,7 +203,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Acceleration 2D
     {
         "Acceleration 2D", "Acceleration2D", "ECS::Components::Acceleration2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderAcceleration2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAcceleration2D(d, e, w); },
         []() { return nlohmann::json{
             {"Value", {{"X", 0.0f}, {"Y", 0.0f}}}
         }; },
@@ -213,7 +213,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Physics Material 2D
     {
         "Physics Material 2D", "PhysicsMaterial2D", "ECS::Components::PhysicsMaterial2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderPhysicsMaterial2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderPhysicsMaterial2D(d, e, w); },
         []() { return nlohmann::json{
             {"Friction", 0.5f}, {"Restitution", 0.0f}, {"PositionCorrectPercent", 0.2f}
         }; },
@@ -223,7 +223,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Circle Collider 2D
     {
         "Circle Collider 2D", "CircleCollider2D", "ECS::Components::CircleCollider2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderCircleCollider2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCircleCollider2D(d, e, w); },
         []() { return nlohmann::json{
             {"Radius", 0.5f},
             {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -235,7 +235,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Box Collider 2D
     {
         "Box Collider 2D", "BoxCollider2D", "ECS::Components::BoxCollider2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderBoxCollider2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderBoxCollider2D(d, e, w); },
         []() { return nlohmann::json{
             {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
             {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -248,7 +248,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Shape Circle 2D
     {
         "Shape Circle", "ShapeCircle2D", "ECS::Components::ShapeCircle2D", true,
-            [](ComponentUI& ui, nlohmann::json& d) { ui.RenderShapeCircle2D(d); },
+            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeCircle2D(d, e, w); },
             []() { return nlohmann::json{
                 {"Radius", 0.5f},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -261,7 +261,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Shape Box 2D
     {
         "Shape Box", "ShapeBox2D", "ECS::Components::ShapeBox2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderShapeBox2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeBox2D(d, e, w); },
         []() { return nlohmann::json{
             {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
             {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -274,7 +274,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Shape Line 2D
     {
         "Shape Line", "ShapeLine2D", "ECS::Components::ShapeLine2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderShapeLine2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeLine2D(d, e, w); },
         []() { return nlohmann::json{
             {"A", {{"X", 0.0f}, {"Y", 0.0f}}},
             {"B", {{"X", 1.0f}, {"Y", 0.0f}}},
@@ -287,7 +287,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Light 2D
     {
         "Light 2D", "Light2D", "ECS::Components::Light2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLight2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLight2D(d, e, w); },
         []() { return nlohmann::json{
             {"LightType", 0},
             {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
@@ -301,7 +301,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Text
     {
         "Text", "Text", "ECS::Components::Text", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderText(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderText(d, e, w); },
         []() { return nlohmann::json{
             {"Content", "Text"},
             {"FontPath", "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf"},
@@ -315,7 +315,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Animation State 2D
     {
         "Animation State 2D", "AnimationState2D", "ECS::Components::AnimationState2D", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderAnimationState2D(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationState2D(d, e, w); },
         []() { return nlohmann::json{
             {"CurrentFrame", 0}, {"TimeAccumulator", 0.0f}, {"Finished", false}
         }; },
@@ -330,9 +330,9 @@ static std::vector<ComponentUIMetadata> m_registry = {
         true,                              // Can byebye
 
         // RenderUI -> use ComponentUI's RenderAudioSource
-        [](ComponentUI& ui, nlohmann::json& data)
+        [](ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w)
         {
-            ui.RenderAudioSource(data);
+            ui.RenderAudioSource(data, e, w);
         },
 
         // Defaults -> initial JSON for a new AudioSource
@@ -379,7 +379,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Layer
     {
         "Layer 2D", "Layer", "ECS::Components::Layer", true,
-            [](ComponentUI& ui, nlohmann::json& d) { ui.RenderLayer2D(d); },
+            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); },
             []() { return nlohmann::json{
                 {"Id", 0}}; },
             COMPONENT_OPS(ECS::Components::Layer)
@@ -388,7 +388,7 @@ static std::vector<ComponentUIMetadata> m_registry = {
     // Script Instance
     {
         "Script Instance", "ScriptInstance", "ECS::Components::ScriptInstance", true,
-        [](ComponentUI& ui, nlohmann::json& d) { ui.RenderScriptInstance(d); },
+        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderScriptInstance(d, e, w); },
         []() { return nlohmann::json{
             {"TypeName", ""},
             {"ScriptPath", ""},

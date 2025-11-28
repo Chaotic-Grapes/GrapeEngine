@@ -45,7 +45,9 @@ void ComponentUI::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbols
 // -----------------------------------------------------------------------------
 
 // Renders the Name component properties
-void ComponentUI::RenderName(nlohmann::json& data) {
+void ComponentUI::RenderName(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Name" });
 
     // Get current name value
@@ -67,14 +69,18 @@ void ComponentUI::RenderName(nlohmann::json& data) {
 }
 
 // Renders the Active component properties
-void ComponentUI::RenderActive(nlohmann::json& data) {
+void ComponentUI::RenderActive(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Active" });
     EditorUI::RenderCheckboxProperty("Enabled", data, "Enabled");
     EditorUI::EndPropertySection();
 }
 
 // Renders the TagMask component properties
-void ComponentUI::RenderTagMask(nlohmann::json& data) {
+void ComponentUI::RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Tag Mask" });
 
     // Tag mask is a bitfield stored as integer
@@ -92,14 +98,18 @@ void ComponentUI::RenderTagMask(nlohmann::json& data) {
 }
 
 // Renders the Lifetime component properties
-void ComponentUI::RenderLifetime(nlohmann::json& data) {
+void ComponentUI::RenderLifetime(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Lifetime" });
     EditorUI::RenderFloatRow("Time##Lifetime", "s", data, "Time", 0.1f);
     EditorUI::EndPropertySection();
 }
 
 // Renders the LocalTransform component properties
-void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
+void ComponentUI::RenderLocalTransform(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Start a grouped section so all three rows share aligned labels
     EditorUI::BeginPropertySection({ "Local Rotation", "Local Position", "Local Scale" });
 
@@ -223,7 +233,9 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data) {
 }
 
 // Renders the SpriteRenderer2D component properties
-void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
+void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // RELOAD TEXTURE FROM PATH ON FIRST RENDER
     // Build a human readable summary of the current texture
     std::string texPath = data.value("TexturePath", "");
@@ -339,7 +351,9 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data) {
 }
 
 // Renders the Rigidbody2D physics component properties
-void ComponentUI::RenderRigidbody2D(nlohmann::json& data) {
+void ComponentUI::RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Group all rigidbody fields so labels line up and scrolling feels consistent
     EditorUI::BeginPropertySection({ "Mass", "Inverse Mass", "Linear Damping", "Angular Damping",
         "Gravity Scale", "Flags" });
@@ -365,7 +379,9 @@ void ComponentUI::RenderRigidbody2D(nlohmann::json& data) {
 }
 
 // Renders the LinearVelocity2D component
-void ComponentUI::RenderLinearVelocity2D(nlohmann::json& data) {
+void ComponentUI::RenderLinearVelocity2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Single row section for velocity vector
     EditorUI::BeginPropertySection({ "Linear Velocity" });
 
@@ -375,7 +391,9 @@ void ComponentUI::RenderLinearVelocity2D(nlohmann::json& data) {
 }
 
 // Renders the AngularVelocity2D component
-void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data) {
+void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Single row section for angular velocity
     EditorUI::BeginPropertySection({ "Angular Velocity" });
 
@@ -385,7 +403,9 @@ void ComponentUI::RenderAngularVelocity2D(nlohmann::json& data) {
 }
 
 // Renders the CircleCollider2D component
-void ComponentUI::RenderCircleCollider2D(nlohmann::json& data) {
+void ComponentUI::RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Group rows for trigger, offset, radius and layer mask together
     EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Radius", "Layer Mask" });
 
@@ -415,7 +435,7 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data) {
 }
 
 // Renders the BoxCollider2D component
-void ComponentUI::RenderBoxCollider2D(nlohmann::json& data) {
+void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     // Group rows for trigger, offset, size, rotation and layer mask
     EditorUI::BeginPropertySection({ "Is Trigger", "Offset", "Half Extents", "Rotation",
         "Layer Mask" });
@@ -440,11 +460,34 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data) {
 
     // Layer mask selects which collision layers the box interacts with
     EditorUI::RenderIntProperty("Layer Mask##Box", data, "LayerMask");
+
+    if (ImGui::Button("Generate AABB")) { // Sam
+        using namespace ECS::Components;
+        // get the current selected entity (HierarchyPanel::m_selectedEntityId), get sprite component, 
+        // get textureId, using textureId ask resource manager to return the texture object. 
+        // from there can get the texture data and plug into the auto generation function.
+        //return 0;
+        //autogenerate should simply modify selected entity's collider2d
+        // 
+        // get the sprite component, get the width and height
+        //ECS::Entity entity = HierarchyPanel->m_selectedEntityId;
+        
+        auto& sprite = world->Get<SpriteRenderer2D>(entity);
+
+        int pixelWidth = sprite.Width;
+        int pixelHeight = sprite.Height;
+
+        auto& col = world->Get<BoxCollider2D>(entity);
+        col.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+    }
+
     EditorUI::EndPropertySection();
 }
 
 // Renders the ShapeCircle2D debug draw component
-void ComponentUI::RenderShapeCircle2D(nlohmann::json& data) {
+void ComponentUI::RenderShapeCircle2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Group radius, offset, color, thickness and filled flag together
     EditorUI::BeginPropertySection({ "Radius", "Offset", "Color", "Thickness", "Filled" });
 
@@ -466,7 +509,9 @@ void ComponentUI::RenderShapeCircle2D(nlohmann::json& data) {
 }
 
 // Renders the ShapeBox2D debug draw component
-void ComponentUI::RenderShapeBox2D(nlohmann::json& data) {
+void ComponentUI::RenderShapeBox2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Group size, offset, color, thickness and filled flag together
     EditorUI::BeginPropertySection({ "Half Extents", "Offset", "Color", "Thickness", "Filled" });
 
@@ -488,7 +533,9 @@ void ComponentUI::RenderShapeBox2D(nlohmann::json& data) {
 }
 
 // Renders the ShapeLine2D debug draw component
-void ComponentUI::RenderShapeLine2D(nlohmann::json& data) {
+void ComponentUI::RenderShapeLine2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Group both endpoints, thickness and color in a single section
     EditorUI::BeginPropertySection({ "Point A", "Point B", "Thickness", "Color" });
 
@@ -508,7 +555,8 @@ void ComponentUI::RenderShapeLine2D(nlohmann::json& data) {
 
 // Renders the Camera3D component properties
 // User can choose between perspective and orthographic modes
-void ComponentUI::RenderCamera3D(nlohmann::json& data) {
+void ComponentUI::RenderCamera3D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity; (void)world;
     // Group camera mode and projection related settings together
     EditorUI::BeginPropertySection({ "Mode", "Near Plane", "Far Plane", "Aspect Ratio", "FOV",
         "Ortho Size" });
@@ -542,7 +590,9 @@ void ComponentUI::RenderCamera3D(nlohmann::json& data) {
 
 // Renders the Acceleration2D component properties
 // Shows the 2D acceleration vector that affects physics bodies
-void ComponentUI::RenderAcceleration2D(nlohmann::json& data) {
+void ComponentUI::RenderAcceleration2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Acceleration" });
 
     // X and Y components of the acceleration vector
@@ -552,7 +602,9 @@ void ComponentUI::RenderAcceleration2D(nlohmann::json& data) {
 
 // Renders the PhysicsMaterial2D component properties
 // Controls friction, bounciness and position correction for colliders
-void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data) {
+void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Friction", "Restitution", "Position Correct" });
 
     // Friction coefficient (0 = frictionless, 1 = very sticky)
@@ -569,7 +621,9 @@ void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data) {
 
 // Renders the SpriteSheetAnimation2D component properties
 // Controls animated sprite playback from sprite sheets
-void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
+void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // RELOAD TEXTURE FROM PATH ON FIRST RENDER
     // Build a human readable summary of the current texture
     std::string texPath = data.value("TexturePath", "");
@@ -694,7 +748,9 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data) {
 
 // Renders the ZIndex2D component properties
 // Controls the rendering order in 2D (higher values render on top)
-void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
+void ComponentUI::RenderZIndex2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Z-Order" });
 
     // Integer Z-order value (can be negative)
@@ -703,7 +759,9 @@ void ComponentUI::RenderZIndex2D(nlohmann::json& data) {
 }
 
 // Renders the Light2D component properties
-void ComponentUI::RenderLight2D(nlohmann::json& data) {
+void ComponentUI::RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Light Type", "Position", "Direction", "Color", "Intensity", "Range", "Casts Shadows" });
 
     // Light type selection (Directional = 0, Point = 1)
@@ -743,7 +801,9 @@ void ComponentUI::RenderLight2D(nlohmann::json& data) {
 }
 
 // Renders the Text component properties
-void ComponentUI::RenderText(nlohmann::json& data) {
+void ComponentUI::RenderText(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Content", "Font Path", "Pixel Size", "Color", "Anchor" });
 
     // Text content
@@ -799,7 +859,9 @@ void ComponentUI::RenderText(nlohmann::json& data) {
 }
 
 // Renders the AnimationState2D component properties
-void ComponentUI::RenderAnimationState2D(nlohmann::json& data) {
+void ComponentUI::RenderAnimationState2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Current Frame", "Time Accumulator", "Finished" });
 
     // Current frame (integer)
@@ -820,8 +882,9 @@ static std::string s_unsupportedPath;
 
 
 // Renders the AudioSource component Properties
-void ComponentUI::RenderAudioSource(nlohmann::json& data)
-{
+void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Ensure keys exist with defaults
     if (!data.contains("CueId"))       data["CueId"] = 0;
     if (!data.contains("Volume"))      data["Volume"] = 1.0f;
@@ -956,14 +1019,18 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data)
 }
 
 // Renders the Layer component properties
-void ComponentUI::RenderLayer2D(nlohmann::json& data) {
+void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     EditorUI::BeginPropertySection({ "Layer" });
     EditorUI::RenderIntProperty("Id", data, "Id");
     EditorUI::EndPropertySection();
 }
 
 // Renders the ScriptInstance component properties
-void ComponentUI::RenderScriptInstance(nlohmann::json& data) {
+void ComponentUI::RenderScriptInstance(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
     // Ensure keys exist with defaults
     if (!data.contains("TypeName")) data["TypeName"] = "";
     if (!data.contains("ScriptPath")) data["ScriptPath"] = "";
