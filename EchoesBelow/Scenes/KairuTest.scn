@@ -500,7 +500,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.8773424625396729,
+                        "AspectRatio": 1.4852173328399658,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -972,16 +972,6 @@
                 },
                 {
                     "Data": {
-                        "Initialized": true,
-                        "ManagedHandle": 2,
-                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\UIClickableTest.cs",
-                        "TypeHash": 0,
-                        "TypeName": "Scripts.UIClickableTest"
-                    },
-                    "TypeName": "ScriptInstance"
-                },
-                {
-                    "Data": {
                         "Color": {
                             "A": 1.0,
                             "B": 0.9634692072868347,
@@ -1083,16 +1073,6 @@
                         "Id": 31
                     },
                     "TypeName": "Layer"
-                },
-                {
-                    "Data": {
-                        "Initialized": true,
-                        "ManagedHandle": 3,
-                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\UIClickableTest.cs",
-                        "TypeHash": 0,
-                        "TypeName": "Scripts.UIClickableTest"
-                    },
-                    "TypeName": "ScriptInstance"
                 },
                 {
                     "Data": {
@@ -1513,11 +1493,11 @@
             "parent": 6
         },
         {
-            "child": 9,
+            "child": 10,
             "parent": 6
         },
         {
-            "child": 10,
+            "child": 9,
             "parent": 6
         },
         {
