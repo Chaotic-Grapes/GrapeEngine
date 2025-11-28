@@ -424,7 +424,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                 // UI renderer callback: InspectorPanel calls this and forwards to ComponentWidgets
                 // via the ComponentUI helper to draw the actual fields
                 _renderComponentSection(meta->DisplayName, meta->TypeName, data,
-                    [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); }, meta->CanDelete);
+                    [this, meta, entity](nlohmann::json& d) { meta->RenderUI(m_componentUI, d, entity, m_world); }, meta->CanDelete);
 
                 size_t hashAfter = std::hash<std::string>{}(data.dump());
 
@@ -693,7 +693,7 @@ void InspectorPanel::_renderPrefabComponents() {
         _renderComponentSection(meta->DisplayName, meta->TypeName, data,
             // UI renderer callback: InspectorPanel forwards JSON to ComponentWidgets
             // Prefabs do not have live ECS so we save as soon as data changes
-            [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d); _savePrefabData(); },
+            [this, meta](nlohmann::json& d) { meta->RenderUI(m_componentUI, d, ECS::Entity{}, nullptr); _savePrefabData(); },
             meta->CanDelete
         );
         ImGui::Dummy(ImVec2(0, 4));
