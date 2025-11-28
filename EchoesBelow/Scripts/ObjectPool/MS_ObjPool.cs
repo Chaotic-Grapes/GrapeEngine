@@ -22,8 +22,8 @@ public class MS_ObjPool : ScriptBehaviour
             {
                 Log($"MS_Item: {obj.objID} detected!============");
 
-                Entity fromIdEntity = Entity.FromId(obj.objID);
                 //Declare and assign a new reference to the according Obj thru ID
+                Entity fromIdEntity = Entity.FromId(obj.objID);
                 ref LocalTransform transform3 = ref fromIdEntity.GetComponent<LocalTransform>();
                 Log("Entity FromId(): " + transform3.Position);
             }

@@ -39,12 +39,17 @@ public class MS_MarineSnow : ScriptBehaviour
         ref Active activeStatus = ref GetComponent<Active>();
         inPool = !activeStatus.Enabled;
 
-        // Get collision events for this wall
-        List<CollisionEvent> events = CollisionEvents.GetEvents(Entity);
+        SendBackToPool(ref transform, ref activeStatus);
+    }
 
-        if(events.Count != 0) //only check for first collision
+    private void SendBackToPool(ref LocalTransform transform, ref Active activeStatus)
+    {
+        // Get collision events for this wall
+        List<CollisionEvent> collisionEvents = CollisionEvents.GetEvents(Entity);
+
+        if (collisionEvents.Count != 0) //only check for first collision
         {
-            if (events[0].Other.EntityId == Player.playerEntityId)
+            if (collisionEvents[0].Other.EntityId == Player.playerEntityId)
             {
                 //future send to inv controller
                 //send it back to its original position and reset all values
@@ -52,7 +57,7 @@ public class MS_MarineSnow : ScriptBehaviour
                 activeStatus.Enabled = false;
                 inPool = !activeStatus.Enabled;
             }
-            else if (events[0].Type == CollisionEventType.Stay)
+            else if (collisionEvents[0].Type == CollisionEventType.Stay)
             {
                 //send it back to its original position and reset all values
                 transform.Position = startPos;
@@ -60,25 +65,6 @@ public class MS_MarineSnow : ScriptBehaviour
                 inPool = !activeStatus.Enabled;
             }
         }
-        
-        
-
-
-    }
-    public override void OnCollisionEnter(ulong otherEntity)
-    {
-        base.OnCollisionEnter(otherEntity);
-        Log("1 COLLIDE");
-    }
-    public override void OnCollisionExit(ulong otherEntity)
-    {
-        base.OnCollisionExit(otherEntity);
-        Log("2 COLLIDE");
-    }
-    public override void OnCollisionStay(ulong otherEntity)
-    {
-        base.OnCollisionStay(otherEntity);
-        Log("3 COLLIDE");
     }
 }
 
