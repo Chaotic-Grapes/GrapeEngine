@@ -3,9 +3,9 @@
         {
             "Data": {
                 "Position": {
-                    "X": 0.0,
-                    "Y": 2.0,
-                    "Z": 0.0
+                    "X": 10.998298645019531,
+                    "Y": -0.19965457916259766,
+                    "Z": -6.103515625e-05
                 },
                 "Rotation": {
                     "W": 1.0,
@@ -14,8 +14,8 @@
                     "Z": 0.0
                 },
                 "Scale": {
-                    "X": 0.44999998807907104,
-                    "Y": 0.44999998807907104,
+                    "X": 1.0,
+                    "Y": 1.0,
                     "Z": 1.0
                 }
             },
@@ -23,69 +23,53 @@
         },
         {
             "Data": {
-                "Value": "OceanLight"
+                "Value": "Scene2"
             },
             "TypeName": "Name"
         },
         {
             "Data": {
-                "Enabled": true
-            },
-            "TypeName": "Active"
-        },
-        {
-            "Data": {
-                "Id": 20
+                "Id": 0
             },
             "TypeName": "Layer"
         },
         {
             "Data": {
-                "Initialized": false,
-                "ManagedHandle": 0,
-                "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\SpinningObject.cs",
-                "TypeHash": 0,
-                "TypeName": "EchoesBelow.Scripts.SpinningObject"
-            },
-            "TypeName": "ScriptInstance"
-        },
-        {
-            "Data": {
                 "Color": {
-                    "A": 1.100000023841858,
+                    "A": 1.0,
                     "B": 1.0,
-                    "G": 1.0,
-                    "R": 0.9998999834060669
+                    "G": 0.0,
+                    "R": 0.16139984130859375
+                },
+                "Filled": false,
+                "HalfExtents": {
+                    "X": 4.5,
+                    "Y": 2.5299999713897705
                 },
                 "Offset": {
                     "X": 0.0,
                     "Y": 0.0
                 },
-                "TextureId": 21,
-                "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
-                "Tiling": {
-                    "X": 1.0,
-                    "Y": 1.0
-                }
+                "Thickness": 0.10000000149011612
             },
-            "TypeName": "SpriteRenderer2D"
+            "TypeName": "ShapeBox2D"
         },
         {
             "Data": {
                 "Dirty": false,
                 "Matrix": {
-                    "m00": 0.30000001192092896,
+                    "m00": 1.0,
                     "m01": 0.0,
                     "m02": 0.0,
-                    "m03": 0.0,
+                    "m03": 10.998298645019531,
                     "m10": 0.0,
-                    "m11": 0.30000001192092896,
+                    "m11": 1.0,
                     "m12": 0.0,
-                    "m13": 2.0,
+                    "m13": 13.110345840454102,
                     "m20": 0.0,
                     "m21": 0.0,
                     "m22": 1.0,
-                    "m23": 0.0,
+                    "m23": 55.99993896484375,
                     "m30": 0.0,
                     "m31": 0.0,
                     "m32": 0.0,

@@ -19,16 +19,16 @@ public class AudioManager : ScriptBehaviour
     public override void OnUpdate()
     {
         // Called every frame
-        if (Input.IsKeyPressed(KeyCode.P))
-        {
-            //ref AudioSource audio = ref audioEntities[0].GetComponent<AudioSource>();
-            //audio.PlayOnStart = true;
-            foreach (ulong entityId in audioEntityIds)
-            {
-                Log($"audioentity: {entityId} detected!");
+        //if (Input.IsKeyPressed(KeyCode.P))
+        //{
+        //    //ref AudioSource audio = ref audioEntities[0].GetComponent<AudioSource>();
+        //    //audio.PlayOnStart = true;
+        //    foreach (ulong entityId in audioEntityIds)
+        //    {
+        //        Log($"audioentity: {entityId} detected!");
 
-            }
-        }
+        //    }
+        //}
     }
     //public override void OnDisable()
     //{

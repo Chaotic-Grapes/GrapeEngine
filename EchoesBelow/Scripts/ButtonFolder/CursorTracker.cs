@@ -9,11 +9,13 @@ public class CursorTracker : ScriptBehaviour
 {
     public static Vector3 cursorRawPos;
     public static CursorTracker singleton;
+    public static ulong objId;
     //There should always be one cursor only in the scene at all times
 
     public override void OnStart()
     {
         singleton = this;
+        objId = Entity.EntityId;
     }
 
     public override void OnUpdate()

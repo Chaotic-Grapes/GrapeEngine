@@ -19,11 +19,11 @@ public class Button : ScriptBehaviour
     private float xMin, xMax, yMin, yMax;
 
     //Constructor
-    public Button(Vector3 buttonPos, float halfExtent_X, float halfExtent_Y)
+    public Button(Vector3 buttonPos, LocalTransform transform, float halfExtent_X, float halfExtent_Y)
     {
         this.buttonPos = buttonPos;
-        this.halfExtent_X = halfExtent_X;
-        this.halfExtent_Y = halfExtent_Y;
+        this.halfExtent_X = halfExtent_X * transform.Scale.X;
+        this.halfExtent_Y = halfExtent_Y * transform.Scale.Y;
 
         instance = this;
         Log("Hello I am a button!");
@@ -40,25 +40,25 @@ public class Button : ScriptBehaviour
         yMax = buttonPos.Y + halfExtent_Y;
         yMin = buttonPos.Y - halfExtent_Y;
 
-        Log("CursorPos Now via Button: " + CursorTracker.cursorRawPos);
-        Log($"xMin [{xMin}]<: " + (xMin <= CursorTracker.cursorRawPos.X));
-        Log($"xMax [{xMax}]>: " + (xMax >= CursorTracker.cursorRawPos.X));
-        Log($"yMin [{yMin}]<: " + (yMin <= CursorTracker.cursorRawPos.Y));
-        Log($"yMax [{yMax}]>: " + (yMax >= CursorTracker.cursorRawPos.Y));
+        //Log("CursorPos Now via Button: " + CursorTracker.cursorRawPos);
+        //Log($"xMin [{xMin}]<: " + (xMin <= CursorTracker.cursorRawPos.X));
+        //Log($"xMax [{xMax}]>: " + (xMax >= CursorTracker.cursorRawPos.X));
+        //Log($"yMin [{yMin}]<: " + (yMin <= CursorTracker.cursorRawPos.Y));
+        //Log($"yMax [{yMax}]>: " + (yMax >= CursorTracker.cursorRawPos.Y));
 
         if (xMin <= CursorTracker.cursorRawPos.X
          && xMax >= CursorTracker.cursorRawPos.X
          && yMin <= CursorTracker.cursorRawPos.Y
          && yMax >= CursorTracker.cursorRawPos.Y)
         {
-            Log("1: StepButton");
+            //Log("1: StepButton");
             isHovering = true;
             if (Input.IsMousePressed(0)) isPressed = true;
             else isPressed = false;
         }
         else
         {
-            Log("2: StepButton");
+            //Log("2: StepButton");
             isHovering = false;
             isPressed = false;
         }
