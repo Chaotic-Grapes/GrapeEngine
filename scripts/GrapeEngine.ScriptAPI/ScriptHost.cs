@@ -57,7 +57,7 @@ public static class ScriptHost
     private static ulong m_nextHandle = 1;
     
     // Custom assembly load context to ensure proper type identity
-    private static AssemblyLoadContext? s_loadContext = null;
+    // private static readonly AssemblyLoadContext? s_loadContext = null;
     private static bool s_resolverRegistered = false;
 
     static ScriptHost()
@@ -120,18 +120,23 @@ public static class ScriptHost
                 NativeLog("Loaded assemblies:", LogLevel.Error);
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
+                    if (asm == null ||
+                        asm.GetName() is not { } asmName ||
+                        asmName.Name is not { } asmNameStr)
+                        continue;
+
                     NativeLog($"  - {asm.GetName().Name} ({asm.GetName().Version})", LogLevel.Error);
                     
                     // If this looks like a game assembly, list its types
-                    if (!asm.GetName().Name.StartsWith("System") && 
-                        !asm.GetName().Name.StartsWith("Microsoft") &&
-                        !asm.GetName().Name.StartsWith("netstandard") &&
-                        asm.GetName().Name != "GrapeEngine.ScriptAPI")
+                    if (!asmNameStr.StartsWith("System") && 
+                        !asmNameStr.StartsWith("Microsoft") &&
+                        !asmNameStr.StartsWith("netstandard") &&
+                        asmNameStr != "GrapeEngine.ScriptAPI")
                     {
                         try
                         {
                             var types = asm.GetTypes();
-                            NativeLog($"    Types in {asm.GetName().Name}:", LogLevel.Error);
+                            NativeLog($"    Types in {asmNameStr}:", LogLevel.Error);
                             foreach (var t in types)
                             {
                                 if (!t.IsNested && t.Namespace != null)
@@ -392,7 +397,7 @@ public static class ScriptHost
             if (total > BUFFER_CAPACITY)
             {
                 var remaining = total - BUFFER_CAPACITY;
-                var offset = BUFFER_CAPACITY;
+                // var offset = BUFFER_CAPACITY;
 
                 // allocate exactly remaining now
                 var moreOther = new ulong[remaining];

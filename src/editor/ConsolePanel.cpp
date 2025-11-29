@@ -105,7 +105,7 @@ void ConsolePanel::_renderMessages() {
         const auto& msg = m_messages[i];
 
         if (_shouldDisplayMessage(msg)) {
-            _renderMessage(msg, i);
+            _renderMessage(msg, static_cast<int>(i));
             displayedCount++;
         }
     }
@@ -285,16 +285,14 @@ ImVec4 ConsolePanel::_getColorForLevel(LogLevel level) const {
     }
 }
 
-const char* ConsolePanel::_getLevelIcon(LogLevel level) const {
-    ImGui::PushFont(m_symbolsFont);
-    switch (level) {
-    case LogLevel::WARNING:  return "\xEE\x80\x82";
-    case LogLevel::ERROR:    return "\xEE\x80\x80";
-    case LogLevel::CRITICAL: return "\xEE\xA2\x9A";
-    default:                 return "?";
-    }
-    ImGui::PopFont();
-}
+// const char* ConsolePanel::_getLevelIcon(LogLevel level) const {
+//     switch (level) {
+//     case LogLevel::WARNING:  return "\xEE\x80\x82";
+//     case LogLevel::ERROR:    return "\xEE\x80\x80";
+//     case LogLevel::CRITICAL: return "\xEE\xA2\x9A";
+//     default:                 return "?";
+//     }
+// }
 
 const char* ConsolePanel::_getLevelText(LogLevel level) const {
     switch (level) {

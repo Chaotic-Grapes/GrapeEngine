@@ -40,6 +40,7 @@ extern Audio::FmodAudioDevice* gAudioDevice;
  * @return True if the cue was loaded successfully, false otherwise
  */
 SCRIPT_API bool ScriptAPI_Audio_LoadCue(const char* cueId, const char* filePath, bool is3D, bool isLooping, bool isStreaming) {
+    (void)isLooping; // Currently unused
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return false;

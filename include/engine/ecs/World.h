@@ -1209,10 +1209,6 @@ namespace ECS {
         // Component removing hook
         void _onComponentRemoving(const Entity e, const TypeId t) {
             if (t == TypeIdOf<Parent>()) {
-                // Log removal for diagnostics
-                if (Has<Parent>(e)) {
-                    const auto& p = Get<Parent>(e);
-                }
                 // Unlink from hierarchy indices
                 _unlinkChild(e);
 

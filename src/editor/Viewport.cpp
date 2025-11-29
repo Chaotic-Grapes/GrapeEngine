@@ -52,6 +52,8 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 // Lifecycle
 // -------------------------------------------------------------------------
 void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, Scenes::SceneManager* sceneManager) {
+    (void)sceneManager;
+
     m_mainFont = mainFont;
     m_boldFont = boldFont;
     m_symbolsFont = symbolsFont;
@@ -286,6 +288,8 @@ void Viewport::_renderViewport() {
     int cameraCount = 0;
     if (m_world) {
         m_world->Each<ECS::Components::Camera3D>([&](ECS::Entity e, ECS::Components::Camera3D& cam) {
+            (void)e;
+
             hasCameraComponent = true;
             cameraCount++;
             if (cam.Active) {
@@ -344,6 +348,8 @@ void Viewport::_renderViewport() {
         // Update camera aspect ratio to match display size (prevents squishing)
         if (m_world) {
             m_world->Each<ECS::Components::Camera3D>([targetRatio](ECS::Entity e, ECS::Components::Camera3D& cam) {
+                (void)e;
+
                 if (cam.Active) {
                     cam.AspectRatio = targetRatio;
                 }
@@ -444,6 +450,8 @@ void Viewport::SetSelectedEntity(EntityId id) {
 }
 
 void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize) {
+    (void)viewportSize;
+    
     if (!m_rendererSystem) return;
 
     // Get FPS data from Profiler

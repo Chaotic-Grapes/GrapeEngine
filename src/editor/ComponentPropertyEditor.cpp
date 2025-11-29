@@ -140,6 +140,9 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data, ECS::Entity entity,
         float m21 = 2.0f * (qy * qz + qx * qw);
         float m22 = 1.0f - 2.0f * (qx * qx + qy * qy);
 
+        (void)m12;
+        (void)m02;
+
         // Decompose assuming rotation order: apply X (pitch), then Y (yaw), then Z (roll)
         // This matches Quaternion::FromEulerRad(pitch, yaw, roll) used elsewhere.
         auto clampf = [](float v, float lo, float hi) {
@@ -164,7 +167,6 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data, ECS::Entity entity,
         }
 
         // Convert to degrees for display
-        const float RAD_TO_DEG = 180.0f / 3.14159265358979323846f;
         float degX = pitchRad * RAD_TO_DEG;
         float degY = yawRad   * RAD_TO_DEG;
         float degZ = rollRad  * RAD_TO_DEG;
@@ -208,7 +210,6 @@ void ComponentUI::RenderLocalTransform(nlohmann::json& data, ECS::Entity entity,
 
         // If user changed Euler degrees, convert back to quaternion (radians) and write into JSON
         if (changed) {
-            const float DEG_TO_RAD = 3.14159265358979323846f / 180.0f;
             float p = degX * DEG_TO_RAD;
             float y = degY * DEG_TO_RAD;
             float r = degZ * DEG_TO_RAD;

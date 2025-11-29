@@ -66,7 +66,7 @@ private:
     // Helpers
     // -------------------------------------------------------------------------
     ImVec4 _getColorForLevel(LogLevel level) const;
-    const char* _getLevelIcon(LogLevel level) const;
+    // const char* _getLevelIcon(LogLevel level) const;
     const char* _getLevelText(LogLevel level) const;
 
     // -------------------------------------------------------------------------

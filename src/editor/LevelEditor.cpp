@@ -149,6 +149,8 @@ void LevelEditor::_buildDockLayout() {
 
 // Invalidate the layout so the next frame rebuilds it on new size
 void LevelEditor::OnWindowResized(int width, int height) {
+    (void)width;
+    (void)height;
     m_dockLayoutBuilt = false;
 }
 
