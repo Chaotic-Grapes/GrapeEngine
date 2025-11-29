@@ -70,6 +70,22 @@ message(STATUS "Build Configuration:")
 message(STATUS "  BUILD_EDITOR: ${BUILD_EDITOR}")
 message(STATUS "  BUILD_GAME: ${BUILD_GAME}")
 
+# ---------------------- Icon / Resource configuration --------------------
+# Default icon (can be overridden via CMake cache):
+set(GAME_ICON "${CMAKE_CURRENT_LIST_DIR}/assets/game_icon.ico" CACHE FILEPATH "Icon file for the standalone game executable")
+set(EDITOR_ICON "${CMAKE_CURRENT_LIST_DIR}/assets/editor_icon.ico" CACHE FILEPATH "Icon file for the editor executable")
+
+# Generate per-target .rc files from templates so each target can embed a different icon.
+configure_file("${CMAKE_CURRENT_LIST_DIR}/app_game.rc.in" "${CMAKE_BINARY_DIR}/app_game.rc" @ONLY)
+configure_file("${CMAKE_CURRENT_LIST_DIR}/app_editor.rc.in" "${CMAKE_BINARY_DIR}/app_editor.rc" @ONLY)
+
+if(NOT EXISTS "${GAME_ICON}")
+    message(WARNING "Game icon not found: ${GAME_ICON} — the resource compile may fail")
+endif()
+if(NOT EXISTS "${EDITOR_ICON}")
+    message(WARNING "Editor icon not found: ${EDITOR_ICON} — the resource compile may fail")
+endif()
+
 # ======================= COMMON SOURCE FILES =========================
 # Collect engine source files (no editor, no game-specific entry points)
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS 
@@ -116,6 +132,15 @@ if(BUILD_EDITOR)
     set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 23)
     set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD_REQUIRED ON)
     
+    # Make Release builds of the editor a GUI/Windows app (no console) to match game behavior.
+    # Keep Debug builds as console apps for developer logging.
+    set_target_properties(GrapeEngine PROPERTIES WIN32_EXECUTABLE "$<$<CONFIG:Release>:TRUE>")
+
+    # Embed application resources (icon) into the Visual Studio build on Windows
+    if(WIN32)
+        target_sources(GrapeEngine PRIVATE "${CMAKE_BINARY_DIR}/app_editor.rc")
+    endif()
+    
     # Compile definitions - USE_IMGUI enables ImGui
     target_compile_definitions(GrapeEngine PRIVATE USE_IMGUI)
     
@@ -155,6 +180,15 @@ if(BUILD_GAME)
     # Set C++ standard
     set_property(TARGET GrapeGame PROPERTY CXX_STANDARD 23)
     set_property(TARGET GrapeGame PROPERTY CXX_STANDARD_REQUIRED ON)
+
+    # Make Release builds a GUI/Windows app (no console) so end-user EXE doesn't open a console window.
+    # Keep Debug builds as console apps for developer logging.
+    set_target_properties(GrapeGame PROPERTIES WIN32_EXECUTABLE "$<$<CONFIG:Release>:TRUE>")
+
+    # Embed application resources (icon) into the Visual Studio build on Windows
+    if(WIN32)
+        target_sources(GrapeGame PRIVATE "${CMAKE_BINARY_DIR}/app_game.rc")
+    endif()
 
     # ------------------------------------------------------------------
     # Auto-detect or override output name for the game executable
@@ -244,6 +278,7 @@ if(BUILD_GAME)
     if(MSVC)
         add_custom_command(TARGET GrapeGame POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E echo "Normalizing game executable name to ${GAME_FINAL_OUTPUT_NAME}.exe"
+            COMMAND ${CMAKE_COMMAND} -E echo ""
             COMMAND ${CMAKE_COMMAND} -E rename "$<TARGET_FILE:GrapeGame>" "$<TARGET_FILE_DIR:GrapeGame>/${GAME_FINAL_OUTPUT_NAME}.exe"
             COMMENT "Normalize game executable name"
         )
@@ -255,6 +290,7 @@ if(BUILD_GAME)
         # This must happen AFTER the rename above so the source file exists.
         add_custom_command(TARGET GrapeGame POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E echo "Providing GrapeEngine.exe alias for scripting interop"
+            COMMAND ${CMAKE_COMMAND} -E echo ""
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE_DIR:GrapeGame>/${GAME_FINAL_OUTPUT_NAME}.exe" "$<TARGET_FILE_DIR:GrapeGame>/GrapeEngine.exe"
             COMMENT "Create GrapeEngine.exe alias in game output directory"
         )
@@ -530,14 +566,11 @@ if(DOTNET_EXECUTABLE)
                 message(STATUS "  Found game project: ${PROJECT_NAME} with ${CS_COUNT} script(s) (no .csproj - auto-discovery)")
                 message(STATUS "    Tip: Create ${PROJECT_NAME}.csproj for IDE support and hot reload")
                 
-                # Build directly - output to build/Debug or build/Release based on config
-                if(CMAKE_CONFIGURATION_TYPES)
-                    set(OUTPUT_DIR "${CMAKE_BINARY_DIR}/Debug")  # Default to Debug for multi-config
-                else()
-                    set(OUTPUT_DIR "${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}")
-                endif()
-                set(SCRIPTAPI_DLL_PATH "${OUTPUT_DIR}/GrapeEngine.ScriptAPI.dll")
-                
+                # Build directly - generate a temporary .csproj that references the
+                # engine ScriptAPI DLL using MSBuild's $(Configuration) so the correct
+                # Debug/Release output is used at build time for multi-config generators.
+                set(SCRIPTAPI_DLL_PATH "${CMAKE_BINARY_DIR}/$(Configuration)/GrapeEngine.ScriptAPI.dll")
+
                 # Generate a temporary .csproj for this game project
                 set(TEMP_CSPROJ "${CMAKE_BINARY_DIR}/${PROJECT_NAME}_Generated.csproj")
                 file(WRITE ${TEMP_CSPROJ} "<Project Sdk=\"Microsoft.NET.Sdk\">\n")
@@ -559,12 +592,12 @@ if(DOTNET_EXECUTABLE)
                 file(APPEND ${TEMP_CSPROJ} "    </Reference>\n")
                 file(APPEND ${TEMP_CSPROJ} "  </ItemGroup>\n")
                 file(APPEND ${TEMP_CSPROJ} "</Project>\n")
-                
+
                 add_custom_target(
                     Build_${PROJECT_NAME}Scripts ALL
                     COMMAND ${DOTNET_EXECUTABLE} build "${TEMP_CSPROJ}"
-                        --configuration Debug
-                        --output "${OUTPUT_DIR}"
+                        --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
+                        --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
                     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
                     COMMENT "Building ${PROJECT_NAME} scripts (${CS_COUNT} files)..."
                     DEPENDS BuildScriptAPI ${FILTERED_CS_FILES}
@@ -670,6 +703,7 @@ foreach(SETTINGS_FILE ${ALL_PROJECT_SETTINGS_FOR_COPY})
             # Use directory junction on Windows (mklink /J) to avoid requiring developer-mode symlink privileges
             add_custom_command(TARGET GrapeEngine POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E echo "Creating junction to ${PROJECT_NAME} (Editor)"
+                COMMAND ${CMAKE_COMMAND} -E echo ""
                 COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GrapeEngine>"
                 COMMAND cmd /C "if not exist \"$<TARGET_FILE_DIR:GrapeEngine>\\${PROJECT_NAME}\" mklink /J \"$<TARGET_FILE_DIR:GrapeEngine>\\${PROJECT_NAME}\" \"${PROJECT_DIR}\""
                 COMMENT "Creating junction to ${PROJECT_NAME} project (Editor)"
@@ -689,6 +723,7 @@ foreach(SETTINGS_FILE ${ALL_PROJECT_SETTINGS_FOR_COPY})
         if(WIN32)
             add_custom_command(TARGET GrapeGame POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E echo "Creating junction to ${PROJECT_NAME} (Game)"
+                COMMAND ${CMAKE_COMMAND} -E echo ""
                 COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GrapeGame>"
                 COMMAND cmd /C "if not exist \"$<TARGET_FILE_DIR:GrapeGame>\\${PROJECT_NAME}\" mklink /J \"$<TARGET_FILE_DIR:GrapeGame>\\${PROJECT_NAME}\" \"${PROJECT_DIR}\""
                 COMMENT "Creating junction to ${PROJECT_NAME} project (Game)"

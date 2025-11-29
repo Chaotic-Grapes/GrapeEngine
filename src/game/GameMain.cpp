@@ -121,3 +121,14 @@ int main() {
 
     return 0;
 }
+
+#ifdef _WIN32
+#include <windows.h>
+// WinMain shim: when linked as a GUI/Windows subsystem the linker expects WinMain.
+// Provide a small wrapper that forwards to the regular `main()` function so the
+// same code works for both console and GUI subsystems.
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    (void)hInstance; (void)hPrevInstance; (void)lpCmdLine; (void)nCmdShow;
+    return main();
+}
+#endif
