@@ -56,12 +56,14 @@ public class MS_MarineSnow : ScriptBehaviour
 
         if (collisionEvents.Count != 0) //only check for first collision
         {
-            if (collisionEvents[0].Other.EntityId == Player.playerEntityId)
+            bool isTransitioning = false;
+            if (!isTransitioning && collisionEvents[0].Other.EntityId == Player.playerEntityId)
             {
+                isTransitioning = true;
                 //future send to inv controller
                 InventoryController.Instance.AddToHotBar(instance, Entity.EntityId);
                 Log("Added to hotbar");
-                
+                isTransitioning = false;
                 //disable
 
             }

@@ -84,7 +84,7 @@ public class Player : ScriptBehaviour
 
         //Reach endgame Object
         EndGameQuery();
-
+        if (InventoryController.capturedMS_inSlots.Count >= 5) InventoryController.isFull = true;
 
         //Log("playerDir: " + playerDir + " angle: " + angle);
     }
