@@ -574,73 +574,86 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         }
     }
     else {
-        // Render the actual tree node
-        nodeOpen = ImGui::TreeNodeEx(label.c_str(), nodeFlags);
+        // Calculate icon sizes to reserve space on the right BEFORE creating the tree node.
+        const float iconPadding = 6.0f; // space between icons and edge
+        float prefabIconWidth = 0.0f;
+        float scriptIconWidth = 0.0f;
+        const char* prefabIcon = "\xEE\xA6\xA4";
+        const char* scriptIcon = "\xEE\xA1\xAF";
 
-        // Render prefab icon to the left of the name if this is a prefab instance
-        if (isPrefabInstance && m_symbolsFont) {
-            ImVec2 itemRectMin = ImGui::GetItemRectMin();
-            ImVec2 itemRectMax = ImGui::GetItemRectMax();
-
-            const float iconPadding = 4.0f;
-            const char* prefabIcon = "\xEE\xA6\xA4"; // Material Symbols: deployed_code icon (U+E9A4)
-
-            // Calculate icon size using symbols font
+        if (m_symbolsFont && isPrefabInstance) {
             ImGui::PushFont(m_symbolsFont);
-            ImVec2 iconSize = ImGui::CalcTextSize(prefabIcon);
+            prefabIconWidth = ImGui::CalcTextSize(prefabIcon).x;
             ImGui::PopFont();
-
-            // Position to the RIGHT of the tree node text (before script icon)
-            float scriptIconWidth = 0.0f;
-            if (hasScript) {
-                ImGui::PushFont(m_symbolsFont);
-                scriptIconWidth = ImGui::CalcTextSize("\xEE\xA1\xAF").x + iconPadding * 2;
-                ImGui::PopFont();
-            }
-
-            ImVec2 iconPos = ImVec2(
-                itemRectMax.x - iconSize.x - scriptIconWidth - iconPadding,
-                itemRectMin.y + (itemRectMax.y - itemRectMin.y - iconSize.y) * 0.5f
-            );
-
-            // Draw the prefab icon with blue color (matching prefab text color)
-            ImGui::GetWindowDrawList()->AddText(
-                m_symbolsFont,
-                26.0f,
-                iconPos,
-                ImGui::GetColorU32(ImVec4(0.4f, 0.7f, 1.0f, 1.0f)), // Light blue matching prefab text
-                prefabIcon
-            );
+        }
+        if (m_symbolsFont && hasScript) {
+            ImGui::PushFont(m_symbolsFont);
+            scriptIconWidth = ImGui::CalcTextSize(scriptIcon).x;
+            ImGui::PopFont();
         }
 
-        // Render script icon on the right side if entity has a script
+        float iconsTotalWidth = 0.0f;
+        if (prefabIconWidth > 0.0f) iconsTotalWidth += prefabIconWidth + iconPadding;
+        if (scriptIconWidth > 0.0f) iconsTotalWidth += scriptIconWidth + iconPadding;
+
+        // Compute available width for label using content region (safer than querying item rect)
+        ImVec2 contentMax = ImGui::GetWindowContentRegionMax();
+        float cursorX = ImGui::GetCursorPosX();
+        // Add a safety reserve to account for frame padding and item spacing so the
+        // ellipsis or text never overlaps the icons even with font rounding.
+        const ImGuiStyle& style = ImGui::GetStyle();
+        float reservedWidth = style.ItemSpacing.x * 2.0f + style.FramePadding.x * 2.0f + 8.0f;
+        float maxLabelWidth = contentMax.x - cursorX - iconsTotalWidth - reservedWidth;
+        if (maxLabelWidth < 0.0f) maxLabelWidth = 0.0f;
+
+        // Truncate label with ellipsis to fit into available width
+        std::string displayLabel = label;
+        if (m_mainFont) ImGui::PushFont(m_mainFont);
+        ImVec2 fullSize = ImGui::CalcTextSize(displayLabel.c_str());
+        if (fullSize.x > maxLabelWidth) {
+            std::string ellipsis = "...";
+            while (!displayLabel.empty()) {
+                displayLabel.pop_back();
+                std::string test = displayLabel + ellipsis;
+                ImVec2 testSize = ImGui::CalcTextSize(test.c_str());
+                if (testSize.x <= maxLabelWidth) {
+                    displayLabel = test;
+                    break;
+                }
+            }
+            if (displayLabel.empty()) displayLabel = ellipsis;
+        }
+        if (m_mainFont) ImGui::PopFont();
+
+        // Now create the tree node with the truncated label (safer, preserves ImGui internal state)
+        nodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)entityId, nodeFlags, "%s", displayLabel.c_str());
+
+        // After creating the node, get item rect to position icons correctly
+        ImVec2 itemRectMin = ImGui::GetItemRectMin();
+        ImVec2 itemRectMax = ImGui::GetItemRectMax();
+
+        // Draw icons on the right, script icon at the far right, prefab just left of it
+        float drawX = itemRectMax.x - iconPadding;
+        float itemCenterY = itemRectMin.y + (itemRectMax.y - itemRectMin.y) * 0.5f;
+
         if (hasScript && m_symbolsFont) {
-            // Get the position and size of the tree node item
-            ImVec2 itemRectMin = ImGui::GetItemRectMin();
-            ImVec2 itemRectMax = ImGui::GetItemRectMax();
-            
-            // Calculate position for the script icon (right-aligned with some padding)
-            const float iconPadding = 8.0f;
-            const char* scriptIcon = "\xEE\xA1\xAF"; // Material Symbols: description/script icon (U+E86F)
-            
-            // Calculate icon size using symbols font
             ImGui::PushFont(m_symbolsFont);
             ImVec2 iconSize = ImGui::CalcTextSize(scriptIcon);
+            ImVec2 iconPos = ImVec2(drawX - iconSize.x, itemCenterY - iconSize.y * 0.5f);
+            ImGui::GetWindowDrawList()->AddText(m_symbolsFont, 26.f, iconPos,
+                ImGui::GetColorU32(ImVec4(0.7f, 0.8f, 0.9f, 0.9f)), scriptIcon);
             ImGui::PopFont();
-            
-            ImVec2 iconPos = ImVec2(
-                itemRectMax.x - iconSize.x - iconPadding,
-                itemRectMin.y + (itemRectMax.y - itemRectMin.y - iconSize.y) * 0.5f
-            );
-            
-            // Draw the icon with a subtle color using the symbols font
-            ImGui::GetWindowDrawList()->AddText(
-                m_symbolsFont,
-                26.f, // Font size
-                iconPos,
-                ImGui::GetColorU32(ImVec4(0.7f, 0.8f, 0.9f, 0.9f)), // Subtle blue-gray
-                scriptIcon
-            );
+            drawX -= (iconSize.x + iconPadding);
+        }
+
+        if (isPrefabInstance && m_symbolsFont) {
+            ImGui::PushFont(m_symbolsFont);
+            ImVec2 iconSize = ImGui::CalcTextSize(prefabIcon);
+            ImVec2 iconPos = ImVec2(drawX - iconSize.x, itemCenterY - iconSize.y * 0.5f);
+            ImGui::GetWindowDrawList()->AddText(m_symbolsFont, 26.0f, iconPos,
+                ImGui::GetColorU32(ImVec4(0.4f, 0.7f, 1.0f, 1.0f)), prefabIcon);
+            ImGui::PopFont();
+            drawX -= (iconSize.x + iconPadding);
         }
 
         // Handle interactions like clicks and drag-drop
@@ -684,7 +697,7 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
     if (m_renamingEntityId != ECS::Entity::NPOS32) return;
 
     // Get current time for click timing
-    float currentTime = ImGui::GetTime();
+    float currentTime = static_cast<float>(ImGui::GetTime());
 
     // Check modifier keys
     bool ctrlPressed = ImGui::GetIO().KeyCtrl;
@@ -1184,7 +1197,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         // Open and read prefab file
         std::ifstream file(prefabPath);
         if (!file.is_open()) {
-            LOG_ERROR("Cannot open prefab: {}", prefabPath);
+            LOG_ERROR("Cannot open prefab: " << prefabPath);
             return ECS::Entity::NPOS32;
         }
 
@@ -1223,7 +1236,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         }
 
         if (rootEntity.IsNull() || !m_world->IsAlive(rootEntity)) {
-            LOG_ERROR("Failed to instantiate prefab: {}", prefabPath);
+            LOG_ERROR("Failed to instantiate prefab: " << prefabPath);
             return ECS::Entity::NPOS32;
         }
 
@@ -1240,13 +1253,13 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
 
         // Set entity name from prefab filename
         std::string prefabName = p.stem().string();
-        LOG_INFO("Instantiated prefab: {}", prefabName);
+        LOG_INFO("Instantiated prefab: " << prefabName);
 
         // Return the entity ID so caller can select it
         return rootEntity.Index;
     }
     catch (const std::exception& e) {
-        LOG_ERROR("Failed to instantiate prefab: {}", e.what());
+        LOG_ERROR("Failed to instantiate prefab: " << e.what());
         return ECS::Entity::NPOS32;
     }
 }
