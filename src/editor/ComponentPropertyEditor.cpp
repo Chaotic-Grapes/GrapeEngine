@@ -472,13 +472,35 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
         // get the sprite component, get the width and height
         //ECS::Entity entity = HierarchyPanel->m_selectedEntityId;
         
-        auto& sprite = world->Get<SpriteRenderer2D>(entity);
+        // Validate world and entity first to avoid dereferencing invalid pointers
+        if (!world) {
+            LOG_WARNING("Generate AABB called with null world pointer");
+        }
+        else if (!world->IsAlive(entity)) {
+            LOG_WARNING("Generate AABB called for dead/invalid entity");
+        }
+        else {
+            // Try to get the sprite component; if missing, bail out gracefully
+            auto* sprite = world->TryGet<SpriteRenderer2D>(entity);
+            if (!sprite) {
+                LOG_WARNING("Generate AABB: entity has no SpriteRenderer2D component");
+            }
+            else {
+                int pixelWidth = sprite->Width;
+                int pixelHeight = sprite->Height;
 
-        int pixelWidth = sprite.Width;
-        int pixelHeight = sprite.Height;
-
-        auto& col = world->Get<BoxCollider2D>(entity);
-        col.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+                // If the entity already has a BoxCollider2D, update it. Otherwise add one.
+                auto* col = world->TryGet<BoxCollider2D>(entity);
+                if (col) {
+                    col->HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+                }
+                else {
+                    BoxCollider2D newCol;
+                    newCol.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+                    world->Set<BoxCollider2D>(entity, newCol);
+                }
+            }
+        }
     }
 
     EditorUI::EndPropertySection();
