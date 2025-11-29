@@ -29,6 +29,7 @@
 #include <memory>
 #include "core/IService.h"
 #include "audio/FmodAudioDevice.h"
+#include "core/messaging/MessageSystem.h"
 
 namespace Services {
  
@@ -94,6 +95,10 @@ namespace Services {
 	private:
 		// Owns the FMOD-backed device; created in Initialize(), destroyed in Terminate().
 		std::unique_ptr<Audio::FmodAudioDevice> m_device;
+
+		// Window focus handling for audio muting
+		Messaging::SubscriptionHandle m_focusHandle;
+		float m_volumeBeforeFocusLoss = 1.0f;
 	};
 
 
