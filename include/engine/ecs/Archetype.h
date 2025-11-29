@@ -153,9 +153,12 @@ namespace ECS {
         template<typename T>
         T* Get(const uint32_t chunkIndex, const uint32_t slot) {
             const TypeId t = TypeIdOf<T>();
+
             // O(1) hash lookup
-            auto it = m_componentIndexCache.find(t);
-            assert(it != m_componentIndexCache.end());
+            auto it = m_componentIndexCache.find(t);            
+            if (it == m_componentIndexCache.end()) {
+                throw std::runtime_error("Component type not found in archetype.");
+            }
             return static_cast<T*>(m_chunks[chunkIndex]->ComponentPtr(it->second, slot));
         }
 
@@ -169,7 +172,9 @@ namespace ECS {
         void* GetRaw(const TypeId t, const uint32_t chunkIndex, const uint32_t slot) {
             // O(1) hash lookup
             auto it = m_componentIndexCache.find(t);
-            assert(it != m_componentIndexCache.end());
+            if (it == m_componentIndexCache.end()) {
+                throw std::runtime_error("Component type not found in archetype.");
+            }
             return m_chunks[chunkIndex]->ComponentPtr(it->second, slot);
         }
 

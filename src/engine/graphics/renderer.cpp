@@ -45,8 +45,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 // No need to grow since there is batch flushing when capacity is exceeded
 void Renderer::ensureCapacity(size_t vNeeded, size_t iNeeded) {
-    assert(vNeeded <= vboCapacity && iNeeded <= eboCapacity &&
-        "Renderer: exceeded batch capacity. Did you forget to flush?");
+    if (vNeeded > vboCapacity || iNeeded > eboCapacity) {
+        throw std::runtime_error("Renderer: exceeded batch capacity. Did you forget to flush?");
+    }
 }
 
 void Renderer::clearTextureSlots() {
