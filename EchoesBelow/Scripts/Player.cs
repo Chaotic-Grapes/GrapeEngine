@@ -11,9 +11,9 @@ namespace Scripts;
 public class Player : ScriptBehaviour
 {
     //Constant Parameters
-    const float moveSpeed = 1.5f;
+    const float moveSpeed = 2.2f;
     const float maxSpeed = 30f;
-    const float rotateSpeed = 70f;
+    const float rotateSpeed = 200f;
     
     
     //For Testing Purposes
