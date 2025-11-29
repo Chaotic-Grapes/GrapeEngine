@@ -41,6 +41,18 @@ public class MenuManager : ScriptBehaviour
             ref LocalTransform pauseMenuTransform = ref pauseMenu.GetComponent<LocalTransform>();
             pauseMenuTransform.Position = new Vector3(0, 0, 0);
 
+            Entity gameHUD = Entity; //just as a placeholder
+            foreach (ulong index in UI_SlideManager.slides)
+            {
+                gameHUD = Entity.FromId(index);
+                TagMask tag = gameHUD.GetComponent<TagMask>();
+                if (tag.Mask == (int)Tags.GameHud) break;
+            }
+
+            ref LocalTransform gameHUDTransform = ref gameHUD.GetComponent<LocalTransform>();
+            InventoryController.gameHUDPos = new Vector3(0, gameHUDTransform.Position.Y + 24, 0);
+            gameHUDTransform.Position = new Vector3(0, gameHUDTransform.Position.Y + 24, 0);
+
             //re - enable buttons
             Entity resumeButton = Entity.FromId(Button_Resume.instance.objId);
             ref Active resumeButtonActive = ref resumeButton.GetComponent<Active>();

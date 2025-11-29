@@ -47,7 +47,19 @@ public class Button_Start : ScriptBehaviour
             }
 
             ref LocalTransform startMenuTransform = ref startMenu.GetComponent<LocalTransform>();
-            startMenuTransform.Position = new Vector3(startMenuTransform.Position.X, startMenuTransform.Position.Y + 15, 0);
+            startMenuTransform.Position = new Vector3(0, startMenuTransform.Position.Y + 18, 0);
+
+            Entity gameHUD = Entity; //just as a placeholder
+            foreach (ulong index in UI_SlideManager.slides)
+            {
+                gameHUD = Entity.FromId(index);
+                TagMask tag = gameHUD.GetComponent<TagMask>();
+                if (tag.Mask == (int)Tags.GameHud) break;
+            }
+
+            ref LocalTransform gameHUDTransform = ref gameHUD.GetComponent<LocalTransform>();
+            InventoryController.gameHUDPos = new Vector3(0, 0, 0);
+            gameHUDTransform.Position = new Vector3(0, 0, 0);
 
             ref Active active = ref GetComponent<Active>();
             active.Enabled = false;

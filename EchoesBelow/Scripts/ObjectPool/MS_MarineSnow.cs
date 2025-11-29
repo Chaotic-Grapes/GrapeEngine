@@ -1,6 +1,7 @@
 using GrapeEngine.Events;
 using GrapeEngine.Numerics;
 using GrapeEngine.Scripting;
+using Scripts.UI_Scripts;
 
 namespace Scripts.ObjectPool;
 
@@ -11,15 +12,21 @@ public class MS_MarineSnow : ScriptBehaviour
     public bool inPool;
     public MS_MarineSnow instance;
 
-    Vector3 startPos;
+    public ulong startLayerID;
+    public Vector3 startPos;
+    public BoxCollider2D startBX;
 
     public override void OnStart()
     {
         ref LocalTransform transform = ref GetComponent<LocalTransform>();
+        BoxCollider2D bx = GetComponent<BoxCollider2D>();
 
+        startBX = bx;
         objID = this.Entity.EntityId;
         instance = this;
         startPos = transform.Position;
+        ref Layer layer2D = ref GetComponent<Layer>();
+        startLayerID = layer2D.Id;
         
         // assign this field
         MS_ObjPool.ms_Objs.Add(this);
@@ -52,10 +59,11 @@ public class MS_MarineSnow : ScriptBehaviour
             if (collisionEvents[0].Other.EntityId == Player.playerEntityId)
             {
                 //future send to inv controller
-                //send it back to its original position and reset all values
-                transform.Position = startPos;
-                activeStatus.Enabled = false;
-                inPool = !activeStatus.Enabled;
+                InventoryController.Instance.AddToHotBar(instance, Entity.EntityId);
+                Log("Added to hotbar");
+                
+                //disable
+
             }
             else if (collisionEvents[0].Type == CollisionEventType.Stay)
             {

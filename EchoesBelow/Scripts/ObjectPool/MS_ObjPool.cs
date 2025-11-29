@@ -17,18 +17,18 @@ public class MS_ObjPool : ScriptBehaviour
     {
         // Called every frame
         //dev key for checking whats in the pool
-        if (Input.IsKeyPressed(KeyCode.P))
-        {
-            foreach (MS_MarineSnow obj in ms_Objs)
-            {
-                Log($"MS_Item: {obj.objID} detected!============");
+        //if (Input.IsKeyPressed(KeyCode.P))
+        //{
+        //    foreach (MS_MarineSnow obj in ms_Objs)
+        //    {
+        //        Log($"MS_Item: {obj.objID} detected!============");
 
-                //Declare and assign a new reference to the according Obj thru ID
-                Entity fromIdEntity = Entity.FromId(obj.objID);
-                ref LocalTransform transform3 = ref fromIdEntity.GetComponent<LocalTransform>();
-                Log("Entity FromId(): " + transform3.Position);
-            }
-        }
+        //        //Declare and assign a new reference to the according Obj thru ID
+        //        Entity fromIdEntity = Entity.FromId(obj.objID);
+        //        ref LocalTransform transform3 = ref fromIdEntity.GetComponent<LocalTransform>();
+        //        Log("Entity FromId(): " + transform3.Position);
+        //    }
+        //}
         //if (Input.IsKeyPressed(KeyCode.L))
         //{
         //    foreach (MS_MarineSnow obj in ms_Objs)

@@ -54,7 +54,7 @@
                                 "X": 0.0,
                                 "Y": 0.0
                             },
-                            "TextureId": 3,
+                            "TextureId": 5,
                             "TexturePath": "EchoesBelow\\Assets\\Sprites\\MarineSnow\\MarineSnow_Square.png",
                             "Tiling": {
                                 "X": 1.0,
@@ -181,27 +181,6 @@
                     "TypeName": "Scripts.ObjectPool.MS_MarineSnow"
                 },
                 "TypeName": "ScriptInstance"
-            },
-            {
-                "Data": {
-                    "Color": {
-                        "A": 1.0,
-                        "B": 0.0,
-                        "G": 1.0,
-                        "R": 0.13733482360839844
-                    },
-                    "Filled": false,
-                    "HalfExtents": {
-                        "X": 0.30000001192092896,
-                        "Y": 0.30000001192092896
-                    },
-                    "Offset": {
-                        "X": 0.0,
-                        "Y": 0.0
-                    },
-                    "Thickness": 0.029999999329447746
-                },
-                "TypeName": "ShapeBox2D"
             },
             {
                 "Data": {

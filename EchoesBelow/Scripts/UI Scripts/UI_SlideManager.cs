@@ -13,14 +13,14 @@ public class UI_SlideManager : ScriptBehaviour
     }
     public override void OnUpdate()
     {
-        if (Input.IsKeyPressed(KeyCode.P))
-        {
-            Log("P Pressed!");
-            foreach (ulong entityId in slides)
-            {
-                Log($"slide: {entityId} detected!====");
-            }
-        }
+        //if (Input.IsKeyPressed(KeyCode.P))
+        //{
+        //    Log("P Pressed!");
+        //    foreach (ulong entityId in slides)
+        //    {
+        //        Log($"slide: {entityId} detected!====");
+        //    }
+        //}
     }
 }
 

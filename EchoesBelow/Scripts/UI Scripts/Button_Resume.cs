@@ -45,7 +45,19 @@ public class Button_Resume : ScriptBehaviour
             }
 
             ref LocalTransform pauseMenuTransform = ref pauseMenu.GetComponent<LocalTransform>();
-            pauseMenuTransform.Position = new Vector3(pauseMenuTransform.Position.X, pauseMenuTransform.Position.Y + 15, 0);
+            pauseMenuTransform.Position = new Vector3(pauseMenuTransform.Position.X, pauseMenuTransform.Position.Y + 6, 0);
+
+            Entity gameHUD = Entity; //just as a placeholder
+            foreach (ulong index in UI_SlideManager.slides)
+            {
+                gameHUD = Entity.FromId(index);
+                TagMask tag = gameHUD.GetComponent<TagMask>();
+                if (tag.Mask == (int)Tags.GameHud) break;
+            }
+
+            ref LocalTransform gameHUDTransform = ref gameHUD.GetComponent<LocalTransform>();
+            InventoryController.gameHUDPos = new Vector3(0, 0, 0);
+            gameHUDTransform.Position = new Vector3(0, 0, 0);
 
             //wow...
             ref Active active = ref GetComponent<Active>();

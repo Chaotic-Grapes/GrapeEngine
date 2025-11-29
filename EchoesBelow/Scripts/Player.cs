@@ -112,8 +112,20 @@ public class Player : ScriptBehaviour
                 //placing the endScene into the game screen
                 ref LocalTransform endSceneTransform = ref endScene.GetComponent<LocalTransform>();
                 endSceneTransform.Position = new Vector3(0, 0, 0);
-                //Log("COLLISION STILL OCCURING || LIST STILL HERE / CollisionCount: " + collisionEvents.Count);
-                
+
+                Entity gameHUD = Entity; //just as a placeholder
+                foreach (ulong index in UI_SlideManager.slides)
+                {
+                    gameHUD = Entity.FromId(index);
+                    TagMask tag = gameHUD.GetComponent<TagMask>();
+                    if (tag.Mask == (int)Tags.GameHud) break;
+                }
+
+                ref LocalTransform gameHUDTransform = ref gameHUD.GetComponent<LocalTransform>();
+                InventoryController.gameHUDPos = new Vector3(0, gameHUDTransform.Position.Y + 24, 0);
+                gameHUDTransform.Position = new Vector3(0, gameHUDTransform.Position.Y + 24, 0);
+
+
                 EndGameTimer.isEnding = true;
                 MenuManager.isRunning = false;
                 //CollisionEvents.GetEvents(Entity).Clear();
