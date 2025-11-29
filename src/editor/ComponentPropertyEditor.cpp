@@ -1,8 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
 \file   ComponentPropertyEditor.cpp
-\author Foo Rui Qin (100%)
+\author Foo Rui Qin (90%)
+        Samantha Leong (10%)
 \par    ruiqin.foo@digipen.edu
+        s.leong@digipen.edu
 \date   3rd November 2025
 
 \brief
@@ -461,21 +463,15 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
     // Layer mask selects which collision layers the box interacts with
     EditorUI::RenderIntProperty("Layer Mask##Box", data, "LayerMask");
 
+    // Auto-generates or updates a BoxCollider2D (AABB) for the selected entity based on its sprite size.
     if (ImGui::Button("Generate AABB")) { // Sam
         using namespace ECS::Components;
-        // get the current selected entity (HierarchyPanel::m_selectedEntityId), get sprite component, 
-        // get textureId, using textureId ask resource manager to return the texture object. 
-        // from there can get the texture data and plug into the auto generation function.
-        //return 0;
-        //autogenerate should simply modify selected entity's collider2d
-        // 
-        // get the sprite component, get the width and height
-        //ECS::Entity entity = HierarchyPanel->m_selectedEntityId;
         
         // Validate world and entity first to avoid dereferencing invalid pointers
         if (!world) {
             LOG_WARNING("Generate AABB called with null world pointer");
         }
+        // Ensure the entity is alive before accessing its components
         else if (!world->IsAlive(entity)) {
             LOG_WARNING("Generate AABB called for dead/invalid entity");
         }
@@ -486,15 +482,18 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                 LOG_WARNING("Generate AABB: entity has no SpriteRenderer2D component");
             }
             else {
+                // Extract pixel dimensions from the sprite (already loaded by resource manager)
                 int pixelWidth = sprite->Width;
                 int pixelHeight = sprite->Height;
 
                 // If the entity already has a BoxCollider2D, update it. Otherwise add one.
                 auto* col = world->TryGet<BoxCollider2D>(entity);
                 if (col) {
+                    // Update the collider's half-extents based on the sprite size
                     col->HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
                 }
                 else {
+                    // No collider yet; create and attach a new BoxCollider2D
                     BoxCollider2D newCol;
                     newCol.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
                     world->Set<BoxCollider2D>(entity, newCol);

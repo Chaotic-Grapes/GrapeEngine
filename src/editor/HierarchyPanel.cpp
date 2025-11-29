@@ -98,6 +98,24 @@ namespace {
     }
 }
 
+/**
+ * @brief Opens a platform-specific file dialog to select a C# script and attaches it to an entity.
+ *
+ * This function is responsible for:
+ *  - Opening a Windows file dialog (Win32 API) to let the user choose a `.cs` script file.
+ *  - Extracting the script class name using the file stem.
+ *  - Parsing the namespace declaration (if present) from the script file.
+ *  - Constructing the full type name (`Namespace.ClassName`) used by the scripting backend.
+ *  - Converting the file path to a project-relative path when possible.
+ *  - Attaching the ScriptInstance component with the resolved type name and path.
+ *  - Updating HierarchyPanel's entity selection state and invoking selection callbacks.
+ *
+ * On non-Windows platforms, the function simply logs a warning because no file dialog
+ * implementation exists for Linux/macOS.
+ *
+ * @param entityId The target entity to attach the script to. If `ECS::Entity::NPOS32`,
+ *                 the function exits immediately.
+ */
 void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
     if (entityId == ECS::Entity::NPOS32) return;
 
