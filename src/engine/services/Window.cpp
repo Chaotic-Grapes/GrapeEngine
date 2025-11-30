@@ -36,120 +36,158 @@ namespace {
 
 Window::~Window() { Destroy(); }
 
-bool Window::Create(const std::string& title, const int width, const int height, const bool vsync, const bool isFullscreen, WindowMode::Flags mode, GLFWmonitor* monitor, GLFWwindow* parent) {
-	this->m_width = width;
-	this->m_height = height;
+bool Window::Create(const std::string& title, int width, int height, 
+                    bool vsync, WindowMode::Flags mode, 
+                    GLFWmonitor* monitor, GLFWwindow* parent) {
+    
+    // Validate mode combination
+    if (HasFlag(mode, WindowMode::Borderless) && HasFlag(mode, WindowMode::Fullscreen)) {
+        LOG_ERROR("Invalid mode combination: Borderless and Fullscreen cannot be used together");
+        return false;
+    }
 
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-	glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	
-	// If an invalid size was supplied (0 or negative), fall back to the monitor's resolution
-	int createWidth = width;
-	int createHeight = height;
-	if (createWidth <= 0 || createHeight <= 0) {
-		if (!monitor)
-			monitor = glfwGetPrimaryMonitor();
-		
-		// Query monitor video mode
-		const GLFWvidmode* vm = monitor ? glfwGetVideoMode(monitor) : nullptr;
+    // Default to windowed if no mode specified
+    if (mode == static_cast<WindowMode::Flags>(0)) {
+        mode = WindowMode::Windowed;
+        LOG_WARNING("No window mode specified, defaulting to Windowed");
+    }
 
-		// Fallback to monitor resolution if available
-		if (vm) {
-			createWidth = vm->width;
-			createHeight = vm->height;
-			this->m_width = createWidth;
-			this->m_height = createHeight;
-			LOG_WARNING("Invalid window size provided, using monitor resolution: " << createWidth << "x" << createHeight);
-		}
-		else {
-			// Critical because if monitor query fails, who knows in the long run we may run into further issues
-			LOG_CRITICAL("Invalid window size and failed to query monitor resolution; using default 1600x900");
-			createWidth = createWidth > 0 ? createWidth : 1600;
-			createHeight = createHeight > 0 ? createHeight : 900;
-			this->m_width = createWidth;
-			this->m_height = createHeight;
-		}
-	}
+    // Default to primary monitor if none specified
+    if (!monitor)
+        monitor = glfwGetPrimaryMonitor();
 
-	// If explicit fullscreen requested, make sure monitor is set and override size to monitor's video mode
-	if (isFullscreen) {
-		if (!monitor)
-			monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* vm = monitor ? glfwGetVideoMode(monitor) : nullptr;
+    if (!vm) {
+        LOG_ERROR("Failed to query video mode for monitor");
+        return false;
+    }
 
-		const GLFWvidmode* vm = monitor ? glfwGetVideoMode(monitor) : nullptr;
-		
-		if (vm) {
-			createWidth = vm->width;
-			createHeight = vm->height;
-			this->m_width = createWidth;
-			this->m_height = createHeight;
-			
-			LOG_WARNING("Fullscreen requested: forcing creation size to monitor resolution: " << createWidth << "x" << createHeight);
-		}
+    // Determine creation size based on mode
+    int createWidth = width;
+    int createHeight = height;
 
-		// Mark mode as fullscreen for creation-time behavior
-		mode |= WindowMode::Fullscreen;
-	}
+    // If invalid size provided, use monitor resolution
+    if (createWidth <= 0 || createHeight <= 0) {
+        createWidth = vm->width;
+        createHeight = vm->height;
+        LOG_WARNING("Invalid window size provided (" << width << "x" << height 
+                    << "), using monitor resolution: " << createWidth << "x" << createHeight);
+    }
 
-	// Ensure primary monitor is used by default for fullscreen if none provided.
-	if (HasFlag(mode, WindowMode::Fullscreen) && !monitor)
-		monitor = glfwGetPrimaryMonitor();
+    // For fullscreen/borderless modes, ALWAYS use monitor resolution
+    if (HasFlag(mode, WindowMode::Fullscreen) || HasFlag(mode, WindowMode::Borderless)) {
+        createWidth = vm->width;
+        createHeight = vm->height;
+        LOG_INFO("Using monitor resolution for " 
+                 << (HasFlag(mode, WindowMode::Fullscreen) ? "fullscreen" : "borderless") 
+                 << " mode: " << createWidth << "x" << createHeight);
+    }
 
-	GLFWmonitor* createMonitor = HasFlag(mode, WindowMode::Fullscreen) ? monitor : nullptr;
-	m_windowHandle = glfwCreateWindow(createWidth, createHeight, title.c_str(), createMonitor, parent);
-	m_title = title;
+    // Store dimensions
+    m_width = createWidth;
+    m_height = createHeight;
 
-	if (!m_windowHandle) {
-		// Log: "Failed to create GLFW window";
-		return false;
-	}
-	glfwMakeContextCurrent(m_windowHandle);
+    // Configure GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	// Lock the aspect ratio (16:9)
-	glfwSetWindowAspectRatio(m_windowHandle, 16, 9);
+    // Set decorations based on mode (for initial creation)
+    if (HasFlag(mode, WindowMode::Borderless)) {
+        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    } 
+	else {
+        glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+    }
 
-	if (!gladLoadGL()) {
-		// Log: "Failed to initialize GLAD";
-		glfwDestroyWindow(m_windowHandle);
-		return false;
-	}
+    // Create the window
+    // For exclusive fullscreen, attach to monitor during creation
+    GLFWmonitor* createMonitor = HasFlag(mode, WindowMode::Fullscreen) ? monitor : nullptr;
+    
+    m_windowHandle = glfwCreateWindow(createWidth, createHeight, title.c_str(), 
+                                     createMonitor, parent);
+    m_title = title;
 
-	// === ENABLE OR DISABLE VSYNC HERE ===
-	SetVSync(vsync);
+    if (!m_windowHandle) {
+        LOG_ERROR("Failed to create GLFW window");
+        return false;
+    }
 
-	// Initialize input system with the window
-	Input::Initialize(m_windowHandle);
+    glfwMakeContextCurrent(m_windowHandle);
 
-	// Register all GLFW input and framebuffer callbacks
-	Input::SetupEventCallbacks();
+    // Initialize OpenGL
+    if (!gladLoadGL()) {
+        LOG_ERROR("Failed to initialize GLAD");
+        glfwDestroyWindow(m_windowHandle);
+        m_windowHandle = nullptr;
+        return false;
+    }
 
-	glViewport(0, 0, this->m_width, this->m_height);
+    // Set VSync
+    SetVSync(vsync);
 
-	// Store the pointer to this instance for use in callbacks
-	// because GLFW does not know context
-	glfwSetWindowUserPointer(m_windowHandle, this);
+    // Initialize Input System
+    Input::Initialize(m_windowHandle);
+    Input::SetupEventCallbacks();
 
-	// One unified framebuffer-size callback
-	glfwSetFramebufferSizeCallback(m_windowHandle, [](GLFWwindow* w, int fbw, int fbh) {
-		glViewport(0, 0, fbw, fbh);
-		if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(w))) {
-			self->m_width = fbw;
-			self->m_height = fbh;
-		}
-		Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ fbw, fbh });
-		});
+    // Set initial viewport
+    glViewport(0, 0, m_width, m_height);
 
-	// Window focus callback - broadcast focus changes for audio muting, etc.
-	glfwSetWindowFocusCallback(m_windowHandle, [](GLFWwindow* w, int focused) {
-		(void)w;
-		Messaging::MessageSystem::Broadcast(Messaging::WindowFocusChanged{ focused != 0 });
-		});
+    // Store window pointer for callbacks
+    glfwSetWindowUserPointer(m_windowHandle, this);
 
-	SetMode(mode, monitor);
+    // Setup Callbacks
+    glfwSetFramebufferSizeCallback(m_windowHandle, [](GLFWwindow* w, int fbw, int fbh) {
+        glViewport(0, 0, fbw, fbh);
+        if (auto* self = static_cast<Window*>(glfwGetWindowUserPointer(w))) {
+            self->m_width = fbw;
+            self->m_height = fbh;
+        }
+        Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ fbw, fbh });
+    });
 
-	return true;
+    glfwSetWindowFocusCallback(m_windowHandle, [](GLFWwindow* w, int focused) {
+        (void)w;
+        Messaging::MessageSystem::Broadcast(Messaging::WindowFocusChanged{ focused != 0 });
+    });
+
+    // Initialize windowed state for future mode switches
+    if (HasFlag(mode, WindowMode::Windowed)) {
+        // For windowed mode, store the initial position and size
+        glfwGetWindowPos(m_windowHandle, &m_windowedX, &m_windowedY);
+        m_windowedWidth = createWidth;
+        m_windowedHeight = createHeight;
+    } 
+	else {
+        // For fullscreen/borderless, use user-provided size as windowed fallback
+        // (or defaults if size was invalid)
+        m_windowedWidth = (width > 0) ? width : 1600;
+        m_windowedHeight = (height > 0) ? height : 900;
+        m_windowedX = 100;
+        m_windowedY = 100;
+        LOG_INFO("Initialized windowed fallback state: " << m_windowedWidth 
+                 << "x" << m_windowedHeight << " at (" << m_windowedX << ", " << m_windowedY << ")");
+    }
+
+    // === Lock aspect ratio (16:9) ===
+    glfwSetWindowAspectRatio(m_windowHandle, 16, 9);
+
+    // Apply mode-specific settings
+    // For borderless, position it over the monitor
+    if (HasFlag(mode, WindowMode::Borderless)) {
+        int monX = 0, monY = 0;
+        glfwGetMonitorPos(monitor, &monX, &monY);
+        glfwSetWindowPos(m_windowHandle, monX, monY);
+        LOG_INFO("Positioned borderless window at monitor coordinates (" 
+                 << monX << ", " << monY << ")");
+    }
+
+    // Store the initial mode
+    m_mode = mode;
+
+    LOG_INFO("Window created successfully in mode: " << static_cast<int>(mode));
+    return true;
 }
 
 void Window::Destroy() {
@@ -160,57 +198,89 @@ void Window::Destroy() {
 }
 
 void Window::SetMode(const WindowMode::Flags mode, GLFWmonitor* monitor) {
-	// log current mode and new mode
-	// Cast to int because Flags uses uint8_t (which streams as a char otherwise)
-	std::cout << "Current mode: " << static_cast<int>(m_mode) << ", New mode: " << static_cast<int>(mode) << "\n";
-	if (mode == m_mode) return;
-	std::cout << "Switching window mode...\n";
+    // Validate mode - Borderless + Fullscreen is invalid
+    if (HasFlag(mode, WindowMode::Borderless) && HasFlag(mode, WindowMode::Fullscreen)) {
+        LOG_ERROR("Invalid mode combination: Borderless and Fullscreen cannot be used together");
+        return;
+    }
 
-	// TODO: When hardware manager is done, get:
-	// All monitor pos and sizes, window pos (and size?)
-	// Calculate them to get the monitor which the window is on
-	if (!monitor) 
-		monitor = glfwGetPrimaryMonitor();
-	const GLFWvidmode* modeInfo = glfwGetVideoMode(monitor);
-	if (!modeInfo) {
-		std::cout << "Failed to query video mode for monitor\n";
-		return;
-	}
+    // No change needed
+    if (mode == m_mode) return;
 
-	std::cout << "Mode info - Width: " << modeInfo->width << ", Height: " << modeInfo->height 
-			  << ", RefreshRate: " << modeInfo->refreshRate << "\n";
+    LOG_INFO("Switching window mode from " << static_cast<int>(m_mode) 
+             << " to " << static_cast<int>(mode));
 
-	if (HasFlag(mode, WindowMode::Borderless)) {
-		// Store the current windowed position/size for restore
-		glfwGetWindowPos(m_windowHandle, &m_windowedX, &m_windowedY);
-		glfwGetWindowSize(m_windowHandle, &m_windowedWidth, &m_windowedHeight);
-		std::cout << "Stored windowed position: (" << m_windowedX << ", " << m_windowedY << "), size: (" << m_windowedWidth << "x" << m_windowedHeight << ")\n";
+    // Default to primary monitor if none specified
+    if (!monitor) 
+        monitor = glfwGetPrimaryMonitor();
+    
+    const GLFWvidmode* modeInfo = glfwGetVideoMode(monitor);
+    if (!modeInfo) {
+        LOG_ERROR("Failed to query video mode for monitor");
+        return;
+    }
 
-		// Remove decorations
-		glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_FALSE);
+    // Save current windowed state before transitioning away from windowed mode
+    // Only save if currently in true windowed mode (not fullscreen or borderless)
+    if (HasFlag(m_mode, WindowMode::Windowed) &&
+		!HasFlag(m_mode, WindowMode::Fullscreen) &&
+        !HasFlag(m_mode, WindowMode::Borderless)) {
+        glfwGetWindowPos(m_windowHandle, &m_windowedX, &m_windowedY);
+        glfwGetWindowSize(m_windowHandle, &m_windowedWidth, &m_windowedHeight);
+        LOG_DEBUG("Saved windowed state: pos(" << m_windowedX << ", " << m_windowedY 
+                  << "), size(" << m_windowedWidth << "x" << m_windowedHeight << ")");
+    }
 
-		// If Borderless is requested but Fullscreen is NOT requested, make the window
-		// cover the monitor (borderless windowed fullscreen) without attaching to the monitor.
-		if (!HasFlag(mode, WindowMode::Fullscreen)) {
-			int monX = 0, monY = 0;
-			glfwGetMonitorPos(monitor, &monX, &monY);
-			glfwSetWindowMonitor(m_windowHandle, nullptr, monX, monY, modeInfo->width, modeInfo->height, 0);
-			std::cout << "Switched to borderless windowed (covering monitor) mode\n";
-		}
-	}
-	if (HasFlag(mode, WindowMode::Windowed)) {
-		glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_TRUE);
-		glfwSetWindowMonitor(m_windowHandle, nullptr, m_windowedX, m_windowedY, m_windowedWidth, m_windowedHeight, 0);
-		std::cout << "Restored windowed position: (" << m_windowedX << ", " << m_windowedY << "), size: (" << m_windowedWidth << "x" << m_windowedHeight << ")\n";
-	}
-	if (HasFlag(mode, WindowMode::Fullscreen)) {
-		glfwGetWindowPos(m_windowHandle, &m_windowedX, &m_windowedY);
-		glfwGetWindowSize(m_windowHandle, &m_windowedWidth, &m_windowedHeight);
-		glfwSetWindowMonitor(m_windowHandle, monitor, 0, 0, modeInfo->width, modeInfo->height, modeInfo->refreshRate);
-		std::cout << "Switched to fullscreen mode on monitor\n";
-	}
-	
-	m_mode = mode;
+    // Exclusive Fullscreen (monitor attached, decorated doesn't matter)
+    if (HasFlag(mode, WindowMode::Fullscreen)) {
+        glfwSetWindowMonitor(m_windowHandle, monitor, 0, 0, 
+                           modeInfo->width, modeInfo->height, modeInfo->refreshRate);
+        LOG_INFO("Switched to exclusive fullscreen: " << modeInfo->width 
+                 << "x" << modeInfo->height << " @ " << modeInfo->refreshRate << "Hz");
+        m_mode = mode;
+        return;
+    }
+
+    // Borderless Windowed Fullscreen (no monitor, no decorations, covers screen)
+    if (HasFlag(mode, WindowMode::Borderless)) {
+        glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_FALSE);
+        
+        int monX = 0, monY = 0;
+        glfwGetMonitorPos(monitor, &monX, &monY);
+        
+        glfwSetWindowMonitor(m_windowHandle, nullptr, monX, monY, 
+                           modeInfo->width, modeInfo->height, GLFW_DONT_CARE);
+        LOG_INFO("Switched to borderless windowed: " << modeInfo->width 
+                 << "x" << modeInfo->height << " at monitor pos(" << monX << ", " << monY << ")");
+        m_mode = mode;
+        return;
+    }
+
+    // Regular Windowed (no monitor, with decorations, custom size/pos)
+    if (HasFlag(mode, WindowMode::Windowed)) {
+        glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_TRUE);
+        
+        // Validate stored dimensions before restoring
+        if (m_windowedWidth <= 0 || m_windowedHeight <= 0) {
+            LOG_WARNING("Invalid stored windowed dimensions, using defaults");
+            m_windowedWidth = 1600;
+            m_windowedHeight = 900;
+            m_windowedX = 100;
+            m_windowedY = 100;
+        }
+        
+        glfwSetWindowMonitor(m_windowHandle, nullptr, 
+                           m_windowedX, m_windowedY, 
+                           m_windowedWidth, m_windowedHeight, GLFW_DONT_CARE);
+        LOG_INFO("Switched to windowed: " << m_windowedWidth << "x" << m_windowedHeight 
+                 << " at pos(" << m_windowedX << ", " << m_windowedY << ")");
+        m_mode = mode;
+        return;
+    }
+
+    // No valid flags set, so treat as windowed
+    LOG_WARNING("No valid window mode flags set, defaulting to windowed");
+    SetMode(WindowMode::Windowed, monitor);
 }
 
 void Window::Resize(std::optional<int> width, std::optional<int> height) {
