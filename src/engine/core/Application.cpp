@@ -123,6 +123,18 @@ namespace Engine {
 
             // --- Input & Game Update ---
             Input::_processInput();
+			
+			// Add fullscreen toggle (F11 key)
+			if (Input::IsKeyPressed(GLFW_KEY_F11)) {
+				Window* mainWindow = WindowManager::GetMainWindow();
+				if (mainWindow) {
+					if (mainWindow->HasMode(WindowMode::Fullscreen)) {
+						mainWindow->SetMode(WindowMode::Windowed);
+					} else {
+						mainWindow->SetMode(WindowMode::Fullscreen);
+					}
+				}
+			}
 
             // --- Update Services ---
             m_audio->Update();
