@@ -250,7 +250,7 @@ namespace ECS {
             return Engine::Collision::ContactManifold();
         }
 
-        // CREATE SIMPLE MANIFOLD (single contact point)
+        // create simple maniford
         Engine::Collision::ContactManifold manifold;
         manifold.normal = normal;
         manifold.penetration = penetration;
@@ -325,7 +325,7 @@ namespace ECS {
         if (!Engine::Physics::IsEnabled()) return;
         if (dt <= 0.0f) return;
 
-        // 0) Choose substep count; make it a tunable or cvar if you like.
+        //  Choose substep count; make it a tunable or cvar if you like.
         const int   substeps = 8;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
 
@@ -340,9 +340,9 @@ namespace ECS {
         ++s_frameCounter;
 
 
-        // 1) Collect entity sets ONCE per frame (usually fine).
-        //    If your scene can add/remove colliders mid-frame, you can also
-        //    move these two collectors *inside* the substep loop.
+        //  Collect entity sets once per frame (usually fine).
+        //  If your scene can add/remove colliders mid-frame, you can also
+        //  move these two collectors *inside* the substep loop.
         std::vector<Entity> dynamicEntities;
         dynamicEntities.reserve(512);
 
@@ -373,9 +373,9 @@ namespace ECS {
                 staticEntities.push_back(e); // Push to store and use static entities for checks later
             });
 
-        // 2) Substep loop: integrate and resolve in smaller time slices.
+        // Substep loop: integrate and resolve in smaller time slices.
         for (int step = 0; step < substeps; ++step) {
-            // 2A) Integrate dynamics with subDt and apply optional world bounds.
+            // Integrate dynamics with subDt and apply optional world bounds.
             world.Each<Components::Rigidbody2D, Components::LinearVelocity2D,
                 Components::AngularVelocity2D, Components::LocalTransform>(
                     [&](const Entity e,
@@ -436,7 +436,7 @@ namespace ECS {
                         }
                     });
 
-            // 2B) Broad phase for this substep (rebuild grid because poses changed).
+            // Broad phase for this substep (rebuild grid because poses changed).
             SpatialPartitioning grid;
             auto insertEntity = [&](Entity e) {
                 const auto* t = world.TryGet<Components::LocalTransform>(e);
@@ -451,7 +451,7 @@ namespace ECS {
             for (Entity e : dynamicEntities) insertEntity(e);
             for (Entity e : staticEntities)  insertEntity(e);
 
-            // 2C) Candidate pairs deduped per substep.
+            // Candidate pairs deduped per substep.
             std::vector<std::pair<Entity, Entity>> pairs;
             std::unordered_set<uint64_t>           seen;
             pairs.reserve(dynamicEntities.size() * 4);
@@ -460,10 +460,10 @@ namespace ECS {
             // Builds a list of unique candidate collision pairs from each spatial - grid cell, deduplicating pairs that appear in multiple cells.
             auto pairKey = [](uint64_t a, uint64_t b) -> uint64_t { if (a > b) std::swap(a, b); return (a << 32) | (b & 0xffffffffull); };
 
-            //Iterates all occupied cells in the spatial hash/grid. Each cell has a small list of entities that overlap that cell.
+            // Iterates all occupied cells in the spatial hash/grid. Each cell has a small list of entities that overlap that cell.
             for (const auto& cell : grid.Grid()) {
                 const auto& ents = cell.second;
-                //Enumerate all unordered pairs within the cell by running i from 0..n-2 and j from i+1..n-1.
+                // Enumerate all unordered pairs within the cell by running i from 0..n-2 and j from i+1..n-1.
                 for (size_t i = 0; i + 1 < ents.size(); ++i) {
                     for (size_t j = i + 1; j < ents.size(); ++j) {
                         //Packs the pair (ents[i], ents[j]) into the 64-bit canonical key using pairKey
