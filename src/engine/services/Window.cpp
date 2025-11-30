@@ -73,7 +73,12 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		}
 	}
 
-	m_windowHandle = glfwCreateWindow(createWidth, createHeight, title.c_str(), monitor, parent);
+    // Get primary monitor if none provided and is fullscreen
+    if (HasFlag(mode, WindowMode::Fullscreen) && !monitor)
+        monitor = glfwGetPrimaryMonitor();
+
+	GLFWmonitor* createMonitor = HasFlag(mode, WindowMode::Fullscreen) ? monitor : nullptr;
+	m_windowHandle = glfwCreateWindow(createWidth, createHeight, title.c_str(), createMonitor, parent);
 	m_title = title;
 
 	if (!m_windowHandle) {
@@ -156,10 +161,22 @@ void Window::SetMode(const WindowMode::Flags mode, GLFWmonitor* monitor) {
 			  << ", RefreshRate: " << modeInfo->refreshRate << "\n";
 
 	if (HasFlag(mode, WindowMode::Borderless)) {
-		glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_FALSE);
+		// Store the current windowed position/size for restore
 		glfwGetWindowPos(m_windowHandle, &m_windowedX, &m_windowedY);
 		glfwGetWindowSize(m_windowHandle, &m_windowedWidth, &m_windowedHeight);
 		std::cout << "Stored windowed position: (" << m_windowedX << ", " << m_windowedY << "), size: (" << m_windowedWidth << "x" << m_windowedHeight << ")\n";
+
+		// Remove decorations
+		glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_FALSE);
+
+		// If Borderless is requested but Fullscreen is NOT requested, make the window
+		// cover the monitor (borderless windowed fullscreen) without attaching to the monitor.
+		if (!HasFlag(mode, WindowMode::Fullscreen)) {
+			int monX = 0, monY = 0;
+			glfwGetMonitorPos(monitor, &monX, &monY);
+			glfwSetWindowMonitor(m_windowHandle, nullptr, monX, monY, modeInfo->width, modeInfo->height, 0);
+			std::cout << "Switched to borderless windowed (covering monitor) mode\n";
+		}
 	}
 	if (HasFlag(mode, WindowMode::Windowed)) {
 		glfwSetWindowAttrib(m_windowHandle, GLFW_DECORATED, GLFW_TRUE);
@@ -232,4 +249,4 @@ void Window::SetResizable(const bool flag) const { if (m_windowHandle) glfwSetWi
 void Window::SetVSync(bool enabled) { m_vsync = enabled; glfwSwapInterval(enabled ? 1 : 0); }
 bool Window::IsVSync() const 			  { return m_vsync; }
 
-bool Window::HasMode(const WindowMode::Flags value) const { return HasFlag(value, m_mode); }
+bool Window::HasMode(const WindowMode::Flags value) const { return HasFlag(m_mode, value); }
