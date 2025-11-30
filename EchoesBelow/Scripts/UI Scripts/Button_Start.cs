@@ -2,6 +2,7 @@ using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
 using Scripts.ButtonFolder;
 using Scripts.Tool_Scripts;
+using GrapeEngine; // for namespace that has audio and handle
 
 namespace Scripts.UI_Scripts;
 
@@ -11,6 +12,10 @@ public class Button_Start : ScriptBehaviour
     Color startCol;
     Button button;
     public ulong objId;
+
+    // audio button click SFX
+    private AudioHandle buttonClickSfx;
+
     public override void OnStart()
     {
         //Time.TimeScale = 0;
@@ -24,6 +29,9 @@ public class Button_Start : ScriptBehaviour
 
         ref SpriteRenderer2D sr = ref GetComponent<SpriteRenderer2D>();
         startCol = sr.Color;
+
+         // Load button click sound (adjust path as wanted if UX team wants to edit)
+        Audio.LoadCue("button_click", "assets/Audio/SFX/Underwater-Cashling_SFX.wav", is3D: false, isLooping: false, isStreaming: false);
         //Log("Button Created!");
     }
 
@@ -35,6 +43,10 @@ public class Button_Start : ScriptBehaviour
 
         if (button.instance.isPressed)
         {
+
+            // Play button click SFX
+            buttonClickSfx = Audio.PlaySingle("button_click", PlayPolicy.RestartSingle, volume: 1.0f, pitch: 1.0f);
+
             sr.Color = new Color(100, 100, 100, 255);
             //Task
 
