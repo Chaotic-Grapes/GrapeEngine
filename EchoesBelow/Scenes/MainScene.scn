@@ -97,7 +97,7 @@
                         "Pitch": 1.0,
                         "PlayOnStart": true,
                         "Spatial3D": false,
-                        "Volume": 1.0
+                        "Volume": 0.0
                     },
                     "TypeName": "AudioSource"
                 },
