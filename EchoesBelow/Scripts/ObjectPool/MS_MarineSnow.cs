@@ -16,8 +16,13 @@ public class MS_MarineSnow : ScriptBehaviour
     public Vector3 startPos;
     public BoxCollider2D startBX;
 
+    float timer = 0f;
+    bool isTransitioning = false;
+
     public override void OnStart()
     {
+        isTransitioning = false;
+        timer = 0f;
         ref LocalTransform transform = ref GetComponent<LocalTransform>();
         BoxCollider2D bx = GetComponent<BoxCollider2D>();
 
@@ -40,6 +45,12 @@ public class MS_MarineSnow : ScriptBehaviour
     }
     public override void OnUpdate()
     {
+        if (isTransitioning) timer += Time.UnscaledDeltaTime;
+        if (timer > 0.5f)
+        {
+            timer = 0f;
+            isTransitioning = false;
+        }
         ref LocalTransform transform = ref GetComponent<LocalTransform>();
 
         //If obj is active, it is not in pool, vice versa
@@ -56,14 +67,13 @@ public class MS_MarineSnow : ScriptBehaviour
 
         if (collisionEvents.Count != 0) //only check for first collision
         {
-            bool isTransitioning = false;
             if (!isTransitioning && collisionEvents[0].Other.EntityId == Player.playerEntityId)
             {
                 isTransitioning = true;
                 //future send to inv controller
                 InventoryController.Instance.AddToHotBar(instance, Entity.EntityId);
                 Log("Added to hotbar");
-                isTransitioning = false;
+                
                 //disable
 
             }

@@ -11,9 +11,9 @@ namespace Scripts;
 public class Player : ScriptBehaviour
 {
     //Constant Parameters
-    const float moveSpeed = 2.2f;
+    const float moveSpeed = 2.45f;
     const float maxSpeed = 30f;
-    const float rotateSpeed = 200f;
+    const float rotateSpeed = 70f;
     
     
     //For Testing Purposes
@@ -143,13 +143,13 @@ public class Player : ScriptBehaviour
         //reference the angular velocity property
         //ref AngularVelocity2D angularVelocity = ref GetComponent<AngularVelocity2D>();
 
-        angularVelocity.Value = GMath.Lerp(angularVelocity.Value, input * rotateSpeed * Time.DeltaTime, 0.2f);
+        angularVelocity.Value = GMath.Lerp(angularVelocity.Value, input * rotateSpeed * Time.FixedDeltaTime, 0.2f);
         return angularVelocity.Value;
     }
     private void AddForce(ref LinearVelocity2D linearVelocity)
     { //add an impulse force
         //currently adding force continuously for now
-        linearVelocity.Value += playerDir * moveSpeed * Time.DeltaTime;
+        linearVelocity.Value += playerDir * moveSpeed * Time.FixedDeltaTime;
         linearVelocity.Value.X = GMath.Clamp(linearVelocity.Value.X, -maxSpeed, maxSpeed);
         linearVelocity.Value.Y = GMath.Clamp(linearVelocity.Value.Y, -maxSpeed, maxSpeed);
     }
