@@ -1,3 +1,20 @@
+/* Start Header *****************************************************************/
+/*!
+\file   UndoSystem.cpp
+\author Daniel Kay Neo Zuo Feng
+\date   14th November 2025
+\brief
+Implementation of the UndoSystem and command types used to support
+undo/redo operations within the editor. This system records user actions,
+applies them via command objects, and restores previous states when
+undoing or redoing actions.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "UndoSystem.h"
 #include "services/Input.h"
 #include "core/Logger.h"

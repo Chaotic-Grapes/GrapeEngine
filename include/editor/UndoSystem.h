@@ -1,3 +1,26 @@
+/* Start Header *****************************************************************/
+/*!
+\file   UndoSystem.h
+\author Daniel Kay Neo Zuo Feng
+\date   14th November 2025
+\brief
+Declaration of the undo/redo command system used by the editor.
+
+This module implements a command-based undo/redo framework following the
+Command Pattern. It supports reversible editor actions such as transform
+modifications, entity creation, and entity deletion by encapsulating each
+operation into a command object that can be executed, undone, and redone.
+
+The UndoSystem serves as the editor’s central history manager, ensuring that
+entity edits and scene interactions remain fully reversible and consistent
+with ECS state.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef UNDO_SYSTEM_H
 #define UNDO_SYSTEM_H
 
