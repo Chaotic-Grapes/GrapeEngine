@@ -36,7 +36,7 @@ namespace {
 
 Window::~Window() { Destroy(); }
 
-bool Window::Create(const std::string& title, const int width, const int height, const bool vsync, WindowMode::Flags mode, GLFWmonitor* monitor, GLFWwindow* parent) {
+bool Window::Create(const std::string& title, const int width, const int height, const bool vsync, const bool isFullscreen, WindowMode::Flags mode, GLFWmonitor* monitor, GLFWwindow* parent) {
 	this->m_width = width;
 	this->m_height = height;
 
@@ -73,9 +73,29 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		}
 	}
 
-    // Get primary monitor if none provided and is fullscreen
-    if (HasFlag(mode, WindowMode::Fullscreen) && !monitor)
-        monitor = glfwGetPrimaryMonitor();
+	// If explicit fullscreen requested, make sure monitor is set and override size to monitor's video mode
+	if (isFullscreen) {
+		if (!monitor)
+			monitor = glfwGetPrimaryMonitor();
+
+		const GLFWvidmode* vm = monitor ? glfwGetVideoMode(monitor) : nullptr;
+		
+		if (vm) {
+			createWidth = vm->width;
+			createHeight = vm->height;
+			this->m_width = createWidth;
+			this->m_height = createHeight;
+			
+			LOG_WARNING("Fullscreen requested: forcing creation size to monitor resolution: " << createWidth << "x" << createHeight);
+		}
+
+		// Mark mode as fullscreen for creation-time behavior
+		mode |= WindowMode::Fullscreen;
+	}
+
+	// Ensure primary monitor is used by default for fullscreen if none provided.
+	if (HasFlag(mode, WindowMode::Fullscreen) && !monitor)
+		monitor = glfwGetPrimaryMonitor();
 
 	GLFWmonitor* createMonitor = HasFlag(mode, WindowMode::Fullscreen) ? monitor : nullptr;
 	m_windowHandle = glfwCreateWindow(createWidth, createHeight, title.c_str(), createMonitor, parent);

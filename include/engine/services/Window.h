@@ -55,7 +55,10 @@ public:
 	Window() = default;
 	~Window();
 
-	bool Create(const std::string& title, int width, int height, bool vsync = true, WindowMode::Flags mode = WindowMode::Windowed, GLFWmonitor* monitor = nullptr, GLFWwindow* parent = nullptr);
+	// isFullscreen: if true, create an exclusive fullscreen window on the specified
+	// monitor (or primary monitor if monitor==nullptr). This overrides the 'mode'
+	// parameter for creation time only.
+	bool Create(const std::string& title, int width, int height, bool vsync = true, bool isFullscreen = false, WindowMode::Flags mode = WindowMode::Windowed, GLFWmonitor* monitor = nullptr, GLFWwindow* parent = nullptr);
 	void Destroy();
 
 	void PollEvents() const;
