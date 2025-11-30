@@ -16,14 +16,14 @@ public:
 
 	static AudioAssetLibrary& Get() {
 		// reference function to always refer to this one static
-		// local instance that is reusable and only "ONE"
+		// local instance that is reusable and only one
 		static AudioAssetLibrary s_instance;
 		return s_instance;
 	}
 
     /*
       Refresh(audioRoot)
-      -------------------
+   
       Scans a root folder (e.g. "assets/Audio") and ALL subfolders.
 
       Finds all supported audio file formats:
@@ -38,8 +38,7 @@ public:
               m_byId           (lookup ID -> info)
               m_byPath         (lookup path -> info)
 
-      This should be called ONCE when the editor loads,
-      or anytime the asset directory changes (optional).
+      This should be called once when the editor loads
   */
     void Refresh(const std::string& audioRoot) {
         m_clips.clear();
