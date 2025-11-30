@@ -1,0 +1,98 @@
+{
+    "Components": [
+        {
+            "Data": {
+                "Position": {
+                    "X": 0.0,
+                    "Y": 2.0,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "W": 1.0,
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 0.44999998807907104,
+                    "Y": 0.44999998807907104,
+                    "Z": 1.0
+                }
+            },
+            "TypeName": "LocalTransform"
+        },
+        {
+            "Data": {
+                "Value": "OceanLight"
+            },
+            "TypeName": "Name"
+        },
+        {
+            "Data": {
+                "Enabled": true
+            },
+            "TypeName": "Active"
+        },
+        {
+            "Data": {
+                "Id": 20
+            },
+            "TypeName": "Layer"
+        },
+        {
+            "Data": {
+                "Initialized": false,
+                "ManagedHandle": 0,
+                "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\SpinningObject.cs",
+                "TypeHash": 0,
+                "TypeName": "EchoesBelow.Scripts.SpinningObject"
+            },
+            "TypeName": "ScriptInstance"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.100000023841858,
+                    "B": 1.0,
+                    "G": 1.0,
+                    "R": 0.9998999834060669
+                },
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "TextureId": 21,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
+                "Tiling": {
+                    "X": 1.0,
+                    "Y": 1.0
+                }
+            },
+            "TypeName": "SpriteRenderer2D"
+        },
+        {
+            "Data": {
+                "Dirty": false,
+                "Matrix": {
+                    "m00": 0.30000001192092896,
+                    "m01": 0.0,
+                    "m02": 0.0,
+                    "m03": 0.0,
+                    "m10": 0.0,
+                    "m11": 0.30000001192092896,
+                    "m12": 0.0,
+                    "m13": 2.0,
+                    "m20": 0.0,
+                    "m21": 0.0,
+                    "m22": 1.0,
+                    "m23": 0.0,
+                    "m30": 0.0,
+                    "m31": 0.0,
+                    "m32": 0.0,
+                    "m33": 1.0
+                }
+            },
+            "TypeName": "WorldTransform"
+        }
+    ]
+}

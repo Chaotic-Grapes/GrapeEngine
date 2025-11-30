@@ -99,7 +99,21 @@ int main() {
     // Create and run the editor
     Engine::Application engine;
     EditorGame editor;
+    
+#ifdef _DEBUG
     engine.Run(editor, true);
+#else
+    engine.Run(editor, false);
+#endif
 
     return 0;
 }
+
+#ifdef _WIN32
+#include <windows.h>
+// WinMain shim for GUI/Windows subsystem: forward to main()
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    (void)hInstance; (void)hPrevInstance; (void)lpCmdLine; (void)nCmdShow;
+    return main();
+}
+#endif

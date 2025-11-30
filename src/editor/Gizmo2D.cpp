@@ -1,14 +1,20 @@
-/**
- * @Name: Samantha Leong, 2403088
- * @email: s.leong@digipen.edu
- * @file Gizmo2D.cpp
- * @brief Implements editor gizmo rendering and manipulation for 2D/3D entities.
- *
- * This file uses ImGuizmo to render translation/rotation/scale gizmos inside
- * the editor viewport. The gizmo allows real-time manipulation of entity
- * transforms in ECS::World. The system converts LocalTransform components
- * into matrices, sends them to ImGuizmo, and applies back any modifications.
- */
+/* Start Header *****************************************************************/
+/*!
+\file   Gizmo2D.cpp
+\author Samantha Leong (100%)
+\par    s.leong@digipen.edu
+\date   5th November 2025
+
+\brief
+Implements editor gizmo rendering and manipulation for 2D/3D entities.
+
+This file uses ImGuizmo to render translation/rotation/scale gizmos inside
+the editor viewport. The gizmo allows real-time manipulation of entity
+transforms in ECS::World. The system converts LocalTransform components
+into matrices, sends them to ImGuizmo, and applies back any modifications.
+*/
+/* End Header *******************************************************************/
+
 
 // In Gizmo2D.cpp - use engine math (Matrix4x4 / TransformUtils) instead of glm
 #include "ecs/systems/RendererSystem.h"

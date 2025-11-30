@@ -85,7 +85,7 @@ namespace Engine {
 
         // Ensure the editor camera shows up with a clear name in the hierarchy
         auto& nameComp = world.Add<ECS::Components::Name>(m_cameraEntity);
-        std::strncpy(nameComp.Value, "EditorCamera", sizeof(nameComp.Value) - 1);
+        strncpy_s(nameComp.Value, "EditorCamera", sizeof(nameComp.Value) - 1);
         nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
 
         m_camera->UsePerspective = false;
@@ -164,7 +164,7 @@ namespace Engine {
         m_camera = &world.Add<ECS::Components::CameraEditor3D>(m_cameraEntity);
 
         auto& nameComp = world.Add<ECS::Components::Name>(m_cameraEntity);
-        std::strncpy(nameComp.Value, "EditorCamera", sizeof(nameComp.Value) - 1);
+        strncpy_s(nameComp.Value, "EditorCamera", sizeof(nameComp.Value) - 1);
         nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
 
         m_camera->UsePerspective = false;

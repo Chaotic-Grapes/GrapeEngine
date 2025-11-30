@@ -94,7 +94,7 @@ namespace Messaging {
         // Observer priority (higher value notified earlier).
         virtual int GetPriority() const { return 0; }
         // Whether this observer should receive the given message.
-        virtual bool ShouldReceive(const T& message) const { return true; }
+        virtual bool ShouldReceive(const T& message) const { (void)message; return true; }
     };
 
     // Wrapper for lambda or std::function observers.

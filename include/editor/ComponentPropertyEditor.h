@@ -21,6 +21,8 @@ to C++ components.
 
 #include <nlohmann/json.hpp>
 #include <imgui.h>
+#include "ecs/Entity.h"
+#include "ecs/World.h"
 
 // Handles rendering of all component UIs in the inspector
 class ComponentUI {
@@ -38,79 +40,79 @@ public:
     // -------------------------------------------------------------------------
 
     // Renders entity name component for identifying entities in hierarchy
-    void RenderName(nlohmann::json& data);
+    void RenderName(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders active/enabled state toggle for entity activation control
-    void RenderActive(nlohmann::json& data);
+    void RenderActive(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders tag mask bitfield for entity tagging and filtering systems
-    void RenderTagMask(nlohmann::json& data);
+    void RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders lifetime timer component for auto-destroying entities
-    void RenderLifetime(nlohmann::json& data);
+    void RenderLifetime(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders transform properties including position, rotation and scale values
-    void RenderLocalTransform(nlohmann::json& data);
+    void RenderLocalTransform(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders sprite properties including material reference and color tint values
-    void RenderSpriteRenderer2D(nlohmann::json& data);
+    void RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders physics body properties including mass, drag and gravity settings
-    void RenderRigidbody2D(nlohmann::json& data);
+    void RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders linear velocity vector for 2D movement with X and Y components
-    void RenderLinearVelocity2D(nlohmann::json& data);
+    void RenderLinearVelocity2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders angular velocity for rotation around Z-axis in radians per second
-    void RenderAngularVelocity2D(nlohmann::json& data);
+    void RenderAngularVelocity2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders circle collider properties including radius and center offset values
-    void RenderCircleCollider2D(nlohmann::json& data);
+    void RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders box collider properties including width, height and offset values
-    void RenderBoxCollider2D(nlohmann::json& data);
+    void RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders circle shape properties for visual representation including radius
-    void RenderShapeCircle2D(nlohmann::json& data);
+    void RenderShapeCircle2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders box shape properties for visual representation including dimensions
-    void RenderShapeBox2D(nlohmann::json& data);
+    void RenderShapeBox2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders line shape properties including start and end point coordinates
-    void RenderShapeLine2D(nlohmann::json& data);
+    void RenderShapeLine2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders camera properties including projection type and near/far clipping planes
-    void RenderCamera3D(nlohmann::json& data);
+    void RenderCamera3D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders acceleration vector for forces applied to 2D physics bodies
-    void RenderAcceleration2D(nlohmann::json& data);
+    void RenderAcceleration2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders physics material properties including friction and restitution
-    void RenderPhysicsMaterial2D(nlohmann::json& data);
+    void RenderPhysicsMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders sprite sheet animation properties including frame data and playback settings
-    void RenderSpriteSheetAnimation2D(nlohmann::json& data);
+    void RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders Z-index for controlling 2D rendering order
-    void RenderZIndex2D(nlohmann::json& data);
+    void RenderZIndex2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders 2D light component for lighting effects
-    void RenderLight2D(nlohmann::json& data);
+    void RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders text component for displaying text on screen
-    void RenderText(nlohmann::json& data);
+    void RenderText(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders animation state for sprite sheet animation playback
-    void RenderAnimationState2D(nlohmann::json& data);
+    void RenderAnimationState2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders AudioSource for component 
-    void RenderAudioSource(nlohmann::json& data);
+    void RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
     
     // Renders entity layer
-    void RenderLayer2D(nlohmann::json& data);
+    void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
     // Renders script instance component for C# scripting
-    void RenderScriptInstance(nlohmann::json& data);
+    void RenderScriptInstance(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
 
 private:

@@ -82,14 +82,11 @@ namespace Engine {
         }*/
 
 
-#if !_DEBUG
         if (consoleFlag)
             _enableConsole();
         else
             _disableConsole();
-#else
-        (void)consoleFlag;
-#endif
+            
 		// Initialize services
 		_initializeServices();
 

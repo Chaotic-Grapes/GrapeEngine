@@ -1,0 +1,88 @@
+{
+    "Components": [
+        {
+            "Data": {
+                "Position": {
+                    "X": -5.63973331451416,
+                    "Y": -0.02321028709411621,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "W": 1.0,
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 17.064496994018555,
+                    "Y": 17.064496994018555,
+                    "Z": 17.064496994018555
+                }
+            },
+            "TypeName": "LocalTransform"
+        },
+        {
+            "Data": {
+                "Value": "Earth"
+            },
+            "TypeName": "Name"
+        },
+        {
+            "Data": {
+                "Enabled": true
+            },
+            "TypeName": "Active"
+        },
+        {
+            "Data": {
+                "Id": 30
+            },
+            "TypeName": "Layer"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.0,
+                    "B": 1.0,
+                    "G": 1.0,
+                    "R": 1.0
+                },
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "TextureId": 1,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI Art\\EarthLikeGiant.png",
+                "Tiling": {
+                    "X": 1.0,
+                    "Y": 1.0
+                }
+            },
+            "TypeName": "SpriteRenderer2D"
+        },
+        {
+            "Data": {
+                "Dirty": false,
+                "Matrix": {
+                    "m00": 17.064496994018555,
+                    "m01": 0.0,
+                    "m02": 0.0,
+                    "m03": -5.63973331451416,
+                    "m10": 0.0,
+                    "m11": 17.064496994018555,
+                    "m12": 0.0,
+                    "m13": -0.02321028709411621,
+                    "m20": 0.0,
+                    "m21": 0.0,
+                    "m22": 17.064496994018555,
+                    "m23": 0.0,
+                    "m30": 0.0,
+                    "m31": 0.0,
+                    "m32": 0.0,
+                    "m33": 1.0
+                }
+            },
+            "TypeName": "WorldTransform"
+        }
+    ]
+}

@@ -497,7 +497,7 @@ namespace ECS {
 
         // Pass 1: Render scene to HDR framebuffer
         m_renderGraph->AddPass("Scene2D", {}, { "HDR" },
-            [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints](ResourceAccessor& res)
+            [this, &world, &viewProj, &maxLayerId, &buckets, &transformedCorners, &polyPoints, &win](ResourceAccessor& res)
             {
                 (void)res;
                 // Get HDR framebuffer from render graph
@@ -540,7 +540,6 @@ namespace ECS {
 
                     // If this is UI layer, use fixed screen-space projection
                     if (isUILayer) {
-                        const auto& win = WindowManager::GetMainWindow();
                         glm::mat4 uiProjection = glm::ortho(
                             0.0f, static_cast<float>(win->GetWidth()),
                             0.0f, static_cast<float>(win->GetHeight()),
@@ -700,7 +699,6 @@ namespace ECS {
                     if (m_textShader) {
                         m_textShader->use();
 
-                        const auto& win = WindowManager::GetMainWindow();
                         const float screenWidth = static_cast<float>(win->GetWidth());
                         const float screenHeight = static_cast<float>(win->GetHeight());
 
@@ -803,7 +801,6 @@ namespace ECS {
                                 const glm::vec2 frustumMax = camPos + glm::vec2(halfW, halfH);
 
                                 // Calculate constant screen-space thickness
-                                const auto& win = WindowManager::GetMainWindow();
                                 const float desiredPixelThickness = 2.0f; // Always 2 pixels thick
                                 const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPixelThickness;
 
@@ -824,7 +821,7 @@ namespace ECS {
 
         // Object Picking Pass
         m_renderGraph->AddPass("Picking", {}, {},
-            [this, &world, &viewProj, &buckets](ResourceAccessor& res)
+            [this, &world, &viewProj, &buckets, &win](ResourceAccessor& res)
             {
                 // Skip picking entirely when force scene camera is enabled
                 if (m_forceSceneCamera || !m_editorInputEnabled) {
@@ -847,7 +844,6 @@ namespace ECS {
                 glm::vec2 viewportMin(0, 0);
                 glm::vec2 viewportSize;
 
-                const auto& win = WindowManager::GetMainWindow();
                 viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
                 bool useViewportCoords = m_useEditorCamera;
 
@@ -1095,7 +1091,7 @@ namespace ECS {
         // Highlight the currently selected entity (overlay onto HDR)
         // Read from HDR target, then write back to the same HDR target (overlay)
         m_renderGraph->AddPass("SelectionOutline", { "HDR" }, { "HDR" },
-            [this, &world, &viewProj, &buckets, &transformedCorners, &polyPoints](ResourceAccessor& res)
+            [this, &world, &viewProj, &buckets, &transformedCorners, &polyPoints, &win](ResourceAccessor& res)
             {
                 // nothing selected this frame
                 if (m_selectedEntityID == INVALID_ENTITY_ID) return;  // Check for sentinel value
@@ -1107,7 +1103,6 @@ namespace ECS {
                 hdrFbo->Bind();
 
                 // make outline look 2px thick in screen space
-                const auto& win = WindowManager::GetMainWindow();
                 const float desiredPx = 2.0f;
                 const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPx;
 
@@ -1451,12 +1446,11 @@ namespace ECS {
 
         // Blit LDR to backbuffer
         m_renderGraph->AddPass("Composite", { "LDR" }, { "Backbuffer" },
-            [this](ResourceAccessor& res)
+            [this, &win](ResourceAccessor& res)
             {
                 auto* ldr = res.GetFramebuffer("LDR");
                 if (!ldr) return;
 
-                const auto& win = WindowManager::GetMainWindow();
                 Framebuffer::BindDefault();
                 glViewport(0, 0, win->GetWidth(), win->GetHeight());
 
@@ -1595,7 +1589,7 @@ namespace ECS {
                         float dragDistance = glm::length(dragDelta);
 
                         // Calculate drag threshold in world space (5 pixels)
-                        const auto& win = WindowManager::GetMainWindow();
+                        // const auto& win = WindowManager::GetMainWindow();
                         const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->GetHeight())) * 5.0f;
 
                         // Start dragging if moved beyond threshold

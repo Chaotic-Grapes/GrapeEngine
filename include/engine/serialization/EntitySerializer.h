@@ -434,6 +434,71 @@ namespace Serialization {
 			return e;
 		}
 
+		// Serialize entity with full hierarchy (includes all children recursively)
+		static json SerializeEntityHierarchy(const ECS::World& world, const ECS::Entity e) {
+			// Serialize the entity's components first
+			json entityJson = SerializeEntity(world, e);
+
+			// Find all children
+			std::vector<EntityId> children;
+			world.Each<ECS::Parent>([&](ECS::Entity child, const ECS::Parent& p) {
+				// Entity's parent is entity we're serializing, it's a child basically
+				if (p.ParentEntity.Index == e.Index) {
+					children.push_back(child.Index);
+				}
+				});
+
+			// Recursively serialize children
+			if (!children.empty()) {
+				// Make a JSON array for them
+				json childrenArray = json::array();
+				// For each one...
+				for (EntityId childId : children) {
+					// Call SerializeEntityHierarchy on it
+					ECS::Entity childEntity = world.Resolve(childId);
+					// Recursion = function calls itself
+					if (world.IsAlive(childEntity)) {
+						childrenArray.push_back(SerializeEntityHierarchy(world, childEntity));
+					}
+				}
+				// Add all serialized children to parent's JSON
+				entityJson["Children"] = childrenArray;
+			}
+
+			return entityJson;
+		}
+
+		// Deserialize entity with full hierarchy (includes all children recursively)
+		static ECS::Entity DeserializeEntityHierarchy(ECS::World& world, const json& entityJson, EntityId parentId = ECS::Entity::NPOS32) {
+			// Create this entity from JSON
+			ECS::Entity entity = DeserializeEntity(world, entityJson);
+
+			// Creation failed
+			if (entity.IsNull() || !world.IsAlive(entity)) {
+				return ECS::NULL_ENTITY;
+			}
+
+			// If this entity has a parent...
+			if (parentId != ECS::Entity::NPOS32) {
+				// Connect this entity to its parent in the hierarchy
+				ECS::Entity parent = world.Resolve(parentId);
+				if (!parent.IsNull() && world.IsAlive(parent)) {
+					world.Attach(entity, parent);
+				}
+			}
+
+			// If this entity has children in the JSON...
+			if (entityJson.contains("Children") && entityJson["Children"].is_array()) {
+				// Recursively call itself to create each child
+				// Pass THIS entity's ID as the parent
+				for (const auto& childJson : entityJson["Children"]) {
+					DeserializeEntityHierarchy(world, childJson, entity.Index);
+				}
+			}
+
+			return entity;
+		}
+
 		/**
 		 * @brief Save an entity as a prefab file (.prefab)
 		 * @param filename Path to write (must end with .prefab)
@@ -441,10 +506,13 @@ namespace Serialization {
 		 * @param e Entity to serialize
 		 * @return true on success
 		 */
+
+		/* 
 		static bool SavePrefab(const std::string& filename, const ECS::World& world, const ECS::Entity e) {
 			json j = SerializeEntity(world, e);
 			return Serializer::SaveJson(filename, "prefab", j);
 		}
+		*/
 
 		/**
 		 * @brief Load a prefab file and instantiate it into the provided world
@@ -453,6 +521,8 @@ namespace Serialization {
 		 * @param outEntity Optional out param to receive created entity
 		 * @return true on success
 		 */
+
+		/*
 		static bool LoadPrefab(const std::string& filename, ECS::World& world, ECS::Entity* outEntity = nullptr) {
 			json j;
 			if (!Serializer::LoadJson(filename, "prefab", j))
@@ -464,6 +534,7 @@ namespace Serialization {
 
 			return true;
 		}
+		*/
 	};
 
 	// --- Register all component serializers ---

@@ -337,7 +337,7 @@ namespace Engine {
         // ========================================================================
 
         for (int i = 0; i < manifold.pointCount; ++i) {
-            const Vector2D& contactPoint = manifold.points[i];
+            // const Vector2D& contactPoint = manifold.points[i];
 
             // Calculate relative velocity at this specific contact point
             // For now, we're not handling rotation, so velocity is same everywhere

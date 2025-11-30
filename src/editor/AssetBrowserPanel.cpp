@@ -709,7 +709,15 @@ void AssetBrowserPanel::_loadPrefab() {
                 file.close();       // Close file after reading
 
                 // Deserialize JSON into an entity in the current world
-                auto entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+                ECS::Entity entity;
+                if (entityJson.contains("Entity")) {
+                    // If JSON has Entity key (there's hierarchy)
+                    entity = Serialization::EntitySerializer::DeserializeEntityHierarchy(*m_world, entityJson["Entity"]);
+                }
+                // Load just 1 entity without children
+                else if (entityJson.contains("Components")) {
+                    entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
+                }
 
                 // Add PrefabLink component to store normalized path of prefab
                 std::filesystem::path p(m_selectedAsset);

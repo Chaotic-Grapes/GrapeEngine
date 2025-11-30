@@ -1,0 +1,98 @@
+{
+    "Components": [
+        {
+            "Data": {
+                "Position": {
+                    "X": 0.0,
+                    "Y": 7.104832649230957,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "W": 1.0,
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 0.0
+                },
+                "Scale": {
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                }
+            },
+            "TypeName": "LocalTransform"
+        },
+        {
+            "Data": {
+                "Value": "MS_Spawner"
+            },
+            "TypeName": "Name"
+        },
+        {
+            "Data": {
+                "Enabled": true
+            },
+            "TypeName": "Active"
+        },
+        {
+            "Data": {
+                "Id": 0
+            },
+            "TypeName": "Layer"
+        },
+        {
+            "Data": {
+                "Initialized": false,
+                "ManagedHandle": 0,
+                "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\ObjectPool\\MS_Spawner.cs",
+                "TypeHash": 0,
+                "TypeName": "Scripts.ObjectPool.MS_Spawner"
+            },
+            "TypeName": "ScriptInstance"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.0,
+                    "B": 0.0,
+                    "G": 0.0,
+                    "R": 1.0
+                },
+                "Filled": false,
+                "HalfExtents": {
+                    "X": 5.5,
+                    "Y": 0.5
+                },
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "Thickness": 0.10000000149011612
+            },
+            "TypeName": "ShapeBox2D"
+        },
+        {
+            "Data": {
+                "Dirty": false,
+                "Matrix": {
+                    "m00": 1.0,
+                    "m01": 0.0,
+                    "m02": 0.0,
+                    "m03": 0.0,
+                    "m10": 0.0,
+                    "m11": 1.0,
+                    "m12": 0.0,
+                    "m13": 7.104832649230957,
+                    "m20": 0.0,
+                    "m21": 0.0,
+                    "m22": 1.0,
+                    "m23": 0.0,
+                    "m30": 0.0,
+                    "m31": 0.0,
+                    "m32": 0.0,
+                    "m33": 1.0
+                }
+            },
+            "TypeName": "WorldTransform"
+        }
+    ]
+}

@@ -1,0 +1,772 @@
+{
+    "Entity": {
+        "Children": [
+            {
+                "Children": [
+                    {
+                        "Components": [
+                            {
+                                "Data": {
+                                    "Position": {
+                                        "X": 0.26820749044418335,
+                                        "Y": -0.05821672081947327,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "W": 1.0,
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.012177100405097008,
+                                        "Y": 0.012177100405097008,
+                                        "Z": 0.012177100405097008
+                                    }
+                                },
+                                "TypeName": "LocalTransform"
+                            },
+                            {
+                                "Data": {
+                                    "Value": "BGMSliderHandle"
+                                },
+                                "TypeName": "Name"
+                            },
+                            {
+                                "Data": {
+                                    "Enabled": true
+                                },
+                                "TypeName": "Active"
+                            },
+                            {
+                                "Data": {
+                                    "Id": 32
+                                },
+                                "TypeName": "Layer"
+                            },
+                            {
+                                "Data": {
+                                    "Color": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "Filled": true,
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "Radius": 0.5,
+                                    "Thickness": 1.0
+                                },
+                                "TypeName": "ShapeCircle2D"
+                            },
+                            {
+                                "Data": {
+                                    "Dirty": false,
+                                    "Matrix": {
+                                        "m00": 0.10597160458564758,
+                                        "m01": 0.0,
+                                        "m02": 0.0,
+                                        "m03": 2.3440098762512207,
+                                        "m10": 0.0,
+                                        "m11": 0.05455341190099716,
+                                        "m12": 0.0,
+                                        "m13": 2.041489601135254,
+                                        "m20": 0.0,
+                                        "m21": 0.0,
+                                        "m22": 0.05455341190099716,
+                                        "m23": 56.0,
+                                        "m30": 0.0,
+                                        "m31": 0.0,
+                                        "m32": 0.0,
+                                        "m33": 1.0
+                                    }
+                                },
+                                "TypeName": "WorldTransform"
+                            }
+                        ]
+                    },
+                    {
+                        "Components": [
+                            {
+                                "Data": {
+                                    "Position": {
+                                        "X": 0.26820749044418335,
+                                        "Y": -0.10216030478477478,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "W": 1.0,
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.012177100405097008,
+                                        "Y": 0.012177100405097008,
+                                        "Z": 0.012177100405097008
+                                    }
+                                },
+                                "TypeName": "LocalTransform"
+                            },
+                            {
+                                "Data": {
+                                    "Value": "SFXSliderHandle"
+                                },
+                                "TypeName": "Name"
+                            },
+                            {
+                                "Data": {
+                                    "Enabled": true
+                                },
+                                "TypeName": "Active"
+                            },
+                            {
+                                "Data": {
+                                    "Id": 32
+                                },
+                                "TypeName": "Layer"
+                            },
+                            {
+                                "Data": {
+                                    "Color": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "Filled": true,
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "Radius": 0.5,
+                                    "Thickness": 1.0
+                                },
+                                "TypeName": "ShapeCircle2D"
+                            },
+                            {
+                                "Data": {
+                                    "Dirty": false,
+                                    "Matrix": {
+                                        "m00": 0.10597160458564758,
+                                        "m01": 0.0,
+                                        "m02": 0.0,
+                                        "m03": 2.3440098762512207,
+                                        "m10": 0.0,
+                                        "m11": 0.05455341190099716,
+                                        "m12": 0.0,
+                                        "m13": 1.844622254371643,
+                                        "m20": 0.0,
+                                        "m21": 0.0,
+                                        "m22": 0.05455341190099716,
+                                        "m23": 56.0,
+                                        "m30": 0.0,
+                                        "m31": 0.0,
+                                        "m32": 0.0,
+                                        "m33": 1.0
+                                    }
+                                },
+                                "TypeName": "WorldTransform"
+                            }
+                        ]
+                    },
+                    {
+                        "Components": [
+                            {
+                                "Data": {
+                                    "Position": {
+                                        "X": -0.13457097113132477,
+                                        "Y": 0.3351171314716339,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "W": 1.0,
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.1913710981607437,
+                                        "Y": 0.10320112109184265,
+                                        "Z": 0.11726588755846024
+                                    }
+                                },
+                                "TypeName": "LocalTransform"
+                            },
+                            {
+                                "Data": {
+                                    "Value": "Resume"
+                                },
+                                "TypeName": "Name"
+                            },
+                            {
+                                "Data": {
+                                    "Enabled": true
+                                },
+                                "TypeName": "Active"
+                            },
+                            {
+                                "Data": {
+                                    "Flags": 0,
+                                    "HalfExtents": {
+                                        "X": 0.5,
+                                        "Y": 0.5
+                                    },
+                                    "LayerMask": 4294967295,
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "Rotation": 0.0
+                                },
+                                "TypeName": "BoxCollider2D"
+                            },
+                            {
+                                "Data": {
+                                    "Id": 31
+                                },
+                                "TypeName": "Layer"
+                            },
+                            {
+                                "Data": {
+                                    "Initialized": true,
+                                    "ManagedHandle": 2,
+                                    "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\UIClickableTest.cs",
+                                    "TypeHash": 0,
+                                    "TypeName": "Scripts.UIClickableTest"
+                                },
+                                "TypeName": "ScriptInstance"
+                            },
+                            {
+                                "Data": {
+                                    "Color": {
+                                        "A": 1.0,
+                                        "B": 0.9634692072868347,
+                                        "G": 0.7297950387001038,
+                                        "R": 0.0
+                                    },
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "TextureId": 4,
+                                    "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI Art\\Menu\\Resume.png",
+                                    "Tiling": {
+                                        "X": 1.0,
+                                        "Y": 1.0
+                                    }
+                                },
+                                "TypeName": "SpriteRenderer2D"
+                            },
+                            {
+                                "Data": {
+                                    "Dirty": false,
+                                    "Matrix": {
+                                        "m00": 1.6654130220413208,
+                                        "m01": 0.0,
+                                        "m02": 0.0,
+                                        "m03": -1.1611824035644531,
+                                        "m10": 0.0,
+                                        "m11": 0.4623410105705261,
+                                        "m12": 0.0,
+                                        "m13": 3.8036251068115234,
+                                        "m20": 0.0,
+                                        "m21": 0.0,
+                                        "m22": 0.5253511667251587,
+                                        "m23": 56.0,
+                                        "m30": 0.0,
+                                        "m31": 0.0,
+                                        "m32": 0.0,
+                                        "m33": 1.0
+                                    }
+                                },
+                                "TypeName": "WorldTransform"
+                            }
+                        ]
+                    },
+                    {
+                        "Components": [
+                            {
+                                "Data": {
+                                    "Position": {
+                                        "X": -0.13457097113132477,
+                                        "Y": 0.16854578256607056,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "W": 1.0,
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.1913710981607437,
+                                        "Y": 0.10320112109184265,
+                                        "Z": 0.11726588755846024
+                                    }
+                                },
+                                "TypeName": "LocalTransform"
+                            },
+                            {
+                                "Data": {
+                                    "Value": "Exit"
+                                },
+                                "TypeName": "Name"
+                            },
+                            {
+                                "Data": {
+                                    "Enabled": true
+                                },
+                                "TypeName": "Active"
+                            },
+                            {
+                                "Data": {
+                                    "Flags": 0,
+                                    "HalfExtents": {
+                                        "X": 0.5,
+                                        "Y": 0.5
+                                    },
+                                    "LayerMask": 4294967295,
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "Rotation": 0.0
+                                },
+                                "TypeName": "BoxCollider2D"
+                            },
+                            {
+                                "Data": {
+                                    "Id": 31
+                                },
+                                "TypeName": "Layer"
+                            },
+                            {
+                                "Data": {
+                                    "Initialized": true,
+                                    "ManagedHandle": 3,
+                                    "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\UIClickableTest.cs",
+                                    "TypeHash": 0,
+                                    "TypeName": "Scripts.UIClickableTest"
+                                },
+                                "TypeName": "ScriptInstance"
+                            },
+                            {
+                                "Data": {
+                                    "Color": {
+                                        "A": 1.0,
+                                        "B": 0.9634692072868347,
+                                        "G": 0.7297950387001038,
+                                        "R": 0.0
+                                    },
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "TextureId": 5,
+                                    "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI Art\\Menu\\Exit.png",
+                                    "Tiling": {
+                                        "X": 1.0,
+                                        "Y": 1.0
+                                    }
+                                },
+                                "TypeName": "SpriteRenderer2D"
+                            },
+                            {
+                                "Data": {
+                                    "Dirty": false,
+                                    "Matrix": {
+                                        "m00": 1.6654130220413208,
+                                        "m01": 0.0,
+                                        "m02": 0.0,
+                                        "m03": -1.1611824035644531,
+                                        "m10": 0.0,
+                                        "m11": 0.4623410105705261,
+                                        "m12": 0.0,
+                                        "m13": 3.0573854446411133,
+                                        "m20": 0.0,
+                                        "m21": 0.0,
+                                        "m22": 0.5253511667251587,
+                                        "m23": 56.0,
+                                        "m30": 0.0,
+                                        "m31": 0.0,
+                                        "m32": 0.0,
+                                        "m33": 1.0
+                                    }
+                                },
+                                "TypeName": "WorldTransform"
+                            }
+                        ]
+                    },
+                    {
+                        "Components": [
+                            {
+                                "Data": {
+                                    "Position": {
+                                        "X": 0.34723469614982605,
+                                        "Y": -0.05870997533202171,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "W": 1.0,
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.18491247296333313,
+                                        "Y": 0.024732641875743866,
+                                        "Z": 0.686538815498352
+                                    }
+                                },
+                                "TypeName": "LocalTransform"
+                            },
+                            {
+                                "Data": {
+                                    "Value": "BGMSlider"
+                                },
+                                "TypeName": "Name"
+                            },
+                            {
+                                "Data": {
+                                    "Enabled": true
+                                },
+                                "TypeName": "Active"
+                            },
+                            {
+                                "Data": {
+                                    "Id": 31
+                                },
+                                "TypeName": "Layer"
+                            },
+                            {
+                                "Data": {
+                                    "Color": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "TextureId": 6,
+                                    "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI Art\\Menu\\AudioSlider.png",
+                                    "Tiling": {
+                                        "X": 1.0,
+                                        "Y": 1.0
+                                    }
+                                },
+                                "TypeName": "SpriteRenderer2D"
+                            },
+                            {
+                                "Data": {
+                                    "Dirty": false,
+                                    "Matrix": {
+                                        "m00": 1.6092066764831543,
+                                        "m01": 0.0,
+                                        "m02": 0.0,
+                                        "m03": 3.0317466259002686,
+                                        "m10": 0.0,
+                                        "m11": 0.11080223321914673,
+                                        "m12": 0.0,
+                                        "m13": 2.0392796993255615,
+                                        "m20": 0.0,
+                                        "m21": 0.0,
+                                        "m22": 3.0756938457489014,
+                                        "m23": 56.0,
+                                        "m30": 0.0,
+                                        "m31": 0.0,
+                                        "m32": 0.0,
+                                        "m33": 1.0
+                                    }
+                                },
+                                "TypeName": "WorldTransform"
+                            }
+                        ]
+                    },
+                    {
+                        "Components": [
+                            {
+                                "Data": {
+                                    "Position": {
+                                        "X": 0.34723469614982605,
+                                        "Y": -0.10188440978527069,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "W": 1.0,
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.18491247296333313,
+                                        "Y": 0.024732641875743866,
+                                        "Z": 0.686538815498352
+                                    }
+                                },
+                                "TypeName": "LocalTransform"
+                            },
+                            {
+                                "Data": {
+                                    "Value": "SFXSlider"
+                                },
+                                "TypeName": "Name"
+                            },
+                            {
+                                "Data": {
+                                    "Enabled": true
+                                },
+                                "TypeName": "Active"
+                            },
+                            {
+                                "Data": {
+                                    "Id": 31
+                                },
+                                "TypeName": "Layer"
+                            },
+                            {
+                                "Data": {
+                                    "Color": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "TextureId": 6,
+                                    "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI Art\\Menu\\AudioSlider.png",
+                                    "Tiling": {
+                                        "X": 1.0,
+                                        "Y": 1.0
+                                    }
+                                },
+                                "TypeName": "SpriteRenderer2D"
+                            },
+                            {
+                                "Data": {
+                                    "Dirty": false,
+                                    "Matrix": {
+                                        "m00": 1.6092066764831543,
+                                        "m01": 0.0,
+                                        "m02": 0.0,
+                                        "m03": 3.0317466259002686,
+                                        "m10": 0.0,
+                                        "m11": 0.11080223321914673,
+                                        "m12": 0.0,
+                                        "m13": 1.8458583354949951,
+                                        "m20": 0.0,
+                                        "m21": 0.0,
+                                        "m22": 3.0756938457489014,
+                                        "m23": 56.0,
+                                        "m30": 0.0,
+                                        "m31": 0.0,
+                                        "m32": 0.0,
+                                        "m33": 1.0
+                                    }
+                                },
+                                "TypeName": "WorldTransform"
+                            }
+                        ]
+                    }
+                ],
+                "Components": [
+                    {
+                        "Data": {
+                            "Position": {
+                                "X": 0.009925752878189087,
+                                "Y": -0.006059736013412476,
+                                "Z": 0.0
+                            },
+                            "Rotation": {
+                                "W": 1.0,
+                                "X": 0.0,
+                                "Y": 0.0,
+                                "Z": 0.0
+                            },
+                            "Scale": {
+                                "X": 8.702531814575195,
+                                "Y": 4.480000019073486,
+                                "Z": 4.480000019073486
+                            }
+                        },
+                        "TypeName": "LocalTransform"
+                    },
+                    {
+                        "Data": {
+                            "Value": "Menu UI"
+                        },
+                        "TypeName": "Name"
+                    },
+                    {
+                        "Data": {
+                            "Enabled": true
+                        },
+                        "TypeName": "Active"
+                    },
+                    {
+                        "Data": {
+                            "Id": 30
+                        },
+                        "TypeName": "Layer"
+                    },
+                    {
+                        "Data": {
+                            "Color": {
+                                "A": 1.0,
+                                "B": 1.0,
+                                "G": 1.0,
+                                "R": 1.0
+                            },
+                            "Offset": {
+                                "X": 0.0,
+                                "Y": 0.0
+                            },
+                            "TextureId": 3,
+                            "TexturePath": "EchoesBelow\\Assets\\Sprites\\UI Art\\Menu\\MenuBG.png",
+                            "Tiling": {
+                                "X": 1.0,
+                                "Y": 1.0
+                            }
+                        },
+                        "TypeName": "SpriteRenderer2D"
+                    },
+                    {
+                        "Data": {
+                            "Dirty": false,
+                            "Matrix": {
+                                "m00": 8.702531814575195,
+                                "m01": 0.0,
+                                "m02": 0.0,
+                                "m03": 0.009925693273544312,
+                                "m10": 0.0,
+                                "m11": 4.480000019073486,
+                                "m12": 0.0,
+                                "m13": 2.302300453186035,
+                                "m20": 0.0,
+                                "m21": 0.0,
+                                "m22": 4.480000019073486,
+                                "m23": 56.0,
+                                "m30": 0.0,
+                                "m31": 0.0,
+                                "m32": 0.0,
+                                "m33": 1.0
+                            }
+                        },
+                        "TypeName": "WorldTransform"
+                    }
+                ]
+            }
+        ],
+        "Components": [
+            {
+                "Data": {
+                    "Position": {
+                        "X": -5.960464477539063e-08,
+                        "Y": 2.3083600997924805,
+                        "Z": 56.0
+                    },
+                    "Rotation": {
+                        "W": 1.0,
+                        "X": 0.0,
+                        "Y": 0.0,
+                        "Z": 0.0
+                    },
+                    "Scale": {
+                        "X": 1.0,
+                        "Y": 1.0,
+                        "Z": 1.0
+                    }
+                },
+                "TypeName": "LocalTransform"
+            },
+            {
+                "Data": {
+                    "Value": "UI"
+                },
+                "TypeName": "Name"
+            },
+            {
+                "Data": {
+                    "Enabled": true
+                },
+                "TypeName": "Active"
+            },
+            {
+                "Data": {
+                    "Id": 30
+                },
+                "TypeName": "Layer"
+            },
+            {
+                "Data": {
+                    "Initialized": true,
+                    "ManagedHandle": 5,
+                    "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\FollowLeader.cs",
+                    "TypeHash": 0,
+                    "TypeName": "Scripts.FollowLeader"
+                },
+                "TypeName": "ScriptInstance"
+            },
+            {
+                "Data": {
+                    "Color": {
+                        "A": 1.0,
+                        "B": 0.0,
+                        "G": 0.0,
+                        "R": 1.0
+                    },
+                    "Filled": false,
+                    "HalfExtents": {
+                        "X": 4.5,
+                        "Y": 2.53125
+                    },
+                    "Offset": {
+                        "X": 0.0,
+                        "Y": 0.0
+                    },
+                    "Thickness": 0.05000000074505806
+                },
+                "TypeName": "ShapeBox2D"
+            },
+            {
+                "Data": {
+                    "Mask": 2
+                },
+                "TypeName": "TagMask"
+            },
+            {
+                "Data": {
+                    "Dirty": false,
+                    "Matrix": {
+                        "m00": 1.0,
+                        "m01": 0.0,
+                        "m02": 0.0,
+                        "m03": -5.960464477539063e-08,
+                        "m10": 0.0,
+                        "m11": 1.0,
+                        "m12": 0.0,
+                        "m13": 2.3083600997924805,
+                        "m20": 0.0,
+                        "m21": 0.0,
+                        "m22": 1.0,
+                        "m23": 56.0,
+                        "m30": 0.0,
+                        "m31": 0.0,
+                        "m32": 0.0,
+                        "m33": 1.0
+                    }
+                },
+                "TypeName": "WorldTransform"
+            }
+        ]
+    }
+}

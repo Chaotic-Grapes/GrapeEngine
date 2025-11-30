@@ -116,6 +116,12 @@ bool Window::Create(const std::string& title, const int width, const int height,
 		Messaging::MessageSystem::Broadcast(Messaging::WindowResized{ fbw, fbh });
 		});
 
+	// Window focus callback - broadcast focus changes for audio muting, etc.
+	glfwSetWindowFocusCallback(m_windowHandle, [](GLFWwindow* w, int focused) {
+		(void)w;
+		Messaging::MessageSystem::Broadcast(Messaging::WindowFocusChanged{ focused != 0 });
+		});
+
 	SetMode(mode, monitor);
 
 	return true;

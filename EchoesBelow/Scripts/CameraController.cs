@@ -13,8 +13,13 @@ public class CameraController : ScriptBehaviour
 
     //static public fields
     public static Vector3 cameraPos;
+    public static ulong cameraObjId;
 
     private Entity? _targetEntity;
+    public override void OnStart()
+    {
+        cameraObjId = this.Entity.EntityId;
+    }
     public override void OnUpdate()
     {
         // Called every frame

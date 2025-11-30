@@ -31,6 +31,8 @@
 #include "audio/FmodAudioDevice.h"
 #include "services/AudioService.h"
 #include "core/Logger.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 
 Audio::FmodAudioDevice* gAudioDevice = nullptr;
 
@@ -58,6 +60,25 @@ namespace Services {
 
         // FMOD system + master group are ready for use.
         Trace("Audio initialized: FMOD");
+
+        // Subscribe to window focus changes to mute/unmute audio
+        m_focusHandle = Messaging::MessageSystem::Subscribe<Messaging::WindowFocusChanged>(
+            [this](const Messaging::WindowFocusChanged& event) {
+                if (!m_device) return;
+
+                if (event.HasFocus) {
+                    // Window gained focus - restore previous volume
+                    m_device->SetMasterVolume(m_volumeBeforeFocusLoss);
+                    LOG_DEBUG("Window focused - audio volume restored to " << m_volumeBeforeFocusLoss);
+                }
+                else {
+                    // Window lost focus - save current volume and mute
+                    m_volumeBeforeFocusLoss = m_device->GetMasterVolume();
+                    m_device->SetMasterVolume(0.0f);
+                    LOG_DEBUG("Window unfocused - audio muted (previous volume: " << m_volumeBeforeFocusLoss << ")");
+                }
+            }
+        );
     }
 
     /**
@@ -83,6 +104,11 @@ namespace Services {
      * - Logs a short termination message.
      */
     void AudioService::Terminate() {
+        // Unsubscribe from window focus events
+        if (m_focusHandle.IsValid()) {
+            Messaging::MessageSystem::Unsubscribe<Messaging::WindowFocusChanged>(m_focusHandle);
+        }
+
         gAudioDevice = nullptr;
         if (m_device) {
             m_device->Shutdown();

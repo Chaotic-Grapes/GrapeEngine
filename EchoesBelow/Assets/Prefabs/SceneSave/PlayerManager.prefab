@@ -1,0 +1,404 @@
+{
+    "Entity": {
+        "Children": [
+            {
+                "Children": [
+                    {
+                        "Components": [
+                            {
+                                "Data": {
+                                    "Position": {
+                                        "X": 0.0,
+                                        "Y": 2.3283064365386963e-10,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "W": 1.0,
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "TypeName": "LocalTransform"
+                            },
+                            {
+                                "Data": {
+                                    "Value": "GrainSprite"
+                                },
+                                "TypeName": "Name"
+                            },
+                            {
+                                "Data": {
+                                    "Id": 20
+                                },
+                                "TypeName": "Layer"
+                            },
+                            {
+                                "Data": {
+                                    "Color": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "Offset": {
+                                        "X": 0.0,
+                                        "Y": 0.0
+                                    },
+                                    "TextureId": 5,
+                                    "TexturePath": "EchoesBelow\\Assets\\Sprites\\Idle_000.png",
+                                    "Tiling": {
+                                        "X": 1.0,
+                                        "Y": 1.0
+                                    }
+                                },
+                                "TypeName": "SpriteRenderer2D"
+                            },
+                            {
+                                "Data": {
+                                    "Dirty": false,
+                                    "Matrix": {
+                                        "m00": -0.2894718647003174,
+                                        "m01": -0.9571864604949951,
+                                        "m02": 0.0,
+                                        "m03": -2.2286233969381897e-10,
+                                        "m10": 0.9571864604949951,
+                                        "m11": -0.2894718647003174,
+                                        "m12": 0.0,
+                                        "m13": -6.739792057786076e-11,
+                                        "m20": 0.0,
+                                        "m21": 0.0,
+                                        "m22": 1.0,
+                                        "m23": 0.0,
+                                        "m30": 0.0,
+                                        "m31": 0.0,
+                                        "m32": 0.0,
+                                        "m33": 1.0
+                                    }
+                                },
+                                "TypeName": "WorldTransform"
+                            }
+                        ]
+                    }
+                ],
+                "Components": [
+                    {
+                        "Data": {
+                            "Position": {
+                                "X": 0.0,
+                                "Y": 0.0,
+                                "Z": 0.0
+                            },
+                            "Rotation": {
+                                "W": -0.5962154269218445,
+                                "X": 0.0,
+                                "Y": 0.0,
+                                "Z": -0.8031903505325317
+                            },
+                            "Scale": {
+                                "X": 1.0,
+                                "Y": 1.0,
+                                "Z": 1.0
+                            }
+                        },
+                        "TypeName": "LocalTransform"
+                    },
+                    {
+                        "Data": {
+                            "Value": "Player"
+                        },
+                        "TypeName": "Name"
+                    },
+                    {
+                        "Data": {
+                            "Enabled": true
+                        },
+                        "TypeName": "Active"
+                    },
+                    {
+                        "Data": {
+                            "Value": 1.821688003622262e-43
+                        },
+                        "TypeName": "AngularVelocity2D"
+                    },
+                    {
+                        "Data": {
+                            "CueId": 1670846282,
+                            "Loop": true,
+                            "Pitch": 1.0,
+                            "PlayOnStart": true,
+                            "Spatial3D": false,
+                            "Volume": 1.0
+                        },
+                        "TypeName": "AudioSource"
+                    },
+                    {
+                        "Data": {
+                            "Flags": 0,
+                            "HalfExtents": {
+                                "X": 0.27000001072883606,
+                                "Y": 0.47999998927116394
+                            },
+                            "LayerMask": 4294967295,
+                            "Offset": {
+                                "X": 0.0,
+                                "Y": 0.05000000074505806
+                            },
+                            "Rotation": 0.0
+                        },
+                        "TypeName": "BoxCollider2D"
+                    },
+                    {
+                        "Data": {
+                            "Id": 2
+                        },
+                        "TypeName": "Layer"
+                    },
+                    {
+                        "Data": {
+                            "Value": {
+                                "X": -9.528829557408756e-44,
+                                "Y": -9.528829557408756e-44
+                            }
+                        },
+                        "TypeName": "LinearVelocity2D"
+                    },
+                    {
+                        "Data": {
+                            "AngularDamping": 0.699999988079071,
+                            "Flags": 2,
+                            "GravityScale": 0.0,
+                            "InverseMass": 0.0,
+                            "LinearDamping": 1.0,
+                            "Mass": 1.0
+                        },
+                        "TypeName": "Rigidbody2D"
+                    },
+                    {
+                        "Data": {
+                            "Initialized": false,
+                            "ManagedHandle": 0,
+                            "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\Player.cs",
+                            "TypeHash": 0,
+                            "TypeName": "Scripts.Player"
+                        },
+                        "TypeName": "ScriptInstance"
+                    },
+                    {
+                        "Data": {
+                            "Color": {
+                                "A": 1.0,
+                                "B": 0.19839359819889069,
+                                "G": 0.8718132376670837,
+                                "R": 0.0
+                            },
+                            "Filled": false,
+                            "HalfExtents": {
+                                "X": 0.27000001072883606,
+                                "Y": 0.47999998927116394
+                            },
+                            "Offset": {
+                                "X": 0.0,
+                                "Y": 0.05000000074505806
+                            },
+                            "Thickness": 0.009999999776482582
+                        },
+                        "TypeName": "ShapeBox2D"
+                    },
+                    {
+                        "Data": {
+                            "Dirty": false,
+                            "Matrix": {
+                                "m00": -0.2894718647003174,
+                                "m01": -0.9571864604949951,
+                                "m02": 0.0,
+                                "m03": 0.0,
+                                "m10": 0.9571864604949951,
+                                "m11": -0.2894718647003174,
+                                "m12": 0.0,
+                                "m13": 0.0,
+                                "m20": 0.0,
+                                "m21": 0.0,
+                                "m22": 1.0,
+                                "m23": 0.0,
+                                "m30": 0.0,
+                                "m31": 0.0,
+                                "m32": 0.0,
+                                "m33": 1.0
+                            }
+                        },
+                        "TypeName": "WorldTransform"
+                    }
+                ]
+            },
+            {
+                "Components": [
+                    {
+                        "Data": {
+                            "Position": {
+                                "X": 0.0,
+                                "Y": 0.0,
+                                "Z": 56.0
+                            },
+                            "Rotation": {
+                                "W": 1.0,
+                                "X": 0.0,
+                                "Y": 0.0,
+                                "Z": 0.0
+                            },
+                            "Scale": {
+                                "X": 14.0,
+                                "Y": 8.539999961853027,
+                                "Z": 1.0
+                            }
+                        },
+                        "TypeName": "LocalTransform"
+                    },
+                    {
+                        "Data": {
+                            "Value": "BG"
+                        },
+                        "TypeName": "Name"
+                    },
+                    {
+                        "Data": {
+                            "Enabled": true
+                        },
+                        "TypeName": "Active"
+                    },
+                    {
+                        "Data": {
+                            "Id": 0
+                        },
+                        "TypeName": "Layer"
+                    },
+                    {
+                        "Data": {
+                            "Initialized": false,
+                            "ManagedHandle": 0,
+                            "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\FollowLeader.cs",
+                            "TypeHash": 0,
+                            "TypeName": "Scripts.FollowLeader"
+                        },
+                        "TypeName": "ScriptInstance"
+                    },
+                    {
+                        "Data": {
+                            "Color": {
+                                "A": 1.0,
+                                "B": 1.0,
+                                "G": 1.0,
+                                "R": 1.0
+                            },
+                            "Offset": {
+                                "X": 0.0,
+                                "Y": 0.0
+                            },
+                            "TextureId": 6,
+                            "TexturePath": "EchoesBelow\\Assets\\Sprites\\Player Essentials\\OceanBG_00@4x.png",
+                            "Tiling": {
+                                "X": 1.0,
+                                "Y": 1.0
+                            }
+                        },
+                        "TypeName": "SpriteRenderer2D"
+                    },
+                    {
+                        "Data": {
+                            "Mask": 2
+                        },
+                        "TypeName": "TagMask"
+                    },
+                    {
+                        "Data": {
+                            "Dirty": false,
+                            "Matrix": {
+                                "m00": 14.0,
+                                "m01": 0.0,
+                                "m02": 0.0,
+                                "m03": 0.0,
+                                "m10": 0.0,
+                                "m11": 8.539999961853027,
+                                "m12": 0.0,
+                                "m13": 0.0,
+                                "m20": 0.0,
+                                "m21": 0.0,
+                                "m22": 1.0,
+                                "m23": 56.0,
+                                "m30": 0.0,
+                                "m31": 0.0,
+                                "m32": 0.0,
+                                "m33": 1.0
+                            }
+                        },
+                        "TypeName": "WorldTransform"
+                    }
+                ]
+            }
+        ],
+        "Components": [
+            {
+                "Data": {
+                    "Position": {
+                        "X": 0.0,
+                        "Y": 0.0,
+                        "Z": 0.0
+                    },
+                    "Rotation": {
+                        "W": 1.0,
+                        "X": 0.0,
+                        "Y": 0.0,
+                        "Z": 0.0
+                    },
+                    "Scale": {
+                        "X": 1.0,
+                        "Y": 1.0,
+                        "Z": 1.0
+                    }
+                },
+                "TypeName": "LocalTransform"
+            },
+            {
+                "Data": {
+                    "Value": "PlayerManager"
+                },
+                "TypeName": "Name"
+            },
+            {
+                "Data": {
+                    "Id": 0
+                },
+                "TypeName": "Layer"
+            },
+            {
+                "Data": {
+                    "Dirty": false,
+                    "Matrix": {
+                        "m00": 1.0,
+                        "m01": 0.0,
+                        "m02": 0.0,
+                        "m03": 0.0,
+                        "m10": 0.0,
+                        "m11": 1.0,
+                        "m12": 0.0,
+                        "m13": 0.0,
+                        "m20": 0.0,
+                        "m21": 0.0,
+                        "m22": 1.0,
+                        "m23": 0.0,
+                        "m30": 0.0,
+                        "m31": 0.0,
+                        "m32": 0.0,
+                        "m33": 1.0
+                    }
+                },
+                "TypeName": "WorldTransform"
+            }
+        ]
+    }
+}

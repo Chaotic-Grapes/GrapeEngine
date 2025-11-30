@@ -23,7 +23,7 @@ PREREQUISITES
    - Required for scripting
 
 ================================================================================
-STEP 1: INSTALL CMAKE
+STEP 1: INSTALL CMAKE (Build System)
 ================================================================================
 
 CMAKE is required to generate the Visual Studio solution files.
@@ -55,6 +55,10 @@ Open Command Prompt or PowerShell and run:
     cmake --version
 
 You should see output like: cmake version 3.XX.X
+
+PREMAKE (N.A.)
+-------------------------------
+This project uses CMake and does not provide Premake files. You do not need Premake.
 
 ================================================================================
 STEP 2: CLONE THE REPOSITORY
@@ -212,6 +216,18 @@ To switch between configurations in Visual Studio:
 - Use the dropdown in the toolbar to select "Debug" or "Release"
 - Rebuild the solution after changing configurations
 
+TARGETS (Editor vs Standalone Game)
+-----------------------------------
+
+The project produces two targets:
+- Editor: interactive level editor, built into `build\Debug` / `build\Release`
+- Standalone Game: gameplay-only executable, built via scripts into `build_game\Debug` / `build_game\Release`
+
+How to select targets:
+- Use 'script_build_editor.bat' / 'script_run_editor.bat' for the Editor
+- Use 'script_build_game.bat' / 'script_run_game.bat' for the Standalone Game
+- In Visual Studio, open the solution in 'build\' and run the Editor; game builds are produced by scripts
+
 APPLICATION CONFIGURATION (config.json)
 ---------------------------------------
 
@@ -250,24 +266,20 @@ warnings:
 The config.json file should remain in the project root and does NOT need to be 
 copied to build directories.
 
-IMGUI DEBUG INTERFACE
----------------------
+LEVEL EDITOR MODES
+------------------
 
-The GrapeEngine includes a comprehensive ImGui-based debug interface with 
-multiple windows:
+Real-time Editor (recommended):
+- Run the Editor target using 'script_run_editor.bat' or from Visual Studio
+- Use the playback toolbar (Play/Pause/Stop) to control simulation
 
-Available Debug Windows:
-1. GrapeEngine Debug Console - Main debug interface
-2. Performance Monitor - FPS and frame timing information
-3. Input Debug - Real-time input state monitoring
-4. Game Object Editor - Edit game object properties
+Turn Editor Off (gameplay-only):
+- Run the Standalone Game target using 'script_run_game.bat' (no editor overlay)
+- Alternatively, close the editor and run the game exe from 'build_game\Debug\' or 'build_game\Release\'
 
-Controls:
-- F1: Toggle debug UI on/off
-- W, A, S, D: Movement keys (monitored in Input Debug)
-- SPACE: Action key (press count tracked)
-- P: Pause/unpause functionality
-- G, J, K, R: Additional test keys for engine features
+Offline Editing:
+- Use the Editor to edit scenes/prefabs without pressing Play; save changes to JSON
+- Scenes/prefabs are deserialized at runtime, so no recompilation is needed
 
 TROUBLESHOOTING CONFIGURATION ISSUES
 ------------------------------------
@@ -277,15 +289,27 @@ Config File Not Found:
 - Copy config.json from project root to build/Debug/ or build/Release/
 - Check that the JSON syntax is valid
 
-ImGui Not Showing:
-- Press F1 to toggle the debug interface
-- Ensure the application window has focus
-- Check that ImGui is properly initialized (no console errors)
-
 Build Configuration Issues:
 - Verify the correct configuration (Debug/Release) is selected
 - Clean and rebuild the solution if switching configurations
 - Check that all dependencies are properly linked
+
+REGENERATE VISUAL STUDIO 2022 SOLUTION
+--------------------------------------
+
+Quick scripts (recommended):
+- Editor: 'script_build_editor.bat' (creates/refreshes 'build\' and generates the solution)
+- Game: 'script_build_game.bat' (creates/refreshes 'build_game\' and generates the game build)
+
+Manual CMake:
+- Regenerate Editor solution:
+  1) 'mkdir build'
+  2) 'cd build'
+  3) 'cmake .. -G "Visual Studio 17 2022" -A x64'
+
+Notes:
+- Use 'cmake --version' to verify CMake is installed
+- If generator errors occur, ensure Visual Studio 2022 and C++ workload are installed
 
 ================================================================================
 SUPPORT
