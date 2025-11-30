@@ -1,3 +1,17 @@
+/**
+ * @Name: Dalton Koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file CollisionEvents.h
+ * @brief Collision event system interface for physics-to-script communication.
+ *
+ * @details
+ * Defines the collision event data structures and management interface used to
+ * communicate collision state changes from the physics system to gameplay scripts.
+ * Provides three collision event types (Enter, Stay, Exit) representing the full
+ * lifecycle of entity interactions, and a static event queue for efficient per-entity
+ * collision lookup.
+ */
+
 #ifndef COLLISION_EVENTS_H
 #define COLLISION_EVENTS_H
 

@@ -1,3 +1,16 @@
+/**
+ * @Name: Dalton Koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file AudioAssetLibrary.h
+ * @brief Singleton asset indexing system for audio file discovery and CueId management.
+ *
+ * @details
+ * Provides a centralized audio asset management system that recursively scans the
+ * assets/Audio directory to discover all supported audio files (.wav, .ogg, .mp3, .flac),
+ * automatically generates stable hash-based CueIds from normalized file paths, and
+ * maintains efficient lookup maps for path-to-CueId and CueId-to-path resolution.
+ */
+
 #pragma once
 #include <string>
 #include <vector>

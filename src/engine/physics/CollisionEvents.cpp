@@ -1,3 +1,16 @@
+/**
+ * @Name: Dalton Koh, 2403250
+ * @email: d.koh@digipen.edu
+ * @file CollisionEvents.cpp
+ * @brief Implementation of the collision event queue management system.
+ *
+ * @details
+ * Implements the static methods for the CollisionEventQueue class, managing
+ * global collision event storage through an entity-indexed hash map. The queue
+ * serves as the bridge between the physics system (which generates collision
+ * events each frame) and gameplay scripts (which query events to implement
+ * custom collision responses).
+ */
 #include "../engine/physics/CollisionEvents.h"
 
 namespace ECS {
