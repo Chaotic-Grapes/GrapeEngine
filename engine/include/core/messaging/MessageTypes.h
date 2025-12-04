@@ -16,6 +16,9 @@ communication between systems (window, input, gameplay, audio, debug, etc.).
 #include <string>
 #include <functional>
 
+// Forward declarations for math types
+class Vector3D;
+class Quaternion;
 
 namespace Messaging {
     // -------------------------------
@@ -270,6 +273,38 @@ namespace Messaging {
         
         ViewportResized(float w, float h)
             : Width(w), Height(h), AspectRatio(w / h) {
+        }
+    };
+
+    // -------------------------------
+    // Editor Integration Events
+    // -------------------------------
+
+    // Sent when an entity's transform is modified (for undo system)
+    struct EntityTransformChanged {
+        uint32_t EntityId;
+        Vector3D OldPosition;
+        Quaternion OldRotation;
+        Vector3D OldScale;
+        Vector3D NewPosition;
+        Quaternion NewRotation;
+        Vector3D NewScale;
+
+        EntityTransformChanged(uint32_t id, 
+                             const Vector3D& oldPos, const Quaternion& oldRot, const Vector3D& oldScale,
+                             const Vector3D& newPos, const Quaternion& newRot, const Vector3D& newScale)
+            : EntityId(id), 
+              OldPosition(oldPos), OldRotation(oldRot), OldScale(oldScale),
+              NewPosition(newPos), NewRotation(newRot), NewScale(newScale) {
+        }
+    };
+
+    // Sent when scene data is modified (for marking scene dirty)
+    struct SceneModified {
+        std::string Reason; // Optional description of what changed
+        
+        SceneModified(const std::string& reason = "")
+            : Reason(reason) {
         }
     };
 }

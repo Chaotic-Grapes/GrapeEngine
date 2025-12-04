@@ -58,13 +58,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Time.h"
 
 // ============================================================================
-// Editor (Undo)
-// ============================================================================
-#ifdef USE_IMGUI
-#include "UndoSystem.h"
-#endif
-
-// ============================================================================
 // Helpers
 // ============================================================================
 #include "helpers/TransformUtils.h"
@@ -80,13 +73,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Third-Party Libraries
 // ============================================================================
 #include <glm/gtc/matrix_transform.hpp>
-
-// NOTE: ImGui / ImGuizmo are editor-only. The engine must not depend on
-// editor UI libraries. Provide an engine-side no-op for editor helpers so
-// the engine library has no editor linkage.
-namespace {
-    inline void MarkSceneDirtyIfNeeded(void* /*fileMenu*/) { }
-}
 
 namespace ECS {
     static constexpr uint32_t INVALID_ENTITY_ID = Entity::NPOS32;
@@ -187,17 +173,6 @@ namespace ECS {
         // Renderer
         m_renderer = std::make_unique<Renderer>(15000);
 
-        // --- Editor Camera ---
-        m_editorCamera = std::make_unique<Engine::EditorCamera>(world);
-
-        // In standalone game mode, default to using scene camera instead of editor camera
-        if (!Engine::CORE->IsInEditorMode()) {
-            m_useEditorCamera = false;
-            if (m_editorCamera) {
-                m_editorCamera->GetCameraComponent()->Active = false;
-            }
-        }
-
         // RenderGraph now owns all framebuffers (no more m_fbos!)
         m_renderGraph = std::make_unique<RenderGraph>();
 
@@ -254,22 +229,9 @@ namespace ECS {
     }
 
     void RendererSystem::BindWorld(World& world) {
-        // Maintain a single EditorCamera instance; rebind to the new world instead of recreating
-        if (!m_editorCamera) {
-            m_editorCamera = std::make_unique<Engine::EditorCamera>(world);
-        }
-        else {
-            m_editorCamera->BindWorld(world);
-        }
-
-        if (m_editorCamera && m_editorCamera->GetCameraComponent()) {
-            // Keep editor camera usage consistent across scenes
-            m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
-            m_cameraOrthoSize = m_editorCamera->GetCameraComponent()->OrthoSize;
-        }
+        (void)world; // Currently unused
 
         // Reset interaction state when rebinding worlds
-        // ALERT
         m_selectedEntityID = INVALID_ENTITY_ID;
         m_isDragging = false;
     }
@@ -337,56 +299,17 @@ namespace ECS {
         m_cameraOrthoSize = kReferenceOrthoSize; // default fallback (world-space 1080p)
 
         // ============================================================
-        // 1. Toggle or cycle camera (Editor-only)
+        // 1. Use provided camera, or find active ECS camera
         // ============================================================
-        if (Engine::CORE && Engine::CORE->IsInEditorMode() && Input::IsKeyPressed(KEY_C)) {
-            // Count available cameras
-            bool hasSceneCamera = false;
-
-            world.Each<ECS::Components::Camera3D>([&](ECS::Entity e, ECS::Components::Camera3D& cam) {
-                (void)cam;
-                // Exclude editor camera entity from count
-                if (m_editorCamera && e != m_editorCamera->GetEntity()) {
-                    hasSceneCamera = true;
-                }
-                });
-
-            // Determine what to do based on camera availability
-            if (!hasSceneCamera && !m_useEditorCamera) {
-                // We're on scene camera but there isn't one - shouldn't happen, but stay safe
-                LOG_DEBUG("[RendererSystem] Warning: No scene camera exists, switching to editor camera");
-                m_useEditorCamera = true;
-            }
-            else if (hasSceneCamera) {
-                // Normal toggle; we have a scene camera to toggle to/from
-                m_useEditorCamera = !m_useEditorCamera;
-                LOG_DEBUG("[RendererSystem] "
-                    << (m_useEditorCamera ? "Using Editor Camera" : "Using Scene Camera"));
-            }
-            else {
-                // We're on editor camera and there's no scene camera so don't toggle
-                LOG_DEBUG("[RendererSystem] No scene camera available - staying on editor camera");
-            }
-
-            if (m_editorCamera) {
-                m_editorCamera->GetCameraComponent()->Active = m_useEditorCamera;
-            }
-        }
-
-        // ============================================================
-        // 2. Use EditorCamera if active, otherwise ECS camera
-        // ============================================================
-        // If force scene camera is enabled (for game window), skip editor camera entirely
-        if (m_useEditorCamera && m_editorCamera && !m_forceSceneCamera) {
-            // Respect editor UI hover: only process input when viewport is hovered
-            m_editorCamera->SetAllowInput(m_editorInputEnabled);
-            m_editorCamera->Update(Time::DeltaTime());
-            view = m_editorCamera->GetViewMatrix();
-            projection = m_editorCamera->GetProjectionMatrix();
+        // If external camera is set (e.g., editor camera), use it
+        if (m_activeCamera && !m_forceSceneCamera) {
+            view = m_activeCamera->GetViewMatrix();
+            projection = m_activeCamera->GetProjectionMatrix();
             foundActive = true;
-            m_cameraOrthoSize = m_editorCamera->GetCameraComponent()->OrthoSize;
+            m_cameraOrthoSize = m_activeCamera->OrthoSize;
         }
         else {
+            // Use ECS camera
             world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
                 [&](ECS::Entity /*e*/,
                     const ECS::Components::LocalTransform& transform,
@@ -1534,24 +1457,25 @@ namespace ECS {
                     if (m_isDragging && !isMouseDownThisFrame) {
                         LOG_DEBUG("[DRAG] Drag ended");
 
-#ifdef USE_IMGUI
-                        // Record the transform change for undo
-                        if (m_undoSystem) {
-                            world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
-                                if (e.Index == m_selectedEntityID) {
-                                    // Create undo command with old and new transforms
-                                    Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
-                                    Vector3D newPos = lt.Position;
+                        // Notify editor of transform change via message system
+                        world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+                            if (e.Index == m_selectedEntityID) {
+                                // Create undo command with old and new transforms
+                                Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
+                                Vector3D newPos = lt.Position;
 
-                                    // Only record if position actually changed
-                                    if (oldPos != newPos) {
-                                        m_undoSystem->RecordTransformChange(e.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale, newPos, lt.Rotation, lt.Scale);
-                                        LOG_DEBUG("[UNDO] Recorded transform change");
-                                    }
+                                // Only notify if position actually changed
+                                if (oldPos != newPos) {
+                                    Messaging::MessageSystem::Notify(
+                                        Messaging::EntityTransformChanged(
+                                            e.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale,
+                                            newPos, lt.Rotation, lt.Scale
+                                        )
+                                    );
+                                    LOG_DEBUG("[UNDO] Notified transform change");
                                 }
-                                });
-                        }
-#endif
+                            }
+                            });
                         m_isDragging = false;
                     }
 
@@ -1584,8 +1508,8 @@ namespace ECS {
                     m_selectedEntityID = INVALID_ENTITY_ID;     // Clear selection
                     m_isDragging = false;                       // Cancel any drag operation
 
-                    // Mark scene as dirty when entity is deleted
-                    MarkSceneDirtyIfNeeded(m_fileMenu);
+                    // Notify editor that scene has been modified
+                    Messaging::MessageSystem::Notify(Messaging::SceneModified("Entity deleted"));
                 }
                 });
         }

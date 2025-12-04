@@ -17,8 +17,10 @@ Header for Viewport class handling viewport rendering and entity selection with 
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include "EditorFileMenu.h"
-#include "graphics/EditorCamera.hpp"
+#include "EditorCamera.h"
 #include "UndoSystem.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 #include <imgui.h>
 #include "ImGuizmo.h"
 #include <memory>
@@ -27,7 +29,7 @@ Header for Viewport class handling viewport rendering and entity selection with 
 // Forward declarations
 namespace ECS { class RendererSystem; }
 namespace Scenes { class SceneManager; }
-namespace Engine { class EditorCamera; }
+namespace Editor { class EditorCamera; }
 
 using EntityId = uint32_t;
 class EditorFileMenu;
@@ -63,8 +65,8 @@ public:
     ImVec2 GetSceneDrawPos() const { return m_sceneDrawPos; }
     ImVec2 GetSceneDrawSize() const { return m_sceneDrawSize; }
 
-    // Get the editor camera from renderer system
-    Engine::EditorCamera* GetEditorCamera() const;
+    // Get the editor camera
+    Editor::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
 
 private:
     void _renderViewport();
@@ -77,7 +79,10 @@ private:
     ImFont* m_boldFont = nullptr;
     ImFont* m_symbolsFont = nullptr;
 
-    // Renderer (manages EditorCamera internally)
+    // Editor camera (owned by viewport)
+    std::unique_ptr<Editor::EditorCamera> m_editorCamera;
+
+    // Renderer systems
     std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
     
     // Game window renderer (always uses scene camera)
@@ -105,6 +110,10 @@ private:
 
     // Undo system
     Editor::UndoSystem* m_undoSystem = nullptr;
+
+    // Message system subscriptions
+    Messaging::SubscriptionHandle m_transformChangedSubscription;
+    Messaging::SubscriptionHandle m_sceneModifiedSubscription;
 };
 
 #endif // VIEWPORT_H

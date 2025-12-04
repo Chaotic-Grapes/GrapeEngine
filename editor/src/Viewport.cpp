@@ -59,22 +59,39 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
     m_symbolsFont = symbolsFont;
     m_world = world;
 
+    // Create editor camera (viewport owns it)
+    if (!m_editorCamera) {
+        m_editorCamera = std::make_unique<Editor::EditorCamera>();
+    }
+
     // Create and initialize renderer system
-    // RendererSystem creates and manages its own EditorCamera internally
     if (m_world && !m_rendererSystem) {
         m_rendererSystem = std::make_shared<ECS::RendererSystem>();
         m_rendererSystem->Initialize(*m_world);
         m_rendererSystem->BindWorld(*m_world);
-        m_rendererSystem->SetEditorInputEnabled(true);
+        
+        // Set the editor camera for rendering
+        m_rendererSystem->SetCamera(m_editorCamera->GetCamera());
+    }
+    
+    // Subscribe to engine events for editor integration
+    if (m_undoSystem) {
+        m_transformChangedSubscription = Messaging::MessageSystem::Subscribe<Messaging::EntityTransformChanged>(
+            [this](const Messaging::EntityTransformChanged& e) {
+                m_undoSystem->RecordTransformChange(e.EntityId, 
+                    e.OldPosition, e.OldRotation, e.OldScale,
+                    e.NewPosition, e.NewRotation, e.NewScale);
+            }
+        );
+    }
 
-        if (m_undoSystem) {
-            m_rendererSystem->SetUndoSystem(m_undoSystem);
-        }
-
-        // Wire up file menu if available
-        if (m_fileMenu) {
-            m_rendererSystem->SetFileMenu(m_fileMenu);
-        }
+    if (m_fileMenu) {
+        m_sceneModifiedSubscription = Messaging::MessageSystem::Subscribe<Messaging::SceneModified>(
+            [this](const Messaging::SceneModified& e) {
+                (void)e; // May use e.Reason for logging
+                m_fileMenu->SetSceneDirty();
+            }
+        );
     }
     
     // Create game renderer (always uses scene camera)
@@ -88,38 +105,27 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
     }
 }
 
-Engine::EditorCamera* Viewport::GetEditorCamera() const {
-    return m_rendererSystem ? m_rendererSystem->GetEditorCamera() : nullptr;
-}
-
 void Viewport::SetWorld(ECS::World* world) {
     m_world = world;
+
+    // Create editor camera if needed
+    if (!m_editorCamera) {
+        m_editorCamera = std::make_unique<Editor::EditorCamera>();
+    }
 
     // Create renderer if it doesn't exist yet (handles File > Open Scene case)
     if (!m_rendererSystem && world) {
         m_rendererSystem = std::make_shared<ECS::RendererSystem>();
         m_rendererSystem->Initialize(*world);
         m_rendererSystem->BindWorld(*world);
-        m_rendererSystem->SetEditorInputEnabled(true);
-        m_rendererSystem->SetUndoSystem(m_undoSystem);
-
-        // Wire up file menu if available
-        if (m_fileMenu) {
-            m_rendererSystem->SetFileMenu(m_fileMenu);
-        }
+        m_rendererSystem->SetCamera(m_editorCamera->GetCamera());
+        
+        // Message subscriptions are already set up in Initialize()
     }
     // Rebind existing renderer to new world
     else if (m_rendererSystem && world) {
         m_rendererSystem->BindWorld(*world);
-
-        if (m_undoSystem) {
-            m_rendererSystem->SetUndoSystem(m_undoSystem);
-        }
-
-        // Reset file menu when world changes
-        if (m_fileMenu) {
-            m_rendererSystem->SetFileMenu(m_fileMenu);
-        }
+        // Camera pointer persists across world changes
     }
     
     // Create game renderer if it doesn't exist yet
@@ -201,6 +207,12 @@ void Viewport::_renderViewport() {
     // Check if viewport window is hovered AND focused (not blocked by other windows)
     m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
         && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+    // Update editor camera (processes input if viewport is hovered)
+    if (m_editorCamera) {
+        m_editorCamera->SetAllowInput(m_isViewportHovered);
+        m_editorCamera->Update(Time::DeltaTime());
+    }
 
     if (m_rendererSystem) {
         auto size = ImGui::GetContentRegionAvail();
@@ -409,10 +421,9 @@ void Viewport::FocusOnEntity(EntityId entityId) {
         return;
     }
 
-    // Access editor camera through renderer system and focus on entity
-    auto* editorCam = m_rendererSystem->GetEditorCamera();
-    if (editorCam) {
-        editorCam->Focus(glm::vec3(position.X, position.Y, position.Z));
+    // Focus editor camera on entity
+    if (m_editorCamera) {
+        m_editorCamera->Focus(glm::vec3(position.X, position.Y, position.Z));
     }
     else {
         LOG_WARNING("Cannot focus: editor camera not available");
@@ -433,9 +444,16 @@ bool Viewport::IsViewportHovered() const {
 void Viewport::SetFileMenu(EditorFileMenu* fileMenu) {
     m_fileMenu = fileMenu;
 
-    // Propagate to renderer if it exists
-    if (m_rendererSystem) {
-        m_rendererSystem->SetFileMenu(fileMenu);
+    // Subscribe to scene modification events
+    if (fileMenu) {
+        m_sceneModifiedSubscription = Messaging::MessageSystem::Subscribe<Messaging::SceneModified>(
+            [this](const Messaging::SceneModified& e) {
+                (void)e; // May use e.Reason for logging
+                if (m_fileMenu) {
+                    m_fileMenu->SetSceneDirty();
+                }
+            }
+        );
     }
 }
 
