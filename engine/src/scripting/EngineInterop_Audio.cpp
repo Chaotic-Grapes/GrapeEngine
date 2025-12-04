@@ -1,11 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
-\file    ScriptAPI_Audio.cpp
+\file    EngineInterop_Audio.cpp
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \date    21st November 2025
 \brief
-C# scripting API exports for audio playback and control.
+C API exports for managed C# scripting systems for audio playback and control.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -16,11 +16,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "audio/FmodAudioDevice.h"
 #include "core/Logger.h"
 
-// Export macro
-#ifndef SCRIPT_API
+// Export macro for C API
 #ifdef _WIN32
-    #define SCRIPT_API extern "C" __declspec(dllexport)
-#endif
+    #ifdef BUILDING_ENGINE_INTEROP
+        #define ENGINE_INTEROP_API extern "C" __declspec(dllexport)
+    #else
+        #define ENGINE_INTEROP_API extern "C" __declspec(dllimport)
+    #endif
+#else
+    #define ENGINE_INTEROP_API extern "C"
 #endif
 
 // External audio device reference
@@ -39,7 +43,7 @@ extern Audio::FmodAudioDevice* gAudioDevice;
  * @param isStreaming Whether the sound should be streamed
  * @return True if the cue was loaded successfully, false otherwise
  */
-SCRIPT_API bool ScriptAPI_Audio_LoadCue(const char* cueId, const char* filePath, bool is3D, bool isLooping, bool isStreaming) {
+ENGINE_INTEROP_API bool EngineInterop_Audio_LoadCue(const char* cueId, const char* filePath, bool is3D, bool isLooping, bool isStreaming) {
     (void)isLooping; // Currently unused
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
@@ -57,7 +61,7 @@ SCRIPT_API bool ScriptAPI_Audio_LoadCue(const char* cueId, const char* filePath,
  * @brief Unload a previously loaded audio cue
  * @param cueId The identifier for the cue to unload
  */
-SCRIPT_API void ScriptAPI_Audio_UnloadCue(const char* cueId) {
+ENGINE_INTEROP_API void EngineInterop_Audio_UnloadCue(const char* cueId) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
@@ -71,7 +75,7 @@ SCRIPT_API void ScriptAPI_Audio_UnloadCue(const char* cueId) {
  * @param cueId The identifier for the cue
  * @return True if the cue is loaded, false otherwise
  */
-SCRIPT_API bool ScriptAPI_Audio_HasCue(const char* cueId) {
+ENGINE_INTEROP_API bool EngineInterop_Audio_HasCue(const char* cueId) {
     if (!gAudioDevice) {
         return false;
     }
@@ -87,7 +91,7 @@ SCRIPT_API bool ScriptAPI_Audio_HasCue(const char* cueId) {
  * @param paused Whether to start the sound paused
  * @return A handle ID for the playback instance
  */
-SCRIPT_API uint64_t ScriptAPI_Audio_Play(const char* cueId, float volume, float pitch, bool paused) {
+ENGINE_INTEROP_API uint64_t EngineInterop_Audio_Play(const char* cueId, float volume, float pitch, bool paused) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return 0;
@@ -110,7 +114,7 @@ SCRIPT_API uint64_t ScriptAPI_Audio_Play(const char* cueId, float volume, float 
  * @param policy The play policy (0=NewInstance, 1=SingleInstanceRestart, 2=SingleInstanceResume, 3=SingleInstanceIgnore)
  * @return A handle ID for the playback instance
  */
-SCRIPT_API uint64_t ScriptAPI_Audio_PlaySingle(const char* cueId, float volume, float pitch, int policy) {
+ENGINE_INTEROP_API uint64_t EngineInterop_Audio_PlaySingle(const char* cueId, float volume, float pitch, int policy) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return 0;
@@ -130,7 +134,7 @@ SCRIPT_API uint64_t ScriptAPI_Audio_PlaySingle(const char* cueId, float volume, 
  * @param handleId The handle ID of the playback instance to stop
  * @param stopMode The stop mode (0=Immediate, 1=AllowFadeOut)
  */
-SCRIPT_API void ScriptAPI_Audio_Stop(uint64_t handleId, int stopMode) {
+ENGINE_INTEROP_API void EngineInterop_Audio_Stop(uint64_t handleId, int stopMode) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
@@ -148,7 +152,7 @@ SCRIPT_API void ScriptAPI_Audio_Stop(uint64_t handleId, int stopMode) {
  * @param cueId The identifier for the cue to stop
  * @param stopMode The stop mode (0=Immediate, 1=AllowFadeOut)
  */
-SCRIPT_API void ScriptAPI_Audio_StopCue(const char* cueId, int stopMode) {
+ENGINE_INTEROP_API void EngineInterop_Audio_StopCue(const char* cueId, int stopMode) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
@@ -163,7 +167,7 @@ SCRIPT_API void ScriptAPI_Audio_StopCue(const char* cueId, int stopMode) {
  * @param cueId The identifier for the cue
  * @return True if the cue is playing, false otherwise
  */
-SCRIPT_API bool ScriptAPI_Audio_IsCuePlaying(const char* cueId) {
+ENGINE_INTEROP_API bool EngineInterop_Audio_IsCuePlaying(const char* cueId) {
     if (!gAudioDevice) {
         return false;
     }
@@ -180,7 +184,7 @@ SCRIPT_API bool ScriptAPI_Audio_IsCuePlaying(const char* cueId) {
  * @param handleId The handle ID of the playback instance
  * @param volume The new volume (0.0 to 1.0)
  */
-SCRIPT_API void ScriptAPI_Audio_SetInstanceVolume(uint64_t handleId, float volume) {
+ENGINE_INTEROP_API void EngineInterop_Audio_SetInstanceVolume(uint64_t handleId, float volume) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
@@ -196,7 +200,7 @@ SCRIPT_API void ScriptAPI_Audio_SetInstanceVolume(uint64_t handleId, float volum
  * @param handleId The handle ID of the playback instance
  * @param pitch The new pitch (0.5 to 2.0)
  */
-SCRIPT_API void ScriptAPI_Audio_SetInstancePitch(uint64_t handleId, float pitch) {
+ENGINE_INTEROP_API void EngineInterop_Audio_SetInstancePitch(uint64_t handleId, float pitch) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
@@ -217,7 +221,7 @@ SCRIPT_API void ScriptAPI_Audio_SetInstancePitch(uint64_t handleId, float pitch)
  * @param velY The Y velocity
  * @param velZ The Z velocity
  */
-SCRIPT_API void ScriptAPI_Audio_SetInstancePosition(uint64_t handleId, float posX, float posY, float posZ, float velX, float velY, float velZ) {
+ENGINE_INTEROP_API void EngineInterop_Audio_SetInstancePosition(uint64_t handleId, float posX, float posY, float posZ, float velX, float velY, float velZ) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
@@ -240,7 +244,7 @@ SCRIPT_API void ScriptAPI_Audio_SetInstancePosition(uint64_t handleId, float pos
  * @brief Set the master volume
  * @param volume The new master volume (0.0 to 1.0)
  */
-SCRIPT_API void ScriptAPI_Audio_SetMasterVolume(float volume) {
+ENGINE_INTEROP_API void EngineInterop_Audio_SetMasterVolume(float volume) {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return;
@@ -253,7 +257,7 @@ SCRIPT_API void ScriptAPI_Audio_SetMasterVolume(float volume) {
  * @brief Get the master volume
  * @return The current master volume (0.0 to 1.0)
  */
-SCRIPT_API float ScriptAPI_Audio_GetMasterVolume() {
+ENGINE_INTEROP_API float EngineInterop_Audio_GetMasterVolume() {
     if (!gAudioDevice) {
         LOG_ERROR("[ScriptAPI] Audio device not initialized");
         return 1.0f;
@@ -277,7 +281,7 @@ SCRIPT_API float ScriptAPI_Audio_GetMasterVolume() {
  * @param upY The Y component of the up vector
  * @param upZ The Z component of the up vector
  */
-SCRIPT_API void ScriptAPI_Audio_SetListener(float posX, float posY, float posZ, 
+ENGINE_INTEROP_API void EngineInterop_Audio_SetListener(float posX, float posY, float posZ, 
                                              float velX, float velY, float velZ,
                                              float fwdX, float fwdY, float fwdZ,
                                              float upX, float upY, float upZ) {

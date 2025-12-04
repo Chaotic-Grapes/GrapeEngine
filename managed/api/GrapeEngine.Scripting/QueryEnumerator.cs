@@ -25,8 +25,8 @@ public unsafe struct QueryEnumerator<T1>
 {
     private readonly World _world;
     private QueryIterator _iterator;
-    private ulong _currentEntityId;
-    private bool _initialized;
+    private readonly ulong _currentEntityId;
+    private readonly bool _initialized;
 
     internal QueryEnumerator(World world, uint[] componentHashes)
     {
@@ -81,7 +81,7 @@ public unsafe struct QueryEnumerator<T1, T2>
 {
     private readonly World _world;
     private QueryIterator _iterator;
-    private ulong _currentEntityId;
+    private readonly ulong _currentEntityId;
 
     internal QueryEnumerator(World world, uint[] componentHashes)
     {
@@ -136,7 +136,7 @@ public unsafe struct QueryEnumerator<T1, T2, T3>
 {
     private readonly World _world;
     private QueryIterator _iterator;
-    private ulong _currentEntityId;
+    private readonly ulong _currentEntityId;
 
     internal QueryEnumerator(World world, uint[] componentHashes)
     {

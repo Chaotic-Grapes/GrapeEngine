@@ -23,40 +23,40 @@ namespace GrapeEngine.Scripting.Unsafe;
 internal static partial class InputAPI
 {
     // Keyboard input
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_IsKeyPressed")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsKeyPressed")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool IsKeyPressed(int key);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_IsKeyDown")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsKeyDown")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool IsKeyDown(int key);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_IsKeyUp")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsKeyUp")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool IsKeyUp(int key);
 
     // Mouse input
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_IsMousePressed")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_IsMousePressed")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool IsMousePressed(int button);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_GetMouseX")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_GetMouseX")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial double GetMouseX();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_GetMouseY")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_GetMouseY")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial double GetMouseY();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_GetScrollX")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_GetScrollX")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial double GetScrollX();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_GetScrollY")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Input_GetScrollY")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial double GetScrollY();
 

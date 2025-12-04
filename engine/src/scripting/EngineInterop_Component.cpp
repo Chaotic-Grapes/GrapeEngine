@@ -1,11 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
-\file   ScriptAPI_Component.cpp
+\file   EngineInterop_Component.cpp
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \date   20th November 2025
 \brief
-C# scripting API exports for generic component operations.
+C API exports for managed C# scripting systems for generic component operations.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -20,11 +20,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <cstring>
 #include "core/Logger.h"
 
-// Export macro
-#ifndef SCRIPT_API
+// Export macro for C API
 #ifdef _WIN32
-    #define SCRIPT_API extern "C" __declspec(dllexport)
-#endif
+    #ifdef BUILDING_ENGINE_INTEROP
+        #define ENGINE_INTEROP_API extern "C" __declspec(dllexport)
+    #else
+        #define ENGINE_INTEROP_API extern "C" __declspec(dllimport)
+    #endif
+#else
+    #define ENGINE_INTEROP_API extern "C"
 #endif
 
 // Global world pointer for script API access
@@ -388,7 +392,7 @@ namespace {
  * @param bufferSize Size of the output buffer in bytes
  * @return True if the component was retrieved successfully; false otherwise
  */
-SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize) {
+ENGINE_INTEROP_API bool EngineInterop_GetComponent(uint64_t entityId, uint32_t typeHash, void* outBuffer, int bufferSize) {
     return GetComponentGeneric(entityId, typeHash, outBuffer, bufferSize);
 }
 
@@ -398,7 +402,7 @@ SCRIPT_API bool ScriptAPI_GetComponent(uint64_t entityId, uint32_t typeHash, voi
  * @param typeHash The FNV-1a hash of the component type name
  * @return Pointer to the component data, or nullptr if not found
  */
-SCRIPT_API void* ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash) {
+ENGINE_INTEROP_API void* EngineInterop_GetComponentPtr(uint64_t entityId, uint32_t typeHash) {
     return GetComponentPtr(entityId, typeHash);
 }
 
@@ -411,7 +415,7 @@ SCRIPT_API void* ScriptAPI_GetComponentPtr(uint64_t entityId, uint32_t typeHash)
  * @param outBuffer Pointer to the output buffer to receive the added component data
  * @return True if the component was added successfully; false otherwise
  */
-SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
+ENGINE_INTEROP_API bool EngineInterop_AddComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize, void* outBuffer) {
     return AddComponentGeneric(entityId, typeHash, componentData, dataSize, outBuffer);
 }
 
@@ -422,7 +426,7 @@ SCRIPT_API bool ScriptAPI_AddComponent(uint64_t entityId, uint32_t typeHash, con
  * @param componentData Pointer to the component data to set
  * @param dataSize Size of the component data in bytes
  */
-SCRIPT_API void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize) {
+ENGINE_INTEROP_API void EngineInterop_SetComponent(uint64_t entityId, uint32_t typeHash, const void* componentData, int dataSize) {
     SetComponentGeneric(entityId, typeHash, componentData, dataSize);
 }
 
@@ -432,7 +436,7 @@ SCRIPT_API void ScriptAPI_SetComponent(uint64_t entityId, uint32_t typeHash, con
  * @param typeHash The FNV-1a hash of the component type name
  * @return True if the entity has the component; false otherwise
  */
-SCRIPT_API bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash) {
+ENGINE_INTEROP_API bool EngineInterop_HasComponent(uint64_t entityId, uint32_t typeHash) {
     return HasComponentGeneric(entityId, typeHash);
 }
 
@@ -441,7 +445,7 @@ SCRIPT_API bool ScriptAPI_HasComponent(uint64_t entityId, uint32_t typeHash) {
  * @param entityId The packed entity ID
  * @param typeHash The FNV-1a hash of the component type name
  */
-SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash) {
+ENGINE_INTEROP_API void EngineInterop_RemoveComponent(uint64_t entityId, uint32_t typeHash) {
     RemoveComponentGeneric(entityId, typeHash);
 }
 
@@ -449,7 +453,7 @@ SCRIPT_API void ScriptAPI_RemoveComponent(uint64_t entityId, uint32_t typeHash) 
  * @brief Set the global ECS world for script API access
  * @param world Pointer to the ECS world
  */
-SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world) {
+ENGINE_INTEROP_API void EngineInterop_SetWorld(ECS::World* world) {
     g_scriptWorld = world;
 }
 
@@ -458,7 +462,7 @@ SCRIPT_API void ScriptAPI_SetWorld(ECS::World* world) {
  * @param entityId Packed entity id (Index+Generation)
  * @return Number of collision events recorded for this entity
  */
-SCRIPT_API uint32_t ScriptAPI_Collision_GetEventCount(uint64_t entityId) {
+ENGINE_INTEROP_API uint32_t EngineInterop_Collision_GetEventCount(uint64_t entityId) {
     ECS::World* world = GetScriptWorld();
     if (!world) {
         LOG_ERROR("[ScriptAPI] World not set");
@@ -482,7 +486,7 @@ SCRIPT_API uint32_t ScriptAPI_Collision_GetEventCount(uint64_t entityId) {
  * @param outEventType Integer value of the CollisionEventType enum (output)
  * @return True if the event was retrieved, false otherwise
  */
-SCRIPT_API bool ScriptAPI_Collision_GetEvent(uint64_t entityId, uint32_t index, uint64_t* outOtherEntity, int* outEventType) {
+ENGINE_INTEROP_API bool EngineInterop_Collision_GetEvent(uint64_t entityId, uint32_t index, uint64_t* outOtherEntity, int* outEventType) {
     ECS::World* world = GetScriptWorld();
     if (!world) {
         LOG_ERROR("[ScriptAPI] World not set");
@@ -511,7 +515,7 @@ SCRIPT_API bool ScriptAPI_Collision_GetEvent(uint64_t entityId, uint32_t index, 
  * @param capacity Number of elements available in the output buffers
  * @return Total number of events available (may be > capacity). Caller should call again with larger buffers if needed.
  */
-SCRIPT_API uint32_t ScriptAPI_Collision_GetEventsBulk(uint64_t entityId, uint64_t* outOtherEntities, int* outEventTypes, uint32_t capacity) {
+ENGINE_INTEROP_API uint32_t EngineInterop_Collision_GetEventsBulk(uint64_t entityId, uint64_t* outOtherEntities, int* outEventTypes, uint32_t capacity) {
     ECS::World* world = GetScriptWorld();
     if (!world) {
         LOG_ERROR("[ScriptAPI] World not set");

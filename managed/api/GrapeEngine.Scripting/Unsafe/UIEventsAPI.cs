@@ -22,40 +22,40 @@ namespace GrapeEngine.Scripting.Unsafe;
 /// </summary>
 internal partial class UIEventsAPI
 {
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_UIEvents_Clear")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_UIEvents_Clear")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void Clear();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_UIEvents_WasClicked")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_UIEvents_WasClicked")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool WasClicked(ulong entityId, int button);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_UIEvents_WasHoverEntered")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_UIEvents_WasHoverEntered")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool WasHoverEntered(ulong entityId);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_UIEvents_WasHoverExited")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_UIEvents_WasHoverExited")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool WasHoverExited(ulong entityId);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_UIEvents_GetEventCount")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_UIEvents_GetEventCount")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int GetEventCount(ulong entityId);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_UIEvents_GetEvent")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_UIEvents_GetEvent")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static unsafe partial bool GetEvent(ulong entityId, int eventIndex,
         int* outType, int* outButton, float* outScreenX, float* outScreenY);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_UIEvents_GetHoveredEntity")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_UIEvents_GetHoveredEntity")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial ulong GetHoveredEntity();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_UIEvents_IsMouseOverUI")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_UIEvents_IsMouseOverUI")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool IsMouseOverUI();

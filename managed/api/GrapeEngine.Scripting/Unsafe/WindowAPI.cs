@@ -22,74 +22,74 @@ namespace GrapeEngine.Scripting.Unsafe;
 /// </summary>
 internal partial class WindowAPI
 {
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_GetWidth")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_GetWidth")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int GetWidth();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_GetHeight")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_GetHeight")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int GetHeight();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_ShouldClose")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_ShouldClose")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool ShouldClose();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_Close")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_Close")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void Close();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_IsFocused")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_IsFocused")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool IsFocused();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_IsMinimized")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_IsMinimized")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool IsMinimized();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_SetMinimized")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetMinimized")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetMinimized([MarshalAs(UnmanagedType.I1)] bool minimized);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_IsMaximized")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_IsMaximized")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool IsMaximized();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_SetMaximized")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetMaximized")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetMaximized([MarshalAs(UnmanagedType.I1)] bool maximized);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_IsVisible")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_IsVisible")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool IsVisible();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_SetVisible")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetVisible")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetVisible([MarshalAs(UnmanagedType.I1)] bool visible);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_IsResizable")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_IsResizable")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool IsResizable();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_SetResizable")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetResizable")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetResizable([MarshalAs(UnmanagedType.I1)] bool resizable);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_SetMode")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_SetMode")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetMode(int mode);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_HasMode")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_HasMode")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool HasMode(int mode);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Window_Resize")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Window_Resize")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void Resize(int width, int height);
 }

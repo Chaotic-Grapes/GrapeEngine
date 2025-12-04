@@ -21,6 +21,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 
+using GrapeEngine.Scripting.Unsafe;
+
 namespace GrapeEngine;
 
 public enum LogLevel

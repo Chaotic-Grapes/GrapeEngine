@@ -1,11 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
-\file    ScriptAPI_Window.cpp
+\file    EngineInterop_Window.cpp
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \date    21st November 2025
 \brief
-C# scripting API exports for window management and queries.
+C API exports for managed C# scripting systems for window management and queries.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -17,11 +17,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/Window.h"
 #include "core/Logger.h"
 
-// Export macro
-#ifndef SCRIPT_API
+// Export macro for C API
 #ifdef _WIN32
-    #define SCRIPT_API extern "C" __declspec(dllexport)
-#endif
+    #ifdef BUILDING_ENGINE_INTEROP
+        #define ENGINE_INTEROP_API extern "C" __declspec(dllexport)
+    #else
+        #define ENGINE_INTEROP_API extern "C" __declspec(dllimport)
+    #endif
+#else
+    #define ENGINE_INTEROP_API extern "C"
 #endif
 
 // ============================================================================
@@ -31,7 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /// <summary>
 /// Get the width of the main window
 /// </summary>
-SCRIPT_API int ScriptAPI_Window_GetWidth() {
+ENGINE_INTEROP_API int EngineInterop_Window_GetWidth() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
@@ -43,7 +47,7 @@ SCRIPT_API int ScriptAPI_Window_GetWidth() {
 /// <summary>
 /// Get the height of the main window
 /// </summary>
-SCRIPT_API int ScriptAPI_Window_GetHeight() {
+ENGINE_INTEROP_API int EngineInterop_Window_GetHeight() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
@@ -55,7 +59,7 @@ SCRIPT_API int ScriptAPI_Window_GetHeight() {
 /// <summary>
 /// Check if the window should close
 /// </summary>
-SCRIPT_API bool ScriptAPI_Window_ShouldClose() {
+ENGINE_INTEROP_API bool EngineInterop_Window_ShouldClose() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         return true;
@@ -66,7 +70,7 @@ SCRIPT_API bool ScriptAPI_Window_ShouldClose() {
 /// <summary>
 /// Request the window to close
 /// </summary>
-SCRIPT_API void ScriptAPI_Window_Close() {
+ENGINE_INTEROP_API void EngineInterop_Window_Close() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
@@ -82,7 +86,7 @@ SCRIPT_API void ScriptAPI_Window_Close() {
 /// <summary>
 /// Check if the window is focused
 /// </summary>
-SCRIPT_API bool ScriptAPI_Window_IsFocused() {
+ENGINE_INTEROP_API bool EngineInterop_Window_IsFocused() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         return false;
@@ -93,7 +97,7 @@ SCRIPT_API bool ScriptAPI_Window_IsFocused() {
 /// <summary>
 /// Check if the window is minimized
 /// </summary>
-SCRIPT_API bool ScriptAPI_Window_IsMinimized() {
+ENGINE_INTEROP_API bool EngineInterop_Window_IsMinimized() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         return false;
@@ -104,7 +108,7 @@ SCRIPT_API bool ScriptAPI_Window_IsMinimized() {
 /// <summary>
 /// Set the window minimized state
 /// </summary>
-SCRIPT_API void ScriptAPI_Window_SetMinimized(bool minimized) {
+ENGINE_INTEROP_API void EngineInterop_Window_SetMinimized(bool minimized) {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
@@ -116,7 +120,7 @@ SCRIPT_API void ScriptAPI_Window_SetMinimized(bool minimized) {
 /// <summary>
 /// Check if the window is maximized
 /// </summary>
-SCRIPT_API bool ScriptAPI_Window_IsMaximized() {
+ENGINE_INTEROP_API bool EngineInterop_Window_IsMaximized() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         return false;
@@ -127,7 +131,7 @@ SCRIPT_API bool ScriptAPI_Window_IsMaximized() {
 /// <summary>
 /// Set the window maximized state
 /// </summary>
-SCRIPT_API void ScriptAPI_Window_SetMaximized(bool maximized) {
+ENGINE_INTEROP_API void EngineInterop_Window_SetMaximized(bool maximized) {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
@@ -139,7 +143,7 @@ SCRIPT_API void ScriptAPI_Window_SetMaximized(bool maximized) {
 /// <summary>
 /// Check if the window is visible
 /// </summary>
-SCRIPT_API bool ScriptAPI_Window_IsVisible() {
+ENGINE_INTEROP_API bool EngineInterop_Window_IsVisible() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         return false;
@@ -150,7 +154,7 @@ SCRIPT_API bool ScriptAPI_Window_IsVisible() {
 /// <summary>
 /// Set the window visibility
 /// </summary>
-SCRIPT_API void ScriptAPI_Window_SetVisible(bool visible) {
+ENGINE_INTEROP_API void EngineInterop_Window_SetVisible(bool visible) {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
@@ -162,7 +166,7 @@ SCRIPT_API void ScriptAPI_Window_SetVisible(bool visible) {
 /// <summary>
 /// Check if the window is resizable
 /// </summary>
-SCRIPT_API bool ScriptAPI_Window_IsResizable() {
+ENGINE_INTEROP_API bool EngineInterop_Window_IsResizable() {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         return false;
@@ -173,7 +177,7 @@ SCRIPT_API bool ScriptAPI_Window_IsResizable() {
 /// <summary>
 /// Set the window resizable state
 /// </summary>
-SCRIPT_API void ScriptAPI_Window_SetResizable(bool resizable) {
+ENGINE_INTEROP_API void EngineInterop_Window_SetResizable(bool resizable) {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
@@ -189,7 +193,7 @@ SCRIPT_API void ScriptAPI_Window_SetResizable(bool resizable) {
 /// <summary>
 /// Set the window mode (Windowed = 1, Fullscreen = 2, Borderless = 4)
 /// </summary>
-SCRIPT_API void ScriptAPI_Window_SetMode(int mode) {
+ENGINE_INTEROP_API void EngineInterop_Window_SetMode(int mode) {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
@@ -201,7 +205,7 @@ SCRIPT_API void ScriptAPI_Window_SetMode(int mode) {
 /// <summary>
 /// Check if the window has a specific mode flag
 /// </summary>
-SCRIPT_API bool ScriptAPI_Window_HasMode(int mode) {
+ENGINE_INTEROP_API bool EngineInterop_Window_HasMode(int mode) {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         return false;
@@ -212,7 +216,7 @@ SCRIPT_API bool ScriptAPI_Window_HasMode(int mode) {
 /// <summary>
 /// Resize the window to the specified dimensions
 /// </summary>
-SCRIPT_API void ScriptAPI_Window_Resize(int width, int height) {
+ENGINE_INTEROP_API void EngineInterop_Window_Resize(int width, int height) {
     Window* window = WindowManager::GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");

@@ -26,71 +26,71 @@ internal static partial class EntityAPI
     // Use LibraryImportAttribute for better performance
     // See: https://learn.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke-source-generation
 
-    //[LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_GetComponent")]
+    //[LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_GetComponent")]
     //[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     //[return: MarshalAs(UnmanagedType.Bool)]
     //public static unsafe partial bool GetComponent(ulong entityId, uint typeHash, byte* outBuffer, int bufferSize);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_GetComponentPtr")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_GetComponentPtr")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial byte* GetComponentPtr(ulong entityId, uint typeHash);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_AddComponent")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_AddComponent")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static unsafe partial bool AddComponent(ulong entityId, uint typeHash, void* componentData, int dataSize, void* outBuffer);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_SetComponent")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_SetComponent")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void SetComponent(ulong entityId, uint typeHash, void* componentData, int dataSize);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_HasComponent")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_HasComponent")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool HasComponent(ulong entityId, uint typeHash);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_RemoveComponent")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_RemoveComponent")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static partial void RemoveComponent(ulong entityId, uint typeHash);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_DestroyEntity")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_DestroyEntity")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static partial void DestroyEntity(ulong entityId);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_CreateEntity")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_CreateEntity")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static partial ulong CreateEntity();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_IsAlive")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_IsAlive")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool IsAlive(ulong entityId);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_SetWorld")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_SetWorld")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void SetWorld(void* world);
 
-    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "ScriptAPI_GetComponent", CallingConvention = CallingConvention.Cdecl)]
+    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "EngineInterop_GetComponent", CallingConvention = CallingConvention.Cdecl)]
     //public static extern unsafe bool GetComponent(ulong entityId, uint typeHash, byte* outBuffer, int bufferSize);
 
-    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "ScriptAPI_AddComponent", CallingConvention = CallingConvention.Cdecl)]
+    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "EngineInterop_AddComponent", CallingConvention = CallingConvention.Cdecl)]
     //public static extern unsafe bool AddComponent(ulong entityId, uint typeHash, void* componentData, int dataSize, void* outBuffer);
 
-    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "ScriptAPI_SetComponent", CallingConvention = CallingConvention.Cdecl)]
+    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "EngineInterop_SetComponent", CallingConvention = CallingConvention.Cdecl)]
     //public static extern unsafe void SetComponent(ulong entityId, uint typeHash, void* componentData, int dataSize);
 
-    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "ScriptAPI_HasComponent", CallingConvention = CallingConvention.Cdecl)]
+    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "EngineInterop_HasComponent", CallingConvention = CallingConvention.Cdecl)]
     //public static extern bool HasComponent(ulong entityId, uint typeHash);
 
-    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "ScriptAPI_RemoveComponent", CallingConvention = CallingConvention.Cdecl)]
+    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "EngineInterop_RemoveComponent", CallingConvention = CallingConvention.Cdecl)]
     //public static extern void RemoveComponent(ulong entityId, uint typeHash);
 
-    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "ScriptAPI_DestroyEntity", CallingConvention = CallingConvention.Cdecl)]
+    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "EngineInterop_DestroyEntity", CallingConvention = CallingConvention.Cdecl)]
     //public static extern void DestroyEntity(ulong entityId);
 
-    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "ScriptAPI_CreateEntity", CallingConvention = CallingConvention.Cdecl)]
+    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "EngineInterop_CreateEntity", CallingConvention = CallingConvention.Cdecl)]
     //public static extern ulong CreateEntity();
 
-    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "ScriptAPI_SetWorld", CallingConvention = CallingConvention.Cdecl)]
+    //[DllImport(NativeLibHelper.NativeLib, EntryPoint = "EngineInterop_SetWorld", CallingConvention = CallingConvention.Cdecl)]
     //public static extern unsafe void SetWorld(void* world);
 }

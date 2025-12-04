@@ -1,11 +1,12 @@
 /* Start Header *****************************************************************/
 /*!
-\file   ScriptAPI_Input.cpp
+\file   EngineInterop_Input.cpp
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \date   20th November 2025
 \brief
-C# scripting API exports for input handling.
+C API exports for input handling used by C# scripting systems.
+This provides the bridge between C++ input services and managed C# code.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -15,11 +16,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "services/Input.h"
 
-// Export macro
-#ifndef SCRIPT_API
+// Export macro for C API
 #ifdef _WIN32
-    #define SCRIPT_API extern "C" __declspec(dllexport)
-#endif
+    #ifdef BUILDING_ENGINE_INTEROP
+        #define ENGINE_INTEROP_API extern "C" __declspec(dllexport)
+    #else
+        #define ENGINE_INTEROP_API extern "C" __declspec(dllimport)
+    #endif
+#else
+    #define ENGINE_INTEROP_API extern "C"
 #endif
 
 // ============================================================================
@@ -29,21 +34,21 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /// <summary>
 /// Check if a key is currently pressed (true every frame while held)
 /// </summary>
-SCRIPT_API bool ScriptAPI_IsKeyPressed(int key) {
+ENGINE_INTEROP_API bool EngineInterop_Input_IsKeyPressed(int key) {
     return Input::IsKeyPressed(key);
 }
 
 /// <summary>
 /// Check if a key was pressed this frame (true only on first frame)
 /// </summary>
-SCRIPT_API bool ScriptAPI_IsKeyDown(int key) {
+ENGINE_INTEROP_API bool EngineInterop_Input_IsKeyDown(int key) {
     return Input::IsKeyDown(key);
 }
 
 /// <summary>
 /// Check if a key was released this frame
 /// </summary>
-SCRIPT_API bool ScriptAPI_IsKeyUp(int key) {
+ENGINE_INTEROP_API bool EngineInterop_Input_IsKeyUp(int key) {
     return Input::IsKeyUp(key);
 }
 
@@ -54,34 +59,34 @@ SCRIPT_API bool ScriptAPI_IsKeyUp(int key) {
 /// <summary>
 /// Check if a mouse button is currently pressed
 /// </summary>
-SCRIPT_API bool ScriptAPI_IsMousePressed(int button) {
+ENGINE_INTEROP_API bool EngineInterop_Input_IsMousePressed(int button) {
     return Input::IsMousePressed(button);
 }
 
 /// <summary>
 /// Get the current mouse X position
 /// </summary>
-SCRIPT_API double ScriptAPI_GetMouseX() {
+ENGINE_INTEROP_API double EngineInterop_Input_GetMouseX() {
     return Input::GetMouseX();
 }
 
 /// <summary>
 /// Get the current mouse Y position
 /// </summary>
-SCRIPT_API double ScriptAPI_GetMouseY() {
+ENGINE_INTEROP_API double EngineInterop_Input_GetMouseY() {
     return Input::GetMouseY();
 }
 
 /// <summary>
 /// Get the mouse scroll delta X (horizontal scroll)
 /// </summary>
-SCRIPT_API double ScriptAPI_GetScrollX() {
+ENGINE_INTEROP_API double EngineInterop_Input_GetScrollX() {
     return Input::GetScrollX();
 }
 
 /// <summary>
 /// Get the mouse scroll delta Y (vertical scroll)
 /// </summary>
-SCRIPT_API double ScriptAPI_GetScrollY() {
+ENGINE_INTEROP_API double EngineInterop_Input_GetScrollY() {
     return Input::GetScrollY();
 }

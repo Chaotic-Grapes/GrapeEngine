@@ -22,43 +22,43 @@ namespace GrapeEngine.Scripting.Unsafe;
 /// </summary>
 internal partial class TimeAPI
 {
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_GetDeltaTime")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_GetDeltaTime")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetDeltaTime();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_GetUnscaledDeltaTime")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_GetUnscaledDeltaTime")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetUnscaledDeltaTime();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_GetFixedDeltaTime")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_GetFixedDeltaTime")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetFixedDeltaTime();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_GetUnscaledFixedDeltaTime")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_GetUnscaledFixedDeltaTime")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetUnscaledFixedDeltaTime();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_GetElapsedTime")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_GetElapsedTime")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial double GetElapsedTime();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_GetFrameCount")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_GetFrameCount")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int GetFrameCount();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_GetTimeScale")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_GetTimeScale")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetTimeScale();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_SetTimeScale")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_SetTimeScale")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetTimeScale(float scale);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_GetMaximumDeltaTime")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_GetMaximumDeltaTime")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetMaximumDeltaTime();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Time_SetMaximumDeltaTime")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Time_SetMaximumDeltaTime")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetMaximumDeltaTime(float maxDelta);
 }

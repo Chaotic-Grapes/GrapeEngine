@@ -22,19 +22,19 @@ namespace GrapeEngine.Scripting.Unsafe;
 /// </summary>
 internal partial class ApplicationAPI
 {
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Application_Quit")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Application_Quit")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void Quit();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Application_GetName", StringMarshalling = StringMarshalling.Utf8)]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Application_GetName", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial string GetName();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Application_GetFixedTimeStep")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Application_GetFixedTimeStep")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float GetFixedTimeStep();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Application_IsVSyncEnabled")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Application_IsVSyncEnabled")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool IsVSyncEnabled();

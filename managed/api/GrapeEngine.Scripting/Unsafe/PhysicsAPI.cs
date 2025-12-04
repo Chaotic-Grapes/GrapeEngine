@@ -22,36 +22,36 @@ namespace GrapeEngine.Scripting.Unsafe;
 /// </summary>
 internal partial class PhysicsAPI
 {
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Physics_SetGravity")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Physics_SetGravity")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetGravity(float x, float y);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Physics_GetGravity")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Physics_GetGravity")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void GetGravity(out float x, out float y);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Physics_SetEnabled")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Physics_SetEnabled")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetEnabled([MarshalAs(UnmanagedType.I1)] bool enabled);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Physics_IsEnabled")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Physics_IsEnabled")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static partial bool IsEnabled();
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Physics_ApplyForce")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Physics_ApplyForce")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void ApplyForce(ulong entityId, float forceX, float forceY);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Physics_ApplyImpulse")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Physics_ApplyImpulse")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void ApplyImpulse(ulong entityId, float impulseX, float impulseY);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Physics_GetVelocity")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Physics_GetVelocity")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void GetVelocity(ulong entityId, out float x, out float y);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Physics_SetVelocity")]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Physics_SetVelocity")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void SetVelocity(ulong entityId, float x, float y);
 }

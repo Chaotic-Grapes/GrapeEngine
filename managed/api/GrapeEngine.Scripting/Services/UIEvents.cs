@@ -35,6 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Numerics;
+using GrapeEngine.Scripting.Unsafe;
 
 namespace GrapeEngine.Events;
 

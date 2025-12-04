@@ -22,19 +22,19 @@ namespace GrapeEngine.Scripting.Unsafe;
 /// </summary>
 internal partial class DebugAPI
 {
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Debug_LogInfo", StringMarshalling = StringMarshalling.Utf8)]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Debug_LogInfo", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void LogInfo(string message);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Debug_LogDebug", StringMarshalling = StringMarshalling.Utf8)]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Debug_LogDebug", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void LogDebug(string message);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Debug_LogWarning", StringMarshalling = StringMarshalling.Utf8)]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Debug_LogWarning", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void LogWarning(string message);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "ScriptAPI_Debug_LogError", StringMarshalling = StringMarshalling.Utf8)]
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Debug_LogError", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void LogError(string message);
 }

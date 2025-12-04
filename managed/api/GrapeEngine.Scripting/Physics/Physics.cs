@@ -15,6 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting;
 using GrapeEngine.Numerics;
+using GrapeEngine.Scripting.Unsafe;
 
 namespace GrapeEngine.Physics;
 
