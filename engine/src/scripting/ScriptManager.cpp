@@ -315,8 +315,8 @@ namespace ECS {
             m_loadAssemblyAndGetFunctionPtr
         );
 
-        // Path to ScriptHost assembly
-        std::filesystem::path scriptHostPath = std::filesystem::current_path() / "GrapeEngine.ScriptHost.dll";
+        // Path to ScriptHost assembly (now part of GrapeEngine.Scripting)
+        std::filesystem::path scriptHostPath = std::filesystem::current_path() / "GrapeEngine.Scripting.dll";
         
 #ifdef _WIN32
         std::wstring scriptHostPathW = scriptHostPath.wstring();
@@ -326,7 +326,7 @@ namespace ECS {
 #endif
 
         // Type and method names in C# ScriptHost
-        const char_t* typeName = DOTNET_STRING("GrapeEngine.ScriptHost.ScriptHost, GrapeEngine.ScriptHost");
+        const char_t* typeName = DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptHost, GrapeEngine.Scripting");
 
         // Helper lambda to load a function pointer
         auto loadFunction = [&](const char* functionName, void** outDelegate) -> bool {

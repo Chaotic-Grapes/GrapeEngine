@@ -5,22 +5,16 @@
 using System.Runtime.InteropServices;
 using System.Reflection;
 using System.Runtime.Loader;
-using GrapeEngine;
 
-namespace GrapeEngine.ScriptHost;
+namespace GrapeEngine.Scripting.Hosting;
 
 /// <summary>
 /// Custom AssemblyLoadContext for hot reload support.
 /// Allows assemblies to be unloaded and reloaded.
 /// </summary>
-internal class ScriptLoadContext : AssemblyLoadContext
+internal class ScriptLoadContext(string assemblyPath) : AssemblyLoadContext(isCollectible: true)
 {
-    private readonly AssemblyDependencyResolver _resolver;
-
-    public ScriptLoadContext(string assemblyPath) : base(isCollectible: true)
-    {
-        _resolver = new AssemblyDependencyResolver(assemblyPath);
-    }
+    private readonly AssemblyDependencyResolver _resolver = new(assemblyPath);
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
@@ -50,11 +44,11 @@ internal class ScriptLoadContext : AssemblyLoadContext
 public static class ScriptHost
 {
     // Loaded assemblies and their load contexts (for hot reload support)
-    private static readonly Dictionary<string, (Assembly Assembly, ScriptLoadContext? Context)> s_loadedAssemblies = new();
+    private static readonly Dictionary<string, (Assembly Assembly, ScriptLoadContext? Context)> s_loadedAssemblies = [];
     
     // Discovered system types
-    private static readonly Dictionary<ulong, Type> s_systemTypes = new();
-    private static readonly Dictionary<ulong, object> s_systemInstances = new();
+    private static readonly Dictionary<ulong, Type> s_systemTypes = [];
+    private static readonly Dictionary<ulong, object> s_systemInstances = [];
     private static ulong s_nextSystemHandle = 1;
 
     /// <summary>
@@ -63,6 +57,9 @@ public static class ScriptHost
     /// </summary>
     [UnmanagedCallersOnly]
     public static unsafe int LoadAssembly(char* assemblyPathPtr)
+        => LoadAssemblyImpl(assemblyPathPtr);
+
+    private static unsafe int LoadAssemblyImpl(char* assemblyPathPtr)
     {
         try
         {
@@ -91,20 +88,23 @@ public static class ScriptHost
     /// Called from C++ ScriptManager::UnloadAssembly()
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int UnloadAssembly(char* assemblyPathPtr)
+    public static unsafe int UnloadAssembly(char* assemblyPathPtr) 
+        => UnloadAssemblyImpl(assemblyPathPtr);
+
+    private static unsafe int UnloadAssemblyImpl(char* assemblyPathPtr)
     {
         try
         {
             string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
-            
+
             Console.WriteLine($"[ScriptHost] Unloading assembly: {assemblyPath}");
-            
+
             if (!s_loadedAssemblies.TryGetValue(assemblyPath, out var entry))
             {
                 Console.WriteLine($"[ScriptHost] Assembly not loaded: {assemblyPath}");
                 return -1;
             }
-            
+
             // Remove all system instances from this assembly
             var systemHandlesToRemove = new List<ulong>();
             foreach (var kvp in s_systemTypes)
@@ -114,28 +114,28 @@ public static class ScriptHost
                     systemHandlesToRemove.Add(kvp.Key);
                 }
             }
-            
+
             foreach (var handle in systemHandlesToRemove)
             {
                 s_systemInstances.Remove(handle);
                 s_systemTypes.Remove(handle);
                 Console.WriteLine($"[ScriptHost] Removed system instance: handle={handle}");
             }
-            
+
             // Unload the assembly load context
             if (entry.Context != null)
             {
                 entry.Context.Unload();
                 Console.WriteLine($"[ScriptHost] Unloaded context for: {assemblyPath}");
             }
-            
+
             s_loadedAssemblies.Remove(assemblyPath);
-            
+
             // Force garbage collection to reclaim memory
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            
+
             Console.WriteLine($"[ScriptHost] Successfully unloaded: {assemblyPath}");
             return 0; // Success
         }
@@ -159,9 +159,9 @@ public static class ScriptHost
             string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
             
             Console.WriteLine($"[ScriptHost] Reloading assembly: {assemblyPath}");
-            
+
             // Unload existing assembly
-            int unloadResult = UnloadAssembly(assemblyPathPtr);
+            int unloadResult = UnloadAssemblyImpl(assemblyPathPtr);
             if (unloadResult != 0)
             {
                 Console.WriteLine($"[ScriptHost] Warning: Failed to unload existing assembly during reload");
@@ -171,7 +171,7 @@ public static class ScriptHost
             System.Threading.Thread.Sleep(100);
             
             // Load new version
-            int loadResult = LoadAssembly(assemblyPathPtr);
+            int loadResult = LoadAssemblyImpl(assemblyPathPtr);
             if (loadResult != 0)
             {
                 Console.WriteLine($"[ScriptHost] Failed to load new assembly during reload");
@@ -322,7 +322,7 @@ public static class ScriptHost
             // Get name
             string name = systemType.FullName ?? systemType.Name;
             byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
-            Marshal.Copy(nameBytes, 0, (IntPtr)outNameBuffer, Math.Min(nameBytes.Length, 256));
+            Marshal.Copy(nameBytes, 0, (IntPtr)outNameBuffer, System.Math.Min(nameBytes.Length, 256));
             
             // TODO: Get group and run mode from attributes or interface methods
             *outGroup = (int)SystemGroup.Update;
@@ -433,4 +433,4 @@ public enum SystemRunMode
     Always,
     PlayOnly,
     EditOnly
-}   void OnDestroy(object world);
+}

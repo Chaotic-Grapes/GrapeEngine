@@ -21,22 +21,22 @@ namespace GrapeEngine;
 /// Represents the ECS World, which contains all entities and their components.
 /// Use this to create, destroy, and query entities from C# systems.
 /// </summary>
-public unsafe class World
+public class World
 {
-    private readonly void* _nativeWorldPtr;
+    private readonly IntPtr _nativeWorldPtr;
 
     /// <summary>
     /// Internal constructor. World instances are created by the engine.
     /// </summary>
-    internal World(void* nativeWorldPtr)
+    internal unsafe World(void* nativeWorldPtr)
     {
-        _nativeWorldPtr = nativeWorldPtr;
+        _nativeWorldPtr = (IntPtr)nativeWorldPtr;
     }
 
     /// <summary>
     /// Internal accessor for native World pointer.
     /// </summary>
-    internal void* NativePtr => _nativeWorldPtr;
+    internal unsafe void* NativePtr => (void*)_nativeWorldPtr;
 
     // ============================================================================
     // Entity Lifecycle
@@ -46,9 +46,9 @@ public unsafe class World
     /// Create a new entity in the world.
     /// </summary>
     /// <returns>A new Entity instance</returns>
-    public Entity CreateEntity()
+    public unsafe Entity CreateEntity()
     {
-        ulong entityId = WorldInteropAPI.CreateEntity(_nativeWorldPtr);
+        ulong entityId = WorldInteropAPI.CreateEntity((void*)_nativeWorldPtr);
         return new Entity(this, entityId);
     }
 
@@ -57,9 +57,9 @@ public unsafe class World
     /// </summary>
     /// <param name="entity">The entity to check</param>
     /// <returns>True if the entity is alive, false otherwise</returns>
-    public bool IsAlive(Entity entity)
+    public unsafe bool IsAlive(Entity entity)
     {
-        return WorldInteropAPI.IsEntityAlive(_nativeWorldPtr, entity.Id);
+        return WorldInteropAPI.IsEntityAlive((void*)_nativeWorldPtr, entity.Id);
     }
 
     // ============================================================================

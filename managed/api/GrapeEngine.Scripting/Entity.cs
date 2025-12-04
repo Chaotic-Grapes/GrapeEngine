@@ -20,7 +20,7 @@ namespace GrapeEngine;
 /// <summary>
 /// Represents an entity in the ECS World. Entities are containers for components.
 /// </summary>
-public unsafe class Entity
+public class Entity
 {
     private readonly World _world;
     private readonly ulong _id;
@@ -74,7 +74,7 @@ public unsafe class Entity
     /// </summary>
     /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
     /// <returns>True if component exists, false otherwise</returns>
-    public bool HasComponent<T>() where T : unmanaged
+    public unsafe bool HasComponent<T>() where T : unmanaged
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
@@ -87,7 +87,7 @@ public unsafe class Entity
     /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
     /// <returns>Reference to the component data</returns>
     /// <exception cref="InvalidOperationException">If component doesn't exist</exception>
-    public ref T GetComponent<T>() where T : unmanaged
+    public unsafe ref T GetComponent<T>() where T : unmanaged
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
@@ -107,7 +107,7 @@ public unsafe class Entity
     /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
     /// <param name="component">Output reference to component if found</param>
     /// <returns>True if component exists, false otherwise</returns>
-    public bool TryGetComponent<T>(out T component) where T : unmanaged
+    public unsafe bool TryGetComponent<T>(out T component) where T : unmanaged
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
@@ -129,7 +129,7 @@ public unsafe class Entity
     /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
     /// <param name="component">Initial component data</param>
     /// <returns>Reference to the added component</returns>
-    public ref T AddComponent<T>(T component = default) where T : unmanaged
+    public unsafe ref T AddComponent<T>(T component = default) where T : unmanaged
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
@@ -168,7 +168,7 @@ public unsafe class Entity
     /// Remove a component from this entity.
     /// </summary>
     /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
-    public void RemoveComponent<T>() where T : unmanaged
+    public unsafe void RemoveComponent<T>() where T : unmanaged
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
@@ -179,6 +179,9 @@ public unsafe class Entity
     /// Destroy this entity, removing it from the world.
     /// </summary>
     public void Destroy()
+        => DestroyUnsafe();
+
+    internal unsafe void DestroyUnsafe()
     {
         WorldInteropAPI.DestroyEntity(_world.NativePtr, _id);
     }

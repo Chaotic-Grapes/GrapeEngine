@@ -9,6 +9,11 @@
     <OutputPath>..\..\build\scripts\</OutputPath>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- For Roslyn compilation support (hot reload) -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+  </ItemGroup>
+
   <!-- System.Runtime.InteropServices is part of .NET 9 - no package reference needed -->
 
 </Project>

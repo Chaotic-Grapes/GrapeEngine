@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using System.Runtime.InteropServices;
 
-namespace GrapeEngine.ScriptHost;
+namespace GrapeEngine.Scripting.Hosting;
 
 /// <summary>
 /// File watcher for hot reload support.
@@ -25,8 +25,8 @@ public static class ScriptFileWatcher
 {
     private static FileSystemWatcher? s_watcher;
     private static System.Timers.Timer? s_debounceTimer;
-    private static readonly HashSet<string> s_changedFiles = new();
-    private static readonly object s_lock = new();
+    private static readonly HashSet<string> s_changedFiles = [];
+    private static readonly Lock _lock = new();
     private static Action<string>? s_onFileChanged;
 
     /// <summary>
@@ -49,7 +49,7 @@ public static class ScriptFileWatcher
             Console.WriteLine($"[ScriptFileWatcher] Starting file watcher for: {directoryPath}");
 
             // Stop existing watcher if any
-            StopWatching();
+            StopWatchingImpl();
 
             // Create file system watcher
             s_watcher = new FileSystemWatcher(directoryPath)
@@ -86,6 +86,9 @@ public static class ScriptFileWatcher
     /// </summary>
     [UnmanagedCallersOnly]
     public static void StopWatching()
+        => StopWatchingImpl();
+
+    private static void StopWatchingImpl()
     {
         if (s_watcher != null)
         {
@@ -113,7 +116,7 @@ public static class ScriptFileWatcher
 
     private static void OnFileChanged(object sender, FileSystemEventArgs e)
     {
-        lock (s_lock)
+        lock (_lock)
         {
             // Add to changed files set
             s_changedFiles.Add(e.FullPath);
@@ -128,7 +131,7 @@ public static class ScriptFileWatcher
 
     private static void OnFileRenamed(object sender, RenamedEventArgs e)
     {
-        lock (s_lock)
+        lock (_lock)
         {
             s_changedFiles.Add(e.FullPath);
             
@@ -142,9 +145,9 @@ public static class ScriptFileWatcher
     private static void OnDebounceTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
         HashSet<string> filesToProcess;
-        lock (s_lock)
+        lock (_lock)
         {
-            filesToProcess = new HashSet<string>(s_changedFiles);
+            filesToProcess = [.. s_changedFiles];
             s_changedFiles.Clear();
         }
 

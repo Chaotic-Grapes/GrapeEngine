@@ -19,7 +19,7 @@ namespace GrapeEngine;
 /// <summary>
 /// Query for iterating over entities with one component type.
 /// </summary>
-public unsafe class Query<T1>
+public class Query<T1>
     where T1 : unmanaged
 {
     private readonly World _world;
@@ -44,7 +44,7 @@ public unsafe class Query<T1>
 /// <summary>
 /// Query for iterating over entities with two component types.
 /// </summary>
-public unsafe class Query<T1, T2>
+public class Query<T1, T2>
     where T1 : unmanaged
     where T2 : unmanaged
 {
@@ -72,7 +72,7 @@ public unsafe class Query<T1, T2>
 /// <summary>
 /// Query for iterating over entities with three component types.
 /// </summary>
-public unsafe class Query<T1, T2, T3>
+public class Query<T1, T2, T3>
     where T1 : unmanaged
     where T2 : unmanaged
     where T3 : unmanaged
