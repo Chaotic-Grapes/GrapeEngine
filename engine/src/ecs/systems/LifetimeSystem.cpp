@@ -16,8 +16,16 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/LifetimeSystem.h"
 
 namespace ECS {
-    // Decrease Lifetime and destroy expired entities (safe: destroys after iteration)
-    void LifetimeSystem::Update(World& world, const float dt) {
+    SystemMetadata LifetimeSystem::GetMetadata() const {
+        SystemMetadata metadata;
+        metadata.name = "Lifetime";
+        metadata.readComponents = {"Lifetime", "Active"};
+        metadata.writeComponents = {"Lifetime"};
+        metadata.executionOrder = 100;
+        return metadata;
+    }
+
+    void LifetimeSystem::OnUpdate(World& world, const float dt) {
         std::vector<Entity> toDestroy;
         world.Each<Components::Lifetime>([&](const Entity entity, Components::Lifetime& life) {
             // Treat entities without Active as enabled by default

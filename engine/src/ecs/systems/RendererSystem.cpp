@@ -122,7 +122,16 @@ namespace ECS {
         return glm::vec2(worldPos.x, worldPos.y);
     }
 
-    void RendererSystem::Initialize(World& world) {
+    SystemMetadata RendererSystem::GetMetadata() const {
+        SystemMetadata metadata;
+        metadata.name = "Renderer";
+        metadata.readComponents = {}; // Reads many components
+        metadata.writeComponents = {};
+        metadata.executionOrder = 0;
+        return metadata;
+    }
+
+    void RendererSystem::OnCreate(World& world) {
         if (m_initialized)
             return;
 
@@ -285,8 +294,8 @@ namespace ECS {
         }
     }
 
-    void RendererSystem::Update(World& world, const float dt) {
-        (void)dt;
+    void RendererSystem::OnUpdate(World& world, const float deltaTime) {
+        (void)deltaTime;
         if (!m_renderer)
             return;
 
@@ -1530,5 +1539,21 @@ namespace ECS {
 
             LOG_DEBUG("Flushes this frame: " << flushes << ss.str() << " | " << "FPS: " <<  static_cast<int>(1.0f / Time::DeltaTime()));
         }
+    }
+
+    void RendererSystem::OnDestroy(World& world) {
+        (void)world;
+        // Cleanup rendering resources
+        m_renderer.reset();
+        m_renderGraph.reset();
+        m_shader.reset();
+        m_textShader.reset();
+        m_sdfCircleShader.reset();
+        m_blitShader.reset();
+        m_bloomBlurShader.reset();
+        m_bloomExtractShader.reset();
+        m_bloomCombineShader.reset();
+        m_pickingFBO.Destroy();
+        s_instance = nullptr;
     }
 }

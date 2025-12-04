@@ -21,9 +21,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scene/SceneManager.h"
 #include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
+#include "ecs/SystemManager.h"
+#include <functional>
 
 // Forward declarations
-namespace ECS { class ScriptSystem; }
+namespace ECS { 
+    class ScriptSystem;
+    class AudioSystem;
+}
 
 namespace Engine {
     class Application {
@@ -75,15 +80,12 @@ namespace Engine {
          */
         void Close();
 
-        /**
-         * @brief Check if running in editor mode (with overlay/level editor)
-         * @return true if editor is active, false for standalone builds
-         */
-        bool IsInEditorMode() const { return m_isInEditorMode; }
-
         // Getters for services
         Services::AudioService* GetAudioService() { return m_audio; }
         const Services::AudioService* GetAudioService() const { return m_audio; }
+        
+        // Get SystemManager for system access
+        ECS::SystemManager& GetSystemManager() { return m_systemManager; }
 
     private:
         // Flag to indicate if application should stop
@@ -91,6 +93,9 @@ namespace Engine {
 
         // Scene manager
         Scenes::SceneManager m_sceneManager;
+        
+        // System manager (global, persistent)
+        ECS::SystemManager m_systemManager;
 
         // Project settings (used by both editor and game runtime)
         ProjectSettings m_projectSettings;
@@ -105,11 +110,13 @@ namespace Engine {
 
         // Services
         Services::AudioService* m_audio = nullptr;
-        ECS::ScriptSystem* m_scriptSystem = nullptr;        // Editor mode flag
-        bool m_isInEditorMode = false;
+        ECS::ScriptSystem* m_scriptSystem = nullptr;
 
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
+        
+        // Callback for external control of game logic (used by editor)
+        std::function<bool()> m_gameLogicCallback;
 
         void _onGameStart(Scenes::Scene* scene);
         void _onGameStop(Scenes::Scene* scene);

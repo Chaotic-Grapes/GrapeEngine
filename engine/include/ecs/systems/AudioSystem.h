@@ -1,9 +1,10 @@
 /* Start Header *****************************************************************/
 /*!
-\file    AudioSystem.h
-\author  Original Implementation (60%), Refactor (40%)
+\file   AudioSystem.h
+\author Dalton Koh (100%)
+\par    d.koh@digipen.edu
 \brief
-Audio system following standardized ISystem interface.
+Declares the AudioSystem which manages audio playback in the ECS framework.
 
 Responsibilities:
 - Process entities with AudioSource component
@@ -11,7 +12,6 @@ Responsibilities:
 - Manage audio playback lifecycle (start/stop/update)
 - Handle 3D spatial audio positioning
 - Support PlayOnStart functionality
-- Track active sound instances
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -29,23 +29,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_map>
 
 namespace ECS {
-
     /**
-     * @brief System for managing audio playback.
-     * 
-     * Processes AudioSource components and manages audio playback through
-     * the AudioService. Supports 3D spatial audio, looping, and dynamic
-     * playback control.
-     * 
-     * Lifecycle:
-     * - OnCreate: Initialize audio cache
-     * - OnUpdate: Process AudioSource components, manage playback
-     * - OnDestroy: Stop all sounds, cleanup
+     * @brief System for managing audio playback
+     * Executes in PostUpdate phase with executionOrder=50
      */
     class AudioSystem : public ISystem {
     public:
         /**
-         * @brief Construct audio system.
+         * @brief Construct audio system
          * @param audioService Reference to audio service (must outlive this system)
          */
         AudioSystem(Services::AudioService& audioService);
@@ -55,19 +46,20 @@ namespace ECS {
         void OnCreate(World& world) override;
         void OnUpdate(World& world, float deltaTime) override;
         void OnDestroy(World& world) override;
-        const SystemMetadata& GetMetadata() const override;
+        
+        SystemMetadata GetMetadata() const override;
         SystemGroup GetSystemGroup() const override { return SystemGroup::PostUpdate; }
         SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
 
         /**
-         * @brief Called when scene starts playing (editor play mode).
-         * Enables PlayOnStart audio to begin.
+         * @brief Called when scene starts playing (editor play mode)
+         * Enables PlayOnStart audio to begin
          */
         void OnSceneStart();
 
         /**
-         * @brief Called when scene stops (editor stop mode).
-         * Stops all active audio.
+         * @brief Called when scene stops (editor stop mode)
+         * Stops all active audio
          */
         void OnSceneStop();
 
@@ -84,7 +76,6 @@ namespace ECS {
         void _stopSound(Entity entity);
         bool _isGamePlaying() const;
     };
-
 }
 
 #endif

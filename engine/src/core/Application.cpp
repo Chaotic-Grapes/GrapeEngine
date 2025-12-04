@@ -21,10 +21,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/systems/ScriptSystem.h"
-#include "audio/AudioSystem.h"
-#include "audio/AudioSystemRegistry.h"
+#include "ecs/systems/LifetimeSystem.h"
+#include "ecs/systems/AudioSystem.h"
 #include "scene/Scene.h"
-#include "scene/SystemRegistry.h"
 #include "services/Input.h"
 #include "services/Time.h"
 #include "services/WindowManager.h"
@@ -75,15 +74,8 @@ namespace Engine {
         else
             _disableConsole();
             
-		// Initialize services
+        // Initialize services
 		_initializeServices();
-
-        // Start with some systems disabled in editor mode
-        if (IsInEditorMode()) {
-            Scenes::SystemRegistry::Disable("Physics");
-            Scenes::SystemRegistry::Disable("Lifetime");
-            Scenes::SystemRegistry::Disable("Animation");
-        }
 
         // Call OnStart() function of game then attempt to create a main window
         game.OnStart(m_sceneManager);
@@ -157,10 +149,11 @@ namespace Engine {
                 // Update physics and scripts
                 _updatePhysics(world, shouldRun, stepRequested);
                 _updateScripts(world, shouldRun);
+                
+                // Update all systems - they control their own run mode behavior
+                const float dt = static_cast<float>(Time::DeltaTime());
+                m_systemManager.Update(world, dt);
             }
-            
-            // Run all non-physics systems at variable timestep
-            m_sceneManager.Update();
             
             // Game-level update hook
             game.OnUpdate(m_sceneManager);
@@ -264,84 +257,43 @@ namespace Engine {
             }
         }
 
-        // Register all ECS systems
+        // Register all ECS systems globally
         _registerSystems();
+        
+        // Initialize all systems
+        ECS::World emptyWorld;
+        m_systemManager.CreateAll(emptyWorld);
+        LOG_INFO("SystemManager: Initialized " << m_systemManager.GetSystemCount() << " systems");
     }
 
     void Application::_registerSystems() {
-        // Physics
-        Scenes::SystemRegistry::Register("Physics", [](ECS::World& w, const float dt) {
-            ECS::PhysicsSystem::Update(w, dt);
-        });
-
-        // Lifetime
-        Scenes::SystemRegistry::Register("Lifetime", [](ECS::World& w, const float dt) {
-            ECS::LifetimeSystem::Update(w, dt);
-        });
-
-        // Animation
-        Scenes::SystemRegistry::Register("Animation", [](ECS::World& w, const float dt) {
-            ECS::AnimationSystem::Update(w, dt);
-        });
+        // Register all ECS systems in order
+        // Systems will execute based on their SystemGroup and executionOrder
         
-        // Render
-        Scenes::SystemRegistry::Register("Render", [this](ECS::World& w, const float dt) {
-            // Only run renderer system in standalone mode
-            // In editor mode, the Viewport handles rendering to avoid double updates
-            if (!IsInEditorMode()) {
-                static ECS::RendererSystem s_renderer;
-                s_renderer.Initialize(w);
-                s_renderer.BindWorld(w);
-                s_renderer.Update(w, dt);
-            }
-        });
-
-        // Register UI System soon
-
-        // Store one AudioSystem instance per world to handle scene switching properly
-        Scenes::SystemRegistry::Register("Audio", [this](ECS::World& w, const float dt) {
-            auto* svc = m_audio;
-            if (!svc) return;
-
-            // Store AudioSystem per world to handle scene switching
-            static std::unordered_map<ECS::World*, std::unique_ptr<AudioSystem>> s_audioSystems;
-
-            auto it = s_audioSystems.find(&w);
-            if (it == s_audioSystems.end()) {
-                auto result = s_audioSystems.emplace(&w, std::make_unique<AudioSystem>(w, *svc));
-                it = result.first;
-                Audio::AUDIO_MAP[&w] = it->second.get();
-                LOG_DEBUG("Audio system: Created AudioSystem for world at " << &w);
-            }
-
-            // Update the audio system
-            if (it->second) {
-                it->second->Update(dt);
-            }
-        });
-
-        // Register scripting system
-        Scenes::SystemRegistry::Register("Script", [this](ECS::World& w, const float dt) {
-            (void)w;
-            (void)dt;
-            if (!m_scriptSystem || !m_scriptSystem->IsInitialized()) return;
-            
-            // Scripts are updated through ScriptSystem::Update which is called separately
-            // This registration mainly ensures the system is tracked
-        });
-
-        // For now, the UIEventSystem is initialized like this
-        // Init UI events system
+        // Update Phase Systems
+        m_systemManager.RegisterSystem<ECS::LifetimeSystem>();
+        m_systemManager.RegisterSystem<ECS::AnimationSystem>();
+        m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
+        
+        // Physics Phase Systems
+        m_systemManager.RegisterSystem<ECS::PhysicsSystem>();
+        
+        // Render Phase Systems
+        m_systemManager.RegisterSystem<ECS::RendererSystem>();
+        
+        // UIEventSystem is initialized separately
         ECS::UIEventSystem::Initialize();
+        
+        LOG_INFO("SystemManager: Registered " << m_systemManager.GetSystemCount() << " systems");
     }
 
     void Application::_onGameStart(Scenes::Scene* scene) {
         if (!scene) return;
 
-        auto* world = &scene->GetWorld();
-        auto it = Audio::AUDIO_MAP.find(world);
-        if (it != Audio::AUDIO_MAP.end() && it->second) {
-            it->second->OnSceneStart();
+        // Notify AudioSystem of scene start
+        auto* audioSys = m_systemManager.GetSystem<ECS::AudioSystem>();
+        if (audioSys) {
+            audioSys->OnSceneStart();
             LOG_DEBUG("AudioSystem: Notified of scene start");
         }
 
@@ -358,9 +310,9 @@ namespace Engine {
         m_accumulator = 0.0f; // Reset accumulator on stop
 
         auto* world = &scene->GetWorld();
-        auto it = Audio::AUDIO_MAP.find(world);
-        if (it != Audio::AUDIO_MAP.end() && it->second) {
-            it->second->OnSceneStop();
+        auto* audioSystem = m_systemManager.GetSystem<ECS::AudioSystem>();
+        if (audioSystem) {
+            audioSystem->OnSceneStop();
             LOG_DEBUG("AudioSystem: Notified of scene stop");
         }
 
@@ -395,43 +347,19 @@ namespace Engine {
     // -------------------------------------------------------------------------
 
     bool Application::_shouldRunGameLogic() const {
-        // Standalone build: always run game logic
-        if (!IsInEditorMode())
-            return true;
-        
-        // Editor build: respect play/pause state
-        return m_overlay->IsGamePlaying();
+        // Use callback if set (for editor control), otherwise always run
+        if (m_gameLogicCallback) {
+            return m_gameLogicCallback();
+        }
+        return true;
     }
 
     void Application::_updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested) {
-        auto* physicsSystem = Scenes::SystemRegistry::Get("Physics");
-        if (!physicsSystem) return;
-
-        // Editor-only: Enable/disable physics based on play state
-        if (IsInEditorMode()) {
-            // Toggle Physics
-            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Physics")) {
-                Scenes::SystemRegistry::Enable("Physics");
-            }
-            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Physics")) {
-                Scenes::SystemRegistry::Disable("Physics");
-            }
-
-            // Toggle Lifetime
-            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Lifetime")) {
-                Scenes::SystemRegistry::Enable("Lifetime");
-            }
-            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Lifetime")) {
-                Scenes::SystemRegistry::Disable("Lifetime");
-            }
-
-            // Toggle Animation
-            if (shouldRun && !Scenes::SystemRegistry::IsEnabled("Animation")) {
-                Scenes::SystemRegistry::Enable("Animation");
-            }
-            else if (!shouldRun && Scenes::SystemRegistry::IsEnabled("Animation")) {
-                Scenes::SystemRegistry::Disable("Animation");
-            }
+        // Handle fixed timestep accumulation for physics
+        // Note: Physics system execution is handled by UpdateSystemsForMode() with SystemRunMode::PlayOnly
+        
+        if (!shouldRun && !stepRequested) {
+            return; // Don't accumulate time when not playing
         }
 
         // Run physics at fixed timestep when playing
@@ -443,8 +371,6 @@ namespace Engine {
                 m_accumulator = maxAccumulator;
 
             while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
-                // (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
-                
                 // Run script FixedUpdate during physics step
                 if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
                     ECS::ScriptSystem::FixedUpdate(world);
@@ -455,7 +381,6 @@ namespace Engine {
         }
         // Editor-only: Single step when paused
         else if (stepRequested) {
-            (*physicsSystem)(world, Time::UnscaledFixedDeltaTime());
             if (m_overlay) m_overlay->ClearStepRequest();
         }
     }

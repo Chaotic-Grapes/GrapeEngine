@@ -1,17 +1,16 @@
 /* Start Header *****************************************************************/
 /*!
 \file   RendererSystem.h
-\author Choi Meng Yew
-\date   27th October 2025
+\author Choi Meng Yew (100%)
+\par    choi.m@digipen.edu
 \brief
-High-level rendering system for the ECS. Manages shaders, camera, and
-orchestrates the render graph for multi-pass rendering.
+Declares the RendererSystem which manages 2D rendering in the ECS framework.
 
 Responsibilities:
 - Initialize and manage rendering resources (shaders, camera, render graph)
 - Process ECS entities with renderable components
-- Execute the render graph each frame
-- Provide temporary accessors for stress testing
+- Execute the render graph each frame with multi-pass rendering
+- Handle object picking and selection highlighting
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -19,23 +18,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#ifndef RENDERER2D_H
-#define RENDERER2D_H
+#ifndef RENDERERSYSTEM_H
+#define RENDERERSYSTEM_H
 
-// Standard Library
-#include <functional>
-
-// Third-Party Includes
-#include <glm/vec2.hpp>
-#include <glm/vec4.hpp>
-#include <glm/ext/matrix_transform.hpp>
-
-// Engine Includes
-#include "Color.h"
+#include "ecs/ISystem.h"
 #include "ecs/World.h"
+#include "Color.h"
 #include "Math/Vector2D.h"
-
-// Graphics Includes
 #include "graphics/shader.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/debugDraw2D.hpp"
@@ -43,38 +32,37 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
+#include <glm/vec2.hpp>
+#include <glm/vec4.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <functional>
 
 namespace ECS {
-
-    // ========================================================================
-    // RendererSystem
-    // ========================================================================
-    /*!
-    \class RendererSystem
-    \brief Manages all 2D rendering through a modern render graph architecture.
-
-    This system owns the render graph, which in turn owns all framebuffers.
-    It processes ECS entities with renderable components and executes multi-pass
-    rendering each frame.
-    */
-    class RendererSystem {
+    /**
+     * @brief System for managing 2D rendering
+     * Executes in Render phase with executionOrder=0
+     */
+    class RendererSystem : public ISystem {
     public:
+        RendererSystem() = default;
+        ~RendererSystem() override = default;
+
         // ====================================================================
         // Public Interface
         // ====================================================================
 
-        /*!
-        \brief Initialize the rendering system with all required resources.
-        \param world The ECS world to render.
-        */
-        void Initialize(World& world);
+        // ISystem interface
+        void OnCreate(World& world) override;
+        void OnUpdate(World& world, float deltaTime) override;
+        void OnDestroy(World& world) override;
+        
+        SystemMetadata GetMetadata() const override;
+        SystemGroup GetSystemGroup() const override { return SystemGroup::Render; }
+        SystemRunMode GetRunMode() const override { return SystemRunMode::Always; }
 
-        /*!
-        \brief Update and render all entities in the world.
-        \param world The ECS world to render.
-        \param dt Delta time (currently unused).
-        */
-        void Update(World& world, float dt);
+        // Legacy compatibility (will be removed)
+        void Initialize(World& world) { OnCreate(world); }
+        void Update(World& world, float dt) { OnUpdate(world, dt); }
 
         /*!
         \brief Get the number of batch flushes this frame (for profiling).
@@ -114,36 +102,7 @@ namespace ECS {
         // Force the renderer to always use scene camera (for game window)
         void SetForceSceneCamera(bool force) { m_forceSceneCamera = force; }
 
-        // ====================================================================
-        // Temporary Accessors (For Stress Testing - Remove Later)
-        // ====================================================================
-        /*! \brief Direct access to low-level renderer for bypass testing. */
-        Renderer* GetRenderer() { return m_renderer.get(); }
-
-        /*! \brief Direct access to main shader for bypass testing. */
-        Shader* GetShader() { return m_shader.get(); }
-
-        /*! \brief Direct access to text shader for bypass testing. */
-        Shader* GetTextShader() { return m_textShader.get(); }
-
-        /*! \brief Get the current projection matrix. */
-        const glm::mat4& GetProjection() const { return m_projection; }
-
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
-
-        /**
-        * @brief Renders the ImGuizmo overlay and allows manipulation of the selected entity.
-        * * This function must be called within the ImGui window context that displays the scene texture.
-        * It handles input for tool switching (W, E, R) and updates the selected entity's
-        * LocalTransform component if the gizmo is being used.
-        * * @param world The current ECS world instance, used to access entity data and scene settings.
-        * @param drawPosX The screen X-coordinate of the top-left corner of the rendered scene image.
-        * @param drawPosY The screen Y-coordinate of the top-left corner of the rendered scene image.
-        * @param drawSizeX The width of the rendered scene image (in pixels).
-        * @param drawSizeY The height of the rendered scene image (in pixels).
-        * 
-        * @note DrawEditorGizmo has been moved to editor code. Editor should handle gizmo rendering separately.
-        */
 
     private:
         // ====================================================================
@@ -220,6 +179,7 @@ namespace ECS {
         // ====================================================================
         // Member Variables - Object Picking
         // ====================================================================
+        
         Framebuffer m_pickingFBO;
         PixelBufferObject m_pbos[2];
         int m_currentPBO = 0;

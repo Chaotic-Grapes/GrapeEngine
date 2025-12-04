@@ -25,7 +25,16 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <algorithm>
 
 namespace ECS {
-    void AnimationSystem::Update(World& world, float dt) {
+    SystemMetadata AnimationSystem::GetMetadata() const {
+        SystemMetadata metadata;
+        metadata.name = "Animation";
+        metadata.readComponents = {"SpriteSheetAnimation2D", "AnimationState2D", "Active"};
+        metadata.writeComponents = {"SpriteSheetAnimation2D", "AnimationState2D", "SpriteRenderer2D"};
+        metadata.executionOrder = 200;
+        return metadata;
+    }
+
+    void AnimationSystem::OnUpdate(World& world, float dt) {
         // Process all entities with animation components
         world.Each<Components::SpriteSheetAnimation2D, Components::AnimationState2D>(
             [&](Entity entity, Components::SpriteSheetAnimation2D& anim, Components::AnimationState2D& state) {

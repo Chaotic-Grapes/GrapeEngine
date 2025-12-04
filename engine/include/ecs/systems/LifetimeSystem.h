@@ -20,14 +20,28 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <vector>
 #include "ecs/World.h"
 #include "ecs/Components.h"
+#include "ecs/ISystem.h"
 
 namespace ECS {
-    class LifetimeSystem {
+    /**
+     * @brief System that decreases Lifetime and destroys expired entities
+     * Executes in Update phase with executionOrder=100
+     */
+    class LifetimeSystem : public ISystem {
     public:
-        // Decrease Lifetime and destroy expired entities (safe: destroys after iteration)
-        static void Update(World& world, float dt);
+        LifetimeSystem() = default;
+        ~LifetimeSystem() override = default;
 
-        // Same, for a specific layer
+        // ISystem interface
+        void OnCreate(World& world) override {}
+        void OnUpdate(World& world, float dt) override;
+        void OnDestroy(World& world) override {}
+        
+        SystemMetadata GetMetadata() const override;
+        SystemGroup GetSystemGroup() const override { return SystemGroup::Update; }
+        SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
+
+        // Utility: Update for a specific layer
         static void UpdateForLayer(World& world, float dt, uint16_t layerId);
     };
 }

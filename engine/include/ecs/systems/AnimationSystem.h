@@ -22,16 +22,26 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define ANIMATIONSYSTEM_H
 
 #include "ecs/World.h"
+#include "ecs/ISystem.h"
 
 namespace ECS {
-    class AnimationSystem {
+    /**
+     * @brief System that updates sprite sheet animations
+     * Executes in Update phase with executionOrder=200
+     */
+    class AnimationSystem : public ISystem {
     public:
-        /**
-         * @brief Update all sprite sheet animations in the world
-         * @param world The ECS world containing entities and components
-         * @param dt Delta time in seconds
-         */
-        static void Update(World& world, float dt);
+        AnimationSystem() = default;
+        ~AnimationSystem() override = default;
+
+        // ISystem interface
+        void OnCreate(World& world) override {}
+        void OnUpdate(World& world, float dt) override;
+        void OnDestroy(World& world) override {}
+        
+        SystemMetadata GetMetadata() const override;
+        SystemGroup GetSystemGroup() const override { return SystemGroup::Update; }
+        SystemRunMode GetRunMode() const override { return SystemRunMode::PlayOnly; }
     };
 }
 

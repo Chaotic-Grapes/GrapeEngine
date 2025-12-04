@@ -64,14 +64,22 @@ namespace {
     }
 }
 
-AudioSystem::AudioSystem(ECS::World& world, Services::AudioService& audioService)
-    : m_world(world)
-    , m_audioService(audioService)
+namespace ECS {
+
+AudioSystem::AudioSystem(Services::AudioService& audioService)
+    : m_audioService(audioService)
     , m_hasStarted(true) 
 {
 }
 
-void AudioSystem::Update(float /*dt*/)
+void AudioSystem::OnCreate(World& world) {
+    (void)world;
+    // Build audio cache on first creation
+    BuildCueCache();
+    LOG_INFO("AudioSystem: Initialized");
+}
+
+void AudioSystem::OnUpdate(World& world, float /*dt*/)
 {
     // Get device
     Audio::FmodAudioDevice* device = m_audioService.Device();
@@ -90,11 +98,11 @@ void AudioSystem::Update(float /*dt*/)
     bool isPlaying = _isGamePlaying();
 
     // Track which entities we've processed this frame
-    std::unordered_set<ECS::Entity, ECS::EntityHash> processedEntities;
+    std::unordered_set<Entity, EntityHash> processedEntities;
 
     // Process all entities with AudioSource
-    m_world.Each<ECS::Components::AudioSource>(
-        [&](ECS::Entity e, ECS::Components::AudioSource& src)
+    world.Each<Components::AudioSource>(
+        [&](Entity e, Components::AudioSource& src)
         {
             processedEntities.insert(e);
 
@@ -211,27 +219,27 @@ void AudioSystem::Update(float /*dt*/)
             }
 
             // ----------------------------------------------------------------
-            // Update existing playback (volume/pitch changes)
+            // Update existing playback parameters
             // ----------------------------------------------------------------
             if (hasInstance) {
                 Audio::PlaybackHandle handle = it->second;
                 device->SetInstanceVolume(handle, src.Volume);
                 device->SetInstancePitch(handle, src.Pitch);
 
-                //// Update 3D position if needed
-                //if (src.Spatial3D && m_world.Has<ECS::Components::WorldTransform>(e)) {
-                //    auto& transform = m_world.Get<ECS::Components::WorldTransform>(e);
-                //    Audio::Vec3 pos{ transform.Position.x, transform.Position.y, transform.Position.z };
-                //    Audio::Vec3 vel{ 0, 0, 0 };
-                //    device->SetInstancePosition(handle, pos, vel);
-                //}
+                // Update 3D position if spatial audio is enabled
+                if (src.Spatial3D && world.Has<Components::WorldTransform>(e)) {
+                    auto& transform = world.Get<Components::WorldTransform>(e);
+                    Audio::Vec3 pos{ transform.Position.x, transform.Position.y, transform.Position.z };
+                    Audio::Vec3 vel{ 0, 0, 0 };
+                    device->SetInstancePosition(handle, pos, vel);
+                }
             }
         });
 
     // ----------------------------------------------------------------
     // Clean up sounds for entities that no longer have AudioSource
     // ----------------------------------------------------------------
-    std::vector<ECS::Entity> toRemove;
+    std::vector<Entity> toRemove;
     for (auto& [entity, handle] : m_activeSounds) {
         if (processedEntities.find(entity) == processedEntities.end()) {
             toRemove.push_back(entity);
@@ -241,6 +249,24 @@ void AudioSystem::Update(float /*dt*/)
     for (auto entity : toRemove) {
         _stopSound(entity);
     }
+}
+
+void AudioSystem::OnDestroy(World& world) {
+    (void)world;
+    // Stop all active sounds
+    OnSceneStop();
+    LOG_INFO("AudioSystem: Destroyed");
+}
+
+const SystemMetadata& AudioSystem::GetMetadata() const {
+    static SystemMetadata metadata{
+        .name = "Audio",
+        .readComponents = {},  // Reads AudioSource, WorldTransform
+        .writeComponents = {}, // Doesn't write components
+        .executionOrder = 50,  // Run after gameplay logic
+        .enabled = true
+    };
+    return metadata;
 }
 
 void AudioSystem::OnSceneStart()
@@ -262,7 +288,7 @@ void AudioSystem::OnSceneStop()
     LOG_DEBUG("AudioSystem: Scene stopped - all sounds stopped");
 }
 
-void AudioSystem::_stopSound(ECS::Entity entity)
+void AudioSystem::_stopSound(Entity entity)
 {
     auto it = m_activeSounds.find(entity);
     if (it != m_activeSounds.end()) {
@@ -277,4 +303,6 @@ bool AudioSystem::_isGamePlaying() const
     // Engine always considers game as "playing"
     // Editor can override this behavior by managing AudioSystem directly
     return true;
+}
+
 }

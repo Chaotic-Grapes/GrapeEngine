@@ -13,6 +13,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 
 #include "LevelEditor.h"
 #include "core/Logger.h"
+#include "core/EditorCallbacks.h"
 #include <imgui.h>
 #include "EditorStyle.h"
 #include "graphics/graphicsConfig.hpp"
@@ -33,6 +34,14 @@ LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Sce
 
 // Destroy the editor instance without owning the world
 LevelEditor::~LevelEditor() {
+    // Unsubscribe from engine messages
+    Messaging::MessageSystem::Unsubscribe<Messaging::EntityCreated>(m_entityCreatedSubscription);
+    Messaging::MessageSystem::Unsubscribe<Messaging::EntityDestroyed>(m_entityDestroyedSubscription);
+    Messaging::MessageSystem::Unsubscribe<Messaging::SceneModified>(m_sceneModifiedSubscription);
+    
+    // Clear engine callbacks
+    Engine::EditorCallbackRegistry::Get().ClearAll();
+    
     // Shutdown console panel to disconnect Logger callback
     m_console.Shutdown();
     
@@ -225,6 +234,118 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
 
     // Wire up hierarchy panel to file menu for entity order preservation
     m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);
+
+    // ===================================================================
+    // Register Editor Callbacks with Engine
+    // ===================================================================
+    auto& callbacks = Engine::EditorCallbackRegistry::Get();
+
+    // Register entity selection handler
+    callbacks.RegisterEntitySelection([this](uint32_t entityId, bool addToSelection) {
+        if (addToSelection) {
+            // Multi-select not yet implemented in hierarchy
+            LOG_WARNING("[LevelEditor] Multi-select not yet implemented");
+        }
+        m_hierarchyWindow.SetSelectedEntity(entityId);
+        m_inspector.InspectEntity(entityId);
+        if (m_viewport.HasValidWorld()) {
+            m_viewport.SetSelectedEntity(entityId);
+        }
+    });
+
+    // Register inspector refresh handler
+    callbacks.RegisterInspectorRefresh([this](uint32_t entityId) {
+        if (entityId == 0) {
+            // Refresh current selection - just re-inspect it
+            EntityId currentId = m_hierarchyWindow.GetPrimarySelectedEntity();
+            if (currentId != 0) {
+                m_inspector.InspectEntity(currentId);
+            }
+        } else {
+            m_inspector.InspectEntity(entityId);
+        }
+    });
+
+    // Register notification handler
+    callbacks.RegisterNotification([this](int severity, const std::string& title,
+                                         const std::string& message, float duration) {
+        // Forward to console with appropriate log level
+        (void)duration; // Duration not used by console currently
+        LogLevel level;
+        switch (severity) {
+            case 0: level = LogLevel::Info; break;
+            case 1: level = LogLevel::Warning; break;
+            case 2: level = LogLevel::Error; break;
+            case 3: level = LogLevel::Info; break; // Success as Info
+            default: level = LogLevel::Info; break;
+        }
+        m_console.AddMessage(level, LogSource::Engine, "", title + ": " + message);
+    });
+
+    // Register debug draw handler
+    callbacks.RegisterDebugDraw([this](ECS::World* world) {
+        // Editor can implement debug visualization here
+        // For now, this is a placeholder
+        (void)world;
+    });
+
+    // Register editor camera provider
+    callbacks.RegisterEditorCamera([this](glm::vec3& outPos, glm::mat4& outView, glm::mat4& outProj) {
+        auto* cam = m_viewport.GetEditorCamera();
+        if (cam) {
+            outPos = cam->GetPosition();
+            outView = cam->GetViewMatrix();
+            outProj = cam->GetProjectionMatrix();
+            return true;
+        }
+        return false;
+    });
+
+    // Register viewport picking (not yet implemented in Viewport)
+    callbacks.RegisterPick([this](float screenX, float screenY) {
+        (void)screenX;
+        (void)screenY;
+        // TODO: Implement actual picking in Viewport
+        return 0;
+    });
+
+    // ===================================================================
+    // Subscribe to Engine Messages
+    // ===================================================================
+    
+    // Subscribe to entity creation events
+    m_entityCreatedSubscription = Messaging::MessageSystem::Subscribe<Messaging::EntityCreated>(
+        [this](const Messaging::EntityCreated& evt) {
+            LOG_INFO("[LevelEditor] Entity created: " << evt.EntityId);
+            // Hierarchy panel will rebuild its tree automatically
+        }
+    );
+
+    // Subscribe to entity destruction events
+    m_entityDestroyedSubscription = Messaging::MessageSystem::Subscribe<Messaging::EntityDestroyed>(
+        [this](const Messaging::EntityDestroyed& evt) {
+            LOG_INFO("[LevelEditor] Entity destroyed: " << evt.EntityId);
+            // Clear selection if the destroyed entity was selected
+            if (m_hierarchyWindow.GetPrimarySelectedEntity() == evt.EntityId) {
+                m_hierarchyWindow.SetSelectedEntity(0);
+                m_inspector.ClearSelection();
+                if (m_viewport.HasValidWorld()) {
+                    m_viewport.SetSelectedEntity(0);
+                }
+            }
+        }
+    );
+
+    // Subscribe to scene modified events
+    m_sceneModifiedSubscription = Messaging::MessageSystem::Subscribe<Messaging::SceneModified>(
+        [this](const Messaging::SceneModified& evt) {
+            // Mark the scene as dirty in the file menu
+            if (m_fileMenu.GetSceneManager()) {
+                LOG_DEBUG("[LevelEditor] Scene modified: " << evt.Reason);
+                m_fileMenu.MarkSceneDirty();
+            }
+        }
+    );
 
     // Wire up file menu to entity actions for dirty tracking
     m_entityActions.SetFileMenu(&m_fileMenu);

@@ -3,7 +3,6 @@
 \file   Camera.h
 \author Choi Meng Yew
 \par    choi.m@digipen.edu
-\date   4th December 2025
 \brief
 A refactored class. Standalone camera class for rendering. This is NOT an ECS 
 component. Used by both editor cameras and as a base for game camera rendering.

@@ -21,6 +21,8 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 #include "HierarchyPanel.h"
 #include "InspectorPanel.h"
 #include "EditorEntityActions.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 #include <imgui.h>
 #include <GLFW/glfw3.h>
 #include <functional>
@@ -116,6 +118,11 @@ private:
 
     // Undo System
     Editor::UndoSystem m_undoSystem;
+
+    // Message system subscriptions for engine events
+    Messaging::SubscriptionHandle m_entityCreatedSubscription;
+    Messaging::SubscriptionHandle m_entityDestroyedSubscription;
+    Messaging::SubscriptionHandle m_sceneModifiedSubscription;
 };
 
 #endif // LEVEL_EDITOR_H

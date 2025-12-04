@@ -158,8 +158,18 @@ private:
 
 namespace ECS {
 
-    // Initialize static previous collsion member
-    std::unordered_set<uint64_t> PhysicsSystem::s_previousCollisions;
+    SystemMetadata PhysicsSystem::GetMetadata() const {
+        SystemMetadata metadata;
+        metadata.name = "Physics";
+        metadata.readComponents = {"LocalTransform", "CircleCollider2D", "BoxCollider2D", "Rigidbody2D", "Active"};
+        metadata.writeComponents = {"LocalTransform", "Rigidbody2D"};
+        metadata.executionOrder = 0;
+        return metadata;
+    }
+
+    void PhysicsSystem::OnDestroy(World& world) {
+        m_previousCollisions.clear();
+    }
 
     // =====================================================================
     // Narrow-phase helpers
@@ -321,7 +331,7 @@ namespace ECS {
     /**
     * @brief Integrate dynamics, build broad phase, test narrow phase, resolve.
     */
-    void PhysicsSystem::Update(World& world, const float dt) {
+    void PhysicsSystem::OnUpdate(World& world, const float dt) {
         if (!Engine::Physics::IsEnabled()) return;
         if (dt <= 0.0f) return;
 
@@ -568,7 +578,7 @@ namespace ECS {
                     uint64_t pairID = MakeCollisionPairID(A, B);
                     currentCollisions.insert(pairID);
 
-                    bool isNewCollision = (s_previousCollisions.find(pairID) == s_previousCollisions.end());
+                    bool isNewCollision = (m_previousCollisions.find(pairID) == m_previousCollisions.end());
                     CollisionEventType type = isNewCollision ? CollisionEventType::Enter : CollisionEventType::Stay;
 
                     CollisionEventQueue::AddEvent({ A, B, type });
@@ -651,7 +661,7 @@ namespace ECS {
                 if (resolved == 0) break;
             }
 
-            for (uint64_t pairID : s_previousCollisions) {
+            for (uint64_t pairID : m_previousCollisions) {
                 if (currentCollisions.find(pairID) == currentCollisions.end()) {
                     // Collision ended
                     uint32_t idA = (pairID >> 32);
@@ -667,7 +677,7 @@ namespace ECS {
                 }
             }
 
-            s_previousCollisions = std::move(currentCollisions);
+            m_previousCollisions = std::move(currentCollisions);
 
             // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
         }

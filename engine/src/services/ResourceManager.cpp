@@ -18,6 +18,8 @@ Features:
 
 #include "services/ResourceManager.h"
 #include "core/Logger.h"
+#include "core/EditorCallbacks.h"
+#include "core/messaging/MessageSystem.h"
 #include <fstream>
 #include <algorithm>
 
@@ -79,6 +81,17 @@ std::shared_ptr<Texture> ResourceManager::Load<Texture>(const std::string& fileP
     // If not found, return nullptr immediately (fail fast)
     if (!std::filesystem::exists(filePath)) {
         LOG_ERROR("File not found: " << filePath);
+        
+        // Notify editor if active
+        if (Engine::EditorCallbackRegistry::Get().IsEditorActive()) {
+            Engine::EditorCallbackRegistry::Get().InvokeNotification(
+                2, // Error
+                "Resource Load Failed",
+                "Texture file not found: " + filePath,
+                5.0f
+            );
+        }
+        
         return nullptr;
     }
 
@@ -89,13 +102,39 @@ std::shared_ptr<Texture> ResourceManager::Load<Texture>(const std::string& fileP
         // Check if texture loaded successfully
         if (texture->ID() == 0) {
             LOG_ERROR("Texture failed to load: " << filePath);
+            
+            // Notify editor if active
+            if (Engine::EditorCallbackRegistry::Get().IsEditorActive()) {
+                Engine::EditorCallbackRegistry::Get().InvokeNotification(
+                    2, // Error
+                    "Resource Load Failed",
+                    "Failed to load texture: " + filePath,
+                    5.0f
+                );
+            }
+            
             return nullptr;
         }
-        // Successful
+        // Successful - send success message
+        Messaging::MessageSystem::Notify(
+            Messaging::ResourceLoaded{filePath, "Texture", true}
+        );
+        
         return texture;
     }
     catch (const std::exception& e) {
         LOG_ERROR("Exception loading texture " << filePath << ": " << e.what());
+        
+        // Notify editor if active
+        if (Engine::EditorCallbackRegistry::Get().IsEditorActive()) {
+            Engine::EditorCallbackRegistry::Get().InvokeNotification(
+                2, // Error
+                "Resource Load Failed",
+                "Exception loading texture: " + std::string(e.what()),
+                5.0f
+            );
+        }
+        
         return nullptr;
     }
 }

@@ -89,17 +89,17 @@ endif()
 # ======================= COMMON SOURCE FILES =========================
 # Collect engine source files (no editor, no game-specific entry points)
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS 
-    ${CMAKE_CURRENT_LIST_DIR}/src/engine/*.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/engine/*.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/externals/*.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/externals/*.c
+    ${CMAKE_CURRENT_LIST_DIR}/engine/src/*.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/engine/src/*.c
+    ${CMAKE_CURRENT_LIST_DIR}/externals/src/*.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/externals/src/*.c
 )
 
 file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS 
-    ${CMAKE_CURRENT_LIST_DIR}/include/engine/*.h
-    ${CMAKE_CURRENT_LIST_DIR}/include/engine/*.hpp
-    ${CMAKE_CURRENT_LIST_DIR}/include/externals/*.h
-    ${CMAKE_CURRENT_LIST_DIR}/include/externals/*.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/engine/include/*.h
+    ${CMAKE_CURRENT_LIST_DIR}/engine/include/*.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/externals/include/*.h
+    ${CMAKE_CURRENT_LIST_DIR}/externals/include/*.hpp
 )
 
 # Exclude editor-only sources from the engine library so the core engine
@@ -123,8 +123,8 @@ endif()
 
 # Engine library public includes and common dependencies
 target_include_directories(GrapeEngineLib PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/include/engine
-    ${CMAKE_CURRENT_LIST_DIR}/include/externals
+    ${CMAKE_CURRENT_LIST_DIR}/engine/include
+    ${CMAKE_CURRENT_LIST_DIR}/externals/include
 )
 
 # Link core dependencies into the engine library (do NOT include ImGui here so
@@ -156,13 +156,13 @@ if(BUILD_EDITOR)
     
     # Collect editor source files
     file(GLOB_RECURSE EDITOR_SOURCES CONFIGURE_DEPENDS 
-        ${CMAKE_CURRENT_LIST_DIR}/src/editor/*.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/src/editor/*.c
+        ${CMAKE_CURRENT_LIST_DIR}/editor/src/*.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/editor/src/*.c
     )
     
     file(GLOB_RECURSE EDITOR_HEADERS CONFIGURE_DEPENDS 
-        ${CMAKE_CURRENT_LIST_DIR}/include/editor/*.h
-        ${CMAKE_CURRENT_LIST_DIR}/include/editor/*.hpp
+        ${CMAKE_CURRENT_LIST_DIR}/editor/include/*.h
+        ${CMAKE_CURRENT_LIST_DIR}/editor/include/*.hpp
     )
     
     # Create editor executable (editor code only) and link engine library
@@ -186,7 +186,7 @@ if(BUILD_EDITOR)
 
     # Editor-specific includes
     target_include_directories(GrapeEngine PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/include/editor
+        ${CMAKE_CURRENT_LIST_DIR}/editor/include
     )
 
     # Link editor exe to the engine library and editor-only libraries
@@ -197,7 +197,7 @@ if(BUILD_EDITOR)
     )
     # Add editor-only source files that were excluded from the core engine
     target_sources(GrapeEngine PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/src/externals/ImGuizmo.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/externals/src/ImGuizmo.cpp
     )
     
     message(STATUS "  Target: GrapeEngine (Editor)")
