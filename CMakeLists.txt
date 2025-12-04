@@ -102,13 +102,53 @@ file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_LIST_DIR}/include/externals/*.hpp
 )
 
-# Exclude editor-only external sources when building standalone game
-if(BUILD_GAME)
-    # Exclude ImGuizmo (editor gizmo) which depends on ImGui
-    list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/ImGuizmo\\.cpp$")
-    # Exclude DebugUI implementation from standalone game (editor-only)
-    list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/DebugUI\\.cpp$")
+# Exclude editor-only sources from the engine library so the core engine
+# can be built without any ImGui/LevelEditor dependencies. These editor-only
+# implementations will be compiled into the editor executable instead.
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/ImGuizmo\\.cpp$")
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/UICommon\\.cpp$")
+list(FILTER ENGINE_HEADERS EXCLUDE REGEX ".*/UICommon\\.h$")
+
+# Option: build engine as shared library (DLL) or static
+option(BUILD_ENGINE_SHARED "Build engine as shared library (DLL)" ON)
+
+# Create an engine library target so both the editor exe and the game exe
+# can link to the same binary. When shared, this will be the DLL the editor
+# loads; when static it will be linked into both executables.
+if(BUILD_ENGINE_SHARED)
+    add_library(GrapeEngineLib SHARED ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+else()
+    add_library(GrapeEngineLib STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 endif()
+
+# Engine library public includes and common dependencies
+target_include_directories(GrapeEngineLib PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/include/engine
+    ${CMAKE_CURRENT_LIST_DIR}/include/externals
+)
+
+# Link core dependencies into the engine library (do NOT include ImGui here so
+# the standalone game does not pull editor UI code when BUILD_GAME is enabled)
+target_link_libraries(GrapeEngineLib
+    PUBLIC
+        glfw
+        glad
+        glm
+        freetype
+        fmod
+        ${NETHOST_LIB}
+)
+
+# When building the engine as a shared library, define the export macro so
+# public symbols can be annotated with `GRAPEENGINE_API` where needed.
+if(BUILD_ENGINE_SHARED)
+    target_compile_definitions(GrapeEngineLib PRIVATE GRAPEENGINE_EXPORTS)
+    # Name the produced DLL to a stable name used by managed imports
+    set_target_properties(GrapeEngineLib PROPERTIES OUTPUT_NAME "GrapeEngineNative")
+endif()
+
+
+
 
 # ======================= EDITOR BUILD =========================
 if(BUILD_EDITOR)
@@ -125,9 +165,9 @@ if(BUILD_EDITOR)
         ${CMAKE_CURRENT_LIST_DIR}/include/editor/*.hpp
     )
     
-    # Create editor executable
-    add_executable(GrapeEngine ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${EDITOR_SOURCES} ${EDITOR_HEADERS})
-    
+    # Create editor executable (editor code only) and link engine library
+    add_executable(GrapeEngine ${EDITOR_SOURCES} ${EDITOR_HEADERS})
+
     # Set C++ standard
     set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD 23)
     set_property(TARGET GrapeEngine PROPERTY CXX_STANDARD_REQUIRED ON)
@@ -141,26 +181,23 @@ if(BUILD_EDITOR)
         target_sources(GrapeEngine PRIVATE "${CMAKE_BINARY_DIR}/app_editor.rc")
     endif()
     
-    # Compile definitions - USE_IMGUI enables ImGui
+    # Compile definitions - USE_IMGUI enables ImGui (editor-only)
     target_compile_definitions(GrapeEngine PRIVATE USE_IMGUI)
-    
-    # Include directories
-    target_include_directories(GrapeEngine PRIVATE 
-        ${CMAKE_CURRENT_LIST_DIR}/include/engine
+
+    # Editor-specific includes
+    target_include_directories(GrapeEngine PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include/editor
-        ${CMAKE_CURRENT_LIST_DIR}/include/externals
     )
-    
-    # Link libraries (includes ImGui)
+
+    # Link editor exe to the engine library and editor-only libraries
     target_link_libraries(GrapeEngine
         PRIVATE
-            glfw
-            glad
+            GrapeEngineLib
             imgui
-            glm
-            freetype
-            fmod
-            ${NETHOST_LIB}
+    )
+    # Add editor-only source files that were excluded from the core engine
+    target_sources(GrapeEngine PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/src/externals/ImGuizmo.cpp
     )
     
     message(STATUS "  Target: GrapeEngine (Editor)")
@@ -174,9 +211,10 @@ if(BUILD_GAME)
     # Game entry point
     set(GAME_SOURCES ${CMAKE_CURRENT_LIST_DIR}/src/game/GameMain.cpp)
     
-    # Create game executable (NO editor sources, NO ImGui)
-    add_executable(GrapeGame ${ENGINE_SOURCES} ${ENGINE_HEADERS} ${GAME_SOURCES})
-    
+    # Create game executable (NO editor sources, NO ImGui). Game links the
+    # engine library rather than containing engine sources directly.
+    add_executable(GrapeGame ${GAME_SOURCES})
+
     # Set C++ standard
     set_property(TARGET GrapeGame PROPERTY CXX_STANDARD 23)
     set_property(TARGET GrapeGame PROPERTY CXX_STANDARD_REQUIRED ON)
@@ -299,21 +337,10 @@ if(BUILD_GAME)
     # NO USE_IMGUI definition - this disables all ImGui code
     # target_compile_definitions(GrapeGame PRIVATE ...) - intentionally empty
     
-    # Include directories (NO editor includes)
-    target_include_directories(GrapeGame PRIVATE 
-        ${CMAKE_CURRENT_LIST_DIR}/include/engine
-        ${CMAKE_CURRENT_LIST_DIR}/include/externals
-    )
-    
-    # Link libraries (NO ImGui)
+    # Link game executable with the engine library (engine has common deps).
     target_link_libraries(GrapeGame
         PRIVATE
-            glfw
-            glad
-            glm
-            freetype
-            fmod
-            ${NETHOST_LIB}
+            GrapeEngineLib
     )
     
     message(STATUS "  Target: ${GAME_FINAL_OUTPUT_NAME} (Standalone)")
@@ -328,16 +355,22 @@ else()
 endif()
 
 # ======================= SCRIPT API EXPORTS =========================
-# Export functions from executables for C# P/Invoke
-# Note: This is temporary until we refactor to a DLL!
+# Export functions for C# P/Invoke. When the engine is built as a shared
+# library we'll export the ScriptAPI symbols from the DLL. For MSVC we add
+# explicit /EXPORT flags to the engine library target when building shared.
 set(SCRIPT_EXPORTS "/EXPORT:ScriptAPI_GetComponent /EXPORT:ScriptAPI_GetComponentPtr /EXPORT:ScriptAPI_AddComponent /EXPORT:ScriptAPI_SetComponent /EXPORT:ScriptAPI_HasComponent /EXPORT:ScriptAPI_RemoveComponent /EXPORT:ScriptAPI_CreateEntity /EXPORT:ScriptAPI_DestroyEntity /EXPORT:ScriptAPI_IsAlive /EXPORT:ScriptAPI_SetWorld /EXPORT:ScriptAPI_IsKeyPressed /EXPORT:ScriptAPI_IsKeyDown /EXPORT:ScriptAPI_IsKeyUp /EXPORT:ScriptAPI_IsMousePressed /EXPORT:ScriptAPI_GetMouseX /EXPORT:ScriptAPI_GetMouseY /EXPORT:ScriptAPI_GetScrollX /EXPORT:ScriptAPI_GetScrollY /EXPORT:ScriptAPI_Time_GetDeltaTime /EXPORT:ScriptAPI_Time_GetUnscaledDeltaTime /EXPORT:ScriptAPI_Time_GetFixedDeltaTime /EXPORT:ScriptAPI_Time_GetUnscaledFixedDeltaTime /EXPORT:ScriptAPI_Time_GetElapsedTime /EXPORT:ScriptAPI_Time_GetFrameCount /EXPORT:ScriptAPI_Time_GetTimeScale /EXPORT:ScriptAPI_Time_SetTimeScale /EXPORT:ScriptAPI_Time_GetMaximumDeltaTime /EXPORT:ScriptAPI_Time_SetMaximumDeltaTime /EXPORT:ScriptAPI_Audio_LoadCue /EXPORT:ScriptAPI_Audio_UnloadCue /EXPORT:ScriptAPI_Audio_HasCue /EXPORT:ScriptAPI_Audio_Play /EXPORT:ScriptAPI_Audio_PlaySingle /EXPORT:ScriptAPI_Audio_Stop /EXPORT:ScriptAPI_Audio_StopCue /EXPORT:ScriptAPI_Audio_IsCuePlaying /EXPORT:ScriptAPI_Audio_SetInstanceVolume /EXPORT:ScriptAPI_Audio_SetInstancePitch /EXPORT:ScriptAPI_Audio_SetInstancePosition /EXPORT:ScriptAPI_Audio_SetMasterVolume /EXPORT:ScriptAPI_Audio_GetMasterVolume /EXPORT:ScriptAPI_Audio_SetListener /EXPORT:ScriptAPI_Physics_SetGravity /EXPORT:ScriptAPI_Physics_GetGravity /EXPORT:ScriptAPI_Physics_SetEnabled /EXPORT:ScriptAPI_Physics_IsEnabled /EXPORT:ScriptAPI_Physics_ApplyForce /EXPORT:ScriptAPI_Physics_ApplyImpulse /EXPORT:ScriptAPI_Physics_GetVelocity /EXPORT:ScriptAPI_Physics_SetVelocity /EXPORT:ScriptAPI_UIEvents_Clear /EXPORT:ScriptAPI_UIEvents_WasClicked /EXPORT:ScriptAPI_UIEvents_WasHoverEntered /EXPORT:ScriptAPI_UIEvents_WasHoverExited /EXPORT:ScriptAPI_UIEvents_GetEventCount /EXPORT:ScriptAPI_UIEvents_GetEvent /EXPORT:ScriptAPI_UIEvents_GetHoveredEntity /EXPORT:ScriptAPI_UIEvents_IsMouseOverUI /EXPORT:ScriptAPI_Math_RandomInt /EXPORT:ScriptAPI_Math_RandomFloat /EXPORT:ScriptAPI_Math_RandomIntSeeded /EXPORT:ScriptAPI_Math_RandomFloatSeeded /EXPORT:ScriptAPI_Math_Clamp /EXPORT:ScriptAPI_Math_ClampInt /EXPORT:ScriptAPI_Math_Lerp /EXPORT:ScriptAPI_Math_Abs /EXPORT:ScriptAPI_Math_Sqrt /EXPORT:ScriptAPI_Math_Pow /EXPORT:ScriptAPI_Math_Round /EXPORT:ScriptAPI_Math_Floor /EXPORT:ScriptAPI_Math_Ceil /EXPORT:ScriptAPI_Math_Min /EXPORT:ScriptAPI_Math_Max /EXPORT:ScriptAPI_Math_Sin /EXPORT:ScriptAPI_Math_Cos /EXPORT:ScriptAPI_Math_Tan /EXPORT:ScriptAPI_Math_Asin /EXPORT:ScriptAPI_Math_Acos /EXPORT:ScriptAPI_Math_Atan /EXPORT:ScriptAPI_Math_Atan2 /EXPORT:ScriptAPI_Math_DegToRad /EXPORT:ScriptAPI_Math_RadToDeg /EXPORT:ScriptAPI_Math_Distance2D /EXPORT:ScriptAPI_Math_DistanceSquared2D /EXPORT:ScriptAPI_Math_Length2D /EXPORT:ScriptAPI_Math_LengthSquared2D /EXPORT:ScriptAPI_Math_Normalize2D /EXPORT:ScriptAPI_Math_Dot2D /EXPORT:ScriptAPI_Math_Cross2D /EXPORT:ScriptAPI_Math_Lerp2D /EXPORT:ScriptAPI_Math_ClampVector2D /EXPORT:ScriptAPI_Math_AngleTo /EXPORT:ScriptAPI_Math_DirectionFromAngle /EXPORT:ScriptAPI_Math_Rotate2D /EXPORT:ScriptAPI_Debug_LogInfo /EXPORT:ScriptAPI_Debug_LogDebug /EXPORT:ScriptAPI_Debug_LogWarning /EXPORT:ScriptAPI_Debug_LogError /EXPORT:ScriptAPI_Window_GetWidth /EXPORT:ScriptAPI_Window_GetHeight /EXPORT:ScriptAPI_Window_ShouldClose /EXPORT:ScriptAPI_Window_Close /EXPORT:ScriptAPI_Window_IsFocused /EXPORT:ScriptAPI_Window_IsMinimized /EXPORT:ScriptAPI_Window_SetMinimized /EXPORT:ScriptAPI_Window_IsMaximized /EXPORT:ScriptAPI_Window_SetMaximized /EXPORT:ScriptAPI_Window_IsVisible /EXPORT:ScriptAPI_Window_SetVisible /EXPORT:ScriptAPI_Window_IsResizable /EXPORT:ScriptAPI_Window_SetResizable /EXPORT:ScriptAPI_Window_SetMode /EXPORT:ScriptAPI_Window_HasMode /EXPORT:ScriptAPI_Window_Resize /EXPORT:ScriptAPI_Application_Quit /EXPORT:ScriptAPI_Application_GetName /EXPORT:ScriptAPI_Application_GetFixedTimeStep /EXPORT:ScriptAPI_Application_IsVSyncEnabled")
 
 if(MSVC)
-    if(BUILD_EDITOR)
-        set_target_properties(GrapeEngine PROPERTIES LINK_FLAGS "${SCRIPT_EXPORTS}")
-    endif()
-    if(BUILD_GAME)
-        set_target_properties(GrapeGame PROPERTIES LINK_FLAGS "${SCRIPT_EXPORTS}")
+    if(BUILD_ENGINE_SHARED)
+        # Export symbols from the engine DLL
+        set_target_properties(GrapeEngineLib PROPERTIES LINK_FLAGS "${SCRIPT_EXPORTS}")
+    else()
+        if(BUILD_EDITOR)
+            set_target_properties(GrapeEngine PROPERTIES LINK_FLAGS "${SCRIPT_EXPORTS}")
+        endif()
+        if(BUILD_GAME)
+            set_target_properties(GrapeGame PROPERTIES LINK_FLAGS "${SCRIPT_EXPORTS}")
+        endif()
     endif()
 endif()
 
