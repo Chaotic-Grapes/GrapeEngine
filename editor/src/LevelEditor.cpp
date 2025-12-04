@@ -14,6 +14,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include "LevelEditor.h"
 #include "core/Logger.h"
 #include "core/EditorCallbacks.h"
+#include "ViewportPicking.h"
 #include <imgui.h>
 #include "EditorStyle.h"
 #include "graphics/graphicsConfig.hpp"
@@ -301,12 +302,34 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         return false;
     });
 
-    // Register viewport picking (not yet implemented in Viewport)
+    // Register viewport picking using editor-side ViewportPicking utility
     callbacks.RegisterPick([this](float screenX, float screenY) {
-        (void)screenX;
-        (void)screenY;
-        // TODO: Implement actual picking in Viewport
-        return 0;
+        // Get the renderer system from the viewport
+        if (!m_viewport.HasValidWorld()) {
+            return uint32_t(0);
+        }
+        
+        // Check if viewport is hovered (don't pick if mouse is outside viewport)
+        if (!m_viewport.IsViewportHovered()) {
+            return uint32_t(0);
+        }
+        
+        // Get viewport bounds for coordinate conversion
+        ImVec2 viewportPos = m_viewport.GetSceneDrawPos();
+        ImVec2 viewportSize = m_viewport.GetSceneDrawSize();
+        
+        // Use editor-side picking utility (no engine coupling)
+        auto* rendererSystem = ECS::RendererSystem::GetInstance();
+        if (rendererSystem) {
+            return Editor::ViewportPicking::PickEntityAtScreenPosition(
+                screenX, screenY,
+                glm::vec2(viewportPos.x, viewportPos.y),    // using glm because ViewportPicking uses glm
+                glm::vec2(viewportSize.x, viewportSize.y),  // using glm because ViewportPicking uses glm
+                rendererSystem
+            );
+        }
+        
+        return uint32_t(0);
     });
 
     // ===================================================================

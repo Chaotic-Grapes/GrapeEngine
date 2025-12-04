@@ -14,7 +14,7 @@ Responsibilities:
 - Execute a RenderGraph-based pipeline for HDR and post-processing effects
 - Render ECS entities by layer with support for SDF primitives, sprites, and text
 - Handle object picking and selection highlighting via ID-encoded FBO
-- Provide editor camera controls and entity drag-to-move functionality
+- Support external camera injection for flexible rendering contexts
 
 The RendererSystem acts as the bridge between ECS data and GPU rendering,
 handling batching, shader bindings, and visual effects in a modular,
@@ -239,10 +239,6 @@ namespace ECS {
 
     void RendererSystem::BindWorld(World& world) {
         (void)world; // Currently unused
-
-        // Reset interaction state when rebinding worlds
-        m_selectedEntityID = INVALID_ENTITY_ID;
-        m_isDragging = false;
     }
 
     glm::vec2 RendererSystem::CalculateAnchoredPosition(
@@ -690,55 +686,6 @@ namespace ECS {
                         m_renderer->endFrame(); // Flush text batch
                     } //if m_textShader
 
-                    // ============================================================
-                    // --- DEBUG: Draw Non-Editor Camera Frustum ---
-                    // ============================================================
-                    // Only show when using editor camera AND not forcing scene camera (i.e., in Scene viewport, not Game viewport)
-                    if (m_useEditorCamera && !m_forceSceneCamera) {
-                        m_shader->use();
-                        m_shader->setMat4("uViewProj", viewProj);
-                        m_renderer->beginFrame();
-
-                        // Get editor camera entity to exclude it
-                        const ECS::Entity editorCameraEntity = m_editorCamera->GetEntity();
-
-                        // Find the active non-editor camera
-                        world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
-                            [&](ECS::Entity entity,
-                                const ECS::Components::LocalTransform& camTransform,
-                                const ECS::Components::Camera3D& camera)
-                            {
-                                // Skip editor camera itself!!!
-                                if (entity == editorCameraEntity) return;
-
-                                if (!camera.Active) return; // Skip inactive cameras
-
-                                // Calculate camera frustum bounds in world space
-                                const float halfH = camera.OrthoSize * 0.5f;
-                                const float halfW = halfH * camera.AspectRatio;
-
-                                // Camera position in world space
-                                const glm::vec2 camPos(camTransform.Position.X, camTransform.Position.Y);
-
-                                // Frustum corners (centered on camera position)
-                                const glm::vec2 frustumMin = camPos - glm::vec2(halfW, halfH);
-                                const glm::vec2 frustumMax = camPos + glm::vec2(halfW, halfH);
-
-                                // Calculate constant screen-space thickness
-                                const float desiredPixelThickness = 2.0f; // Always 2 pixels thick
-                                const float worldThickness = (m_cameraOrthoSize / win->GetHeight()) * desiredPixelThickness;
-
-                                // Draw frustum rectangle with constant screen-space thickness
-                                const glm::vec4 frustumColor(0.0f, 1.0f, 1.0f, 0.6f); // Cyan, semi-transparent
-
-                                DebugDraw2D::RectStroke(*m_renderer, frustumMin, frustumMax,
-                                    worldThickness, frustumColor, 0);
-                            }
-                        );
-
-                        m_renderer->endFrame();
-                    } // if m_useEditorCamera && !m_forceSceneCamera
-
                 }
                 Framebuffer::Unbind();
             });
@@ -748,7 +695,7 @@ namespace ECS {
             [this, &world, &viewProj, &buckets, &win](ResourceAccessor& res)
             {
                 // Skip picking entirely when force scene camera is enabled
-                if (m_forceSceneCamera || !m_editorInputEnabled) {
+                if (m_forceSceneCamera) {
                     LOG_DEBUG("[PICKING] Skipping picking - force scene camera enabled");
                     return;
                 }
@@ -759,24 +706,16 @@ namespace ECS {
                 prevMouseDown = currMouseDown;
 
                 (void)res;
-                if (m_isDragging) return;
                 if (!currMouseDown && !mouseJustReleased) return;
 
                 // ============================================================
                 // GET VIEWPORT BOUNDS
                 // ============================================================
                 glm::vec2 viewportMin(0, 0);
-                glm::vec2 viewportSize;
-
-                viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
-                bool useViewportCoords = m_useEditorCamera;
+                glm::vec2 viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
 
                 glm::dvec2 mousePos;
                 Input::GetMousePosition(mousePos.x, mousePos.y);
-
-                // Editor viewport handling removed in engine build — use full window
-                (void)mousePos;
-                useViewportCoords = false;
 
                 // ============================================================
                 // RESIZE PICKING FBO IF NEEDED
@@ -1346,182 +1285,6 @@ namespace ECS {
         // EXECUTE RENDER GRAPH
         // ============================================================
         m_renderGraph->Execute();
-
-        // ============================================================
-        // DRAG-TO-MOVE SELECTED ENTITY
-        // ============================================================
-        // Store viewport bounds (recalculate or cache from picking pass)
-        glm::vec2 dragViewportMin(0, 0);
-        glm::vec2 dragViewportSize;
-
-        dragViewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
-
-        (void)m_useEditorCamera; // Editor viewport handling moved to editor; use full window in engine
-        static bool wasMouseDownLastFrame = false;
-        static uint32_t lastSelectedEntityID = 0;
-
-        bool allowInteraction = !m_forceSceneCamera && (m_editorInputEnabled || m_isDragging);
-
-        if (allowInteraction&& m_selectedEntityID != INVALID_ENTITY_ID) {
-            LOG_DEBUG("[DRAG] Frame start: m_selectedEntityID=" << m_selectedEntityID
-                << ", lastSelectedEntityID=" << m_lastSelectedEntityID);
-            // ----------------------------------------------------------
-            // CANCEL DRAG IF MOUSE LEAVES THE VIEWPORT CONTENT REGION
-            // ----------------------------------------------------------
-            glm::dvec2 mpos;
-            Input::GetMousePosition(mpos.x, mpos.y);
-
-            bool mouseOutside =
-                (mpos.x < dragViewportMin.x) ||
-                (mpos.y < dragViewportMin.y) ||
-                (mpos.x > dragViewportMin.x + dragViewportSize.x) ||
-                (mpos.y > dragViewportMin.y + dragViewportSize.y);
-
-            if (mouseOutside) {
-                m_isDragging = false;
-                // Do NOT early return; still allow selection updates
-                // Just skip drag logic
-            }
-
-            {
-                bool bypassDrag = false;
-                if (!bypassDrag) {
-                    glm::dvec2 mousePos;
-                    Input::GetMousePosition(mousePos.x, mousePos.y);
-                    glm::vec2 mouseWorld = ScreenToWorld(mousePos, view, projection,
-                        dragViewportMin, dragViewportSize);
-
-                    bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
-                    bool mouseJustPressed = isMouseDownThisFrame && !m_wasMouseDownLastFrame;
-
-                    // Check if mouse is currently in viewport
-                    bool isMouseInViewport = true;
-                    (void)m_useEditorCamera; // Editor UI removed from engine
-
-                    // Check if selection changed
-                    bool selectionChanged = (m_selectedEntityID != m_lastSelectedEntityID);
-                    if (selectionChanged) {
-                        LOG_DEBUG("[DRAG] Selection changed from " << m_lastSelectedEntityID
-                            << " to " << m_selectedEntityID);
-                        // Cancel any ongoing drag
-                        m_isDragging = false;
-                    }
-
-                    // Capture entity position on initial press ONLY
-                    // ONLY if mouse is in viewport
-                    if (mouseJustPressed && !m_isDragging && isMouseInViewport) {
-                        // Store the entity's starting position
-                        world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
-                            if (e.Index == m_selectedEntityID) {
-                                m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
-                                m_dragStartEntityRot = lt.Rotation;     // Store rotation
-                                m_dragStartEntityScale = lt.Scale;      // Store scale
-                                LOG_DEBUG("[DRAG] Captured entity pos: " << lt.Position.X << ", " << lt.Position.Y);
-                            }
-                            });
-
-                        // Capture INITIAL mouse position (for threshold check)
-                        m_dragStartMouseWorld = mouseWorld;
-                    }
-
-                    // During mouse hold - check if we should start dragging
-                    // ONLY start drag if mouse is in viewport
-                    if (isMouseDownThisFrame && !m_isDragging && isMouseInViewport) {
-                        glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
-                        float dragDistance = glm::length(dragDelta);
-
-                        // Calculate drag threshold in world space (5 pixels)
-                        // const auto& win = WindowManager::GetMainWindow();
-                        const float dragThreshold = (m_cameraOrthoSize / static_cast<float>(win->GetHeight())) * 5.0f;
-
-                        // Start dragging if moved beyond threshold
-                        if (dragDistance > dragThreshold) {
-                            LOG_DEBUG("[DRAG] Starting drag! Distance: " << dragDistance);
-                            m_isDragging = true;
-
-                            // CRITICAL: Reset drag start to CURRENT position when drag actually begins
-                            m_dragStartMouseWorld = mouseWorld;
-                            LOG_DEBUG("[DRAG] Reset drag start to: " << mouseWorld.x << ", " << mouseWorld.y);
-                        }
-                    }
-
-                    // Update position while dragging
-                    // NO viewport check - allow dragging anywhere once started!
-                    if (m_isDragging && isMouseDownThisFrame) {
-                        glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
-
-                        // Update entity position
-                        world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
-                            if (e.Index == m_selectedEntityID) {
-                                lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
-                                lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
-
-                                // Mark scene as dirty when transform changes
-                                MarkSceneDirtyIfNeeded(m_fileMenu);
-                            }
-                            });
-                    }
-
-                    // End drag when mouse released
-                    if (m_isDragging && !isMouseDownThisFrame) {
-                        LOG_DEBUG("[DRAG] Drag ended");
-
-                        // Notify editor of transform change via message system
-                        world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
-                            if (e.Index == m_selectedEntityID) {
-                                // Create undo command with old and new transforms
-                                Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
-                                Vector3D newPos = lt.Position;
-
-                                // Only notify if position actually changed
-                                if (oldPos != newPos) {
-                                    Messaging::MessageSystem::Notify(
-                                        Messaging::EntityTransformChanged(
-                                            e.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale,
-                                            newPos, lt.Rotation, lt.Scale
-                                        )
-                                    );
-                                    LOG_DEBUG("[UNDO] Notified transform change");
-                                }
-                            }
-                            });
-                        m_isDragging = false;
-                    }
-
-                    m_wasMouseDownLastFrame = isMouseDownThisFrame;
-        } else {
-                    m_isDragging = false;
-                    m_wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
-                }
-            }
-            LOG_DEBUG("[DRAG] About to update lastSelectedEntityID from "
-                << m_lastSelectedEntityID << " to " << m_selectedEntityID);
-            // Update lastSelectedEntityID unconditionally
-            m_lastSelectedEntityID = m_selectedEntityID;
-        }
-        else {
-            // Nothing selected, reset tracking
-            m_lastSelectedEntityID = INVALID_ENTITY_ID;
-            m_wasMouseDownLastFrame = false;
-            m_selectedEntityID = INVALID_ENTITY_ID;
-        }
-
-        // ============================================================
-        // DELETE SELECTED ENTITY (Editor-only)
-        // ============================================================
-        if (Engine::CORE && Engine::CORE->IsInEditorMode() && m_selectedEntityID != INVALID_ENTITY_ID && Input::IsKeyPressed(KEY_DELETE)) {
-            world.Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
-                (void)lt;
-                if (e.Index == m_selectedEntityID) {
-                    world.Destroy(e);
-                    m_selectedEntityID = INVALID_ENTITY_ID;     // Clear selection
-                    m_isDragging = false;                       // Cancel any drag operation
-
-                    // Notify editor that scene has been modified
-                    Messaging::MessageSystem::Notify(Messaging::SceneModified("Entity deleted"));
-                }
-                });
-        }
 
         // Performance logging
         if (Time::FrameCount() % 120 == 0)

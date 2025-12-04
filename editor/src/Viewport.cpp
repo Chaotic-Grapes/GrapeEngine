@@ -22,6 +22,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #endif
 
 #include "Viewport.h"
+#include "CameraFrustumRenderer.h"
 #include "graphics/EditorCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -63,16 +64,6 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
     if (!m_editorCamera) {
         m_editorCamera = std::make_unique<Editor::EditorCamera>();
     }
-
-    // Create and initialize renderer system
-    if (m_world && !m_rendererSystem) {
-        m_rendererSystem = std::make_shared<ECS::RendererSystem>();
-        m_rendererSystem->Initialize(*m_world);
-        m_rendererSystem->BindWorld(*m_world);
-        
-        // Set the editor camera for rendering
-        m_rendererSystem->SetCamera(m_editorCamera->GetCamera());
-    }
     
     // Subscribe to engine events for editor integration
     if (m_undoSystem) {
@@ -91,17 +82,7 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
                 (void)e; // May use e.Reason for logging
                 m_fileMenu->SetSceneDirty();
             }
-        );
-    }
-    
-    // Create game renderer (always uses scene camera)
-    if (m_world && !m_gameRendererSystem) {
-        m_gameRendererSystem = std::make_shared<ECS::RendererSystem>();
-        m_gameRendererSystem->Initialize(*m_world);
-        m_gameRendererSystem->BindWorld(*m_world);
-        m_gameRendererSystem->SetForceSceneCamera(true);
-        m_gameRendererSystem->SetEditorInputEnabled(false);
-        LOG_INFO("[Viewport] Game renderer initialized with force scene camera");
+        )
     }
 }
 
@@ -111,38 +92,6 @@ void Viewport::SetWorld(ECS::World* world) {
     // Create editor camera if needed
     if (!m_editorCamera) {
         m_editorCamera = std::make_unique<Editor::EditorCamera>();
-    }
-
-    // Create renderer if it doesn't exist yet (handles File > Open Scene case)
-    if (!m_rendererSystem && world) {
-        m_rendererSystem = std::make_shared<ECS::RendererSystem>();
-        m_rendererSystem->Initialize(*world);
-        m_rendererSystem->BindWorld(*world);
-        m_rendererSystem->SetCamera(m_editorCamera->GetCamera());
-        
-        // Message subscriptions are already set up in Initialize()
-    }
-    // Rebind existing renderer to new world
-    else if (m_rendererSystem && world) {
-        m_rendererSystem->BindWorld(*world);
-        // Camera pointer persists across world changes
-    }
-    
-    // Create game renderer if it doesn't exist yet
-    if (!m_gameRendererSystem && world) {
-        m_gameRendererSystem = std::make_shared<ECS::RendererSystem>();
-        m_gameRendererSystem->Initialize(*world);
-        m_gameRendererSystem->BindWorld(*world);
-        m_gameRendererSystem->SetForceSceneCamera(true);
-        m_gameRendererSystem->SetEditorInputEnabled(false);
-        LOG_INFO("[Viewport] Game renderer created in SetWorld");
-    }
-    // Rebind existing game renderer to new world
-    else if (m_gameRendererSystem && world) {
-        m_gameRendererSystem->BindWorld(*world);
-        m_gameRendererSystem->SetForceSceneCamera(true);
-        m_gameRendererSystem->SetEditorInputEnabled(false);
-        LOG_INFO("[Viewport] Game renderer rebound to new world");
     }
 }
 
@@ -168,25 +117,13 @@ void Viewport::HandleInWorldInteraction() {
         m_showSceneFpsOverlay = !m_showSceneFpsOverlay;
     }
 
-    // Control editor camera input based on viewport hover state
-    // RendererSystem will call EditorCamera::Update() in its own Update()
-    if (m_rendererSystem) {
-        m_rendererSystem->SetEditorInputEnabled(m_isViewportHovered);
-    }
-
-    // Keep selection in sync with renderer picking only when hovering the viewport
-    if (m_rendererSystem && m_isViewportHovered) {
-        EntityId newSelection = m_rendererSystem->GetSelectedEntityID();
-
-        // Only notify if selection actually changed
-        if (newSelection != m_selectedEntityId) {
-            m_selectedEntityId = newSelection;
-
-            // Emit selection change event
-            if (m_onSelectionChanged) {
-                m_onSelectionChanged(m_selectedEntityId);
-            }
-        }
+    // Editor camera input is controlled via SetAllowInput() above
+    // Selection is handled by ViewportPicking utility in editor
+    // Viewport maintains its own m_selectedEntityId state
+    
+    // Handle editor-specific entity manipulation (drag-to-move)
+    if (m_isViewportHovered && m_activeTab == 0) { // Only in Scene tab
+        _handleEntityDragToMove();
     }
 }
 
@@ -214,7 +151,8 @@ void Viewport::_renderViewport() {
         m_editorCamera->Update(Time::DeltaTime());
     }
 
-    if (m_rendererSystem) {
+    auto* rendererSystem = _getRendererSystem();
+    if (rendererSystem) {
         auto size = ImGui::GetContentRegionAvail();
         auto pos = ImGui::GetCursorScreenPos();
 
@@ -224,11 +162,19 @@ void Viewport::_renderViewport() {
         // Broadcast viewport resize event for camera aspect ratio updates
         Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
 
-        if (m_world) {
-            m_rendererSystem->Update(*m_world, Time::DeltaTime());
+        // Configure renderer for Scene viewport (uses editor camera)
+        rendererSystem->SetCamera(m_editorCamera->GetCamera());
+        rendererSystem->SetForceSceneCamera(false);
+
+        // Note: RendererSystem::Update() is called by Application's main loop
+        // We just configure camera settings here
+
+        // Render camera frustum overlay if enabled
+        if (m_world && m_showCameraFrustum) {
+            _renderCameraFrustum();
         }
 
-        auto* rg = m_rendererSystem->GetRenderGraph();
+        auto* rg = rendererSystem->GetRenderGraph();
         if (rg) {
             ResourceAccessor acc(rg);
             // Previously, the editor viewport was sampling from the "HDR" texture,
@@ -254,7 +200,7 @@ void Viewport::_renderViewport() {
 
             // 2. Call the RendererSystem method to draw the Gizmo overlay
             // Draw the Gizmo overlay (only in Scene tab)
-            m_rendererSystem->DrawEditorGizmo(
+            rendererSystem->DrawEditorGizmo(
                 *m_world,
                 gizmoPos.x, gizmoPos.y,
                 size.x, size.y
@@ -368,15 +314,15 @@ void Viewport::_renderViewport() {
             });
         }
 
-        if (m_world) {
+        // Configure renderer for Game viewport (uses scene camera)
+        auto* rendererSystem = _getRendererSystem();
+        if (rendererSystem) {
             LOG_DEBUG("[Viewport] Game renderer update - forceSceneCamera should be true");
-            // Ensure game renderer always uses scene camera and has no editor input
-            m_gameRendererSystem->SetForceSceneCamera(true);
-            m_gameRendererSystem->SetEditorInputEnabled(false);
-            m_gameRendererSystem->Update(*m_world, Time::DeltaTime());
+            rendererSystem->SetCamera(nullptr);  // Use ECS camera
+            rendererSystem->SetForceSceneCamera(true);
         }
 
-        auto* rg = m_gameRendererSystem->GetRenderGraph();
+        auto* rg = rendererSystem ? rendererSystem->GetRenderGraph() : nullptr;
         if (rg) {
             ResourceAccessor acc(rg);
             uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
@@ -396,7 +342,8 @@ void Viewport::_renderViewport() {
 }
 
 void Viewport::FocusOnEntity(EntityId entityId) {
-    if (!m_world || !m_rendererSystem) return;
+    auto* rendererSystem = _getRendererSystem();
+    if (!m_world || !rendererSystem) return;
 
     ECS::Entity entity = m_world->Resolve(entityId);
     if (!m_world->IsAlive(entity)) return;
@@ -460,17 +407,71 @@ void Viewport::SetFileMenu(EditorFileMenu* fileMenu) {
 void Viewport::SetSelectedEntity(EntityId id) {
     // Keep local state in sync
     m_selectedEntityId = id;
+    
+    // Selection is now managed entirely by editor
+    // No need to sync with renderer system
+}
 
-    // Forward to renderer system so gizmo and selection outline update
-    if (m_rendererSystem) {
-        m_rendererSystem->SetSelectedEntityID(id);
+void Viewport::_renderCameraFrustum() {
+    auto* rendererSystem = _getRendererSystem();
+    if (!rendererSystem || !m_world || !m_editorCamera) {
+        return;
     }
+
+    auto* rg = rendererSystem->GetRenderGraph();
+    if (!rg) {
+        return;
+    }
+
+    // Get HDR framebuffer to draw on
+    ResourceAccessor acc(rg);
+    auto* hdrFbo = acc.GetFramebuffer("HDR");
+    if (!hdrFbo) {
+        return;
+    }
+
+    // Bind HDR framebuffer (don't clear, we're overlaying)
+    hdrFbo->Bind();
+
+    // Get editor camera info for view projection
+    auto* cam = m_editorCamera->GetCamera();
+    if (!cam) {
+        Framebuffer::Unbind();
+        return;
+    }
+
+    glm::mat4 view = cam->GetViewMatrix();
+    glm::mat4 projection = cam->GetProjectionMatrix();
+    glm::mat4 viewProj = projection * view;
+
+    // Get window dimensions
+    const auto& win = WindowManager::GetMainWindow();
+    float windowHeight = static_cast<float>(win->GetHeight());
+
+    // Get renderer and shader from renderer system
+    Renderer* renderer = rendererSystem->GetRenderer();
+    Shader* shader = rendererSystem->GetShader();
+    
+    if (renderer && shader) {
+        Editor::CameraFrustumRenderer::RenderFrustum(
+            *m_world,
+            *renderer,
+            *shader,
+            viewProj,
+            cam->OrthoSize,
+            windowHeight,
+            0  // No entity to exclude (editor camera is not an ECS entity)
+        );
+    }
+
+    Framebuffer::Unbind();
 }
 
 void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize) {
     (void)viewportSize;
     
-    if (!m_rendererSystem) return;
+    auto* rendererSystem = _getRendererSystem();
+    if (!rendererSystem) return;
 
     // Get FPS data from Profiler
     float currentFps = Profiler::GetFPS();
@@ -525,4 +526,130 @@ void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewport
         ImGui::TextDisabled("Press F to toggle");
     }
     ImGui::End();
+}
+
+ECS::RendererSystem* Viewport::_getRendererSystem() {
+    // Get the global RendererSystem from Application's SystemManager
+    if (Engine::CORE) {
+        return Engine::CORE->GetSystemManager().GetSystem<ECS::RendererSystem>();
+    }
+    return nullptr;
+}
+
+void Viewport::_handleEntityDragToMove() {
+    if (!m_world || m_selectedEntityId == 0) {
+        m_isDragging = false;
+        m_wasMouseDownLastFrame = false;
+        return;
+    }
+
+    auto* rendererSystem = _getRendererSystem();
+    if (!rendererSystem) return;
+
+    // Get camera matrices for screen-to-world conversion
+    Engine::Camera* camera = m_editorCamera->GetCamera();
+    if (!camera) return;
+
+    glm::mat4 view = camera->GetViewMatrix();
+    glm::mat4 projection = camera->GetProjectionMatrix();
+
+    // Get mouse state
+    glm::dvec2 mousePos;
+    Input::GetMousePosition(mousePos.x, mousePos.y);
+    
+    bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
+    bool mouseJustPressed = isMouseDownThisFrame && !m_wasMouseDownLastFrame;
+
+    // Convert screen to world coordinates
+    auto ScreenToWorld = [&](const glm::dvec2& screenPos) -> glm::vec2 {
+        // Convert to viewport-local coordinates
+        glm::vec2 localPos = glm::vec2(screenPos.x - m_sceneDrawPos.x, screenPos.y - m_sceneDrawPos.y);
+
+        // Normalize device coordinates (-1 to 1)
+        glm::vec4 ndc;
+        ndc.x = (2.0f * localPos.x) / m_sceneDrawSize.x - 1.0f;
+        ndc.y = 1.0f - (2.0f * localPos.y) / m_sceneDrawSize.y;
+        ndc.z = 0.0f;
+        ndc.w = 1.0f;
+
+        // Inverse projection and view
+        glm::mat4 invViewProj = glm::inverse(projection * view);
+        glm::vec4 worldPos = invViewProj * ndc;
+
+        return glm::vec2(worldPos.x, worldPos.y);
+    };
+
+    glm::vec2 mouseWorld = ScreenToWorld(mousePos);
+
+    // Check if selection changed (from hierarchy or inspector)
+    bool selectionChanged = (m_selectedEntityId != m_lastSelectedEntityID);
+    if (selectionChanged) {
+        m_isDragging = false;
+        m_lastSelectedEntityID = m_selectedEntityId;
+    }
+
+    // Start drag on mouse press
+    if (mouseJustPressed && !m_isDragging) {
+        m_world->Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+            if (e.Index == m_selectedEntityId) {
+                m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
+                m_dragStartEntityRot = lt.Rotation;
+                m_dragStartEntityScale = lt.Scale;
+            }
+        });
+        m_dragStartMouseWorld = mouseWorld;
+    }
+
+    // Check for drag threshold (5 pixels in world space)
+    if (isMouseDownThisFrame && !m_isDragging) {
+        glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
+        float dragDistance = glm::length(dragDelta);
+
+        const float dragThreshold = (camera->OrthoSize / m_sceneDrawSize.y) * 5.0f;
+
+        if (dragDistance > dragThreshold) {
+            m_isDragging = true;
+            m_dragStartMouseWorld = mouseWorld; // Reset to current position
+        }
+    }
+
+    // Update entity position while dragging
+    if (m_isDragging && isMouseDownThisFrame) {
+        glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
+
+        m_world->Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+            if (e.Index == m_selectedEntityId) {
+                lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
+                lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
+
+                // Mark scene as dirty
+                if (m_fileMenu) {
+                    m_fileMenu->MarkSceneDirty();
+                }
+            }
+        });
+    }
+
+    // End drag and create undo command
+    if (m_isDragging && !isMouseDownThisFrame) {
+        m_world->Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+            if (e.Index == m_selectedEntityId) {
+                Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
+                Vector3D newPos = lt.Position;
+
+                // Only notify if position actually changed
+                if (oldPos != newPos) {
+                    Messaging::MessageSystem::Notify(
+                        Messaging::EntityTransformChanged(
+                            e.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale,
+                            newPos, lt.Rotation, lt.Scale
+                        )
+                    );
+                }
+            }
+        });
+        m_isDragging = false;
+    }
+
+    m_wasMouseDownLastFrame = isMouseDownThisFrame;
 }

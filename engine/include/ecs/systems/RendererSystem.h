@@ -10,7 +10,7 @@ Responsibilities:
 - Initialize and manage rendering resources (shaders, camera, render graph)
 - Process ECS entities with renderable components
 - Execute the render graph each frame with multi-pass rendering
-- Handle object picking and selection highlighting
+- Provide GPU-based picking framebuffer for external queries
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -75,7 +75,6 @@ namespace ECS {
         // Compatibility accessors for editor integration
         float GetCameraOrthoSize() const { return m_cameraOrthoSize; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
-        uint32_t GetSelectedEntityID() const { return m_selectedEntityID; }
 
         // Static accessor for global access
         static RendererSystem* GetInstance() { return s_instance; }
@@ -93,9 +92,6 @@ namespace ECS {
          */
         Engine::Camera* GetCamera() { return m_activeCamera; }
 
-        // Allow external systems (editor panels) to set the currently selected entity
-        void SetSelectedEntityID(uint32_t id) { m_selectedEntityID = id; }
-
         // Rebind the renderer to a new world
         void BindWorld(World& world);
         
@@ -103,6 +99,24 @@ namespace ECS {
         void SetForceSceneCamera(bool force) { m_forceSceneCamera = force; }
 
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
+
+        /**
+         * @brief Get the picking framebuffer for external picking queries
+         * @return Pointer to picking FBO (read-only access)
+         */
+        const Framebuffer* GetPickingFBO() const { return &m_pickingFBO; }
+
+        /**
+         * @brief Get the renderer for external rendering (editor overlays)
+         * @return Pointer to renderer
+         */
+        Renderer* GetRenderer() { return m_renderer.get(); }
+
+        /**
+         * @brief Get the main shader for external rendering (editor overlays)
+         * @return Pointer to batch shader
+         */
+        Shader* GetShader() { return m_shader.get(); }
 
     private:
         // ====================================================================
@@ -179,21 +193,13 @@ namespace ECS {
         // ====================================================================
         // Member Variables - Object Picking
         // ====================================================================
-        
+
         Framebuffer m_pickingFBO;
         PixelBufferObject m_pbos[2];
         int m_currentPBO = 0;
-        uint32_t m_selectedEntityID = 0;  // Currently selected entity
 
         // Static instance pointer
         static RendererSystem* s_instance;
-
-        // Drag-to-move state
-        bool m_isDragging = false;
-        glm::vec2 m_dragStartMouseWorld = {0, 0};
-        glm::vec3 m_dragStartEntityPos = { 0, 0, 0};
-        uint32_t m_lastSelectedEntityID = Entity::NPOS32;
-        bool m_wasMouseDownLastFrame = false;
 
 
         // ====================================================================
@@ -226,12 +232,6 @@ namespace ECS {
             float screenWidth,
             float screenHeight,
             float scaleFactor) const;
-
-        // ====================================================================
-        // Drag state for editor entity manipulation
-        // ==================================================================== 
-        Quaternion m_dragStartEntityRot;
-        Vector3D m_dragStartEntityScale;
     };
 
 } // namespace ECS

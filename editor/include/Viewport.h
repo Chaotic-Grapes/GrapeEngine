@@ -21,8 +21,11 @@ Header for Viewport class handling viewport rendering and entity selection with 
 #include "UndoSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "Math/Quaternion.h"
+#include "Math/Vector3D.h"
 #include <imgui.h>
 #include "ImGuizmo.h"
+#include <glm/glm.hpp>
 #include <memory>
 #include <functional>
 
@@ -68,8 +71,13 @@ public:
     // Get the editor camera
     Editor::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
 
+    // Toggle camera frustum visualization
+    void SetShowCameraFrustum(bool show) { m_showCameraFrustum = show; }
+    bool GetShowCameraFrustum() const { return m_showCameraFrustum; }
+
 private:
     void _renderViewport();
+    void _renderCameraFrustum();
 
     ECS::World* m_world = nullptr;
     EditorFileMenu* m_fileMenu = nullptr;
@@ -81,12 +89,6 @@ private:
 
     // Editor camera (owned by viewport)
     std::unique_ptr<Editor::EditorCamera> m_editorCamera;
-
-    // Renderer systems
-    std::shared_ptr<ECS::RendererSystem> m_rendererSystem;
-    
-    // Game window renderer (always uses scene camera)
-    std::shared_ptr<ECS::RendererSystem> m_gameRendererSystem;
 
     // State
     EntityId m_selectedEntityId = 0;
@@ -100,6 +102,22 @@ private:
     // Toggleable FPS overlay for the Scene viewport (editor-only)
     void _drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize);
     bool m_showSceneFpsOverlay = false;
+    
+    // Toggleable camera frustum visualization
+    bool m_showCameraFrustum = true;  // Default: enabled
+    
+    // Helper to access global RendererSystem from SystemManager
+    ECS::RendererSystem* _getRendererSystem();
+    
+    // Editor-specific entity manipulation
+    void _handleEntityDragToMove();
+    bool m_isDragging = false;
+    glm::vec2 m_dragStartMouseWorld = {0, 0};
+    glm::vec3 m_dragStartEntityPos = {0, 0, 0};
+    Quaternion m_dragStartEntityRot;
+    Vector3D m_dragStartEntityScale;
+    uint32_t m_lastSelectedEntityID = 0;
+    bool m_wasMouseDownLastFrame = false;
     
     // Game window aspect ratio settings
     int m_selectedAspectRatio = 0; // Index into aspect ratio list
