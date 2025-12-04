@@ -30,7 +30,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Profiler.h"
 #include "ecs/Hierarchy.h"
 #include "scene/Scene.h"
-#include "scene/SystemRegistry.h"
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 
@@ -359,27 +358,6 @@ namespace Scenes {
                 return;
 
             m_active = toIndex;
-        }
-
-        /**
-         * @brief Updates a scene by executing its system profile.
-         * @param scene The scene to update.
-         * @param dt Delta time in seconds.
-         */
-        void _updateScene(Scene& scene, const float dt) {
-            auto& world = scene.GetWorld();
-
-            // Only iterate through enabled systems in the profile
-            SystemRegistry::ForEach([&world, dt](const std::string& name, const SystemFunction& system) {
-                if (system) {
-                    Profiler::Get().BeginScope(name.c_str());
-                    system(world, dt);
-                    Profiler::Get().EndScope(name.c_str());
-                }
-            }, true);
-
-            // Always update transform hierarchy after all systems
-            ECS::Hierarchy::UpdateTransforms(world);
         }
 
         std::vector<std::unique_ptr<Scene>> m_scenes;

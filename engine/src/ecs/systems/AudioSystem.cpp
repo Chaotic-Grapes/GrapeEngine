@@ -1,11 +1,31 @@
-#include "audio/AudioSystem.h"
+/* Start Header *****************************************************************/
+/*!
+\file   AudioSystem.cpp
+\author Dalton Koh (100%)
+\par    d.koh@digipen.edu
+\brief
+Implements the AudioSystem which manages audio playback in the ECS framework.
+
+Responsibilities:
+- Process entities with AudioSource component
+- Resolve CueId to audio file paths
+- Manage audio playback lifecycle (start/stop/update)
+- Handle 3D spatial audio positioning
+- Support PlayOnStart functionality
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#include "ecs/systems/AudioSystem.h"
 #include "services/AudioService.h"
 #include "audio/FmodAudioDevice.h"
 #include <iostream>
 #include "core/Logger.h"
 #include <set>
 #include "core/Application.h"
-
 
 namespace {
     // Simple CueId -> Path cache
@@ -258,14 +278,12 @@ void AudioSystem::OnDestroy(World& world) {
     LOG_INFO("AudioSystem: Destroyed");
 }
 
-const SystemMetadata& AudioSystem::GetMetadata() const {
-    static SystemMetadata metadata{
-        .name = "Audio",
-        .readComponents = {},  // Reads AudioSource, WorldTransform
-        .writeComponents = {}, // Doesn't write components
-        .executionOrder = 50,  // Run after gameplay logic
-        .enabled = true
-    };
+SystemMetadata AudioSystem::GetMetadata() const {
+    SystemMetadata metadata;
+    metadata.name = "Audio";
+    metadata.readComponents = {};  // Reads AudioSource, WorldTransform
+    metadata.writeComponents = {}; // Doesn't write components
+    metadata.executionOrder = 50;  // Run after gameplay logic
     return metadata;
 }
 

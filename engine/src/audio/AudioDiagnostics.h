@@ -3,10 +3,10 @@
 #define AUDIODIAGNOSTICS_H
 
 #include "scene/Scene.h"
-#include "scene/SystemRegistry.h"
 #include "core/Application.h"
 #include "core/Logger.h"
 #include "AudioAssetLibrary.h"
+#include "ecs/systems/AudioSystem.h"
 
 namespace AudioDiagnostics {
 
@@ -27,50 +27,25 @@ namespace AudioDiagnostics {
         LOG_INFO("=== AUDIO SYSTEM DIAGNOSIS START ===");
 
         // ----------------------------------------------------------------
-        // Check 1: Is Audio system registered in SystemRegistry?
+        // Check 1: Is Audio system registered in SystemManager?
         // ----------------------------------------------------------------
-        auto* audioSystem = Scenes::SystemRegistry::Get("Audio");
+        auto& systemManager = Engine::CORE->GetSystemManager();
+        auto* audioSystem = systemManager.GetSystem<ECS::AudioSystem>();
         if (!audioSystem) {
-            LOG_ERROR("FAILED: Audio system NOT REGISTERED in SystemRegistry");
-            LOG_ERROR("       -> Register it in Application.cpp during initialization");
+            LOG_ERROR("FAILED: Audio system NOT REGISTERED in SystemManager");
+            LOG_ERROR("       -> Register it in Application::_registerSystems()");
             allChecksPass = false;
         }
         else {
-            LOG_INFO("PASS: Audio system is registered in SystemRegistry");
-        }
-
-        // ----------------------------------------------------------------
-        // Check 2: Is Audio system in the scene's SystemProfile?
-        // ----------------------------------------------------------------
-        auto& profile = scene->GetSystemProfile();
-        bool audioInProfile = false;
-        bool audioEnabled = false;
-        for (const auto& entry : profile.Systems) {
-            if (entry.Name == "Audio") {
-                audioInProfile = true;
-                audioEnabled = entry.Enabled;
-                break;
-            }
-        }
-
-        if (!audioInProfile) {
-            LOG_ERROR("FAILED: Audio NOT in scene SystemProfile");
-            LOG_INFO("       -> FIXING: Adding Audio to SystemProfile now...");
-
-            // Auto-fix: Add Audio system to profile
-            scene->GetSystemProfile().AddSystem("Audio", true);
-
-            LOG_INFO("       -> Audio system added. Save scene to make this permanent.");
-            allChecksPass = false; // Still mark as issue since it wasn't there initially
-        }
-        else {
-            if (audioEnabled) {
-                LOG_INFO("PASS: Audio in SystemProfile and ENABLED");
+            LOG_INFO("PASS: Audio system is registered in SystemManager");
+            
+            // Check if enabled
+            if (audioSystem->IsEnabled()) {
+                LOG_INFO("PASS: Audio system is ENABLED");
             }
             else {
-                LOG_WARNING("WARNING: Audio in SystemProfile but DISABLED");
-                LOG_INFO("         -> Enable it: scene->GetSystemProfile().SetSystemEnabled(\"Audio\", true);");
-                allChecksPass = false;
+                LOG_WARNING("WARNING: Audio system is DISABLED");
+                LOG_INFO("         -> This is normal in editor edit mode");
             }
         }
 
