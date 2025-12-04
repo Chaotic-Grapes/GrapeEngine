@@ -343,7 +343,7 @@ namespace ECS {
             (load_assembly_and_get_function_pointer_fn)m_loadAssemblyAndGetFunctionPtr;
 
         STRING_T assemblyPathNative = StringToNativeString(assemblyPath);
-        STRING_T typeName = STR("GrapeEngine.Scripting.ScriptHost, GrapeEngine.ScriptAPI"); // Important: namespaces MUST match
+        STRING_T typeName = STR("GrapeEngine.Scripting.ScriptHost, GrapeEngine.Scripting"); // Important: namespaces MUST match
 
         // Helper lambda to load a single delegate
         // Using this helps to avoid tedious repetitive code into one single line

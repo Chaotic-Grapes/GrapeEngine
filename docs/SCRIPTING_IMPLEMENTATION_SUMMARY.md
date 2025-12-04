@@ -105,7 +105,7 @@ Runtime reloading of C# assemblies without restarting the application.
 
 ### C# Files
 
-#### Core API (`managed/api/GrapeEngine.ScriptAPI/`):
+#### Core API (`managed/api/GrapeEngine.Scripting/`):
 - `ISystem.cs` - System interface (OnCreate/OnUpdate/OnDestroy)
 - `World.cs` - Managed World wrapper (CreateEntity, IsAlive, Query methods)
 - `Entity.cs` - Entity wrapper with component operations
@@ -115,7 +115,7 @@ Runtime reloading of C# assemblies without restarting the application.
 - `QueryEnumerator.cs` - IEnumerator implementations
 - `TestMovementSystem.cs` - Example system demonstrating Query API
 
-#### P/Invoke Layer (`managed/api/GrapeEngine.ScriptAPI/Unsafe/`):
+#### P/Invoke Layer (`managed/api/GrapeEngine.Scripting/Unsafe/`):
 - `WorldInteropAPI.cs` - Entity/Component operation P/Invoke
 - `QueryInteropAPI.cs` - Query operation P/Invoke
 - `ComponentRegistryAPI.cs` - Component registration P/Invoke
@@ -357,7 +357,7 @@ public class GameManager : ISystem
 1. **Initialize ScriptManager** (C++)
    ```cpp
    ScriptManager scriptManager;
-   scriptManager.InitializeCLR("GrapeEngine.ScriptAPI.runtimeconfig.json");
+   scriptManager.InitializeCLR("GrapeEngine.Scripting.runtimeconfig.json");
    ```
 
 2. **Load Script Assembly**

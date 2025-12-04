@@ -30,7 +30,7 @@ endif()
 # Find .NET SDK
 find_program(DOTNET_EXECUTABLE dotnet REQUIRED)
 
-# ======================= CoreCLR / .NET Hosting Configuration =================
+# ================ CoreCLR / .NET Hosting Configuration =================
 # Set the path to the CoreCLR library directory
 set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/CoreCLR")
 
@@ -279,11 +279,11 @@ if(DOTNET_EXECUTABLE)
         set(DOTNET_TFM "net9.0")  # Fallback
     endif()
     
-    # Build GrapeEngine.ScriptAPI (engine's API)
+    # Build GrapeEngine.Scripting (engine's API)
     add_custom_target(
         BuildScriptAPI ALL
-        COMMAND ${DOTNET_EXECUTABLE} restore "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj"
-        COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj" 
+        COMMAND ${DOTNET_EXECUTABLE} restore "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.Scripting/GrapeEngine.Scripting.csproj"
+        COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.Scripting/GrapeEngine.Scripting.csproj" 
             --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
             --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
             --no-restore
@@ -358,7 +358,7 @@ if(DOTNET_EXECUTABLE)
                 # Build directly - generate a temporary .csproj that references the
                 # engine ScriptAPI DLL using MSBuild's $(Configuration) so the correct
                 # Debug/Release output is used at build time for multi-config generators.
-                set(SCRIPTAPI_DLL_PATH "${CMAKE_BINARY_DIR}/$(Configuration)/GrapeEngine.ScriptAPI.dll")
+                set(SCRIPTAPI_DLL_PATH "${CMAKE_BINARY_DIR}/$(Configuration)/GrapeEngine.Scripting.dll")
 
                 # Generate a temporary .csproj for this game project
                 set(TEMP_CSPROJ "${CMAKE_BINARY_DIR}/${PROJECT_NAME}_Generated.csproj")
@@ -376,7 +376,7 @@ if(DOTNET_EXECUTABLE)
                 endforeach()
                 file(APPEND ${TEMP_CSPROJ} "  </ItemGroup>\n")
                 file(APPEND ${TEMP_CSPROJ} "  <ItemGroup>\n")
-                file(APPEND ${TEMP_CSPROJ} "    <Reference Include=\"GrapeEngine.ScriptAPI\">\n")
+                file(APPEND ${TEMP_CSPROJ} "    <Reference Include=\"GrapeEngine.Scripting\">\n")
                 file(APPEND ${TEMP_CSPROJ} "      <HintPath>${SCRIPTAPI_DLL_PATH}</HintPath>\n")
                 file(APPEND ${TEMP_CSPROJ} "    </Reference>\n")
                 file(APPEND ${TEMP_CSPROJ} "  </ItemGroup>\n")
@@ -412,7 +412,7 @@ if(DOTNET_EXECUTABLE)
         string(FIND "${PROJ_DIR}" "\\build\\" IN_BUILD_DIR_WIN)
         string(FIND "${PROJ_NAME}" "Scripts" HAS_SCRIPTS_SUFFIX)
         
-        if(NOT PROJ_NAME STREQUAL "GrapeEngine.ScriptAPI" AND 
+        if(NOT PROJ_NAME STREQUAL "GrapeEngine.Scripting" AND 
            IN_BUILD_DIR EQUAL -1 AND IN_BUILD_DIR_WIN EQUAL -1 AND
            HAS_SCRIPTS_SUFFIX EQUAL -1)
             
@@ -446,20 +446,20 @@ if(DOTNET_EXECUTABLE)
     # which is the same directory as the executable, so no copying is needed.
 
     # Copy runtimeconfig.json for .NET hosting (editor)
-    if(BUILD_EDITOR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")
-        add_custom_command(TARGET GrapeEditor POST_BUILD
+    if(BUILD_EDITOR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json")
+        add_custom_command(TARGET editor POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json"
+                "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json"
                 "$<TARGET_FILE_DIR:GrapeEditor>"
             COMMENT "Copying runtimeconfig.json to editor output directory"
         )
     endif()
     
     # Copy runtimeconfig.json for .NET hosting (game)
-    if(BUILD_GAME AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json")
-        add_custom_command(TARGET GrapeRuntime POST_BUILD
+    if(BUILD_GAME AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json")
+        add_custom_command(TARGET game POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.ScriptAPI.runtimeconfig.json"
+                "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json"
                 "$<TARGET_FILE_DIR:GrapeRuntime>"
             COMMENT "Copying runtimeconfig.json to game output directory"
         )

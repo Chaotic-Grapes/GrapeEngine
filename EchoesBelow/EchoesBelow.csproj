@@ -10,8 +10,8 @@
 
   <ItemGroup>
     <!-- Reference the engine's Script API -->
-    <Reference Include="GrapeEngine.ScriptAPI">
-	  <HintPath>$(MSBuildThisFileDirectory)..\build\$(Configuration)\GrapeEngine.ScriptAPI.dll</HintPath>
+    <Reference Include="GrapeEngine.Scripting">
+	  <HintPath>$(MSBuildThisFileDirectory)..\build\$(Configuration)\GrapeEngine.Scripting.dll</HintPath>
       <Private>false</Private>
       <SpecificVersion>false</SpecificVersion>
     </Reference>

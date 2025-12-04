@@ -10,8 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Reference the ScriptAPI project -->
-    <ProjectReference Include="..\..\api\GrapeEngine.ScriptAPI\GrapeEngine.ScriptAPI.csproj" />
+    <!-- Reference the Scripting project -->
+    <ProjectReference Include="..\..\api\GrapeEngine.Scripting\GrapeEngine.Scripting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

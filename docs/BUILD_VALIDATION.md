@@ -36,7 +36,7 @@ build/Debug/
 ├── GrapeEngine.exe              # Editor executable
 ├── GrapeEngineNative.dll        # Engine library (if shared)
 ├── imgui.lib                    # ImGui library
-└── GrapeEngine.ScriptAPI.dll    # C# API
+└── GrapeEngine.Scripting.dll    # C# API
 ```
 
 **Runtime Build** (BUILD_GAME=ON):

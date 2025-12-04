@@ -65,12 +65,12 @@ GrapeEngine supports C# scripting through CoreCLR integration. Game scripts are 
    cd scripts
    dotnet new classlib -n MyGame -f net9.0
    cd MyGame
-   dotnet add reference ../GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj
+   dotnet add reference ../GrapeEngine.Scripting/GrapeEngine.Scripting.csproj
    ```
 
 2. **Write scripts:**
    ```csharp
-   using GrapeEngine.ScriptAPI;
+   using GrapeEngine.Scripting;
    
    namespace MyGame;
    

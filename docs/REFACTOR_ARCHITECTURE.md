@@ -180,7 +180,7 @@ CMakeLists.txt          # Orchestrates subprojects
 
 1. **Engine Library** builds first
 2. **Editor/Runtime** link against engine
-3. **C# Script API** (`GrapeEngine.ScriptAPI.dll`) builds
+3. **C# Script API** (`GrapeEngine.Scripting.dll`) builds
 4. **Game Scripts** compile referencing Script API
 5. **Everything** outputs to same directory
 

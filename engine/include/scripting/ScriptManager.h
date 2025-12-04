@@ -63,7 +63,7 @@ namespace ECS {
      * SystemManager systemManager;
      * 
      * // Initialize CLR
-     * scriptManager.InitializeCLR("GrapeEngine.ScriptAPI.runtimeconfig.json");
+     * scriptManager.InitializeCLR("GrapeEngine.Scripting.runtimeconfig.json");
      * 
      * // Load game scripts
      * scriptManager.LoadAssembly("GameScripts.dll");
@@ -95,7 +95,7 @@ namespace ECS {
          * 
          * Must be called before loading any assemblies.
          */
-        bool InitializeCLR(const char* runtimeConfigPath = "GrapeEngine.ScriptAPI.runtimeconfig.json");
+        bool InitializeCLR(const char* runtimeConfigPath = "GrapeEngine.Scripting.runtimeconfig.json");
 
         /**
          * @brief Shutdown the CoreCLR runtime and cleanup.
