@@ -26,14 +26,12 @@ public unsafe struct QueryEnumerator<T1>
     private readonly World _world;
     private QueryIterator _iterator;
     private readonly ulong _currentEntityId;
-    private readonly bool _initialized;
 
     internal QueryEnumerator(World world, uint[] componentHashes)
     {
         _world = world;
         _iterator = default;
         _currentEntityId = 0;
-        _initialized = false;
 
         // Initialize query iterator
         fixed (uint* hashesPtr = componentHashes)

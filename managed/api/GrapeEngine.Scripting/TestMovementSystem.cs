@@ -35,8 +35,9 @@ public class TestMovementSystem : ISystem
         // Query API example: Iterate over all entities with Position and Velocity
         foreach (var (entity, pos, vel) in world.Query<Position, Velocity>())
         {
-            // Modify component data directly (zero-copy access to native memory)
-            pos.Value += vel.Value * deltaTime;
+            // Get mutable reference to position component
+            ref var position = ref entity.GetComponent<Position>();
+            position.Value += vel.Value * deltaTime;
         }
         
         // Note: Components are accessed by reference, so modifications persist

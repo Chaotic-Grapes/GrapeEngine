@@ -58,12 +58,11 @@ public static class Transform
     /// <param name="delta">The position delta</param>
     public static void Translate(Entity entity, Vector3 delta)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (!hasTransform)
+        if (!entity.HasComponent<LocalTransform>())
             return;
 
+        ref var transform = ref entity.GetComponent<LocalTransform>();
         transform.Position += delta;
-        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -73,12 +72,11 @@ public static class Transform
     /// <param name="position">The new position</param>
     public static void SetPosition(Entity entity, Vector3 position)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (!hasTransform)
+        if (!entity.HasComponent<LocalTransform>())
             return;
 
+        ref var transform = ref entity.GetComponent<LocalTransform>();
         transform.Position = position;
-        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -88,8 +86,11 @@ public static class Transform
     /// <returns>The position, or Vector3.Zero if the entity has no transform</returns>
     public static Vector3 GetPosition(Entity entity)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        return hasTransform ? transform.Position : Vector3.Zero;
+        if (!entity.HasComponent<LocalTransform>())
+            return Vector3.Zero;
+
+        ref var transform = ref entity.GetComponent<LocalTransform>();
+        return transform.Position;
     }
 
     // ============================================================================
@@ -103,12 +104,11 @@ public static class Transform
     /// <param name="scale">The new scale</param>
     public static void SetScale(Entity entity, Vector3 scale)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (!hasTransform)
+        if (!entity.HasComponent<LocalTransform>())
             return;
 
+        ref var transform = ref entity.GetComponent<LocalTransform>();
         transform.Scale = scale;
-        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -128,8 +128,11 @@ public static class Transform
     /// <returns>The scale, or Vector3.One if the entity has no transform</returns>
     public static Vector3 GetScale(Entity entity)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        return hasTransform ? transform.Scale : Vector3.One;
+        if (!entity.HasComponent<LocalTransform>())
+            return Vector3.One;
+
+        ref var transform = ref entity.GetComponent<LocalTransform>();
+        return transform.Scale;
     }
 
     // ============================================================================
@@ -143,12 +146,11 @@ public static class Transform
     /// <param name="rotation">The new rotation quaternion</param>
     public static void SetRotation(Entity entity, Quaternion rotation)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (!hasTransform)
+        if (!entity.HasComponent<LocalTransform>())
             return;
 
+        ref var transform = ref entity.GetComponent<LocalTransform>();
         transform.Rotation = rotation;
-        entity.SetComponent(transform);
     }
 
     /// <summary>
@@ -158,8 +160,11 @@ public static class Transform
     /// <returns>The rotation, or Quaternion.Identity if the entity has no transform</returns>
     public static Quaternion GetRotation(Entity entity)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        return hasTransform ? transform.Rotation : Quaternion.Identity;
+        if (!entity.HasComponent<LocalTransform>())
+            return Quaternion.Identity;
+
+        ref var transform = ref entity.GetComponent<LocalTransform>();
+        return transform.Rotation;
     }
 
     // ============================================================================
@@ -174,13 +179,12 @@ public static class Transform
     /// <returns>The distance, or float.MaxValue if either entity has no transform</returns>
     public static float Distance(Entity a, Entity b)
     {
-        ref var transformA = ref a.TryGetComponent<LocalTransform>(out var hasTransformA);
-        ref var transformB = ref b.TryGetComponent<LocalTransform>(out var hasTransformB);
+        if (!a.HasComponent<LocalTransform>() || !b.HasComponent<LocalTransform>())
+            return float.MaxValue;
 
-        if (hasTransformA && hasTransformB)
-            return (transformA.Position - transformB.Position).Magnitude;
-        
-        return float.MaxValue;
+        ref var transformA = ref a.GetComponent<LocalTransform>();
+        ref var transformB = ref b.GetComponent<LocalTransform>();
+        return (transformA.Position - transformB.Position).Magnitude;
     }
 
     /// <summary>
@@ -191,11 +195,11 @@ public static class Transform
     /// <returns>Normalized direction vector, or Vector3.Zero if either entity has no transform</returns>
     public static Vector3 DirectionTo(Entity from, Entity to)
     {
-        ref var transformFrom = ref from.TryGetComponent<LocalTransform>(out var hasFromTransform);
-        ref var transformTo = ref to.TryGetComponent<LocalTransform>(out var hasToTransform);
-        if (!hasFromTransform || !hasToTransform)
+        if (!from.HasComponent<LocalTransform>() || !to.HasComponent<LocalTransform>())
             return Vector3.Zero;
 
+        ref var transformFrom = ref from.GetComponent<LocalTransform>();
+        ref var transformTo = ref to.GetComponent<LocalTransform>();
         var direction = transformTo.Position - transformFrom.Position;
         return direction.Normalized;
     }
@@ -208,10 +212,10 @@ public static class Transform
     /// <param name="target">The target position to look at</param>
     public static void LookAt2D(Entity entity, Vector3 target)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (!hasTransform)
+        if (!entity.HasComponent<LocalTransform>())
             return;
 
+        ref var transform = ref entity.GetComponent<LocalTransform>();
         var direction = target - transform.Position;
         var angle = MathF.Atan2(direction.Y, direction.X);
             
@@ -224,8 +228,6 @@ public static class Transform
             MathF.Sin(halfAngle),
             MathF.Cos(halfAngle)
         );
-            
-        entity.SetComponent(transform);
     }
 
     // ============================================================================
@@ -240,12 +242,11 @@ public static class Transform
     /// <param name="t">Interpolation factor (0 to 1)</param>
     public static void LerpPosition(Entity entity, Vector3 target, float t)
     {
-        ref var transform = ref entity.TryGetComponent<LocalTransform>(out var hasTransform);
-        if (!hasTransform)
+        if (!entity.HasComponent<LocalTransform>())
             return;
 
+        ref var transform = ref entity.GetComponent<LocalTransform>();
         transform.Position = Lerp(transform.Position, target, t);
-        entity.SetComponent(transform);
     }
 
     /// <summary>

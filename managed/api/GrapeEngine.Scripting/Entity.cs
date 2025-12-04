@@ -13,6 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
+using GrapeEngine.Scripting.Unsafe;
 
 namespace GrapeEngine;
 
@@ -39,9 +40,30 @@ public unsafe class Entity
     public ulong Id => _id;
 
     /// <summary>
+    /// The unique identifier for this entity (alias for Id).
+    /// </summary>
+    public ulong EntityId => _id;
+
+    /// <summary>
     /// Check if this entity is alive (valid).
     /// </summary>
     public bool IsAlive => _world.IsAlive(this);
+
+    /// <summary>
+    /// Create an Entity wrapper from a world and entity ID.
+    /// </summary>
+    public static Entity FromId(World world, ulong entityId)
+    {
+        return new Entity(world, entityId);
+    }
+
+    /// <summary>
+    /// Create an Entity wrapper from a world pointer and entity ID (internal use).
+    /// </summary>
+    internal static unsafe Entity FromId(void* worldPtr, ulong entityId)
+    {
+        return new Entity(new World(worldPtr), entityId);
+    }
 
     // ============================================================================
     // Component Operations
@@ -122,6 +144,24 @@ public unsafe class Entity
         }
 
         return ref *(T*)addedPtr;
+    }
+
+    /// <summary>
+    /// Set/update a component's data on this entity.
+    /// </summary>
+    /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
+    /// <param name="component">The new component data</param>
+    public void SetComponent<T>(T component) where T : unmanaged
+    {
+        if (HasComponent<T>())
+        {
+            ref T existing = ref GetComponent<T>();
+            existing = component;
+        }
+        else
+        {
+            AddComponent(component);
+        }
     }
 
     /// <summary>

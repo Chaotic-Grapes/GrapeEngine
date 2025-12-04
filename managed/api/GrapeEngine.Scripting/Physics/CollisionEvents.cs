@@ -27,9 +27,9 @@ public readonly struct CollisionEvent
     public Entity Other { get; }
     public CollisionEventType Type { get; }
 
-    public CollisionEvent(ulong otherEntityId, CollisionEventType type)
+    public CollisionEvent(World world, ulong otherEntityId, CollisionEventType type)
     {
-        Other = Entity.FromId(otherEntityId);
+        Other = Entity.FromId(world, otherEntityId);
         Type = type;
     }
 }
@@ -46,7 +46,7 @@ public static class CollisionEvents
     /// </summary>
     /// <param name="entity">Entity wrapper</param>
     /// <returns>List of collision events (may be empty)</returns>
-    public static List<CollisionEvent> GetEvents(Entity entity)
+    public static List<CollisionEvent> GetEvents(Entity entity, World world)
     {
         var list = new List<CollisionEvent>();
         uint total = CollisionAPI.GetEventCount(entity.EntityId);
@@ -62,7 +62,7 @@ public static class CollisionEvents
 
             for (var i = 0; i < toProcess; ++i)
             {
-                list.Add(new CollisionEvent(others[i], (CollisionEventType)types[i]));
+                list.Add(new CollisionEvent(world, others[i], (CollisionEventType)types[i]));
             }
         }
         else
@@ -75,7 +75,7 @@ public static class CollisionEvents
 
             for (var i = 0; i < toProcess; ++i)
             {
-                list.Add(new CollisionEvent(others[i], (CollisionEventType)types[i]));
+                list.Add(new CollisionEvent(world, others[i], (CollisionEventType)types[i]));
             }
 
             // Remaining
@@ -89,7 +89,7 @@ public static class CollisionEvents
 
                 for (var i = 0; i < gotMoreCount; ++i)
                 {
-                    list.Add(new CollisionEvent(moreOthers[i], (CollisionEventType)moreTypes[i]));
+                    list.Add(new CollisionEvent(world, moreOthers[i], (CollisionEventType)moreTypes[i]));
                 }
             }
         }
