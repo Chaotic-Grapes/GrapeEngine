@@ -21,6 +21,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "scripting/ScriptManager.h"
+#include "scripting/ComponentTypeRegistry.h"
 #include "ecs/systems/LifetimeSystem.h"
 #include "ecs/systems/AudioSystem.h"
 #include "scene/Scene.h"
@@ -243,6 +244,11 @@ namespace Engine {
     void Application::_initializeServices() {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
+
+        // Register all C++ component types with hash mapping for C# interop
+        // This MUST be done before initializing ScriptManager
+        ECS::RegisterAllComponentTypes();
+        LOG_INFO("Component types registered for C# interop");
 
         // Initialize C# scripting via ScriptManager
         m_scriptManager = new ECS::ScriptManager();
