@@ -19,7 +19,7 @@ namespace GrapeEngine;
 /// <summary>
 /// Query for iterating over entities with one component type.
 /// </summary>
-public unsafe class Query<T1> : IEnumerable<QueryResult<T1>>
+public unsafe class Query<T1>
     where T1 : unmanaged
 {
     private readonly World _world;
@@ -39,15 +39,12 @@ public unsafe class Query<T1> : IEnumerable<QueryResult<T1>>
     {
         return new QueryEnumerator<T1>(_world, _componentHashes);
     }
-
-    IEnumerator<QueryResult<T1>> IEnumerable<QueryResult<T1>>.GetEnumerator() => GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 /// <summary>
 /// Query for iterating over entities with two component types.
 /// </summary>
-public unsafe class Query<T1, T2> : IEnumerable<QueryResult<T1, T2>>
+public unsafe class Query<T1, T2>
     where T1 : unmanaged
     where T2 : unmanaged
 {
@@ -70,15 +67,12 @@ public unsafe class Query<T1, T2> : IEnumerable<QueryResult<T1, T2>>
     {
         return new QueryEnumerator<T1, T2>(_world, _componentHashes);
     }
-
-    IEnumerator<QueryResult<T1, T2>> IEnumerable<QueryResult<T1, T2>>.GetEnumerator() => GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 /// <summary>
 /// Query for iterating over entities with three component types.
 /// </summary>
-public unsafe class Query<T1, T2, T3> : IEnumerable<QueryResult<T1, T2, T3>>
+public unsafe class Query<T1, T2, T3>
     where T1 : unmanaged
     where T2 : unmanaged
     where T3 : unmanaged
@@ -104,9 +98,6 @@ public unsafe class Query<T1, T2, T3> : IEnumerable<QueryResult<T1, T2, T3>>
     {
         return new QueryEnumerator<T1, T2, T3>(_world, _componentHashes);
     }
-
-    IEnumerator<QueryResult<T1, T2, T3>> IEnumerable<QueryResult<T1, T2, T3>>.GetEnumerator() => GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 // Add Query<T1, T2, T3, T4> and more as needed...

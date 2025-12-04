@@ -12,6 +12,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using GrapeEngine.Scripting.Unsafe;
 using System.Collections;
 
 namespace GrapeEngine;
@@ -19,7 +20,7 @@ namespace GrapeEngine;
 /// <summary>
 /// Enumerator for single-component queries.
 /// </summary>
-public unsafe struct QueryEnumerator<T1> : IEnumerator<QueryResult<T1>>
+public unsafe struct QueryEnumerator<T1>
     where T1 : unmanaged
 {
     private readonly World _world;
@@ -56,8 +57,6 @@ public unsafe struct QueryEnumerator<T1> : IEnumerator<QueryResult<T1>>
         }
     }
 
-    object IEnumerator.Current => Current;
-
     public bool MoveNext()
     {
         fixed (QueryIterator* iterPtr = &_iterator)
@@ -76,7 +75,7 @@ public unsafe struct QueryEnumerator<T1> : IEnumerator<QueryResult<T1>>
 /// <summary>
 /// Enumerator for two-component queries.
 /// </summary>
-public unsafe struct QueryEnumerator<T1, T2> : IEnumerator<QueryResult<T1, T2>>
+public unsafe struct QueryEnumerator<T1, T2>
     where T1 : unmanaged
     where T2 : unmanaged
 {
@@ -112,8 +111,6 @@ public unsafe struct QueryEnumerator<T1, T2> : IEnumerator<QueryResult<T1, T2>>
         }
     }
 
-    object IEnumerator.Current => Current;
-
     public bool MoveNext()
     {
         fixed (QueryIterator* iterPtr = &_iterator)
@@ -132,7 +129,7 @@ public unsafe struct QueryEnumerator<T1, T2> : IEnumerator<QueryResult<T1, T2>>
 /// <summary>
 /// Enumerator for three-component queries.
 /// </summary>
-public unsafe struct QueryEnumerator<T1, T2, T3> : IEnumerator<QueryResult<T1, T2, T3>>
+public unsafe struct QueryEnumerator<T1, T2, T3>
     where T1 : unmanaged
     where T2 : unmanaged
     where T3 : unmanaged
@@ -169,8 +166,6 @@ public unsafe struct QueryEnumerator<T1, T2, T3> : IEnumerator<QueryResult<T1, T
             }
         }
     }
-
-    object IEnumerator.Current => Current;
 
     public bool MoveNext()
     {
