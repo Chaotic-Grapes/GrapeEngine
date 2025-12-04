@@ -121,15 +121,66 @@ endmacro()
 # Macro to import FMOD
 macro(import_fmod)
     if(NOT TARGET fmod) # Guard to prevent multiple inclusion
-        set(FMOD_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include/externals/fmod")
-        set(FMOD_LIB_DIR "${CMAKE_SOURCE_DIR}/lib/fmod")
-
-        # Create an imported library target
-        add_library(fmod UNKNOWN IMPORTED)
-        set_target_properties(fmod PROPERTIES
-            IMPORTED_LOCATION "${FMOD_LIB_DIR}/fmod_vc.lib"
-            INTERFACE_INCLUDE_DIRECTORIES "${FMOD_INCLUDE_DIR}"
+        # Candidate include directories (prefer externals)
+        set(_fmod_include_candidates
+            "${CMAKE_SOURCE_DIR}/include/externals/fmod"
+            "${CMAKE_SOURCE_DIR}/externals/include/Fmod"
+            "${CMAKE_SOURCE_DIR}/externals/include/fmod"
+            "${CMAKE_SOURCE_DIR}/externals/include/Fmod/include"
         )
+
+        set(FMOD_INCLUDE_DIR "")
+        foreach(_inc ${_fmod_include_candidates})
+            if(EXISTS "${_inc}")
+                set(FMOD_INCLUDE_DIR "${_inc}")
+                break()
+            endif()
+        endforeach()
+
+        # Candidate library directories
+        set(_fmod_lib_candidates
+            "${CMAKE_SOURCE_DIR}/lib/fmod"
+            "${CMAKE_SOURCE_DIR}/externals/lib/Fmod"
+            "${CMAKE_SOURCE_DIR}/externals/lib/fmod"
+            "${CMAKE_SOURCE_DIR}/externals/lib"
+        )
+
+        set(FMOD_LIB_DIR "")
+        set(_found_lib "")
+        foreach(_libdir ${_fmod_lib_candidates})
+            if(EXISTS "${_libdir}/fmod_vc.lib")
+                set(FMOD_LIB_DIR "${_libdir}")
+                set(_found_lib "${_libdir}/fmod_vc.lib")
+                break()
+            elseif(EXISTS "${_libdir}/fmodL_vc.lib")
+                set(FMOD_LIB_DIR "${_libdir}")
+                set(_found_lib "${_libdir}/fmodL_vc.lib")
+                break()
+            endif()
+        endforeach()
+
+        if(_found_lib)
+            add_library(fmod UNKNOWN IMPORTED)
+            set_target_properties(fmod PROPERTIES
+                IMPORTED_LOCATION "${_found_lib}"
+            )
+
+            if(FMOD_INCLUDE_DIR)
+                set_target_properties(fmod PROPERTIES
+                    INTERFACE_INCLUDE_DIRECTORIES "${FMOD_INCLUDE_DIR}"
+                )
+            endif()
+
+            message(STATUS "FMOD: found library ${_found_lib}")
+            if(FMOD_INCLUDE_DIR)
+                message(STATUS "FMOD: using include dir ${FMOD_INCLUDE_DIR}")
+            else()
+                message(WARNING "FMOD: include directory not found; headers may be missing")
+            endif()
+        else()
+            message(WARNING "FMOD not found in expected locations. Searched: ${_fmod_lib_candidates}")
+            message(WARNING "If you have FMOD installed, set up the folder under externals/lib/Fmod or lib/fmod.")
+        endif()
     endif()
 endmacro()
 

@@ -31,30 +31,42 @@ endif()
 find_program(DOTNET_EXECUTABLE dotnet REQUIRED)
 
 # ================ CoreCLR / .NET Hosting Configuration =================
-# Set the path to the CoreCLR library directory
+# Set the path to the CoreCLR library directory (primary default)
 set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/CoreCLR")
 
-# Find nethost library
-find_library(NETHOST_LIB 
+# Also consider common fallback locations and an environment override
+set(CORECLR_FALLBACK_DIR "${CMAKE_CURRENT_LIST_DIR}/externals/lib/CoreCLR")
+set(NETHOST_ENV_DIR $ENV{NETHOST_DIR})
+
+# Build a search list for find_library so CMake can locate nethost in a few places
+set(NETHOST_SEARCH_DIRS
+    ${CORECLR_LIB_DIR}
+    ${CORECLR_FALLBACK_DIR}
+    ${NETHOST_ENV_DIR}
+)
+
+# Find nethost library (allow system defaults as a last resort)
+find_library(NETHOST_LIB
     NAMES nethost
-    PATHS ${CORECLR_LIB_DIR}
-    NO_DEFAULT_PATH
+    PATHS ${NETHOST_SEARCH_DIRS}
     REQUIRED
 )
 
 if(NETHOST_LIB)
     message(STATUS "Found nethost library: ${NETHOST_LIB}")
+    get_filename_component(NETHOST_LIB_DIR ${NETHOST_LIB} DIRECTORY)
+    message(STATUS "nethost library directory: ${NETHOST_LIB_DIR}")
 else()
-    message(FATAL_ERROR "nethost.lib not found in ${CORECLR_LIB_DIR}")
-    message(FATAL_ERROR "Please place nethost.lib in lib/CoreCLR/")
+    message(FATAL_ERROR "nethost.lib not found. Searched: ${NETHOST_SEARCH_DIRS}")
+    message(FATAL_ERROR "Please place nethost.lib in one of the above locations or set the NETHOST_DIR environment variable.")
 endif()
 
-# Verify nethost.dll exists for runtime
-if(EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
-    message(STATUS "Found nethost.dll: ${CORECLR_LIB_DIR}/nethost.dll")
+# Verify nethost.dll exists for runtime (use the directory where the library was found)
+if(DEFINED NETHOST_LIB_DIR AND EXISTS "${NETHOST_LIB_DIR}/nethost.dll")
+    message(STATUS "Found nethost.dll: ${NETHOST_LIB_DIR}/nethost.dll")
 else()
-    message(WARNING "nethost.dll not found in ${CORECLR_LIB_DIR}")
-    message(WARNING "Runtime may fail - please place nethost.dll in lib/CoreCLR/")
+    message(WARNING "nethost.dll not found in ${NETHOST_LIB_DIR}")
+    message(WARNING "Runtime may fail - please place nethost.dll alongside nethost.lib or set NETHOST_DIR env var to its folder.")
 endif()
 
 # ======================= BUILD CONFIGURATION =========================
@@ -141,11 +153,19 @@ if(BUILD_EDITOR)
         source_group("${group_path}" FILES "${header}")
     endforeach()
     
-    # Compiler warnings for editor
+    # Compiler warnings for editor: apply to the actual editor or engine targets
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(GrapeEngine PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        if(TARGET GrapeEditor)
+            target_compile_options(GrapeEditor PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        elseif(TARGET GrapeEngineLib)
+            target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        endif()
     elseif (MSVC)
-        target_compile_options(GrapeEngine PRIVATE /W4)
+        if(TARGET GrapeEditor)
+            target_compile_options(GrapeEditor PRIVATE /W4)
+        elseif(TARGET GrapeEngineLib)
+            target_compile_options(GrapeEngineLib PRIVATE /W4)
+        endif()
     endif()
 endif()
 
@@ -172,11 +192,19 @@ if(BUILD_GAME)
         source_group("${group_path}" FILES "${header}")
     endforeach()
     
-    # Compiler warnings for game
+    # Compiler warnings for game: apply to runtime or engine targets
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(GrapeGame PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        if(TARGET GrapeRuntime)
+            target_compile_options(GrapeRuntime PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        elseif(TARGET GrapeEngineLib)
+            target_compile_options(GrapeEngineLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        endif()
     elseif (MSVC)
-        target_compile_options(GrapeGame PRIVATE /W4)
+        if(TARGET GrapeRuntime)
+            target_compile_options(GrapeRuntime PRIVATE /W4)
+        elseif(TARGET GrapeEngineLib)
+            target_compile_options(GrapeEngineLib PRIVATE /W4)
+        endif()
     endif()
 endif()
 
@@ -184,68 +212,91 @@ endif()
 
 # Copy assets to build directory for editor
 if(BUILD_EDITOR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
-    add_custom_command(TARGET GrapeEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_LIST_DIR}/assets"
-        "$<TARGET_FILE_DIR:GrapeEngine>/assets"
-        COMMENT "Copying assets to editor build directory"
-    )
-    add_custom_command(TARGET GrapeEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_LIST_DIR}/assets"
-        "${CMAKE_BINARY_DIR}/assets"
-        COMMENT "Copying assets to project folder"
-    )
+    if(TARGET GrapeEditor)
+        add_custom_target(Copy_Assets_Editor ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_LIST_DIR}/assets"
+                "$<TARGET_FILE_DIR:GrapeEditor>/assets"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_LIST_DIR}/assets"
+                "${CMAKE_BINARY_DIR}/assets"
+            DEPENDS GrapeEditor
+            COMMENT "Copying assets to editor build directory and project folder"
+        )
+    endif()
 endif()
 
 # Copy assets to build directory for game
 if(BUILD_GAME AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/assets")
-    add_custom_command(TARGET GrapeGame POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_LIST_DIR}/assets"
-        "$<TARGET_FILE_DIR:GrapeGame>/assets"
-        COMMENT "Copying assets to game build directory"
-    )
+    if(TARGET GrapeRuntime)
+        add_custom_target(Copy_Assets_Runtime ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_LIST_DIR}/assets"
+                "$<TARGET_FILE_DIR:GrapeRuntime>/assets"
+            DEPENDS GrapeRuntime
+            COMMENT "Copying assets to game build directory"
+        )
+    endif()
 endif()
 
 # Copy FMOD DLL (Windows) for editor
 if(BUILD_EDITOR)
-    add_custom_command(TARGET GrapeEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_LIST_DIR}/lib/fmod/fmod.dll"
-            "$<TARGET_FILE_DIR:GrapeEngine>"
-        COMMENT "Copying FMOD DLL to editor output directory"
-    )
+    if(DEFINED FMOD_LIB_DIR AND EXISTS "${FMOD_LIB_DIR}/fmod.dll")
+        if(TARGET GrapeEditor)
+            add_custom_target(Copy_FMOD_Editor ALL
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${FMOD_LIB_DIR}/fmod.dll"
+                    "$<TARGET_FILE_DIR:GrapeEditor>"
+                DEPENDS GrapeEditor
+                COMMENT "Copying FMOD DLL to editor output directory"
+            )
+        endif()
+    else()
+        message(STATUS "FMOD DLL not found; skipping FMOD copy for editor. Searched: ${FMOD_LIB_DIR}/fmod.dll")
+    endif()
 endif()
 
 # Copy FMOD DLL (Windows) for game
 if(BUILD_GAME)
-    add_custom_command(TARGET GrapeGame POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_LIST_DIR}/lib/fmod/fmod.dll"
-            "$<TARGET_FILE_DIR:GrapeGame>"
-        COMMENT "Copying FMOD DLL to game output directory"
-    )
+    if(DEFINED FMOD_LIB_DIR AND EXISTS "${FMOD_LIB_DIR}/fmod.dll")
+        if(TARGET GrapeRuntime)
+            add_custom_target(Copy_FMOD_Runtime ALL
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${FMOD_LIB_DIR}/fmod.dll"
+                    "$<TARGET_FILE_DIR:GrapeRuntime>"
+                DEPENDS GrapeRuntime
+                COMMENT "Copying FMOD DLL to game output directory"
+            )
+        endif()
+    else()
+        message(STATUS "FMOD DLL not found; skipping FMOD copy for game. Searched: ${FMOD_LIB_DIR}/fmod.dll")
+    endif()
 endif()
 
 # Copy nethost.dll for CoreCLR hosting (Windows) for editor
-if(BUILD_EDITOR AND EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
-    add_custom_command(TARGET GrapeEngine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CORECLR_LIB_DIR}/nethost.dll"
-            "$<TARGET_FILE_DIR:GrapeEngine>"
-        COMMENT "Copying nethost.dll to editor output directory"
-    )
+if(BUILD_EDITOR AND DEFINED NETHOST_LIB_DIR AND EXISTS "${NETHOST_LIB_DIR}/nethost.dll")
+    if(TARGET GrapeEditor)
+        add_custom_target(Copy_Nethost_Editor ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${NETHOST_LIB_DIR}/nethost.dll"
+                "$<TARGET_FILE_DIR:GrapeEditor>"
+            DEPENDS GrapeEditor
+            COMMENT "Copying nethost.dll to editor output directory"
+        )
+    endif()
 endif()
 
 # Copy nethost.dll for CoreCLR hosting (Windows) for game
-if(BUILD_GAME AND EXISTS "${CORECLR_LIB_DIR}/nethost.dll")
-    add_custom_command(TARGET GrapeGame POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CORECLR_LIB_DIR}/nethost.dll"
-            "$<TARGET_FILE_DIR:GrapeGame>"
-        COMMENT "Copying nethost.dll to game output directory"
-    )
+if(BUILD_GAME AND DEFINED NETHOST_LIB_DIR AND EXISTS "${NETHOST_LIB_DIR}/nethost.dll")
+    if(TARGET GrapeRuntime)
+        add_custom_target(Copy_Nethost_Runtime ALL
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${NETHOST_LIB_DIR}/nethost.dll"
+                "$<TARGET_FILE_DIR:GrapeRuntime>"
+            DEPENDS GrapeRuntime
+            COMMENT "Copying nethost.dll to game output directory"
+        )
+    endif()
 endif()
 
 # ======================= C# Scripting API Build ===========================
@@ -418,9 +469,15 @@ if(DOTNET_EXECUTABLE)
             
             file(RELATIVE_PATH REL_PATH "${CMAKE_CURRENT_LIST_DIR}" "${CSPROJ_FILE}")
             message(STATUS "  Found standalone script project: ${PROJ_NAME} (${REL_PATH})")
-            
+
+            # Create a unique target name by appending a sanitized relative path
+            string(REPLACE "/" "_" REL_PATH_SAFE "${REL_PATH}")
+            string(REPLACE "\\" "_" REL_PATH_SAFE "${REL_PATH_SAFE}")
+            string(REPLACE "." "_" REL_PATH_SAFE "${REL_PATH_SAFE}")
+            set(STANDALONE_TARGET_NAME "Build_${PROJ_NAME}_${REL_PATH_SAFE}")
+
             add_custom_target(
-                Build_${PROJ_NAME} ALL
+                ${STANDALONE_TARGET_NAME} ALL
                 COMMAND ${DOTNET_EXECUTABLE} build "${CSPROJ_FILE}"
                     --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
                     --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
@@ -429,8 +486,8 @@ if(DOTNET_EXECUTABLE)
                 DEPENDS BuildScriptAPI
                 VERBATIM
             )
-            
-            list(APPEND GAME_SCRIPT_TARGETS Build_${PROJ_NAME})
+
+            list(APPEND GAME_SCRIPT_TARGETS ${STANDALONE_TARGET_NAME})
         endif()
     endforeach()
     
@@ -447,22 +504,28 @@ if(DOTNET_EXECUTABLE)
 
     # Copy runtimeconfig.json for .NET hosting (editor)
     if(BUILD_EDITOR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json")
-        add_custom_command(TARGET editor POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json"
-                "$<TARGET_FILE_DIR:GrapeEditor>"
-            COMMENT "Copying runtimeconfig.json to editor output directory"
-        )
+        if(TARGET GrapeEditor)
+            add_custom_target(Copy_RuntimeConfig_Editor ALL
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json"
+                    "$<TARGET_FILE_DIR:GrapeEditor>"
+                DEPENDS GrapeEditor
+                COMMENT "Copying runtimeconfig.json to editor output directory"
+            )
+        endif()
     endif()
-    
+
     # Copy runtimeconfig.json for .NET hosting (game)
     if(BUILD_GAME AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json")
-        add_custom_command(TARGET game POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json"
-                "$<TARGET_FILE_DIR:GrapeRuntime>"
-            COMMENT "Copying runtimeconfig.json to game output directory"
-        )
+        if(TARGET GrapeRuntime)
+            add_custom_target(Copy_RuntimeConfig_Runtime ALL
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_CURRENT_LIST_DIR}/managed/build/scripts/GrapeEngine.Scripting.runtimeconfig.json"
+                    "$<TARGET_FILE_DIR:GrapeRuntime>"
+                DEPENDS GrapeRuntime
+                COMMENT "Copying runtimeconfig.json to game output directory"
+            )
+        endif()
     endif()
     
     message(STATUS "C# build output: ${CMAKE_BINARY_DIR}/$<CONFIG>")
@@ -486,42 +549,53 @@ foreach(SETTINGS_FILE ${ALL_PROJECT_SETTINGS_FOR_COPY})
     get_filename_component(PROJECT_DIR ${SETTINGS_FILE} DIRECTORY)
     get_filename_component(PROJECT_NAME ${PROJECT_DIR} NAME)
     
-    # Create symlink/junction for editor build
-    if(BUILD_EDITOR)
+    # Create symlink/junction for editor build (use a custom target that depends on the editor)
+    if(BUILD_EDITOR AND TARGET GrapeEditor)
+        string(REPLACE "/" "_" JUNCTION_SAFE_NAME "${PROJECT_NAME}")
+        string(REPLACE "\\" "_" JUNCTION_SAFE_NAME "${JUNCTION_SAFE_NAME}")
+        set(JUNCTION_TARGET_NAME "CreateJunction_${JUNCTION_SAFE_NAME}_Editor")
+
         if(WIN32)
-            # Use directory junction on Windows (mklink /J) to avoid requiring developer-mode symlink privileges
-            add_custom_command(TARGET GrapeEditor POST_BUILD
+            add_custom_target(${JUNCTION_TARGET_NAME} ALL
                 COMMAND ${CMAKE_COMMAND} -E echo "Creating junction to ${PROJECT_NAME} (Editor)"
                 COMMAND ${CMAKE_COMMAND} -E echo ""
                 COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GrapeEditor>"
                 COMMAND cmd /C "if not exist \"$<TARGET_FILE_DIR:GrapeEditor>\\${PROJECT_NAME}\" mklink /J \"$<TARGET_FILE_DIR:GrapeEditor>\\${PROJECT_NAME}\" \"${PROJECT_DIR}\""
+                DEPENDS GrapeEditor
                 COMMENT "Creating junction to ${PROJECT_NAME} project (Editor)"
             )
         else()
-            add_custom_command(TARGET GrapeEditor POST_BUILD
+            add_custom_target(${JUNCTION_TARGET_NAME} ALL
                 COMMAND ${CMAKE_COMMAND} -E create_symlink
-                "${PROJECT_DIR}"
-                "$<TARGET_FILE_DIR:GrapeEditor>/${PROJECT_NAME}"
+                    "${PROJECT_DIR}"
+                    "$<TARGET_FILE_DIR:GrapeEditor>/${PROJECT_NAME}"
+                DEPENDS GrapeEditor
                 COMMENT "Creating symlink to ${PROJECT_NAME} project (Editor)"
             )
         endif()
     endif()
 
-    # Create symlink/junction for game build
-    if(BUILD_GAME)
+    # Create symlink/junction for game build (use a custom target that depends on the runtime)
+    if(BUILD_GAME AND TARGET GrapeRuntime)
+        string(REPLACE "/" "_" JUNCTION_SAFE_NAME_GAME "${PROJECT_NAME}")
+        string(REPLACE "\\" "_" JUNCTION_SAFE_NAME_GAME "${JUNCTION_SAFE_NAME_GAME}")
+        set(JUNCTION_TARGET_NAME_GAME "CreateJunction_${JUNCTION_SAFE_NAME_GAME}_Runtime")
+
         if(WIN32)
-            add_custom_command(TARGET GrapeRuntime POST_BUILD
+            add_custom_target(${JUNCTION_TARGET_NAME_GAME} ALL
                 COMMAND ${CMAKE_COMMAND} -E echo "Creating junction to ${PROJECT_NAME} (Game)"
                 COMMAND ${CMAKE_COMMAND} -E echo ""
                 COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GrapeRuntime>"
                 COMMAND cmd /C "if not exist \"$<TARGET_FILE_DIR:GrapeRuntime>\\${PROJECT_NAME}\" mklink /J \"$<TARGET_FILE_DIR:GrapeRuntime>\\${PROJECT_NAME}\" \"${PROJECT_DIR}\""
+                DEPENDS GrapeRuntime
                 COMMENT "Creating junction to ${PROJECT_NAME} project (Game)"
             )
         else()
-            add_custom_command(TARGET GrapeRuntime POST_BUILD
+            add_custom_target(${JUNCTION_TARGET_NAME_GAME} ALL
                 COMMAND ${CMAKE_COMMAND} -E create_symlink
-                "${PROJECT_DIR}"
-                "$<TARGET_FILE_DIR:GrapeRuntime>/${PROJECT_NAME}"
+                    "${PROJECT_DIR}"
+                    "$<TARGET_FILE_DIR:GrapeRuntime>/${PROJECT_NAME}"
+                DEPENDS GrapeRuntime
                 COMMENT "Creating symlink to ${PROJECT_NAME} project (Game)"
             )
         endif()

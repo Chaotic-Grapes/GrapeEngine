@@ -101,9 +101,17 @@ target_link_libraries(GrapeEngineLib
         glad
         glm
         freetype
-        fmod
         ${NETHOST_LIB}
 )
+
+if(TARGET fmod)
+    target_link_libraries(GrapeEngineLib
+        PUBLIC
+            fmod
+    )
+else()
+    message(WARNING "Engine: FMOD target not available; audio features disabled unless FMOD is provided in externals/lib/Fmod or lib/fmod")
+endif()
 
 # ======================= Compiler Definitions =========================
 # Engine does NOT define USE_IMGUI - editor code is completely separate
