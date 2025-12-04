@@ -438,6 +438,169 @@ namespace ECS {
             return Add<T>(e, std::move(value));
         }
 
+        // ************** Non-Templated Component API (for C# interop) ************** //
+
+        /**
+         * @brief Get archetypes matching a signature (for query iteration)
+         * @param sig The signature to match
+         * @return Vector of matching archetypes
+         */
+        inline const std::vector<Archetype*>& GetMatchingArchetypes(const Signature& sig) const {
+            return _getMatchingArchetypes(sig);
+        }
+
+        /**
+         * @brief Check if entity has a component by ComponentId
+         * @param e The entity to check
+         * @param componentId The component type ID
+         * @return True if entity has component
+         */
+        inline bool HasById(Entity e, ComponentTypeId componentId) const {
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr)
+                return false;
+            return loc.ArchetypePtr->Has(componentId);
+        }
+
+        /**
+         * @brief Get raw component pointer by ComponentId
+         * @param e The entity
+         * @param componentId The component type ID
+         * @return Pointer to component data, or nullptr if not found
+         */
+        inline void* GetRawComponentPtr(Entity e, ComponentTypeId componentId) {
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr || !loc.ArchetypePtr->Has(componentId))
+                return nullptr;
+            return loc.ArchetypePtr->GetRaw(componentId, loc.ChunkIndex, loc.SlotIndex);
+        }
+
+        /**
+         * @brief Add a component by ComponentId with raw data
+         * @param e The entity
+         * @param componentId The component type ID
+         * @param data Pointer to component data to copy (can be nullptr for default construction)
+         * @param size Size of component data
+         * @return Pointer to the added component
+         */
+        inline void* AddComponentById(Entity e, ComponentTypeId componentId, void* data, size_t size) {
+            // Ensure component info exists
+            if (m_componentSizes.find(componentId) == m_componentSizes.end()) {
+                return nullptr; // Component type not registered
+            }
+
+            auto& loc = m_locations[e.Index];
+            
+            // If entity has no archetype, create new one with just this component
+            if (!loc.ArchetypePtr) {
+                const Signature ns({ componentId });
+                Archetype* to = _getOrCreateArchetype(ns);
+                auto [ci, slot] = to->Insert();
+                
+                void* componentPtr = to->GetRaw(componentId, ci, slot);
+                if (data && size > 0) {
+                    std::memcpy(componentPtr, data, size);
+                } else {
+                    const auto& meta = ComponentRegistry::Meta(componentId);
+                    if (meta.ctor) meta.ctor(componentPtr);
+                }
+                
+                _placeEntity(e, to, ci, slot);
+                _onComponentAdded(e, componentId);
+                return componentPtr;
+            }
+            
+            // If entity already has this component, just return pointer
+            if (loc.ArchetypePtr->Has(componentId)) {
+                return loc.ArchetypePtr->GetRaw(componentId, loc.ChunkIndex, loc.SlotIndex);
+            }
+            
+            // Move to new archetype with added component
+            Archetype* from = loc.ArchetypePtr;
+            Archetype* to = from->GetAddEdge(componentId);
+            
+            if (!to) {
+                const Signature ns = from->GetSignature().MergedWith(componentId);
+                to = _getOrCreateArchetype(ns);
+                from->SetAddEdge(componentId, to);
+            }
+            
+            auto [ci, slot] = to->Insert();
+            
+            // Copy existing components
+            for (auto& info : from->GetComponents()) {
+                if (info.Id == componentId) continue;
+                void* dst = to->GetRaw(info.Id, ci, slot);
+                const void* src = from->GetRaw(info.Id, loc.ChunkIndex, loc.SlotIndex);
+                std::memcpy(dst, src, info.Size);
+            }
+            
+            // Initialize new component
+            void* componentPtr = to->GetRaw(componentId, ci, slot);
+            if (data && size > 0) {
+                std::memcpy(componentPtr, data, size);
+            } else {
+                const auto& meta = ComponentRegistry::Meta(componentId);
+                if (meta.ctor) meta.ctor(componentPtr);
+            }
+            
+            _removeFromArchetype(e, loc);
+            _placeEntity(e, to, ci, slot);
+            _onComponentAdded(e, componentId);
+            
+            return componentPtr;
+        }
+
+        /**
+         * @brief Remove a component by ComponentId
+         * @param e The entity
+         * @param componentId The component type ID
+         */
+        inline void RemoveById(Entity e, ComponentTypeId componentId) {
+            auto& loc = m_locations[e.Index];
+            
+            if (!loc.ArchetypePtr || !loc.ArchetypePtr->Has(componentId)) {
+                return; // Entity doesn't have this component
+            }
+            
+            _onComponentRemoving(e, componentId);
+            
+            Archetype* from = loc.ArchetypePtr;
+            Archetype* to = from->GetRemoveEdge(componentId);
+            
+            if (!to) {
+                const Signature ns = from->GetSignature().Without(componentId);
+                if (ns.Types().empty()) {
+                    to = nullptr;
+                } else {
+                    to = _getOrCreateArchetype(ns);
+                }
+                from->SetRemoveEdge(componentId, to);
+            }
+            
+            const uint32_t fromChunk = loc.ChunkIndex;
+            const uint32_t fromSlot = loc.SlotIndex;
+            
+            // If no components left, just remove from archetype
+            if (!to) {
+                _removeFromArchetype(e, loc);
+                loc.ArchetypePtr = nullptr;
+                return;
+            }
+            
+            // Copy all components except the one being removed
+            auto [ci, slot] = to->Insert();
+            for (auto& info : from->GetComponents()) {
+                if (info.Id == componentId) continue;
+                void* dst = to->GetRaw(info.Id, ci, slot);
+                const void* src = from->GetRaw(info.Id, fromChunk, fromSlot);
+                std::memcpy(dst, src, info.Size);
+            }
+            
+            _removeFromArchetype(e, loc);
+            _placeEntity(e, to, ci, slot);
+        }
+
         /**
 		 * @brief Iterate over all entities that have the specified components, invoking the provided function for each.
 		 * @tparam Ts The component types to filter entities by

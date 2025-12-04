@@ -33,6 +33,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace ECS {
   using ComponentTypeId = uint32_t;
+  constexpr ComponentTypeId NULL_COMPONENT_ID = static_cast<ComponentTypeId>(-1);
 
   // Metadata for each registered component type
   struct ComponentMeta {
@@ -128,6 +129,35 @@ namespace ECS {
           // and reads happen only after registration is complete (happens before relationship I think)
           static std::unordered_map<ComponentTypeId, ComponentMeta> m;
           return m;
+      }
+
+      // Hash to ComponentId mapping for C# interop
+      static std::unordered_map<uint32_t, ComponentTypeId>& _hashToId() {
+          static std::unordered_map<uint32_t, ComponentTypeId> map;
+          return map;
+      }
+
+  public:
+      /**
+       * @brief Register a component type with its type name hash (for C# interop)
+       * @tparam T The component type
+       * @param typeHash FNV-1a hash of the component type name
+       */
+      template<typename T>
+      static void RegisterWithHash(uint32_t typeHash) {
+          ComponentTypeId id = Type<T>();
+          _hashToId()[typeHash] = id;
+      }
+
+      /**
+       * @brief Get ComponentTypeId from type name hash
+       * @param typeHash FNV-1a hash of component type name
+       * @return ComponentTypeId or NULL_COMPONENT_ID if not found
+       */
+      static ComponentTypeId GetComponentIdFromHash(uint32_t typeHash) {
+          auto& map = _hashToId();
+          auto it = map.find(typeHash);
+          return (it != map.end()) ? it->second : NULL_COMPONENT_ID;
       }
   };
 

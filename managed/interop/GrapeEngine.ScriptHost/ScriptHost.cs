@@ -4,8 +4,44 @@
 
 using System.Runtime.InteropServices;
 using System.Reflection;
+using System.Runtime.Loader;
+using GrapeEngine;
 
 namespace GrapeEngine.ScriptHost;
+
+/// <summary>
+/// Custom AssemblyLoadContext for hot reload support.
+/// Allows assemblies to be unloaded and reloaded.
+/// </summary>
+internal class ScriptLoadContext : AssemblyLoadContext
+{
+    private readonly AssemblyDependencyResolver _resolver;
+
+    public ScriptLoadContext(string assemblyPath) : base(isCollectible: true)
+    {
+        _resolver = new AssemblyDependencyResolver(assemblyPath);
+    }
+
+    protected override Assembly? Load(AssemblyName assemblyName)
+    {
+        string? assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
+        if (assemblyPath != null)
+        {
+            return LoadFromAssemblyPath(assemblyPath);
+        }
+        return null;
+    }
+
+    protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
+    {
+        string? libraryPath = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
+        if (libraryPath != null)
+        {
+            return LoadUnmanagedDllFromPath(libraryPath);
+        }
+        return IntPtr.Zero;
+    }
+}
 
 /// <summary>
 /// Main entry point for script hosting from C++.
@@ -13,8 +49,8 @@ namespace GrapeEngine.ScriptHost;
 /// </summary>
 public static class ScriptHost
 {
-    // Loaded assemblies (for hot reload support)
-    private static readonly Dictionary<string, Assembly> s_loadedAssemblies = new();
+    // Loaded assemblies and their load contexts (for hot reload support)
+    private static readonly Dictionary<string, (Assembly Assembly, ScriptLoadContext? Context)> s_loadedAssemblies = new();
     
     // Discovered system types
     private static readonly Dictionary<ulong, Type> s_systemTypes = new();
@@ -34,9 +70,11 @@ public static class ScriptHost
             
             Console.WriteLine($"[ScriptHost] Loading assembly: {assemblyPath}");
             
-            // Load assembly
-            Assembly assembly = Assembly.LoadFrom(assemblyPath);
-            s_loadedAssemblies[assemblyPath] = assembly;
+            // Create a new load context for hot reload support
+            var loadContext = new ScriptLoadContext(assemblyPath);
+            Assembly assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
+            
+            s_loadedAssemblies[assemblyPath] = (assembly, loadContext);
             
             Console.WriteLine($"[ScriptHost] Loaded: {assembly.FullName}");
             return 0; // Success
@@ -49,7 +87,7 @@ public static class ScriptHost
     }
 
     /// <summary>
-    /// Unload an assembly (requires AssemblyLoadContext for true unloading).
+    /// Unload an assembly for hot reload support.
     /// Called from C++ ScriptManager::UnloadAssembly()
     /// </summary>
     [UnmanagedCallersOnly]
@@ -59,14 +97,93 @@ public static class ScriptHost
         {
             string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
             
-            // TODO: Implement with AssemblyLoadContext for hot reload
-            Console.WriteLine($"[ScriptHost] UnloadAssembly not yet implemented: {assemblyPath}");
+            Console.WriteLine($"[ScriptHost] Unloading assembly: {assemblyPath}");
             
-            return -1; // Not implemented
+            if (!s_loadedAssemblies.TryGetValue(assemblyPath, out var entry))
+            {
+                Console.WriteLine($"[ScriptHost] Assembly not loaded: {assemblyPath}");
+                return -1;
+            }
+            
+            // Remove all system instances from this assembly
+            var systemHandlesToRemove = new List<ulong>();
+            foreach (var kvp in s_systemTypes)
+            {
+                if (kvp.Value.Assembly == entry.Assembly)
+                {
+                    systemHandlesToRemove.Add(kvp.Key);
+                }
+            }
+            
+            foreach (var handle in systemHandlesToRemove)
+            {
+                s_systemInstances.Remove(handle);
+                s_systemTypes.Remove(handle);
+                Console.WriteLine($"[ScriptHost] Removed system instance: handle={handle}");
+            }
+            
+            // Unload the assembly load context
+            if (entry.Context != null)
+            {
+                entry.Context.Unload();
+                Console.WriteLine($"[ScriptHost] Unloaded context for: {assemblyPath}");
+            }
+            
+            s_loadedAssemblies.Remove(assemblyPath);
+            
+            // Force garbage collection to reclaim memory
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            
+            Console.WriteLine($"[ScriptHost] Successfully unloaded: {assemblyPath}");
+            return 0; // Success
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[ScriptHost] Error unloading assembly: {ex.Message}");
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Reload an assembly for hot reload support.
+    /// This unloads the old version and loads the new one.
+    /// Called from C++ ScriptManager::ReloadAssembly()
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int ReloadAssembly(char* assemblyPathPtr)
+    {
+        try
+        {
+            string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
+            
+            Console.WriteLine($"[ScriptHost] Reloading assembly: {assemblyPath}");
+            
+            // Unload existing assembly
+            int unloadResult = UnloadAssembly(assemblyPathPtr);
+            if (unloadResult != 0)
+            {
+                Console.WriteLine($"[ScriptHost] Warning: Failed to unload existing assembly during reload");
+            }
+            
+            // Wait a bit for finalizers to complete
+            System.Threading.Thread.Sleep(100);
+            
+            // Load new version
+            int loadResult = LoadAssembly(assemblyPathPtr);
+            if (loadResult != 0)
+            {
+                Console.WriteLine($"[ScriptHost] Failed to load new assembly during reload");
+                return -1;
+            }
+            
+            Console.WriteLine($"[ScriptHost] Successfully reloaded: {assemblyPath}");
+            return 0; // Success
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] Error reloading assembly: {ex.Message}");
             return -1;
         }
     }
@@ -85,11 +202,11 @@ public static class ScriptHost
             var systemTypes = new List<Type>();
             
             // Search all loaded assemblies for ISystem implementations
-            foreach (var assembly in s_loadedAssemblies.Values)
+            foreach (var entry in s_loadedAssemblies.Values)
             {
                 try
                 {
-                    var types = assembly.GetTypes()
+                    var types = entry.Assembly.GetTypes()
                         .Where(t => t.IsClass && !t.IsAbstract)
                         .Where(t => typeof(ISystem).IsAssignableFrom(t));
                     
@@ -97,7 +214,7 @@ public static class ScriptHost
                 }
                 catch (ReflectionTypeLoadException ex)
                 {
-                    Console.WriteLine($"[ScriptHost] Warning: Could not load some types from {assembly.FullName}");
+                    Console.WriteLine($"[ScriptHost] Warning: Could not load some types from {entry.Assembly.FullName}");
                     Console.WriteLine($"  Errors: {string.Join(", ", ex.LoaderExceptions.Select(e => e?.Message))}");
                 }
             }
@@ -143,9 +260,9 @@ public static class ScriptHost
             
             // Find the type
             Type? systemType = null;
-            foreach (var assembly in s_loadedAssemblies.Values)
+            foreach (var entry in s_loadedAssemblies.Values)
             {
-                systemType = assembly.GetType(typeName);
+                systemType = entry.Assembly.GetType(typeName);
                 if (systemType != null) break;
             }
             
@@ -233,9 +350,10 @@ public static class ScriptHost
             
             if (instance is ISystem system)
             {
-                // TODO: Wrap worldPtr in managed World wrapper
-                Console.WriteLine($"[ScriptHost] TODO: CallSystemOnCreate for {instance.GetType().Name}");
-                // system.OnCreate(managedWorld);
+                // Wrap native World pointer in managed World wrapper
+                World managedWorld = new World(worldPtr);
+                Console.WriteLine($"[ScriptHost] CallSystemOnCreate for {instance.GetType().Name}");
+                system.OnCreate(managedWorld);
             }
         }
         catch (Exception ex)
@@ -259,8 +377,9 @@ public static class ScriptHost
             
             if (instance is ISystem system)
             {
-                // TODO: Wrap worldPtr in managed World wrapper
-                // system.OnUpdate(managedWorld, deltaTime);
+                // Wrap native World pointer in managed World wrapper
+                World managedWorld = new World(worldPtr);
+                system.OnUpdate(managedWorld, deltaTime);
             }
         }
         catch (Exception ex)
@@ -268,7 +387,6 @@ public static class ScriptHost
             Console.WriteLine($"[ScriptHost] Error in OnUpdate: {ex.Message}");
         }
     }
-
     /// <summary>
     /// Call OnDestroy on a scripted system.
     /// </summary>
@@ -284,8 +402,9 @@ public static class ScriptHost
             
             if (instance is ISystem system)
             {
-                // TODO: Wrap worldPtr in managed World wrapper
-                // system.OnDestroy(managedWorld);
+                // Wrap native World pointer in managed World wrapper
+                World managedWorld = new World(worldPtr);
+                system.OnDestroy(managedWorld);
             }
         }
         catch (Exception ex)
@@ -314,12 +433,4 @@ public enum SystemRunMode
     Always,
     PlayOnly,
     EditOnly
-}
-
-// Placeholder ISystem interface (will be moved to ScriptAPI)
-public interface ISystem
-{
-    void OnCreate(object world);
-    void OnUpdate(object world, float deltaTime);
-    void OnDestroy(object world);
-}
+}   void OnDestroy(object world);
