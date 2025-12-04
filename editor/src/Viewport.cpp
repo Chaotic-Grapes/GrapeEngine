@@ -23,9 +23,11 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 
 #include "Viewport.h"
 #include "CameraFrustumRenderer.h"
+#include "EditorGizmo.h"
 #include "graphics/EditorCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/gtc/type_ptr.hpp>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 #include "services/Input.h"
@@ -198,13 +200,24 @@ void Viewport::_renderViewport() {
                 _drawFpsOverlay(gizmoPos, size);
             }
 
-            // 2. Call the RendererSystem method to draw the Gizmo overlay
             // Draw the Gizmo overlay (only in Scene tab)
-            rendererSystem->DrawEditorGizmo(
-                *m_world,
-                gizmoPos.x, gizmoPos.y,
-                size.x, size.y
-            );
+            if (m_selectedEntityId != 0 && m_editorCamera) {
+                auto* camera = m_editorCamera->GetCamera();
+                if (camera) {
+                    glm::mat4 view = camera->GetViewMatrix();
+                    glm::mat4 proj = camera->GetProjectionMatrix();
+
+                    Editor::EditorGizmo::DrawGizmo(
+                        *m_world,
+                        m_selectedEntityId,
+                        glm::value_ptr(view),
+                        glm::value_ptr(proj),
+                        gizmoPos.x, gizmoPos.y,
+                        size.x, size.y,
+                        false  // isOrthographic
+                    );
+                }
+            }
         }
     }
     else {
