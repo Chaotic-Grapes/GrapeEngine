@@ -20,7 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
-#include "ecs/systems/ScriptSystem.h"
+#include "scripting/ScriptManager.h"
 #include "ecs/systems/LifetimeSystem.h"
 #include "ecs/systems/AudioSystem.h"
 #include "scene/Scene.h"
@@ -187,10 +187,10 @@ namespace Engine {
         game.OnShutdown(m_sceneManager);
 
         // Clean up services
-        if (m_scriptSystem) {
-            m_scriptSystem->Shutdown();
-            delete m_scriptSystem;
-            m_scriptSystem = nullptr;
+        if (m_scriptManager) {
+            m_scriptManager->ShutdownCLR();
+            delete m_scriptManager;
+            m_scriptManager = nullptr;
         }
         delete m_audio;
         delete m_overlay;
@@ -244,16 +244,24 @@ namespace Engine {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
 
-        // Initialize scripting system
-        m_scriptSystem = new ECS::ScriptSystem();
-        if (!m_scriptSystem->Initialize("GrapeEngine.Scripting.runtimeconfig.json")) {
-            LOG_WARNING("Failed to initialize ScriptSystem");
+        // Initialize C# scripting via ScriptManager
+        m_scriptManager = new ECS::ScriptManager();
+        if (!m_scriptManager->InitializeCLR("GrapeEngine.ScriptAPI.runtimeconfig.json")) {
+            LOG_WARNING("Failed to initialize ScriptManager/CLR");
         }
         else {
-            LOG_INFO("ScriptSystem initialized successfully");
+            LOG_INFO("ScriptManager initialized successfully");
+            
             // Load the script API assembly
-            if (!m_scriptSystem->LoadAssembly("GrapeEngine.Scripting.dll")) {
+            if (!m_scriptManager->LoadAssembly("GrapeEngine.ScriptAPI.dll")) {
                 LOG_WARNING("Failed to load ScriptAPI assembly");
+            }
+            else {
+                LOG_INFO("Scripting assembly loaded");
+                
+                // Discover and register all C# systems
+                int systemCount = m_scriptManager->RegisterScriptedSystems(m_systemManager);
+                LOG_INFO("ScriptManager: Registered " << systemCount << " C# systems");
             }
         }
 
@@ -297,11 +305,6 @@ namespace Engine {
             LOG_DEBUG("AudioSystem: Notified of scene start");
         }
 
-        // Initialize all scripts when game starts
-        if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
-            ECS::ScriptSystem::OnStart(*world);
-            LOG_DEBUG("ScriptSystem: Initialized all scripts");
-        }
     }
 
     void Application::_onGameStop(Scenes::Scene* scene) {
@@ -385,17 +388,4 @@ namespace Engine {
         }
     }
 
-    void Application::_updateScripts(ECS::World& world, bool shouldRun) {
-        if (!shouldRun || !m_scriptSystem || !m_scriptSystem->IsInitialized())
-            return;
-
-        // Regular update
-        ECS::ScriptSystem::Update(world);
-        
-        // Active state changes (OnEnable/OnDisable)
-        ECS::ScriptSystem::UpdateActiveState(world);
-        
-        // Late update
-        ECS::ScriptSystem::LateUpdate(world);
-    }
 }

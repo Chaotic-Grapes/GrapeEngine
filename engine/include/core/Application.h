@@ -26,7 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 // Forward declarations
 namespace ECS { 
-    class ScriptSystem;
+    class ScriptManager;
     class AudioSystem;
 }
 
@@ -110,7 +110,7 @@ namespace Engine {
 
         // Services
         Services::AudioService* m_audio = nullptr;
-        ECS::ScriptSystem* m_scriptSystem = nullptr;
+        ECS::ScriptManager* m_scriptManager = nullptr;
 
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
@@ -124,7 +124,6 @@ namespace Engine {
         // Helper methods for cleaner game loop logic
         bool _shouldRunGameLogic() const;
         void _updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested);
-        void _updateScripts(ECS::World& world, bool shouldRun);
     };
 
     extern Application* CORE;
