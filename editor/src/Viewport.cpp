@@ -24,6 +24,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include "Viewport.h"
 #include "CameraFrustumRenderer.h"
 #include "EditorGizmo.h"
+#include "SelectionOutlineRenderer.h"
 #include "graphics/EditorCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -200,13 +201,26 @@ void Viewport::_renderViewport() {
                 _drawFpsOverlay(gizmoPos, size);
             }
 
-            // Draw the Gizmo overlay (only in Scene tab)
+            // Draw selection outline and gizmo for selected entity
             if (m_selectedEntityId != 0 && m_editorCamera) {
                 auto* camera = m_editorCamera->GetCamera();
                 if (camera) {
                     glm::mat4 view = camera->GetViewMatrix();
                     glm::mat4 proj = camera->GetProjectionMatrix();
+                    glm::mat4 viewProj = proj * view;
 
+                    // Draw wireframe outline around selected entity
+                    Editor::SelectionOutlineRenderer::RenderOutline(
+                        *m_world,
+                        m_selectedEntityId,
+                        rendererSystem->GetRenderer(),
+                        rendererSystem->GetShader(),
+                        viewProj,
+                        camera->OrthoSize,
+                        size.y
+                    );
+
+                    // Draw gizmo for transform manipulation
                     Editor::EditorGizmo::DrawGizmo(
                         *m_world,
                         m_selectedEntityId,
@@ -214,7 +228,7 @@ void Viewport::_renderViewport() {
                         glm::value_ptr(proj),
                         gizmoPos.x, gizmoPos.y,
                         size.x, size.y,
-                        false  // isOrthographic
+                        false  // isPerspective
                     );
                 }
             }
