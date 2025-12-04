@@ -282,13 +282,27 @@ if(DOTNET_EXECUTABLE)
     # Build GrapeEngine.ScriptAPI (engine's API)
     add_custom_target(
         BuildScriptAPI ALL
-        COMMAND ${DOTNET_EXECUTABLE} restore "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj"
-        COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/scripts/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj" 
+        COMMAND ${DOTNET_EXECUTABLE} restore "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj"
+        COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.ScriptAPI/GrapeEngine.ScriptAPI.csproj" 
             --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
             --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
             --no-restore
-        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/scripts"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/managed/api"
         COMMENT "Building GrapeEngine Scripting API..."
+        VERBATIM
+    )
+    
+    # Build GrapeEngine.ScriptHost (interop bridge)
+    add_custom_target(
+        BuildScriptHost ALL
+        COMMAND ${DOTNET_EXECUTABLE} restore "${CMAKE_CURRENT_LIST_DIR}/managed/interop/GrapeEngine.ScriptHost/GrapeEngine.ScriptHost.csproj"
+        COMMAND ${DOTNET_EXECUTABLE} build "${CMAKE_CURRENT_LIST_DIR}/managed/interop/GrapeEngine.ScriptHost/GrapeEngine.ScriptHost.csproj"
+            --configuration $<IF:$<CONFIG:Debug>,Debug,Release>
+            --output "${CMAKE_BINARY_DIR}/$<CONFIG>"
+            --no-restore
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/managed/interop"
+        COMMENT "Building GrapeEngine ScriptHost..."
+        DEPENDS BuildScriptAPI
         VERBATIM
     )
     
@@ -422,10 +436,10 @@ if(DOTNET_EXECUTABLE)
     
     # Make targets depend on all script builds
     if(BUILD_EDITOR)
-        add_dependencies(GrapeEditor BuildScriptAPI ${GAME_SCRIPT_TARGETS})
+        add_dependencies(GrapeEditor BuildScriptAPI BuildScriptHost ${GAME_SCRIPT_TARGETS})
     endif()
     if(BUILD_GAME)
-        add_dependencies(GrapeRuntime BuildScriptAPI ${GAME_SCRIPT_TARGETS})
+        add_dependencies(GrapeRuntime BuildScriptAPI BuildScriptHost ${GAME_SCRIPT_TARGETS})
     endif()
     
     # Note: C# DLLs are already built directly to ${CMAKE_BINARY_DIR}/$<CONFIG>

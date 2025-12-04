@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <OutputPath>..\..\..\build\scripts\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference the ScriptAPI project -->
+    <ProjectReference Include="..\..\api\GrapeEngine.ScriptAPI\GrapeEngine.ScriptAPI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- For Roslyn compilation support (future) -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+  </ItemGroup>
+
+</Project>
