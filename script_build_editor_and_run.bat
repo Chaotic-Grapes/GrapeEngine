@@ -1,11 +1,14 @@
 @echo off
 REM ===============================================
-REM Windows Build and Run Script
+REM Windows Build and Run Script (Editor)
 REM ===============================================
 
 echo.
 echo ===============================================
 echo   GrapeEngine - Windows Build and Run
+echo ===============================================
+echo   Engine: GrapeEngineLib (DLL)
+echo   Editor: GrapeEditor -^> GrapeEngine.exe
 echo ===============================================
 echo.
 
@@ -40,9 +43,9 @@ echo [2/4] Creating build directory...
 mkdir build
 cd build
 
-REM Configure with CMake
+REM Configure with CMake (builds engine library + editor)
 echo [3/4] Configuring project with CMake...
-cmake .. -G "Visual Studio 17 2022" -A x64
+cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=ON -DBUILD_GAME=OFF
 if %errorlevel% neq 0 (
     echo ERROR: CMake configuration failed
     cd ..
@@ -64,12 +67,35 @@ echo.
 echo ===============================================
 echo   Build completed successfully!
 echo ===============================================
+echo   Engine DLL: engine\Debug\GrapeEngineNative.dll
+echo   Editor EXE: editor\Debug\GrapeEngine.exe
+echo ===============================================
 echo.
 
+REM Copy DLL to editor directory if needed
+if not exist editor\Debug\GrapeEngineNative.dll (
+    if exist engine\Debug\GrapeEngineNative.dll (
+        echo Copying GrapeEngineNative.dll to editor directory...
+        copy engine\Debug\GrapeEngineNative.dll editor\Debug\ >nul
+        if %errorlevel% neq 0 (
+            echo ERROR: Failed to copy engine DLL!
+            cd ..
+            pause
+            exit /b 1
+        )
+    ) else (
+        echo ERROR: Engine DLL not found!
+        echo Missing: engine\Debug\GrapeEngineNative.dll
+        cd ..
+        pause
+        exit /b 1
+    )
+)
+
 REM Run the application
-echo Running GrapeEngine...
+echo Running GrapeEngine Editor...
 echo.
-cd Debug
+cd editor\Debug
 GrapeEngine.exe
 if %errorlevel% neq 0 (
     echo.

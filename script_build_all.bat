@@ -12,10 +12,14 @@ echo.
 echo ===============================================
 echo            Building Both (%CONFIG%)
 echo ===============================================
+echo   Engine: GrapeEngineLib (DLL)
+echo   Editor: GrapeEditor -^> GrapeEngine.exe
+echo   Runtime: GrapeRuntime -^> Game executable
+echo ===============================================
 
 REM Build Editor in 'build' directory
 echo.
-echo --- Building Editor ---
+echo --- Building Editor (with Engine Library) ---
 if not exist build mkdir build
 pushd build
 cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=ON -DBUILD_GAME=OFF
@@ -49,7 +53,7 @@ popd
 
 REM Build Game in 'build_game' directory
 echo.
-echo --- Building Game ---
+echo --- Building Game (with Engine Library) ---
 if not exist build_game mkdir build_game
 pushd build_game
 cmake .. -G "Visual Studio 17 2022" -A x64 -DBUILD_EDITOR=OFF -DBUILD_GAME=ON
@@ -70,23 +74,29 @@ if %errorlevel% neq 0 (
 popd
 
 echo.
+echo ===============================================
 echo Build %CONFIG% completed successfully!
-echo Editor location: build\%CONFIG%\GrapeEngine.exe
+echo ===============================================
+echo.
+echo EDITOR:
+echo   Engine DLL: build\engine\%CONFIG%\GrapeEngineNative.dll
+echo   Editor EXE: build\editor\%CONFIG%\GrapeEngine.exe
+echo.
+echo GAME:
 
 REM Detect game executable name
 set "EXE_DIR=build_game\%CONFIG%"
 set "EXE_NAME="
 
-for /f "delims=" %%F in ('dir "%EXE_DIR%\*Game.exe" /b 2^>nul') do if not defined EXE_NAME set "EXE_NAME=%%F"
-if not defined EXE_NAME (
-    for /f "delims=" %%F in ('dir "%EXE_DIR%\*.exe" /b 2^>nul') do if not defined EXE_NAME set "EXE_NAME=%%F"
-)
+for /f "delims=" %%F in ('dir "%EXE_DIR%\*.exe" /b 2^>nul') do if not defined EXE_NAME set "EXE_NAME=%%F"
 
 if defined EXE_NAME (
-    echo Game location: %EXE_DIR%\%EXE_NAME%
+    echo   Engine DLL: %EXE_DIR%\GrapeEngineNative.dll
+    echo   Game EXE:   %EXE_DIR%\%EXE_NAME%
 ) else (
-    echo Game location: %EXE_DIR%\^<not found^>
+    echo   Game EXE:   %EXE_DIR%\^<not found^>
 )
 
 echo.
+echo ===============================================
 pause
