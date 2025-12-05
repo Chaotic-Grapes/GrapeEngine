@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Prevent Roslyn/C# shared compilation server from holding locks on obj files during parallel builds -->
+    <UseSharedCompilation>false</UseSharedCompilation>
+  </PropertyGroup>
+</Project>
