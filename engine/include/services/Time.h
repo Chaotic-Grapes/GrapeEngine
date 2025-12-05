@@ -27,7 +27,7 @@ public:
     static float  FixedDeltaTime();
     static float  UnscaledFixedDeltaTime();
     static double ElapsedTime();
-    static void   TimeScale(const float& scale);
+    static void   TimeScale(float scale);
     static float  TimeScale();
     static int    FrameCount();
     static void   MaximumDeltaTime(const float& maxDelta);

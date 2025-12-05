@@ -371,6 +371,19 @@ if(DOTNET_EXECUTABLE)
         endif()
     endif()
 
+    # Copy managed scripting DLL to editor output so host can load delegates
+    if(BUILD_EDITOR)
+        if(TARGET GrapeEditor)
+            add_custom_target(Copy_Scripting_Editor ALL
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_BINARY_DIR}/$<CONFIG>/GrapeEngine.Scripting.dll"
+                    "$<TARGET_FILE_DIR:GrapeEditor>"
+                DEPENDS BuildScripting GrapeEditor
+                COMMENT "Copying GrapeEngine.Scripting.dll to editor output directory"
+            )
+        endif()
+    endif()
+
     # Copy runtimeconfig.json for .NET hosting (game)
     if(BUILD_GAME AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/managed/api/GrapeEngine.Scripting.runtimeconfig.json")
         if(TARGET GrapeRuntime)
@@ -380,6 +393,19 @@ if(DOTNET_EXECUTABLE)
                     "$<TARGET_FILE_DIR:GrapeRuntime>"
                 DEPENDS GrapeRuntime
                 COMMENT "Copying .NET runtimeconfig.json to game output directory"
+            )
+        endif()
+    endif()
+
+    # Copy managed scripting DLL to game output
+    if(BUILD_GAME)
+        if(TARGET GrapeRuntime)
+            add_custom_target(Copy_Scripting_Runtime ALL
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_BINARY_DIR}/$<CONFIG>/GrapeEngine.Scripting.dll"
+                    "$<TARGET_FILE_DIR:GrapeRuntime>"
+                DEPENDS BuildScripting GrapeRuntime
+                COMMENT "Copying GrapeEngine.Scripting.dll to game output directory"
             )
         endif()
     endif()

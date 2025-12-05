@@ -9,12 +9,12 @@ set JOBS=%2
 if "%JOBS%"=="" set JOBS=%NUMBER_OF_PROCESSORS%
 
 echo.
-echo ===============================================
-echo     Building Standalone Game (%CONFIG%)
-echo ===============================================
+echo ==========================================================
+echo           Building Standalone Game (%CONFIG%)
+echo ----------------------------------------------------------
 echo   Engine: GrapeEngineLib (DLL)
 echo   Runtime: GrapeRuntime -^> Game executable
-echo ===============================================
+echo ==========================================================
 
 REM Create build folder if it doesn't exist
 if not exist build_game mkdir build_game
@@ -42,9 +42,9 @@ if %errorlevel% neq 0 (
 
 cd ..
 echo.
-echo ===============================================
-echo Standalone Game build %CONFIG% completed successfully!
-echo ===============================================
+echo ==========================================================
+echo  Standalone Game build %CONFIG% completed successfully!
+echo ==========================================================
 REM Try to detect the produced executable name
 set "EXE_DIR=build_game\%CONFIG%"
 set "EXE_NAME="

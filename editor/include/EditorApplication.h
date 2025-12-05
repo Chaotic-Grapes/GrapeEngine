@@ -1,0 +1,76 @@
+/* Start Header *****************************************************************/
+/*!
+\file   EditorApplication.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+Editor application class that manages editor-specific functionality,
+UI, and tools separate from the engine core.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#ifndef EDITORAPPLICATION_H
+#define EDITORAPPLICATION_H
+
+#include "core/Application.h"
+#include "EditorConfiguration.h"
+
+// Forward declarations
+namespace Services {
+    class EditorService;
+}
+
+namespace Scenes {
+    class SceneManager;
+}
+
+/**
+ * @brief Editor application that manages editor UI and tools
+ */
+class EditorApplication {
+public:
+    explicit EditorApplication(Engine::Application* engine);
+    ~EditorApplication();
+
+    /**
+     * @brief Initialize editor systems and UI
+     */
+    void Initialize();
+
+    /**
+     * @brief Update editor UI and tools
+     */
+    void Update();
+
+    /**
+     * @brief Render editor UI
+     */
+    void Render();
+
+    /**
+     * @brief Shutdown editor and save state
+     */
+    void Shutdown();
+
+    /**
+     * @brief Get editor settings
+     */
+    const EditorSettings& GetSettings() const { return m_editorSettings; }
+
+private:
+    Engine::Application* m_engine;
+    Services::EditorService* m_editorService;
+    EditorSettings m_editorSettings;
+    bool m_initialized = false;
+
+    void _loadEditorSettings();
+    void _saveEditorSettings();
+    void _createMainWindow();
+    void _initializeEditorService();
+};
+
+#endif

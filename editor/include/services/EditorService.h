@@ -74,6 +74,8 @@ namespace Services {
 #ifdef USE_IMGUI
         std::unique_ptr<LevelEditor> m_levelEditor;
         bool m_initialized = false;
+        // Tracks whether ImGui platform/renderer backends have been initialized
+        bool m_backendInitialized = false;
         bool m_showLevelEditor = false;
         Scenes::Scene* m_levelEditorForScene = nullptr;
         bool m_pendingLevelEditorRebuild = false;

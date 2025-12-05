@@ -64,12 +64,12 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo ===============================================
-echo   Build completed successfully!
-echo ===============================================
+echo ==========================================================
+echo               Build completed successfully!
+echo ----------------------------------------------------------
 echo   Engine DLL: engine\Debug\GrapeEngineNative.dll
 echo   Editor EXE: editor\Debug\GrapeEngine.exe
-echo ===============================================
+echo ==========================================================
 echo.
 
 REM Copy DLL to editor directory if needed

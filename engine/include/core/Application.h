@@ -18,7 +18,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define APPLICATION_H
 
 #include "Export.h"
-#include "Game.h"
 #include "scene/SceneManager.h"
 #include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
@@ -32,6 +31,14 @@ namespace ECS {
 }
 
 namespace Engine {
+    /**
+     * @brief Engine execution mode
+     */
+    enum class GRAPEENGINE_API EngineMode {
+        Game,   // Standalone game runtime
+        Editor  // Editor mode with ImGui and tools
+    };
+
     class GRAPEENGINE_API Application {
     public:
         /**
@@ -62,12 +69,32 @@ namespace Engine {
         bool SaveProjectSettings(const std::string& projectRoot);
 
         /**
-         * @brief Starts the engine
-         *
-         * @param game Reference to the game instance
-         * @param consoleFlag If true, runs with console output enabled
+         * @brief Initialize the engine in specified mode
+         * @param mode Engine execution mode (Game or Editor)
+         * @param enableConsole If true, enables console output
          */
-        void Run(Game& game, bool consoleFlag);
+        void Initialize(EngineMode mode, bool enableConsole = true);
+
+        /**
+         * @brief Update engine systems for one frame
+         */
+        void Update();
+
+        /**
+         * @brief Check if engine is still running
+         * @return true if engine should continue running
+         */
+        bool IsRunning() const { return !m_shouldStop; }
+
+        /**
+         * @brief Shutdown the engine and release resources
+         */
+        void Shutdown();
+
+        /**
+         * @brief Get current engine mode
+         */
+        EngineMode GetMode() const { return m_mode; }
 
         /**
          * @brief Load project-specific settings from ProjectSettings.json
@@ -101,8 +128,10 @@ namespace Engine {
         void SetStepRequestCallback(std::function<bool()> callback) { m_stepRequestCallback = callback; }
 
     private:
-        // Flag to indicate if application should stop
-        static bool m_shouldStop;
+        // Engine state
+        bool m_shouldStop = false;
+        bool m_initialized = false;
+        EngineMode m_mode = EngineMode::Game;
 
         // Scene manager
         Scenes::SceneManager m_sceneManager;

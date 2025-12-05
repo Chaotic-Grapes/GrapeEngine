@@ -41,11 +41,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Engine {
     // Global pointer to the core engine
     Application* CORE = nullptr;
-    bool Application::m_shouldStop = false;
 
-    void Application::Run(Game& game, const bool consoleFlag) {
-        Time::_initialize();
-        bool wasPlaying = false;
+    void Application::Initialize(EngineMode mode, bool enableConsole) {
+        if (m_initialized) {
+            LOG_WARNING("Application already initialized");
+            return;
+        }
+
+        m_mode = mode;
+        m_shouldStop = false;
 
         // Set global pointer to this application instance
         CORE = this;
@@ -55,131 +59,115 @@ namespace Engine {
         CrashDumping::SetProgramName("GrapeEngine");
         CrashDumping::SetDumpCreateState(true);
 
+        // Initialize time system
+        Time::_initialize();
 
-        // Initialize the message system here
-        // Subscribe to Events
-        //auto& bus = EventBus::Get();
-
-        // Subscribe to action events
-        /*bus.subscribe<ActionPressed>([this](const ActionPressed& e) {
-            auto& busRef = EventBus::Get();
-            if (e.action == "ActiveCameraSwitch") {
-            std::cout << 'event action pressed';
-
-            }
-        }*/
-
-
-        if (consoleFlag)
+        // Enable/disable console
+        if (enableConsole)
             _enableConsole();
         else
             _disableConsole();
-            
-        // Initialize services
-		_initializeServices();
 
-        // Call OnStart() function of game then attempt to create a main window
-        game.OnStart(m_sceneManager);
+        // Initialize services
+        _initializeServices();
 
         m_lastFrameTime = glfwGetTime();
-        while (!m_shouldStop) {
-            const double frameStart = glfwGetTime();
-            const double rawDelta = frameStart - m_lastFrameTime;
-            m_lastFrameTime = frameStart;
+        m_initialized = true;
 
-            // IMPORTANT NOTE: Anything to do with the UIEventQueue in this while loop
-            // is only temporary! The proper handling of UI events should be done
-            // by a centralized event system that is registered as a PROPER system.
-            // TODO: Make centralized event system for UI events and others, and as
-            // as a proper system
-            ECS::UIEventQueue::Clear();
-            
-            Time::_update(rawDelta, frameStart);
-            Profiler::UpdateTime();
+        LOG_INFO("Engine initialized in " << (mode == EngineMode::Editor ? "Editor" : "Game") << " mode");
+    }
 
-            // if (5 second passed ){
-               // publish the event
-                //bus.publish(ActionPressed{ actionName });
-            //}
+    void Application::Update() {
+        LOG_INFO("Application::Update called");
+        if (!m_initialized) {
+            LOG_ERROR("Application::Update called before Initialize");
+            return;
+        }
+        LOG_INFO("Input: Processed input events for this frame 1");
 
-            // --- Input & Game Update ---
-            Input::_processInput();
-			
-			// Add fullscreen toggle (F11 key)
-			if (Input::IsKeyPressed(GLFW_KEY_F11)) {
-				Window* mainWindow = WindowManager::GetMainWindow();
-				if (mainWindow) {
-					if (mainWindow->HasMode(WindowMode::Fullscreen)) {
-						mainWindow->SetMode(WindowMode::Windowed);
-					} else {
-						mainWindow->SetMode(WindowMode::Fullscreen);
-					}
-				}
-			}
+        const double frameStart = glfwGetTime();
+        const double rawDelta = frameStart - m_lastFrameTime;
+        m_lastFrameTime = frameStart;
 
-            // --- Update Services ---
-            m_audio->Update();
+        // Clear UI event queue
+        LOG_INFO("Input: Processed input events for this frame 1");
+        ECS::UIEventQueue::Clear();
+        
+        // Update time
+        LOG_INFO("Input: Processed input events for this frame 1");
+        Time::_update(rawDelta, frameStart);
+        Profiler::UpdateTime();
 
-            // --- Scene Update ---
-            auto* currentScene = m_sceneManager.GetActive();
-            
-            if (currentScene) {
-                const bool shouldRun = _shouldRunGameLogic();
-                const bool stepRequested = (m_stepRequestCallback && m_stepRequestCallback());
-                auto& world = currentScene->GetWorld();
-
-                // Handle game state transitions (start/stop)
-                if (shouldRun && !wasPlaying) {
-                    LOG_INFO("Game started playing");
-                    _onGameStart(currentScene);
-                }
-                else if (!shouldRun && wasPlaying) {
-                    LOG_INFO("Game stopped/paused");
-                    _onGameStop(currentScene);
-                }
-                wasPlaying = shouldRun;
-
-                uint32_t pickedEntityID = 0;  // TODO: Get from renderer
-
-                double mouseX, mouseY;
-                Input::GetMousePosition(mouseX, mouseY);
-                Vector2D mousePos(static_cast<float>(mouseX), static_cast<float>(mouseY));
-
-                ECS::UIEventSystem::Update(&world, pickedEntityID, mousePos);
-
-                // Update physics
-                _updatePhysics(world, shouldRun, stepRequested);
-                
-                // Update all systems - they control their own run mode behavior
-                const float dt = static_cast<float>(Time::DeltaTime());
-                m_systemManager.Update(world, dt);
-            }
-            
-            // Game-level update hook
-            game.OnUpdate(m_sceneManager);
-
-            // --- Rendering ---
-            for (const auto* win : WindowManager::GetWindows()) {
-                if (win->ShouldClose()) {
-                    m_shouldStop = true;
-                    break;
-                }
-                win->SwapBuffers();
-            }
-
-            // --- FPS Controller ---
-            if (Time::FpsCap() > 0) {
-                const double frameDuration = glfwGetTime() - frameStart;
-                const double targetFrameTime = 1.0 / Time::FpsCap();
-                if (frameDuration < targetFrameTime) {
-                    std::this_thread::sleep_for(
-                        std::chrono::duration<double>(targetFrameTime - frameDuration)
-                    );
+        // --- Input Processing ---
+        LOG_INFO("Input: Processed input events for this frame 1");
+        Input::_processInput();
+        
+        // Add fullscreen toggle (F11 key)
+        if (Input::IsKeyPressed(GLFW_KEY_F11)) {
+            Window* mainWindow = WindowManager::GetMainWindow();
+            if (mainWindow) {
+                if (mainWindow->HasMode(WindowMode::Fullscreen)) {
+                    mainWindow->SetMode(WindowMode::Windowed);
+                } else {
+                    mainWindow->SetMode(WindowMode::Fullscreen);
                 }
             }
         }
 
-        game.OnShutdown(m_sceneManager);
+        // --- Update Services ---
+        m_audio->Update();
+
+        // --- Scene Update ---
+        auto* currentScene = m_sceneManager.GetActive();
+        
+        if (currentScene) {
+            const bool shouldRun = _shouldRunGameLogic();
+            const bool stepRequested = (m_stepRequestCallback && m_stepRequestCallback());
+            auto& world = currentScene->GetWorld();
+
+            // Handle game state transitions (start/stop)
+            static bool wasPlaying = false;
+            if (shouldRun && !wasPlaying) {
+                LOG_INFO("Game started playing");
+                _onGameStart(currentScene);
+            }
+            else if (!shouldRun && wasPlaying) {
+                LOG_INFO("Game stopped/paused");
+                _onGameStop(currentScene);
+            }
+            wasPlaying = shouldRun;
+
+            uint32_t pickedEntityID = 0;  // TODO: Get from renderer
+
+            double mouseX, mouseY;
+            Input::GetMousePosition(mouseX, mouseY);
+            Vector2D mousePos(static_cast<float>(mouseX), static_cast<float>(mouseY));
+
+            ECS::UIEventSystem::Update(&world, pickedEntityID, mousePos);
+
+            // Update physics
+            _updatePhysics(world, shouldRun, stepRequested);
+            
+            // Update all systems - they control their own run mode behavior
+            const float dt = static_cast<float>(Time::DeltaTime());
+            m_systemManager.Update(world, dt);
+        }
+
+        // Check for window close
+        for (const auto* win : WindowManager::GetWindows()) {
+            if (win->ShouldClose()) {
+                m_shouldStop = true;
+                break;
+            }
+        }
+    }
+
+    void Application::Shutdown() {
+        if (!m_initialized) {
+            return;
+        }
+
+        LOG_INFO("Shutting down engine...");
 
         // Clean up services
         if (m_scriptManager) {
@@ -188,8 +176,14 @@ namespace Engine {
             m_scriptManager = nullptr;
         }
         delete m_audio;
+        m_audio = nullptr;
 
         WindowManager::DestroyAll();
+
+        m_initialized = false;
+        CORE = nullptr;
+
+        LOG_INFO("Engine shutdown complete");
     }
 
     void Application::Close() {
@@ -264,13 +258,13 @@ namespace Engine {
             }
         }
 
-        // Register all ECS systems globally
+        // Register all ECS systems globally (do NOT initialize them yet)
+        // Systems that depend on an OpenGL context (RendererSystem) expect a
+        // main window to exist before OnCreate() is called. Creating systems
+        // here (before Game::OnStart) may run them before the window is
+        // created which leads to null-pointer access. Defer CreateAll until
+        // after Game::OnStart so the game/editor can create windows first.
         _registerSystems();
-        
-        // Initialize all systems
-        ECS::World emptyWorld;
-        m_systemManager.CreateAll(emptyWorld);
-        LOG_INFO("SystemManager: Initialized " << m_systemManager.GetSystemCount() << " systems");
     }
 
     void Application::_registerSystems() {

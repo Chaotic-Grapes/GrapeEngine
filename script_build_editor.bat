@@ -9,12 +9,12 @@ set JOBS=%2
 if "%JOBS%"=="" set JOBS=%NUMBER_OF_PROCESSORS%
 
 echo.
-echo ===============================================
-echo      Building Editor (%CONFIG%)
-echo ===============================================
+echo ==========================================================
+echo              Building Editor (%CONFIG%)
+echo ----------------------------------------------------------
 echo   Engine: GrapeEngineLib (DLL)
 echo   Editor: GrapeEditor -^> GrapeEngine.exe
-echo ===============================================
+echo ==========================================================
 
 REM Create build folder if it doesn't exist
 if not exist build mkdir build
@@ -42,12 +42,12 @@ if %errorlevel% neq 0 (
 
 cd ..
 echo.
-echo ===============================================
-echo  Editor build %CONFIG% completed successfully!
-echo ===============================================
+echo ==========================================================
+echo      Editor build %CONFIG% completed successfully!
+echo ----------------------------------------------------------
 echo  Engine DLL: build\engine\%CONFIG%\GrapeEngineNative.dll
 echo  Editor EXE: build\editor\%CONFIG%\GrapeEngine.exe
-echo ===============================================
+echo ==========================================================
 echo.
 echo NOTE: Engine DLL should be copied to editor directory.
 echo       Checking if copy is needed...
@@ -62,5 +62,5 @@ if not exist build\editor\%CONFIG%\GrapeEngineNative.dll (
 ) else (
     echo   DLL already present in editor directory.
 )
-echo ===============================================
+echo ==========================================================
 pause

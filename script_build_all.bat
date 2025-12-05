@@ -9,13 +9,13 @@ set JOBS=%2
 if "%JOBS%"=="" set JOBS=%NUMBER_OF_PROCESSORS%
 
 echo.
-echo ===============================================
-echo            Building Both (%CONFIG%)
-echo ===============================================
+echo ==========================================================
+echo             Building Both (%CONFIG%)
+echo ----------------------------------------------------------
 echo   Engine: GrapeEngineLib (DLL)
 echo   Editor: GrapeEditor -^> GrapeEngine.exe
 echo   Runtime: GrapeRuntime -^> Game executable
-echo ===============================================
+echo ==========================================================
 
 REM Build Editor in 'build' directory
 echo.
@@ -74,9 +74,9 @@ if %errorlevel% neq 0 (
 popd
 
 echo.
-echo ===============================================
-echo Build %CONFIG% completed successfully!
-echo ===============================================
+echo ==========================================================
+echo        Build %CONFIG% completed successfully!
+echo ----------------------------------------------------------
 echo.
 echo EDITOR:
 echo   Engine DLL: build\engine\%CONFIG%\GrapeEngineNative.dll
@@ -98,5 +98,5 @@ if defined EXE_NAME (
 )
 
 echo.
-echo ===============================================
+echo ==========================================================
 pause

@@ -31,8 +31,20 @@ Features:
 #ifdef USE_IMGUI
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
+#include <imgui_impl_glfw.h>
 #include <imgui_internal.h>
 #include "LevelEditor.h"
+
+// Custom allocator functions for ImGui to share across DLL boundary
+static void* ImGuiMallocWrapper(size_t size, void* user_data) {
+    (void)user_data;
+    return malloc(size);
+}
+
+static void ImGuiFreeWrapper(void* ptr, void* user_data) {
+    (void)user_data;
+    free(ptr);
+}
 #endif
 
 using namespace Services;
@@ -45,18 +57,37 @@ void EditorService::Initialize() {
         UICommon::InitializeDefaultLayouts();
     }
 
+    Window* mainWindow = WindowManager::GetMainWindow();
+    if (!mainWindow) {
+        LOG_WARNING("EditorService::Initialize() - No main window available");
+        return;
+    }
+
+    // Create ImGui context only - defer backend initialization until first Update()
+    // This ensures glfwPollEvents() has been called at least once, which is required
+    // for the Win32 window procedure to be properly initialized
+    if (ImGui::GetCurrentContext() == nullptr) {
+        LOG_INFO("Creating ImGui context...");
+        ImGui::CreateContext();
+        
+        // CRITICAL for DLL boundaries: Set allocator functions to ensure heap consistency
+        // across Engine.dll and Editor.exe. Without this, ImGui may crash due to
+        // allocating in one module and freeing in another.
+        ImGui::SetAllocatorFunctions(ImGuiMallocWrapper, ImGuiFreeWrapper, nullptr);
+        
+        ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = "imgui.ini";
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    }
+
+    // Subscribe to window resize events
     if (!m_initialized) {
-        Window* mainWindow = WindowManager::GetMainWindow();
-        if (mainWindow) {
-            ImGuiIO& io = ImGui::GetIO();
-            io.IniFilename = "imgui.ini";
-            m_initialized = true;
-            Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
-                [this](const Messaging::WindowResized& msg) {
-                    if (m_levelEditor) { m_levelEditor->OnWindowResized(msg.Width, msg.Height); }
-                }
-            );
-        }
+        Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
+            [this](const Messaging::WindowResized& msg) {
+                if (m_levelEditor) { m_levelEditor->OnWindowResized(msg.Width, msg.Height); }
+            }
+        );
+        m_initialized = true;
     }
 }
 
@@ -71,19 +102,43 @@ void EditorService::SetWorld(ECS::World* world) {
 }
 
 void EditorService::Update() {
+    if (!m_initialized) return;
+
+    // Initialize ImGui backends on first Update() call (after glfwPollEvents has run)
+    if (!m_backendInitialized) {
+        Window* mainWindow = WindowManager::GetMainWindow();
+        if (!mainWindow) return;
+        
+        // Ensure ImGui context is set for this DLL boundary
+        // This is critical when Engine.dll and Editor.exe both use ImGui
+        ImGuiContext* ctx = ImGui::GetCurrentContext();
+        if (ctx) {
+            ImGui::SetCurrentContext(ctx);
+        }
+        
+        LOG_INFO("Initializing ImGui backends (deferred to first frame)...");
+        ImGui_ImplGlfw_InitForOpenGL(mainWindow->Handle(), true);
+        ImGui_ImplOpenGL3_Init("#version 130");
+        LOG_INFO("ImGui backends initialized successfully");
+        
+        m_backendInitialized = true;
+    }
+
     if (m_pendingLevelEditorRebuild && m_levelEditor) {
         LevelEditorConfig config;
         m_levelEditor.reset();
         Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : m_sceneManager.GetActive();
         m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
         Window* mainWindow = WindowManager::GetMainWindow();
-        if (mainWindow && m_initialized) m_levelEditor->Initialize(mainWindow->Handle());
+        if (mainWindow) m_levelEditor->Initialize(mainWindow->Handle());
         m_pendingLevelEditorRebuild = false;
     }
 
     auto* activeScene = m_sceneManager.GetActive();
 
-    if (m_showLevelEditor && m_levelEditorForScene && activeScene != m_levelEditorForScene) DisableLevelEditor();
+    if (m_showLevelEditor && m_levelEditorForScene && activeScene != m_levelEditorForScene) {
+        DisableLevelEditor();
+    }
 
     bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
 
@@ -92,15 +147,7 @@ void EditorService::Update() {
         Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : activeScene;
         m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
         Window* mainWindow = WindowManager::GetMainWindow();
-        if (mainWindow && m_initialized) m_levelEditor->Initialize(mainWindow->Handle());
-    }
-
-    if (!m_initialized) {
-        Window* mainWindow = WindowManager::GetMainWindow();
-        if (mainWindow) {
-            if (m_levelEditor && shouldShowLevelEditor) m_levelEditor->Initialize(mainWindow->Handle());
-            m_initialized = true;
-        } else return;
+        if (mainWindow) m_levelEditor->Initialize(mainWindow->Handle());
     }
 }
 
@@ -108,18 +155,38 @@ void EditorService::Render() {
     auto* activeScene = m_sceneManager.GetActive();
     bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
     
-    if (m_levelEditor && shouldShowLevelEditor && m_initialized) { 
+    if (m_levelEditor && shouldShowLevelEditor && m_initialized && m_backendInitialized) {
+        // Ensure correct ImGui context for this DLL boundary before every frame
+        ImGuiContext* ctx = ImGui::GetCurrentContext();
+        if (ctx) {
+            ImGui::SetCurrentContext(ctx);
+        }
+        
+        // Start new ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        
         m_levelEditor->Update(); 
         m_levelEditor->Render(); 
+        
+        ImGui::Render();
+        auto* drawData = ImGui::GetDrawData();
+        if (drawData) ImGui_ImplOpenGL3_RenderDrawData(drawData);
     }
-    
-    ImGui::Render();
-    auto* drawData = ImGui::GetDrawData();
-    if (drawData) ImGui_ImplOpenGL3_RenderDrawData(drawData);
 }
 
 void EditorService::Terminate() {
     if (m_levelEditor) m_levelEditor.reset();
+
+    if (ImGui::GetCurrentContext() != nullptr) {
+        if (m_backendInitialized) {
+            ImGui_ImplOpenGL3_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            m_backendInitialized = false;
+        }
+        ImGui::DestroyContext();
+    }
 }
 
 void EditorService::EnableLevelEditorForScene(Scenes::Scene* scene) {

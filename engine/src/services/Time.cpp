@@ -14,6 +14,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+#ifndef GRAPEENGINE_EXPORTS
+#define GRAPEENGINE_EXPORTS
+#endif
+
 #include "services/Time.h"
 #include <algorithm>
 #include <string>
@@ -44,7 +48,7 @@ void Time::_update(const double dt, const double now) {
     ++m_frameCounter;
 }
 
-void Time::TimeScale(const float& scale) {
+void Time::TimeScale(float scale) {
     m_timeScale = std::max(scale, 0.f);
 }
 

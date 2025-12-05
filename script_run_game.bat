@@ -3,9 +3,9 @@ set CONFIG=%1
 if "%CONFIG%"=="" set CONFIG=Debug
 
 echo.
-echo ===============================================
-echo       Running Standalone Game (%CONFIG%)
-echo ===============================================
+echo ==========================================================
+echo            Running Standalone Game (%CONFIG%)
+echo ==========================================================
 echo.
 
 set "EXE_DIR=build_game\%CONFIG%"

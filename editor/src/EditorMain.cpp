@@ -11,125 +11,10 @@ Launches the application in editor mode with the level editor interface.
 /* End Header *******************************************************************/
 
 #include <crtdbg.h>
-#include <filesystem>
 #include "core/Application.h"
-#include "core/ProjectPaths.h"
-#include "Game.h"
+#include "EditorApplication.h"
+#include "services/Time.h"
 #include "services/WindowManager.h"
-#include "services/EditorService.h"
-#include "EditorConfiguration.h"
-#include "core/Logger.h"
-#include "physics/Physics.h"
-
-/**
- * @brief Editor-focused game class that launches directly into the level editor
- */
-class EditorGame : public Game {
-private:
-    EditorSettings m_editorSettings;
-
-public:
-    void OnStart(Scenes::SceneManager& sceneManager) override {
-        (void)sceneManager; // Editor starts scene-less
-        
-        LOG_INFO("Starting Grape Engine Level Editor...");
-        
-        // Load editor configuration
-        bool configLoaded = Editor::EditorConfiguration::LoadConfig("config.json", m_editorSettings);
-        if (!configLoaded) {
-            // Fallback: common scenario when running from build directory
-            if (Editor::EditorConfiguration::LoadConfig("../config.json", m_editorSettings)) {
-                LOG_INFO("Loaded editor configuration from parent directory: ../config.json");
-            }
-        }
-        else {
-            LOG_INFO("Loaded editor configuration: " << std::filesystem::current_path().string() + "/config.json");
-        }
-        
-        // TODO: Remove hardcoded "EchoesBelow" when editor is separated from engine
-        // Initialize project paths to point to game project folder
-        Engine::ProjectPaths::Initialize("EchoesBelow");
-        
-        // Load project-specific settings
-        Engine::CORE->LoadProjectSettings("EchoesBelow");
-        
-        // Get window dimensions from editor config (editor always uses its own settings)
-        int width = m_editorSettings.WindowSettings.Width;
-        int height = m_editorSettings.WindowSettings.Height;
-        
-        // Apply physics settings from project configuration if available
-        if (Engine::CORE->HasProjectSettings()) {
-            const auto& projectSettings = Engine::CORE->GetProjectSettings();
-            Engine::Physics::SetGravity(Vector2D(0.0f, projectSettings.Physics.Gravity));
-            LOG_INFO("Applied physics gravity from ProjectSettings: " << projectSettings.Physics.Gravity);
-        }
-
-        // Create main window based on editor config
-        LOG_INFO("Creating main window from EditorSettings");
-        auto* window = CREATE_WINDOW_EX("Grape Engine Editor", width, height, 
-            m_editorSettings.WindowSettings.VSync,
-            WindowMode::Windowed
-        );
-
-        if (!window) {
-            LOG_ERROR("Failed to create main window for editor");
-            return;
-        }
-        
-        window->SetMaximized(m_editorSettings.WindowSettings.Maximized);
-        
-        // Enable level editor without a scene (scene-less editor mode)
-        auto* editorService = Services::EditorService::Get();
-        if (editorService) {
-            editorService->EnableLevelEditorForScene(nullptr);
-            LOG_INFO("Level Editor initialized successfully");
-            
-            // Connect editor callbacks to engine for play/pause/step control
-            Engine::CORE->SetGameLogicCallback([editorService]() {
-                return editorService->IsGamePlaying();
-            });
-            
-            Engine::CORE->SetStepRequestCallback([editorService]() {
-                bool stepRequested = editorService->IsStepRequested();
-                if (stepRequested) {
-                    editorService->ClearStepRequest();
-                }
-                return stepRequested;
-            });
-        }
-        else {
-            LOG_ERROR("Failed to initialize Level Editor: EditorService not available");
-        }
-    }
-
-    void OnUpdate(Scenes::SceneManager& sceneManager) override {
-        (void)sceneManager;
-        
-        // Update and render editor UI
-        if (auto* editorService = Services::EditorService::Get()) {
-            editorService->Update();
-            editorService->Render();
-        }
-    }
-
-    void OnShutdown(Scenes::SceneManager& sceneManager) override {
-        (void)sceneManager;
-        
-        // Save editor settings on shutdown
-        if (auto* window = WindowManager::GetMainWindow()) {
-            m_editorSettings.WindowSettings.Width = window->GetWidth();
-            m_editorSettings.WindowSettings.Height = window->GetHeight();
-            m_editorSettings.WindowSettings.Maximized = window->IsMaximized();
-            m_editorSettings.WindowSettings.VSync = window->IsVSync();
-            
-            Editor::EditorConfiguration::SaveConfig("config.json", m_editorSettings);
-            LOG_INFO("Saved editor configuration");
-        }
-        
-        DESTROY_ALL_WINDOWS();
-        LOG_INFO("Grape Engine Editor shutdown complete");
-    }
-};
 
 /**
  * @brief Main entry point for the Grape Engine Level Editor
@@ -138,15 +23,42 @@ int main() {
     // Enable memory leak detection in debug builds
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-    // Create and run the editor
+    // Initialize engine in Editor mode
     Engine::Application engine;
-    EditorGame editor;
-    
 #ifdef _DEBUG
-    engine.Run(editor, true);
+    engine.Initialize(Engine::EngineMode::Editor, true);
 #else
-    engine.Run(editor, false);
+    engine.Initialize(Engine::EngineMode::Editor, false);
 #endif
+
+    // Create editor application
+    EditorApplication editor(&engine);
+    editor.Initialize();
+
+    // Initialize systems after window is created
+    ECS::World emptyWorld;
+    engine.GetSystemManager().CreateAll(emptyWorld);
+
+    // Editor main loop
+    while (engine.IsRunning()) {
+        // IMPORTANT: Update engine FIRST to ensure glfwPollEvents() is called
+        // before ImGui backends try to initialize (requires Win32 window proc to be ready)
+        engine.Update();
+
+        LOG_INFO("EditorMain: Engine updated for this frame");
+        // Update editor UI and tools (backends init deferred until after first glfwPollEvents)
+        editor.Update();
+        editor.Render();
+
+        // Swap buffers
+        for (const auto* win : WindowManager::GetWindows()) {
+            win->SwapBuffers();
+        }
+    }
+
+    // Shutdown
+    editor.Shutdown();
+    engine.Shutdown();
 
     return 0;
 }
