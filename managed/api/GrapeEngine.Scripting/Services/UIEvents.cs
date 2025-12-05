@@ -34,161 +34,111 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Numerics;
 using GrapeEngine.Scripting.Unsafe;
 
-namespace GrapeEngine.Events;
+namespace GrapeEngine.Scripting;
 
 /// <summary>
 /// Type of UI event that occurred
 /// </summary>
 public enum UIEventType
 {
-    /// <summary>Entity was clicked</summary>
+    /// <summary>
+    /// Entity was clicked
+    /// </summary>
     Click = 0,
-    /// <summary>Mouse entered entity (hover started)</summary>
+
+    /// <summary>
+    /// Mouse entered entity (hover started)
+    /// </summary>
     HoverEnter = 1,
-    /// <summary>Mouse exited entity (hover ended)</summary>
+
+    /// <summary>
+    /// Mouse exited entity (hover ended)
+    /// </summary>
     HoverExit = 2
 }
 
 /// <summary>
-/// Represents a single UI event
-/// </summary>
-public struct UIEvent
-{
-    /// <summary>
-    /// Type of event that occurred
-    /// </summary>
-    public UIEventType Type;
-    
-    /// <summary>
-    /// Mouse button involved (or -1 for hover events)
-    /// </summary>
-    public int Button;
-    
-    /// <summary>
-    /// Screen position where the event occurred
-    /// </summary>
-    public Vector2 ScreenPosition;
-
-    /// <summary>
-    /// Check if this is a click event with a specific button
-    /// </summary>
-    public bool IsClick(MouseButton button = MouseButton.Left)
-        => Type == UIEventType.Click && Button == (int)button;
-
-    /// <summary>
-    /// Check if this is a hover enter event
-    /// </summary>
-    public bool IsHoverEnter => Type == UIEventType.HoverEnter;
-
-    /// <summary>
-    /// Check if this is a hover exit event
-    /// </summary>
-    public bool IsHoverExit => Type == UIEventType.HoverExit;
-}
-
-/// <summary>
-/// Mouse button constants for UI events
-/// </summary>
-public enum MouseButton
-{
-    Left = 0,
-    Right = 1,
-    Middle = 2
-}
-
-/// <summary>
-/// High-level UI events service for script access.
-/// Provides methods to query UI interactions like clicks and hover states.
+/// High-level UI events utilities for detecting mouse interactions with entities.
+/// Uses the new World-based architecture.
 /// </summary>
 public static class UIEvents
 {
     /// <summary>
-    /// Clear all UI events from the queue (typically called at start of frame by engine)
+    /// Clear all UI events (typically called at start of frame).
     /// </summary>
-    internal static void Clear() => UIEventsAPI.Clear();
-
-    /// <summary>
-    /// Check if an entity was clicked this frame
-    /// </summary>
-    /// <param name="entityId">Entity ID to check</param>
-    /// <param name="button">Mouse button to check (default: Left)</param>
-    /// <returns>True if the entity was clicked with the specified button</returns>
-    public static bool WasClicked(ulong entityId, MouseButton button = MouseButton.Left)
-        => UIEventsAPI.WasClicked(entityId, (int)button);
-
-    /// <summary>
-    /// Check if the mouse entered an entity this frame (hover started)
-    /// </summary>
-    /// <param name="entityId">Entity ID to check</param>
-    /// <returns>True if hover started this frame</returns>
-    public static bool WasHoverEntered(ulong entityId)
-        => UIEventsAPI.WasHoverEntered(entityId);
-
-    /// <summary>
-    /// Check if the mouse exited an entity this frame (hover ended)
-    /// </summary>
-    /// <param name="entityId">Entity ID to check</param>
-    /// <returns>True if hover ended this frame</returns>
-    public static bool WasHoverExited(ulong entityId)
-        => UIEventsAPI.WasHoverExited(entityId);
-
-    /// <summary>
-    /// Get all UI events for a specific entity this frame
-    /// </summary>
-    /// <param name="entityId">Entity ID to get events for</param>
-    /// <returns>Array of UI events for this entity</returns>
-    public static UIEvent[] GetEvents(ulong entityId)
+    public static unsafe void Clear(World world)
     {
-        int count = UIEventsAPI.GetEventCount(entityId);
-        if (count == 0)
-            return Array.Empty<UIEvent>();
-
-        var events = new UIEvent[count];
-        
-        unsafe
-        {
-            for (int i = 0; i < count; i++)
-            {
-                int type, button;
-                float screenX, screenY;
-                
-                if (UIEventsAPI.GetEvent(entityId, i, &type, &button, &screenX, &screenY))
-                {
-                    events[i] = new UIEvent
-                    {
-                        Type = (UIEventType)type,
-                        Button = button,
-                        ScreenPosition = new Vector2(screenX, screenY)
-                    };
-                }
-            }
-        }
-
-        return events;
+        WorldInteropAPI.UIEvents_Clear(world.NativePtr);
     }
 
     /// <summary>
-    /// Get the entity ID that is currently hovered (0 if none)
+    /// Check if an entity was clicked this frame.
     /// </summary>
-    /// <returns>Entity ID of the hovered entity, or 0 if none</returns>
-    public static ulong GetHoveredEntity()
-        => UIEventsAPI.GetHoveredEntity();
+    public static unsafe bool WasClicked(World world, Entity entity, int button = 0)
+    {
+        return WorldInteropAPI.UIEvents_WasClicked(world.NativePtr, entity.Id, button);
+    }
 
     /// <summary>
-    /// Check if the mouse is currently over any UI element
+    /// Check if an entity had hover enter this frame.
     /// </summary>
-    /// <returns>True if mouse is over a UI element</returns>
-    public static bool IsMouseOverUI()
-        => UIEventsAPI.IsMouseOverUI();
+    public static unsafe bool WasHoverEntered(World world, Entity entity)
+    {
+        return WorldInteropAPI.UIEvents_WasHoverEntered(world.NativePtr, entity.Id);
+    }
 
     /// <summary>
-    /// Check if a specific entity is currently hovered
+    /// Check if an entity had hover exit this frame.
     /// </summary>
-    /// <param name="entityId">Entity ID to check</param>
-    /// <returns>True if this entity is currently hovered</returns>
-    public static bool IsHovered(ulong entityId)
-        => GetHoveredEntity() == entityId;
+    public static unsafe bool WasHoverExited(World world, Entity entity)
+    {
+        return WorldInteropAPI.UIEvents_WasHoverExited(world.NativePtr, entity.Id);
+    }
+
+    /// <summary>
+    /// Get the number of UI events this frame.
+    /// </summary>
+    public static unsafe int GetEventCount(World world)
+    {
+        return WorldInteropAPI.UIEvents_GetEventCount(world.NativePtr);
+    }
+
+    /// <summary>
+    /// Get a UI event by index.
+    /// </summary>
+    public static unsafe (Entity entity, UIEventType eventType) GetEvent(World world, int index)
+    {
+        ulong entityId;
+        int eventType;
+        WorldInteropAPI.UIEvents_GetEvent(world.NativePtr, index, &entityId, &eventType);
+        return (new Entity(world, entityId), (UIEventType)eventType);
+    }
+
+    /// <summary>
+    /// Get the entity currently being hovered.
+    /// </summary>
+    public static unsafe Entity? GetHoveredEntity(World world)
+    {
+        ulong entityId = WorldInteropAPI.UIEvents_GetHoveredEntity(world.NativePtr);
+        return entityId != 0 ? new Entity(world, entityId) : null;
+    }
+
+    /// <summary>
+    /// Check if the mouse is over any UI element.
+    /// </summary>
+    public static unsafe bool IsMouseOverUI(World world)
+    {
+        return WorldInteropAPI.UIEvents_IsMouseOverUI(world.NativePtr);
+    }
+
+    /// <summary>
+    /// Check if a specific entity is currently hovered.
+    /// </summary>
+    public static bool IsHovered(World world, Entity entity)
+    {
+        var hovered = GetHoveredEntity(world);
+        return hovered != null && hovered.Id == entity.Id;
+    }
 }
