@@ -78,7 +78,7 @@ public class Entity
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
-        return WorldInteropAPI.HasComponent(_world.NativePtr, _id, typeHash);
+        return WorldAPI.HasComponent(_world.NativePtr, _id, typeHash);
     }
 
     /// <summary>
@@ -91,7 +91,7 @@ public class Entity
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
-        void* componentPtr = WorldInteropAPI.GetComponentPtr(_world.NativePtr, _id, typeHash);
+        void* componentPtr = WorldAPI.GetComponentPtr(_world.NativePtr, _id, typeHash);
         
         if (componentPtr == null)
         {
@@ -111,7 +111,7 @@ public class Entity
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
-        void* componentPtr = WorldInteropAPI.GetComponentPtr(_world.NativePtr, _id, typeHash);
+        void* componentPtr = WorldAPI.GetComponentPtr(_world.NativePtr, _id, typeHash);
         
         if (componentPtr == null)
         {
@@ -136,7 +136,7 @@ public class Entity
         int size = Marshal.SizeOf<T>();
         
         void* componentData = &component;
-        void* addedPtr = WorldInteropAPI.AddComponent(_world.NativePtr, _id, typeHash, componentData, size);
+        void* addedPtr = WorldAPI.AddComponent(_world.NativePtr, _id, typeHash, componentData, size);
         
         if (addedPtr == null)
         {
@@ -172,7 +172,7 @@ public class Entity
     {
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
-        WorldInteropAPI.RemoveComponent(_world.NativePtr, _id, typeHash);
+        WorldAPI.RemoveComponent(_world.NativePtr, _id, typeHash);
     }
 
     /// <summary>
@@ -183,7 +183,7 @@ public class Entity
 
     internal unsafe void DestroyUnsafe()
     {
-        WorldInteropAPI.DestroyEntity(_world.NativePtr, _id);
+        WorldAPI.DestroyEntity(_world.NativePtr, _id);
     }
 }
 

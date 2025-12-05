@@ -1,6 +1,8 @@
 #pragma once
 
-class Vector3D {
+#include "Export.h"
+
+class GRAPEENGINE_API Vector3D {
 public:
     float X, Y, Z;
 
@@ -46,20 +48,11 @@ public:
 };
 
 // Binary operators (non-member functions)
-Vector3D operator+(const Vector3D& a, const Vector3D& b);
-Vector3D operator-(const Vector3D& a, const Vector3D& b);
-Vector3D operator*(const Vector3D& vector, float scalar);
-Vector3D operator*(float scalar, const Vector3D& vector);
-Vector3D operator/(const Vector3D& vector, float scalar);
-bool operator==(const Vector3D& a, const Vector3D& b);
-bool operator!=(const Vector3D& a, const Vector3D& b);
-
-// Static member definitions
-inline const Vector3D Vector3D::Zero     = Vector3D(0.0f, 0.0f, 0.0f);
-inline const Vector3D Vector3D::Forward  = Vector3D(0.0f, 0.0f, 1.0f);
-inline const Vector3D Vector3D::Up       = Vector3D(0.0f, 1.0f, 0.0f);
-inline const Vector3D Vector3D::Right    = Vector3D(1.0f, 0.0f, 0.0f);
-inline const Vector3D Vector3D::Backward = Vector3D(0.0f, 0.0f, -1.0f);
-inline const Vector3D Vector3D::Down     = Vector3D(0.0f, -1.0f, 0.0f);
-inline const Vector3D Vector3D::Left     = Vector3D(-1.0f, 0.0f, 0.0f);
+GRAPEENGINE_API Vector3D operator+(const Vector3D& a, const Vector3D& b);
+GRAPEENGINE_API Vector3D operator-(const Vector3D& a, const Vector3D& b);
+GRAPEENGINE_API Vector3D operator*(const Vector3D& vector, float scalar);
+GRAPEENGINE_API Vector3D operator*(float scalar, const Vector3D& vector);
+GRAPEENGINE_API Vector3D operator/(const Vector3D& vector, float scalar);
+GRAPEENGINE_API bool operator==(const Vector3D& a, const Vector3D& b);
+GRAPEENGINE_API bool operator!=(const Vector3D& a, const Vector3D& b);
 

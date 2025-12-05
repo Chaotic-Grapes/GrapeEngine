@@ -1,7 +1,8 @@
 #pragma once
 #include "math/Vector3D.h"
+#include "Export.h"
 
-class Quaternion {
+class GRAPEENGINE_API Quaternion {
 public:
     float X, Y, Z, W;
 

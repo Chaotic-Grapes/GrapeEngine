@@ -28,6 +28,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
     #define DOTNET_STRING(s) s
 #endif
 
+// typedef for nethost get_hostfxr_path function pointer
+// Uses the project's char_t type already employed throughout this file.
+using get_hostfxr_path_fn = int(*)(char_t* path, size_t* path_size, void* reserved);
+
 namespace ECS {
 
     // ============================================================================
@@ -458,9 +462,9 @@ namespace ECS {
     void ScriptSystemWrapper::CacheMetadata() const {
         if (!m_scriptManager) {
             // Fallback to defaults
-            m_metadata.name = m_typeName;
-            m_metadata.executionOrder = 0;
-            m_metadata.enabled = true;
+            m_metadata.Name = m_typeName;
+            m_metadata.ExecutionOrder = 0;
+            m_metadata.Enabled = true;
             m_group = SystemGroup::Update;
             m_runMode = SystemRunMode::PlayOnly;
             m_metadataCached = true;
@@ -476,17 +480,17 @@ namespace ECS {
             getMetadata(m_managedHandle, nameBuffer, &group, &runMode);
 
             // Set metadata from C# system
-            m_metadata.name = nameBuffer[0] != '\0' ? std::string(nameBuffer) : m_typeName;
-            m_metadata.executionOrder = 0;  // TODO: Get from C#
-            m_metadata.enabled = true;
+            m_metadata.Name = nameBuffer[0] != '\0' ? std::string(nameBuffer) : m_typeName;
+            m_metadata.ExecutionOrder = 0;  // TODO: Get from C#
+            m_metadata.Enabled = true;
 
             m_group = static_cast<SystemGroup>(group);
             m_runMode = static_cast<SystemRunMode>(runMode);
         } else {
             // Fallback to defaults
-            m_metadata.name = m_typeName;
-            m_metadata.executionOrder = 0;
-            m_metadata.enabled = true;
+            m_metadata.Name = m_typeName;
+            m_metadata.ExecutionOrder = 0;
+            m_metadata.Enabled = true;
             m_group = SystemGroup::Update;
             m_runMode = SystemRunMode::PlayOnly;
         }

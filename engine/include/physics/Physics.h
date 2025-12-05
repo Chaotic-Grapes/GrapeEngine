@@ -1,12 +1,13 @@
 #ifndef PHYSICS_H
 #define PHYSICS_H
 
+#include "Export.h"
 #include "ecs/Components.h"
 #include "math/Vector2D.h"
 #include "Collision.h"
 
 namespace Engine {
-    class Physics {
+    class GRAPEENGINE_API Physics {
     public:
         // Boundary collision
         struct BoundaryConstraint {

@@ -21,6 +21,7 @@ render targets, making it suitable for HDR pipelines and general render passes.
 /* End Header *******************************************************************/
 
 #pragma once
+#include "Export.h"
 #include <glad/glad.h>
 #include <vector>
 
@@ -31,7 +32,7 @@ render targets, making it suitable for HDR pipelines and general render passes.
  * Provides functionality for creating, resizing, and managing off-screen
  * framebuffers used in rendering pipelines.
  */
-class Framebuffer {
+class GRAPEENGINE_API Framebuffer {
 public:
     GLuint fbo = 0;    //!< OpenGL framebuffer object ID
     std::vector<GLuint> colorAttachments;

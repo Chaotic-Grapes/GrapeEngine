@@ -21,6 +21,7 @@ Features:
 /* End Header *******************************************************************/
 
 #pragma once
+#include "Export.h"
 #include <string>
 #include <map>
 #include <vector>
@@ -38,7 +39,7 @@ struct Glyph {
     glm::vec4 uv{};             // UV coords in atlas {u0, v0, u1, v1}
 };
 
-class Font {
+class GRAPEENGINE_API Font {
 public:
     Font(const std::string& path, int pixelSize);
     ~Font();

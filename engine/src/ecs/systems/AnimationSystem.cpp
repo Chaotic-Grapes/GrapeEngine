@@ -23,14 +23,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/Components.h"
 #include <algorithm>
+#include <vector>
 
 namespace ECS {
     SystemMetadata AnimationSystem::GetMetadata() const {
         SystemMetadata metadata;
-        metadata.name = "Animation";
-        metadata.readComponents = {"SpriteSheetAnimation2D", "AnimationState2D", "Active"};
-        metadata.writeComponents = {"SpriteSheetAnimation2D", "AnimationState2D", "SpriteRenderer2D"};
-        metadata.executionOrder = 200;
+        metadata.Name = "Animation";
+        metadata.ReadComponents = {ComponentRegistry::Type<Components::SpriteSheetAnimation2D>(), ComponentRegistry::Type<Components::AnimationState2D>(), ComponentRegistry::Type<Components::Active>()};
+        metadata.WriteComponents = {ComponentRegistry::Type<Components::SpriteSheetAnimation2D>(), ComponentRegistry::Type<Components::AnimationState2D>(), ComponentRegistry::Type<Components::SpriteRenderer2D>()};
+        metadata.ExecutionOrder = 200;
         return metadata;
     }
 

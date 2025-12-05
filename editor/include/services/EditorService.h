@@ -1,25 +1,23 @@
 /**
- * @file OverlayService.h
+ * @file EditorService.h
  * @author Foo Rui Qin
  * @date 2025
- * @brief Overlay system bridging DebugUI and the ImGui-based LevelEditor
+ * @brief Editor service managing the ImGui-based LevelEditor interface
  * 
- * This file defines the OverlayService class which serves as a system-level wrapper
- * for editor and debug UI functionality. OverlayService manages:
- * - DebugUI lifecycle and ImGui backend integration
+ * This file defines the EditorService class which serves as a system-level wrapper
+ * for editor UI functionality. EditorService manages:
  * - LevelEditor creation/update/render gating per active scene
- * - Audio system integration for debug monitoring
+ * - Audio system integration for editor monitoring
  * - Conditional compilation support for ImGui features
  * - Window management integration for UI rendering
- * - World reference propagation to keep editor/debug views in sync
+ * - World reference propagation to keep editor views in sync
  * 
- * The OverlayService system inherits from Engine::ISystem and follows the ECS pattern,
- * providing a clean interface between the engine's system architecture and
- * the ImGui-based debug interface.
+ * The EditorService inherits from Engine::IService and integrates with the engine's
+ * service architecture, providing a clean interface for the ImGui-based editor.
  */
 
-#ifndef EDITOR_OVERLAYSERVICE_H
-#define EDITOR_OVERLAYSERVICE_H
+#ifndef EDITOR_EDITORSERVICE_H
+#define EDITOR_EDITORSERVICE_H
 
 #include "core/IService.h"
 #include <memory>
@@ -31,24 +29,22 @@ namespace Scenes { class SceneManager; class Scene; }
 namespace ECS { class World; }
 
 #ifdef USE_IMGUI
-#include "services/DebugUI.h"
 #include "LevelEditor.h"
 #else
 // Forward declarations for non-ImGui builds to avoid pulling editor headers
-class DebugUI;
 class LevelEditor;
 #endif
 
 namespace Services {
-    class OverlayService final : public Engine::IService {
+    class EditorService final : public Engine::IService {
     public:
-        explicit OverlayService(Scenes::SceneManager& sceneManager) : IService("Overlay Service"), m_sceneManager(sceneManager) {
-            m_overlayInstance = this;
+        explicit EditorService(Scenes::SceneManager& sceneManager) : IService("Editor Service"), m_sceneManager(sceneManager) {
+            m_editorInstance = this;
             SetEnabled(false);
         }
 
 #ifdef USE_IMGUI
-        ~OverlayService() override;
+        ~EditorService() override;
 #endif
 
         void Initialize() override;
@@ -66,17 +62,16 @@ namespace Services {
         bool IsStepRequested() const;
         void ClearStepRequest() const;
 
-        static inline OverlayService* Get() { return m_overlay_instance; }
+        static inline EditorService* Get() { return m_editorInstance; }
 
     private:
         Audio::FmodAudioDevice* m_audioDevice = nullptr;
         Scenes::SceneManager& m_sceneManager;
         ECS::World* m_world = nullptr;
 
-        static inline OverlayService* m_overlay_instance = nullptr;
+        static inline EditorService* m_editorInstance = nullptr;
 
 #ifdef USE_IMGUI
-        std::unique_ptr<DebugUI> m_debugUI;
         std::unique_ptr<LevelEditor> m_levelEditor;
         bool m_initialized = false;
         bool m_showLevelEditor = false;
@@ -86,4 +81,4 @@ namespace Services {
     };
 }
 
-#endif // EDITOR_OVERLAYSERVICE_H
+#endif // EDITOR_EDITORSERVICE_H

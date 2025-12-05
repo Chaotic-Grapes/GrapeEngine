@@ -2,7 +2,7 @@
 #define UI_EVENT_SYSTEM_H
 
 #include "ecs/World.h"
-#include "../engine/services/UIEvents.h"
+#include "services/UIEvents.h"
 #include "Math/Vector2D.h"
 
 namespace ECS {

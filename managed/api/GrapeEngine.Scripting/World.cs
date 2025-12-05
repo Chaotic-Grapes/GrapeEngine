@@ -48,7 +48,7 @@ public class World
     /// <returns>A new Entity instance</returns>
     public unsafe Entity CreateEntity()
     {
-        ulong entityId = WorldInteropAPI.CreateEntity((void*)_nativeWorldPtr);
+        ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
         return new Entity(this, entityId);
     }
 
@@ -59,7 +59,7 @@ public class World
     /// <returns>True if the entity is alive, false otherwise</returns>
     public unsafe bool IsAlive(Entity entity)
     {
-        return WorldInteropAPI.IsEntityAlive((void*)_nativeWorldPtr, entity.Id);
+        return WorldAPI.IsEntityAlive((void*)_nativeWorldPtr, entity.Id);
     }
 
     // ============================================================================

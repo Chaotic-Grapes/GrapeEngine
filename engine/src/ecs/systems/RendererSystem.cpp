@@ -37,6 +37,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Application.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "services/Input.h"
 
 // ============================================================================
 // Graphics
@@ -124,10 +125,10 @@ namespace ECS {
 
     SystemMetadata RendererSystem::GetMetadata() const {
         SystemMetadata metadata;
-        metadata.name = "Renderer";
-        metadata.readComponents = {}; // Reads many components
-        metadata.writeComponents = {};
-        metadata.executionOrder = 0;
+        metadata.Name = "Renderer";
+        metadata.ReadComponents = {}; // Reads many components
+        metadata.WriteComponents = {};
+        metadata.ExecutionOrder = 0;
         return metadata;
     }
 

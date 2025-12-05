@@ -15,8 +15,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+#define GLM_ENABLE_EXPERIMENTAL
+
 // Graphics
-#include "EditorCamera.h"
+#include "EditorCamera.hpp"
 
 // Services
 #include "services/Input.h"

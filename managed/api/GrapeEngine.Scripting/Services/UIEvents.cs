@@ -70,7 +70,7 @@ public static class UIEvents
     /// </summary>
     public static unsafe void Clear(World world)
     {
-        WorldInteropAPI.UIEvents_Clear(world.NativePtr);
+        UIEventsAPI.Clear(world.NativePtr);
     }
 
     /// <summary>
@@ -78,7 +78,7 @@ public static class UIEvents
     /// </summary>
     public static unsafe bool WasClicked(World world, Entity entity, int button = 0)
     {
-        return WorldInteropAPI.UIEvents_WasClicked(world.NativePtr, entity.Id, button);
+        return UIEventsAPI.WasClicked(world.NativePtr, entity.Id, button);
     }
 
     /// <summary>
@@ -86,7 +86,7 @@ public static class UIEvents
     /// </summary>
     public static unsafe bool WasHoverEntered(World world, Entity entity)
     {
-        return WorldInteropAPI.UIEvents_WasHoverEntered(world.NativePtr, entity.Id);
+        return UIEventsAPI.WasHoverEntered(world.NativePtr, entity.Id);
     }
 
     /// <summary>
@@ -94,7 +94,7 @@ public static class UIEvents
     /// </summary>
     public static unsafe bool WasHoverExited(World world, Entity entity)
     {
-        return WorldInteropAPI.UIEvents_WasHoverExited(world.NativePtr, entity.Id);
+        return UIEventsAPI.WasHoverExited(world.NativePtr, entity.Id);
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public static class UIEvents
     /// </summary>
     public static unsafe int GetEventCount(World world)
     {
-        return WorldInteropAPI.UIEvents_GetEventCount(world.NativePtr);
+        return UIEventsAPI.GetEventCount(world.NativePtr);
     }
 
     /// <summary>
@@ -112,7 +112,7 @@ public static class UIEvents
     {
         ulong entityId;
         int eventType;
-        WorldInteropAPI.UIEvents_GetEvent(world.NativePtr, index, &entityId, &eventType);
+        UIEventsAPI.GetEvent(world.NativePtr, index, &entityId, &eventType);
         return (new Entity(world, entityId), (UIEventType)eventType);
     }
 
@@ -121,7 +121,7 @@ public static class UIEvents
     /// </summary>
     public static unsafe Entity? GetHoveredEntity(World world)
     {
-        ulong entityId = WorldInteropAPI.UIEvents_GetHoveredEntity(world.NativePtr);
+        ulong entityId = UIEventsAPI.GetHoveredEntity(world.NativePtr);
         return entityId != 0 ? new Entity(world, entityId) : null;
     }
 
@@ -130,7 +130,7 @@ public static class UIEvents
     /// </summary>
     public static unsafe bool IsMouseOverUI(World world)
     {
-        return WorldInteropAPI.UIEvents_IsMouseOverUI(world.NativePtr);
+        return UIEventsAPI.IsMouseOverUI(world.NativePtr);
     }
 
     /// <summary>

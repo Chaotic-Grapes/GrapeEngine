@@ -18,10 +18,8 @@ communication between systems (window, input, gameplay, audio, debug, etc.).
 #include <vector>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
-
-// Forward declarations for math types
-class Vector3D;
-class Quaternion;
+#include "math/Vector3D.h"
+#include "math/Quaternion.h"
 
 namespace Messaging {
     // -------------------------------

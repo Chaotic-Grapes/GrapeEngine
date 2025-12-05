@@ -30,6 +30,7 @@ Usage:
 
 #ifndef RESOURCE_MANAGER_H
 #define RESOURCE_MANAGER_H
+#include "Export.h"
 #include <unordered_map>
 #include <memory>
 #include <string>
@@ -49,7 +50,7 @@ struct AudioData {
 
 // Centralized resource management system for game assets
 // Supports textures, audio and fonts
-class ResourceManager {
+class GRAPEENGINE_API ResourceManager {
 public:
     // Default constructor
     ResourceManager() = default;
@@ -98,6 +99,6 @@ private:
 };
 
 // Global ResourceManager instance
-extern ResourceManager RM;
+extern GRAPEENGINE_API ResourceManager RM;
 
 #endif

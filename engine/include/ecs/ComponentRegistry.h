@@ -60,7 +60,7 @@ namespace ECS {
             // After registration, subsequent calls skip the registration logic entirely (no mutex needed)
             // std::call_once ensures thread-safe one-time initialization
             static std::once_flag registrationFlag;
-            std::call_once(registrationFlag, [id]() { _detailRegister<T>(id); });
+            std::call_once(registrationFlag, [](ComponentTypeId capturedId) { _detailRegister<T>(capturedId); }, id);
             
             return id;
         }

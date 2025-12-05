@@ -17,6 +17,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef WINDOW_MANAGER_H
 #define WINDOW_MANAGER_H
 
+#include "Export.h"
+
 #define CREATE_WINDOW(title, width, height) WindowManager::CreateWindow(title, width, height)
 #define CREATE_WINDOW_EX(title, width, height, vsync, mode) WindowManager::CreateWindow(title, width, height, vsync, mode)
 #define CREATE_CHILD_WINDOW(title, width, height, vsync, mode, parent) WindowManager::CreateWindow(title, width, height, vsync, mode, parent)
@@ -31,7 +33,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #undef CreateWindow
 #endif
 
-class WindowManager final {
+class GRAPEENGINE_API WindowManager final {
 public:
     ~WindowManager();
 

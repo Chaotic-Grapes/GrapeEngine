@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file    EngineInterop_Debug.cpp
+\file    Interop_Debug.cpp
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \date    20th November 2025
@@ -13,18 +13,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#include "core/Logger.h"
-
-// Export macro for C API
-#ifdef _WIN32
-    #ifdef BUILDING_ENGINE_INTEROP
-        #define ENGINE_INTEROP_API extern "C" __declspec(dllexport)
-    #else
-        #define ENGINE_INTEROP_API extern "C" __declspec(dllimport)
-    #endif
-#else
-    #define ENGINE_INTEROP_API extern "C"
+#ifndef BUILDING_INTEROP
+#define BUILDING_INTEROP
 #endif
+
+#include "Export.h"
+#include "core/Logger.h"
 
 // ============================================================================
 // Debug API - Logging
@@ -34,7 +28,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
  * @brief Log an info message to the console
  * @param message The message to log
  */
-ENGINE_INTEROP_API void EngineInterop_Debug_LogInfo(const char* message) {
+INTEROP_API void EngineInterop_Debug_LogInfo(const char* message) {
     if (!message) return;
     Logger::Get().Log(LogLevel::INFO, message, LogSource::SCRIPT);
 }
@@ -43,7 +37,7 @@ ENGINE_INTEROP_API void EngineInterop_Debug_LogInfo(const char* message) {
  * @brief Log a debug message to the console
  * @param message The message to log
  */
-ENGINE_INTEROP_API void EngineInterop_Debug_LogDebug(const char* message) {
+INTEROP_API void EngineInterop_Debug_LogDebug(const char* message) {
     if (!message) return;
     Logger::Get().Log(LogLevel::DEBUG, message, LogSource::SCRIPT);
 }
@@ -52,7 +46,7 @@ ENGINE_INTEROP_API void EngineInterop_Debug_LogDebug(const char* message) {
  * @brief Log a warning message to the console
  * @param message The message to log
  */
-ENGINE_INTEROP_API void EngineInterop_Debug_LogWarning(const char* message) {
+INTEROP_API void EngineInterop_Debug_LogWarning(const char* message) {
     if (!message) return;
     Logger::Get().Log(LogLevel::WARNING, message, LogSource::SCRIPT);
 }
@@ -61,7 +55,7 @@ ENGINE_INTEROP_API void EngineInterop_Debug_LogWarning(const char* message) {
  * @brief Log an error message to the console
  * @param message The message to log
  */
-ENGINE_INTEROP_API void EngineInterop_Debug_LogError(const char* message) {
+INTEROP_API void EngineInterop_Debug_LogError(const char* message) {
     if (!message) return;
     Logger::Get().Log(LogLevel::ERROR, message, LogSource::SCRIPT);
 }

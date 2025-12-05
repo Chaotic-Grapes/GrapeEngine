@@ -21,6 +21,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "EditorGizmo.h"
 #include "core/Logger.h"
 #include <imgui.h>
+#include <ImGuizmo.h>
 #include "ecs/World.h"
 #include "helpers/TransformUtils.h"
 #include "math/Matrix4x4.h"

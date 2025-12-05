@@ -19,6 +19,7 @@ Features:
 /* End Header *******************************************************************/
 
 #pragma once
+#include "Export.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <cstdint>
@@ -33,7 +34,7 @@ inline constexpr float kPixelsPerUnit = 100.0f; // 1 world unit == 100 pixels
 inline float PixelsToUnits(float px) { return px / kPixelsPerUnit; }
 inline float UnitsToPixels(float wu) { return wu * kPixelsPerUnit; }
 
-class Renderer {
+class GRAPEENGINE_API Renderer {
 public:
     Renderer(size_t maxQuads = 20000);
     ~Renderer();

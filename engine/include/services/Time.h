@@ -17,8 +17,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef TIME_H
 #define TIME_H
 
+#include "Export.h"
+
 namespace Engine { class Application; }
-class Time final {
+class GRAPEENGINE_API Time final {
 public:
     static float  DeltaTime();
     static float  UnscaledDeltaTime();

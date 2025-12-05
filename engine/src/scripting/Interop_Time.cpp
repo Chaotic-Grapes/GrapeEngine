@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file    EngineInterop_Time.cpp
+\file    Interop_Time.cpp
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \brief
@@ -12,18 +12,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#include "services/Time.h"
-
-// Export macro for C API
-#ifdef _WIN32
-    #ifdef BUILDING_ENGINE_INTEROP
-        #define ENGINE_INTEROP_API extern "C" __declspec(dllexport)
-    #else
-        #define ENGINE_INTEROP_API extern "C" __declspec(dllimport)
-    #endif
-#else
-    #define ENGINE_INTEROP_API extern "C"
+#ifndef BUILDING_INTEROP
+#define BUILDING_INTEROP
 #endif
+
+#include "Export.h"
+#include "services/Time.h"
 
 // ============================================================================
 // Time API - Read-Only Properties
@@ -32,42 +26,42 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /// <summary>
 /// Get the scaled delta time (time since last frame, affected by time scale)
 /// </summary>
-ENGINE_INTEROP_API float EngineInterop_Time_GetDeltaTime() {
+INTEROP_API float EngineInterop_Time_GetDeltaTime() {
     return Time::DeltaTime();
 }
 
 /// <summary>
 /// Get the unscaled delta time (time since last frame, NOT affected by time scale)
 /// </summary>
-ENGINE_INTEROP_API float EngineInterop_Time_GetUnscaledDeltaTime() {
+INTEROP_API float EngineInterop_Time_GetUnscaledDeltaTime() {
     return Time::UnscaledDeltaTime();
 }
 
 /// <summary>
 /// Get the scaled fixed delta time (physics timestep, affected by time scale)
 /// </summary>
-ENGINE_INTEROP_API float EngineInterop_Time_GetFixedDeltaTime() {
+INTEROP_API float EngineInterop_Time_GetFixedDeltaTime() {
     return Time::FixedDeltaTime();
 }
 
 /// <summary>
 /// Get the unscaled fixed delta time (physics timestep, NOT affected by time scale)
 /// </summary>
-ENGINE_INTEROP_API float EngineInterop_Time_GetUnscaledFixedDeltaTime() {
+INTEROP_API float EngineInterop_Time_GetUnscaledFixedDeltaTime() {
     return Time::UnscaledFixedDeltaTime();
 }
 
 /// <summary>
 /// Get the total elapsed time since engine start
 /// </summary>
-ENGINE_INTEROP_API double EngineInterop_Time_GetElapsedTime() {
+INTEROP_API double EngineInterop_Time_GetElapsedTime() {
     return Time::ElapsedTime();
 }
 
 /// <summary>
 /// Get the current frame count
 /// </summary>
-ENGINE_INTEROP_API int EngineInterop_Time_GetFrameCount() {
+INTEROP_API int EngineInterop_Time_GetFrameCount() {
     return Time::FrameCount();
 }
 
@@ -78,28 +72,28 @@ ENGINE_INTEROP_API int EngineInterop_Time_GetFrameCount() {
 /// <summary>
 /// Get the current time scale multiplier
 /// </summary>
-ENGINE_INTEROP_API float EngineInterop_Time_GetTimeScale() {
+INTEROP_API float EngineInterop_Time_GetTimeScale() {
     return Time::TimeScale();
 }
 
 /// <summary>
 /// Set the time scale multiplier (0.0 = paused, 1.0 = normal, 2.0 = double speed)
 /// </summary>
-ENGINE_INTEROP_API void EngineInterop_Time_SetTimeScale(float scale) {
+INTEROP_API void EngineInterop_Time_SetTimeScale(float scale) {
     Time::TimeScale(scale);
 }
 
 /// <summary>
 /// Get the maximum allowed delta time (prevents large spikes)
 /// </summary>
-ENGINE_INTEROP_API float EngineInterop_Time_GetMaximumDeltaTime() {
+INTEROP_API float EngineInterop_Time_GetMaximumDeltaTime() {
     return Time::MaximumDeltaTime();
 }
 
 /// <summary>
 /// Set the maximum allowed delta time
 /// </summary>
-ENGINE_INTEROP_API void EngineInterop_Time_SetMaximumDeltaTime(float maxDelta) {
+INTEROP_API void EngineInterop_Time_SetMaximumDeltaTime(float maxDelta) {
     Time::MaximumDeltaTime(maxDelta);
 }
 

@@ -17,7 +17,7 @@ Header for Viewport class handling viewport rendering and entity selection with 
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include "EditorFileMenu.h"
-#include "EditorCamera.h"
+#include "EditorCamera.hpp"
 #include "UndoSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
@@ -69,7 +69,7 @@ public:
     ImVec2 GetSceneDrawSize() const { return m_sceneDrawSize; }
 
     // Get the editor camera
-    Editor::EditorCamera* GetEditorCamera() { return m_editorCamera.get(); }
+    Editor::EditorCamera* GetEditorCamera() const { return m_editorCamera.get(); }
 
     // Toggle camera frustum visualization
     void SetShowCameraFrustum(bool show) { m_showCameraFrustum = show; }

@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
+#include "Export.h"
 #include "Game.h"
 #include "scene/SceneManager.h"
 #include "serialization/ConfigurationSerializer.h"
@@ -31,7 +32,7 @@ namespace ECS {
 }
 
 namespace Engine {
-    class Application {
+    class GRAPEENGINE_API Application {
     public:
         /**
          * @brief Access the SceneManager for creating/loading/unloading scenes
@@ -87,6 +88,18 @@ namespace Engine {
         // Get SystemManager for system access
         ECS::SystemManager& GetSystemManager() { return m_systemManager; }
 
+        /**
+         * @brief Set callback to control whether game logic should run (editor use)
+         * @param callback Function that returns true if game should run
+         */
+        void SetGameLogicCallback(std::function<bool()> callback) { m_gameLogicCallback = callback; }
+
+        /**
+         * @brief Set callback to check if step was requested (editor use)
+         * @param callback Function that returns true if step requested (and clears the flag)
+         */
+        void SetStepRequestCallback(std::function<bool()> callback) { m_stepRequestCallback = callback; }
+
     private:
         // Flag to indicate if application should stop
         static bool m_shouldStop;
@@ -115,8 +128,9 @@ namespace Engine {
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
         
-        // Callback for external control of game logic (used by editor)
+        // Callbacks for external control of game logic (used by editor)
         std::function<bool()> m_gameLogicCallback;
+        std::function<bool()> m_stepRequestCallback;  // Returns true if step requested, resets after check
 
         void _onGameStart(Scenes::Scene* scene);
         void _onGameStop(Scenes::Scene* scene);
@@ -126,7 +140,7 @@ namespace Engine {
         void _updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested);
     };
 
-    extern Application* CORE;
+    extern GRAPEENGINE_API Application* CORE;
 }
 
 #endif

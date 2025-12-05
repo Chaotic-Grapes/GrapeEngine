@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef WINDOW_H
 #define WINDOW_H
 
+#include "Export.h"
 #include <string>
 #include <glad/glad.h> // DO NOT REMOVE THIS LINE OR IT WILL NOT COMPILE
 #include <GLFW/glfw3.h>
@@ -50,7 +51,7 @@ inline WindowMode::Flags& operator|=(WindowMode::Flags& a, const WindowMode::Fla
 
 // Todo: Borderless, Fullscreen etc
 // Borderless: glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-class Window {
+class GRAPEENGINE_API Window {
 public:	
 	Window() = default;
 	~Window();

@@ -1,4 +1,4 @@
-#include "Math/Vector3D.h"
+#include "math/Vector3D.h"
 #include <cmath> // For trigonometric or arithmetic operations
 #include <stdexcept>
 
@@ -123,3 +123,12 @@ Vector3D operator/(const Vector3D& vector, float scalar) {
 
 bool operator==(const Vector3D& a, const Vector3D& b) { return (a.X == b.X) && (a.Y == b.Y) && (a.Z == b.Z); }  
 bool operator!=(const Vector3D& a, const Vector3D& b) { return !(a == b); }
+
+// Static member definitions
+const Vector3D Vector3D::Zero     = Vector3D(0.0f, 0.0f, 0.0f);
+const Vector3D Vector3D::Forward  = Vector3D(0.0f, 0.0f, 1.0f);
+const Vector3D Vector3D::Up       = Vector3D(0.0f, 1.0f, 0.0f);
+const Vector3D Vector3D::Right    = Vector3D(1.0f, 0.0f, 0.0f);
+const Vector3D Vector3D::Backward = Vector3D(0.0f, 0.0f, -1.0f);
+const Vector3D Vector3D::Down     = Vector3D(0.0f, -1.0f, 0.0f);
+const Vector3D Vector3D::Left     = Vector3D(-1.0f, 0.0f, 0.0f);

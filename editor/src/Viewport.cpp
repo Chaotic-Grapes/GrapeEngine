@@ -25,7 +25,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include "CameraFrustumRenderer.h"
 #include "EditorGizmo.h"
 #include "SelectionOutlineRenderer.h"
-#include "graphics/EditorCamera.hpp"
+#include "EditorCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -34,7 +34,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include "services/Input.h"
 #include <imgui.h>
 #include <algorithm>
-#include "editor/services/OverlayService.h"
+#include "services/EditorService.h"
 #include "core/Application.h"
 #include "scene/Scene.h"
 #include <filesystem>
@@ -83,9 +83,9 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
         m_sceneModifiedSubscription = Messaging::MessageSystem::Subscribe<Messaging::SceneModified>(
             [this](const Messaging::SceneModified& e) {
                 (void)e; // May use e.Reason for logging
-                m_fileMenu->SetSceneDirty();
+				m_fileMenu->MarkSceneDirty();
             }
-        )
+        );
     }
 }
 
@@ -156,8 +156,8 @@ void Viewport::_renderViewport() {
 
     auto* rendererSystem = _getRendererSystem();
     if (rendererSystem) {
-        auto size = ImGui::GetContentRegionAvail();
-        auto pos = ImGui::GetCursorScreenPos();
+        const auto size = ImGui::GetContentRegionAvail();
+        const auto pos = ImGui::GetCursorScreenPos();
 
         m_sceneDrawPos = pos;
         m_sceneDrawSize = size;
@@ -188,9 +188,9 @@ void Viewport::_renderViewport() {
             // pass then blits LDR to the real backbuffer. Sampling "LDR" here ensures the
             // Editor viewport shows the same tone-mapped, gamma-correct image the game
             // actually outputs.
-            uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
+            const uint32_t textureId = acc.GetTexture("LDR");
             if (textureId > 0) {
-                ImGui::Image((void*)(intptr_t)textureId, size, ImVec2(0, 1), ImVec2(1, 0));
+                ImGui::Image(textureId, size, ImVec2(0, 1), ImVec2(1, 0));
             }
 
             // 1. Get the drawing position of the image we just rendered
@@ -207,7 +207,7 @@ void Viewport::_renderViewport() {
                 if (camera) {
                     glm::mat4 view = camera->GetViewMatrix();
                     glm::mat4 proj = camera->GetProjectionMatrix();
-                    glm::mat4 viewProj = proj * view;
+                    const glm::mat4 viewProj = proj * view;
 
                     // Draw wireframe outline around selected entity
                     Editor::SelectionOutlineRenderer::RenderOutline(
@@ -272,7 +272,7 @@ void Viewport::_renderViewport() {
     bool hasActiveCamera = false;
     int cameraCount = 0;
     if (m_world) {
-        m_world->Each<ECS::Components::Camera3D>([&](ECS::Entity e, ECS::Components::Camera3D& cam) {
+        m_world->Each<ECS::Components::Camera3D>([&](const ECS::Entity e, const ECS::Components::Camera3D& cam) {
             (void)e;
 
             hasCameraComponent = true;
@@ -283,7 +283,7 @@ void Viewport::_renderViewport() {
         });
     }
 
-    if (!m_gameRendererSystem) {
+    if (!rendererSystem) {
         ImGui::TextDisabled("No game renderer not initialized");
     }
     else if (!hasCameraComponent) {
@@ -311,7 +311,7 @@ void Viewport::_renderViewport() {
                 case 6: targetRatio = 1.0f; break;           // 1:1
             }
             
-            float availableRatio = availableSize.x / availableSize.y;
+            const float availableRatio = availableSize.x / availableSize.y;
             
             if (availableRatio > targetRatio) {
                 // Available space is wider - constrain width
@@ -325,8 +325,8 @@ void Viewport::_renderViewport() {
             }
             
             // Center the viewport
-            float offsetX = (availableSize.x - displaySize.x) * 0.5f;
-            float offsetY = (availableSize.y - displaySize.y) * 0.5f;
+            const float offsetX = (availableSize.x - displaySize.x) * 0.5f;
+            const float offsetY = (availableSize.y - displaySize.y) * 0.5f;
             ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + offsetX, ImGui::GetCursorPosY() + offsetY));
         }
         
@@ -352,9 +352,9 @@ void Viewport::_renderViewport() {
         auto* rg = rendererSystem ? rendererSystem->GetRenderGraph() : nullptr;
         if (rg) {
             ResourceAccessor acc(rg);
-            uint32_t textureId = static_cast<uint32_t>(acc.GetTexture("LDR"));
+            const uint32_t textureId = acc.GetTexture("LDR");
             if (textureId > 0) {
-                ImGui::Image((void*)(intptr_t)textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
+                ImGui::Image(textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
             }
             else {
                 ImGui::TextDisabled("Texture ID is 0 - render graph issue");
@@ -368,22 +368,22 @@ void Viewport::_renderViewport() {
     ImGui::End();
 }
 
-void Viewport::FocusOnEntity(EntityId entityId) {
+void Viewport::FocusOnEntity(const EntityId entityId) {
     auto* rendererSystem = _getRendererSystem();
     if (!m_world || !rendererSystem) return;
 
-    ECS::Entity entity = m_world->Resolve(entityId);
+    const ECS::Entity entity = m_world->Resolve(entityId);
     if (!m_world->IsAlive(entity)) return;
 
     // Get entity position (use WorldTransform if available, else LocalTransform)
     Vector3D position;
     if (m_world->Has<ECS::Components::WorldTransform>(entity)) {
-        const auto& wt = m_world->Get<ECS::Components::WorldTransform>(entity);
+        const auto& [Matrix, Dirty] = m_world->Get<ECS::Components::WorldTransform>(entity);
         // Extract position from the translation column of the matrix
         // In a standard 4x4 transformation matrix, translation is in the last column
-        position.X = wt.Matrix.m03;
-        position.Y = wt.Matrix.m13;
-        position.Z = wt.Matrix.m23;
+        position.X = Matrix.m03;
+        position.Y = Matrix.m13;
+        position.Z = Matrix.m23;
     }
     else if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
         const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
@@ -424,14 +424,14 @@ void Viewport::SetFileMenu(EditorFileMenu* fileMenu) {
             [this](const Messaging::SceneModified& e) {
                 (void)e; // May use e.Reason for logging
                 if (m_fileMenu) {
-                    m_fileMenu->SetSceneDirty();
+                    m_fileMenu->MarkSceneDirty();
                 }
             }
         );
     }
 }
 
-void Viewport::SetSelectedEntity(EntityId id) {
+void Viewport::SetSelectedEntity(const EntityId id) {
     // Keep local state in sync
     m_selectedEntityId = id;
     
@@ -467,13 +467,13 @@ void Viewport::_renderCameraFrustum() {
         return;
     }
 
-    glm::mat4 view = cam->GetViewMatrix();
-    glm::mat4 projection = cam->GetProjectionMatrix();
-    glm::mat4 viewProj = projection * view;
+    const glm::mat4 view = cam->GetViewMatrix();
+    const glm::mat4 projection = cam->GetProjectionMatrix();
+    const glm::mat4 viewProj = projection * view;
 
     // Get window dimensions
     const auto& win = WindowManager::GetMainWindow();
-    float windowHeight = static_cast<float>(win->GetHeight());
+    const float windowHeight = static_cast<float>(win->GetHeight());
 
     // Get renderer and shader from renderer system
     Renderer* renderer = rendererSystem->GetRenderer();
@@ -501,13 +501,13 @@ void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewport
     if (!rendererSystem) return;
 
     // Get FPS data from Profiler
-    float currentFps = Profiler::GetFPS();
-    float frameTimeMs = Profiler::GetFrameTimeMs();
-    int flushCount = m_rendererSystem->GetFlushCount();
+    const float currentFps = Profiler::GetFPS();
+    const float frameTimeMs = Profiler::GetFrameTimeMs();
+    const int flushCount = rendererSystem->GetFlushCount();
 
     // Position overlay in top-left corner of viewport with padding
-    const float padding = 10.0f;
-    ImVec2 overlayPos(viewportPos.x + padding, viewportPos.y + padding);
+    constexpr float padding = 10.0f;
+    const ImVec2 overlayPos(viewportPos.x + padding, viewportPos.y + padding);
 
     // Setup overlay window
     ImGui::SetNextWindowPos(overlayPos, ImGuiCond_Always);
@@ -574,23 +574,23 @@ void Viewport::_handleEntityDragToMove() {
     if (!rendererSystem) return;
 
     // Get camera matrices for screen-to-world conversion
-    Engine::Camera* camera = m_editorCamera->GetCamera();
+    const Engine::Camera* camera = m_editorCamera->GetCamera();
     if (!camera) return;
 
-    glm::mat4 view = camera->GetViewMatrix();
-    glm::mat4 projection = camera->GetProjectionMatrix();
+    const glm::mat4 view = camera->GetViewMatrix();
+    const glm::mat4 projection = camera->GetProjectionMatrix();
 
     // Get mouse state
     glm::dvec2 mousePos;
     Input::GetMousePosition(mousePos.x, mousePos.y);
     
-    bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
-    bool mouseJustPressed = isMouseDownThisFrame && !m_wasMouseDownLastFrame;
+    const bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
+    const bool mouseJustPressed = isMouseDownThisFrame && !m_wasMouseDownLastFrame;
 
     // Convert screen to world coordinates
-    auto ScreenToWorld = [&](const glm::dvec2& screenPos) -> glm::vec2 {
+    const auto screenToWorld = [&](const glm::dvec2& screenPos) -> glm::vec2 {
         // Convert to viewport-local coordinates
-        glm::vec2 localPos = glm::vec2(screenPos.x - m_sceneDrawPos.x, screenPos.y - m_sceneDrawPos.y);
+        const auto localPos = glm::vec2(screenPos.x - m_sceneDrawPos.x, screenPos.y - m_sceneDrawPos.y);
 
         // Normalize device coordinates (-1 to 1)
         glm::vec4 ndc;
@@ -600,24 +600,23 @@ void Viewport::_handleEntityDragToMove() {
         ndc.w = 1.0f;
 
         // Inverse projection and view
-        glm::mat4 invViewProj = glm::inverse(projection * view);
+        const glm::mat4 invViewProj = glm::inverse(projection * view);
         glm::vec4 worldPos = invViewProj * ndc;
 
-        return glm::vec2(worldPos.x, worldPos.y);
+        return {worldPos.x, worldPos.y};
     };
 
-    glm::vec2 mouseWorld = ScreenToWorld(mousePos);
+    glm::vec2 mouseWorld = screenToWorld(mousePos);
 
     // Check if selection changed (from hierarchy or inspector)
-    bool selectionChanged = (m_selectedEntityId != m_lastSelectedEntityID);
-    if (selectionChanged) {
+    if (m_selectedEntityId != m_lastSelectedEntityID) {
         m_isDragging = false;
         m_lastSelectedEntityID = m_selectedEntityId;
     }
 
     // Start drag on mouse press
     if (mouseJustPressed && !m_isDragging) {
-        m_world->Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+        m_world->Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, const ECS::Components::LocalTransform& lt) {
             if (e.Index == m_selectedEntityId) {
                 m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
                 m_dragStartEntityRot = lt.Rotation;
@@ -629,9 +628,8 @@ void Viewport::_handleEntityDragToMove() {
 
     // Check for drag threshold (5 pixels in world space)
     if (isMouseDownThisFrame && !m_isDragging) {
-        glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
-        float dragDistance = glm::length(dragDelta);
-
+        const glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
+        const float dragDistance = glm::length(dragDelta);
         const float dragThreshold = (camera->OrthoSize / m_sceneDrawSize.y) * 5.0f;
 
         if (dragDistance > dragThreshold) {
@@ -642,9 +640,9 @@ void Viewport::_handleEntityDragToMove() {
 
     // Update entity position while dragging
     if (m_isDragging && isMouseDownThisFrame) {
-        glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
+        const glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
 
-        m_world->Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+        m_world->Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, ECS::Components::LocalTransform& lt) {
             if (e.Index == m_selectedEntityId) {
                 lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
                 lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
@@ -659,10 +657,10 @@ void Viewport::_handleEntityDragToMove() {
 
     // End drag and create undo command
     if (m_isDragging && !isMouseDownThisFrame) {
-        m_world->Each<Components::LocalTransform>([&](Entity e, Components::LocalTransform& lt) {
+        m_world->Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, const ECS::Components::LocalTransform& lt) {
             if (e.Index == m_selectedEntityId) {
-                Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
-                Vector3D newPos = lt.Position;
+                const Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
+                const Vector3D newPos = lt.Position;
 
                 // Only notify if position actually changed
                 if (oldPos != newPos) {

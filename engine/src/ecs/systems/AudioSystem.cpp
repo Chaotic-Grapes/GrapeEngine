@@ -249,7 +249,10 @@ void AudioSystem::OnUpdate(World& world, float /*dt*/)
                 // Update 3D position if spatial audio is enabled
                 if (src.Spatial3D && world.Has<Components::WorldTransform>(e)) {
                     auto& transform = world.Get<Components::WorldTransform>(e);
-                    Audio::Vec3 pos{ transform.Position.x, transform.Position.y, transform.Position.z };
+                    // Extract translation from Matrix4x4: translation is stored in the
+                    // last column (m03, m13, m23) per Matrix4x4::Translation implementation.
+                    const auto& m = transform.Matrix;
+                    Audio::Vec3 pos{ m.m03, m.m13, m.m23 };
                     Audio::Vec3 vel{ 0, 0, 0 };
                     device->SetInstancePosition(handle, pos, vel);
                 }
@@ -280,10 +283,10 @@ void AudioSystem::OnDestroy(World& world) {
 
 SystemMetadata AudioSystem::GetMetadata() const {
     SystemMetadata metadata;
-    metadata.name = "Audio";
-    metadata.readComponents = {};  // Reads AudioSource, WorldTransform
-    metadata.writeComponents = {}; // Doesn't write components
-    metadata.executionOrder = 50;  // Run after gameplay logic
+    metadata.Name = "Audio";
+    metadata.ReadComponents = {};  // Reads AudioSource, WorldTransform
+    metadata.WriteComponents = {}; // Doesn't write components
+    metadata.ExecutionOrder = 50;  // Run after gameplay logic
     return metadata;
 }
 

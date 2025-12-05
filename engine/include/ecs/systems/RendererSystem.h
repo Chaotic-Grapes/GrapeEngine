@@ -21,6 +21,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef RENDERERSYSTEM_H
 #define RENDERERSYSTEM_H
 
+#include "Export.h"
 #include "ecs/ISystem.h"
 #include "ecs/World.h"
 #include "Color.h"
@@ -42,7 +43,7 @@ namespace ECS {
      * @brief System for managing 2D rendering
      * Executes in Render phase with executionOrder=0
      */
-    class RendererSystem : public ISystem {
+    class GRAPEENGINE_API RendererSystem : public ISystem {
     public:
         RendererSystem() = default;
         ~RendererSystem() override = default;

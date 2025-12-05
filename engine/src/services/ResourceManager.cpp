@@ -68,11 +68,11 @@ std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
     return resource;
 }
 
-// Explicit instantiations
+// Explicit instantiations with export declarations
 // When other files call RM.Get<T>(), the linker can find them
-template std::shared_ptr<Texture> ResourceManager::Get<Texture>(const std::string&);
-template std::shared_ptr<AudioData> ResourceManager::Get<AudioData>(const std::string&);
-template std::shared_ptr<Font> ResourceManager::Get<Font>(const std::string&);
+template GRAPEENGINE_API std::shared_ptr<Texture> ResourceManager::Get<Texture>(const std::string&);
+template GRAPEENGINE_API std::shared_ptr<AudioData> ResourceManager::Get<AudioData>(const std::string&);
+template GRAPEENGINE_API std::shared_ptr<Font> ResourceManager::Get<Font>(const std::string&);
 
 // Loading function for textures
 template<>

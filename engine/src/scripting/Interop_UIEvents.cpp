@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file   WorldInterop_UIEvents.cpp
+\file   Interop_UIEvents.cpp
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \brief
@@ -13,21 +13,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+#ifndef BUILDING_INTEROP
+#define BUILDING_INTEROP
+#endif
+
+#include "Export.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "helpers/EntityUtils.h"
 #include "core/Logger.h"
-
-// Export macro for C API
-#ifdef _WIN32
-    #ifdef BUILDING_WORLD_INTEROP
-        #define WORLD_INTEROP_API extern "C" __declspec(dllexport)
-    #else
-        #define WORLD_INTEROP_API extern "C" __declspec(dllimport)
-    #endif
-#else
-    #define WORLD_INTEROP_API extern "C"
-#endif
 
 // ============================================================================
 // UI Events API
@@ -36,7 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /// <summary>
 /// Clear all UI events (called at start of frame)
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_UIEvents_Clear(void* worldPtr) {
+INTEROP_API void WorldInterop_UIEvents_Clear(void* worldPtr) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return;
@@ -49,7 +43,7 @@ WORLD_INTEROP_API void WorldInterop_UIEvents_Clear(void* worldPtr) {
 /// <summary>
 /// Check if an entity was clicked this frame
 /// </summary>
-WORLD_INTEROP_API bool WorldInterop_UIEvents_WasClicked(void* worldPtr, uint64_t entityId, int button) {
+INTEROP_API bool WorldInterop_UIEvents_WasClicked(void* worldPtr, uint64_t entityId, int button) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return false;
@@ -70,7 +64,7 @@ WORLD_INTEROP_API bool WorldInterop_UIEvents_WasClicked(void* worldPtr, uint64_t
 /// <summary>
 /// Check if an entity had hover enter this frame
 /// </summary>
-WORLD_INTEROP_API bool WorldInterop_UIEvents_WasHoverEntered(void* worldPtr, uint64_t entityId) {
+INTEROP_API bool WorldInterop_UIEvents_WasHoverEntered(void* worldPtr, uint64_t entityId) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return false;
@@ -90,7 +84,7 @@ WORLD_INTEROP_API bool WorldInterop_UIEvents_WasHoverEntered(void* worldPtr, uin
 /// <summary>
 /// Check if an entity had hover exit this frame
 /// </summary>
-WORLD_INTEROP_API bool WorldInterop_UIEvents_WasHoverExited(void* worldPtr, uint64_t entityId) {
+INTEROP_API bool WorldInterop_UIEvents_WasHoverExited(void* worldPtr, uint64_t entityId) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return false;
@@ -110,7 +104,7 @@ WORLD_INTEROP_API bool WorldInterop_UIEvents_WasHoverExited(void* worldPtr, uint
 /// <summary>
 /// Get the number of UI events this frame
 /// </summary>
-WORLD_INTEROP_API int WorldInterop_UIEvents_GetEventCount(void* worldPtr) {
+INTEROP_API int WorldInterop_UIEvents_GetEventCount(void* worldPtr) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return 0;
@@ -123,7 +117,7 @@ WORLD_INTEROP_API int WorldInterop_UIEvents_GetEventCount(void* worldPtr) {
 /// <summary>
 /// Get a UI event by index
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_UIEvents_GetEvent(void* worldPtr, int index, uint64_t* outEntityId, int* outEventType) {
+INTEROP_API void WorldInterop_UIEvents_GetEvent(void* worldPtr, int index, uint64_t* outEntityId, int* outEventType) {
     if (!worldPtr || !outEntityId || !outEventType) {
         LOG_ERROR("[WorldInterop] Invalid parameters");
         return;
@@ -137,7 +131,7 @@ WORLD_INTEROP_API void WorldInterop_UIEvents_GetEvent(void* worldPtr, int index,
 /// <summary>
 /// Get the entity currently being hovered
 /// </summary>
-WORLD_INTEROP_API uint64_t WorldInterop_UIEvents_GetHoveredEntity(void* worldPtr) {
+INTEROP_API uint64_t WorldInterop_UIEvents_GetHoveredEntity(void* worldPtr) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return 0;
@@ -150,7 +144,7 @@ WORLD_INTEROP_API uint64_t WorldInterop_UIEvents_GetHoveredEntity(void* worldPtr
 /// <summary>
 /// Check if the mouse is over any UI element
 /// </summary>
-WORLD_INTEROP_API bool WorldInterop_UIEvents_IsMouseOverUI(void* worldPtr) {
+INTEROP_API bool WorldInterop_UIEvents_IsMouseOverUI(void* worldPtr) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return false;

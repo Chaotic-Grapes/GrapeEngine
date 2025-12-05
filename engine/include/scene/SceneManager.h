@@ -33,13 +33,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 
-#include "ecs/systems/RendererSystem.h"
-#include "ecs/systems/PhysicsSystem.h"
-#include "ecs/systems/LifetimeSystem.h"
-#include "ecs/systems/AnimationSystem.h"
-#include "ecs/systems/ScriptSystem.h"
-#include "ecs/systems/UISystem.h"
-
 using json = nlohmann::json;
 
 namespace Scenes {
@@ -169,9 +162,6 @@ namespace Scenes {
          */
         void Update() {
             _processPending();
-            if (m_active != NPOS) {
-                _updateScene(*m_scenes[m_active], Time::DeltaTime());
-            }
         }
 
 		// ************************************** SCENE SERIALIZATION ************************************** //

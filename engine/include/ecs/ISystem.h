@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef ISYSTEM_H
 #define ISYSTEM_H
 
+#include "Export.h"
 #include "ecs/World.h"
 #include <string>
 #include <vector>
@@ -43,11 +44,11 @@ namespace ECS {
      * @brief Metadata describing a system's component dependencies
      */
     struct SystemMetadata {
-        std::string name;                                   // System name (e.g., "Physics", "Animation")
-        std::vector<ComponentTypeId> readComponents;        // Components this system reads
-        std::vector<ComponentTypeId> writeComponents;       // Components this system writes
-        int executionOrder = 0;                             // Execution priority (lower = earlier)
-        bool enabled = true;                                // Whether system is currently active
+        std::string Name;                                   // System name (e.g., "Physics", "Animation")
+        std::vector<ComponentTypeId> ReadComponents;        // Components this system reads
+        std::vector<ComponentTypeId> WriteComponents;       // Components this system writes
+        int ExecutionOrder = 0;                             // Execution priority (lower = earlier)
+        bool Enabled = true;                                // Whether system is currently active
     };
 
     /**
@@ -111,7 +112,7 @@ namespace ECS {
      * };
      * @endcode
      */
-    class ISystem {
+    class GRAPEENGINE_API ISystem {
     public:
         virtual ~ISystem() = default;
 
@@ -163,14 +164,14 @@ namespace ECS {
 
         /**
          * @brief Get system metadata (name, dependencies, execution order).
-         * @return Const reference to SystemMetadata
+         * @return SystemMetadata by value
          * 
          * This is queried by the SystemManager to:
          * - Sort systems by execution order
          * - Detect read/write conflicts
          * - Display system information in profiler
          */
-        virtual const SystemMetadata& GetMetadata() const = 0;
+        virtual SystemMetadata GetMetadata() const = 0;
 
         /**
          * @brief Get the system group this system belongs to.

@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef EDITORCALLBACKS_H
 #define EDITORCALLBACKS_H
 
+#include "Export.h"
 #include <functional>
 #include <memory>
 #include <string>
@@ -122,7 +123,7 @@ namespace Engine {
      * 
      * Thread-safe: All callbacks are invoked from the main engine thread.
      */
-    class EditorCallbackRegistry {
+    class GRAPEENGINE_API EditorCallbackRegistry {
     public:
         // Singleton access
         static EditorCallbackRegistry& Get();

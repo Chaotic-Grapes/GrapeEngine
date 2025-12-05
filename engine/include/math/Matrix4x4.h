@@ -1,9 +1,10 @@
 #pragma once
 #include <cmath>  // For trigonometric or arithmetic operations
-#include "Math/Vector3D.h"
-#include "Math/Vector4D.h"
+#include "math/Vector3D.h"
+#include "math/Vector4D.h"
+#include "Export.h"
 
-class Matrix4x4 {
+class GRAPEENGINE_API Matrix4x4 {
 public:
 	float m00, m01, m02, m03;
 	float m10, m11, m12, m13;
@@ -50,18 +51,18 @@ public:
 };
 
 // Binary operators (non-member functions)
-Matrix4x4 operator+(const Matrix4x4& a, const Matrix4x4& b);
-Matrix4x4 operator-(const Matrix4x4& a, const Matrix4x4& b);
-Matrix4x4 operator*(const Matrix4x4& matrix, float scalar);
-Matrix4x4 operator*(float scalar, const Matrix4x4& matrix);
-Matrix4x4 operator*(const Matrix4x4& a, const Matrix4x4& b);
+GRAPEENGINE_API Matrix4x4 operator+(const Matrix4x4& a, const Matrix4x4& b);
+GRAPEENGINE_API Matrix4x4 operator-(const Matrix4x4& a, const Matrix4x4& b);
+GRAPEENGINE_API Matrix4x4 operator*(const Matrix4x4& matrix, float scalar);
+GRAPEENGINE_API Matrix4x4 operator*(float scalar, const Matrix4x4& matrix);
+GRAPEENGINE_API Matrix4x4 operator*(const Matrix4x4& a, const Matrix4x4& b);
 
 // Vector transformations
-Vector3D operator*(const Matrix4x4& a, const Vector3D& b);
-Vector4D operator*(const Matrix4x4& a, const Vector4D& b);
+GRAPEENGINE_API Vector3D operator*(const Matrix4x4& a, const Vector3D& b);
+GRAPEENGINE_API Vector4D operator*(const Matrix4x4& a, const Vector4D& b);
 
-Matrix4x4 operator/(const Matrix4x4& matrix, float scalar);
-bool operator==(const Matrix4x4& a, const Matrix4x4& b);
+GRAPEENGINE_API Matrix4x4 operator/(const Matrix4x4& matrix, float scalar);
+GRAPEENGINE_API bool operator==(const Matrix4x4& a, const Matrix4x4& b);
 bool operator!=(const Matrix4x4& a, const Matrix4x4& b);
 
 // Constants

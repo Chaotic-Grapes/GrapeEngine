@@ -169,7 +169,7 @@ private:
 
     // Asset browsing state
     AssetLibrary m_assetLibrary;
-    std::string m_currentPath = "";
+    std::string m_currentPath;
     std::string m_selectedAsset;
     std::unordered_set<std::string> m_selectedAssets;  // Multi-selection support
     std::string m_anchorAsset;  // For shift-selection
@@ -183,12 +183,11 @@ private:
     float m_statusTimer = 0.0f;
 
     // Context menu state
-    bool m_showContextMenu = false;
     bool m_openCreateDialog = false;
     char m_newAssetNameBuffer[128] = "";
     bool m_focusNameInput = false;
-    enum class AssetCreationType { None, Script, Scene, Folder };
-    AssetCreationType m_creationType = AssetCreationType::None;
+    enum class AssetCreationType : uint8_t { NONE, SCRIPT, SCENE, FOLDER };
+    AssetCreationType m_creationType = AssetCreationType::NONE;
 
     // Rename state
     std::string m_renamingAsset;

@@ -50,7 +50,7 @@ public:
     LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene);
     ~LevelEditor();
 
-    void Initialize(GLFWwindow* pWin);
+    void Initialize(const GLFWwindow* pWin);
     void Update();
     void Render();
     void SetWorld(ECS::World* world);
@@ -65,9 +65,9 @@ public:
 private:
     // Panel registration system
     void _registerPanel(const char* panelName,
-        std::function<void()> initFn,
-        std::function<void()> renderFn,
-        std::function<void(ECS::World*)> setWorldFn);
+        const std::function<void()>& initFn,
+        const std::function<void()>& renderFn,
+        const std::function<void(ECS::World*)>& setWorldFn);
     void _initializePanels();
     void _renderPanels();
     void _updatePanelWorlds(ECS::World* world);

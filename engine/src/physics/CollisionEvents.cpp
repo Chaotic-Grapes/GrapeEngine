@@ -11,7 +11,7 @@
  * events each frame) and gameplay scripts (which query events to implement
  * custom collision responses).
  */
-#include "../engine/physics/CollisionEvents.h"
+#include "physics/CollisionEvents.h"
 
 namespace ECS {
 

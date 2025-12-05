@@ -33,10 +33,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 ********************************************************************************/
 
 #pragma once
+#include "Export.h"
 #include <glad/glad.h>
 #include <string>
 
-class Texture {
+class GRAPEENGINE_API Texture {
 public:
     Texture() : m_id(0), m_width(0), m_height(0), m_channels(0) {}
 

@@ -1,7 +1,8 @@
 #pragma once
-#include "Math/Vector3D.h"
+#include "math/Vector3D.h"
+#include "Export.h"
 
-class Vector4D {
+class GRAPEENGINE_API Vector4D {
 public:
     float X, Y, Z, W;
 
@@ -53,6 +54,3 @@ Vector4D operator*(float scalar, const Vector4D& vector);
 Vector4D operator/(const Vector4D& vector, float scalar);
 bool operator==(const Vector4D& a, const Vector4D& b);
 bool operator!=(const Vector4D& a, const Vector4D& b);
-
-// Static member definitions
-inline const Vector4D Vector4D::Zero = Vector4D(0.0f, 0.0f, 0.0f, 0.0f);

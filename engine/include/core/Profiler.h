@@ -1,6 +1,7 @@
 #ifndef PROFILER_H
 #define PROFILER_H
 
+#include "Export.h"
 #include <iostream>
 #include <string>
 #include <map>
@@ -19,7 +20,7 @@ struct ScopeData {
     float MaxTimeMs = 0.0f;
 };
 
-class Profiler {
+class GRAPEENGINE_API Profiler {
 public:
 
     // Define the map type for clarity

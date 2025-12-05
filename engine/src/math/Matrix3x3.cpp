@@ -1,4 +1,4 @@
-#include "Math/Matrix3x3.h"
+#include "math/Matrix3x3.h"
 
 // Constructors
 Matrix3x3::Matrix3x3() : 

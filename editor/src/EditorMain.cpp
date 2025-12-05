@@ -16,8 +16,8 @@ Launches the application in editor mode with the level editor interface.
 #include "core/ProjectPaths.h"
 #include "Game.h"
 #include "services/WindowManager.h"
-#include "editor/services/OverlayService.h"
-#include "editor/EditorConfiguration.h"
+#include "services/EditorService.h"
+#include "EditorConfiguration.h"
 #include "core/Logger.h"
 #include "physics/Physics.h"
 
@@ -79,19 +79,37 @@ public:
         window->SetMaximized(m_editorSettings.WindowSettings.Maximized);
         
         // Enable level editor without a scene (scene-less editor mode)
-        if (auto* overlay = Services::OverlayService::Get()) {
-            overlay->EnableLevelEditorForScene(nullptr);
+        auto* editorService = Services::EditorService::Get();
+        if (editorService) {
+            editorService->EnableLevelEditorForScene(nullptr);
             LOG_INFO("Level Editor initialized successfully");
+            
+            // Connect editor callbacks to engine for play/pause/step control
+            Engine::CORE->SetGameLogicCallback([editorService]() {
+                return editorService->IsGamePlaying();
+            });
+            
+            Engine::CORE->SetStepRequestCallback([editorService]() {
+                bool stepRequested = editorService->IsStepRequested();
+                if (stepRequested) {
+                    editorService->ClearStepRequest();
+                }
+                return stepRequested;
+            });
         }
         else {
-            LOG_ERROR("Failed to initialize Level Editor: OverlayService not available");
+            LOG_ERROR("Failed to initialize Level Editor: EditorService not available");
         }
     }
 
     void OnUpdate(Scenes::SceneManager& sceneManager) override {
         (void)sceneManager;
-        // Editor updates are handled by the overlay service
-
+        
+        // Update and render editor UI
+        if (auto* editorService = Services::EditorService::Get()) {
+            editorService->Update();
+            editorService->Render();
+        }
     }
 
     void OnShutdown(Scenes::SceneManager& sceneManager) override {

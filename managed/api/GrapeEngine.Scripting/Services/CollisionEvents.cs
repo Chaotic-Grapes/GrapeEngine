@@ -90,7 +90,7 @@ public static class CollisionEvents
     /// </summary>
     public static unsafe void Clear(World world)
     {
-        WorldInteropAPI.Collision_Clear(world.NativePtr);
+        CollisionAPI.Clear(world.NativePtr);
     }
 
     /// <summary>
@@ -98,7 +98,7 @@ public static class CollisionEvents
     /// </summary>
     public static unsafe int GetEventCount(World world, Entity entity)
     {
-        return (int)WorldInteropAPI.Collision_GetEventCount(world.NativePtr, entity.EntityId);
+        return (int)CollisionAPI.GetEventCount(world.NativePtr, entity.EntityId);
     }
 
     /// <summary>
@@ -109,7 +109,7 @@ public static class CollisionEvents
         ulong otherEntityId;
         int eventType;
         
-        bool success = WorldInteropAPI.Collision_GetEvent(
+        bool success = CollisionAPI.GetEvent(
             world.NativePtr,
             entity.EntityId,
             (uint)index,
@@ -128,7 +128,7 @@ public static class CollisionEvents
     public static unsafe List<CollisionEvent> GetEvents(World world, Entity entity)
     {
         var events = new List<CollisionEvent>();
-        uint count = WorldInteropAPI.Collision_GetEventCount(world.NativePtr, entity.EntityId);
+        uint count = CollisionAPI.GetEventCount(world.NativePtr, entity.EntityId);
 
         if (count == 0)
             return events;
@@ -146,7 +146,7 @@ public static class CollisionEvents
             fixed (ulong* otherPtr = otherEntityIds)
             fixed (int* typePtr = eventTypes)
             {
-                WorldInteropAPI.Collision_GetEventsBulk(
+                CollisionAPI.GetEventsBulk(
                     world.NativePtr,
                     entity.EntityId,
                     otherPtr,
@@ -172,7 +172,7 @@ public static class CollisionEvents
                 fixed (ulong* otherPtr = otherEntityIds)
                 fixed (int* typePtr = eventTypes)
                 {
-                    WorldInteropAPI.Collision_GetEventsBulk(
+                    CollisionAPI.GetEventsBulk(
                         world.NativePtr,
                         entity.EntityId,
                         otherPtr,
@@ -201,7 +201,7 @@ public static class CollisionEvents
     /// </summary>
     public static unsafe bool HasCollisionWith(World world, Entity entity, Entity other)
     {
-        return WorldInteropAPI.Collision_HasCollisionWith(world.NativePtr, entity.EntityId, other.EntityId);
+        return CollisionAPI.HasCollisionWith(world.NativePtr, entity.EntityId, other.EntityId);
     }
 
     /// <summary>
@@ -210,7 +210,7 @@ public static class CollisionEvents
     /// </summary>
     public static unsafe CollisionEventType? GetCollisionType(World world, Entity entity, Entity other)
     {
-        int type = WorldInteropAPI.Collision_GetCollisionType(world.NativePtr, entity.EntityId, other.EntityId);
+        int type = CollisionAPI.GetCollisionType(world.NativePtr, entity.EntityId, other.EntityId);
         
         if (type < 0)
             return null;

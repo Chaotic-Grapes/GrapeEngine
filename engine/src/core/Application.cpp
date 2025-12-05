@@ -125,7 +125,7 @@ namespace Engine {
             
             if (currentScene) {
                 const bool shouldRun = _shouldRunGameLogic();
-                const bool stepRequested = (m_overlay && m_overlay->IsStepRequested());
+                const bool stepRequested = (m_stepRequestCallback && m_stepRequestCallback());
                 auto& world = currentScene->GetWorld();
 
                 // Handle game state transitions (start/stop)
@@ -147,9 +147,8 @@ namespace Engine {
 
                 ECS::UIEventSystem::Update(&world, pickedEntityID, mousePos);
 
-                // Update physics and scripts
+                // Update physics
                 _updatePhysics(world, shouldRun, stepRequested);
-                _updateScripts(world, shouldRun);
                 
                 // Update all systems - they control their own run mode behavior
                 const float dt = static_cast<float>(Time::DeltaTime());
@@ -158,11 +157,6 @@ namespace Engine {
             
             // Game-level update hook
             game.OnUpdate(m_sceneManager);
-
-            // --- Update Overlay Service ---
-            // This here because it depends on current scene
-			m_overlay->Update();
-            m_overlay->Render();
 
             // --- Rendering ---
             for (const auto* win : WindowManager::GetWindows()) {
@@ -194,7 +188,6 @@ namespace Engine {
             m_scriptManager = nullptr;
         }
         delete m_audio;
-        delete m_overlay;
 
         WindowManager::DestroyAll();
     }
@@ -252,15 +245,15 @@ namespace Engine {
 
         // Initialize C# scripting via ScriptManager
         m_scriptManager = new ECS::ScriptManager();
-        if (!m_scriptManager->InitializeCLR("GrapeEngine.ScriptAPI.runtimeconfig.json")) {
+        if (!m_scriptManager->InitializeCLR("GrapeEngine.Scripting.runtimeconfig.json")) {
             LOG_WARNING("Failed to initialize ScriptManager/CLR");
         }
         else {
             LOG_INFO("ScriptManager initialized successfully");
             
             // Load the script API assembly
-            if (!m_scriptManager->LoadAssembly("GrapeEngine.ScriptAPI.dll")) {
-                LOG_WARNING("Failed to load ScriptAPI assembly");
+            if (!m_scriptManager->LoadAssembly("GrapeEngine.Scripting.dll")) {
+                LOG_WARNING("Failed to load Scripting assembly");
             }
             else {
                 LOG_INFO("Scripting assembly loaded");
@@ -318,17 +311,10 @@ namespace Engine {
 
         m_accumulator = 0.0f; // Reset accumulator on stop
 
-        auto* world = &scene->GetWorld();
         auto* audioSystem = m_systemManager.GetSystem<ECS::AudioSystem>();
         if (audioSystem) {
             audioSystem->OnSceneStop();
             LOG_DEBUG("AudioSystem: Notified of scene stop");
-        }
-
-        // Cleanup scripts when game stops
-        if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
-            ECS::ScriptSystem::OnDestroy(*world);
-            LOG_DEBUG("ScriptSystem: Cleaned up scripts");
         }
     }
    
@@ -380,17 +366,12 @@ namespace Engine {
                 m_accumulator = maxAccumulator;
 
             while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
-                // Run script FixedUpdate during physics step
-                if (m_scriptSystem && m_scriptSystem->IsInitialized()) {
-                    ECS::ScriptSystem::FixedUpdate(world);
-                }
-                
                 m_accumulator -= Time::UnscaledFixedDeltaTime();
             }
         }
-        // Editor-only: Single step when paused
+        // Editor-only: Single step when paused (callback already consumed the flag)
         else if (stepRequested) {
-            if (m_overlay) m_overlay->ClearStepRequest();
+            // Step request was already handled/cleared by callback
         }
     }
 

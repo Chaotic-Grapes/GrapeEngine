@@ -24,6 +24,7 @@ and textures from within a render pass.
 /* End Header *******************************************************************/
 
 #pragma once
+#include "Export.h"
 #include <functional>
 #include <string>
 #include <vector>
@@ -39,7 +40,7 @@ class RenderGraph; // forward declaration
 
 // Provides access to framebuffer resources managed by the RenderGraph.
 // Used inside render pass callbacks to fetch textures or FBOs.
-class ResourceAccessor {
+class GRAPEENGINE_API ResourceAccessor {
 public:
     // ============================================================================
     // Constructs the accessor and binds it to a RenderGraph instance.
@@ -52,7 +53,7 @@ public:
     Framebuffer* GetFramebuffer(const std::string& name);
 
     // ============================================================================
-    // Returns the OpenGL texture ID of the framebuffer’s first color attachment.
+    // Returns the OpenGL texture ID of the framebufferï¿½s first color attachment.
     // ============================================================================
     GLuint GetTexture(const std::string& name);
 
@@ -64,7 +65,7 @@ private:
 // Manages framebuffer resources and orchestrates ordered rendering passes.
 // Each pass defines which textures it reads from and writes to, allowing
 // clear, data-driven control over the render pipeline.
-class RenderGraph {
+class GRAPEENGINE_API RenderGraph {
 public:
     // ----------------------------------------------------------------------------
     // Describes the properties of a texture or render target.
@@ -79,6 +80,14 @@ public:
 
     RenderGraph() = default;
     ~RenderGraph() = default;
+
+    // Delete copy operations (contains unique_ptr)
+    RenderGraph(const RenderGraph&) = delete;
+    RenderGraph& operator=(const RenderGraph&) = delete;
+
+    // Allow move operations
+    RenderGraph(RenderGraph&&) noexcept = default;
+    RenderGraph& operator=(RenderGraph&&) noexcept = default;
 
     // ============================================================================
     // Creates a framebuffer resource and registers it with the RenderGraph.
@@ -122,6 +131,17 @@ private:
         std::string name;
         TextureDesc desc;
         std::unique_ptr<Framebuffer> fbo;
+
+        // Default constructor
+        Resource() = default;
+
+        // Move constructor and assignment (required for unique_ptr)
+        Resource(Resource&&) noexcept = default;
+        Resource& operator=(Resource&&) noexcept = default;
+
+        // Delete copy operations
+        Resource(const Resource&) = delete;
+        Resource& operator=(const Resource&) = delete;
     };
 
     // ----------------------------------------------------------------------------

@@ -30,7 +30,7 @@ namespace ECS {
         // ISystem interface
         void OnCreate(World& world) override {}
         void OnUpdate(World& world, float dt) override;
-        void OnDestroy(World& world) override {}
+        void OnDestroy(World& world) override;
         
         SystemMetadata GetMetadata() const override;
         SystemGroup GetSystemGroup() const override { return SystemGroup::Physics; }

@@ -27,7 +27,7 @@ public static class Physics
     /// </summary>
     public static unsafe void SetGravity(World world, Vector2 gravity)
     {
-        WorldInteropAPI.Physics_SetGravity(world.NativePtr, gravity.X, gravity.Y);
+        PhysicsAPI.SetGravity(world.NativePtr, gravity.X, gravity.Y);
     }
 
     /// <summary>
@@ -36,7 +36,7 @@ public static class Physics
     public static unsafe Vector2 GetGravity(World world)
     {
         float x, y;
-        WorldInteropAPI.Physics_GetGravity(world.NativePtr, &x, &y);
+        PhysicsAPI.GetGravity(world.NativePtr, &x, &y);
         return new Vector2(x, y);
     }
 
@@ -45,7 +45,7 @@ public static class Physics
     /// </summary>
     public static unsafe void SetEnabled(World world, bool enabled)
     {
-        WorldInteropAPI.Physics_SetEnabled(world.NativePtr, enabled);
+        PhysicsAPI.SetEnabled(world.NativePtr, enabled);
     }
 
     /// <summary>
@@ -53,7 +53,7 @@ public static class Physics
     /// </summary>
     public static unsafe bool IsEnabled(World world)
     {
-        return WorldInteropAPI.Physics_IsEnabled(world.NativePtr);
+        return PhysicsAPI.IsEnabled(world.NativePtr);
     }
 
     /// <summary>
@@ -61,7 +61,7 @@ public static class Physics
     /// </summary>
     public static unsafe void ApplyForce(World world, Entity entity, Vector2 force)
     {
-        WorldInteropAPI.Physics_ApplyForce(world.NativePtr, entity.Id, force.X, force.Y);
+        PhysicsAPI.ApplyForce(world.NativePtr, entity.Id, force.X, force.Y);
     }
 
     /// <summary>
@@ -69,7 +69,7 @@ public static class Physics
     /// </summary>
     public static unsafe void ApplyImpulse(World world, Entity entity, Vector2 impulse)
     {
-        WorldInteropAPI.Physics_ApplyImpulse(world.NativePtr, entity.Id, impulse.X, impulse.Y);
+        PhysicsAPI.ApplyImpulse(world.NativePtr, entity.Id, impulse.X, impulse.Y);
     }
 
     /// <summary>
@@ -78,7 +78,7 @@ public static class Physics
     public static unsafe Vector2 GetVelocity(World world, Entity entity)
     {
         float x, y;
-        WorldInteropAPI.Physics_GetVelocity(world.NativePtr, entity.Id, &x, &y);
+        PhysicsAPI.GetVelocity(world.NativePtr, entity.Id, &x, &y);
         return new Vector2(x, y);
     }
 
@@ -87,6 +87,6 @@ public static class Physics
     /// </summary>
     public static unsafe void SetVelocity(World world, Entity entity, Vector2 velocity)
     {
-        WorldInteropAPI.Physics_SetVelocity(world.NativePtr, entity.Id, velocity.X, velocity.Y);
+        PhysicsAPI.SetVelocity(world.NativePtr, entity.Id, velocity.X, velocity.Y);
     }
 }

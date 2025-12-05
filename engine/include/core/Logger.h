@@ -1,6 +1,8 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
+#include "Export.h"
+
 #ifdef ERROR
 #undef ERROR
 #endif
@@ -44,7 +46,7 @@ enum class LogLevel {
 
 //AI states tracks what AI is doing at the current game loop
 
-class Logger {
+class GRAPEENGINE_API Logger {
 public:
 	Logger();
 	~Logger();

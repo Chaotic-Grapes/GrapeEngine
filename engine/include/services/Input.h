@@ -24,6 +24,7 @@ Features:
 #ifndef INPUT_H
 #define INPUT_H
 
+#include "Export.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <unordered_map>
@@ -31,7 +32,7 @@ Features:
 namespace Engine { class Application; }
 
 // Static input management class for keyboard and mouse events
-class Input {
+class GRAPEENGINE_API Input {
 public:
     // Initialize the input system with a GLFW window
     static void Initialize(GLFWwindow* pWin);

@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file    WorldInterop_Collision.cpp
+\file    Interop_Collision.cpp
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \brief
@@ -12,8 +12,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#define BUILDING_WORLD_INTEROP
-#include "scripting/WorldInterop.h"
+#ifndef BUILDING_INTEROP
+#define BUILDING_INTEROP
+#endif
+
+#include "Export.h"
 #include "ecs/World.h"
 #include "physics/CollisionEvents.h"
 #include "helpers/EntityUtils.h"
@@ -30,7 +33,7 @@ namespace {
 // Collision Events
 // ============================================================================
 
-WORLD_INTEROP_API void WorldInterop_Collision_Clear(void* worldPtr) {
+INTEROP_API void WorldInterop_Collision_Clear(void* worldPtr) {
     if (!worldPtr) {
         LOG_WARNING("[WorldInterop_Collision] World pointer is null");
         return;
@@ -40,7 +43,7 @@ WORLD_INTEROP_API void WorldInterop_Collision_Clear(void* worldPtr) {
     ECS::CollisionEventQueue::Clear();
 }
 
-WORLD_INTEROP_API uint32_t WorldInterop_Collision_GetEventCount(void* worldPtr, uint64_t entityId) {
+INTEROP_API uint32_t WorldInterop_Collision_GetEventCount(void* worldPtr, uint64_t entityId) {
     if (!worldPtr) {
         LOG_WARNING("[WorldInterop_Collision] World pointer is null");
         return 0;
@@ -57,7 +60,7 @@ WORLD_INTEROP_API uint32_t WorldInterop_Collision_GetEventCount(void* worldPtr, 
     return static_cast<uint32_t>(events.size());
 }
 
-WORLD_INTEROP_API bool WorldInterop_Collision_GetEvent(void* worldPtr, uint64_t entityId, uint32_t index, uint64_t* outOtherEntityId, int* outEventType) {
+INTEROP_API bool WorldInterop_Collision_GetEvent(void* worldPtr, uint64_t entityId, uint32_t index, uint64_t* outOtherEntityId, int* outEventType) {
     if (!worldPtr || !outOtherEntityId || !outEventType) {
         LOG_WARNING("[WorldInterop_Collision] Invalid parameters");
         return false;
@@ -82,7 +85,7 @@ WORLD_INTEROP_API bool WorldInterop_Collision_GetEvent(void* worldPtr, uint64_t 
     return true;
 }
 
-WORLD_INTEROP_API bool WorldInterop_Collision_GetEventsBulk(void* worldPtr, uint64_t entityId, uint64_t* outOtherEntityIds, int* outEventTypes, uint32_t maxCount, uint32_t* outActualCount) {
+INTEROP_API bool WorldInterop_Collision_GetEventsBulk(void* worldPtr, uint64_t entityId, uint64_t* outOtherEntityIds, int* outEventTypes, uint32_t maxCount, uint32_t* outActualCount) {
     if (!worldPtr || !outOtherEntityIds || !outEventTypes || !outActualCount) {
         LOG_WARNING("[WorldInterop_Collision] Invalid parameters");
         return false;
@@ -108,7 +111,7 @@ WORLD_INTEROP_API bool WorldInterop_Collision_GetEventsBulk(void* worldPtr, uint
     return true;
 }
 
-WORLD_INTEROP_API bool WorldInterop_Collision_HasCollisionWith(void* worldPtr, uint64_t entityId, uint64_t otherEntityId) {
+INTEROP_API bool WorldInterop_Collision_HasCollisionWith(void* worldPtr, uint64_t entityId, uint64_t otherEntityId) {
     if (!worldPtr) {
         return false;
     }
@@ -124,7 +127,7 @@ WORLD_INTEROP_API bool WorldInterop_Collision_HasCollisionWith(void* worldPtr, u
     const auto& events = ECS::CollisionEventQueue::GetEvents(entity);
     
     for (const auto& evt : events) {
-        if (evt.OtherEntity.GetID() == otherEntity.GetID()) {
+        if (evt.OtherEntity.Index == otherEntity.Index) {
             return true;
         }
     }
@@ -132,7 +135,7 @@ WORLD_INTEROP_API bool WorldInterop_Collision_HasCollisionWith(void* worldPtr, u
     return false;
 }
 
-WORLD_INTEROP_API int WorldInterop_Collision_GetCollisionType(void* worldPtr, uint64_t entityId, uint64_t otherEntityId) {
+INTEROP_API int WorldInterop_Collision_GetCollisionType(void* worldPtr, uint64_t entityId, uint64_t otherEntityId) {
     if (!worldPtr) {
         return -1;
     }
@@ -148,7 +151,7 @@ WORLD_INTEROP_API int WorldInterop_Collision_GetCollisionType(void* worldPtr, ui
     const auto& events = ECS::CollisionEventQueue::GetEvents(entity);
     
     for (const auto& evt : events) {
-        if (evt.OtherEntity.GetID() == otherEntity.GetID()) {
+        if (evt.OtherEntity.Index == otherEntity.Index) {
             return static_cast<int>(evt.Type);
         }
     }

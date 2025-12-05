@@ -18,10 +18,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace ECS {
     SystemMetadata LifetimeSystem::GetMetadata() const {
         SystemMetadata metadata;
-        metadata.name = "Lifetime";
-        metadata.readComponents = {"Lifetime", "Active"};
-        metadata.writeComponents = {"Lifetime"};
-        metadata.executionOrder = 100;
+        metadata.Name = "Lifetime";
+        metadata.ReadComponents = {ComponentRegistry::Type<Components::Lifetime>(), ComponentRegistry::Type<Components::Active>()};
+        metadata.WriteComponents = {ComponentRegistry::Type<Components::Lifetime>()};
+        metadata.ExecutionOrder = 100;
         return metadata;
     }
 

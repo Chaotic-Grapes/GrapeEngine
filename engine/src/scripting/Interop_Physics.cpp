@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file   WorldInterop_Physics.cpp
+\file   Interop_Physics.cpp
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \brief
@@ -13,22 +13,16 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+#ifndef BUILDING_INTEROP
+#define BUILDING_INTEROP
+#endif
+
+#include "Export.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "helpers/EntityUtils.h"
 #include "core/Logger.h"
-#include "physics/PhysicsSystem.h"
-
-// Export macro for C API
-#ifdef _WIN32
-    #ifdef BUILDING_WORLD_INTEROP
-        #define WORLD_INTEROP_API extern "C" __declspec(dllexport)
-    #else
-        #define WORLD_INTEROP_API extern "C" __declspec(dllimport)
-    #endif
-#else
-    #define WORLD_INTEROP_API extern "C"
-#endif
+#include "ecs/systems/PhysicsSystem.h"
 
 // ============================================================================
 // Physics Control API
@@ -37,7 +31,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /// <summary>
 /// Set the global gravity for the physics world
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_Physics_SetGravity(void* worldPtr, float x, float y) {
+INTEROP_API void WorldInterop_Physics_SetGravity(void* worldPtr, float x, float y) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return;
@@ -50,7 +44,7 @@ WORLD_INTEROP_API void WorldInterop_Physics_SetGravity(void* worldPtr, float x, 
 /// <summary>
 /// Get the global gravity for the physics world
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_Physics_GetGravity(void* worldPtr, float* outX, float* outY) {
+INTEROP_API void WorldInterop_Physics_GetGravity(void* worldPtr, float* outX, float* outY) {
     if (!worldPtr || !outX || !outY) {
         LOG_ERROR("[WorldInterop] Invalid parameters");
         return;
@@ -64,7 +58,7 @@ WORLD_INTEROP_API void WorldInterop_Physics_GetGravity(void* worldPtr, float* ou
 /// <summary>
 /// Enable or disable the physics system
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_Physics_SetEnabled(void* worldPtr, bool enabled) {
+INTEROP_API void WorldInterop_Physics_SetEnabled(void* worldPtr, bool enabled) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return;
@@ -76,7 +70,7 @@ WORLD_INTEROP_API void WorldInterop_Physics_SetEnabled(void* worldPtr, bool enab
 /// <summary>
 /// Check if the physics system is enabled
 /// </summary>
-WORLD_INTEROP_API bool WorldInterop_Physics_IsEnabled(void* worldPtr) {
+INTEROP_API bool WorldInterop_Physics_IsEnabled(void* worldPtr) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return false;
@@ -89,7 +83,7 @@ WORLD_INTEROP_API bool WorldInterop_Physics_IsEnabled(void* worldPtr) {
 /// <summary>
 /// Apply a force to an entity with a Rigidbody2D
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_Physics_ApplyForce(void* worldPtr, uint64_t entityId, float forceX, float forceY) {
+INTEROP_API void WorldInterop_Physics_ApplyForce(void* worldPtr, uint64_t entityId, float forceX, float forceY) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return;
@@ -113,15 +107,15 @@ WORLD_INTEROP_API void WorldInterop_Physics_ApplyForce(void* worldPtr, uint64_t 
 
     // Apply force (F = ma, so a = F/m, v += a*dt)
     // For immediate force application, add to velocity
-    float mass = rb->mass > 0.0f ? rb->mass : 1.0f;
-    vel->x += forceX / mass;
-    vel->y += forceY / mass;
+    float mass = rb->Mass > 0.0f ? rb->Mass : 1.0f;
+    vel->Value.X += forceX / mass;
+    vel->Value.Y += forceY / mass;
 }
 
 /// <summary>
 /// Apply an impulse to an entity with a Rigidbody2D
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_Physics_ApplyImpulse(void* worldPtr, uint64_t entityId, float impulseX, float impulseY) {
+INTEROP_API void WorldInterop_Physics_ApplyImpulse(void* worldPtr, uint64_t entityId, float impulseX, float impulseY) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return;
@@ -144,15 +138,15 @@ WORLD_INTEROP_API void WorldInterop_Physics_ApplyImpulse(void* worldPtr, uint64_
     }
 
     // Apply impulse (change in momentum, p = mv, so Δv = impulse/m)
-    float mass = rb->mass > 0.0f ? rb->mass : 1.0f;
-    vel->x += impulseX / mass;
-    vel->y += impulseY / mass;
+    float mass = rb->Mass > 0.0f ? rb->Mass : 1.0f;
+    vel->Value.X += impulseX / mass;
+    vel->Value.Y += impulseY / mass;
 }
 
 /// <summary>
 /// Get the velocity of an entity with a Rigidbody2D
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_Physics_GetVelocity(void* worldPtr, uint64_t entityId, float* outX, float* outY) {
+INTEROP_API void WorldInterop_Physics_GetVelocity(void* worldPtr, uint64_t entityId, float* outX, float* outY) {
     if (!worldPtr || !outX || !outY) {
         LOG_ERROR("[WorldInterop] Invalid parameters");
         return;
@@ -169,8 +163,8 @@ WORLD_INTEROP_API void WorldInterop_Physics_GetVelocity(void* worldPtr, uint64_t
 
     auto* vel = world->TryGet<ECS::Components::LinearVelocity2D>(entity);
     if (vel) {
-        *outX = vel->x;
-        *outY = vel->y;
+        *outX = vel->Value.X;
+        *outY = vel->Value.Y;
     } else {
         *outX = 0.0f;
         *outY = 0.0f;
@@ -180,7 +174,7 @@ WORLD_INTEROP_API void WorldInterop_Physics_GetVelocity(void* worldPtr, uint64_t
 /// <summary>
 /// Set the velocity of an entity with a Rigidbody2D
 /// </summary>
-WORLD_INTEROP_API void WorldInterop_Physics_SetVelocity(void* worldPtr, uint64_t entityId, float x, float y) {
+INTEROP_API void WorldInterop_Physics_SetVelocity(void* worldPtr, uint64_t entityId, float x, float y) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
         return;
@@ -196,8 +190,8 @@ WORLD_INTEROP_API void WorldInterop_Physics_SetVelocity(void* worldPtr, uint64_t
 
     auto* vel = world->TryGet<ECS::Components::LinearVelocity2D>(entity);
     if (vel) {
-        vel->x = x;
-        vel->y = y;
+        vel->Value.X = x;
+        vel->Value.Y = y;
     } else {
         LOG_WARNING("[WorldInterop] Entity missing LinearVelocity2D component");
     }

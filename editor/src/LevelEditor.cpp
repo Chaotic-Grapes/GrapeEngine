@@ -11,25 +11,23 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 */
 /* End Header *******************************************************************/
 
-#include "LevelEditor.h"
-#include "core/Logger.h"
+#include "AudioAssetLibrary.h"
 #include "core/EditorCallbacks.h"
-#include "ViewportPicking.h"
-#include <imgui.h>
+#include "core/Logger.h"
+#include "ecs/systems/RendererSystem.h"
 #include "EditorStyle.h"
 #include "graphics/graphicsConfig.hpp"
-#include "ecs/systems/RendererSystem.h"
-#include <imgui_internal.h>
-#include <core/Application.h>
+#include "LevelEditor.h"
 #include "services/Time.h"
-#include "AudioAssetLibrary.h"
 #include "UndoSystem.h"
+#include "ViewportPicking.h"
+#include <core/Application.h>
+#include <imgui.h>
+#include <imgui_internal.h>
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
-    : m_world(world), m_config(config), m_playback(world), m_symbolsFont(nullptr),
-    m_mainFont(nullptr), m_boldFont(nullptr), m_assetBrowser(), m_viewport(),
-    m_hierarchyWindow(), m_inspector(), m_entityActions(scene) {
+    : m_world(world), m_config(config), m_playback(world), m_inspector(), m_entityActions(scene) {
     // Defer panel initialization to Initialize to use loaded fonts
 }
 
@@ -56,14 +54,14 @@ LevelEditor::~LevelEditor() {
 // Register a panel with initialization and render callbacks.
 // Centralizes panel management and eliminates repetitive init/render boilerplate.
 void LevelEditor::_registerPanel(const char* panelName,
-    std::function<void()> initFn,
-    std::function<void()> renderFn,
-    std::function<void(ECS::World*)> setWorldFn) {
+    const std::function<void()>& initFn,
+    const std::function<void()>& renderFn,
+    const std::function<void(ECS::World*)>& setWorldFn) {
     PanelRegistration reg;
     reg.Name = panelName;
-    reg.InitializeCallback = initFn;
-    reg.RenderCallback = renderFn;
-    reg.SetWorldCallback = setWorldFn;
+    reg.InitializeCallback = std::move(initFn);
+    reg.RenderCallback = std::move(renderFn);
+    reg.SetWorldCallback = std::move(setWorldFn);
     m_panelRegistry.push_back(reg);
 }
 
@@ -105,7 +103,7 @@ void LevelEditor::_buildDockLayout() {
     // Rebuild only when flagged to avoid resetting panel positions
     if (m_dockLayoutBuilt) return;
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
     if (vp->Size.x <= 0 || vp->Size.y <= 0) return;         // Guard against zero size
 
     ImGui::DockBuilderRemoveNode(m_dockspaceId);
@@ -117,7 +115,7 @@ void LevelEditor::_buildDockLayout() {
     // bottom asset browser, right strip for inspector/prefab editors
 
     // First split: toolbar at the very top (calculate ratio from config)
-    float toolbarRatio = m_config.ToolbarHeight / vp->Size.y;
+    const float toolbarRatio = m_config.ToolbarHeight / vp->Size.y;
     ImGuiID toolbarNode, mainAreaNode;
     ImGui::DockBuilderSplitNode(m_dockspaceId, ImGuiDir_Up, toolbarRatio, &toolbarNode, &mainAreaNode);
 
@@ -158,7 +156,7 @@ void LevelEditor::_buildDockLayout() {
 }
 
 // Invalidate the layout so the next frame rebuilds it on new size
-void LevelEditor::OnWindowResized(int width, int height) {
+void LevelEditor::OnWindowResized(const int width, const int height) {
     (void)width;
     (void)height;
     m_dockLayoutBuilt = false;
@@ -176,10 +174,10 @@ void LevelEditor::_renderDockSpace() {
     }
 
     const float topOffset = ImGui::GetFrameHeight();
-    ImVec2 safePos(vp->Pos.x, vp->Pos.y + topOffset);
+    const ImVec2 safePos(vp->Pos.x, vp->Pos.y + topOffset);
 
     // Use raw viewport size and keep proportions stable via docking splits
-    ImVec2 safeSize(vp->Size.x, std::max(1.0f, vp->Size.y - topOffset));
+    const ImVec2 safeSize(vp->Size.x, std::max(1.0f, vp->Size.y - topOffset));
 
     ImGui::SetNextWindowPos(safePos);     // Position dock host under main menu bar
     ImGui::SetNextWindowSize(safeSize);   // Size dock host to fill viewport
@@ -189,7 +187,7 @@ void LevelEditor::_renderDockSpace() {
     // NoDocking: disallow docking into this window
     // NoTitleBar/NoResize/NoMove: make it a static, decoration-less host
     // NoBringToFrontOnFocus/NoNavFocus: keep focus behavior stable
-    ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+    constexpr ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
@@ -204,7 +202,7 @@ void LevelEditor::_renderDockSpace() {
     ImGui::PopStyleVar(3);
 
     m_dockspaceId = ImGui::GetID("MainDockSpace");                         // Stable ID for this dockspace
-    ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Let central node pass content
+    constexpr ImGuiDockNodeFlags dockFlags = ImGuiDockNodeFlags_PassthruCentralNode; // Let central node pass content
     ImGui::DockSpace(m_dockspaceId, ImVec2(0.0f, 0.0f), dockFlags);        // Create dockspace filling the host window
 
     _buildDockLayout(); // Build once on first frame or after resize
@@ -215,7 +213,7 @@ void LevelEditor::_renderDockSpace() {
 // Initialization
 // -------------------------------------------------------------------------
 // Initialize fonts build atlas and set up editor panels and hooks
-void LevelEditor::Initialize(GLFWwindow* pWin) {
+void LevelEditor::Initialize(const GLFWwindow* pWin) {
     if (!pWin) return;
 
     ImGuiStyle& style = ImGui::GetStyle();
@@ -242,7 +240,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     auto& callbacks = Engine::EditorCallbackRegistry::Get();
 
     // Register entity selection handler
-    callbacks.RegisterEntitySelection([this](uint32_t entityId, bool addToSelection) {
+    callbacks.RegisterEntitySelection([this](const uint32_t entityId, const bool addToSelection) {
         if (addToSelection) {
             // Multi-select not yet implemented in hierarchy
             LOG_WARNING("[LevelEditor] Multi-select not yet implemented");
@@ -255,10 +253,10 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     });
 
     // Register inspector refresh handler
-    callbacks.RegisterInspectorRefresh([this](uint32_t entityId) {
+    callbacks.RegisterInspectorRefresh([this](const uint32_t entityId) {
         if (entityId == 0) {
             // Refresh current selection - just re-inspect it
-            EntityId currentId = m_hierarchyWindow.GetPrimarySelectedEntity();
+            const EntityId currentId = m_hierarchyWindow.GetPrimarySelectedEntity();
             if (currentId != 0) {
                 m_inspector.InspectEntity(currentId);
             }
@@ -268,23 +266,23 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     });
 
     // Register notification handler
-    callbacks.RegisterNotification([this](int severity, const std::string& title,
-                                         const std::string& message, float duration) {
+    callbacks.RegisterNotification([this](const int severity, const std::string& title,
+                                         const std::string& message, const float duration) {
         // Forward to console with appropriate log level
         (void)duration; // Duration not used by console currently
         LogLevel level;
         switch (severity) {
-            case 0: level = LogLevel::Info; break;
-            case 1: level = LogLevel::Warning; break;
-            case 2: level = LogLevel::Error; break;
-            case 3: level = LogLevel::Info; break; // Success as Info
-            default: level = LogLevel::Info; break;
+            case 0: level = LogLevel::INFO; break;
+            case 1: level = LogLevel::WARNING; break;
+            case 2: level = LogLevel::ERROR; break;
+            case 3: level = LogLevel::INFO; break; // Success as Info
+            default: level = LogLevel::INFO; break;
         }
-        m_console.AddMessage(level, LogSource::Engine, "", title + ": " + message);
+        m_console.AddMessage(level, LogSource::ENGINE, "", title + ": " + message);
     });
 
     // Register debug draw handler
-    callbacks.RegisterDebugDraw([this](ECS::World* world) {
+    callbacks.RegisterDebugDraw([this](const ECS::World* world) {
         // Editor can implement debug visualization here
         // For now, this is a placeholder
         (void)world;
@@ -294,29 +292,34 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     callbacks.RegisterEditorCamera([this](glm::vec3& outPos, glm::mat4& outView, glm::mat4& outProj) {
         auto* cam = m_viewport.GetEditorCamera();
         if (cam) {
-            outPos = cam->GetPosition();
-            outView = cam->GetViewMatrix();
-            outProj = cam->GetProjectionMatrix();
+            const Engine::Camera* c = cam->GetCamera();
+            if (!c)
+                return false;
+            
+            outPos = c->Position;
+            outView = c->GetViewMatrix();
+            outProj = c->GetProjectionMatrix();
+            
             return true;
         }
         return false;
     });
 
     // Register viewport picking using editor-side ViewportPicking utility
-    callbacks.RegisterPick([this](float screenX, float screenY) {
+    callbacks.RegisterPick([this](const float screenX, const float screenY) {
         // Get the renderer system from the viewport
         if (!m_viewport.HasValidWorld()) {
-            return uint32_t(0);
+            return static_cast<uint32_t>(0);
         }
         
         // Check if viewport is hovered (don't pick if mouse is outside viewport)
         if (!m_viewport.IsViewportHovered()) {
-            return uint32_t(0);
+            return static_cast<uint32_t>(0);
         }
         
         // Get viewport bounds for coordinate conversion
-        ImVec2 viewportPos = m_viewport.GetSceneDrawPos();
-        ImVec2 viewportSize = m_viewport.GetSceneDrawSize();
+        const ImVec2 viewportPos = m_viewport.GetSceneDrawPos();
+        const ImVec2 viewportSize = m_viewport.GetSceneDrawSize();
         
         // Use editor-side picking utility (no engine coupling)
         auto* rendererSystem = ECS::RendererSystem::GetInstance();
@@ -329,7 +332,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
             );
         }
         
-        return uint32_t(0);
+        return static_cast<uint32_t>(0);
     });
 
     // ===================================================================
@@ -363,7 +366,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     m_sceneModifiedSubscription = Messaging::MessageSystem::Subscribe<Messaging::SceneModified>(
         [this](const Messaging::SceneModified& evt) {
             // Mark the scene as dirty in the file menu
-            if (m_fileMenu.GetSceneManager()) {
+            if (Engine::CORE->GetSceneManager().GetActive()) {
                 LOG_DEBUG("[LevelEditor] Scene modified: " << evt.Reason);
                 m_fileMenu.MarkSceneDirty();
             }
@@ -387,7 +390,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         [this]() {
             m_playback.Initialize(m_mainFont, m_symbolsFont, m_config.ToolbarHeight);
             // Register playback state change callback
-            m_playback.OnStateChanged([this](Playback::GameState oldState, Playback::GameState newState) {
+            m_playback.OnStateChanged([this](const Playback::GameState oldState, const Playback::GameState newState) {
                 _onPlaybackStateChanged(oldState, newState);
                 });
         },
@@ -410,7 +413,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
             m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
             m_viewport.SetUndoSystem(&m_undoSystem);
             // Register viewport selection callback
-            m_viewport.OnSelectionChanged([this](EntityId id) {
+            m_viewport.OnSelectionChanged([this](const EntityId id) {
                 _onViewportSelectionChanged(id);
                 });
         },
@@ -444,7 +447,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
             m_console.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
 
             // Connect Logger to Console - use singleton instance
-            Logger::Get().SetConsoleCallback([this](LogLevel level, LogSource source,
+            Logger::Get().SetConsoleCallback([this](const LogLevel level, const LogSource source,
                 const std::string& timestamp, const std::string& message) {
                     m_console.AddMessage(level, source, timestamp, message);
                 });
@@ -469,7 +472,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
     m_viewport.SetFileMenu(&m_fileMenu);
 
     // Set up hierarchy selection callback to sync with inspector
-    m_hierarchyWindow.OnSelectionChanged([this](EntityId id) {
+    m_hierarchyWindow.OnSelectionChanged([this](const EntityId id) {
         if (!m_world) {
             m_inspector.ClearSelection();
             if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
@@ -483,7 +486,7 @@ void LevelEditor::Initialize(GLFWwindow* pWin) {
         } // Clear when no entity
 
         // Resolve the entity to the current generation before checking aliveness
-        ECS::Entity e = m_world->Resolve(id);
+        const ECS::Entity e = m_world->Resolve(id);
         if (m_world->IsAlive(e)) {
             m_inspector.InspectEntity(id); // Inspect when valid
             if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(id);
@@ -528,7 +531,7 @@ void LevelEditor::_loadFonts() {
     }
 
     float iconFontSize = m_config.IconFontSize;
-    static const ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
+    static constexpr ImWchar iconRanges[] = { 0xE000, 0xF8FF, 0 };
     ImFontConfig iconsConfig;
     iconsConfig.MergeMode = false;
     iconsConfig.PixelSnapH = true;
@@ -551,7 +554,7 @@ void LevelEditor::_loadFonts() {
         m_symbolsFont = io.Fonts->Fonts[2];
     }
 
-    if (io.Fonts->Fonts.size() > 0 && !io.Fonts->IsBuilt()) {
+    if (!io.Fonts->Fonts.empty() && !io.Fonts->IsBuilt()) {
         io.Fonts->Build();
     }
 }
@@ -606,7 +609,7 @@ void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback
 }
 
 // Handle viewport selection changes (called by Viewport via callback)
-void LevelEditor::_onViewportSelectionChanged(EntityId id) {
+void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
     if (!m_world) {
         m_inspector.ClearSelection();
         m_hierarchyWindow.SetSelectedEntity(0);
@@ -620,7 +623,7 @@ void LevelEditor::_onViewportSelectionChanged(EntityId id) {
     }
 
     // Validate entity before inspecting
-    ECS::Entity e = m_world->Resolve(id);
+    const ECS::Entity e = m_world->Resolve(id);
     if (m_world->IsAlive(e)) {
         m_inspector.InspectEntity(id);
         m_hierarchyWindow.SetSelectedEntity(id);

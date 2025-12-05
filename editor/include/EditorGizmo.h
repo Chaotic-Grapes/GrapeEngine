@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define EDITOR_GIZMO_H
 
 #include "ecs/World.h"
+#include <imgui.h>
 #include <ImGuizmo.h>
 
 namespace Editor {

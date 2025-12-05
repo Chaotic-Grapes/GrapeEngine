@@ -16,6 +16,7 @@ TODO: This is a temporary solution until the editor is separated from the engine
 #ifndef PROJECTPATHS_H
 #define PROJECTPATHS_H
 
+#include "Export.h"
 #include <string>
 #include <filesystem>
 
@@ -27,7 +28,7 @@ namespace Engine {
      * TODO: Remove hardcoded "EchoesBelow" path when editor is separated.
      *       Future implementation should support loading projects from any location.
      */
-    class ProjectPaths {
+    class GRAPEENGINE_API ProjectPaths {
     public:
         /**
          * @brief Initialize project paths system

@@ -1,8 +1,9 @@
 #pragma once
 #include <cmath>  // For trigonometric or arithmetic operations
-#include "Math/Vector2D.h"
+#include "math/Vector2D.h"
+#include "Export.h"
 
-class Matrix3x3 {
+class GRAPEENGINE_API Matrix3x3 {
 public:
 	float m00, m01, m02;
 	float m10, m11, m12;

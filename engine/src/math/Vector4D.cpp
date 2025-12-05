@@ -1,4 +1,4 @@
-#include "Math/Vector4D.h"
+#include "math/Vector4D.h"
 #include <cmath>  // For trigonometric or arithmetic operations
 #include <stdexcept>
 
@@ -147,3 +147,6 @@ Vector4D operator/(const Vector4D& vector, float scalar) {
 
 bool operator==(const Vector4D& a, const Vector4D& b) { return (a.X == b.X) && (a.Y == b.Y) && (a.Z == b.Z) && (a.W == b.W); }
 bool operator!=(const Vector4D& a, const Vector4D& b) { return !(a == b); }
+
+// Static member definitions
+const Vector4D Vector4D::Zero = Vector4D(0.0f, 0.0f, 0.0f, 0.0f);

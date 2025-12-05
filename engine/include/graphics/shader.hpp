@@ -14,11 +14,12 @@ variables of various types (bool, int, float, vectors, and matrices).
 /* End Header *******************************************************************/
 
 #pragma once
+#include "Export.h"
 #include <string>
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 
-class Shader {
+class GRAPEENGINE_API Shader {
 public:
     Shader() = default;
     Shader(const std::string& vertexPath, const std::string& fragmentPath);

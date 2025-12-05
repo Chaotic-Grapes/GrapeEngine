@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file    EngineInterop_Application.cpp
+\file    Interop_Application.cpp
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \date    21st November 2025
@@ -13,19 +13,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+#ifndef BUILDING_INTEROP
+#define BUILDING_INTEROP
+#endif
+
+#include "Export.h"
 #include "core/Application.h"
 #include "core/Logger.h"
-
-// Export macro for C API
-#ifdef _WIN32
-    #ifdef BUILDING_ENGINE_INTEROP
-        #define ENGINE_INTEROP_API extern "C" __declspec(dllexport)
-    #else
-        #define ENGINE_INTEROP_API extern "C" __declspec(dllimport)
-    #endif
-#else
-    #define ENGINE_INTEROP_API extern "C"
-#endif
+#include "services/WindowManager.h"
 
 // ============================================================================
 // Application API - Application Control
@@ -34,7 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /// <summary>
 /// Request the application to quit
 /// </summary>
-ENGINE_INTEROP_API void EngineInterop_Application_Quit() {
+INTEROP_API void EngineInterop_Application_Quit() {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");
         return;
@@ -49,7 +44,7 @@ ENGINE_INTEROP_API void EngineInterop_Application_Quit() {
 /// <summary>
 /// Get the application name from configuration
 /// </summary>
-ENGINE_INTEROP_API const char* EngineInterop_Application_GetName() {
+INTEROP_API const char* EngineInterop_Application_GetName() {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");
         return "";
@@ -64,7 +59,7 @@ ENGINE_INTEROP_API const char* EngineInterop_Application_GetName() {
 /// <summary>
 /// Get the fixed time step from configuration (from project settings)
 /// </summary>
-ENGINE_INTEROP_API float EngineInterop_Application_GetFixedTimeStep() {
+INTEROP_API float EngineInterop_Application_GetFixedTimeStep() {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");
         return 0.02f;
@@ -79,7 +74,7 @@ ENGINE_INTEROP_API float EngineInterop_Application_GetFixedTimeStep() {
 /// <summary>
 /// Check if VSync is enabled in configuration
 /// </summary>
-ENGINE_INTEROP_API bool EngineInterop_Application_IsVSyncEnabled() {
+INTEROP_API bool EngineInterop_Application_IsVSyncEnabled() {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");
         return false;

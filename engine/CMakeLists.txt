@@ -5,7 +5,7 @@
 # This library can be:
 # - Linked by the Editor executable
 # - Linked by the Runtime/Game executable
-# - Wrapped by EngineInterop for C# scripting
+# - Wrapped by Interop for C# scripting
 # ===============================================================================
 
 cmake_minimum_required(VERSION 3.13)
@@ -60,8 +60,7 @@ if(BUILD_ENGINE_SHARED)
     # Define export macros for shared library
     target_compile_definitions(GrapeEngineLib PRIVATE 
         GRAPEENGINE_EXPORTS
-        BUILDING_ENGINE_INTEROP
-        BUILDING_WORLD_INTEROP
+        BUILDING_INTEROP
     )
     
     # Set stable output name for managed interop
@@ -119,7 +118,7 @@ endif()
 
 # ======================= Compiler Definitions =========================
 # Engine does NOT define USE_IMGUI - editor code is completely separate
-# Interop exports are handled via __declspec(dllexport) when BUILDING_ENGINE_INTEROP and BUILDING_WORLD_INTEROP are defined
+# Interop exports are handled via __declspec(dllexport) when BUILDING_INTEROP is defined
 
 # ======================= Installation (Optional) =========================
 # This allows engine to be installed as a reusable library

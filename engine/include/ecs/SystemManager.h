@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef SYSTEMMANAGER_H
 #define SYSTEMMANAGER_H
 
+#include "Export.h"
 #include "ecs/ISystem.h"
 #include <memory>
 #include <vector>
@@ -66,10 +67,18 @@ namespace ECS {
      * systemManager.DestroyAll();
      * @endcode
      */
-    class SystemManager {
+    class GRAPEENGINE_API SystemManager {
     public:
         SystemManager() = default;
         ~SystemManager() = default;
+
+        // Delete copy operations (contains unique_ptr)
+        SystemManager(const SystemManager&) = delete;
+        SystemManager& operator=(const SystemManager&) = delete;
+
+        // Allow move operations
+        SystemManager(SystemManager&&) noexcept = default;
+        SystemManager& operator=(SystemManager&&) noexcept = default;
 
         /**
          * @brief Register a new system.
@@ -100,7 +109,7 @@ namespace ECS {
             m_systemGroups[group].push_back(std::move(system));
 
             // Track by name
-            m_systemsByName[metadata.name] = ptr;
+            m_systemsByName[metadata.Name] = ptr;
 
             // Sort systems by execution order within group
             _sortSystemGroup(group);
@@ -122,7 +131,7 @@ namespace ECS {
             SystemGroup group = system->GetSystemGroup();
 
             m_scriptedSystemGroups[group].push_back(system);
-            m_systemsByName[metadata.name] = system;
+            m_systemsByName[metadata.Name] = system;
 
             _sortSystemGroup(group);
         }
@@ -332,14 +341,14 @@ namespace ECS {
             auto& systems = m_systemGroups[group];
             std::sort(systems.begin(), systems.end(),
                 [](const std::unique_ptr<ISystem>& a, const std::unique_ptr<ISystem>& b) {
-                    return a->GetMetadata().executionOrder < b->GetMetadata().executionOrder;
+                    return a->GetMetadata().ExecutionOrder < b->GetMetadata().ExecutionOrder;
                 });
 
             // Sort scripted systems
             auto& scriptedSystems = m_scriptedSystemGroups[group];
             std::sort(scriptedSystems.begin(), scriptedSystems.end(),
                 [](const ISystem* a, const ISystem* b) {
-                    return a->GetMetadata().executionOrder < b->GetMetadata().executionOrder;
+                    return a->GetMetadata().ExecutionOrder < b->GetMetadata().ExecutionOrder;
                 });
         }
 

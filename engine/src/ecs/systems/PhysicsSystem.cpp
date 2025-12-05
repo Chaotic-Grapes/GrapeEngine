@@ -46,8 +46,8 @@
 #include "helpers/MathUtils.h"
 #include "helpers/EntityUtils.h"
 #include <iostream>
-#include "../engine/audio/FmodAudioDevice.h"
-#include "../engine/physics/CollisionEvents.h"
+#include "audio/FmodAudioDevice.h"
+#include "physics/CollisionEvents.h"
 
 extern Audio::FmodAudioDevice* gAudioDevice;
 
@@ -160,10 +160,10 @@ namespace ECS {
 
     SystemMetadata PhysicsSystem::GetMetadata() const {
         SystemMetadata metadata;
-        metadata.name = "Physics";
-        metadata.readComponents = {"LocalTransform", "CircleCollider2D", "BoxCollider2D", "Rigidbody2D", "Active"};
-        metadata.writeComponents = {"LocalTransform", "Rigidbody2D"};
-        metadata.executionOrder = 0;
+        metadata.Name = "Physics";
+        metadata.ReadComponents = {ComponentRegistry::Type<Components::LocalTransform>(), ComponentRegistry::Type<Components::CircleCollider2D>(), ComponentRegistry::Type<Components::BoxCollider2D>(), ComponentRegistry::Type<Components::Rigidbody2D>(), ComponentRegistry::Type<Components::Active>()};
+        metadata.WriteComponents = {ComponentRegistry::Type<Components::LocalTransform>(), ComponentRegistry::Type<Components::Rigidbody2D>()};
+        metadata.ExecutionOrder = 0;
         return metadata;
     }
 

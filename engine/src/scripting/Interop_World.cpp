@@ -1,6 +1,6 @@
 /* Start Header *****************************************************************/
 /*!
-\file    WorldInterop.cpp
+\file    Interop_World.cpp
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
 \brief
@@ -12,13 +12,33 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#define BUILDING_WORLD_INTEROP
-#include "scripting/WorldInterop.h"
+#ifndef BUILDING_INTEROP
+#define BUILDING_INTEROP
+#endif
+
+#include "Export.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "helpers/EntityUtils.h"
 #include "core/Logger.h"
 #include <cstring>
+
+// ============================================================================
+// Query Iterator Structure
+// ============================================================================
+
+/// <summary>
+/// Structure representing query iteration state
+/// </summary>
+struct QueryIterator {
+    void* worldPtr;
+    const void* archetypes;      // std::vector<Archetype*>*
+    uint32_t archetypeIndex;
+    uint32_t chunkIndex;
+    uint32_t entityIndex;
+    uint32_t componentCount;
+    uint32_t componentTypeIds[8]; // Max 8 components in a query
+};
 
 namespace {
     // Convert World pointer
@@ -38,7 +58,7 @@ namespace {
 // Entity Lifecycle Operations
 // ============================================================================
 
-WORLD_INTEROP_API uint64_t WorldInterop_CreateEntity(void* worldPtr) {
+INTEROP_API uint64_t WorldInterop_CreateEntity(void* worldPtr) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] World pointer is null");
         return 0;
@@ -53,7 +73,7 @@ WORLD_INTEROP_API uint64_t WorldInterop_CreateEntity(void* worldPtr) {
     return ECS::EntityUtils::Pack(entity);
 }
 
-WORLD_INTEROP_API void WorldInterop_DestroyEntity(void* worldPtr, uint64_t entityId) {
+INTEROP_API void WorldInterop_DestroyEntity(void* worldPtr, uint64_t entityId) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] World pointer is null");
         return;
@@ -67,7 +87,7 @@ WORLD_INTEROP_API void WorldInterop_DestroyEntity(void* worldPtr, uint64_t entit
     }
 }
 
-WORLD_INTEROP_API bool WorldInterop_IsEntityAlive(void* worldPtr, uint64_t entityId) {
+INTEROP_API bool WorldInterop_IsEntityAlive(void* worldPtr, uint64_t entityId) {
     if (!worldPtr) {
         return false;
     }
@@ -82,7 +102,7 @@ WORLD_INTEROP_API bool WorldInterop_IsEntityAlive(void* worldPtr, uint64_t entit
 // Component Operations
 // ============================================================================
 
-WORLD_INTEROP_API bool WorldInterop_HasComponent(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash) {
+INTEROP_API bool WorldInterop_HasComponent(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash) {
     if (!worldPtr) {
         return false;
     }
@@ -96,14 +116,14 @@ WORLD_INTEROP_API bool WorldInterop_HasComponent(void* worldPtr, uint64_t entity
 
     ECS::ComponentTypeId componentId = GetComponentIdFromHash(componentTypeHash);
     if (componentId == ECS::NULL_COMPONENT_ID) {
-        LOG_WARNING("[WorldInterop] Unknown component type hash: {}", componentTypeHash);
+        LOG_WARNING("[WorldInterop] Unknown component type hash: " << componentTypeHash);
         return false;
     }
 
     return world->HasById(entity, componentId);
 }
 
-WORLD_INTEROP_API void* WorldInterop_GetComponentPtr(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash) {
+INTEROP_API void* WorldInterop_GetComponentPtr(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash) {
     if (!worldPtr) {
         return nullptr;
     }
@@ -117,7 +137,7 @@ WORLD_INTEROP_API void* WorldInterop_GetComponentPtr(void* worldPtr, uint64_t en
 
     ECS::ComponentTypeId componentId = GetComponentIdFromHash(componentTypeHash);
     if (componentId == ECS::NULL_COMPONENT_ID) {
-        LOG_WARNING("[WorldInterop] Unknown component type hash: {}", componentTypeHash);
+        LOG_WARNING("[WorldInterop] Unknown component type hash: " << componentTypeHash);
         return nullptr;
     }
 
@@ -125,7 +145,7 @@ WORLD_INTEROP_API void* WorldInterop_GetComponentPtr(void* worldPtr, uint64_t en
     return world->GetRawComponentPtr(entity, componentId);
 }
 
-WORLD_INTEROP_API void* WorldInterop_AddComponent(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash, void* componentData, int componentSize) {
+INTEROP_API void* WorldInterop_AddComponent(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash, void* componentData, int componentSize) {
     if (!worldPtr) {
         return nullptr;
     }
@@ -139,7 +159,7 @@ WORLD_INTEROP_API void* WorldInterop_AddComponent(void* worldPtr, uint64_t entit
 
     ECS::ComponentTypeId componentId = GetComponentIdFromHash(componentTypeHash);
     if (componentId == ECS::NULL_COMPONENT_ID) {
-        LOG_WARNING("[WorldInterop] Unknown component type hash: {}", componentTypeHash);
+        LOG_WARNING("[WorldInterop] Unknown component type hash: " << componentTypeHash);
         return nullptr;
     }
 
@@ -149,7 +169,7 @@ WORLD_INTEROP_API void* WorldInterop_AddComponent(void* worldPtr, uint64_t entit
     return addedComponentPtr;
 }
 
-WORLD_INTEROP_API void WorldInterop_RemoveComponent(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash) {
+INTEROP_API void WorldInterop_RemoveComponent(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash) {
     if (!worldPtr) {
         return;
     }
@@ -163,7 +183,7 @@ WORLD_INTEROP_API void WorldInterop_RemoveComponent(void* worldPtr, uint64_t ent
 
     ECS::ComponentTypeId componentId = GetComponentIdFromHash(componentTypeHash);
     if (componentId == ECS::NULL_COMPONENT_ID) {
-        LOG_WARNING("[WorldInterop] Unknown component type hash: {}", componentTypeHash);
+        LOG_WARNING("[WorldInterop] Unknown component type hash: " << componentTypeHash);
         return;
     }
 
@@ -174,7 +194,7 @@ WORLD_INTEROP_API void WorldInterop_RemoveComponent(void* worldPtr, uint64_t ent
 // Query Operations
 // ============================================================================
 
-WORLD_INTEROP_API bool WorldInterop_CreateQuery(void* worldPtr, uint32_t* componentHashes, int componentCount, QueryIterator* outIterator) {
+INTEROP_API bool WorldInterop_CreateQuery(void* worldPtr, uint32_t* componentHashes, int componentCount, QueryIterator* outIterator) {
     if (!worldPtr || !outIterator || componentCount <= 0 || componentCount > 8) {
         return false;
     }
@@ -188,7 +208,7 @@ WORLD_INTEROP_API bool WorldInterop_CreateQuery(void* worldPtr, uint32_t* compon
     for (int i = 0; i < componentCount; ++i) {
         ECS::ComponentTypeId id = GetComponentIdFromHash(componentHashes[i]);
         if (id == ECS::NULL_COMPONENT_ID) {
-            LOG_WARNING("[WorldInterop] Unknown component type hash in query: {}", componentHashes[i]);
+            LOG_WARNING("[WorldInterop] Unknown component type hash in query: " << componentHashes[i]);
             return false;
         }
         componentIds.push_back(id);
@@ -210,7 +230,7 @@ WORLD_INTEROP_API bool WorldInterop_CreateQuery(void* worldPtr, uint32_t* compon
     return !archetypes.empty();
 }
 
-WORLD_INTEROP_API bool WorldInterop_QueryNext(QueryIterator* iterator, uint64_t* outEntityId) {
+INTEROP_API bool WorldInterop_QueryNext(QueryIterator* iterator, uint64_t* outEntityId) {
     if (!iterator || !iterator->archetypes) {
         return false;
     }
@@ -255,7 +275,7 @@ WORLD_INTEROP_API bool WorldInterop_QueryNext(QueryIterator* iterator, uint64_t*
     return false; // No more entities
 }
 
-WORLD_INTEROP_API void* WorldInterop_QueryGetComponent(QueryIterator* iterator, int componentIndex) {
+INTEROP_API void* WorldInterop_QueryGetComponent(QueryIterator* iterator, int componentIndex) {
     if (!iterator || !iterator->archetypes || componentIndex < 0 || componentIndex >= static_cast<int>(iterator->componentCount)) {
         return nullptr;
     }
@@ -345,7 +365,7 @@ namespace {
     }
 }
 
-WORLD_INTEROP_API bool WorldInterop_RegisterComponent(uint32_t typeNameHash, int size, int alignment) {
+INTEROP_API bool WorldInterop_RegisterComponent(uint32_t typeNameHash, int size, int alignment) {
     auto& tracker = GetRegistrationTracker();
     std::lock_guard<std::mutex> lock(tracker.mutex);
     
@@ -362,13 +382,12 @@ WORLD_INTEROP_API bool WorldInterop_RegisterComponent(uint32_t typeNameHash, int
     // For now, we just track that C# requested registration
     tracker.registered[typeNameHash] = true;
     
-    LOG_INFO("[WorldInterop] Component registered from C#: hash={}, size={}, alignment={}", 
-             typeNameHash, size, alignment);
+    LOG_INFO("[WorldInterop] Component registered from C#: hash=" << typeNameHash << ", size=" << size << ", alignment=" << alignment);
     
     return true;
 }
 
-WORLD_INTEROP_API bool WorldInterop_IsComponentRegistered(uint32_t typeNameHash) {
+INTEROP_API bool WorldInterop_IsComponentRegistered(uint32_t typeNameHash) {
     // Check if component is registered in ComponentRegistry
     ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeNameHash);
     if (id != ECS::NULL_COMPONENT_ID) {
