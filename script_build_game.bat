@@ -56,4 +56,18 @@ if defined EXE_NAME (
 ) else (
     echo Executable location: %EXE_DIR%\^<not found^>
 )
+echo.
+echo NOTE: Engine DLL should be copied to game executable directory.
+echo       Checking if copy is needed (copy only if source is newer)...
+echo   Attempting to copy build\engine\%CONFIG%\GrapeEngineNative.dll -> %EXE_DIR%\
+xcopy /Y /D "build\engine\%CONFIG%\GrapeEngineNative.dll" "%EXE_DIR%\" >nul
+if %errorlevel% equ 0 (
+    echo   Copy successful!
+) else (
+    if %errorlevel% equ 1 (
+        echo   DLL already up-to-date in game directory.
+    ) else (
+        echo   WARNING: Failed to copy DLL - game may not run!
+    )
+)
 pause
