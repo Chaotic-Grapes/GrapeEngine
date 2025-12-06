@@ -18,7 +18,7 @@ polling system counters while the game is not running.
 /* End Header *******************************************************************/
 
 #include "PerformancePanel.h"
-#include "core/Profiler.h"
+#include "services/TimeSystem.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include <algorithm>
@@ -58,12 +58,12 @@ void PerformancePanel::Render(bool isPlaying) {
         
         // Cache live data while playing
         try {
-            m_cachedFps = Profiler::GetFPS();
-            m_cachedFrameMs = Profiler::GetFrameTimeMs();
-            m_cachedTotalTime = Profiler::GetTotalScopeTimes();
+            m_cachedFps = TimeSystem::Instance().GetFPS();
+            m_cachedFrameMs = TimeSystem::Instance().GetFrameTimeMs();
+            m_cachedTotalTime = TimeSystem::Instance().GetTotalScopeTimes();
             
             // Cache scope data
-            const auto &liveScopes = Profiler::GetAllScopeData();
+            const auto liveScopes = TimeSystem::Instance().GetAllScopeData();
             m_cachedScopes.clear();
             for (const auto &kv : liveScopes) {
                 CachedScopeData cached;

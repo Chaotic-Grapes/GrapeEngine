@@ -1,9 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
-\file   TimeSystem.cpp
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
-\date   14th September 2025
+\file     TimeSystem.cpp
+\authors  Muhammad Nur Fadzly Bin Zulkifli (70%)
+          Samantha Leong (30%)
+\par      muhammadnurfadzly.b@digipen.edu
+          s.leong@digipen.edu
+\date     14th September 2025
 \brief
 Implements the Time service which provides time-related functionality
 within the engine. Adds time scaling, fixed timestep, smoothing, and a simple
@@ -18,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include <algorithm>
 #include <cstring>
+#include <numeric>
 
 // Simple singleton instance
 TimeSystem& TimeSystem::Instance() {
@@ -94,9 +97,12 @@ void TimeSystem::Advance(double rawDeltaSeconds, double nowSeconds) {
         sum += v;
     m_smoothDeltaTime = sum / static_cast<double>(m_smoothWindow.size());
 
-    // Apply global time scaling (slow motion / pause control).
-    double scale = m_timeScale.load();
-    m_deltaTime = m_unscaledDeltaTime * scale;
+    // Apply time scale
+    double unscaledSeconds = rawDeltaSeconds;
+    double scaledSeconds = unscaledSeconds * (double)m_timeScale.load();
+
+    m_unscaledDeltaTime = (float)unscaledSeconds;
+    m_deltaTime = (float)scaledSeconds;
 
     // Totals for diagnostics / scripting
     m_totalTimeUnscaled += m_unscaledDeltaTime;
@@ -119,6 +125,17 @@ void TimeSystem::Advance(double rawDeltaSeconds, double nowSeconds) {
     // Aggregate and dispatch profiler samples collected on threads during
     // this frame. Keeping collection centralized minimizes overhead in the
     // sampling hot path.
+    // Update FPS / frame time stats
+    m_frameTimeMs = (float)(unscaledSeconds * 1000.0);
+    m_fpsWindow.push_back(1.0 / std::max(1e-6, unscaledSeconds));
+
+    if (m_fpsWindow.size() > (size_t)m_fpsWindowSize)
+        m_fpsWindow.pop_front();
+
+    double fpsSum = std::accumulate(m_fpsWindow.begin(), m_fpsWindow.end(), 0.0);
+    m_fps = (float)(fpsSum / m_fpsWindow.size());
+
+    // Collect profiler samples from threads and aggregate
     _collectThreadSamples();
 }
 
@@ -142,10 +159,12 @@ void TimeSystem::SetProfilerCollector(ProfilerCollector cb) {
 }
 
 void TimeSystem::ProfileBegin(const char* name) {
-    // Push a cheap sampling marker into the current thread's stack. We
-    // record a pointer to the name (callers should ensure its lifetime).
+    // Intern the name (may lock briefly on first-seen names) and push
+    // a (scopeId, startTime) into the per-thread stack. This keeps the
+    // hot path allocation- and lock-light for repeated scopes.
+    uint32_t id = _internScopeName(name);
     auto* ts = _getOrCreateThreadSamples();
-    ts->Stack.emplace_back(name, _platformNowSeconds());
+    ts->Stack.emplace_back(id, _platformNowSeconds());
 }
 
 void TimeSystem::ProfileEnd() {
@@ -159,8 +178,7 @@ void TimeSystem::ProfileEnd() {
     ts->Stack.pop_back();
 
     ProfileSample s;
-    std::strncpy(s.Name, ent.first, sizeof(s.Name)-1);
-    s.Name[sizeof(s.Name)-1] = '\0';
+    s.ScopeId = ent.first;
     s.DurationSeconds = now - ent.second;
 
     ts->Samples.push_back(s);
@@ -193,23 +211,60 @@ TimeSystem::ThreadSamples* TimeSystem::_getOrCreateThreadSamples() {
 }
 
 void TimeSystem::_collectThreadSamples() {
-    if (!m_profilerCollector)
-        return;
-
+    // Collect all samples produced on threads this frame.
     std::vector<ProfileSample> all;
-    std::lock_guard<std::mutex> lk(m_profilerMutex);
+    {
+        std::lock_guard<std::mutex> lk(m_profilerMutex);
 
-    for (auto& kv : m_threadSamples) {
-        auto* ts = kv.second.get();
+        for (auto& kv : m_threadSamples) {
+            auto* ts = kv.second.get();
 
-        for (auto& s : ts->Samples)
-            all.push_back(s);
+            for (auto& s : ts->Samples)
+                all.push_back(s);
 
-        ts->Samples.clear();
+            ts->Samples.clear();
+        }
     }
 
-    if (!all.empty())
+    if (all.empty())
+        return;
+
+    // Aggregate samples into per-id ScopeData for UI consumption.
+    {
+        std::lock_guard<std::mutex> lk(m_scopeMutex);
+
+        for (const auto &s : all) {
+            uint32_t id = s.ScopeId;
+            float ms = static_cast<float>(s.DurationSeconds * 1000.0);
+
+            if (id >= m_scopeDataById.size()) {
+                m_scopeDataById.resize(id + 1);
+                // m_scopeNames should already contain a name for this id via interning
+            }
+
+            auto &sd = m_scopeDataById[id];
+            sd.FrameTimes.push_back(ms);
+            if (sd.FrameTimes.size() > m_scopeHistorySize)
+                sd.FrameTimes.erase(sd.FrameTimes.begin());
+
+            sd.LastTimeMs = ms;
+
+            // compute average and max
+            float sum = 0.0f;
+            float maxv = 0.0f;
+            for (float v : sd.FrameTimes) {
+                sum += v;
+                if (v > maxv) maxv = v;
+            }
+            sd.AverageTimeMs = sd.FrameTimes.empty() ? 0.0f : (sum / sd.FrameTimes.size());
+            sd.MaxTimeMs = maxv;
+        }
+    }
+
+    // If a collector is installed, forward the raw sample vector as well
+    if (m_profilerCollector) {
         m_profilerCollector(all);
+    }
 }
 
 // ==================== Getters ====================
@@ -220,3 +275,54 @@ double TimeSystem::GetSmoothedDeltaTime() const { return m_smoothDeltaTime; }
 double TimeSystem::GetTotalTime() const { return m_totalTimeScaled; }
 double TimeSystem::GetRealTimeSinceStart() const { return m_totalTimeUnscaled; }
 int    TimeSystem::GetFrameCount() const { return static_cast<int>(m_frameCount.load()); }
+
+float TimeSystem::GetFPS() const {
+    return m_fps;
+}
+
+float TimeSystem::GetFrameTimeMs() const {
+    return m_frameTimeMs;
+}
+
+TimeSystem::ScopeDataMap TimeSystem::GetAllScopeData() const {
+    ScopeDataMap out;
+    std::lock_guard<std::mutex> lk(const_cast<std::mutex&>(m_scopeMutex));
+    const size_t n = std::min(m_scopeNames.size(), m_scopeDataById.size());
+    for (size_t i = 0; i < n; ++i) {
+        out[m_scopeNames[i]] = m_scopeDataById[i];
+    }
+    return out;
+}
+
+std::string TimeSystem::GetScopeName(uint32_t id) const {
+    std::lock_guard<std::mutex> lk(const_cast<std::mutex&>(m_scopeMutex));
+    if (id < m_scopeNames.size()) return m_scopeNames[id];
+    return std::string();
+}
+
+double TimeSystem::GetTotalScopeTimes() const {
+    std::lock_guard<std::mutex> lk(const_cast<std::mutex&>(m_scopeMutex));
+    double total = 0.0;
+    const size_t n = std::min(m_scopeNames.size(), m_scopeDataById.size());
+    for (size_t i = 0; i < n; ++i) {
+        total += m_scopeDataById[i].LastTimeMs;
+    }
+    return total;
+}
+
+void TimeSystem::ClearProfilerHistory() {
+    std::lock_guard<std::mutex> lk(m_scopeMutex);
+    for (auto &sd : m_scopeDataById) sd.FrameTimes.clear();
+}
+
+uint32_t TimeSystem::_internScopeName(const char* name) {
+    if (!name) return 0;
+    std::lock_guard<std::mutex> lk(m_internMutex);
+    auto it = m_scopeNameToId.find(name);
+    if (it != m_scopeNameToId.end()) return it->second;
+    uint32_t id = static_cast<uint32_t>(m_scopeNames.size());
+    m_scopeNames.emplace_back(name);
+    m_scopeNameToId.emplace(m_scopeNames.back(), id);
+    if (m_scopeDataById.size() <= id) m_scopeDataById.resize(id + 1);
+    return id;
+}

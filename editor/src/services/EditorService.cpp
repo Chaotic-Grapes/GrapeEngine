@@ -228,8 +228,6 @@ void EditorService::Render() {
                 io.DisplaySize = ImVec2(static_cast<float>(w->GetWidth()), static_cast<float>(w->GetHeight()));
             }
         }
-        std::cout << "dt: " << TimeSystem::Instance().GetDeltaTime() << std::endl;
-        std::cout << "frame ccount: " << TimeSystem::Instance().GetFrameCount() << std::endl;
         io.DeltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
 
         double mx, my; Input::GetMousePosition(mx, my);

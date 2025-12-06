@@ -16,7 +16,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "core/Application.h"
 #include "core/CrashDumping.h"
-#include "core/Profiler.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
@@ -108,7 +107,6 @@ namespace Engine {
         
         // Update time using platform timestamp and computed delta
         TimeSystem::Instance().Advance(rawDelta, frameStart);
-        Profiler::UpdateTime();
 
         // --- Input Processing ---
         Input::_processInput();

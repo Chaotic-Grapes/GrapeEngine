@@ -27,7 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <nlohmann/json.hpp>
 
 #include "core/Logger.h"
-#include "core/Profiler.h"
+#include "services/TimeSystem.h"
 #include "ecs/Hierarchy.h"
 #include "scene/Scene.h"
 #include "serialization/EntitySerializer.h"

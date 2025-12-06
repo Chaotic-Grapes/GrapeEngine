@@ -1,9 +1,11 @@
 /* Start Header *****************************************************************/
 /*!
-\file   TimeSystem.h
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
-\date   14th September 2025
+\file     TimeSystem.h
+\authors  Muhammad Nur Fadzly Bin Zulkifli (70%)
+          Samantha Leong (30%)
+\par      muhammadnurfadzly.b@digipen.edu
+          s.leong@digipen.edu
+\date     14th September 2025
 \brief
 Declares the time service using std::chrono; provides delta, smoothing,
 fixed-step accumulator, time-scaling, and a simple profiler sampling API.
@@ -19,8 +21,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "Export.h"
 #include <chrono>
+#include <cstdint>
 #include <vector>
 #include <deque>
+#include <map>
 #include <atomic>
 #include <functional>
 #include <mutex>
@@ -35,11 +39,34 @@ public:
     using Duration = std::chrono::duration<double>;
 
     struct ProfileSample {
-        char Name[64];
+        uint32_t ScopeId = 0;
         double DurationSeconds = 0.0;
     };
 
     using ProfilerCollector = std::function<void(const std::vector<ProfileSample>&)>;
+
+    // Profiler data structures
+    struct ScopeData {
+        std::vector<float> FrameTimes;
+        float LastTimeMs = 0.0f;
+        float AverageTimeMs = 0.0f;
+        float MaxTimeMs = 0.0f;
+    };
+
+    using ScopeDataMap = std::map<std::string, ScopeData>;
+
+    /** @brief Get FPS (frames per second) computed from unscaled delta. */
+    float GetFPS() const;
+    /** @brief Get frame time in milliseconds (unscaled). */
+    float GetFrameTimeMs() const;
+    /** @brief Get aggregated scope data map for profiler UI. Returns a copy. */
+    ScopeDataMap GetAllScopeData() const;
+    /** @brief Get interned scope name for id. Returns empty string for invalid id. */
+    std::string GetScopeName(uint32_t id) const;
+    /** @brief Get total of all scope last times (ms). */
+    double GetTotalScopeTimes() const;
+    /** @brief Clear profiler history. */
+    void ClearProfilerHistory();
 
     /**
      * @page TimeSystem_Usage TimeSystem usage examples
@@ -82,7 +109,9 @@ public:
      * // Install a simple collector to print samples once per Advance().
      * TimeSystem::Instance().SetProfilerCollector([](const std::vector<TimeSystem::ProfileSample>& samples){
      *     for (const auto &s : samples) {
-     *         printf("%s: %f\n", s.Name, s.DurationSeconds);
+     *         // Resolve interned id to name for printing
+     *         std::string name = TimeSystem::Instance().GetScopeName(s.ScopeId);
+     *         printf("%s: %f\n", name.c_str(), s.DurationSeconds);
      *     }
      * });
      *
@@ -225,8 +254,9 @@ private:
     // profiler collector + thread-local buffers
     ProfilerCollector m_profilerCollector;
     struct ThreadSamples {
-      std::vector<ProfileSample> Samples; 
-      std::vector<std::pair<const char*, double>> Stack; 
+        std::vector<ProfileSample> Samples;
+        // Stack stores (scopeId, startTimeSeconds)
+        std::vector<std::pair<uint32_t, double>> Stack;
     };
     // map thread id -> samples (protected by mutex when collecting)
     std::mutex m_profilerMutex;
@@ -236,10 +266,26 @@ private:
     double m_startTimeSeconds = 0.0;
     bool m_running = false;
 
+    // FPS / frame time aggregation for profiler UI
+    float m_frameTimeMs = 0.0f;
+    float m_fps = 0.0f;
+    std::deque<double> m_fpsWindow;
+    size_t m_fpsWindowSize = 20;
+
+    // Aggregated profiler scope data (kept as ms per-frame history)
+    // per-id aggregation for fast indexing
+    std::vector<ScopeData> m_scopeDataById;
+    std::vector<std::string> m_scopeNames; // id -> name
+    std::unordered_map<std::string, uint32_t> m_scopeNameToId;
+    std::mutex m_internMutex;
+    size_t m_scopeHistorySize = 120;
+    std::mutex m_scopeMutex;
+
     // helpers
     double _platformNowSeconds() const;
     ThreadSamples* _getOrCreateThreadSamples();
     void _collectThreadSamples();
+    uint32_t _internScopeName(const char* name);
 };
 
 #endif

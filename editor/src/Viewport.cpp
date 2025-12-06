@@ -502,9 +502,9 @@ void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewport
     auto* rendererSystem = _getRendererSystem();
     if (!rendererSystem) return;
 
-    // Get FPS data from Profiler
-    const float currentFps = Profiler::GetFPS();
-    const float frameTimeMs = Profiler::GetFrameTimeMs();
+    // Get FPS data from TimeSystem
+    const float currentFps = TimeSystem::Instance().GetFPS();
+    const float frameTimeMs = TimeSystem::Instance().GetFrameTimeMs();
     const int flushCount = rendererSystem->GetFlushCount();
 
     // Position overlay in top-left corner of viewport with padding
