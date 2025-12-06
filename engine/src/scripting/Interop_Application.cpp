@@ -20,7 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include "core/Application.h"
 #include "core/Logger.h"
-#include "services/WindowManager.h"
+#include "platform/IPlatformContext.h"
 
 // ============================================================================
 // Application API - Application Control
@@ -83,9 +83,11 @@ INTEROP_API bool EngineInterop_Application_IsVSyncEnabled() {
     if (Engine::CORE->HasProjectSettings()) {
         return Engine::CORE->GetProjectSettings().WindowSettings.VSync;
     }
-    // Fallback to checking window manager directly
-    if (auto* window = WindowManager::GetMainWindow()) {
-        return window->IsVSync();
+    // Fallback to checking main window from platform context
+    if (auto* context = Engine::CORE->GetPlatformContext()) {
+        if (auto* window = context->GetMainWindow()) {
+            return window->IsVSync();
+        }
     }
     return true; // Default to VSync enabled
 }

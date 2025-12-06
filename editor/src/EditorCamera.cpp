@@ -22,7 +22,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 // Services
 #include "services/Input.h"
-#include "services/WindowManager.h"
+#include "core/Application.h"
+#include "platform/IPlatformContext.h"
 
 // Core systems
 #include "core/messaging/MessageTypes.h"
@@ -44,7 +45,8 @@ namespace Editor {
         m_camera.FarPlane = 1000.0f;
 
         // Set initial aspect ratio
-        const auto& window = WindowManager::GetMainWindow();
+        auto* context = Engine::CORE->GetPlatformContext();
+        auto* window = context ? context->GetMainWindow() : nullptr;
         if (window) {
             m_camera.SetAspectRatio(
                 static_cast<float>(window->GetWidth()),

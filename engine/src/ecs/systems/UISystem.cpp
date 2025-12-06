@@ -27,8 +27,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/UISystem.h"
 #include "ecs/Components.h"
 #include "services/Input.h"
-#include "services/WindowManager.h"
 #include "core/Logger.h"
+#include "core/Application.h"
+#include "platform/IPlatformContext.h"
 #include <glm/vec2.hpp>
 
 namespace ECS {
@@ -59,7 +60,9 @@ namespace ECS {
         glm::dvec2 mousePos;
         Input::GetMousePosition(mousePos.x, mousePos.y);
 
-        const auto& window = WindowManager::GetMainWindow();
+        auto* context = Engine::CORE->GetPlatformContext();
+        auto* window = context ? context->GetMainWindow() : nullptr;
+        if (!window) return;
         const float winHeight = static_cast<float>(window->GetHeight());
 
         // Convert to bottom-left origin (OpenGL style)

@@ -14,7 +14,6 @@ Launches the application in editor mode with the level editor interface.
 #include "core/Application.h"
 #include "EditorApplication.h"
 #include "services/Time.h"
-#include "services/WindowManager.h"
 #include "platform/IPlatformContext.h"
 
 /**

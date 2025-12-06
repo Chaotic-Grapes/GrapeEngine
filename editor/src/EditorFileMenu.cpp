@@ -37,7 +37,7 @@ centralized and consistent with the currently active scene.
 #include "core/ProjectPaths.h"
 #include "scene/SceneManager.h"
 #include "scene/Scene.h"
-#include "services/WindowManager.h"
+#include "platform/IPlatformContext.h"
 #include "services/Input.h"
 #include <filesystem>
 #include <algorithm>
@@ -328,7 +328,12 @@ void EditorFileMenu::OpenSceneDialog() {
 
     // Fill in the required fields for the dialog
     ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = glfwGetWin32Window(WindowManager::GetMainWindow()->Handle());
+    auto* context = Engine::CORE->GetPlatformContext();
+    auto* mainWindow = context ? context->GetMainWindow() : nullptr;
+    if (!mainWindow)
+        return;
+
+    ofn.hwndOwner = glfwGetWin32Window(reinterpret_cast<GLFWwindow*>(mainWindow->GetNativeHandle()));
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = sizeof(szFile);
     ofn.lpstrFilter = "Scene Files (*.scn;*.scene)\0*.scn;*.scene\0All Files (*.*)\0*.*\0";
@@ -364,7 +369,12 @@ void EditorFileMenu::SaveSceneAsDialog() {
     char szFile[260] = {};
 
     ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = glfwGetWin32Window(WindowManager::GetMainWindow()->Handle());
+    auto* context2 = Engine::CORE->GetPlatformContext();
+    auto* mainWindow2 = context2 ? context2->GetMainWindow() : nullptr;
+    if (!mainWindow2)
+        return;
+        
+    ofn.hwndOwner = glfwGetWin32Window(reinterpret_cast<GLFWwindow*>(mainWindow2->GetNativeHandle()));
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = sizeof(szFile);
     ofn.lpstrFilter = "Scene Files (*.scn;*.scene)\0*.scn;*.scene\0All Files (*.*)\0*.*\0";

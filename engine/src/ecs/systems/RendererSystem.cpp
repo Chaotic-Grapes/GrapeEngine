@@ -55,8 +55,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // ============================================================================
 // Services
 // ============================================================================
-#include "services/WindowManager.h"
 #include "services/Time.h"
+#include "platform/IPlatformContext.h"
 
 // ============================================================================
 // Helpers
@@ -141,7 +141,12 @@ namespace ECS {
         //set static instance pointer
         s_instance = this;
 
-        const auto& mainWindow = WindowManager::GetMainWindow();
+        auto* context = Engine::CORE->GetPlatformContext();
+        auto* mainWindow = context ? context->GetMainWindow() : nullptr;
+        if (!mainWindow) {
+            LOG_ERROR("RendererSystem::OnCreate: No main window available");
+            return;
+        }
         const int width = mainWindow->GetWidth();
         const int height = mainWindow->GetHeight();
 
@@ -360,16 +365,21 @@ namespace ECS {
 
         // fallback (if no active camera found)
         if (!foundActive) {
-            const auto& mainWindow = WindowManager::GetMainWindow();
-            projection = glm::ortho(0.f, static_cast<float>(mainWindow->GetWidth()),
-                0.f, static_cast<float>(mainWindow->GetHeight()),
-                -1.f, 1.f);
+            auto* context = Engine::CORE->GetPlatformContext();
+            auto* mainWindow = context ? context->GetMainWindow() : nullptr;
+            if (mainWindow) {
+                projection = glm::ortho(0.f, static_cast<float>(mainWindow->GetWidth()),
+                    0.f, static_cast<float>(mainWindow->GetHeight()),
+                    -1.f, 1.f);
+            }
         }
 
         // ============================================================
         // BLOOM RADIUS CALCULATION (world-space consistent)
         // ============================================================
-        const auto& win = WindowManager::GetMainWindow();
+        auto* context = Engine::CORE->GetPlatformContext();
+        auto* win = context ? context->GetMainWindow() : nullptr;
+        if (!win) return;
         const float bloomBufferHeight = static_cast<float>(win->GetHeight()) / 2.0f;
 
         // How zoomed in we are relative to the default ortho size

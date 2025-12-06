@@ -41,11 +41,12 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include "core/Logger.h"
+#include "core/Application.h"
+#include "platform/IPlatformContext.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/systems/RendererSystem.h"  
 #include "graphics/RenderGraph.hpp"
 #include "services/Time.h"
-#include "services/WindowManager.h"
 
 // Messaging for editor warnings
 #include "core/messaging/MessageSystem.h"
@@ -471,7 +472,9 @@ void Viewport::_renderCameraFrustum() {
     const glm::mat4 viewProj = projection * view;
 
     // Get window dimensions
-    const auto& win = WindowManager::GetMainWindow();
+    auto* context = Engine::CORE->GetPlatformContext();
+    auto* win = context ? context->GetMainWindow() : nullptr;
+    if (!win) return;
     const float windowHeight = static_cast<float>(win->GetHeight());
 
     // Get renderer and shader from renderer system
