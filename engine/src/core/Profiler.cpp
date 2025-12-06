@@ -68,26 +68,26 @@ void Profiler::UpdateTime(double fpsCalcInt) {
     
     // 1. Calculate and store total frame time (in milliseconds)
     // Time::UnscaledDeltaTime() returns seconds, so multiply by 1000
-    Profiler::FrameTimeMs = Time::UnscaledDeltaTime() * 1000.0;
+    Profiler::FrameTimeMs = TimeSystem::Instance().GetUnscaledDeltaTime() * 1000.0;
 
     // fps calculations
     static double count = 0.0; // number of game loop iterations
     //static double start_time = glfwGetTime();
     // get elapsed time since very beginning (in seconds) ...
     //double elapsed_time = curr_time - start_time;
-    static double startTime = Time::ElapsedTime(); // Use Time's elapsed time
+    static double startTime = TimeSystem::Instance().GetTotalTime(); // Use Time's elapsed time
 
     ++count;
 
     // Get elapsed time since the last FPS update
-    const double elapsedTime = Time::ElapsedTime() - startTime;
+    const double elapsedTime = TimeSystem::Instance().GetTotalTime() - startTime;
 
     // update fps at least every 10 seconds ...
     fpsCalcInt = (fpsCalcInt < 0.0) ? 0.0 : fpsCalcInt;
     fpsCalcInt = (fpsCalcInt > 10.0) ? 10.0 : fpsCalcInt;
     if (elapsedTime > fpsCalcInt) {
         Profiler::Fps = count / elapsedTime;
-        startTime = Time::ElapsedTime();
+        startTime = TimeSystem::Instance().GetTotalTime();
         count = 0.0;
     }
 }

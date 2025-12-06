@@ -46,7 +46,7 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include "serialization/EntitySerializer.h"
 #include "ecs/systems/RendererSystem.h"  
 #include "graphics/RenderGraph.hpp"
-#include "services/Time.h"
+#include "services/TimeSystem.h"
 
 // Messaging for editor warnings
 #include "core/messaging/MessageSystem.h"
@@ -150,9 +150,9 @@ void Viewport::_renderViewport() {
         && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     // Update editor camera (processes input if viewport is hovered)
-    if (m_editorCamera) {
+        if (m_editorCamera) {
         m_editorCamera->SetAllowInput(m_isViewportHovered);
-        m_editorCamera->Update(Time::DeltaTime());
+        m_editorCamera->Update(static_cast<float>(TimeSystem::Instance().GetDeltaTime()));
     }
 
     auto* rendererSystem = _getRendererSystem();

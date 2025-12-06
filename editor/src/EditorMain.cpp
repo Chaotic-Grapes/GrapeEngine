@@ -13,7 +13,7 @@ Launches the application in editor mode with the level editor interface.
 #include <crtdbg.h>
 #include "core/Application.h"
 #include "EditorApplication.h"
-#include "services/Time.h"
+#include "services/TimeSystem.h"
 #include "platform/IPlatformContext.h"
 
 /**

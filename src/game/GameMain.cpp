@@ -14,7 +14,7 @@ Launches the game directly from the startup scene specified in ProjectSettings.j
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
 #include "core/Logger.h"
-#include "services/Time.h"
+#include "services/TimeSystem.h"
 #include "platform/IPlatformContext.h"
 #include "physics/Physics.h"
 #include "scene/SceneManager.h"

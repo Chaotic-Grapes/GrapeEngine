@@ -26,7 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/AudioSystem.h"
 #include "scene/Scene.h"
 #include "services/Input.h"
-#include "services/Time.h"
+#include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
 #include "ecs/systems/UIEventSystem.h"
@@ -60,7 +60,7 @@ namespace Engine {
         CrashDumping::SetDumpCreateState(true);
 
         // Initialize time system
-        Time::_initialize();
+        TimeSystem::Instance().Start();
 
         // Enable/disable console
         if (enableConsole)
@@ -81,7 +81,10 @@ namespace Engine {
         // Initialize services
         _initializeServices();
 
-        m_lastFrameTime = Time::ElapsedTime();
+        // Initialize last-frame timestamp using the platform steady clock
+        using Clock = TimeSystem::Clock;
+        using Duration = TimeSystem::Duration;
+        m_lastFrameTime = std::chrono::duration_cast<Duration>(Clock::now().time_since_epoch()).count();
         m_initialized = true;
 
         LOG_INFO("Engine initialized in " << (mode == EngineMode::Editor ? "Editor" : "Game") << " mode");
@@ -93,15 +96,18 @@ namespace Engine {
             return;
         }
 
-        const double frameStart = Time::ElapsedTime();
+        // Compute platform steady-clock timestamp for this frame and delta
+        using Clock = TimeSystem::Clock;
+        using Duration = TimeSystem::Duration;
+        const double frameStart = std::chrono::duration_cast<Duration>(Clock::now().time_since_epoch()).count();
         const double rawDelta = frameStart - m_lastFrameTime;
         m_lastFrameTime = frameStart;
 
         // Clear UI event queue
         ECS::UIEventQueue::Clear();
         
-        // Update time
-        Time::_update(rawDelta, frameStart);
+        // Update time using platform timestamp and computed delta
+        TimeSystem::Instance().Advance(rawDelta, frameStart);
         Profiler::UpdateTime();
 
         // --- Input Processing ---
@@ -152,7 +158,7 @@ namespace Engine {
             _updatePhysics(world, shouldRun, stepRequested);
             
             // Update all systems - they control their own run mode behavior
-            const float dt = static_cast<float>(Time::DeltaTime());
+            const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
             m_systemManager.Update(world, dt);
         }
 
@@ -364,14 +370,14 @@ namespace Engine {
 
         // Run physics at fixed timestep when playing
         if (shouldRun) {
-            m_accumulator += Time::UnscaledDeltaTime();
+            m_accumulator += static_cast<float>(TimeSystem::Instance().GetUnscaledDeltaTime());
 
-            const float maxAccumulator = Time::UnscaledFixedDeltaTime() * 5.0f;
+            const float maxAccumulator = static_cast<float>(TimeSystem::Instance().GetFixedTimeStep()) * 5.0f;
             if (m_accumulator > maxAccumulator)
                 m_accumulator = maxAccumulator;
 
-            while (m_accumulator >= Time::UnscaledFixedDeltaTime()) {
-                m_accumulator -= Time::UnscaledFixedDeltaTime();
+            while (m_accumulator >= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep())) {
+                m_accumulator -= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep());
             }
         }
         // Editor-only: Single step when paused (callback already consumed the flag)

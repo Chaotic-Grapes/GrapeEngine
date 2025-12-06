@@ -23,7 +23,7 @@ Reference:
 
 #include "PlaybackControls.h"
 #include "services/Input.h"
-#include "services/Time.h"
+#include "services/TimeSystem.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
@@ -378,13 +378,13 @@ void Playback::_changeState(GameState newState) {
     // Handle time scale changes based on state
     switch (newState) {
     case GameState::Stopped:
-        Time::TimeScale(1.0f);
+        TimeSystem::Instance().SetTimeScale(1.0);
         break;
     case GameState::Paused:
-        Time::TimeScale(0.0f);
+        TimeSystem::Instance().SetTimeScale(0.0);
         break;
     case GameState::Playing:
-        Time::TimeScale(1.0f);
+        TimeSystem::Instance().SetTimeScale(1.0);
         break;
     }
 

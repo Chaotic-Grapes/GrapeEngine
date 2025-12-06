@@ -55,7 +55,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // ============================================================================
 // Services
 // ============================================================================
-#include "services/Time.h"
+#include "services/TimeSystem.h"
 #include "platform/IPlatformContext.h"
 
 // ============================================================================
@@ -1009,7 +1009,7 @@ namespace ECS {
         m_renderGraph->Execute();
 
         // Performance logging
-        if (Time::FrameCount() % 120 == 0)
+        if (TimeSystem::Instance().GetFrameCount() % 120 == 0)
         {
             static int previousFlushTotal = 0;
             int currentTotal = GetFlushCount();
@@ -1022,7 +1022,7 @@ namespace ECS {
             else if (flushes == 1)
                 ss << " Single batch, bottleneck is CPU-side or GPU fillrate";
 
-            LOG_DEBUG("Flushes this frame: " << flushes << ss.str() << " | " << "FPS: " <<  static_cast<int>(1.0f / Time::DeltaTime()));
+            LOG_DEBUG("Flushes this frame: " << flushes << ss.str() << " | " << "FPS: " <<  static_cast<int>(1.0f / TimeSystem::Instance().GetDeltaTime()));
         }
     }
 

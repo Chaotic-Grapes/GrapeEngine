@@ -25,6 +25,7 @@ Features:
 #include "platform/IPlatformContext.h"
 #include "platform/IWindow.h"
 #include "services/Input.h"
+#include "services/TimeSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/Logger.h"
@@ -227,9 +228,9 @@ void EditorService::Render() {
                 io.DisplaySize = ImVec2(static_cast<float>(w->GetWidth()), static_cast<float>(w->GetHeight()));
             }
         }
-        std::cout << "dt: " << Time::DeltaTime() << std::endl;
-        std::cout << "frame ccount: " << Time::FrameCount() << std::endl;
-        io.DeltaTime = Time::DeltaTime();
+        std::cout << "dt: " << TimeSystem::Instance().GetDeltaTime() << std::endl;
+        std::cout << "frame ccount: " << TimeSystem::Instance().GetFrameCount() << std::endl;
+        io.DeltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
 
         double mx, my; Input::GetMousePosition(mx, my);
         io.MousePos = ImVec2(static_cast<float>(mx), static_cast<float>(my));

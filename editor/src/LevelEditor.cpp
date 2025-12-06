@@ -18,7 +18,7 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 #include "EditorStyle.h"
 #include "graphics/graphicsConfig.hpp"
 #include "LevelEditor.h"
-#include "services/Time.h"
+#include "services/TimeSystem.h"
 #include "UndoSystem.h"
 #include "ViewportPicking.h"
 #include <core/Application.h>
