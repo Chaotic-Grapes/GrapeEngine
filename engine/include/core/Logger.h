@@ -7,6 +7,20 @@
 #undef ERROR
 #endif
 
+// Windows headers (and some third-party libs) sometimes define common
+// short macros like ERROR, WARNING, DEBUG, INFO which conflict with our
+// `LogLevel` enum identifiers. Undefine them here to avoid collisions when
+// this header is included after platform headers.
+#ifdef WARNING
+#undef WARNING
+#endif
+#ifdef DEBUG
+#undef DEBUG
+#endif
+#ifdef INFO
+#undef INFO
+#endif
+
 #define LOG_STREAM(level, msg)						\
     do {											\
         std::ostringstream ossMacro;				\

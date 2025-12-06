@@ -108,7 +108,11 @@ void LevelEditor::_buildDockLayout() {
 
     ImGui::DockBuilderRemoveNode(m_dockspaceId);
     // Flags: DockSpace creates a root docking container; PassthruCentralNode lets the central area render game content underneath
-    ImGui::DockBuilderAddNode(m_dockspaceId, ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
+    // Combine dock node flags using integer casts to avoid deprecated enum-| between different enum types (C5054)
+    const ImGuiDockNodeFlags dockNodeFlags = static_cast<ImGuiDockNodeFlags>(
+        static_cast<int>(ImGuiDockNodeFlags_DockSpace) | static_cast<int>(ImGuiDockNodeFlags_PassthruCentralNode)
+    );
+    ImGui::DockBuilderAddNode(m_dockspaceId, dockNodeFlags);
     ImGui::DockBuilderSetNodeSize(m_dockspaceId, vp->Size); // Match viewport size
 
     // Target layout: left hierarchy, center viewport with controls on top,
@@ -121,7 +125,9 @@ void LevelEditor::_buildDockLayout() {
 
     // Hide tab bar and disable resizing on toolbar node
     ImGuiDockNode* toolbarDockNode = ImGui::DockBuilderGetNode(toolbarNode);
-    toolbarDockNode->LocalFlags |= ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_NoResize;
+    toolbarDockNode->LocalFlags |= static_cast<ImGuiDockNodeFlags>(
+        static_cast<int>(ImGuiDockNodeFlags_NoTabBar) | static_cast<int>(ImGuiDockNodeFlags_NoResize)
+    );
 
     ImGuiID leftCenterNode, rightNode;
     // Split main area: carve right strip (25% width) for inspectors
@@ -187,9 +193,12 @@ void LevelEditor::_renderDockSpace() {
     // NoDocking: disallow docking into this window
     // NoTitleBar/NoResize/NoMove: make it a static, decoration-less host
     // NoBringToFrontOnFocus/NoNavFocus: keep focus behavior stable
-    constexpr ImGuiWindowFlags hostFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+    // Compose window flags via integer casts to avoid deprecated enum-| warnings (C5054)
+    constexpr ImGuiWindowFlags hostFlags = static_cast<ImGuiWindowFlags>(
+        static_cast<int>(ImGuiWindowFlags_NoDocking) | static_cast<int>(ImGuiWindowFlags_NoTitleBar) |
+        static_cast<int>(ImGuiWindowFlags_NoResize) | static_cast<int>(ImGuiWindowFlags_NoMove) |
+        static_cast<int>(ImGuiWindowFlags_NoBringToFrontOnFocus) | static_cast<int>(ImGuiWindowFlags_NoNavFocus)
+    );
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);                  // Square corners for host
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);                // No border around host

@@ -15,6 +15,7 @@ Launches the application in editor mode with the level editor interface.
 #include "EditorApplication.h"
 #include "services/Time.h"
 #include "services/WindowManager.h"
+#include "platform/IPlatformContext.h"
 
 /**
  * @brief Main entry point for the Grape Engine Level Editor
@@ -31,6 +32,12 @@ int main() {
     engine.Initialize(Engine::EngineMode::Editor, false);
 #endif
 
+    // Get platform context for editor use
+    auto* platformContext = engine.GetPlatformContext();
+    if (!platformContext) {
+        return -1;
+    }
+
     // Create editor application
     EditorApplication editor(&engine);
     editor.Initialize();
@@ -41,17 +48,12 @@ int main() {
 
     // Editor main loop
     while (engine.IsRunning()) {
-        // IMPORTANT: Update engine FIRST to ensure glfwPollEvents() is called
-        // before ImGui backends try to initialize (requires Win32 window proc to be ready)
-        engine.Update();
-
-        LOG_INFO("EditorMain: Engine updated for this frame");
-        // Update editor UI and tools (backends init deferred until after first glfwPollEvents)
         editor.Update();
+        engine.Update();
         editor.Render();
 
-        // Swap buffers
-        for (const auto* win : WindowManager::GetWindows()) {
+        // Swap buffers using platform abstraction
+        for (auto* win : platformContext->GetAllWindows()) {
             win->SwapBuffers();
         }
     }

@@ -298,18 +298,18 @@ void Window::SetTitle(const std::string& title) {
 		glfwSetWindowTitle(m_windowHandle, title.c_str());
 }
 
-std::string Window::GetTitle() const { return m_title; }
+std::string Window::GetTitle()  const { return m_title; }
 
-GLFWwindow* Window::Handle()  const { return m_windowHandle; }
-int Window::GetWidth()						const { return m_width; }
-int Window::GetHeight()					const { return m_height; }
-void Window::PollEvents()		  const { glfwPollEvents(); }
+GLFWwindow* Window::Handle()    const { return m_windowHandle; }
+int Window::GetWidth()			const { return m_width; }
+int Window::GetHeight()			const { return m_height; }
+void Window::PollEvents()		const { glfwPollEvents(); }
 void Window::SwapBuffers()		const { glfwSwapBuffers(m_windowHandle); }
 bool Window::ShouldClose()		const { return m_windowHandle && glfwWindowShouldClose(m_windowHandle); }
-void Window::Close()			    const { glfwSetWindowShouldClose(m_windowHandle, true); }
+void Window::Close()			const { glfwSetWindowShouldClose(m_windowHandle, true); }
 
-bool Window::IsFocused()				  			   const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_FOCUSED); }
-bool Window::IsMinimized()				  			 const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_ICONIFIED); }
+bool Window::IsFocused()				   const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_FOCUSED); }
+bool Window::IsMinimized()				   const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_ICONIFIED); }
 void Window::SetMinimized(const bool flag) const {
 	if (!m_windowHandle) return;
 	if (flag)
@@ -317,7 +317,7 @@ void Window::SetMinimized(const bool flag) const {
 	else
 		glfwRestoreWindow(m_windowHandle);
 }
-bool Window::IsMaximized() const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_MAXIMIZED); }
+bool Window::IsMaximized()                 const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_MAXIMIZED); }
 void Window::SetMaximized(const bool flag) const {
 	if (!m_windowHandle) return;
 	if (flag)
@@ -325,7 +325,7 @@ void Window::SetMaximized(const bool flag) const {
 	else
 		glfwRestoreWindow(m_windowHandle);
 }
-bool Window::IsVisible() const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_VISIBLE); }
+bool Window::IsVisible()                 const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_VISIBLE); }
 void Window::SetVisible(const bool flag) const {
 	if (!m_windowHandle) return;
 	if (flag)
@@ -333,10 +333,10 @@ void Window::SetVisible(const bool flag) const {
 	else
 		glfwHideWindow(m_windowHandle);
 }
-bool Window::IsResizable()				  			 const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_RESIZABLE); }
+bool Window::IsResizable()				   const { return m_windowHandle && glfwGetWindowAttrib(m_windowHandle, GLFW_RESIZABLE); }
 void Window::SetResizable(const bool flag) const { if (m_windowHandle) glfwSetWindowAttrib(m_windowHandle, GLFW_RESIZABLE, flag ? GLFW_TRUE : GLFW_FALSE); }
 
-void Window::SetVSync(bool enabled) { m_vsync = enabled; glfwSwapInterval(enabled ? 1 : 0); }
-bool Window::IsVSync() const 			  { return m_vsync; }
+void Window::SetVSync(bool enabled)              { m_vsync = enabled; glfwSwapInterval(enabled ? 1 : 0); }
+bool Window::IsVSync()                     const { return m_vsync; }
 
 bool Window::HasMode(const WindowMode::Flags value) const { return HasFlag(m_mode, value); }

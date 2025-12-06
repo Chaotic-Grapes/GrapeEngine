@@ -107,6 +107,7 @@ namespace Editor {
     }
 
     void EditorCamera::HandleMouseInput(float deltaTime) {
+        (void)deltaTime;
         double x, y;
         Input::GetMousePosition(x, y);
         glm::vec2 mousePos(static_cast<float>(x), static_cast<float>(y));

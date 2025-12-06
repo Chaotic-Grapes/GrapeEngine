@@ -15,11 +15,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "EditorApplication.h"
 #include "services/EditorService.h"
-#include "services/WindowManager.h"
 #include "EditorConfiguration.h"
 #include "core/Logger.h"
 #include "core/ProjectPaths.h"
 #include "physics/Physics.h"
+#include "platform/IPlatformContext.h"
+#include "platform/IWindow.h"
 #include <filesystem>
 
 EditorApplication::EditorApplication(Engine::Application* engine) : m_engine(engine), m_editorService(nullptr), m_initialized(false) { }
@@ -118,11 +119,15 @@ void EditorApplication::_loadEditorSettings() {
 
 void EditorApplication::_saveEditorSettings() {
     // Update settings from current window state
-    if (auto* window = WindowManager::GetMainWindow()) {
-        m_editorSettings.WindowSettings.Width = window->GetWidth();
-        m_editorSettings.WindowSettings.Height = window->GetHeight();
-        m_editorSettings.WindowSettings.Maximized = window->IsMaximized();
-        m_editorSettings.WindowSettings.VSync = window->IsVSync();
+    auto* platformContext = m_engine->GetPlatformContext();
+    if (platformContext) {
+        auto* window = platformContext->GetMainWindow();
+        if (window) {
+            m_editorSettings.WindowSettings.Width = window->GetWidth();
+            m_editorSettings.WindowSettings.Height = window->GetHeight();
+            m_editorSettings.WindowSettings.Maximized = window->IsMaximized();
+            m_editorSettings.WindowSettings.VSync = window->IsVSync();
+        }
     }
 
     Editor::EditorConfiguration::SaveConfig("config.json", m_editorSettings);
@@ -132,19 +137,31 @@ void EditorApplication::_saveEditorSettings() {
 void EditorApplication::_createMainWindow() {
     LOG_INFO("Creating main window from EditorSettings");
 
-    int width = m_editorSettings.WindowSettings.Width;
-    int height = m_editorSettings.WindowSettings.Height;
-    bool vsync = m_editorSettings.WindowSettings.VSync;
+    // Get platform context from engine
+    auto* platformContext = m_engine->GetPlatformContext();
+    if (!platformContext) {
+        LOG_ERROR("Platform context not available");
+        return;
+    }
 
-    auto* window = CREATE_WINDOW_EX("Grape Engine Editor", width, height, vsync, WindowMode::Windowed);
+    // Create window using platform abstraction
+    Platform::WindowCreateInfo windowInfo;
+    windowInfo.Title = "Grape Engine Editor";
+    windowInfo.Width = m_editorSettings.WindowSettings.Width;
+    windowInfo.Height = m_editorSettings.WindowSettings.Height;
+    windowInfo.VSync = m_editorSettings.WindowSettings.VSync;
+    windowInfo.Mode = Platform::WindowMode::Windowed;
+    windowInfo.Resizable = true;
+    windowInfo.Decorated = true;
 
+    auto* window = platformContext->CreatePlatformWindow(windowInfo);
     if (!window) {
         LOG_ERROR("Failed to create main window for editor");
         return;
     }
 
     window->SetMaximized(m_editorSettings.WindowSettings.Maximized);
-    LOG_INFO("Main window created successfully");
+    LOG_INFO("Main window created successfully via platform abstraction");
 }
 
 void EditorApplication::_initializeEditorService() {
@@ -154,10 +171,30 @@ void EditorApplication::_initializeEditorService() {
     }
 
     // Create and initialize editor service
-    m_editorService = new Services::EditorService(m_engine->GetSceneManager());
-    m_editorService->Initialize();
-    m_editorService->SetEnabled(true);
-    LOG_INFO("EditorService created and initialized");
+    LOG_INFO("About to create EditorService (sceneManager=" << reinterpret_cast<void*>(&m_engine->GetSceneManager()) << ")");
+    try {
+        m_editorService = new Services::EditorService(m_engine->GetSceneManager());
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception creating EditorService: " << e.what());
+        m_editorService = nullptr;
+    }
+
+    LOG_INFO("EditorService pointer after new: " << reinterpret_cast<void*>(m_editorService));
+
+    if (m_editorService) {
+        try {
+            LOG_INFO("Calling EditorService::Initialize()");
+            m_editorService->Initialize();
+            LOG_INFO("EditorService::Initialize returned");
+        } catch (const std::exception& e) {
+            LOG_ERROR("Exception in EditorService::Initialize: " << e.what());
+        }
+
+        m_editorService->SetEnabled(true);
+        LOG_INFO("EditorService created and initialized");
+    } else {
+        LOG_ERROR("EditorService pointer is null after allocation");
+    }
 
     // Enable level editor without a scene (scene-less editor mode)
     m_editorService->EnableLevelEditorForScene(nullptr);

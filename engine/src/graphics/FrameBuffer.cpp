@@ -17,7 +17,7 @@ This file provides functions for:
 - Clearing and blitting contents between framebuffers
 - Binding framebuffer textures for post-processing passes
 
-The Framebuffer class is a key component of the engine’s rendering pipeline,
+The Framebuffer class is a key component of the engine's rendering pipeline,
 used for effects such as HDR rendering, bloom, tone mapping, and deferred passes.
 */
 /* End Header *******************************************************************/
@@ -48,6 +48,8 @@ void Framebuffer::Create(int w, int h,
     colorAttachments.resize(colorAttachmentCount);
     glGenTextures(colorAttachmentCount, colorAttachments.data());
 
+    numColorAttachments = colorAttachmentCount;
+
     GLenum internalFormat = floatingPoint ? GL_RGBA16F : GL_RGBA8;
     GLenum type = floatingPoint ? GL_FLOAT : GL_UNSIGNED_BYTE;
 
@@ -68,11 +70,18 @@ void Framebuffer::Create(int w, int h,
     }
 
     // Tell OpenGL which color attachments to render to
-    std::vector<GLenum> attachments;
-    attachments.reserve(colorAttachmentCount);
-    for (int i = 0; i < colorAttachmentCount; ++i)
-        attachments.push_back(GL_COLOR_ATTACHMENT0 + i);
-    glDrawBuffers(colorAttachmentCount, attachments.data());
+    if (colorAttachmentCount > 0) {
+        std::vector<GLenum> attachments;
+        attachments.reserve(colorAttachmentCount);
+        for (int i = 0; i < colorAttachmentCount; ++i)
+            attachments.push_back(GL_COLOR_ATTACHMENT0 + i);
+        glDrawBuffers(colorAttachmentCount, attachments.data());
+    }
+    else {
+        // No color attachments: explicitly set no draw/read buffers
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+    }
 
     // ------------------------------------------------------------
     // Optional depth/stencil attachment
@@ -88,8 +97,36 @@ void Framebuffer::Create(int w, int h,
             depth);
     }
 
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cerr << "Framebuffer incomplete!\n";
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Framebuffer incomplete! status=0x" << std::hex << status << std::dec << "\n";
+        switch (status) {
+        case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+            std::cerr << "  Reason: INCOMPLETE_ATTACHMENT\n";
+            break;
+        case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+            std::cerr << "  Reason: MISSING_ATTACHMENT\n";
+            break;
+        case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
+            std::cerr << "  Reason: INCOMPLETE_DRAW_BUFFER\n";
+            break;
+        case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
+            std::cerr << "  Reason: INCOMPLETE_READ_BUFFER\n";
+            break;
+        case GL_FRAMEBUFFER_UNSUPPORTED:
+            std::cerr << "  Reason: UNSUPPORTED (check formats)\n";
+            break;
+        case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
+            std::cerr << "  Reason: INCOMPLETE_MULTISAMPLE\n";
+            break;
+        case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:
+            std::cerr << "  Reason: INCOMPLETE_LAYER_TARGETS\n";
+            break;
+        default:
+            std::cerr << "  Reason: Unknown\n";
+            break;
+        }
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -117,7 +154,7 @@ void Framebuffer::Resize(int w, int h,
 }
 
 // ============================================================================
-// Frees all GPU resources associated with this framebuffer —
+// Frees all GPU resources associated with this framebuffer
 // deletes color textures, depth buffers, and the FBO itself.
 // ============================================================================
 void Framebuffer::Destroy()
@@ -154,7 +191,7 @@ void Framebuffer::BindAndClear(float r, float g, float b, float a)
 }
 
 // ============================================================================
-// Copies (blits) the framebuffer’s contents to the default backbuffer.
+// Copies (blits) the framebuffer's contents to the default backbuffer.
 // Usually used to display post-processed results to the screen.
 // ============================================================================
 void Framebuffer::BlitToDefault(GLbitfield mask, GLenum filter) const
@@ -168,7 +205,7 @@ void Framebuffer::BlitToDefault(GLbitfield mask, GLenum filter) const
 }
 
 // ============================================================================
-// Binds one of the framebuffer’s color textures to a given texture unit,
+// Binds one of the framebuffer's color textures to a given texture unit,
 // so it can be sampled in a shader (e.g., for post-processing).
 // ============================================================================
 void Framebuffer::BindColorTexture(int index, int unit) const

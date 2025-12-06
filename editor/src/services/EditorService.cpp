@@ -21,12 +21,38 @@ Features:
 #include "glad/glad.h"
 #include "services/EditorService.h"
 #include "scene/SceneManager.h"
-#include "services/WindowManager.h"
+#include "core/Application.h"
+#include "platform/IPlatformContext.h"
+#include "platform/IWindow.h"
 #include "services/Input.h"
 #include "core/messaging/MessageTypes.h"
 #include "core/messaging/MessageSystem.h"
+#include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "services/UICommon.h"
+#include <sstream>
+#include <iomanip>
+#include <GLFW/glfw3.h>
+
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include <Windows.h>
+#endif
+
+// Undefine common Windows macros that conflict with our logging enums/macros
+#ifdef ERROR
+#undef ERROR
+#endif
+#ifdef WARNING
+#undef WARNING
+#endif
+#ifdef DEBUG
+#undef DEBUG
+#endif
+#ifdef INFO
+#undef INFO
+#endif
 
 #ifdef USE_IMGUI
 #include <imgui.h>
@@ -34,17 +60,7 @@ Features:
 #include <imgui_impl_glfw.h>
 #include <imgui_internal.h>
 #include "LevelEditor.h"
-
-// Custom allocator functions for ImGui to share across DLL boundary
-static void* ImGuiMallocWrapper(size_t size, void* user_data) {
-    (void)user_data;
-    return malloc(size);
-}
-
-static void ImGuiFreeWrapper(void* ptr, void* user_data) {
-    (void)user_data;
-    free(ptr);
-}
+#include "EditorStyle.h"
 #endif
 
 using namespace Services;
@@ -53,34 +69,74 @@ using namespace Services;
 EditorService::~EditorService() { m_editorInstance = nullptr; }
 
 void EditorService::Initialize() {
-    if (m_world) {
-        UICommon::InitializeDefaultLayouts();
+    LOG_INFO("EditorService::Initialize ENTRY - this=" << reinterpret_cast<void*>(this) << ", m_world=" << reinterpret_cast<void*>(m_world));
+    try {
+        if (m_world) {
+            LOG_INFO("EditorService::Initialize - calling UICommon::InitializeDefaultLayouts");
+            UICommon::InitializeDefaultLayouts();
+        }
+
+    if (!Engine::CORE) {
+        LOG_ERROR("EditorService::Initialize() - Engine CORE not available");
+        return;
     }
 
-    Window* mainWindow = WindowManager::GetMainWindow();
+    auto* platformContext = Engine::CORE->GetPlatformContext();
+    if (!platformContext) {
+        LOG_ERROR("EditorService::Initialize() - Platform context not available");
+        return;
+    }
+
+    auto* mainWindow = platformContext->GetMainWindow();
     if (!mainWindow) {
         LOG_WARNING("EditorService::Initialize() - No main window available");
         return;
     }
 
-    // Create ImGui context only - defer backend initialization until first Update()
-    // This ensures glfwPollEvents() has been called at least once, which is required
-    // for the Win32 window procedure to be properly initialized
-    if (ImGui::GetCurrentContext() == nullptr) {
-        LOG_INFO("Creating ImGui context...");
-        ImGui::CreateContext();
-        
-        // CRITICAL for DLL boundaries: Set allocator functions to ensure heap consistency
-        // across Engine.dll and Editor.exe. Without this, ImGui may crash due to
-        // allocating in one module and freeing in another.
-        ImGui::SetAllocatorFunctions(ImGuiMallocWrapper, ImGuiFreeWrapper, nullptr);
-        
-        ImGuiIO& io = ImGui::GetIO();
-        io.IniFilename = "imgui.ini";
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    LOG_INFO("EditorService::Initialize - platformContext=" << reinterpret_cast<void*>(platformContext)
+             << ", mainWindow=" << reinterpret_cast<void*>(mainWindow)
+             << ", nativeHandle=" << reinterpret_cast<void*>(mainWindow->GetNativeHandle()));
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+
+    ImGuiIO& io = ImGui::GetIO();
+    // Enable docking, but disable multi-viewport to avoid the ImGui GLFW
+    // backend attempting to install Win32 WndProc hooks (engine already
+    // manages GLFW callbacks and that caused assertion failures).
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+    io.FontGlobalScale = EditorStyle::FontScale;
+
+    ImGui::StyleColorsDark();
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.TabBarBorderSize = 0.0f;
+
+    GLFWwindow* glfwHandle = static_cast<GLFWwindow*>(mainWindow->GetNativeHandle());
+    if (!glfwHandle) {
+        LOG_ERROR("EditorService::Initialize() - GLFW native handle is null; cannot initialize ImGui");
+        return;
     }
 
-    // Subscribe to window resize events
+    // Make sure the window's context is current before initializing GL loader/backends
+    glfwMakeContextCurrent(glfwHandle);
+
+    // Ensure GL functions are available (GLAD). Window creation normally initializes GLAD,
+    // but re-check here to be safe in case of ordering differences during refactor.
+    if (!gladLoadGL()) {
+        LOG_ERROR("EditorService::Initialize() - gladLoadGL() failed; OpenGL functions unavailable");
+        return;
+    }
+
+    // We avoid using ImGui's GLFW platform backend (it installs Win32 hooks
+    // which conflict with our input system). Instead we initialize only the
+    // OpenGL renderer backend and provide minimal platform data ourselves.
+    ImGui_ImplOpenGL3_Init("#version 460");
+    ImGuiIO& io2 = ImGui::GetIO();
+    io2.BackendPlatformName = "GrapeEngine_Custom";
+    io2.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // we can honor cursors
+    m_backendInitialized = true;
+
     if (!m_initialized) {
         Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
             [this](const Messaging::WindowResized& msg) {
@@ -89,6 +145,11 @@ void EditorService::Initialize() {
         );
         m_initialized = true;
     }
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception in EditorService::Initialize(): " << e.what());
+    } catch (...) {
+        LOG_ERROR("Unknown exception in EditorService::Initialize()");
+    }
 }
 
 bool EditorService::IsGamePlaying() const { return (m_levelEditor) && m_levelEditor->IsPlaying(); }
@@ -96,41 +157,35 @@ bool EditorService::IsStepRequested() const { return (m_levelEditor) && m_levelE
 void EditorService::ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
 
 void EditorService::SetWorld(ECS::World* world) {
-    if (m_world == world) return;
+    if (m_world == world)
+        return;
+
     m_world = world;
-    if (m_levelEditor) m_levelEditor->SetWorld(m_world);
+
+    if (m_levelEditor)
+        m_levelEditor->SetWorld(m_world);
 }
 
 void EditorService::Update() {
     if (!m_initialized) return;
 
-    // Initialize ImGui backends on first Update() call (after glfwPollEvents has run)
-    if (!m_backendInitialized) {
-        Window* mainWindow = WindowManager::GetMainWindow();
-        if (!mainWindow) return;
-        
-        // Ensure ImGui context is set for this DLL boundary
-        // This is critical when Engine.dll and Editor.exe both use ImGui
-        ImGuiContext* ctx = ImGui::GetCurrentContext();
-        if (ctx) {
-            ImGui::SetCurrentContext(ctx);
-        }
-        
-        LOG_INFO("Initializing ImGui backends (deferred to first frame)...");
-        ImGui_ImplGlfw_InitForOpenGL(mainWindow->Handle(), true);
-        ImGui_ImplOpenGL3_Init("#version 130");
-        LOG_INFO("ImGui backends initialized successfully");
-        
-        m_backendInitialized = true;
-    }
-
     if (m_pendingLevelEditorRebuild && m_levelEditor) {
         LevelEditorConfig config;
         m_levelEditor.reset();
+
         Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : m_sceneManager.GetActive();
         m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
-        Window* mainWindow = WindowManager::GetMainWindow();
-        if (mainWindow) m_levelEditor->Initialize(mainWindow->Handle());
+
+        if (Engine::CORE) {
+            auto* platformContext = Engine::CORE->GetPlatformContext();
+            if (platformContext) {
+                auto* mainWindow = platformContext->GetMainWindow();
+                if (mainWindow) {
+                    m_levelEditor->Initialize(static_cast<GLFWwindow*>(mainWindow->GetNativeHandle()));
+                }
+            }
+        }
+
         m_pendingLevelEditorRebuild = false;
     }
 
@@ -146,8 +201,16 @@ void EditorService::Update() {
         LevelEditorConfig config;
         Scenes::Scene* targetScene = m_levelEditorForScene ? m_levelEditorForScene : activeScene;
         m_levelEditor = std::make_unique<LevelEditor>(m_world, config, targetScene);
-        Window* mainWindow = WindowManager::GetMainWindow();
-        if (mainWindow) m_levelEditor->Initialize(mainWindow->Handle());
+
+        if (Engine::CORE) {
+            auto* platformContext = Engine::CORE->GetPlatformContext();
+            if (platformContext) {
+                auto* mainWindow = platformContext->GetMainWindow();
+                if (mainWindow) {
+                    m_levelEditor->Initialize(static_cast<GLFWwindow*>(mainWindow->GetNativeHandle()));
+                }
+            }
+        }
     }
 }
 
@@ -156,23 +219,33 @@ void EditorService::Render() {
     bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
     
     if (m_levelEditor && shouldShowLevelEditor && m_initialized && m_backendInitialized) {
-        // Ensure correct ImGui context for this DLL boundary before every frame
-        ImGuiContext* ctx = ImGui::GetCurrentContext();
-        if (ctx) {
-            ImGui::SetCurrentContext(ctx);
+        // Minimal platform glue: update ImGui IO from our Input and Time systems
+        ImGuiIO& io = ImGui::GetIO();
+        auto* platformContext = Engine::CORE ? Engine::CORE->GetPlatformContext() : nullptr;
+        if (platformContext) {
+            if (auto* w = platformContext->GetMainWindow()) {
+                io.DisplaySize = ImVec2(static_cast<float>(w->GetWidth()), static_cast<float>(w->GetHeight()));
+            }
         }
-        
-        // Start new ImGui frame
+        io.DeltaTime = Time::DeltaTime();
+
+        double mx, my; Input::GetMousePosition(mx, my);
+        io.MousePos = ImVec2(static_cast<float>(mx), static_cast<float>(my));
+        io.MouseDown[0] = Input::IsMouseButtonDown(0);
+        io.MouseDown[1] = Input::IsMouseButtonDown(1);
+        io.MouseDown[2] = Input::IsMouseButtonDown(2);
+
         ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
         m_levelEditor->Update(); 
         m_levelEditor->Render(); 
         
         ImGui::Render();
+        ImGui::EndFrame();
         auto* drawData = ImGui::GetDrawData();
-        if (drawData) ImGui_ImplOpenGL3_RenderDrawData(drawData);
+        if (drawData)
+            ImGui_ImplOpenGL3_RenderDrawData(drawData);
     }
 }
 
@@ -190,11 +263,9 @@ void EditorService::Terminate() {
 }
 
 void EditorService::EnableLevelEditorForScene(Scenes::Scene* scene) {
-#ifdef USE_IMGUI
     m_showLevelEditor = true;
     m_levelEditorForScene = scene;
     LOG_DEBUG(scene ? "LevelEditor enabled for scene" : "LevelEditor enabled (scene-less)");
-#endif
 }
 
 void EditorService::DisableLevelEditor() {

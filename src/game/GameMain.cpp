@@ -15,7 +15,7 @@ Launches the game directly from the startup scene specified in ProjectSettings.j
 #include "core/ProjectPaths.h"
 #include "core/Logger.h"
 #include "services/Time.h"
-#include "services/WindowManager.h"
+#include "platform/IPlatformContext.h"
 #include "physics/Physics.h"
 #include "scene/SceneManager.h"
 
@@ -62,17 +62,23 @@ int main() {
     Engine::Physics::SetGravity(Vector2D(0.0f, projectSettings.Physics.Gravity));
     LOG_INFO("Applied physics gravity: " << projectSettings.Physics.Gravity);
 
-    // Create game window
+    // Create game window via platform context
     LOG_INFO("Creating game window: " << projectSettings.Title);
-    WindowMode::Flags windowMode = fullscreen ? WindowMode::Fullscreen : WindowMode::Windowed;
-    auto* window = CREATE_WINDOW_EX(
-        projectSettings.Title.c_str(),
-        width,
-        height,
-        vsync,
-        windowMode
-    );
+    auto* platformContext = engine.GetPlatformContext();
+    if (!platformContext) {
+        LOG_ERROR("Platform context not available");
+        engine.Shutdown();
+        return 1;
+    }
 
+    Platform::WindowCreateInfo windowInfo;
+    windowInfo.Title = projectSettings.Title;
+    windowInfo.Width = width;
+    windowInfo.Height = height;
+    windowInfo.VSync = vsync;
+    windowInfo.Mode = fullscreen ? Platform::WindowMode::Fullscreen : Platform::WindowMode::Windowed;
+
+    auto* window = platformContext->CreatePlatformWindow(windowInfo);
     if (!window) {
         LOG_ERROR("Failed to create game window");
         engine.Shutdown();
@@ -103,23 +109,18 @@ int main() {
         return 1;
     }
 
-    // Activate the startup scene
-    sceneManager.SetActive(sceneIndex);
-    LOG_INFO("Game initialized successfully");
-
     // Game main loop
     while (engine.IsRunning()) {
         // Update engine (all game systems run)
         engine.Update();
 
         // Swap buffers
-        for (const auto* win : WindowManager::GetWindows()) {
+        for (auto* win : platformContext->GetAllWindows()) {
             win->SwapBuffers();
         }
     }
 
     // Shutdown
-    DESTROY_ALL_WINDOWS();
     engine.Shutdown();
     LOG_INFO("Game shutdown complete");
 

@@ -27,11 +27,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scene/Scene.h"
 #include "services/Input.h"
 #include "services/Time.h"
-#include "services/WindowManager.h"
 #include <thread>
 #include <filesystem>
 #include "ecs/systems/UIEventSystem.h"
 #include "services/UIEvents.h"
+#include "platform/glfw/GLFWPlatformContext.h"
 
 // Undefine potential Windows macros that conflict with enum names
 #ifdef ERROR
@@ -68,49 +68,52 @@ namespace Engine {
         else
             _disableConsole();
 
+        // Initialize platform context (GLFW, windowing, input, rendering)
+        m_platformContext = new Platform::GLFWPlatformContext();
+        if (!m_platformContext->Initialize()) {
+            LOG_ERROR("Failed to initialize platform context");
+            delete m_platformContext;
+            m_platformContext = nullptr;
+            return;
+        }
+        LOG_INFO("Platform context initialized successfully");
+
         // Initialize services
         _initializeServices();
 
-        m_lastFrameTime = glfwGetTime();
+        m_lastFrameTime = Time::ElapsedTime();
         m_initialized = true;
 
         LOG_INFO("Engine initialized in " << (mode == EngineMode::Editor ? "Editor" : "Game") << " mode");
     }
 
     void Application::Update() {
-        LOG_INFO("Application::Update called");
         if (!m_initialized) {
             LOG_ERROR("Application::Update called before Initialize");
             return;
         }
-        LOG_INFO("Input: Processed input events for this frame 1");
 
-        const double frameStart = glfwGetTime();
+        const double frameStart = Time::ElapsedTime();
         const double rawDelta = frameStart - m_lastFrameTime;
         m_lastFrameTime = frameStart;
 
         // Clear UI event queue
-        LOG_INFO("Input: Processed input events for this frame 1");
         ECS::UIEventQueue::Clear();
         
         // Update time
-        LOG_INFO("Input: Processed input events for this frame 1");
         Time::_update(rawDelta, frameStart);
         Profiler::UpdateTime();
 
         // --- Input Processing ---
-        LOG_INFO("Input: Processed input events for this frame 1");
         Input::_processInput();
         
         // Add fullscreen toggle (F11 key)
         if (Input::IsKeyPressed(GLFW_KEY_F11)) {
-            Window* mainWindow = WindowManager::GetMainWindow();
+            auto* mainWindow = m_platformContext->GetMainWindow();
             if (mainWindow) {
-                if (mainWindow->HasMode(WindowMode::Fullscreen)) {
-                    mainWindow->SetMode(WindowMode::Windowed);
-                } else {
-                    mainWindow->SetMode(WindowMode::Fullscreen);
-                }
+                // Toggle fullscreen via platform abstraction
+                // Note: IWindow doesn't expose mode switching yet - keeping legacy for now
+                LOG_WARNING("Fullscreen toggle not yet implemented in platform abstraction");
             }
         }
 
@@ -154,7 +157,7 @@ namespace Engine {
         }
 
         // Check for window close
-        for (const auto* win : WindowManager::GetWindows()) {
+        for (const auto* win : m_platformContext->GetAllWindows()) {
             if (win->ShouldClose()) {
                 m_shouldStop = true;
                 break;
@@ -178,7 +181,15 @@ namespace Engine {
         delete m_audio;
         m_audio = nullptr;
 
-        WindowManager::DestroyAll();
+        // Shutdown platform context (handles window cleanup)
+        if (m_platformContext) {
+            m_platformContext->Shutdown();
+            delete m_platformContext;
+            m_platformContext = nullptr;
+        }
+
+        delete m_audio;
+        m_audio = nullptr;
 
         m_initialized = false;
         CORE = nullptr;

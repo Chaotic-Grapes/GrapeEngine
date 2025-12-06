@@ -342,7 +342,6 @@ void Viewport::_renderViewport() {
         }
 
         // Configure renderer for Game viewport (uses scene camera)
-        auto* rendererSystem = _getRendererSystem();
         if (rendererSystem) {
             LOG_DEBUG("[Viewport] Game renderer update - forceSceneCamera should be true");
             rendererSystem->SetCamera(nullptr);  // Use ECS camera

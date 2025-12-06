@@ -36,7 +36,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Forward declarations
 namespace ECS {
     class World;
-    class Entity;
+    struct Entity;
 }
 
 namespace Engine {

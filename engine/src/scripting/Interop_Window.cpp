@@ -18,9 +18,17 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #endif
 
 #include "Export.h"
-#include "services/WindowManager.h"
-#include "services/Window.h"
+#include "core/Application.h"
+#include "platform/IPlatformContext.h"
+#include "platform/IWindow.h"
 #include "core/Logger.h"
+
+// Helper to get main window via platform context
+static Platform::IWindow* GetMainWindow() {
+    if (!Engine::CORE) return nullptr;
+    auto* platform = Engine::CORE->GetPlatformContext();
+    return platform ? platform->GetMainWindow() : nullptr;
+}
 
 // ============================================================================
 // Window API - Window Queries
@@ -30,7 +38,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /// Get the width of the main window
 /// </summary>
 INTEROP_API int EngineInterop_Window_GetWidth() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return 0;
@@ -42,7 +50,7 @@ INTEROP_API int EngineInterop_Window_GetWidth() {
 /// Get the height of the main window
 /// </summary>
 INTEROP_API int EngineInterop_Window_GetHeight() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return 0;
@@ -54,7 +62,7 @@ INTEROP_API int EngineInterop_Window_GetHeight() {
 /// Check if the window should close
 /// </summary>
 INTEROP_API bool EngineInterop_Window_ShouldClose() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         return true;
     }
@@ -65,7 +73,7 @@ INTEROP_API bool EngineInterop_Window_ShouldClose() {
 /// Request the window to close
 /// </summary>
 INTEROP_API void EngineInterop_Window_Close() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
@@ -81,7 +89,7 @@ INTEROP_API void EngineInterop_Window_Close() {
 /// Check if the window is focused
 /// </summary>
 INTEROP_API bool EngineInterop_Window_IsFocused() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         return false;
     }
@@ -92,7 +100,7 @@ INTEROP_API bool EngineInterop_Window_IsFocused() {
 /// Check if the window is minimized
 /// </summary>
 INTEROP_API bool EngineInterop_Window_IsMinimized() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         return false;
     }
@@ -103,7 +111,7 @@ INTEROP_API bool EngineInterop_Window_IsMinimized() {
 /// Set the window minimized state
 /// </summary>
 INTEROP_API void EngineInterop_Window_SetMinimized(bool minimized) {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
@@ -115,7 +123,7 @@ INTEROP_API void EngineInterop_Window_SetMinimized(bool minimized) {
 /// Check if the window is maximized
 /// </summary>
 INTEROP_API bool EngineInterop_Window_IsMaximized() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         return false;
     }
@@ -126,7 +134,7 @@ INTEROP_API bool EngineInterop_Window_IsMaximized() {
 /// Set the window maximized state
 /// </summary>
 INTEROP_API void EngineInterop_Window_SetMaximized(bool maximized) {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
@@ -138,7 +146,7 @@ INTEROP_API void EngineInterop_Window_SetMaximized(bool maximized) {
 /// Check if the window is visible
 /// </summary>
 INTEROP_API bool EngineInterop_Window_IsVisible() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         return false;
     }
@@ -149,7 +157,7 @@ INTEROP_API bool EngineInterop_Window_IsVisible() {
 /// Set the window visibility
 /// </summary>
 INTEROP_API void EngineInterop_Window_SetVisible(bool visible) {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
@@ -161,7 +169,7 @@ INTEROP_API void EngineInterop_Window_SetVisible(bool visible) {
 /// Check if the window is resizable
 /// </summary>
 INTEROP_API bool EngineInterop_Window_IsResizable() {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         return false;
     }
@@ -172,7 +180,7 @@ INTEROP_API bool EngineInterop_Window_IsResizable() {
 /// Set the window resizable state
 /// </summary>
 INTEROP_API void EngineInterop_Window_SetResizable(bool resizable) {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
@@ -188,30 +196,30 @@ INTEROP_API void EngineInterop_Window_SetResizable(bool resizable) {
 /// Set the window mode (Windowed = 1, Fullscreen = 2, Borderless = 4)
 /// </summary>
 INTEROP_API void EngineInterop_Window_SetMode(int mode) {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;
     }
-    window->SetMode(static_cast<WindowMode::Flags>(mode), nullptr);
+    window->SetMode(static_cast<Platform::WindowMode>(mode));
 }
 
 /// <summary>
 /// Check if the window has a specific mode flag
 /// </summary>
 INTEROP_API bool EngineInterop_Window_HasMode(int mode) {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         return false;
     }
-    return window->HasMode(static_cast<WindowMode::Flags>(mode));
+    return window->HasMode(static_cast<Platform::WindowMode>(mode));
 }
 
 /// <summary>
 /// Resize the window to the specified dimensions
 /// </summary>
 INTEROP_API void EngineInterop_Window_Resize(int width, int height) {
-    Window* window = WindowManager::GetMainWindow();
+    auto* window = GetMainWindow();
     if (!window) {
         LOG_ERROR("[ScriptAPI] Main window not available");
         return;

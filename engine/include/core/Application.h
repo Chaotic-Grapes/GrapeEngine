@@ -30,6 +30,10 @@ namespace ECS {
     class AudioSystem;
 }
 
+namespace Platform {
+    class IPlatformContext;
+}
+
 namespace Engine {
     /**
      * @brief Engine execution mode
@@ -127,6 +131,15 @@ namespace Engine {
          */
         void SetStepRequestCallback(std::function<bool()> callback) { m_stepRequestCallback = callback; }
 
+        /**
+         * @brief Get the platform context (window, rendering, input services)
+         * @return Pointer to platform context interface
+         * 
+         * This provides the editor and other modules access to platform services
+         * through abstract interfaces, without coupling to GLFW or platform specifics.
+         */
+        Platform::IPlatformContext* GetPlatformContext() const { return m_platformContext; }
+
     private:
         // Engine state
         bool m_shouldStop = false;
@@ -142,6 +155,9 @@ namespace Engine {
         // Project settings (used by both editor and game runtime)
         ProjectSettings m_projectSettings;
         bool m_hasProjectSettings = false;
+
+        // Platform abstraction (window, rendering, input)
+        Platform::IPlatformContext* m_platformContext = nullptr;
 
 		// Functions to enable/disable console output
         static void _enableConsole();
