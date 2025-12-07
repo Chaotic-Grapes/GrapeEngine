@@ -28,7 +28,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "core/Logger.h"
 #include "services/TimeSystem.h"
-#include "ecs/Hierarchy.h"
 #include "scene/Scene.h"
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"

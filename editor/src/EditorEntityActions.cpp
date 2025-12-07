@@ -17,7 +17,6 @@ direct ECS manipulation.
 #include "EditorEntityActions.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
-#include "ecs/Hierarchy.h" 
 #include "ecs/Components.h" 
 #include "core/Logger.h"
 #include <functional>

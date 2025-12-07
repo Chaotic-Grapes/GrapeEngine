@@ -26,7 +26,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef SCENE_H
 #define SCENE_H
 
-#include "ecs/Hierarchy.h"
 #include "ecs/World.h"
 #include "scene/LayerManager.h"
 #include <memory>

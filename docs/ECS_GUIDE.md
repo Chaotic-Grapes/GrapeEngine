@@ -370,8 +370,9 @@ world.Add<Components::LocalTransform>(e, Components::LocalTransform{
 });
 ```
 
+
 #### `Components::WorldTransform`
-Computed world-space transform matrix. Updated by `Hierarchy::UpdateTransforms()`.
+Computed world-space transform matrix. Updated by the engine's `Transform` system (`ECS::TransformSystem`).
 
 ```cpp
 struct WorldTransform {
@@ -857,8 +858,8 @@ world.ForChildren(parent, [](Entity child) {
 The engine propagates transforms down the hierarchy each frame:
 
 ```cpp
-// Usually called automatically by Scene::_update()
-ECS::Hierarchy::UpdateTransforms(world);
+// Transforms are normally updated automatically by the engine's Transform system.
+// You typically do not need to call this manually.
 ```
 
 **Important Notes:**
@@ -2166,7 +2167,7 @@ void MyScene::OnUnload() {
 **Checklist:**
 1. Both parent and child have `WorldTransform` component
 2. Both have `LocalTransform` component
-3. `Hierarchy::UpdateTransforms()` is being called
+3. Transforms are being updated by the engine's `Transform` system (ensure `TransformSystem` is registered)
 4. Child is properly attached: `world.Attach(child, parent)`
 
 ---
