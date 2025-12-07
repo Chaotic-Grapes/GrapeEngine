@@ -323,6 +323,52 @@ namespace ECS {
             return count;
         }
 
+        /**
+         * @brief Notify all systems that a scene has started playing.
+         * Called when transitioning from Edit/Paused mode to Play mode.
+         * Allows systems like AudioSystem to perform initialization.
+         * @param world The active scene's World
+         */
+        void OnSceneStart(World& world) {
+            (void)world;
+            // Call OnSceneStart on all owned systems
+            for (auto& [group, systems] : m_systemGroups) {
+                for (auto& system : systems) {
+                    system->OnSceneStart();
+                }
+            }
+
+            // Call OnSceneStart on all scripted systems
+            for (auto& [group, systems] : m_scriptedSystemGroups) {
+                for (auto* system : systems) {
+                    system->OnSceneStart();
+                }
+            }
+        }
+
+        /**
+         * @brief Notify all systems that a scene has stopped playing.
+         * Called when transitioning from Play mode to Edit/Paused mode.
+         * Allows systems like AudioSystem to stop playback.
+         * @param world The active scene's World
+         */
+        void OnSceneStop(World& world) {
+            (void)world;
+            // Call OnSceneStop on all owned systems
+            for (auto& [group, systems] : m_systemGroups) {
+                for (auto& system : systems) {
+                    system->OnSceneStop();
+                }
+            }
+
+            // Call OnSceneStop on all scripted systems
+            for (auto& [group, systems] : m_scriptedSystemGroups) {
+                for (auto* system : systems) {
+                    system->OnSceneStop();
+                }
+            }
+        }
+
     private:
         /// Native C++ systems (owned)
         std::unordered_map<SystemGroup, std::vector<std::unique_ptr<ISystem>>> m_systemGroups;

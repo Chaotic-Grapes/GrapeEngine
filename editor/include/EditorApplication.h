@@ -18,6 +18,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "core/Application.h"
 #include "EditorConfiguration.h"
+#include "EditorState.h"
 
 // Forward declarations
 namespace Services {
@@ -60,6 +61,12 @@ public:
      * @brief Get editor settings
      */
     const EditorSettings& GetSettings() const { return m_editorSettings; }
+
+    /**
+     * @brief Get current editor playback state
+     * @return Current editor state (Edit, Play, Paused, Step)
+     */
+    EditorState GetEditorState() const;
 
 private:
     Engine::Application* m_engine;

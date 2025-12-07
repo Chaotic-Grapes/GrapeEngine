@@ -235,6 +235,14 @@ namespace Audio {
         return m_masterVolume;
     }
 
+    void FmodAudioDevice::PauseAll() {
+        if (m_master) m_master->setPaused(true);
+    }
+
+    void FmodAudioDevice::ResumeAll() {
+        if (m_master) m_master->setPaused(false);
+    }
+
     void FmodAudioDevice::GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const {
         out.clear();
         out.reserve(m_cues.size());

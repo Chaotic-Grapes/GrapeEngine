@@ -24,10 +24,13 @@ active scene.
 #include <vector>
 #include <imgui.h>
 #include "serialization/ConfigurationSerializer.h"
+#include "EditorState.h"
 
-// Forward declaration so we don't need the full SceneManager here
+// Forward declarations
 namespace Scenes { class SceneManager; }
 class HierarchyPanel;
+#include <functional>
+
 
 // Handles File menu UI and scene file operations
 class EditorFileMenu {
@@ -48,6 +51,11 @@ public:
     // Set hierarchy panel for entity order management during save/load
     void SetHierarchyPanel(HierarchyPanel* hierarchyPanel) {
         m_hierarchyPanel = hierarchyPanel;
+    }
+
+    // Set a getter to query current editor state (decouples FileMenu from Playback)
+    void SetEditorStateGetter(std::function<EditorState()> getter) {
+        m_getEditorState = std::move(getter);
     }
 
     // -------------------------------------------------------------------------
@@ -112,6 +120,8 @@ private:
     Scenes::SceneManager* m_sceneManager = nullptr;
     // Hierarchy panel for entity order preservation
     HierarchyPanel* m_hierarchyPanel = nullptr;
+    // Getter used to query current EditorState; optional (defaults to Edit)
+    std::function<EditorState()> m_getEditorState = nullptr;
     // Tracks last opened/saved path for direct Save
     std::string m_currentScenePath;
     // Track whether current scene has unsaved changes

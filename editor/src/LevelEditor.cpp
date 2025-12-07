@@ -12,7 +12,6 @@ Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
 /* End Header *******************************************************************/
 
 #include "AudioAssetLibrary.h"
-#include "core/EditorCallbacks.h"
 #include "core/Logger.h"
 #include "ecs/systems/RendererSystem.h"
 #include "EditorStyle.h"
@@ -38,9 +37,9 @@ LevelEditor::~LevelEditor() {
     Messaging::MessageSystem::Unsubscribe<Messaging::EntityDestroyed>(m_entityDestroyedSubscription);
     Messaging::MessageSystem::Unsubscribe<Messaging::SceneModified>(m_sceneModifiedSubscription);
     
-    // Clear engine callbacks
-    Engine::EditorCallbackRegistry::Get().ClearAll();
-    
+    // Clear file menu state getter to avoid calling back into this object during member teardown
+    m_fileMenu.SetEditorStateGetter(nullptr);
+
     // Shutdown console panel to disconnect Logger callback
     m_console.Shutdown();
     
@@ -243,106 +242,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Wire up hierarchy panel to file menu for entity order preservation
     m_fileMenu.SetHierarchyPanel(&m_hierarchyWindow);
 
-    // ===================================================================
-    // Register Editor Callbacks with Engine
-    // ===================================================================
-    auto& callbacks = Engine::EditorCallbackRegistry::Get();
-
-    // Register entity selection handler
-    callbacks.RegisterEntitySelection([this](const uint32_t entityId, const bool addToSelection) {
-        if (addToSelection) {
-            // Multi-select not yet implemented in hierarchy
-            LOG_WARNING("[LevelEditor] Multi-select not yet implemented");
-        }
-        m_hierarchyWindow.SetSelectedEntity(entityId);
-        m_inspector.InspectEntity(entityId);
-        if (m_viewport.HasValidWorld()) {
-            m_viewport.SetSelectedEntity(entityId);
-        }
-    });
-
-    // Register inspector refresh handler
-    callbacks.RegisterInspectorRefresh([this](const uint32_t entityId) {
-        if (entityId == 0) {
-            // Refresh current selection - just re-inspect it
-            const EntityId currentId = m_hierarchyWindow.GetPrimarySelectedEntity();
-            if (currentId != 0) {
-                m_inspector.InspectEntity(currentId);
-            }
-        } else {
-            m_inspector.InspectEntity(entityId);
-        }
-    });
-
-    // Register notification handler
-    callbacks.RegisterNotification([this](const int severity, const std::string& title,
-                                         const std::string& message, const float duration) {
-        // Forward to console with appropriate log level
-        (void)duration; // Duration not used by console currently
-        LogLevel level;
-        switch (severity) {
-            case 0: level = LogLevel::INFO; break;
-            case 1: level = LogLevel::WARNING; break;
-            case 2: level = LogLevel::ERROR; break;
-            case 3: level = LogLevel::INFO; break; // Success as Info
-            default: level = LogLevel::INFO; break;
-        }
-        m_console.AddMessage(level, LogSource::ENGINE, "", title + ": " + message);
-    });
-
-    // Register debug draw handler
-    callbacks.RegisterDebugDraw([this](const ECS::World* world) {
-        // Editor can implement debug visualization here
-        // For now, this is a placeholder
-        (void)world;
-    });
-
-    // Register editor camera provider
-    callbacks.RegisterEditorCamera([this](glm::vec3& outPos, glm::mat4& outView, glm::mat4& outProj) {
-        auto* cam = m_viewport.GetEditorCamera();
-        if (cam) {
-            const Engine::Camera* c = cam->GetCamera();
-            if (!c)
-                return false;
-            
-            outPos = c->Position;
-            outView = c->GetViewMatrix();
-            outProj = c->GetProjectionMatrix();
-            
-            return true;
-        }
-        return false;
-    });
-
-    // Register viewport picking using editor-side ViewportPicking utility
-    callbacks.RegisterPick([this](const float screenX, const float screenY) {
-        // Get the renderer system from the viewport
-        if (!m_viewport.HasValidWorld()) {
-            return static_cast<uint32_t>(0);
-        }
-        
-        // Check if viewport is hovered (don't pick if mouse is outside viewport)
-        if (!m_viewport.IsViewportHovered()) {
-            return static_cast<uint32_t>(0);
-        }
-        
-        // Get viewport bounds for coordinate conversion
-        const ImVec2 viewportPos = m_viewport.GetSceneDrawPos();
-        const ImVec2 viewportSize = m_viewport.GetSceneDrawSize();
-        
-        // Use editor-side picking utility (no engine coupling)
-        auto* rendererSystem = ECS::RendererSystem::GetInstance();
-        if (rendererSystem) {
-            return Editor::ViewportPicking::PickEntityAtScreenPosition(
-                screenX, screenY,
-                glm::vec2(viewportPos.x, viewportPos.y),    // using glm because ViewportPicking uses glm
-                glm::vec2(viewportSize.x, viewportSize.y),  // using glm because ViewportPicking uses glm
-                rendererSystem
-            );
-        }
-        
-        return static_cast<uint32_t>(0);
-    });
+    // Wire up playback state getter to file menu for edit/play mode checking
+    m_fileMenu.SetEditorStateGetter([this]() { return m_playback.GetEditorState(); });
 
     // ===================================================================
     // Subscribe to Engine Messages
@@ -399,7 +300,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() {
             m_playback.Initialize(m_mainFont, m_symbolsFont, m_config.ToolbarHeight);
             // Register playback state change callback
-            m_playback.OnStateChanged([this](const Playback::GameState oldState, const Playback::GameState newState) {
+            m_playback.OnStateChanged([this](const EditorState oldState, const EditorState newState) {
                 _onPlaybackStateChanged(oldState, newState);
                 });
         },
@@ -600,13 +501,27 @@ void LevelEditor::Update() {
 // Event Handlers
 // -------------------------------------------------------------------------
 // Handle playback state changes (called by Playback via callback)
-void LevelEditor::_onPlaybackStateChanged(Playback::GameState oldState, Playback::GameState newState) {
+void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newState) {
     // Any editor-specific logic that needs to happen on state change goes here
     // (The time scale is already handled by Playback itself)
     LOG_INFO("Playback state changed from " << static_cast<int>(oldState) << " to " << static_cast<int>(newState));
 
+    // Handle audio pause/resume based on state
+    auto audioService = Engine::CORE ? Engine::CORE->GetAudioService() : nullptr;
+    if (audioService) {
+        if (newState == EditorState::Paused || newState == EditorState::Step) {
+            // Pause all audio when entering paused or step state
+            audioService->PauseAll();
+        }
+        else if (newState == EditorState::Play) {
+            // Resume audio when entering play state
+            audioService->ResumeAll();
+        }
+        // When entering Edit state, audio will be stopped by OnSceneStop callback in AudioSystem
+    }
+
     // Handle state transitions
-    if (newState == Playback::GameState::Stopped) {
+    if (newState == EditorState::Edit) {
         // Note: Entity IDs are now preserved during restore, so selection can remain valid
         // However, we still clear selection as a safe UX pattern when stopping play mode
         m_hierarchyWindow.SetSelectedEntity(0);
@@ -690,6 +605,13 @@ void LevelEditor::SetWorld(ECS::World* world) {
     m_performancePanel.ResetForNewScene();
 }
 
+// Set the active Scenes::Scene so EntityActions has the scene pointer
+void LevelEditor::SetScene(Scenes::Scene* scene) {
+    m_entityActions.SetScene(scene);
+    ECS::World* world = scene ? &scene->GetWorld() : nullptr;
+    SetWorld(world);
+}
+
 // -------------------------------------------------------------------------
 // Accessors
 // -------------------------------------------------------------------------
@@ -703,4 +625,8 @@ bool LevelEditor::IsStepRequested() const {
 
 void LevelEditor::ClearStepRequest() {
     m_playback.ClearStepRequest();
+}
+
+EditorState LevelEditor::GetEditorState() const {
+    return m_playback.GetEditorState();
 }

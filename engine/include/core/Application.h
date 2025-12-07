@@ -120,18 +120,6 @@ namespace Engine {
         ECS::SystemManager& GetSystemManager() { return m_systemManager; }
 
         /**
-         * @brief Set callback to control whether game logic should run (editor use)
-         * @param callback Function that returns true if game should run
-         */
-        void SetGameLogicCallback(std::function<bool()> callback) { m_gameLogicCallback = callback; }
-
-        /**
-         * @brief Set callback to check if step was requested (editor use)
-         * @param callback Function that returns true if step requested (and clears the flag)
-         */
-        void SetStepRequestCallback(std::function<bool()> callback) { m_stepRequestCallback = callback; }
-
-        /**
          * @brief Get the platform context (window, rendering, input services)
          * @return Pointer to platform context interface
          * 
@@ -139,6 +127,32 @@ namespace Engine {
          * through abstract interfaces, without coupling to GLFW or platform specifics.
          */
         Platform::IPlatformContext* GetPlatformContext() const { return m_platformContext; }
+
+        /**
+         * @brief Update systems for specific run modes (editor use)
+         * @param modes Bitmask of SystemRunMode values to execute
+         * @param world Active scene's World
+         * @param deltaTime Time since last frame
+         * 
+         * **EDITOR MODE ONLY**: Editor uses this to control which systems execute
+         * based on editor state (play/pause/edit/step).
+         * 
+         * In Game mode, Application::Update() automatically runs Always + PlayOnly systems.
+         * In Editor mode, editor completely controls system execution via this method.
+         * 
+         * Example (edit mode):
+         * @code
+         * uint32_t editModeMask = (1 << SystemRunMode::Always) | (1 << SystemRunMode::EditOnly);
+         * app->UpdateSystemsByMode(editModeMask, world, deltaTime);
+         * @endcode
+         * 
+         * Example (play mode):
+         * @code
+         * uint32_t playModeMask = (1 << SystemRunMode::Always) | (1 << SystemRunMode::PlayOnly);
+         * app->UpdateSystemsByMode(playModeMask, world, deltaTime);
+         * @endcode
+         */
+        void UpdateSystemsByMode(uint32_t modes, ECS::World& world, float deltaTime);
 
     private:
         // Engine state
@@ -173,16 +187,8 @@ namespace Engine {
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
         
-        // Callbacks for external control of game logic (used by editor)
-        std::function<bool()> m_gameLogicCallback;
-        std::function<bool()> m_stepRequestCallback;  // Returns true if step requested, resets after check
-
-        void _onGameStart(Scenes::Scene* scene);
-        void _onGameStop(Scenes::Scene* scene);
-        
         // Helper methods for cleaner game loop logic
-        bool _shouldRunGameLogic() const;
-        void _updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested);
+        void _updatePhysics(ECS::World& world);
     };
 
     extern GRAPEENGINE_API Application* CORE;

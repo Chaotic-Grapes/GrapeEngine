@@ -54,12 +54,15 @@ public:
     void Update();
     void Render();
     void SetWorld(ECS::World* world);
+    // Set active scene pointer so EntityActions can operate immediately
+    void SetScene(Scenes::Scene* scene);
 
     void OnWindowResized(int width, int height);
 
     bool IsPlaying() const;
     bool IsStepRequested() const;
     void ClearStepRequest();
+    EditorState GetEditorState() const;
     bool HasValidWorld() const { return m_world != nullptr; }
 
 private:
@@ -67,7 +70,8 @@ private:
     void _registerPanel(const char* panelName,
         const std::function<void()>& initFn,
         const std::function<void()>& renderFn,
-        const std::function<void(ECS::World*)>& setWorldFn);
+        const std::function<void(ECS::World*)>& setWorldFn
+    );
     void _initializePanels();
     void _renderPanels();
     void _updatePanelWorlds(ECS::World* world);
@@ -80,7 +84,7 @@ private:
     void _loadFonts();
 
     // Event handlers
-    void _onPlaybackStateChanged(Playback::GameState oldState, Playback::GameState newState);
+    void _onPlaybackStateChanged(EditorState oldState, EditorState newState);
     void _onViewportSelectionChanged(EntityId id);
 
     // Core state
@@ -114,7 +118,7 @@ private:
     ImVec2 m_lastViewportSize = ImVec2(0, 0);
 
     // Playback state tracking
-    Playback::GameState m_lastGameState = Playback::GameState::Stopped;
+    EditorState m_lastEditorState = EditorState::Edit;
 
     // Undo System
     Editor::UndoSystem m_undoSystem;

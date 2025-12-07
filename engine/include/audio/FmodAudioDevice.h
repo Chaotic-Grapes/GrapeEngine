@@ -15,7 +15,7 @@
 * Internally caches FMOD::Sound objects per cue and active FMOD::Channel per handle.
 *
 * @sources
-* - FMOD Core Programmer’s Guide (System, Sound, Channel, ChannelGroup usage).
+* - FMOD Core Programmerï¿½s Guide (System, Sound, Channel, ChannelGroup usage).
 *
 * @dependencies
 * - <fmod.hpp>, <unordered_map>, <string>, and Audio::SoundTypes
@@ -32,6 +32,7 @@
 #include <string>
 #include <fmod.hpp>
 #include "audio/SoundTypes.h"
+#include "Export.h"
 
 namespace Audio {
     // Opaque handle for a playing sound instance (maps to FMOD::Channel).
@@ -56,7 +57,7 @@ namespace Audio {
         SingleInstanceIgnore     // if already playing, do nothing (return existing)
     };
 
-    class FmodAudioDevice final {
+    class GRAPEENGINE_API FmodAudioDevice final {
     public:
         FmodAudioDevice() = default; // POD-like; call Initialize() before use
 
@@ -90,6 +91,10 @@ namespace Audio {
         void SetListener(const ListenerParams& listener);
         void SetMasterVolume(float volume);
         float GetMasterVolume() const;
+
+        // Pause/Resume all audio
+        void PauseAll();
+        void ResumeAll();
 
         // Introspection
         void GetLoadedCues(std::vector<std::pair<std::string, std::string>>& out) const;

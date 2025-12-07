@@ -55,16 +55,16 @@ void Playback::ProcessInput() {
     if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
         !Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT) && !Input::IsKeyDown(GLFW_KEY_LEFT_ALT))
     {
-        if (m_gameState == GameState::Stopped) {
+        if (m_editorState == EditorState::Edit) {
             // Simulate play button
             _saveWorldState();
-            _changeState(GameState::Playing);
+            _changeState(EditorState::Play);
             LOG_INFO("Game started (Ctrl+P)");
         }
-        else {
+        else if (m_editorState == EditorState::Play || m_editorState == EditorState::Paused) {
             // Simulate stop button
             _restoreWorldState();
-            _changeState(GameState::Stopped);
+            _changeState(EditorState::Edit);
             LOG_INFO("Game stopped (Ctrl+P)");
         }
     }
@@ -73,19 +73,20 @@ void Playback::ProcessInput() {
     if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_CONTROL) &&
         Input::IsKeyDown(GLFW_KEY_LEFT_SHIFT))
     {
-        if (m_gameState == GameState::Playing) {
-            _changeState(GameState::Paused);
+        if (m_editorState == EditorState::Play) {
+            _changeState(EditorState::Paused);
             LOG_INFO("Game paused (Ctrl+Shift+P)");
         }
-        else if (m_gameState == GameState::Paused) {
-            _changeState(GameState::Playing);
+        else if (m_editorState == EditorState::Paused) {
+            _changeState(EditorState::Play);
             LOG_INFO("Game resumed (Ctrl+Shift+P)");
         }
     }
 
     // Step: Alt + P
     if (Input::IsKeyPressed(GLFW_KEY_P) && Input::IsKeyDown(GLFW_KEY_LEFT_ALT)) {
-        if (m_gameState == GameState::Paused) {
+        if (m_editorState == EditorState::Paused) {
+            _changeState(EditorState::Step);
             m_stepRequested = true;
             LOG_INFO("Stepping 1 physics frame (Alt+P)");
         }
@@ -112,7 +113,7 @@ void Playback::Render() {
     // Follow global FontGlobalScale (no local override)
 
     // If the buttons have been clicked, they get grayed out
-    auto button = [&](const char* icon, bool shouldBeEnabled, GameState newState, const char* logMsg,
+    auto button = [&](const char* icon, bool shouldBeEnabled, EditorState newState, const char* logMsg,
         bool isStepButton = false, const char* tooltip = nullptr, ImVec2 size = ImVec2(35, 20))
         {
             // Disabled scope: gray-out and block clicks when the control shouldn't be active
@@ -131,10 +132,10 @@ void Playback::Render() {
                 ImGui::Text("%s", tooltip);
                 ImGui::Dummy(ImVec2(0, 20));
 
-                // Show current state (resume is essentially == playing)
+                // Show current state
                 ImGui::Text("State: %s",
-                            m_gameState == GameState::Stopped ? "STOPPED" : m_gameState == GameState::Paused ? "PAUSED"
-                                                                                                             : "PLAYING");
+                            m_editorState == EditorState::Edit ? "EDIT" : m_editorState == EditorState::Paused ? "PAUSED"
+                                                                                                             : m_editorState == EditorState::Play ? "PLAY" : "STEP");
                 ImGui::EndTooltip();
 
                 ImGui::PopFont();
@@ -151,10 +152,10 @@ void Playback::Render() {
                 }
                 else {
                     // Normal case: change state
-                    if (newState == GameState::Playing && m_gameState == GameState::Stopped) {
+                    if (newState == EditorState::Play && m_editorState == EditorState::Edit) {
                         _saveWorldState();
                     }
-                    if (newState == GameState::Stopped) {
+                    if (newState == EditorState::Edit) {
                         _restoreWorldState();
                     }
                     _changeState(newState);
@@ -177,32 +178,32 @@ void Playback::Render() {
     }
 
     // Single play/pause toggle button
-    // Shows play when stopped/paused
-    if (m_gameState == GameState::Stopped || m_gameState == GameState::Paused) {
+    // Shows play when in Edit or Paused state
+    if (m_editorState == EditorState::Edit || m_editorState == EditorState::Paused || m_editorState == EditorState::Step) {
         ImGui::PushFont(m_symbolsFont);
-        button("\xEE\x80\xB7", HasValidWorld(), GameState::Playing,
-            m_gameState == GameState::Stopped ? "Game started" : "Game resumed", false,
-            m_gameState == GameState::Stopped ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
+        button("\xEE\x80\xB7", HasValidWorld(), EditorState::Play,
+            m_editorState == EditorState::Edit ? "Game started" : "Game resumed", false,
+            m_editorState == EditorState::Edit ? "Play (Ctrl+P)" : "Resume (Ctrl+Shift+P)");
         ImGui::PopFont();
     }
     // Shows pause when playing
     else {
         ImGui::PushFont(m_symbolsFont);
-        button("\xEE\x80\xB4", HasValidWorld(), GameState::Paused, "Game paused", false, "Pause (Ctrl+Shift+P)");
+        button("\xEE\x80\xB4", HasValidWorld(), EditorState::Paused, "Game paused", false, "Pause (Ctrl+Shift+P)");
         ImGui::PopFont();
     }
     ImGui::SameLine();
 
-    // STOP: playing/paused > stopped
+    // STOP: playing/paused > edit
     ImGui::PushFont(m_symbolsFont);
-    button("\xEE\x81\x87", m_gameState != GameState::Stopped, GameState::Stopped, "Game stopped", false, "Stop (Ctrl+P)");
+    button("\xEE\x81\x87", m_editorState != EditorState::Edit, EditorState::Edit, "Game stopped", false, "Stop (Ctrl+P)");
     ImGui::PopFont();
     ImGui::SameLine();
 
     // Step button (for step-by-step physics)
-    // Only enabled when paused
+    // Enabled when paused or stepping (so you can step multiple frames)
     ImGui::PushFont(m_symbolsFont);
-    button("\xEE\x81\x84", m_gameState == GameState::Paused, GameState::Paused, "Stepping 1 physics frame", true, "Step (Alt+P)");
+    button("\xEE\x81\x84", m_editorState == EditorState::Paused || m_editorState == EditorState::Step, EditorState::Step, "Stepping 1 physics frame", true, "Step (Alt+P)");
     ImGui::PopFont();
 
     ImGui::PopStyleVar();
@@ -369,22 +370,25 @@ void Playback::_restoreWorldState() {
 }
 
 // Internal state change handler that manages time scale and callbacks
-void Playback::_changeState(GameState newState) {
-    if (m_gameState == newState) return;
+void Playback::_changeState(EditorState newState) {
+    if (m_editorState == newState) return;
 
-    GameState oldState = m_gameState;
-    m_gameState = newState;
+    EditorState oldState = m_editorState;
+    m_editorState = newState;
 
     // Handle time scale changes based on state
     switch (newState) {
-    case GameState::Stopped:
+    case EditorState::Edit:
         TimeSystem::Instance().SetTimeScale(1.0);
         break;
-    case GameState::Paused:
+    case EditorState::Paused:
         TimeSystem::Instance().SetTimeScale(0.0);
         break;
-    case GameState::Playing:
+    case EditorState::Play:
         TimeSystem::Instance().SetTimeScale(1.0);
+        break;
+    case EditorState::Step:
+        TimeSystem::Instance().SetTimeScale(0.0);  // Don't advance time, single frame only
         break;
     }
 
@@ -395,13 +399,13 @@ void Playback::_changeState(GameState newState) {
 }
 
 // Register callback for state change events
-void Playback::OnStateChanged(std::function<void(GameState, GameState)> callback) {
+void Playback::OnStateChanged(std::function<void(EditorState, EditorState)> callback) {
     m_onStateChanged = callback;
 }
 
 // Query: Is the game currently in the Playing state?
 bool Playback::IsPlaying() const {
-    return m_gameState == GameState::Playing;
+    return m_editorState == EditorState::Play;
 }
 
 // Query: Was a single-step frame requested while paused?
@@ -415,9 +419,9 @@ void Playback::ClearStepRequest() {
     m_stepRequested = false;
 }
 
-// Get current game state
-Playback::GameState Playback::GetGameState() const {
-    return m_gameState;
+// Get current editor state
+EditorState Playback::GetEditorState() const {
+    return m_editorState;
 }
 
 // Update the world reference safely when scenes change
@@ -425,7 +429,7 @@ Playback::GameState Playback::GetGameState() const {
 // Clears saved snapshot since it no longer matches the world.
 void Playback::SetWorld(ECS::World* world) {
     m_world = world;
-    m_gameState = GameState::Stopped;
+    m_editorState = EditorState::Edit;
     m_stepRequested = false;
     m_savedWorldState.clear();
 }

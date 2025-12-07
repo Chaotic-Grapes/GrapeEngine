@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "EditorApplication.h"
 #include "services/EditorService.h"
 #include "EditorConfiguration.h"
+#include "EditorState.h"
 #include "core/Logger.h"
 #include "core/ProjectPaths.h"
 #include "physics/Physics.h"
@@ -174,7 +175,8 @@ void EditorApplication::_initializeEditorService() {
     LOG_INFO("About to create EditorService (sceneManager=" << reinterpret_cast<void*>(&m_engine->GetSceneManager()) << ")");
     try {
         m_editorService = new Services::EditorService(m_engine->GetSceneManager());
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         LOG_ERROR("Exception creating EditorService: " << e.what());
         m_editorService = nullptr;
     }
@@ -199,17 +201,11 @@ void EditorApplication::_initializeEditorService() {
     // Enable level editor without a scene (scene-less editor mode)
     m_editorService->EnableLevelEditorForScene(nullptr);
     LOG_INFO("Level Editor initialized successfully");
+}
 
-    // Connect editor callbacks to engine for play/pause/step control
-    m_engine->SetGameLogicCallback([this]() {
-        return m_editorService->IsGamePlaying();
-    });
-
-    m_engine->SetStepRequestCallback([this]() {
-        bool stepRequested = m_editorService->IsStepRequested();
-        if (stepRequested) {
-            m_editorService->ClearStepRequest();
-        }
-        return stepRequested;
-    });
+EditorState EditorApplication::GetEditorState() const {
+    if (m_editorService) {
+        return m_editorService->GetPlaybackState();
+    }
+    return EditorState::Edit;
 }

@@ -91,6 +91,10 @@ namespace Services {
 		//Stop a playing instance immediately or with a fade policy
 		void Stop(const Audio::PlaybackHandle handle, Audio::StopMode mode) const { m_device->Stop(handle, mode); }
 
+		// Pause/Resume all audio
+		void PauseAll() const { m_device->PauseAll(); }
+		void ResumeAll() const { m_device->ResumeAll(); }
+
 
 	private:
 		// Owns the FMOD-backed device; created in Initialize(), destroyed in Terminate().

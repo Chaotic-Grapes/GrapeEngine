@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/framebuffer.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace Editor {
 
@@ -62,16 +63,31 @@ namespace Editor {
             return INVALID_ENTITY_ID;
         }
 
+        // IMPORTANT: The RendererSystem uses Pixel Buffer Objects (PBOs) for async picking.
+        // This synchronous read will stall the GPU pipeline. For proper implementation,
+        // coordinate with RendererSystem's PBO-based async picking instead.
+        // For now, we perform a synchronous read as a fallback.
+        
+        GLint previousFBO = 0;
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
+
         // Read pixel from picking FBO
         // Note: We're const_cast'ing here because OpenGL's bind/unbind aren't const-correct
         // but we're only reading, not modifying the FBO
         Framebuffer* mutableFBO = const_cast<Framebuffer*>(pickingFBO);
         mutableFBO->Bind();
         
-        unsigned char pixel[4];
+        // Ensure we're reading from the color attachment
+        GLint readBuffer = 0;
+        glGetIntegerv(GL_READ_BUFFER, &readBuffer);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        
+        unsigned char pixel[4] = {0, 0, 0, 0};
         glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
         
-        Framebuffer::Unbind();
+        // Restore read buffer and FBO
+        glReadBuffer(readBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
 
         // Decode entity ID from RGB channels
         // The picking pass encodes entity IDs as: ID + 1 (so 0 = no entity)

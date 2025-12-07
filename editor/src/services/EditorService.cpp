@@ -20,6 +20,7 @@ Features:
 
 #include "glad/glad.h"
 #include "services/EditorService.h"
+#include "EditorState.h"
 #include "scene/SceneManager.h"
 #include "core/Application.h"
 #include "platform/IPlatformContext.h"
@@ -157,18 +158,31 @@ bool EditorService::IsGamePlaying() const { return (m_levelEditor) && m_levelEdi
 bool EditorService::IsStepRequested() const { return (m_levelEditor) && m_levelEditor->IsStepRequested(); }
 void EditorService::ClearStepRequest() const { if (m_levelEditor) m_levelEditor->ClearStepRequest(); }
 
+EditorState EditorService::GetPlaybackState() const { 
+    return (m_levelEditor) ? m_levelEditor->GetEditorState() : EditorState::Edit; 
+}
+
 void EditorService::SetWorld(ECS::World* world) {
     if (m_world == world)
         return;
 
     m_world = world;
 
-    if (m_levelEditor)
-        m_levelEditor->SetWorld(m_world);
+    if (m_levelEditor) {
+        // Also propagate the active Scenes::Scene so EntityActions is updated
+        Scenes::Scene* activeScene = m_sceneManager.GetActive();
+        m_levelEditor->SetScene(activeScene);
+    }
 }
 
 void EditorService::Update() {
     if (!m_initialized) return;
+
+    // Ensure the SceneManager processes any pending transitions so the editor
+    // immediately sees newly created scenes (e.g. File->New Scene).
+    // Calling Update here is idempotent and cheap (it only processes pending
+    // transitions) and guarantees the editor's world is set correctly.
+    m_sceneManager.Update();
 
     if (m_pendingLevelEditorRebuild && m_levelEditor) {
         LevelEditorConfig config;
@@ -191,6 +205,11 @@ void EditorService::Update() {
     }
 
     auto* activeScene = m_sceneManager.GetActive();
+
+    // Propagate active scene's world to editor panels so UI updates immediately
+    // when a new scene is created or activated.
+    ECS::World* activeWorld = activeScene ? &activeScene->GetWorld() : nullptr;
+    SetWorld(activeWorld);
 
     if (m_showLevelEditor && m_levelEditorForScene && activeScene != m_levelEditorForScene) {
         DisableLevelEditor();
@@ -228,7 +247,7 @@ void EditorService::Render() {
                 io.DisplaySize = ImVec2(static_cast<float>(w->GetWidth()), static_cast<float>(w->GetHeight()));
             }
         }
-        io.DeltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+        io.DeltaTime = static_cast<float>(TimeSystem::Instance().GetUnscaledDeltaTime());
 
         double mx, my; Input::GetMousePosition(mx, my);
         io.MousePos = ImVec2(static_cast<float>(mx), static_cast<float>(my));
@@ -256,7 +275,10 @@ void EditorService::Terminate() {
     if (ImGui::GetCurrentContext() != nullptr) {
         if (m_backendInitialized) {
             ImGui_ImplOpenGL3_Shutdown();
-            ImGui_ImplGlfw_Shutdown();
+            // We only initialize the OpenGL renderer backend (see Initialize()).
+            // Do not call ImGui_ImplGlfw_Shutdown() because we do not use
+            // ImGui's GLFW platform backend (it would attempt to shutdown
+            // a backend that was never initialized and trigger assertions).
             m_backendInitialized = false;
         }
         ImGui::DestroyContext();
@@ -285,5 +307,6 @@ void EditorService::DisableLevelEditor() {}
 bool EditorService::IsGamePlaying() const { return false; }
 bool EditorService::IsStepRequested() const { return false; }
 void EditorService::ClearStepRequest() const {}
+EditorState EditorService::GetPlaybackState() const { return EditorState::Edit; }
 void EditorService::SetWorld(ECS::World* world) { (void)world; }
 #endif

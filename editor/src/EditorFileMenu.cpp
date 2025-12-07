@@ -77,19 +77,54 @@ void EditorFileMenu::RenderFileMenu() {
             hasActiveScene = (idx != static_cast<size_t>(-1));
         }
 
+        // Determine if we're in edit mode (not playing)
+        bool isInEditMode = true;
+        if (m_getEditorState) {
+            isInEditMode = (m_getEditorState() == EditorState::Edit);
+        }
+
+        // Determine if save should be enabled:
+        // - Must have an active scene
+        // - Must be in edit mode (not playing)
+        // - Must have unsaved changes
+        bool canSave = hasActiveScene && isInEditMode && m_hasUnsavedChanges;
+
         // Show "Save Scene*" in BOLD when there are unsaved changes
         if (m_hasUnsavedChanges && m_boldFont) {
             ImGui::PushFont(m_boldFont);
-            bool clicked = ImGui::MenuItem("Save Scene*", "Ctrl+S", false, hasActiveScene);
+            // When not in edit mode or no unsaved changes, grey out the button
+            if (!isInEditMode) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
+            }
+            bool clicked = ImGui::MenuItem("Save Scene*", "Ctrl+S", false, canSave);
+            if (!isInEditMode) {
+                ImGui::PopStyleColor();
+            }
             ImGui::PopFont();
             if (clicked) SaveScene();
         }
         else {
-            // Normal font when no unsaved changes
-            if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, hasActiveScene)) { SaveScene(); }
+            // Normal font when no unsaved changes - always grey out
+            if (!isInEditMode) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
+            }
+            bool clicked = ImGui::MenuItem("Save Scene", "Ctrl+S", false, canSave);
+            if (!isInEditMode) {
+                ImGui::PopStyleColor();
+            }
+            if (clicked) SaveScene();
         }
 
-        if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S", false, hasActiveScene)) { SaveSceneAsDialog(); }
+        // "Save Scene As..." is also disabled in play mode
+        if (!isInEditMode) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 0.5f));
+        }
+        bool saveAsClicked = ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S", false, hasActiveScene && isInEditMode);
+        if (!isInEditMode) {
+            ImGui::PopStyleColor();
+        }
+        if (saveAsClicked) SaveSceneAsDialog();
+
         ImGui::Separator();
         // Make the Exit menu item visually distinct (danger background)
         ImGui::PushStyleColor(ImGuiCol_Header, EditorStyle::DangerButton);
@@ -427,16 +462,25 @@ void EditorFileMenu::HandleShortcuts(float& uiScale) {
         if (Input::IsKeyPressed(KEY_MINUS)) uiScale -= 0.10f;
         if (Input::IsKeyPressed(KEY_N)) CreateNewScene();
         if (Input::IsKeyPressed(KEY_O)) OpenSceneDialog();
-        // Only allow save shortcuts when there is an active scene
+        
+        // Only allow save shortcuts when:
+        // - There is an active scene
+        // - We are in edit mode (not playing)
+        // - There are unsaved changes (for regular save, not save as)
         bool hasActiveScene = false;
         if (m_sceneManager) {
             size_t idx = m_sceneManager->GetActiveIndex();
             hasActiveScene = (idx != static_cast<size_t>(-1));
         }
 
-        if (Input::IsKeyPressed(KEY_S) && hasActiveScene) {
+        bool isInEditMode = true;
+        if (m_getEditorState) {
+            isInEditMode = (m_getEditorState() == EditorState::Edit);
+        }
+
+        if (Input::IsKeyPressed(KEY_S) && hasActiveScene && isInEditMode) {
             if (shiftDown) SaveSceneAsDialog();
-            else SaveScene();
+            else if (m_hasUnsavedChanges) SaveScene();
         }
     }
 }

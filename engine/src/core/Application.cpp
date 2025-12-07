@@ -128,21 +128,7 @@ namespace Engine {
         auto* currentScene = m_sceneManager.GetActive();
         
         if (currentScene) {
-            const bool shouldRun = _shouldRunGameLogic();
-            const bool stepRequested = (m_stepRequestCallback && m_stepRequestCallback());
             auto& world = currentScene->GetWorld();
-
-            // Handle game state transitions (start/stop)
-            static bool wasPlaying = false;
-            if (shouldRun && !wasPlaying) {
-                LOG_INFO("Game started playing");
-                _onGameStart(currentScene);
-            }
-            else if (!shouldRun && wasPlaying) {
-                LOG_INFO("Game stopped/paused");
-                _onGameStop(currentScene);
-            }
-            wasPlaying = shouldRun;
 
             uint32_t pickedEntityID = 0;  // TODO: Get from renderer
 
@@ -152,12 +138,17 @@ namespace Engine {
 
             ECS::UIEventSystem::Update(&world, pickedEntityID, mousePos);
 
-            // Update physics
-            _updatePhysics(world, shouldRun, stepRequested);
-            
-            // Update all systems - they control their own run mode behavior
-            const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
-            m_systemManager.Update(world, dt);
+            // Game mode: always run systems
+            // Editor mode: editor controls system execution via UpdateSystemsByMode()
+            if (m_mode == EngineMode::Game) {
+                // Update physics
+                _updatePhysics(world);
+                
+                // Update systems - always run for game mode
+                const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+                m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world, dt);
+                m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::PlayOnly, world, dt);
+            }
         }
 
         // Check for window close
@@ -243,6 +234,21 @@ namespace Engine {
         }
     }
 
+    void Application::UpdateSystemsByMode(uint32_t modes, ECS::World& world, float deltaTime) {
+        // Public API for editor to directly control which modes execute
+        // This allows editor to implement play/pause/step/edit state transitions
+        
+        if (modes & (1 << static_cast<int>(ECS::SystemRunMode::Always))) {
+            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world, deltaTime);
+        }
+        if (modes & (1 << static_cast<int>(ECS::SystemRunMode::PlayOnly))) {
+            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::PlayOnly, world, deltaTime);
+        }
+        if (modes & (1 << static_cast<int>(ECS::SystemRunMode::EditOnly))) {
+            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::EditOnly, world, deltaTime);
+        }
+    }
+
     void Application::_initializeServices() {
         m_audio = new Services::AudioService();
         m_audio->Initialize();
@@ -303,31 +309,6 @@ namespace Engine {
         LOG_INFO("SystemManager: Registered " << m_systemManager.GetSystemCount() << " systems");
     }
 
-    void Application::_onGameStart(Scenes::Scene* scene) {
-        if (!scene) return;
-
-        // Notify AudioSystem of scene start
-        auto* audioSys = m_systemManager.GetSystem<ECS::AudioSystem>();
-        if (audioSys) {
-            audioSys->OnSceneStart();
-            LOG_DEBUG("AudioSystem: Notified of scene start");
-        }
-
-    }
-
-    void Application::_onGameStop(Scenes::Scene* scene) {
-        if (!scene) return;
-
-        m_accumulator = 0.0f; // Reset accumulator on stop
-
-        auto* audioSystem = m_systemManager.GetSystem<ECS::AudioSystem>();
-        if (audioSystem) {
-            audioSystem->OnSceneStop();
-            LOG_DEBUG("AudioSystem: Notified of scene stop");
-        }
-    }
-   
-
     void Application::_enableConsole() {
 #ifdef _WIN32
 #include <windows.h>
@@ -346,42 +327,18 @@ namespace Engine {
 #endif
     }
 
-    // -------------------------------------------------------------------------
-    // Game Loop Helper Methods
-    // -------------------------------------------------------------------------
-
-    bool Application::_shouldRunGameLogic() const {
-        // Use callback if set (for editor control), otherwise always run
-        if (m_gameLogicCallback) {
-            return m_gameLogicCallback();
-        }
-        return true;
-    }
-
-    void Application::_updatePhysics(ECS::World& world, bool shouldRun, bool stepRequested) {
+    void Application::_updatePhysics(ECS::World& world) {
         // Handle fixed timestep accumulation for physics
-        // Note: Physics system execution is handled by UpdateSystemsForMode() with SystemRunMode::PlayOnly
+        // Only called in Game mode - always accumulates
         
-        if (!shouldRun && !stepRequested) {
-            return; // Don't accumulate time when not playing
-        }
+        m_accumulator += static_cast<float>(TimeSystem::Instance().GetUnscaledDeltaTime());
 
-        // Run physics at fixed timestep when playing
-        if (shouldRun) {
-            m_accumulator += static_cast<float>(TimeSystem::Instance().GetUnscaledDeltaTime());
+        const float maxAccumulator = static_cast<float>(TimeSystem::Instance().GetFixedTimeStep()) * 5.0f;
+        if (m_accumulator > maxAccumulator)
+            m_accumulator = maxAccumulator;
 
-            const float maxAccumulator = static_cast<float>(TimeSystem::Instance().GetFixedTimeStep()) * 5.0f;
-            if (m_accumulator > maxAccumulator)
-                m_accumulator = maxAccumulator;
-
-            while (m_accumulator >= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep())) {
-                m_accumulator -= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep());
-            }
-        }
-        // Editor-only: Single step when paused (callback already consumed the flag)
-        else if (stepRequested) {
-            // Step request was already handled/cleared by callback
+        while (m_accumulator >= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep())) {
+            m_accumulator -= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep());
         }
     }
-
 }

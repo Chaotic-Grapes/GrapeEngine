@@ -13,6 +13,7 @@ Launches the application in editor mode with the level editor interface.
 #include <crtdbg.h>
 #include "core/Application.h"
 #include "EditorApplication.h"
+#include "EditorState.h"
 #include "services/TimeSystem.h"
 #include "platform/IPlatformContext.h"
 
@@ -45,10 +46,84 @@ int main() {
     ECS::World emptyWorld;
     engine.GetSystemManager().CreateAll(emptyWorld);
 
+    // Track previous state to detect transitions
+    EditorState previousState = EditorState::Edit;
+
     // Editor main loop
     while (engine.IsRunning()) {
+        // Update editor state and input
         editor.Update();
+        
+        // Engine update (input, services, UI events - but NOT systems in editor mode)
         engine.Update();
+        
+        // Editor controls which systems execute based on playback state
+        // Get the current scene
+        auto* currentScene = engine.GetSceneManager().GetActive();
+        if (currentScene) {
+            ECS::World& world = currentScene->GetWorld();
+            float deltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+            
+            // Determine which system modes to run based on editor playback state
+            uint32_t systemModes = 0;
+            
+            // Always run these systems (render, transform hierarchy)
+            systemModes |= (1 << static_cast<int>(ECS::SystemRunMode::Always));
+            
+            // Get current editor state
+            EditorState state = editor.GetEditorState();
+            
+            // Only process transitions if state actually changed
+            if (previousState != state) {
+                // Only stop/start when transitioning between Edit and active play states
+                // Paused state keeps audio initialized but systems don't run
+                bool wasInEdit = (previousState == EditorState::Edit);
+                bool isInEdit = (state == EditorState::Edit);
+                
+                if (!wasInEdit && isInEdit) {
+                    // Transitioning to Edit: stop PlayOnly systems
+                    auto& systemManager = engine.GetSystemManager();
+                    systemManager.OnSceneStop(world);
+                }
+                else if (wasInEdit && !isInEdit) {
+                    // Transitioning from Edit to any active state: start PlayOnly systems
+                    auto& systemManager = engine.GetSystemManager();
+                    systemManager.OnSceneStart(world);
+                }
+                
+                // Update previous state after processing transition
+                previousState = state;
+            }
+            
+            // Run gameplay systems based on playback state
+            switch (state) {
+                case EditorState::Play:
+                    // Play mode: run all gameplay systems
+                    systemModes |= (1 << static_cast<int>(ECS::SystemRunMode::PlayOnly));
+                    break;
+                    
+                case EditorState::Paused:
+                    // Paused: run editor-only systems (gizmos, debug rendering)
+                    systemModes |= (1 << static_cast<int>(ECS::SystemRunMode::EditOnly));
+                    break;
+                    
+                case EditorState::Step:
+                    // Step: run gameplay systems once
+                    systemModes |= (1 << static_cast<int>(ECS::SystemRunMode::PlayOnly));
+                    break;
+                    
+                case EditorState::Edit:
+                default:
+                    // Edit mode: run editor-only systems (gizmos, debug rendering)
+                    systemModes |= (1 << static_cast<int>(ECS::SystemRunMode::EditOnly));
+                    break;
+            }
+            
+            // Execute the filtered systems
+            engine.UpdateSystemsByMode(systemModes, world, deltaTime);
+        }
+        
+        // Render editor UI
         editor.Render();
 
         // Swap buffers using platform abstraction

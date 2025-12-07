@@ -21,6 +21,7 @@
 
 #include "core/IService.h"
 #include "audio/FmodAudioDevice.h"
+#include "EditorState.h"
 #include <memory>
 
 // Forward declarations
@@ -60,6 +61,8 @@ namespace Services {
         bool IsGamePlaying() const;
         bool IsStepRequested() const;
         void ClearStepRequest() const;
+        
+        EditorState GetPlaybackState() const;
 
         static inline EditorService* Get() { return m_editorInstance; }
 

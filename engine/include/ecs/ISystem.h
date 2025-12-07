@@ -163,6 +163,30 @@ namespace ECS {
         virtual void OnDestroy(World& world) { (void)world; }
 
         /**
+         * @brief Called when a scene starts playing (editor: transitioning to Play mode).
+         * 
+         * Use this to:
+         * - Initialize PlayOnly-specific state
+         * - Start audio playback
+         * - Reset physics state
+         * 
+         * Default: no-op (override if needed)
+         */
+        virtual void OnSceneStart() {}
+
+        /**
+         * @brief Called when a scene stops playing (editor: transitioning away from Play mode).
+         * 
+         * Use this to:
+         * - Stop audio playback
+         * - Clean up PlayOnly-specific state
+         * - Pause simulations
+         * 
+         * Default: no-op (override if needed)
+         */
+        virtual void OnSceneStop() {}
+
+        /**
          * @brief Get system metadata (name, dependencies, execution order).
          * @return SystemMetadata by value
          * 
