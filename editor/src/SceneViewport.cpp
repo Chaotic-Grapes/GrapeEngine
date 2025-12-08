@@ -215,18 +215,23 @@ void SceneViewport::_renderViewport() {
             if (m_selectedEntityId != 0 && m_editorCamera) {
                 auto* camera = m_editorCamera->GetCamera();
                 if (camera) {
-                    // Draw wireframe outline around selected entity
+                    // Compute camera matrices for overlays
+                    glm::mat4 view = camera->GetViewMatrix();
+                    glm::mat4 proj = camera->GetProjectionMatrix();
+
+                    // Draw wireframe outline around selected entity (updated signature)
                     Editor::SelectionOutlineRenderer::RenderOutline(
                         *m_world,
                         m_selectedEntityId,
-                        rendererSystem,
+                        rendererSystem->GetRenderer(),
+                        rendererSystem->GetShader(),
+                        proj * view,
                         camera->OrthoSize,
+                        size.x,
                         size.y
                     );
 
                     // Draw gizmo for transform manipulation
-                    glm::mat4 view = camera->GetViewMatrix();
-                    glm::mat4 proj = camera->GetProjectionMatrix();
                     Editor::EditorGizmo::DrawGizmo(
                         *m_world,
                         m_selectedEntityId,
