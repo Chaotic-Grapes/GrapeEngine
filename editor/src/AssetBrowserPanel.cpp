@@ -27,6 +27,7 @@ Provides:
 #include "ecs/Entity.h"
 #include "InspectorPanel.h"
 #include "services/Input.h"
+#include "ScriptTemplates.h"
 #include <fstream>
 #include <cstring>
 #include "EditorStyle.h"
@@ -342,6 +343,51 @@ void AssetBrowserPanel::_renderPrefabPopup() {
         ImGui::Text("%s", dialogTitle);
         ImGui::Separator();
         ImGui::Dummy(ImVec2(0, 5));
+
+        // Show script template selector when creating a script
+        if (m_creationType == AssetCreationType::SCRIPT) {
+            ImGui::Text("Template:");
+            ImGui::SameLine();
+
+            // Get template names
+            int templateCount = 0;
+            const char* const* templateNames = Editor::Templates::ScriptTemplates::GetTemplateNames(templateCount);
+
+            // Show combo for template selection
+            const char* currentTemplateName = nullptr;
+            switch (m_selectedScriptTemplate) {
+                case Editor::Templates::ScriptTemplateType::BasicSystem:
+                    currentTemplateName = "BasicSystem";
+                    break;
+                case Editor::Templates::ScriptTemplateType::EditModeSystem:
+                    currentTemplateName = "EditModeSystem";
+                    break;
+                case Editor::Templates::ScriptTemplateType::HotReloadSystem:
+                    currentTemplateName = "HotReloadSystem";
+                    break;
+                case Editor::Templates::ScriptTemplateType::MetadataSystem:
+                    currentTemplateName = "MetadataSystem";
+                    break;
+            }
+
+            if (ImGui::BeginCombo("##ScriptTemplate", currentTemplateName)) {
+                for (int i = 0; i < templateCount; i++) {
+                    bool isSelected = (currentTemplateName && strcmp(templateNames[i], currentTemplateName) == 0);
+                    if (ImGui::Selectable(templateNames[i], isSelected)) {
+                        m_selectedScriptTemplate = Editor::Templates::ScriptTemplates::GetTemplateTypeFromName(templateNames[i]);
+                    }
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            // Show description of selected template
+            std::string description = Editor::Templates::ScriptTemplates::GetTemplateDescription(m_selectedScriptTemplate);
+            ImGui::TextDisabled("%s", description.c_str());
+            ImGui::Dummy(ImVec2(0, 5));
+        }
 
         // Name input
         ImGui::Text("Name:");
@@ -976,7 +1022,7 @@ void AssetBrowserPanel::_createScript() {
         return;
     }
 
-    // Create script template
+    // Generate script content using the selected template
     std::string className = m_newAssetNameBuffer;
 
     // Create namespace from the target directory by replacing
@@ -1009,24 +1055,42 @@ void AssetBrowserPanel::_createScript() {
 
     // Fallback namespace if resulting string is empty
     if (ns.empty())
-        ns = Engine::ProjectPaths::GetProjectRoot();
+        ns = "GameScripts";
 
-    std::string scriptContent =
-        "using GrapeEngine.Scripting;\n\n"
-        "namespace " + ns + ";\n"
-        "\n"
-        "public class " + className + " : ScriptBehaviour\n"
-        "{\n"
-        "    public override void OnStart()\n"
-        "    {\n"
-        "        // Called once when the script is initialized\n"
-        "    }\n\n"
-        "    public override void OnUpdate()\n"
-        "    {\n"
-        "        // Called every frame\n"
-        "    }\n"
-        "}\n"
-        "\n";
+    // Generate script using the selected template
+    std::string scriptContent = Editor::Templates::ScriptTemplates::GenerateScript(
+        m_selectedScriptTemplate,
+        className,
+        ns
+    );
+
+    // Write file
+    try {
+        std::ofstream file(filePath);
+        if (!file.is_open()) {
+            m_statusMessage = "Failed to create script: " + fileName;
+            m_statusTimer = 3.0f;
+            LOG_ERROR("Failed to create script file: " << filePath.string());
+            return;
+        }
+
+        file << scriptContent;
+        file.close();
+
+        m_statusMessage = "Created script: " + fileName;
+        m_statusTimer = 3.0f;
+        LOG_INFO("Created script: " << filePath.string());
+
+        // Select the newly created file
+        m_selectedAsset = filePath.string();
+
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Error creating script: " + std::string(e.what());
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Exception creating script: " << e.what());
+    }
+}
 
     // Write file
     try {

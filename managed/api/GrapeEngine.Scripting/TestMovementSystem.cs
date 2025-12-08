@@ -4,8 +4,9 @@
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \brief
-Example C# system demonstrating World/Entity interop for scripting.
-This system moves entities with a Velocity component.
+Example C# system demonstrating the new record struct component pattern and 
+ECS World/Entity interop for gameplay scripting. This system updates entity 
+positions based on their velocities.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -19,44 +20,48 @@ using System.Numerics;
 namespace GrapeEngine.Scripting;
 
 /// <summary>
-/// Example system that demonstrates World/Entity access from C#.
-/// This will be discovered by ScriptManager and registered as an ECS system.
+/// Example system demonstrating the record struct component pattern and
+/// how to write efficient ECS systems in C#.
+/// 
+/// This system:
+/// 1. Queries entities with Transform and Velocity components
+/// 2. Updates positions based on velocity and deltaTime
+/// 3. Demonstrates immutable component updates using `with` expressions
 /// </summary>
 public class TestMovementSystem : ISystem
 {
+    /// <summary>
+    /// Cached query for faster iteration (optional, but recommended for frequently-used queries).
+    /// </summary>
+    private Query<Transform, Velocity> _query;
+
     public void OnCreate(World world)
     {
-        Console.WriteLine("[TestMovementSystem] OnCreate called!");
-        Console.WriteLine("[TestMovementSystem] World interop bridge is working!");
+        Console.WriteLine("[TestMovementSystem] System created");
+        
+        // Cache the query for better performance in OnUpdate
+        _query = world.Query<Transform, Velocity>();
     }
 
     public void OnUpdate(World world, float deltaTime)
     {
-        // Query API example: Iterate over all entities with Position and Velocity
-        foreach (var (entity, pos, vel) in world.Query<Position, Velocity>())
+        // Use cached query to iterate over all entities with Transform and Velocity
+        foreach (var (entity, transform, velocity) in _query)
         {
-            // Get mutable reference to position component
-            ref var position = ref entity.GetComponent<Position>();
-            position.Value += vel.Value * deltaTime;
+            // Update position using immutable `with` expression
+            // This is the new preferred pattern for record struct components
+            var newTransform = transform with 
+            { 
+                Position = transform.Position + velocity.Value * deltaTime 
+            };
+            
+            // Write updated component back to entity
+            entity.SetComponent(newTransform);
         }
-        
-        // Note: Components are accessed by reference, so modifications persist
-        // across frames. No need to "set" components back to the entity.
     }
 
     public void OnDestroy(World world)
     {
-        Console.WriteLine("[TestMovementSystem] OnDestroy called!");
+        Console.WriteLine("[TestMovementSystem] System destroyed");
     }
-}
-
-// Example component structs (these would normally be defined alongside C++ components)
-public struct Position
-{
-    public Vector3 Value;
-}
-
-public struct Velocity
-{
-    public Vector3 Value;
 }

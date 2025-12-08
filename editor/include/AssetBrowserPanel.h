@@ -23,6 +23,7 @@ Provides:
 
 #include "ecs/World.h"
 #include "AssetLibrary.h"
+#include "ScriptTemplates.h"
 #include <imgui.h>
 #include <string>
 #include <unordered_set>
@@ -188,6 +189,7 @@ private:
     bool m_focusNameInput = false;
     enum class AssetCreationType : uint8_t { NONE, SCRIPT, SCENE, FOLDER };
     AssetCreationType m_creationType = AssetCreationType::NONE;
+    Editor::Templates::ScriptTemplateType m_selectedScriptTemplate = Editor::Templates::ScriptTemplateType::BasicSystem;
 
     // Rename state
     std::string m_renamingAsset;
