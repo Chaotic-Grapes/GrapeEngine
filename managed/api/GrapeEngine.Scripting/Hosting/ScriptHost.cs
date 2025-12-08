@@ -137,21 +137,29 @@ public static class ScriptHost
                 {
                     try
                     {
+                        byte[]? blob = null;
+                        
+                        // Try IHotReloadable first (for custom serialization)
                         if (inst is IHotReloadable hot)
                         {
-                            byte[]? blob = null;
                             try { blob = hot.OnBeforeUnload(); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error OnBeforeUnload: {ex.Message}"); }
+                        }
+                        
+                        // If no blob from IHotReloadable, try automatic [Preserve] field serialization
+                        if (blob == null)
+                        {
+                            try { blob = StateSerializer.SerializePreservedFields(inst); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error serializing preserved fields: {ex.Message}"); }
+                        }
 
-                            if (blob != null)
+                        if (blob != null && blob.Length > 0)
+                        {
+                            string assemblyPathKey = entry.Assembly.Location ?? assemblyPath;
+                            if (!s_savedSystemStateByAssemblyPath.TryGetValue(assemblyPathKey, out var map))
                             {
-                                string assemblyPathKey = entry.Assembly.Location ?? assemblyPath;
-                                if (!s_savedSystemStateByAssemblyPath.TryGetValue(assemblyPathKey, out var map))
-                                {
-                                    map = new Dictionary<string, byte[]?>();
-                                    s_savedSystemStateByAssemblyPath[assemblyPathKey] = map;
-                                }
-                                map[inst.GetType().FullName ?? inst.GetType().Name] = blob;
+                                map = new Dictionary<string, byte[]?>();
+                                s_savedSystemStateByAssemblyPath[assemblyPathKey] = map;
                             }
+                            map[inst.GetType().FullName ?? inst.GetType().Name] = blob;
                         }
                     }
                     catch (Exception ex)
@@ -552,9 +560,15 @@ public static class ScriptHost
                     string key = systemType.FullName ?? systemType.Name;
                     if (map.TryGetValue(key, out var blob))
                     {
+                        // Try IHotReloadable first (for custom serialization)
                         if (instance is IHotReloadable hot)
                         {
                             try { hot.OnAfterReload(blob); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error OnAfterReload: {ex.Message}"); }
+                        }
+                        else
+                        {
+                            // Fall back to automatic [Preserve] field deserialization
+                            try { StateSerializer.DeserializePreservedFields(instance, blob); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error deserializing preserved fields: {ex.Message}"); }
                         }
                         // Remove saved blob once applied
                         map.Remove(key);
@@ -598,14 +612,21 @@ public static class ScriptHost
                 return;
             }
             
+            // Get instance if available (for ISystemMetadata interface)
+            s_systemInstances.TryGetValue(handle, out object? instance);
+            
             // Get name
             string name = systemType.FullName ?? systemType.Name;
             byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
             Marshal.Copy(nameBytes, 0, (IntPtr)outNameBuffer, System.Math.Min(nameBytes.Length, 256));
             
-            // TODO: Get group and run mode from attributes or interface methods
-            *outGroup = (int)SystemGroup.Update;
-            *outRunMode = (int)SystemRunMode.PlayOnly;
+            // Get group - check ISystemMetadata interface first, then [SystemGroup] attribute
+            *outGroup = (int)SystemMetadataExtractor.GetSystemGroup(systemType, instance);
+            
+            // Get run mode - check for [ExecuteInEditMode] attribute
+            *outRunMode = SystemMetadataExtractor.HasExecuteInEditMode(systemType) 
+                ? (int)SystemRunMode.Always 
+                : (int)SystemRunMode.PlayOnly;
         }
         catch (Exception ex)
         {
