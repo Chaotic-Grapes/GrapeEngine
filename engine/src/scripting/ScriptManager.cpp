@@ -164,6 +164,7 @@ namespace ECS {
         std::cout << "[ScriptManager] Discovering scripted systems..." << std::endl;
 
         // Call managed function to discover all ISystem implementations
+        // DiscoverSystems now creates instances and returns INSTANCE handles
         int systemCount = 0;
         void* systemHandlesPtr = m_discoverSystems(&systemCount);
 
@@ -172,17 +173,14 @@ namespace ECS {
             return systems;
         }
 
-        // systemHandlesPtr is an array of uint64_t handles to TYPES
-        // We need to create instances from these types
-        uint64_t* typeHandles = static_cast<uint64_t*>(systemHandlesPtr);
+        // systemHandlesPtr is an array of uint64_t instance handles
+        uint64_t* handles = static_cast<uint64_t*>(systemHandlesPtr);
 
         for (int i = 0; i < systemCount; ++i) {
-            uint64_t typeHandle = typeHandles[i];
+            uint64_t handle = handles[i];
             
-            // For now, use the type handle directly as the instance handle
-            // In a full implementation, we would call GetSystemMetadata to get the type name,
-            // then CreateSystemInstance to create an actual instance
-            auto wrapper = std::make_unique<ScriptSystemWrapper>(typeHandle, this, "ScriptedSystem");
+            // Create wrapper for this C# system instance
+            auto wrapper = std::make_unique<ScriptSystemWrapper>(handle, this, "ScriptedSystem");
             systems.push_back(wrapper.get());
             m_scriptedSystems.push_back(std::move(wrapper));
         }

@@ -455,22 +455,44 @@ public static class ScriptHost
             
             Console.WriteLine($"[ScriptHost] Found {systemTypes.Count} system types");
             
-            // Create handles for each system type
-            var handles = new ulong[systemTypes.Count];
+            // Create instances for each system type (and return instance handles)
+            var instanceHandles = new ulong[systemTypes.Count];
             for (int i = 0; i < systemTypes.Count; i++)
             {
-                ulong handle = s_nextSystemHandle++;
-                s_systemTypes[handle] = systemTypes[i];
-                handles[i] = handle;
+                Type systemType = systemTypes[i];
                 
-                Console.WriteLine($"[ScriptHost]   - {systemTypes[i].FullName} (handle: {handle})");
+                // Create instance
+                object? instance = null;
+                try
+                {
+                    instance = Activator.CreateInstance(systemType);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ScriptHost] Failed to create instance of {systemType.FullName}: {ex.Message}");
+                    continue;
+                }
+                
+                if (instance == null)
+                {
+                    Console.WriteLine($"[ScriptHost] Failed to create instance of {systemType.FullName}");
+                    continue;
+                }
+                
+                // Create instance handle
+                ulong instanceHandle = s_nextSystemHandle++;
+                s_systemTypes[instanceHandle] = systemType;
+                s_systemInstances[instanceHandle] = instance;
+                instanceHandles[i] = instanceHandle;
+                
+                Console.WriteLine($"[ScriptHost]   - {systemType.FullName} (handle: {instanceHandle})");
             }
             
             // Allocate unmanaged array for handles
-            IntPtr handlesPtr = Marshal.AllocHGlobal(sizeof(ulong) * handles.Length);
-            Marshal.Copy(handles.Select(h => (long)h).ToArray(), 0, handlesPtr, handles.Length);
+            IntPtr handlesPtr = Marshal.AllocHGlobal(sizeof(ulong) * instanceHandles.Length);
+            Marshal.Copy(instanceHandles.Select(h => (long)h).ToArray(), 0, handlesPtr, instanceHandles.Length);
             
-            *outCount = handles.Length;
+            *outCount = instanceHandles.Length;
             return (void*)handlesPtr;
         }
         catch (Exception ex)
