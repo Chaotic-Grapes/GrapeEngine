@@ -33,6 +33,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <vector>
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 
 // CoreCLR handle
 using hostfxr_handle = void*;
@@ -75,7 +76,7 @@ namespace ECS {
      * systemManager.Update(world, deltaTime);
      * @endcode
      */
-    class ScriptManager {
+    class GRAPEENGINE_API ScriptManager {
     public:
         ScriptManager();
         ~ScriptManager();
@@ -183,6 +184,14 @@ namespace ECS {
         bool CompileScripts(const std::vector<std::string>& scriptPaths,
                            const std::string& outputAssembly);
 
+        // Start/stop the managed file watcher (used by editor Auto-Reload)
+        bool StartScriptWatching(const std::string& directory);
+        void StopScriptWatching();
+
+        // Expose compile status (updated by native callback from managed watcher)
+        void SetCompileStatus(int status, int progress, const char* message);
+        void GetCompileStatus(int& outStatus, int& outProgress, std::string& outMessage);
+
         // ====================================================================
         // Debugging and Diagnostics
         // ====================================================================
@@ -253,6 +262,21 @@ namespace ECS {
         CallSystemOnCreateFn        m_callSystemOnCreate = nullptr;
         CallSystemOnUpdateFn        m_callSystemOnUpdate = nullptr;
         CallSystemOnDestroyFn       m_callSystemOnDestroy = nullptr;
+        
+        // File-watcher managed delegates (Start/Stop) and setter for native compile callback
+        using StartWatchingFn = int(*)(const char* directoryPath, void* userData);
+        using StopWatchingFn = void(*)();
+        using SetCompileCallbackFn = void(*)(void* callbackPtr);
+        using CompileDirectoryFn = int(*)(const char* directoryPath, const char* outputAssemblyPath);
+        using CompileDirectoryWithDiagFn = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
+        using FreeManagedStringFn = void(*)(void* ptr);
+
+        StartWatchingFn             m_startWatching = nullptr;
+        StopWatchingFn              m_stopWatching = nullptr;
+        SetCompileCallbackFn        m_setCompileCallback = nullptr;
+        CompileDirectoryFn          m_compileDirectory = nullptr;
+        CompileDirectoryWithDiagFn  m_compileDirectoryWithDiag = nullptr;
+        FreeManagedStringFn         m_freeManagedString = nullptr;
 
         // ====================================================================
         // Internal State
@@ -261,6 +285,12 @@ namespace ECS {
         std::vector<std::string> m_loadedAssemblies;
         std::vector<std::unique_ptr<ScriptSystemWrapper>> m_scriptedSystems;
         std::unordered_map<std::string, std::vector<ScriptSystemWrapper*>> m_systemsByAssembly;
+
+        // Compile status reported by managed watcher via native callback
+        int m_compileStatus = 0; // 0 = idle, 1 = compiling, 3 = success, 4 = failure
+        int m_compileProgress = -1; // -1 = indeterminate, 0-100 progress
+        std::string m_compileMessage;
+        std::mutex m_compileMutex;
 
         // ====================================================================
         // Helper Methods

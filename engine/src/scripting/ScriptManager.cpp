@@ -13,9 +13,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 #include "scripting/ScriptManager.h"
+#include "core/Application.h"
 #include <iostream>
 #include <filesystem>
 #include <cstring>
+#include <mutex>
 
 // Platform-specific includes for loading nethost
 #ifdef _WIN32
@@ -31,6 +33,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // typedef for nethost get_hostfxr_path function pointer
 // Uses the project's char_t type already employed throughout this file.
 using get_hostfxr_path_fn = int(*)(char_t* path, size_t* path_size, void* reserved);
+
+// Forward-declare native callback so managed watcher registration can pass
+// its address before the function definition appears later in this file.
+extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, const char* message);
 
 namespace ECS {
 
@@ -188,9 +194,68 @@ namespace ECS {
 
     bool ScriptManager::CompileScripts(const std::vector<std::string>& scriptPaths,
                                       const std::string& outputAssembly) {
-        // TODO: Implement Roslyn compilation
-        std::cerr << "[ScriptManager] CompileScripts not yet implemented (Roslyn integration pending)" << std::endl;
-        return false;
+        if (!m_initialized) {
+            std::cerr << "[ScriptManager] Cannot compile - CLR not initialized" << std::endl;
+            return false;
+        }
+
+        if (!m_compileDirectory) {
+            std::cerr << "[ScriptManager] Compile delegate not available" << std::endl;
+            return false;
+        }
+
+        // For simplicity, accept a single directory path in scriptPaths.
+        if (scriptPaths.empty()) {
+            std::cerr << "[ScriptManager] No script paths provided" << std::endl;
+            return false;
+        }
+
+        std::string dir = scriptPaths.size() == 1 ? scriptPaths[0] : scriptPaths[0];
+
+        int rc = m_compileDirectory(dir.c_str(), outputAssembly.c_str());
+
+        // If diagnostics-aware delegate is available, fetch diagnostics and store message
+        if (m_compileDirectoryWithDiag && m_freeManagedString) {
+            void* p = m_compileDirectoryWithDiag(dir.c_str(), outputAssembly.c_str());
+            if (p != nullptr) {
+                const char* diagC = static_cast<const char*>(p);
+                std::lock_guard<std::mutex> lock(m_compileMutex);
+                m_compileMessage = diagC ? std::string(diagC) : std::string();
+                m_freeManagedString(p);
+            }
+        }
+
+        // Update status
+        std::lock_guard<std::mutex> lock(m_compileMutex);
+        m_compileStatus = (rc == 0) ? 3 : 4;
+        m_compileProgress = (rc == 0) ? 100 : 0;
+        return rc == 0;
+    }
+
+    bool ScriptManager::StartScriptWatching(const std::string& directory) {
+        if (!m_initialized || !m_startWatching) {
+            std::cerr << "[ScriptManager] StartScriptWatching not available" << std::endl;
+            return false;
+        }
+
+        int rc = m_startWatching(directory.c_str(), nullptr);
+        if (rc != 0) {
+            std::cerr << "[ScriptManager] StartWatching returned error: " << rc << std::endl;
+            return false;
+        }
+        // If managed watcher supports setting a native compile-status callback, register it now
+        if (m_setCompileCallback) {
+            // Pass pointer to native function that will be called by managed code
+            m_setCompileCallback(reinterpret_cast<void*>(&Native_CompileStatusCallback));
+        }
+        std::cout << "[ScriptManager] Started watching: " << directory << std::endl;
+        return true;
+    }
+
+    void ScriptManager::StopScriptWatching() {
+        if (!m_initialized || !m_stopWatching) return;
+        m_stopWatching();
+        std::cout << "[ScriptManager] Stopped script watching" << std::endl;
     }
 
     // ============================================================================
@@ -372,6 +437,42 @@ namespace ECS {
         success &= loadFunction("CallSystemOnUpdate", reinterpret_cast<void**>(&m_callSystemOnUpdate));
         success &= loadFunction("CallSystemOnDestroy", reinterpret_cast<void**>(&m_callSystemOnDestroy));
 
+        // Additionally load ScriptFileWatcher methods from the same assembly
+        const char_t* watcherTypeName = DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptFileWatcher, GrapeEngine.Scripting");
+
+        auto loadWatcherFunc = [&](const char* functionName, void** outDelegate) -> bool {
+#ifdef _WIN32
+            std::wstring methodNameW = std::wstring(functionName, functionName + strlen(functionName));
+            const char_t* methodName = methodNameW.c_str();
+#else
+            const char_t* methodName = functionName;
+#endif
+
+            int rc = loadAssemblyFn(
+                scriptHostPathCStr,
+                watcherTypeName,
+                methodName,
+                nullptr,
+                nullptr,
+                outDelegate
+            );
+
+            if (rc != 0 || !*outDelegate) {
+                std::cerr << "[ScriptManager] Failed to load watcher function: " << functionName << " (error: " << rc << ")" << std::endl;
+                return false;
+            }
+
+            std::cout << "[ScriptManager]   Loaded watcher: " << functionName << std::endl;
+            return true;
+        };
+
+        success &= loadWatcherFunc("StartWatching", reinterpret_cast<void**>(&m_startWatching));
+        success &= loadWatcherFunc("StopWatching", reinterpret_cast<void**>(&m_stopWatching));
+        success &= loadWatcherFunc("SetCompileCallback", reinterpret_cast<void**>(&m_setCompileCallback));
+        success &= loadWatcherFunc("CompileScriptsInDirectory", reinterpret_cast<void**>(&m_compileDirectory));
+        success &= loadWatcherFunc("CompileDirectoryWithDiagnostics", reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
+        success &= loadWatcherFunc("FreeStringFromManaged", reinterpret_cast<void**>(&m_freeManagedString));
+
         if (!success) {
             std::cerr << "[ScriptManager] Failed to load all managed delegates" << std::endl;
             return false;
@@ -498,4 +599,32 @@ namespace ECS {
         m_metadataCached = true;
     }
 
+}
+
+// ============================================================================
+// Native callback and compile-status helpers
+// ============================================================================
+
+extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, const char* message)
+{
+    if (Engine::CORE == nullptr) return;
+    ECS::ScriptManager* mgr = Engine::CORE->GetScriptManager();
+    if (!mgr) return;
+    mgr->SetCompileStatus(status, progress, message ? message : "");
+}
+
+void ECS::ScriptManager::SetCompileStatus(int status, int progress, const char* message)
+{
+    std::lock_guard<std::mutex> lock(m_compileMutex);
+    m_compileStatus = status;
+    m_compileProgress = progress;
+    m_compileMessage = message ? std::string(message) : std::string();
+}
+
+void ECS::ScriptManager::GetCompileStatus(int& outStatus, int& outProgress, std::string& outMessage)
+{
+    std::lock_guard<std::mutex> lock(m_compileMutex);
+    outStatus = m_compileStatus;
+    outProgress = m_compileProgress;
+    outMessage = m_compileMessage;
 }

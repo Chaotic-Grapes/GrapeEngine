@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <core/Application.h>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include "CompilePanel.h"
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
@@ -382,6 +383,15 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
                 });
         },
         [this]() { m_console.Render(); },
+        nullptr
+    );
+
+    // Register Compile Panel as an editor-global modal for blocking compilation status
+    _registerPanel("Compile",
+        [this]() {
+            CompilePanel::Initialize();
+        },
+        [this]() { CompilePanel::Render(); },
         nullptr
     );
 

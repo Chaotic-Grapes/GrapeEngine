@@ -116,8 +116,15 @@ namespace Engine {
         Services::AudioService* GetAudioService() { return m_audio; }
         const Services::AudioService* GetAudioService() const { return m_audio; }
         
-        // Get SystemManager for system access
+        /**
+         * @brief Get access to the SystemManager for registering/updating systems
+         */
         ECS::SystemManager& GetSystemManager() { return m_systemManager; }
+
+        /**
+         * @brief Get access to the ScriptManager service (may be null if CLR failed to initialize)
+         */
+        ECS::ScriptManager* GetScriptManager() { return m_scriptManager; }
 
         /**
          * @brief Get the platform context (window, rendering, input services)

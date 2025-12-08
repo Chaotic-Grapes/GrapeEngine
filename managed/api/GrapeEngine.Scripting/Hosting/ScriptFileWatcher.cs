@@ -14,6 +14,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -28,6 +30,10 @@ public static class ScriptFileWatcher
     private static readonly HashSet<string> s_changedFiles = [];
     private static readonly Lock _lock = new();
     private static Action<string>? s_onFileChanged;
+    private static string? s_watchedDirectory;
+    // Native compile status callback (function pointer set by native ScriptManager)
+    // Signature: void callback(int status, int progress, sbyte* messageUtf8)
+    private static unsafe delegate* unmanaged[Cdecl]<int, int, sbyte*, void> s_compileCallback = null;
 
     /// <summary>
     /// Start watching a directory for C# file changes.
@@ -47,6 +53,9 @@ public static class ScriptFileWatcher
             }
 
             Console.WriteLine($"[ScriptFileWatcher] Starting file watcher for: {directoryPath}");
+
+            // Remember watched directory for compile+reload
+            s_watchedDirectory = directoryPath;
 
             // Stop existing watcher if any
             StopWatchingImpl();
@@ -79,6 +88,17 @@ public static class ScriptFileWatcher
             Console.WriteLine($"[ScriptFileWatcher] Error starting watcher: {ex.Message}");
             return -1;
         }
+    }
+
+    /// <summary>
+    /// Set the native compile-status callback function pointer.
+    /// Called by native code (ScriptManager) to register a callback that
+    /// receives compile start/progress/finish notifications.
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "ScriptFileWatcher_SetCompileCallback")]
+    public static unsafe void SetCompileCallback(nint callbackPtr)
+    {
+        s_compileCallback = (delegate* unmanaged[Cdecl]<int, int, sbyte*, void>)callbackPtr;
     }
 
     /// <summary>
@@ -142,7 +162,7 @@ public static class ScriptFileWatcher
         }
     }
 
-    private static void OnDebounceTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    private static unsafe void OnDebounceTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
         HashSet<string> filesToProcess;
         lock (_lock)
@@ -164,8 +184,61 @@ public static class ScriptFileWatcher
             s_onFileChanged?.Invoke(file);
         }
 
-        // TODO: Trigger recompilation and reload
-        // For now, just log that changes were detected
-        Console.WriteLine($"[ScriptFileWatcher] Hot reload triggered for changed files");
+        // Trigger recompilation and reload in background; report status via callback
+        try
+        {
+            if (!string.IsNullOrEmpty(s_watchedDirectory))
+            {
+                // Default output assembly path inside watched dir
+                string outPath = Path.Combine(s_watchedDirectory, "CompiledScripts.dll");
+                Console.WriteLine($"[ScriptFileWatcher] Hot reload triggered - compiling and reloading: {s_watchedDirectory} -> {outPath}");
+
+                // Notify native that compilation started (status 1, progress indeterminate (-1))
+                if (s_compileCallback != null)
+                {
+                    unsafe
+                    {
+                        IntPtr p = ToUtf8Ptr("Compiling...");
+                        try { s_compileCallback(1, -1, (sbyte*)p.ToPointer()); }
+                        finally { if (p != IntPtr.Zero) Marshal.FreeHGlobal(p); }
+                    }
+                }
+
+                // Run compile+reload asynchronously so file-watcher thread isn't blocked
+                Task.Run(() => {
+                    int r = ScriptHost.TriggerCompileAndReloadManaged(s_watchedDirectory, outPath);
+
+                    // Prepare message
+                    string msg = r == 0 ? "OK" : "Compilation failed";
+
+                    // Notify native of completion: status 3 = success, 4 = failure
+                    if (s_compileCallback != null)
+                    {
+                        unsafe
+                        {
+                            IntPtr pmsg = ToUtf8Ptr(msg);
+                            try { s_compileCallback(r == 0 ? 3 : 4, r == 0 ? 100 : 0, (sbyte*)pmsg.ToPointer()); }
+                            finally { if (pmsg != IntPtr.Zero) Marshal.FreeHGlobal(pmsg); }
+                        }
+                    }
+                });
+            }
+            else
+            {
+                Console.WriteLine("[ScriptFileWatcher] No watched directory registered for hot reload");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptFileWatcher] Error during hot reload: {ex.Message}");
+        }
+    }
+
+    private static IntPtr ToUtf8Ptr(string s)
+    {
+        var bytes = Encoding.UTF8.GetBytes(s + '\0');
+        IntPtr p = Marshal.AllocHGlobal(bytes.Length);
+        Marshal.Copy(bytes, 0, p, bytes.Length);
+        return p;
     }
 }

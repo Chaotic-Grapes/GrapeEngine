@@ -261,6 +261,45 @@ public static class ScriptHost
     }
 
     /// <summary>
+    /// Compile directory and return pointer to UTF8 diagnostics string (allocated with CoTaskMemAlloc).
+    /// Caller must free the returned pointer using FreeStringFromManaged.
+    /// Returns IntPtr.Zero on failure to allocate.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe IntPtr CompileDirectoryWithDiagnostics(char* scriptsDirPtr, char* outputAssemblyPathPtr)
+    {
+        try
+        {
+            string dir = Marshal.PtrToStringUTF8((IntPtr)scriptsDirPtr) ?? "";
+            string outPath = Marshal.PtrToStringUTF8((IntPtr)outputAssemblyPathPtr) ?? "";
+
+            Console.WriteLine($"[ScriptHost] CompileDirectoryWithDiagnostics: {dir} -> {outPath}");
+
+            int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
+
+            string diags = RoslynCompiler.GetLastDiagnostics() ?? string.Empty;
+            // Encode as UTF8 and allocate unmanaged memory
+            var bytes = System.Text.Encoding.UTF8.GetBytes(diags + '\0');
+            IntPtr p = Marshal.AllocHGlobal(bytes.Length);
+            Marshal.Copy(bytes, 0, p, bytes.Length);
+
+            return p;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] CompileDirectoryWithDiagnostics error: {ex}");
+            return IntPtr.Zero;
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static unsafe void FreeStringFromManaged(IntPtr ptr)
+    {
+        if (ptr == IntPtr.Zero) return;
+        Marshal.FreeHGlobal(ptr);
+    }
+
+    /// <summary>
     /// Compile scripts and reload resulting assembly.
     /// </summary>
     [UnmanagedCallersOnly]
@@ -349,6 +388,38 @@ public static class ScriptHost
         IntPtr p = Marshal.AllocHGlobal(bytes.Length);
         Marshal.Copy(bytes, 0, p, bytes.Length);
         return p;
+    }
+
+    /// <summary>
+    /// Managed wrapper that compiles scripts in `dir` and reloads the resulting assembly at `outPath`.
+    /// This is callable from other managed classes (e.g., file watcher).
+    /// </summary>
+    public static unsafe int TriggerCompileAndReloadManaged(string dir, string outPath)
+    {
+        try
+        {
+            int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
+            if (res != 0)
+            {
+                Console.WriteLine("[ScriptHost] Compilation failed in TriggerCompileAndReloadManaged");
+                return res;
+            }
+
+            IntPtr utf8Ptr = StringToHGlobalUtf8(outPath);
+            try
+            {
+                return ReloadAssemblyImpl((char*)utf8Ptr);
+            }
+            finally
+            {
+                if (utf8Ptr != IntPtr.Zero) Marshal.FreeHGlobal(utf8Ptr);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] TriggerCompileAndReloadManaged error: {ex}");
+            return -1;
+        }
     }
 
     /// <summary>

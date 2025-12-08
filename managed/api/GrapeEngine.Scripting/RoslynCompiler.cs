@@ -25,8 +25,11 @@ namespace GrapeEngine.Scripting;
 
 internal static class RoslynCompiler
 {
+    private static string s_lastDiagnostics = string.Empty;
+
     public static unsafe int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath, IEnumerable<string>? references = null)
     {
+        s_lastDiagnostics = string.Empty;
         try
         {
             if (!Directory.Exists(dirPath))
@@ -98,21 +101,32 @@ internal static class RoslynCompiler
                 var emitResult = compilation.Emit(fs);
                 if (!emitResult.Success)
                 {
+                    var sb = new System.Text.StringBuilder();
                     foreach (var diag in emitResult.Diagnostics)
                     {
-                        Console.WriteLine($"[RoslynCompiler] {diag.Id}: {diag.GetMessage()} (at {diag.Location})");
+                        var line = $"{diag.Id}: {diag.GetMessage()} (at {diag.Location})";
+                        Console.WriteLine($"[RoslynCompiler] {line}");
+                        sb.AppendLine(line);
                     }
+                    s_lastDiagnostics = sb.ToString();
                     return -1;
                 }
             }
 
             Console.WriteLine($"[RoslynCompiler] Compilation succeeded: {outputAssemblyPath}");
+            s_lastDiagnostics = "";
             return 0;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[RoslynCompiler] Compilation error: {ex}");
+            s_lastDiagnostics = ex.ToString();
             return -1;
         }
+    }
+
+    public static string GetLastDiagnostics()
+    {
+        return s_lastDiagnostics ?? string.Empty;
     }
 }

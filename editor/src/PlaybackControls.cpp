@@ -26,9 +26,14 @@ Reference:
 #include "services/TimeSystem.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
+#include "core/Application.h"
+#include "core/ProjectPaths.h"
 #include "serialization/EntitySerializer.h"
+#include "scripting/ScriptManager.h"
+#include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
+#include <algorithm>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
