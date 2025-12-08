@@ -12,7 +12,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-namespace GrapeEngine;
+using GrapeEngine.Scripting.Core;
+
+namespace GrapeEngine.Scripting.Systems;
 
 /// <summary>
 /// Interface for custom C# systems that execute gameplay logic.

@@ -11,7 +11,7 @@ Additional shared types used by components.
 using System.Runtime.InteropServices;
 using GrapeEngine.Math;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Components.Core;
 
 [StructLayout(LayoutKind.Sequential)]
 public struct Layer

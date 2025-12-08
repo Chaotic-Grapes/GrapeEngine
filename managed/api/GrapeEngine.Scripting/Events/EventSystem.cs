@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using GrapeEngine.Scripting.Core;
 
-namespace GrapeEngine.Events
+namespace GrapeEngine.Scripting.Events;
 {
     /// <summary>
     /// Manages event component lifecycle and provides utilities for working with events.

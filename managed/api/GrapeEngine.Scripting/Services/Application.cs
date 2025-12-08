@@ -15,8 +15,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 
 using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Core;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting.Services;
 
 /// <summary>
 /// Provides access to application-level functionality and configuration.

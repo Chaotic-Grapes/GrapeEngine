@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using System.Runtime.InteropServices;
 using GrapeEngine.Scripting.Unsafe;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting.Core;
 
 /// <summary>
 /// Represents an entity in the ECS World. Entities are containers for components.

@@ -35,8 +35,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Core;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Services;
 
 /// <summary>
 /// Type of UI event that occurred

@@ -38,8 +38,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Numerics;
 using GrapeEngine.Math;
+using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Components.Core;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Helpers;
 
 /// <summary>
 /// Helper class for transform operations.

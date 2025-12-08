@@ -13,9 +13,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Core;
 using System.Numerics;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Services;
 
 /// <summary>
 /// Physics utilities for working with rigidbodies and forces.

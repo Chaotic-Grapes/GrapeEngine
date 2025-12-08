@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Unsafe;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting.Core;
 
 /// <summary>
 /// Represents the ECS World, which contains all entities and their components.

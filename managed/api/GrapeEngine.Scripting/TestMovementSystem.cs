@@ -14,7 +14,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine;
+using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Query;
+using GrapeEngine.Scripting.Systems;
 using System.Numerics;
 
 namespace GrapeEngine.Scripting;

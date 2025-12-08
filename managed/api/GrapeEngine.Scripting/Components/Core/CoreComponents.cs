@@ -12,7 +12,7 @@ Pure data components using record structs for immutability and value semantics.
 using GrapeEngine.Numerics;
 using System.Runtime.InteropServices;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Components.Core;
 
 // ============================================================================
 // Transform & Physics Components

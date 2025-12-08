@@ -14,8 +14,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Unsafe;
 using System.Collections;
+using GrapeEngine.Scripting.Core;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting.Query;
 
 /// <summary>
 /// Enumerator for single-component queries.
@@ -43,7 +44,7 @@ public unsafe struct QueryEnumerator<T1>
         }
     }
 
-        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
@@ -105,7 +106,7 @@ public unsafe struct QueryEnumerator<T1, T2>
         }
     }
 
-        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
@@ -169,7 +170,7 @@ public unsafe struct QueryEnumerator<T1, T2, T3>
         }
     }
 
-        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
@@ -237,7 +238,7 @@ public unsafe struct QueryEnumerator<T1, T2, T3, T4>
         }
     }
 
-        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
@@ -305,7 +306,7 @@ public unsafe struct QueryEnumerator<T1, T2, T3, T4, T5>
         }
     }
 
-        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
@@ -375,7 +376,7 @@ public unsafe struct QueryEnumerator<T1, T2, T3, T4, T5, T6>
         }
     }
 
-        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;

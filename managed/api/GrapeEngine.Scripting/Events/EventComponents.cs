@@ -1,7 +1,7 @@
 using System;
 using GrapeEngine.Numerics;
 
-namespace GrapeEngine.Events
+namespace GrapeEngine.Scripting.Events;
 {
     /// <summary>
     /// Event component fired when two rigid bodies collide.

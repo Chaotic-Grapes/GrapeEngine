@@ -18,6 +18,8 @@ using System.Runtime.InteropServices;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.IO;
+using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Systems;
 
 namespace GrapeEngine.Scripting.Hosting;
 

@@ -23,7 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Unsafe;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting.Services;
 
 public enum LogLevel
 {

@@ -15,8 +15,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Numerics;
 using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Core;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting.Services;
 
 /// <summary>
 /// Audio playback handle returned when playing a sound.

@@ -13,8 +13,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Collections;
+using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Unsafe;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting.Query;
 
 /// <summary>
 /// Query for iterating over entities with one component type.

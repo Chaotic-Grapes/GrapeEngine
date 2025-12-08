@@ -13,8 +13,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Core;
 
-namespace GrapeEngine;
+namespace GrapeEngine.Scripting.Query;
 
 /// <summary>
 /// Result tuple for single-component query.

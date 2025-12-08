@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using System.Collections.Generic;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Core;
 
 /// <summary>
 /// Batches multiple component operations to reduce P/Invoke overhead.

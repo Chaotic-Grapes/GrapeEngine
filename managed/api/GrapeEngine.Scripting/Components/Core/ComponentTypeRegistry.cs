@@ -10,7 +10,7 @@ Component type registry and hashing helper.
 
 using System;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Components.Core;
 
 internal static class ComponentTypeRegistry
 {

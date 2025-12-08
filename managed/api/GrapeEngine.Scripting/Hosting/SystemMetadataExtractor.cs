@@ -13,7 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Reflection;
-using GrapeEngine.Scripting.Attributes;
+using GrapeEngine.Scripting.Systems.Attributes;
 
 namespace GrapeEngine.Scripting.Hosting;
 

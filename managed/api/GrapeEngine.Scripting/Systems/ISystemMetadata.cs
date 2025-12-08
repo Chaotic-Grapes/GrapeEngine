@@ -14,7 +14,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Systems;
 
 /// <summary>
 /// Optional interface for systems to provide custom metadata.

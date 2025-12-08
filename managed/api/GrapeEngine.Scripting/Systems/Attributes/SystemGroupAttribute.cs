@@ -13,7 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-namespace GrapeEngine.Scripting.Attributes;
+namespace GrapeEngine.Scripting.Systems.Attributes;
 
 /// <summary>
 /// Marks a system class with the execution group (phase) it should run in.
