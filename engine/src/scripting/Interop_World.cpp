@@ -37,7 +37,11 @@ struct QueryIterator {
     uint32_t chunkIndex;
     uint32_t entityIndex;
     uint32_t componentCount;
-    uint32_t componentTypeIds[8]; // Max 8 components in a query
+    uint32_t componentTypeIds[8]; // Max 8 required components in a query
+    uint32_t optionalCount;
+    uint32_t optionalTypeIds[8];
+    uint32_t excludeCount;
+    uint32_t excludeTypeIds[8];
 };
 
 namespace {
@@ -194,10 +198,13 @@ INTEROP_API void WorldInterop_RemoveComponent(void* worldPtr, uint64_t entityId,
 // Query Operations
 // ============================================================================
 
-INTEROP_API bool WorldInterop_CreateQuery(void* worldPtr, uint32_t* componentHashes, int componentCount, QueryIterator* outIterator) {
+INTEROP_API bool WorldInterop_CreateQuery(void* worldPtr, uint32_t* componentHashes, int componentCount, uint32_t* optionalHashes, int optionalCount, uint32_t* excludeHashes, int excludeCount, QueryIterator* outIterator) {
     if (!worldPtr || !outIterator || componentCount <= 0 || componentCount > 8) {
         return false;
     }
+
+    if (optionalCount < 0 || optionalCount > 8) return false;
+    if (excludeCount < 0 || excludeCount > 8) return false;
 
     ECS::World* world = GetWorld(worldPtr);
     
@@ -214,20 +221,44 @@ INTEROP_API bool WorldInterop_CreateQuery(void* worldPtr, uint32_t* componentHas
         componentIds.push_back(id);
         outIterator->componentTypeIds[i] = id;
     }
+    // Process optional components
+    outIterator->optionalCount = 0;
+    for (int i = 0; i < optionalCount; ++i) {
+        ECS::ComponentTypeId id = GetComponentIdFromHash(optionalHashes[i]);
+        if (id == ECS::NULL_COMPONENT_ID) {
+            LOG_WARNING("[WorldInterop] Unknown optional component type hash in query: " << optionalHashes[i]);
+            return false;
+        }
+        outIterator->optionalTypeIds[i] = id;
+        outIterator->optionalCount++;
+    }
+
+    // Process exclude components
+    outIterator->excludeCount = 0;
+    for (int i = 0; i < excludeCount; ++i) {
+        ECS::ComponentTypeId id = GetComponentIdFromHash(excludeHashes[i]);
+        if (id == ECS::NULL_COMPONENT_ID) {
+            LOG_WARNING("[WorldInterop] Unknown exclude component type hash in query: " << excludeHashes[i]);
+            return false;
+        }
+        outIterator->excludeTypeIds[i] = id;
+        outIterator->excludeCount++;
+    }
     
-    // Create signature and get matching archetypes
+    // Create signature for required components and get matching archetypes
     ECS::Signature sig(componentIds);
-    const auto& archetypes = world->GetMatchingArchetypes(sig);
-    
-    // Initialize iterator
+    // Keep reference to world's archetype list; we'll skip excluded archetypes during iteration
+    auto& matched = world->GetMatchingArchetypes(sig);
+
+    // Initialize iterator (point at the world's matched archetypes)
     outIterator->worldPtr = worldPtr;
-    outIterator->archetypes = &archetypes;
+    outIterator->archetypes = &matched;
     outIterator->archetypeIndex = 0;
     outIterator->chunkIndex = 0;
     outIterator->entityIndex = 0;
     outIterator->componentCount = componentCount;
     
-    return !archetypes.empty();
+    return !matched.empty();
 }
 
 INTEROP_API bool WorldInterop_QueryNext(QueryIterator* iterator, uint64_t* outEntityId) {
@@ -245,6 +276,21 @@ INTEROP_API bool WorldInterop_QueryNext(QueryIterator* iterator, uint64_t* outEn
         if (!archetype) {
             iterator->archetypeIndex++;
             continue;
+        }
+
+        // If this archetype contains any excluded components, skip it
+        if (iterator->excludeCount > 0) {
+            bool hasExcluded = false;
+            for (uint32_t exIdx = 0; exIdx < iterator->excludeCount; ++exIdx) {
+                ECS::ComponentTypeId exId = iterator->excludeTypeIds[exIdx];
+                if (archetype->Has(exId)) { hasExcluded = true; break; }
+            }
+            if (hasExcluded) {
+                iterator->archetypeIndex++;
+                iterator->chunkIndex = 0;
+                iterator->entityIndex = 0;
+                continue;
+            }
         }
         
         while (iterator->chunkIndex < archetype->GetChunkCount()) {
@@ -321,6 +367,63 @@ INTEROP_API void* WorldInterop_QueryGetComponent(QueryIterator* iterator, int co
     }
     
     ECS::ComponentTypeId componentId = iterator->componentTypeIds[componentIndex];
+    return archetype->GetRaw(componentId, chunkIdx, entityIdx);
+}
+
+INTEROP_API void* WorldInterop_QueryGetOptionalComponent(QueryIterator* iterator, uint32_t componentTypeHash) {
+    if (!iterator || !iterator->archetypes) {
+        return nullptr;
+    }
+
+    ECS::World* world = GetWorld(iterator->worldPtr);
+    const auto& archetypes = *static_cast<const std::vector<ECS::Archetype*>*>(iterator->archetypes);
+
+    // Get current archetype and chunk (iterator was already advanced, so we need previous positions)
+    uint32_t archIdx = iterator->archetypeIndex;
+    uint32_t chunkIdx = iterator->chunkIndex;
+    uint32_t entityIdx = iterator->entityIndex - 1; // Was incremented after finding entity
+
+    // Adjust indices if entity index wrapped
+    if (entityIdx == UINT32_MAX) {
+        if (chunkIdx > 0) {
+            chunkIdx--;
+            ECS::Archetype* arch = archetypes[archIdx];
+            if (arch) {
+                ECS::Chunk* chunk = arch->GetChunk(chunkIdx);
+                entityIdx = chunk->Count() - 1;
+            }
+        } else if (archIdx > 0) {
+            archIdx--;
+            ECS::Archetype* arch = archetypes[archIdx];
+            if (arch && arch->GetChunkCount() > 0) {
+                chunkIdx = arch->GetChunkCount() - 1;
+                ECS::Chunk* chunk = arch->GetChunk(chunkIdx);
+                entityIdx = chunk->Count() - 1;
+            }
+        }
+    }
+
+    if (archIdx >= archetypes.size()) {
+        return nullptr;
+    }
+
+    ECS::Archetype* archetype = archetypes[archIdx];
+    if (!archetype || chunkIdx >= archetype->GetChunkCount()) {
+        return nullptr;
+    }
+
+    // Convert hash to component id
+    ECS::ComponentTypeId componentId = GetComponentIdFromHash(componentTypeHash);
+    if (componentId == ECS::NULL_COMPONENT_ID) {
+        LOG_WARNING("[WorldInterop] Unknown optional component type hash in query: " << componentTypeHash);
+        return nullptr;
+    }
+
+    // If archetype doesn't have the component, return null
+    if (!archetype->Has(componentId)) {
+        return nullptr;
+    }
+
     return archetype->GetRaw(componentId, chunkIdx, entityIdx);
 }
 

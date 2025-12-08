@@ -1,6 +1,18 @@
-// ScriptHost.cs - Managed entry point for C++ ScriptManager
-// This assembly is loaded by ScriptManager and provides the bridge between
-// native C++ and managed C# scripting systems.
+/* Start Header *****************************************************************/
+/*!
+\file   ScriptHost.cs
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+Script host for managing C# assemblies and systems. Provides functions for loading,
+unloading, and reloading assemblies, discovering scripted systems, and invoking their
+lifecycle methods.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
 using System.Reflection;
@@ -154,6 +166,11 @@ public static class ScriptHost
     [UnmanagedCallersOnly]
     public static unsafe int ReloadAssembly(char* assemblyPathPtr)
     {
+        return ReloadAssemblyImpl(assemblyPathPtr);
+    }
+
+    private static unsafe int ReloadAssemblyImpl(char* assemblyPathPtr)
+    {
         try
         {
             string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
@@ -186,6 +203,78 @@ public static class ScriptHost
             Console.WriteLine($"[ScriptHost] Error reloading assembly: {ex.Message}");
             return -1;
         }
+    }
+
+    /// <summary>
+    /// Compile all .cs files in a directory into an assembly using Roslyn.
+    /// Called from C++ to compile scripts in-editor.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int CompileScriptsInDirectory(char* scriptsDirPtr, char* outputAssemblyPathPtr)
+    {
+        try
+        {
+            string dir = Marshal.PtrToStringUTF8((IntPtr)scriptsDirPtr) ?? "";
+            string outPath = Marshal.PtrToStringUTF8((IntPtr)outputAssemblyPathPtr) ?? "";
+
+            Console.WriteLine($"[ScriptHost] CompileScriptsInDirectory: {dir} -> {outPath}");
+
+            int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
+            return res;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] CompileScriptsInDirectory error: {ex}");
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Compile scripts and reload resulting assembly.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int CompileAndReload(char* scriptsDirPtr, char* outputAssemblyPathPtr)
+    {
+        try
+        {
+            string dir = Marshal.PtrToStringUTF8((IntPtr)scriptsDirPtr) ?? "";
+            string outPath = Marshal.PtrToStringUTF8((IntPtr)outputAssemblyPathPtr) ?? "";
+
+            Console.WriteLine($"[ScriptHost] CompileAndReload: {dir} -> {outPath}");
+
+            int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
+            if (res != 0)
+            {
+                Console.WriteLine("[ScriptHost] Compilation failed, aborting reload.");
+                return -1;
+            }
+
+            // Call ReloadAssembly on the resulting assembly path
+            // Convert managed string to UTF8 pointer (portable fallback)
+            IntPtr utf8Ptr = StringToHGlobalUtf8(outPath);
+            try
+            {
+                return ReloadAssemblyImpl((char*)utf8Ptr);
+            }
+            finally
+            {
+                if (utf8Ptr != IntPtr.Zero) Marshal.FreeHGlobal(utf8Ptr);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] CompileAndReload error: {ex}");
+            return -1;
+        }
+    }
+
+    private static IntPtr StringToHGlobalUtf8(string? s)
+    {
+        if (s == null) return IntPtr.Zero;
+        var bytes = System.Text.Encoding.UTF8.GetBytes(s + '\0');
+        IntPtr p = Marshal.AllocHGlobal(bytes.Length);
+        Marshal.Copy(bytes, 0, p, bytes.Length);
+        return p;
     }
 
     /// <summary>

@@ -30,6 +30,10 @@ internal unsafe struct QueryIterator
     public uint EntityIndex;
     public uint ComponentCount;
     public fixed uint ComponentTypeIds[8];
+    public uint OptionalCount;
+    public fixed uint OptionalTypeIds[8];
+    public uint ExcludeCount;
+    public fixed uint ExcludeTypeIds[8];
 }
 
 /// <summary>
@@ -40,7 +44,7 @@ internal static partial class QueryInteropAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_CreateQuery")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static unsafe partial bool CreateQuery(void* worldPtr, uint* componentHashes, int componentCount, QueryIterator* outIterator);
+    public static unsafe partial bool CreateQuery(void* worldPtr, uint* componentHashes, int componentCount, uint* optionalHashes, int optionalCount, uint* excludeHashes, int excludeCount, QueryIterator* outIterator);
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_QueryNext")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
@@ -50,4 +54,8 @@ internal static partial class QueryInteropAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_QueryGetComponent")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void* QueryGetComponent(QueryIterator* iterator, int componentIndex);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_QueryGetOptionalComponent")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial void* QueryGetOptionalComponent(QueryIterator* iterator, uint componentTypeHash);
 }
