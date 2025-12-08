@@ -16,6 +16,10 @@ entities, organize them through parent-child relationships and perform common
 editor actions like create, delete, clone and reparent through drag-drop. It also
 syncs with the inspector and viewport so selection stays consistent across the UI
 and supports prefab instantiation by accepting dragged prefab assets.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -35,7 +39,7 @@ and supports prefab instantiation by accepting dragged prefab assets.
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
-#include "Viewport.h"
+#include "BaseViewport.h"
 
 namespace {
     // Helper template function to safely add components during deserialization

@@ -247,6 +247,80 @@ namespace ECS {
         (void)world; // Currently unused
     }
 
+    bool RendererSystem::GetCameraMatrices(World& world, glm::mat4& outView, glm::mat4& outProjection, float& outOrthoSize) {
+        // Default fallback
+        outView = glm::mat4(1.0f);
+        outProjection = glm::mat4(1.0f);
+        outOrthoSize = kReferenceOrthoSize;
+
+        // Use external camera if provided
+        if (m_activeCamera) {
+            outView = m_activeCamera->GetViewMatrix();
+            outProjection = m_activeCamera->GetProjectionMatrix();
+            outOrthoSize = m_activeCamera->OrthoSize;
+            return true;
+        }
+
+        // Fall back to ECS camera
+        bool foundActive = false;
+        world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
+            [&](ECS::Entity /*e*/,
+                const ECS::Components::LocalTransform& transform,
+                const ECS::Components::Camera3D& camera)
+            {
+                if (foundActive || !camera.Active) return;
+
+                // --- View: eye looks forward along -Z
+                const glm::vec3 eye(
+                    transform.Position.X,
+                    transform.Position.Y,
+                    transform.Position.Z
+                );
+                const glm::vec3 target = eye + glm::vec3(0.f, 0.f, -1.f);
+                outView = glm::lookAt(eye, target, glm::vec3(0.f, 1.f, 0.f));
+
+                // --- Projection
+                if (camera.UsePerspective) {
+                    // camera.FOV assumed radians
+                    outProjection = glm::perspective(
+                        camera.FOV,
+                        camera.AspectRatio,
+                        camera.NearPlane,
+                        camera.FarPlane
+                    );
+                }
+                else {
+                    const float halfH = camera.OrthoSize * 0.5f;
+                    const float halfW = halfH * camera.AspectRatio;
+                    outProjection = glm::ortho(
+                        -halfW, +halfW,
+                        -halfH, +halfH,
+                        camera.NearPlane, camera.FarPlane
+                    );
+                }
+
+                foundActive = true;
+                outOrthoSize = camera.OrthoSize;
+            }
+        );
+
+        if (foundActive) {
+            return true;
+        }
+
+        // Fallback: screen-aligned ortho
+        auto* context = Engine::CORE->GetPlatformContext();
+        auto* mainWindow = context ? context->GetMainWindow() : nullptr;
+        if (mainWindow) {
+            outProjection = glm::ortho(0.f, static_cast<float>(mainWindow->GetWidth()),
+                0.f, static_cast<float>(mainWindow->GetHeight()),
+                -1.f, 1.f);
+            return true;
+        }
+
+        return false;
+    }
+
     glm::vec2 RendererSystem::CalculateAnchoredPosition(
         const Components::LocalTransform& transform,
         Components::TextAnchor anchor,
@@ -304,75 +378,12 @@ namespace ECS {
         // Batching pipeline and render graph
         glm::mat4 view = glm::mat4(1.0f);
         glm::mat4 projection = glm::mat4(1.0f);
-        bool foundActive = false;
-
-        // Track current camera zoom for bloom scaling
         m_cameraOrthoSize = kReferenceOrthoSize; // default fallback (world-space 1080p)
 
         // ============================================================
-        // 1. Use provided camera, or find active ECS camera
+        // 1. Acquire camera matrices from active source (camera agnostic)
         // ============================================================
-        // If external camera is set (e.g., editor camera), use it
-        if (m_activeCamera && !m_forceSceneCamera) {
-            view = m_activeCamera->GetViewMatrix();
-            projection = m_activeCamera->GetProjectionMatrix();
-            foundActive = true;
-            m_cameraOrthoSize = m_activeCamera->OrthoSize;
-        }
-        else {
-            // Use ECS camera
-            world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
-                [&](ECS::Entity /*e*/,
-                    const ECS::Components::LocalTransform& transform,
-                    const ECS::Components::Camera3D& camera)
-                {
-                    if (foundActive || !camera.Active) return;
-
-                    // --- View: eye looks forward along -Z
-                    const glm::vec3 eye(
-                        transform.Position.X,
-                        transform.Position.Y,
-                        transform.Position.Z
-                    );
-                    const glm::vec3 target = eye + glm::vec3(0.f, 0.f, -1.f);
-                    view = glm::lookAt(eye, target, glm::vec3(0.f, 1.f, 0.f));
-
-                    // --- Projection
-                    if (camera.UsePerspective) {
-                        // camera.FOV assumed radians
-                        projection = glm::perspective(
-                            camera.FOV,
-                            camera.AspectRatio,
-                            camera.NearPlane,
-                            camera.FarPlane
-                        );
-                    }
-                    else {
-                        const float halfH = camera.OrthoSize * 0.5f;
-                        const float halfW = halfH * camera.AspectRatio;
-                        projection = glm::ortho(
-                            -halfW, +halfW,
-                            -halfH, +halfH,
-                            camera.NearPlane, camera.FarPlane
-                        );
-                    }
-
-                    foundActive = true; // take the first active camera
-                    m_cameraOrthoSize = camera.OrthoSize;
-                }
-            );
-        }
-
-        // fallback (if no active camera found)
-        if (!foundActive) {
-            auto* context = Engine::CORE->GetPlatformContext();
-            auto* mainWindow = context ? context->GetMainWindow() : nullptr;
-            if (mainWindow) {
-                projection = glm::ortho(0.f, static_cast<float>(mainWindow->GetWidth()),
-                    0.f, static_cast<float>(mainWindow->GetHeight()),
-                    -1.f, 1.f);
-            }
-        }
+        GetCameraMatrices(world, view, projection, m_cameraOrthoSize);
 
         // ============================================================
         // BLOOM RADIUS CALCULATION (world-space consistent)
@@ -705,9 +716,9 @@ namespace ECS {
         m_renderGraph->AddPass("Picking", {}, {},
             [this, &world, &viewProj, &buckets, &win](ResourceAccessor& res)
             {
-                // Skip picking entirely when force scene camera is enabled
-                if (m_forceSceneCamera) {
-                    LOG_DEBUG("[PICKING] Skipping picking - force scene camera enabled");
+                // Skip picking when using external camera (typically in game window)
+                if (m_activeCamera) {
+                    LOG_DEBUG("[PICKING] Skipping picking - external camera active");
                     return;
                 }
 

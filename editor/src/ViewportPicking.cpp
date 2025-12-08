@@ -47,9 +47,10 @@ namespace Editor {
             return INVALID_ENTITY_ID;
         }
 
-        // Convert to FBO coordinates (flip Y for OpenGL)
+        // Convert to FBO coordinates (flip Y for OpenGL). Subtract 1 to
+        // convert from top-left inclusive coordinates to 0-based bottom-left.
         int x = static_cast<int>(localPos.x);
-        int y = static_cast<int>(viewportSize.y - localPos.y);
+        int y = static_cast<int>(viewportSize.y - localPos.y - 1.0f);
 
         // Clamp to FBO bounds
         int vpWidth = static_cast<int>(viewportSize.x);
@@ -78,15 +79,15 @@ namespace Editor {
         mutableFBO->Bind();
         
         // Ensure we're reading from the color attachment
-        GLint readBuffer = 0;
-        glGetIntegerv(GL_READ_BUFFER, &readBuffer);
+        GLenum previousReadBuffer = GL_NONE;
+        glGetIntegerv(GL_READ_BUFFER, reinterpret_cast<GLint*>(&previousReadBuffer));
         glReadBuffer(GL_COLOR_ATTACHMENT0);
         
         unsigned char pixel[4] = {0, 0, 0, 0};
         glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
         
         // Restore read buffer and FBO
-        glReadBuffer(readBuffer);
+        glReadBuffer(previousReadBuffer);
         glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
 
         // Decode entity ID from RGB channels

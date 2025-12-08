@@ -8,6 +8,10 @@
 Implements the LevelEditor class - main orchestrator for the game editor interface.
 Manages docking layout, panel coordination, entity selection, and playback controls.
 Integrates Hierarchy, Inspector, Asset Browser, and Viewport panels.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -137,15 +141,15 @@ void LevelEditor::_buildDockLayout() {
     // Split left-center area vertically: top work area (65%), bottom asset browser (35%)
     ImGui::DockBuilderSplitNode(leftCenterNode, ImGuiDir_Up, 0.65f, &topSection, &assetBrowserNode); // Split for assets
 
-    ImGuiID leftTopNode, viewportNode;
-    // Split top work area horizontally: left hierarchy (33%), center viewport (67%)
-    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &viewportNode); // Hierarchy strip
+    ImGuiID leftTopNode, sceneGameNode;
+    // Split top work area horizontally: left hierarchy (33%), center scene/game (67%)
+    ImGui::DockBuilderSplitNode(topSection, ImGuiDir_Left, 0.333f, &leftTopNode, &sceneGameNode); // Hierarchy strip
 
     // Map panels to target nodes to realize the layout
     ImGui::DockBuilderDockWindow("Game Controls", toolbarNode);  // Toolbar at top
     ImGui::DockBuilderDockWindow("Hierarchy", leftTopNode);
-    ImGui::DockBuilderDockWindow("Scene", viewportNode);
-    ImGui::DockBuilderDockWindow("Game", viewportNode);
+    ImGui::DockBuilderDockWindow("Scene", sceneGameNode);
+    ImGui::DockBuilderDockWindow("Game", sceneGameNode);
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
@@ -265,8 +269,11 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             if (m_hierarchyWindow.GetPrimarySelectedEntity() == evt.EntityId) {
                 m_hierarchyWindow.SetSelectedEntity(0);
                 m_inspector.ClearSelection();
-                if (m_viewport.HasValidWorld()) {
-                    m_viewport.SetSelectedEntity(0);
+                if (m_sceneViewport.HasValidWorld()) {
+                    m_sceneViewport.SetSelectedEntity(0);
+                }
+                if (m_gameViewport.HasValidWorld()) {
+                    m_gameViewport.SetSelectedEntity(0);
                 }
             }
         }
@@ -320,20 +327,32 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     _registerPanel("Scene",
         [this]() {
             Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
-            m_viewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
-            m_viewport.SetUndoSystem(&m_undoSystem);
+            m_sceneViewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
+            m_sceneViewport.SetViewportType(BaseViewport::ViewportType::Scene);
+            m_sceneViewport.SetUndoSystem(&m_undoSystem);
             // Register viewport selection callback
-            m_viewport.OnSelectionChanged([this](const EntityId id) {
+            m_sceneViewport.OnSelectionChanged([this](const EntityId id) {
                 _onViewportSelectionChanged(id);
                 });
         },
-        [this]() { m_viewport.ShowEditorWindows(); },
-        [this](ECS::World* w) { m_viewport.SetWorld(w); m_viewport.SetUndoSystem(&m_undoSystem); }
+        [this]() { m_sceneViewport.ShowEditorWindows(); },
+        [this](ECS::World* w) { m_sceneViewport.SetWorld(w); m_sceneViewport.SetUndoSystem(&m_undoSystem); }
+    );
+
+    _registerPanel("Game",
+        [this]() {
+            Scenes::SceneManager* sm = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
+            m_gameViewport.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, sm);
+            m_gameViewport.SetViewportType(BaseViewport::ViewportType::Game);
+            m_gameViewport.SetUndoSystem(&m_undoSystem);
+        },
+        [this]() { m_gameViewport.ShowEditorWindows(); },
+        [this](ECS::World* w) { m_gameViewport.SetWorld(w); m_gameViewport.SetUndoSystem(&m_undoSystem); }
     );
 
     _registerPanel("Hierarchy",
         [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); 
-                   m_hierarchyWindow.SetViewport(&m_viewport); 
+                   m_hierarchyWindow.SetViewport(&m_sceneViewport); 
                    m_hierarchyWindow.SetFileMenu(&m_fileMenu);
         },
         [this]() { m_hierarchyWindow.Render(); },
@@ -378,20 +397,23 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Initialize all registered panels
     _initializePanels();
 
-    // Wire up file menu to viewport after panels are initialized
-    m_viewport.SetFileMenu(&m_fileMenu);
+    // Wire up file menu to viewports after panels are initialized
+    m_sceneViewport.SetFileMenu(&m_fileMenu);
+    m_gameViewport.SetFileMenu(&m_fileMenu);
 
-    // Set up hierarchy selection callback to sync with inspector
+    // Set up hierarchy selection callback to sync with inspector and viewports
     m_hierarchyWindow.OnSelectionChanged([this](const EntityId id) {
         if (!m_world) {
             m_inspector.ClearSelection();
-            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             return;
         } // Clear when no world
 
         if (id == ECS::Entity::NPOS32) {
             m_inspector.ClearSelection();
-            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
             return;
         } // Clear when no entity
 
@@ -399,11 +421,13 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         const ECS::Entity e = m_world->Resolve(id);
         if (m_world->IsAlive(e)) {
             m_inspector.InspectEntity(id); // Inspect when valid
-            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(id);
+            if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(id);
+            if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(id);
         }
         else {
             m_inspector.ClearSelection(); // Clear when entity is dead
-            if (m_viewport.HasValidWorld()) m_viewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            if (m_sceneViewport.HasValidWorld()) m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
+            if (m_gameViewport.HasValidWorld()) m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
         }
         });
 }
@@ -490,7 +514,21 @@ void LevelEditor::Update() {
     }
 
     m_playback.ProcessInput(); // Handle playback hotkeys and actions
-    m_viewport.HandleInWorldInteraction(); // Handle viewport interactions and camera input control
+    m_sceneViewport.HandleInWorldInteraction(); // Handle scene viewport interactions and camera input control
+    m_gameViewport.HandleInWorldInteraction(); // Handle game viewport interactions
+
+    // Ensure the engine's RendererSystem uses the editor viewport camera
+    // for the upcoming systems update. This must happen here because
+    // systems are executed after Editor::Update() but before Editor::Render().
+    if (Engine::CORE) {
+        auto* rendererSystem = Engine::CORE->GetSystemManager().GetSystem<ECS::RendererSystem>();
+        if (rendererSystem) {
+            auto* editorCam = m_sceneViewport.GetEditorCamera();
+            if (editorCam) {
+                rendererSystem->SetCamera(editorCam->GetCamera());
+            }
+        }
+    }
 
     if (m_playback.IsPlaying()) {
         Engine::CORE->GetSceneManager().Update(); // Updates scenemanager to run Audio

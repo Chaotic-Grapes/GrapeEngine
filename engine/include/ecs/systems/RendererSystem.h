@@ -82,22 +82,18 @@ namespace ECS {
 
         /**
          * @brief Set the camera to use for rendering
-         * @param camera Pointer to camera (can be editor or game camera)
-         * @note Pass nullptr to use game camera from ECS
+         * @param camera Pointer to camera for rendering (editor, game, or any other)
          */
         void SetCamera(Engine::Camera* camera) { m_activeCamera = camera; }
 
         /**
-         * @brief Get the currently active camera
-         * @return Pointer to active camera (may be nullptr)
+         * @brief Get the currently active external camera
+         * @return Pointer to external camera (may be nullptr)
          */
         Engine::Camera* GetCamera() { return m_activeCamera; }
 
         // Rebind the renderer to a new world
         void BindWorld(World& world);
-        
-        // Force the renderer to always use scene camera (for game window)
-        void SetForceSceneCamera(bool force) { m_forceSceneCamera = force; }
 
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
 
@@ -145,7 +141,6 @@ namespace ECS {
         // ====================================================================
 
         bool m_initialized = false;                                 ///< Has Initialize() been called?
-        bool m_forceSceneCamera = false;                            ///< Force use of scene camera (for game window)
         int m_activeCameraIndex = 0;                                ///< Active ECS camera (future use)
         glm::mat4x4 m_projection = glm::identity<glm::mat4x4>();    ///< Projection matrix
         uint16_t m_uiLayerId = 0xFFFF;  // Default invalid value
@@ -213,6 +208,20 @@ namespace ECS {
         */
         static constexpr float kReferenceWidth = 1920.0f;
         static constexpr float kReferenceHeight = 1080.0f;
+
+        // ====================================================================
+        // Helper Methods - Camera
+        // ====================================================================
+
+        /**
+         * @brief Extract camera matrices from active source
+         * @param world The ECS world (used if m_activeCamera is null)
+         * @param[out] outView View matrix
+         * @param[out] outProjection Projection matrix
+         * @param[out] outOrthoSize Orthographic size (for bloom scaling)
+         * @return true if a valid camera was found, false otherwise
+         */
+        bool GetCameraMatrices(World& world, glm::mat4& outView, glm::mat4& outProjection, float& outOrthoSize);
 
         // ====================================================================
         // Helper Methods - Text Positioning

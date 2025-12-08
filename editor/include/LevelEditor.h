@@ -6,6 +6,10 @@
 \date   26th October 2025
 \brief
 Header for LevelEditor class - main orchestrator for the game editor interface.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -17,7 +21,8 @@ Header for LevelEditor class - main orchestrator for the game editor interface.
 #include "PlaybackControls.h"
 #include "EditorFileMenu.h"
 #include "AssetBrowserPanel.h"
-#include "Viewport.h"
+#include "SceneViewport.h"
+#include "GameViewport.h"
 #include "HierarchyPanel.h"
 #include "InspectorPanel.h"
 #include "EditorEntityActions.h"
@@ -95,7 +100,8 @@ private:
     Playback m_playback;
     EditorFileMenu m_fileMenu;
     AssetBrowserPanel m_assetBrowser;
-    Viewport m_viewport;
+    SceneViewport m_sceneViewport;
+    GameViewport m_gameViewport;
     HierarchyPanel m_hierarchyWindow;
     InspectorPanel m_inspector;
     EntityActions m_entityActions;

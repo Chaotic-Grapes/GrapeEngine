@@ -5,9 +5,10 @@
 \par    choi.m@digipen.edu
 \date   31st October 2025
 \brief
-Implements a 3D EditorCamera for panning and zooming within the
-editor viewport. Left-click drag pans the view, right-click drag orbits,
-WASD keys move the camera, and scroll input zooms in/out.
+Implementation for the editor viewport camera.
+
+Implements the navigation behaviours declared in `EditorCamera.hpp`.
+The implementation handles platform input, smoothing, and viewport resize messages.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -17,44 +18,45 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #define GLM_ENABLE_EXPERIMENTAL
 
-// Graphics
 #include "EditorCamera.hpp"
 
-// Services
 #include "services/Input.h"
 #include "core/Application.h"
 #include "platform/IPlatformContext.h"
-
-// Core systems
 #include "core/messaging/MessageTypes.h"
 
-// Third-Party Libraries
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <algorithm>
 
 namespace Editor {
 
+    static constexpr float RAD_CLAMP = 1.55334303f; // ~89 degrees in radians
+
     EditorCamera::EditorCamera() {
-        // Initialize camera with sensible defaults
-        m_camera.Position = glm::vec3(0.0f, 5.0f, 10.0f);
-        m_camera.Rotation = glm::quat(glm::vec3(-0.3f, 0.0f, 0.0f));
-        m_camera.UsePerspective = false;  // Start with ortho
-        m_camera.OrthoSize = 10.0f;
+        // Sensible defaults
         m_camera.FOV = 45.0f;
         m_camera.NearPlane = 0.1f;
-        m_camera.FarPlane = 1000.0f;
+        m_camera.FarPlane = 10000.0f;
+        m_camera.OrthoSize = 10.0f;
 
-        // Set initial aspect ratio
+        // Initialise to 2D by default
+        ResetTo2D();
+
+        // smoothing initial state
+        m_smoothPosition = m_camera.Position;
+        m_smoothRotation = m_camera.Rotation;
+
+        // Set initial aspect using platform window if available
         auto* context = Engine::CORE->GetPlatformContext();
-        auto* window = context ? context->GetMainWindow() : nullptr;
-        if (window) {
-            m_camera.SetAspectRatio(
-                static_cast<float>(window->GetWidth()),
-                static_cast<float>(window->GetHeight())
-            );
+        if (context) {
+            if (auto* win = context->GetMainWindow()) {
+                m_camera.SetAspectRatio(static_cast<float>(win->GetWidth()),
+                                        static_cast<float>(win->GetHeight()));
+            }
         }
 
-        // Subscribe to resize events
+        // Subscribe to resize messages
         m_windowResizedSub = Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
             [this](const Messaging::WindowResized& e) {
                 m_camera.SetAspectRatio(static_cast<float>(e.Width), static_cast<float>(e.Height));
@@ -68,105 +70,379 @@ namespace Editor {
         );
     }
 
-    EditorCamera::~EditorCamera() {
-        // Subscriptions auto-unsubscribe via RAII
-    }
+    EditorCamera::~EditorCamera() { } // RAII unsubscription assumed
 
-    void EditorCamera::Update(float deltaTime) {
-        if (!m_allowInput) {
+    void EditorCamera::Update(float dt) {
+        if (!m_isViewportFocused) {
+            // still keep mouse-first flag reset so mouse delta won't jump when focus returns
+            m_firstMouse = true;
             return;
         }
 
-        HandleKeyboardInput(deltaTime);
-        HandleMouseInput(deltaTime);
-        UpdateCameraPosition();
+        // Get mouse delta
+        glm::vec2 mouseDelta(0.0f);
+        _handleMouseDelta(mouseDelta);
+
+        // Process input
+        _handleInput(dt, mouseDelta);
+
+        // Apply smoothing to camera transform
+        _applySmoothing(dt);
     }
 
-    void EditorCamera::HandleKeyboardInput(float deltaTime) {
-        const float moveSpeed = 5.0f;
+    void EditorCamera::_handleMouseDelta(glm::vec2& outDelta) {
+        double mx = 0.0, my = 0.0;
+        Input::GetMousePosition(mx, my);
+        glm::vec2 mousePos(static_cast<float>(mx), static_cast<float>(my));
 
-        // WASD movement
-        if (Input::IsKeyDown(KEY_W)) {
-            m_target += m_camera.GetForward() * moveSpeed * deltaTime;
-        }
-        if (Input::IsKeyDown(KEY_S)) {
-            m_target -= m_camera.GetForward() * moveSpeed * deltaTime;
-        }
-        if (Input::IsKeyDown(KEY_A)) {
-            m_target -= m_camera.GetRight() * moveSpeed * deltaTime;
-        }
-        if (Input::IsKeyDown(KEY_D)) {
-            m_target += m_camera.GetRight() * moveSpeed * deltaTime;
-        }
-
-        // Q/E for vertical movement
-        if (Input::IsKeyDown(KEY_Q)) {
-            m_target.y -= moveSpeed * deltaTime;
-        }
-        if (Input::IsKeyDown(KEY_E)) {
-            m_target.y += moveSpeed * deltaTime;
-        }
-    }
-
-    void EditorCamera::HandleMouseInput(float deltaTime) {
-        (void)deltaTime;
-        double x, y;
-        Input::GetMousePosition(x, y);
-        glm::vec2 mousePos(static_cast<float>(x), static_cast<float>(y));
-        
         if (m_firstMouse) {
             m_lastMousePos = mousePos;
             m_firstMouse = false;
         }
 
-        glm::vec2 delta = mousePos - m_lastMousePos;
+        outDelta = mousePos - m_lastMousePos;
         m_lastMousePos = mousePos;
+    }
 
-        // Right-click to orbit
-        if (Input::IsMouseDown(MOUSE_RIGHT)) {
-            const float rotationSpeed = 0.005f;
-            m_yaw -= delta.x * rotationSpeed;
-            m_pitch -= delta.y * rotationSpeed;
+    void EditorCamera::_handleInput(float dt, const glm::vec2& mouseDelta) {
+        // Input queries
+        const bool alt = Input::IsKeyDown(KEY_LEFT_ALT) || Input::IsKeyDown(KEY_RIGHT_ALT);
+        const bool lmb = Input::IsMouseDown(MOUSE_LEFT);
+        const bool mmb = Input::IsMouseDown(MOUSE_MIDDLE);
+        const bool rmb = Input::IsMouseDown(MOUSE_RIGHT);
+        const float scroll = static_cast<float>(Input::GetScrollY()); // vertical scroll
 
-            // Clamp pitch to avoid gimbal lock
-            m_pitch = glm::clamp(m_pitch, -glm::half_pi<float>() + 0.01f, glm::half_pi<float>() - 0.01f);
+        // Shortcut keys (toggle modes)
+        if (Input::IsKeyPressed(KEY_2)) { ResetTo2D(); }
+        if (Input::IsKeyPressed(KEY_3)) { ResetTo3D(); }
+        if (Input::IsKeyPressed(KEY_V)) { ToggleViewMode(); } // optional
+
+        // Focus selected (editor should compute bounds and call FocusBounds; here we handle F to reframe current target)
+        if (Input::IsKeyPressed(KEY_F)) {
+            // If editor selection system is available, call FocusBounds(min,max) from editor code.
+            // Here we simply refocus to current target to reframe using distance.
+            Focus(m_target);
         }
 
-        // Middle mouse or Alt+Left to pan
-        if (Input::IsMouseDown(MOUSE_MIDDLE) ||
-            (Input::IsKeyDown(KEY_LEFT_ALT) && Input::IsMouseDown(MOUSE_LEFT))) {
-            const float panSpeed = 0.01f * m_distance;
-            m_target -= m_camera.GetRight() * delta.x * panSpeed;
-            m_target += m_camera.GetUp() * delta.y * panSpeed;
+        // Priority: Free-look (RMB), Orbit (Alt+LMB), Pan (MMB), Alt+RMB zoom drag
+        if (rmb) {
+            // Free-look (fly) mode: rotate camera by mouse and allow WASD movement
+            _handleFly(dt, mouseDelta);
+        } else if (alt && lmb) {
+            // Orbit around target
+            _handleOrbit(mouseDelta);
+        } else if (mmb) {
+            // Pan in camera plane
+            _handlePan(mouseDelta);
+        } else if (alt && Input::IsMouseDown(MOUSE_RIGHT) && (mouseDelta.x != 0.0f || mouseDelta.y != 0.0f)) {
+            // Alt + RMB drag for zoom/dolly (vertical drag)
+            _handleZoom(mouseDelta.y * 0.01f);
         }
+        
+            // Handle movement keys (WASD/QE): in 2D they pan the camera, in 3D
+            // they act as FPS movement. Do not call when RMB is held because
+            // HandleFly already moves the camera in that case.
+            if (!rmb) {
+                _handleMovementKeys(dt);
+            }
 
-        // Mouse wheel to zoom
-        float scroll = static_cast<float>(Input::GetScrollY());
+        // Always process scroll zoom (works both for ortho and perspective)
         if (scroll != 0.0f) {
-            const float zoomSpeed = 0.1f;
-            m_distance -= scroll * m_distance * zoomSpeed;
-            m_distance = glm::clamp(m_distance, 0.1f, 1000.0f);
+            _handleZoom(scroll);
         }
     }
 
-    void EditorCamera::UpdateCameraPosition() {
-        // Calculate position based on orbit parameters
+    void EditorCamera::_handleFly(float dt, const glm::vec2& delta) {
+        // Rotation from mouse delta
+        const float lookSpeed = 0.0025f;
+        m_yaw   -= delta.x * lookSpeed;
+        m_pitch -= delta.y * lookSpeed;
+        m_pitch = glm::clamp(m_pitch, -RAD_CLAMP, RAD_CLAMP);
+
+        // Build rotation quaternion (pitch around X, yaw around Y)
+        glm::quat rot = glm::quat(glm::vec3(m_pitch, m_yaw, 0.0f));
+        m_camera.Rotation = rot;
+
+        // Movement in camera local space
+        glm::vec3 forward = m_camera.GetForward();
+        glm::vec3 right   = m_camera.GetRight();
+        glm::vec3 up      = m_camera.GetUp();
+
+        float speed = Input::IsKeyDown(KEY_LEFT_SHIFT) ? m_fastMoveSpeed : m_moveSpeed;
+
+        if (Input::IsKeyDown(KEY_W)) m_camera.Position += forward * speed * dt;
+        if (Input::IsKeyDown(KEY_S)) m_camera.Position -= forward * speed * dt;
+        if (Input::IsKeyDown(KEY_A)) m_camera.Position -= right   * speed * dt;
+        if (Input::IsKeyDown(KEY_D)) m_camera.Position += right   * speed * dt;
+        if (Input::IsKeyDown(KEY_Q)) m_camera.Position -= up      * speed * dt;
+        if (Input::IsKeyDown(KEY_E)) m_camera.Position += up      * speed * dt;
+
+        // Keep orbit target in front of camera so toggling back to orbit behaves sensibly
+        m_target = m_camera.Position + forward * m_distance;
+    }
+
+    void EditorCamera::_handleMovementKeys(float dt) {
+        // 2D orthographic: WASD pans the target/camera in XY
+        if (m_is2DMode || !m_camera.UsePerspective) {
+            float panScale = m_camera.OrthoSize * m_panSpeed;
+            float speedMod = Input::IsKeyDown(KEY_LEFT_SHIFT) ? 4.0f : 1.0f;
+
+            glm::vec3 right = m_camera.GetRight();
+            glm::vec3 up = m_camera.GetUp();
+
+            glm::vec3 delta(0.0f);
+            if (Input::IsKeyDown(KEY_W)) delta += up;
+            if (Input::IsKeyDown(KEY_S)) delta -= up;
+            if (Input::IsKeyDown(KEY_A)) delta -= right;
+            if (Input::IsKeyDown(KEY_D)) delta += right;
+
+            if (glm::length(delta) > 0.0f) {
+                delta = glm::normalize(delta);
+                m_target += delta * panScale * speedMod;
+                _updateOrbitPosition();
+            }
+            return;
+        }
+
+        // 3D FPS-style movement along camera axes
+        glm::vec3 forward = m_camera.GetForward();
+        glm::vec3 right = m_camera.GetRight();
+        glm::vec3 up = m_camera.GetUp();
+
+        float speed = Input::IsKeyDown(KEY_LEFT_SHIFT) ? m_fastMoveSpeed : m_moveSpeed;
+
+        if (Input::IsKeyDown(KEY_W)) m_camera.Position += forward * speed * dt;
+        if (Input::IsKeyDown(KEY_S)) m_camera.Position -= forward * speed * dt;
+        if (Input::IsKeyDown(KEY_A)) m_camera.Position -= right   * speed * dt;
+        if (Input::IsKeyDown(KEY_D)) m_camera.Position += right   * speed * dt;
+        if (Input::IsKeyDown(KEY_Q)) m_camera.Position -= up      * speed * dt;
+        if (Input::IsKeyDown(KEY_E)) m_camera.Position += up      * speed * dt;
+
+        // Keep orbit target consistent with camera
+        m_target = m_camera.Position + forward * m_distance;
+    }
+
+    void EditorCamera::_handleOrbit(const glm::vec2& delta) {
+        // Orbit speed scales with distance so controls feel consistent at different ranges
+        float distanceFactor = glm::max(1.0f, m_distance);
+        float yawDelta = delta.x * m_orbitSpeed * (distanceFactor * 0.02f);
+        float pitchDelta = delta.y * m_orbitSpeed * (distanceFactor * 0.02f);
+
+        m_yaw   -= yawDelta;
+        m_pitch -= pitchDelta;
+        m_pitch = glm::clamp(m_pitch, -RAD_CLAMP, RAD_CLAMP);
+
+        _updateOrbitPosition();
+    }
+
+    void EditorCamera::_handlePan(const glm::vec2& delta) {
+        // Pan along the camera's right and up vectors so Z-depth is respected
+        // Pan amount scales with distance for perspective and with ortho size for orthographic
+        float panScale = 1.0f;
+        if (!m_is2DMode) {
+            panScale = m_distance * m_panSpeed;
+        } else {
+            // scale with orthographic size so panning remains intuitive
+            panScale = m_camera.OrthoSize * m_panSpeed;
+        }
+
+        glm::vec3 right = m_camera.GetRight();
+        glm::vec3 up    = m_camera.GetUp();
+
+        m_target -= right * delta.x * panScale;
+        m_target += up    * delta.y * panScale;
+
+        _updateOrbitPosition();
+    }
+
+    void EditorCamera::_handleZoom(float scrollOrDelta) {
+        if (scrollOrDelta == 0.0f) return;
+
+        if (m_is2DMode || !m_camera.UsePerspective) {
+            // Orthographic zoom: scale ortho size
+            float factor = 1.0f - (scrollOrDelta * m_zoomSpeed);
+            
+            factor = glm::max(0.001f, factor);
+            m_camera.OrthoSize *= factor;
+            m_camera.OrthoSize = glm::clamp(m_camera.OrthoSize, m_minOrthoSize, m_maxOrthoSize);
+        } else {
+            // Perspective dolly: move camera toward/away from target along forward vector
+            // Use multiplicative change so zoom feels consistent at different distances
+            float factor = 1.0f - (scrollOrDelta * m_zoomSpeed);
+
+            factor = glm::max(0.001f, factor);
+            m_distance *= factor;
+            m_distance = glm::clamp(m_distance, m_minDistance, m_maxDistance);
+
+            _updateOrbitPosition();
+        }
+    }
+
+    void EditorCamera::_updateOrbitPosition() {
+        // Compute offset in camera space using spherical coordinates
         glm::vec3 offset;
-        offset.x = m_distance * cos(m_pitch) * sin(m_yaw);
-        offset.y = m_distance * sin(m_pitch);
-        offset.z = m_distance * cos(m_pitch) * cos(m_yaw);
+        offset.x = m_distance * cosf(m_pitch) * sinf(m_yaw);
+        offset.y = m_distance * sinf(m_pitch);
+        offset.z = m_distance * cosf(m_pitch) * cosf(m_yaw);
 
         m_camera.Position = m_target + offset;
-        m_camera.LookAt(m_target);
+
+        // Look at target - robustly compute rotation using quaternion lookAt
+        glm::vec3 forward = glm::normalize(m_target - m_camera.Position);
+        if (glm::length(forward) < 1e-6f) {
+            // degenerate; do nothing
+            return;
+        }
+        // Use engine Camera's LookAt to ensure the same rotation / basis is used
+        // (Camera::LookAt builds a rotation that maps local -Z to the direction).
+        m_camera.LookAt(m_target, glm::vec3(0.0f, 1.0f, 0.0f));
     }
 
-    void EditorCamera::Focus(const glm::vec3& target) {
-        m_target = target;
-        UpdateCameraPosition();
+    void EditorCamera::_applySmoothing(float dt) {
+        if (dt <= 0.0f) return;
+
+        // Position
+        float alphaPos = glm::clamp(dt * m_posLerpSpeed, 0.0f, 1.0f);
+        m_smoothPosition = glm::mix(m_smoothPosition, m_camera.Position, alphaPos);
+
+        // Rotation
+        float alphaRot = glm::clamp(dt * m_rotLerpSpeed, 0.0f, 1.0f);
+        m_smoothRotation = glm::slerp(m_smoothRotation, m_camera.Rotation, alphaRot);
+
+        // Apply smoothed transforms to camera
+        m_camera.Position = m_smoothPosition;
+        m_camera.Rotation = m_smoothRotation;
+    }
+
+    void EditorCamera::Focus(const glm::vec3& worldPoint) {
+        // Move pivot to worldPoint and maintain distance (or adjust if too small)
+        m_target = worldPoint;
+
+        // If current distance is tiny, pick a sensible default
+        if (m_distance < 0.001f)
+            m_distance = 8.0f;
+
+        _updateOrbitPosition();
+        // Re-initialise smoothing targets so there's no jump
+        m_smoothPosition = m_camera.Position;
+        m_smoothRotation = m_camera.Rotation;
+    }
+
+    void EditorCamera::FocusBounds(const glm::vec3& min, const glm::vec3& max) {
+        // Compute centre & radius of AABB
+        glm::vec3 centre = (min + max) * 0.5f;
+        glm::vec3 extents = (max - min) * 0.5f;
+        float radius = glm::length(extents);
+
+        // Choose distance to frame bounding sphere comfortably (fov affects required distance)
+        if (!m_is2DMode && m_camera.UsePerspective) {
+            // perspective: distance depends on FOV such that object fits viewport
+            float fovRad = glm::radians(m_camera.FOV);
+            float screenFactor = 1.2f; // padding
+            float desiredDistance = radius / glm::tan(fovRad * 0.5f);
+            
+            desiredDistance *= screenFactor;
+            m_distance = glm::clamp(desiredDistance, m_minDistance, m_maxDistance);
+        } else {
+            // orthographic: keep ortho size large enough to encompass extents on XY plane
+            float maxExtentXY = glm::max(extents.x, extents.y);
+            m_camera.OrthoSize = glm::clamp(maxExtentXY * 2.0f * 1.1f, m_minOrthoSize, m_maxOrthoSize);
+        }
+
+        // Set target and place camera back along forward vector
+        m_target = centre;
+
+        // If current camera forward is degenerate, recompute yaw/pitch from position->target
+        glm::vec3 toTarget = m_target - m_camera.Position;
+        float dist = glm::length(toTarget);
+        if (dist > 1e-5f) {
+            glm::vec3 n = glm::normalize(toTarget);
+            // Reconstruct pitch/yaw from forward vector. Note: forward = normalize(target - position)
+            // Our spherical orbit uses offsets where forward == -offset/distance, so invert signs.
+            m_pitch = -asinf(glm::clamp(n.y, -1.0f, 1.0f));
+            m_yaw = atan2(-n.x, -n.z);
+        } else {
+            // fallback to default orbit angles
+            m_yaw = 0.785398f;   // 45 degrees
+            m_pitch = -0.35f;    // slight downward
+        }
+
+        _updateOrbitPosition();
+
+        // Reset smoothing buffers to avoid jump
+        m_smoothPosition = m_camera.Position;
+        m_smoothRotation = m_camera.Rotation;
     }
 
     void EditorCamera::SetViewportSize(float width, float height) {
         m_camera.SetAspectRatio(width, height);
     }
 
-} // namespace Editor
+    void EditorCamera::ResetTo2D() {
+        m_is2DMode = true;
+        m_camera.UsePerspective = false;
+
+        // Preserve position but align to strict top-down orthographic view
+        // Do not zero Z — keep Z so layers remain intact; only projection changes
+        // We aim the camera at negative Z so 2D XY plane is visible
+        glm::vec3 pos = m_camera.Position;
+        // place camera above XY plane if it's too close to plane
+        if (pos.z < 0.1f) pos.z = 10.0f;
+
+        m_camera.Position = pos;
+        // Rotation flat: look down -Z; for consistency with 2D editors we'll look along -Z
+        m_camera.Rotation = glm::quat(glm::vec3(0.0f, 0.0f, 0.0f));
+
+        // Set default orthographic size if not set
+        if (m_camera.OrthoSize <= 0.0f) m_camera.OrthoSize = 10.0f;
+
+        // keep target under the camera projection centre
+        m_target = glm::vec3(m_camera.Position.x, m_camera.Position.y, 0.0f);
+
+        // recompute yaw/pitch from top-down orientation
+        m_yaw = 0.0f;
+        m_pitch = 0.0f;
+
+        // smoothing resets
+        m_smoothPosition = m_camera.Position;
+        m_smoothRotation = m_camera.Rotation;
+    }
+
+    void EditorCamera::ResetTo3D() {
+        m_is2DMode = false;
+        m_camera.UsePerspective = true;
+
+        // Default 3D view: angled perspective looking at origin
+        if (glm::length(m_camera.Position) < 1e-4f) {
+            m_camera.Position = glm::vec3(5.0f, 5.0f, 5.0f);
+        }
+
+        // keep Z layers intact: don't zero Z or reproject objects
+        m_target = glm::vec3(0.0f); // look at origin by default
+
+        // compute orbit parameters from current camera transform
+        glm::vec3 toTarget = m_target - m_camera.Position;
+        m_distance = glm::length(toTarget);
+        if (m_distance > 1e-5f) {
+            glm::vec3 n = glm::normalize(toTarget);
+            // Invert signs to match spherical coordinate convention used in _updateOrbitPosition
+            m_pitch = -asinf(glm::clamp(n.y, -1.0f, 1.0f));
+            m_yaw = atan2(-n.x, -n.z);
+        } else {
+            m_distance = 8.0f;
+            m_yaw = 0.785398f; // 45 deg
+            m_pitch = -0.35f;
+        }
+
+        _updateOrbitPosition();
+
+        m_smoothPosition = m_camera.Position;
+        m_smoothRotation = m_camera.Rotation;
+    }
+
+    void EditorCamera::ToggleViewMode() {
+        if (m_is2DMode) ResetTo3D();
+        else ResetTo2D();
+    }
+
+}

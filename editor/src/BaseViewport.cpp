@@ -1,16 +1,17 @@
 /* Start Header *****************************************************************/
 /*!
-\file   ViewportPanel.cpp
+\file   BaseViewport.cpp
 \author Samantha Leong (50%)
-        Foo Rui Qin    (45%)
-        Muhammad Nur Fadzly Bin Zulkifli (5%)
+        Foo Rui Qin    (50%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
-        muhammadnurfadzly.b@digipen.edu
 \date   3rd November 2025
 \brief
-Implements the Viewport and Game classes for core editor functionality and entity management.
-Handles the main menu, viewport rendering, and entity selection with event callbacks.
+Implementation of BaseViewport class with shared functionality for Scene and Game viewports.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
@@ -21,11 +22,12 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 #include <commdlg.h>
 #endif
 
-#include "Viewport.h"
+#include "BaseViewport.h"
 #include "CameraFrustumRenderer.h"
 #include "EditorGizmo.h"
 #include "SelectionOutlineRenderer.h"
 #include "EditorCamera.hpp"
+#include "ViewportPicking.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -56,7 +58,8 @@ Handles the main menu, viewport rendering, and entity selection with event callb
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
-void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont, ECS::World* world, Scenes::SceneManager* sceneManager) {
+void BaseViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
+    ECS::World* world, Scenes::SceneManager* sceneManager) {
     (void)sceneManager;
 
     m_mainFont = mainFont;
@@ -84,13 +87,13 @@ void Viewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFon
         m_sceneModifiedSubscription = Messaging::MessageSystem::Subscribe<Messaging::SceneModified>(
             [this](const Messaging::SceneModified& e) {
                 (void)e; // May use e.Reason for logging
-				m_fileMenu->MarkSceneDirty();
+                m_fileMenu->MarkSceneDirty();
             }
         );
     }
 }
 
-void Viewport::SetWorld(ECS::World* world) {
+void BaseViewport::SetWorld(ECS::World* world) {
     m_world = world;
 
     // Create editor camera if needed
@@ -102,273 +105,46 @@ void Viewport::SetWorld(ECS::World* world) {
 // -------------------------------------------------------------------------
 // Event Registration
 // -------------------------------------------------------------------------
-void Viewport::OnSelectionChanged(std::function<void(EntityId)> callback) {
+void BaseViewport::OnSelectionChanged(std::function<void(EntityId)> callback) {
     m_onSelectionChanged = callback;
 }
 
-// -------------------------------------------------------------------------
-// Update
-// -------------------------------------------------------------------------
-void Viewport::HandleInWorldInteraction() {
-    if (!HasValidWorld()) return;
+void BaseViewport::SetFileMenu(EditorFileMenu* fileMenu) {
+    m_fileMenu = fileMenu;
 
-    if (m_undoSystem) {
-        m_undoSystem->Update();
+    // Subscribe to scene modification events
+    if (fileMenu) {
+        m_sceneModifiedSubscription = Messaging::MessageSystem::Subscribe<Messaging::SceneModified>(
+            [this](const Messaging::SceneModified& e) {
+                (void)e; // May use e.Reason for logging
+                if (m_fileMenu) {
+                    m_fileMenu->MarkSceneDirty();
+                }
+            }
+        );
     }
+}
 
-    // Toggle FPS overlay in the Scene viewport (editor-only)
-    if (Input::IsKeyPressed(KEY_F)) {
-        m_showSceneFpsOverlay = !m_showSceneFpsOverlay;
-    }
+// -------------------------------------------------------------------------
+// Accessors
+// -------------------------------------------------------------------------
+EntityId BaseViewport::GetSelectedEntityId() const {
+    return m_selectedEntityId;
+}
 
-    // Editor camera input is controlled via SetAllowInput() above
-    // Selection is handled by ViewportPicking utility in editor
-    // Viewport maintains its own m_selectedEntityId state
+bool BaseViewport::IsViewportHovered() const {
+    return m_isViewportHovered;
+}
+
+void BaseViewport::SetSelectedEntity(const EntityId id) {
+    // Keep local state in sync
+    m_selectedEntityId = id;
     
-    // Handle editor-specific entity manipulation (drag-to-move)
-    if (m_isViewportHovered && m_activeTab == 0) { // Only in Scene tab
-        _handleEntityDragToMove();
-    }
+    // Selection is now managed entirely by editor
+    // No need to sync with renderer system
 }
 
-// -------------------------------------------------------------------------
-// Rendering
-// -------------------------------------------------------------------------
-void Viewport::ShowEditorWindows() {
-    _renderViewport();
-}
-
-// -------------------------------------------------------------------------
-// Viewport
-// -------------------------------------------------------------------------
-void Viewport::_renderViewport() {
-    // Render Viewport window (editor camera)
-    ImGui::Begin("Scene");
-
-    // Check if viewport window is hovered AND focused (not blocked by other windows)
-    m_isViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
-        && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-
-    // Update editor camera (processes input if viewport is hovered)
-        if (m_editorCamera) {
-        m_editorCamera->SetAllowInput(m_isViewportHovered);
-        m_editorCamera->Update(static_cast<float>(TimeSystem::Instance().GetDeltaTime()));
-    }
-
-    auto* rendererSystem = _getRendererSystem();
-    if (rendererSystem) {
-        const auto size = ImGui::GetContentRegionAvail();
-        const auto pos = ImGui::GetCursorScreenPos();
-
-        m_sceneDrawPos = pos;
-        m_sceneDrawSize = size;
-
-        // Broadcast viewport resize event for camera aspect ratio updates
-        Messaging::MessageSystem::Broadcast(Messaging::ViewportResized(size.x, size.y));
-
-        // Configure renderer for Scene viewport (uses editor camera)
-        rendererSystem->SetCamera(m_editorCamera->GetCamera());
-        rendererSystem->SetForceSceneCamera(false);
-
-        // Note: RendererSystem::Update() is called by Application's main loop
-        // We just configure camera settings here
-
-        // Render camera frustum overlay if enabled
-        if (m_world && m_showCameraFrustum) {
-            _renderCameraFrustum();
-        }
-
-        auto* rg = rendererSystem->GetRenderGraph();
-        if (rg) {
-            ResourceAccessor acc(rg);
-            // Previously, the editor viewport was sampling from the "HDR" texture,
-            // which meant ImGui was displaying raw FP16 linear data with no tone mapping
-            // or gamma. Resulting in very dark, incorrect colors.
-            //
-            // We now use a dedicated ToneMap pass that converts HDR to LDR. The Composite
-            // pass then blits LDR to the real backbuffer. Sampling "LDR" here ensures the
-            // Editor viewport shows the same tone-mapped, gamma-correct image the game
-            // actually outputs.
-            const uint32_t textureId = acc.GetTexture("LDR");
-            if (textureId > 0) {
-                ImGui::Image(textureId, size, ImVec2(0, 1), ImVec2(1, 0));
-            }
-
-            // 1. Get the drawing position of the image we just rendered
-            ImVec2 gizmoPos = ImGui::GetItemRectMin(); // Get the top-left corner of the image item
-
-            // Draw FPS overlay if enabled (before gizmo so it appears behind)
-            if (m_showSceneFpsOverlay) {
-                _drawFpsOverlay(gizmoPos, size);
-            }
-
-            // Draw selection outline and gizmo for selected entity
-            if (m_selectedEntityId != 0 && m_editorCamera) {
-                auto* camera = m_editorCamera->GetCamera();
-                if (camera) {
-                    glm::mat4 view = camera->GetViewMatrix();
-                    glm::mat4 proj = camera->GetProjectionMatrix();
-                    const glm::mat4 viewProj = proj * view;
-
-                    // Draw wireframe outline around selected entity
-                    Editor::SelectionOutlineRenderer::RenderOutline(
-                        *m_world,
-                        m_selectedEntityId,
-                        rendererSystem->GetRenderer(),
-                        rendererSystem->GetShader(),
-                        viewProj,
-                        camera->OrthoSize,
-                        size.y
-                    );
-
-                    // Draw gizmo for transform manipulation
-                    Editor::EditorGizmo::DrawGizmo(
-                        *m_world,
-                        m_selectedEntityId,
-                        glm::value_ptr(view),
-                        glm::value_ptr(proj),
-                        gizmoPos.x, gizmoPos.y,
-                        size.x, size.y,
-                        false  // isPerspective
-                    );
-                }
-            }
-        }
-    }
-    else {
-        ImGui::TextDisabled("No renderer available");
-    }
-
-    ImGui::End();
-
-    // Render Game window (scene camera)
-    ImGui::Begin("Game");
-
-    // Aspect ratio selector panel
-    {
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 4));
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 4));
-        
-        const char* aspectRatios[] = {
-            "Free Aspect",
-            "16:9",
-            "16:10",
-            "4:3",
-            "5:4",
-            "21:9",
-            "1:1"
-        };
-        
-        ImGui::SetNextItemWidth(150);
-        if (ImGui::Combo("##AspectRatio", &m_selectedAspectRatio, aspectRatios, IM_ARRAYSIZE(aspectRatios))) {
-            m_freeAspect = (m_selectedAspectRatio == 0);
-        }
-        
-        ImGui::PopStyleVar(2);
-        ImGui::Separator();
-    }
-
-    // Check if any Camera3D components exist in the world
-    bool hasCameraComponent = false;
-    bool hasActiveCamera = false;
-    int cameraCount = 0;
-    if (m_world) {
-        m_world->Each<ECS::Components::Camera3D>([&](const ECS::Entity e, const ECS::Components::Camera3D& cam) {
-            (void)e;
-
-            hasCameraComponent = true;
-            cameraCount++;
-            if (cam.Active) {
-                hasActiveCamera = true;
-            }
-        });
-    }
-
-    if (!rendererSystem) {
-        ImGui::TextDisabled("No game renderer not initialized");
-    }
-    else if (!hasCameraComponent) {
-        ImGui::TextDisabled("No camera found");
-        ImGui::TextDisabled("Add a Camera3D component to an entity");
-    }
-    else if (!hasActiveCamera) {
-        ImGui::Text("Found %d camera(s) but none are active", cameraCount);
-        ImGui::TextDisabled("Set Camera3D.Active to true in the inspector");
-    }
-    else {
-        auto availableSize = ImGui::GetContentRegionAvail();
-        
-        // Calculate display size based on aspect ratio
-        ImVec2 displaySize = availableSize;
-        float targetRatio = availableSize.x / availableSize.y;
-        
-        if (!m_freeAspect) {
-            switch (m_selectedAspectRatio) {
-                case 1: targetRatio = 16.0f / 9.0f; break;   // 16:9
-                case 2: targetRatio = 16.0f / 10.0f; break;  // 16:10
-                case 3: targetRatio = 4.0f / 3.0f; break;    // 4:3
-                case 4: targetRatio = 5.0f / 4.0f; break;    // 5:4
-                case 5: targetRatio = 21.0f / 9.0f; break;   // 21:9
-                case 6: targetRatio = 1.0f; break;           // 1:1
-            }
-            
-            const float availableRatio = availableSize.x / availableSize.y;
-            
-            if (availableRatio > targetRatio) {
-                // Available space is wider - constrain width
-                displaySize.x = availableSize.y * targetRatio;
-                displaySize.y = availableSize.y;
-            }
-            else {
-                // Available space is taller - constrain height
-                displaySize.x = availableSize.x;
-                displaySize.y = availableSize.x / targetRatio;
-            }
-            
-            // Center the viewport
-            const float offsetX = (availableSize.x - displaySize.x) * 0.5f;
-            const float offsetY = (availableSize.y - displaySize.y) * 0.5f;
-            ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + offsetX, ImGui::GetCursorPosY() + offsetY));
-        }
-        
-        // Update camera aspect ratio to match display size (prevents squishing)
-        if (m_world) {
-            m_world->Each<ECS::Components::Camera3D>([targetRatio](ECS::Entity e, ECS::Components::Camera3D& cam) {
-                (void)e;
-
-                if (cam.Active) {
-                    cam.AspectRatio = targetRatio;
-                }
-            });
-        }
-
-        // Configure renderer for Game viewport (uses scene camera)
-        if (rendererSystem) {
-            LOG_DEBUG("[Viewport] Game renderer update - forceSceneCamera should be true");
-            rendererSystem->SetCamera(nullptr);  // Use ECS camera
-            rendererSystem->SetForceSceneCamera(true);
-        }
-
-        auto* rg = rendererSystem ? rendererSystem->GetRenderGraph() : nullptr;
-        if (rg) {
-            ResourceAccessor acc(rg);
-            const uint32_t textureId = acc.GetTexture("LDR");
-            if (textureId > 0) {
-                ImGui::Image(textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
-            }
-            else {
-                ImGui::TextDisabled("Texture ID is 0 - render graph issue");
-            }
-        }
-        else {
-            ImGui::TextDisabled("No render graph available");
-        }
-    }
-
-    ImGui::End();
-}
-
-void Viewport::FocusOnEntity(const EntityId entityId) {
+void BaseViewport::FocusOnEntity(const EntityId entityId) {
     auto* rendererSystem = _getRendererSystem();
     if (!m_world || !rendererSystem) return;
 
@@ -405,41 +181,9 @@ void Viewport::FocusOnEntity(const EntityId entityId) {
 }
 
 // -------------------------------------------------------------------------
-// Accessors
+// Protected Helper Methods
 // -------------------------------------------------------------------------
-EntityId Viewport::GetSelectedEntityId() const {
-    return m_selectedEntityId;
-}
-
-bool Viewport::IsViewportHovered() const {
-    return m_isViewportHovered;
-}
-
-void Viewport::SetFileMenu(EditorFileMenu* fileMenu) {
-    m_fileMenu = fileMenu;
-
-    // Subscribe to scene modification events
-    if (fileMenu) {
-        m_sceneModifiedSubscription = Messaging::MessageSystem::Subscribe<Messaging::SceneModified>(
-            [this](const Messaging::SceneModified& e) {
-                (void)e; // May use e.Reason for logging
-                if (m_fileMenu) {
-                    m_fileMenu->MarkSceneDirty();
-                }
-            }
-        );
-    }
-}
-
-void Viewport::SetSelectedEntity(const EntityId id) {
-    // Keep local state in sync
-    m_selectedEntityId = id;
-    
-    // Selection is now managed entirely by editor
-    // No need to sync with renderer system
-}
-
-void Viewport::_renderCameraFrustum() {
+void BaseViewport::_renderCameraFrustum() {
     auto* rendererSystem = _getRendererSystem();
     if (!rendererSystem || !m_world || !m_editorCamera) {
         return;
@@ -496,7 +240,7 @@ void Viewport::_renderCameraFrustum() {
     Framebuffer::Unbind();
 }
 
-void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize) {
+void BaseViewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize) {
     (void)viewportSize;
     
     auto* rendererSystem = _getRendererSystem();
@@ -557,7 +301,7 @@ void Viewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewport
     ImGui::End();
 }
 
-ECS::RendererSystem* Viewport::_getRendererSystem() {
+ECS::RendererSystem* BaseViewport::_getRendererSystem() {
     // Get the global RendererSystem from Application's SystemManager
     if (Engine::CORE) {
         return Engine::CORE->GetSystemManager().GetSystem<ECS::RendererSystem>();
@@ -565,7 +309,13 @@ ECS::RendererSystem* Viewport::_getRendererSystem() {
     return nullptr;
 }
 
-void Viewport::_handleEntityDragToMove() {
+void BaseViewport::_handleEntityDragToMove() {
+    // Only Scene viewports support editor drag-to-move behavior
+    if (!IsSceneViewport()) {
+        m_isDragging = false;
+        m_wasMouseDownLastFrame = false;
+        return;
+    }
     if (!m_world || m_selectedEntityId == 0) {
         m_isDragging = false;
         m_wasMouseDownLastFrame = false;
