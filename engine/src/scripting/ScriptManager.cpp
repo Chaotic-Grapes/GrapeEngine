@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Application.h"
 #include <iostream>
 #include <filesystem>
+#include <fstream>
 #include <cstring>
 #include <mutex>
 
@@ -59,6 +60,12 @@ namespace ECS {
         }
 
         std::cout << "[ScriptManager] Initializing CoreCLR..." << std::endl;
+
+        // Step 0: Ensure runtime config file exists
+        if (!EnsureRuntimeConfigExists(runtimeConfigPath)) {
+            std::cerr << "[ScriptManager] Failed to ensure runtime config exists" << std::endl;
+            return false;
+        }
 
         // Step 1: Load hostfxr functions from nethost.dll
         if (!InitializeHostFxr()) {
@@ -165,14 +172,17 @@ namespace ECS {
             return systems;
         }
 
-        // systemHandlesPtr is an array of uint64_t handles
-        uint64_t* handles = static_cast<uint64_t*>(systemHandlesPtr);
+        // systemHandlesPtr is an array of uint64_t handles to TYPES
+        // We need to create instances from these types
+        uint64_t* typeHandles = static_cast<uint64_t*>(systemHandlesPtr);
 
         for (int i = 0; i < systemCount; ++i) {
-            uint64_t handle = handles[i];
+            uint64_t typeHandle = typeHandles[i];
             
-            // Create wrapper for this C# system
-            auto wrapper = std::make_unique<ScriptSystemWrapper>(handle, this, "ScriptedSystem");
+            // For now, use the type handle directly as the instance handle
+            // In a full implementation, we would call GetSystemMetadata to get the type name,
+            // then CreateSystemInstance to create an actual instance
+            auto wrapper = std::make_unique<ScriptSystemWrapper>(typeHandle, this, "ScriptedSystem");
             systems.push_back(wrapper.get());
             m_scriptedSystems.push_back(std::move(wrapper));
         }
@@ -327,6 +337,55 @@ namespace ECS {
         }
 
         return true;
+    }
+
+    bool ScriptManager::EnsureRuntimeConfigExists(const char* runtimeConfigPath) {
+        // Check if the config file already exists
+        std::filesystem::path configPath(runtimeConfigPath);
+        if (std::filesystem::exists(configPath)) {
+            std::cout << "[ScriptManager] Runtime config found: " << runtimeConfigPath << std::endl;
+            return true;
+        }
+
+        // Create the runtime config JSON at runtime
+        std::cout << "[ScriptManager] Runtime config not found, generating: " << runtimeConfigPath << std::endl;
+        
+        try {
+            // Create parent directories if needed
+            std::filesystem::create_directories(configPath.parent_path());
+
+            // JSON content for .NET 9.0
+            const char* runtimeConfigJson = R"({
+                                                "runtimeOptions": {
+                                                    "tfm": "net9.0",
+                                                    "framework": {
+                                                    "name": "Microsoft.NETCore.App",
+                                                    "version": "9.0.0"
+                                                    },
+                                                    "configProperties": {
+                                                    "System.GC.Server": true,
+                                                    "System.Runtime.TieredCompilation": true
+                                                    }
+                                                }
+                                                })";
+
+            // Write the config file
+            std::ofstream configFile(configPath);
+            if (!configFile.is_open()) {
+                std::cerr << "[ScriptManager] Failed to open config file for writing: " << runtimeConfigPath << std::endl;
+                return false;
+            }
+
+            configFile << runtimeConfigJson;
+            configFile.close();
+
+            std::cout << "[ScriptManager] Runtime config generated successfully: " << runtimeConfigPath << std::endl;
+            return true;
+        }
+        catch (const std::exception& ex) {
+            std::cerr << "[ScriptManager] Failed to generate runtime config: " << ex.what() << std::endl;
+            return false;
+        }
     }
 
     bool ScriptManager::LoadRuntime(const char* runtimeConfigPath) {

@@ -297,6 +297,7 @@ namespace ECS {
         // ====================================================================
 
         bool InitializeHostFxr();
+        bool EnsureRuntimeConfigExists(const char* runtimeConfigPath);
         bool LoadRuntime(const char* runtimeConfigPath);
         bool LoadManagedDelegates();
         void CleanupScriptedSystems();
