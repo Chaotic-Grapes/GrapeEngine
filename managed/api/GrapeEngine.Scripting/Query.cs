@@ -66,6 +66,18 @@ public class Query<T1>
         return b.Optional<TOpt>();
     }
 
+    public QueryFilterBuilder WithAll<TOpt1>() where TOpt1 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>();
+    }
+
+    public QueryFilterBuilder WithAll<TOpt1, TOpt2>() where TOpt1 : unmanaged where TOpt2 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>().WithAll<TOpt2>();
+    }
+
     public struct QueryFilterBuilder
     {
         private readonly World _world;
@@ -82,6 +94,13 @@ public class Query<T1>
         }
 
         public QueryFilterBuilder Optional<TOpt>() where TOpt : unmanaged
+        {
+            ComponentRegistry.EnsureRegistered<TOpt>();
+            _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
+            return this;
+        }
+
+        public QueryFilterBuilder WithAll<TOpt>() where TOpt : unmanaged
         {
             ComponentRegistry.EnsureRegistered<TOpt>();
             _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
@@ -155,6 +174,18 @@ public class Query<T1, T2>
         return b.Optional<TOpt>();
     }
 
+    public QueryFilterBuilder WithAll<TOpt1>() where TOpt1 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>();
+    }
+
+    public QueryFilterBuilder WithAll<TOpt1, TOpt2>() where TOpt1 : unmanaged where TOpt2 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>().WithAll<TOpt2>();
+    }
+
     public struct QueryFilterBuilder
     {
         private readonly World _world;
@@ -171,6 +202,13 @@ public class Query<T1, T2>
         }
 
         public QueryFilterBuilder Optional<TOpt>() where TOpt : unmanaged
+        {
+            ComponentRegistry.EnsureRegistered<TOpt>();
+            _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
+            return this;
+        }
+
+        public QueryFilterBuilder WithAll<TOpt>() where TOpt : unmanaged
         {
             ComponentRegistry.EnsureRegistered<TOpt>();
             _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
@@ -247,6 +285,18 @@ public class Query<T1, T2, T3>
         return b.Optional<TOpt>();
     }
 
+    public QueryFilterBuilder WithAll<TOpt1>() where TOpt1 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>();
+    }
+
+    public QueryFilterBuilder WithAll<TOpt1, TOpt2>() where TOpt1 : unmanaged where TOpt2 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>().WithAll<TOpt2>();
+    }
+
     public struct QueryFilterBuilder
     {
         private readonly World _world;
@@ -263,6 +313,13 @@ public class Query<T1, T2, T3>
         }
 
         public QueryFilterBuilder Optional<TOpt>() where TOpt : unmanaged
+        {
+            ComponentRegistry.EnsureRegistered<TOpt>();
+            _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
+            return this;
+        }
+
+        public QueryFilterBuilder WithAll<TOpt>() where TOpt : unmanaged
         {
             ComponentRegistry.EnsureRegistered<TOpt>();
             _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
@@ -344,6 +401,18 @@ public class Query<T1, T2, T3, T4>
         return b.Optional<TOpt>();
     }
 
+    public QueryFilterBuilder WithAll<TOpt1>() where TOpt1 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>();
+    }
+
+    public QueryFilterBuilder WithAll<TOpt1, TOpt2>() where TOpt1 : unmanaged where TOpt2 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>().WithAll<TOpt2>();
+    }
+
     public struct QueryFilterBuilder
     {
         private readonly World _world;
@@ -360,6 +429,13 @@ public class Query<T1, T2, T3, T4>
         }
 
         public QueryFilterBuilder Optional<TOpt>() where TOpt : unmanaged
+        {
+            ComponentRegistry.EnsureRegistered<TOpt>();
+            _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
+            return this;
+        }
+
+        public QueryFilterBuilder WithAll<TOpt>() where TOpt : unmanaged
         {
             ComponentRegistry.EnsureRegistered<TOpt>();
             _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
@@ -442,6 +518,18 @@ public class Query<T1, T2, T3, T4, T5>
         return b.Optional<TOpt>();
     }
 
+    public QueryFilterBuilder WithAll<TOpt1>() where TOpt1 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>();
+    }
+
+    public QueryFilterBuilder WithAll<TOpt1, TOpt2>() where TOpt1 : unmanaged where TOpt2 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>().WithAll<TOpt2>();
+    }
+
     public struct QueryFilterBuilder
     {
         private readonly World _world;
@@ -458,6 +546,13 @@ public class Query<T1, T2, T3, T4, T5>
         }
 
         public QueryFilterBuilder Optional<TOpt>() where TOpt : unmanaged
+        {
+            ComponentRegistry.EnsureRegistered<TOpt>();
+            _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
+            return this;
+        }
+
+        public QueryFilterBuilder WithAll<TOpt>() where TOpt : unmanaged
         {
             ComponentRegistry.EnsureRegistered<TOpt>();
             _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
@@ -543,6 +638,18 @@ public class Query<T1, T2, T3, T4, T5, T6>
         return b.Optional<TOpt>();
     }
 
+    public QueryFilterBuilder WithAll<TOpt1>() where TOpt1 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>();
+    }
+
+    public QueryFilterBuilder WithAll<TOpt1, TOpt2>() where TOpt1 : unmanaged where TOpt2 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>().WithAll<TOpt2>();
+    }
+
     public struct QueryFilterBuilder
     {
         private readonly World _world;
@@ -559,6 +666,13 @@ public class Query<T1, T2, T3, T4, T5, T6>
         }
 
         public QueryFilterBuilder Optional<TOpt>() where TOpt : unmanaged
+        {
+            ComponentRegistry.EnsureRegistered<TOpt>();
+            _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
+            return this;
+        }
+
+        public QueryFilterBuilder WithAll<TOpt>() where TOpt : unmanaged
         {
             ComponentRegistry.EnsureRegistered<TOpt>();
             _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
@@ -647,6 +761,18 @@ public class Query<T1, T2, T3, T4, T5, T6, T7>
         return b.Optional<TOpt>();
     }
 
+    public QueryFilterBuilder WithAll<TOpt1>() where TOpt1 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>();
+    }
+
+    public QueryFilterBuilder WithAll<TOpt1, TOpt2>() where TOpt1 : unmanaged where TOpt2 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>().WithAll<TOpt2>();
+    }
+
     public struct QueryFilterBuilder
     {
         private readonly World _world;
@@ -663,6 +789,13 @@ public class Query<T1, T2, T3, T4, T5, T6, T7>
         }
 
         public QueryFilterBuilder Optional<TOpt>() where TOpt : unmanaged
+        {
+            ComponentRegistry.EnsureRegistered<TOpt>();
+            _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
+            return this;
+        }
+
+        public QueryFilterBuilder WithAll<TOpt>() where TOpt : unmanaged
         {
             ComponentRegistry.EnsureRegistered<TOpt>();
             _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
@@ -754,6 +887,18 @@ public class Query<T1, T2, T3, T4, T5, T6, T7, T8>
         return b.Optional<TOpt>();
     }
 
+    public QueryFilterBuilder WithAll<TOpt1>() where TOpt1 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>();
+    }
+
+    public QueryFilterBuilder WithAll<TOpt1, TOpt2>() where TOpt1 : unmanaged where TOpt2 : unmanaged
+    {
+        var b = new QueryFilterBuilder(_world, _componentHashes);
+        return b.WithAll<TOpt1>().WithAll<TOpt2>();
+    }
+
     public struct QueryFilterBuilder
     {
         private readonly World _world;
@@ -770,6 +915,13 @@ public class Query<T1, T2, T3, T4, T5, T6, T7, T8>
         }
 
         public QueryFilterBuilder Optional<TOpt>() where TOpt : unmanaged
+        {
+            ComponentRegistry.EnsureRegistered<TOpt>();
+            _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());
+            return this;
+        }
+
+        public QueryFilterBuilder WithAll<TOpt>() where TOpt : unmanaged
         {
             ComponentRegistry.EnsureRegistered<TOpt>();
             _optional.Add(ComponentTypeHelper.GetTypeHash<TOpt>());

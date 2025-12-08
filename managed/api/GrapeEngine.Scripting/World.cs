@@ -94,4 +94,74 @@ public class World
     {
         return new Query<T1, T2, T3>(this);
     }
+
+    /// <summary>
+    /// Create a query for iterating over entities with four component types.
+    /// </summary>
+    public Query<T1, T2, T3, T4> Query<T1, T2, T3, T4>()
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+    {
+        return new Query<T1, T2, T3, T4>(this);
+    }
+
+    /// <summary>
+    /// Create a query for iterating over entities with five component types.
+    /// </summary>
+    public Query<T1, T2, T3, T4, T5> Query<T1, T2, T3, T4, T5>()
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+    {
+        return new Query<T1, T2, T3, T4, T5>(this);
+    }
+
+    /// <summary>
+    /// Create a query for iterating over entities with six component types.
+    /// </summary>
+    public Query<T1, T2, T3, T4, T5, T6> Query<T1, T2, T3, T4, T5, T6>()
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+        where T6 : unmanaged
+    {
+        return new Query<T1, T2, T3, T4, T5, T6>(this);
+    }
+
+    /// <summary>
+    /// Create a query for iterating over entities with seven component types.
+    /// </summary>
+    public Query<T1, T2, T3, T4, T5, T6, T7> Query<T1, T2, T3, T4, T5, T6, T7>()
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+        where T6 : unmanaged
+        where T7 : unmanaged
+    {
+        return new Query<T1, T2, T3, T4, T5, T6, T7>(this);
+    }
+
+    /// <summary>
+    /// Create a query for iterating over entities with eight component types.
+    /// </summary>
+    public Query<T1, T2, T3, T4, T5, T6, T7, T8> Query<T1, T2, T3, T4, T5, T6, T7, T8>()
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+        where T6 : unmanaged
+        where T7 : unmanaged
+        where T8 : unmanaged
+    {
+        return new Query<T1, T2, T3, T4, T5, T6, T7, T8>(this);
+    }
 }
