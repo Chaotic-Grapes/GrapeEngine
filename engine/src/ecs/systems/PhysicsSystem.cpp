@@ -48,6 +48,8 @@
 #include <iostream>
 #include "audio/FmodAudioDevice.h"
 #include "physics/CollisionEvents.h"
+#include "ecs/events/EventDispatcher.h"
+#include "math/Vector3D.h"
 
 extern Audio::FmodAudioDevice* gAudioDevice;
 
@@ -339,6 +341,9 @@ namespace ECS {
         const int   substeps = 8;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
 
+        // Create event dispatcher for firing collision events
+        ECS::Events::EventDispatcher eventDispatcher(&world);
+
         //refresh event queue 
         CollisionEventQueue::Clear();
         //to clock currentcollision pairs between A and B entities
@@ -579,10 +584,25 @@ namespace ECS {
                     currentCollisions.insert(pairID);
 
                     bool isNewCollision = (m_previousCollisions.find(pairID) == m_previousCollisions.end());
-                    CollisionEventType type = isNewCollision ? CollisionEventType::Enter : CollisionEventType::Stay;
 
-                    CollisionEventQueue::AddEvent({ A, B, type });
-                    CollisionEventQueue::AddEvent({ B, A, type });
+                    // Fire collision events using EventDispatcher
+                    if (isNewCollision) {
+                        // New collision detected
+                        eventDispatcher.FireCollisionEvent(
+                            A.Index, B.Index,
+                            manifold.points[0],
+                            Vector3D(manifold.normal.X, manifold.normal.Y, 0.0f),
+                            Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
+                            0.0f  // TODO: Compute impact magnitude
+                        );
+                        eventDispatcher.FireCollisionEvent(
+                            B.Index, A.Index,
+                            manifold.points[0],
+                            Vector3D(-manifold.normal.X, -manifold.normal.Y, 0.0f),
+                            Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
+                            0.0f  // TODO: Compute impact magnitude
+                        );
+                    }
 
                     // Gather physics state (by value) and current velocities; some may be missing.
                     Components::Rigidbody2D      rbA{ 0 }, rbB{ 0 };
@@ -671,8 +691,15 @@ namespace ECS {
                     Entity entityB{ idB, 0 };
 
                     if (world.IsAlive(entityA) && world.IsAlive(entityB)) {
-                        CollisionEventQueue::AddEvent({ entityA, entityB, CollisionEventType::Exit });
-                        CollisionEventQueue::AddEvent({ entityB, entityA, CollisionEventType::Exit });
+                        // Fire collision exit events using EventDispatcher
+                        eventDispatcher.FireCollisionExitEvent(
+                            idA, idB,
+                            Vector3D(0.0f, 0.0f, 0.0f)  // TODO: Track last contact point
+                        );
+                        eventDispatcher.FireCollisionExitEvent(
+                            idB, idA,
+                            Vector3D(0.0f, 0.0f, 0.0f)  // TODO: Track last contact point
+                        );
                     }
                 }
             }
@@ -681,5 +708,8 @@ namespace ECS {
 
             // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
         }
+
+        // Clear ephemeral event components at end of frame
+        eventDispatcher.ClearFrameEvents();
     }
 }// namespace ECS

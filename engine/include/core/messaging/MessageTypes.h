@@ -116,13 +116,6 @@ namespace Messaging {
         unsigned int EntityId; // ID of destroyed entity
     };
 
-    // Sent when a collision between two entities occurs.
-    struct CollisionDetected {
-        unsigned int EntityA; // First entity involved
-        unsigned int EntityB; // Second entity involved
-        float ImpactForce; // Magnitude of impact
-    };
-
     // Sent when an entity's health changes.
     struct HealthChanged {
         unsigned int EntityId; // ID of affected entity

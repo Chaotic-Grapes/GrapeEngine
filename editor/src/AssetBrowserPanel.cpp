@@ -1055,7 +1055,7 @@ void AssetBrowserPanel::_createScript() {
 
     // Fallback namespace if resulting string is empty
     if (ns.empty())
-        ns = "GameScripts";
+        ns = Engine::ProjectPaths::GetProjectRoot();
 
     // Generate script using the selected template
     std::string scriptContent = Editor::Templates::ScriptTemplates::GenerateScript(
