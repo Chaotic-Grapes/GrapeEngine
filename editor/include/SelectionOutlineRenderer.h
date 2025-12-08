@@ -51,6 +51,7 @@ namespace Editor {
             Shader* shader,
             const glm::mat4& viewProj,
             float cameraOrthoSize,
+            float windowWidth,
             float windowHeight
         );
     };

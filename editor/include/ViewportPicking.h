@@ -42,12 +42,17 @@ namespace Editor {
          * @param rendererSystem Renderer system to query picking FBO from
          * @return Entity ID at that position, or 0 if none
          */
-        static uint32_t PickEntityAtScreenPosition(
-            float screenX, 
+        // NOTE: synchronous readback helper removed. Use async API below.
+
+        // Async API: enqueue a pick request and poll for result
+        static uint32_t RequestAsyncPick(
+            float screenX,
             float screenY,
             const glm::vec2& viewportPos,
             const glm::vec2& viewportSize,
             ECS::RendererSystem* rendererSystem);
+
+        static bool TryGetAsyncPickResult(uint32_t requestId, uint32_t& outEntityId, ECS::RendererSystem* rendererSystem);
 
     private:
         static constexpr uint32_t INVALID_ENTITY_ID = 0;

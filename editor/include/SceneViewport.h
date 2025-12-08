@@ -24,6 +24,8 @@ public:
 
 private:
     void _renderViewport();
+    // Async pick request id (0 = none)
+    uint32_t m_pendingPickRequestId = 0;
 };
 
 #endif // SCENE_VIEWPORT_H

@@ -21,84 +21,21 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Editor {
 
-    uint32_t ViewportPicking::PickEntityAtScreenPosition(
-        float screenX, 
+    uint32_t ViewportPicking::RequestAsyncPick(
+        float screenX,
         float screenY,
         const glm::vec2& viewportPos,
         const glm::vec2& viewportSize,
         ECS::RendererSystem* rendererSystem)
     {
-        if (!rendererSystem) {
-            return INVALID_ENTITY_ID;
-        }
+        if (!rendererSystem) return 0;
+        return rendererSystem->RequestPick(screenX, screenY, viewportPos, viewportSize);
+    }
 
-        // Get the picking FBO from the renderer
-        const Framebuffer* pickingFBO = rendererSystem->GetPickingFBO();
-        if (!pickingFBO) {
-            return INVALID_ENTITY_ID;
-        }
-
-        // Convert screen coordinates to viewport-local coordinates
-        glm::vec2 localPos = glm::vec2(screenX, screenY) - viewportPos;
-
-        // Check if position is within viewport bounds
-        if (localPos.x < 0 || localPos.y < 0 || 
-            localPos.x >= viewportSize.x || localPos.y >= viewportSize.y) {
-            return INVALID_ENTITY_ID;
-        }
-
-        // Convert to FBO coordinates (flip Y for OpenGL). Subtract 1 to
-        // convert from top-left inclusive coordinates to 0-based bottom-left.
-        int x = static_cast<int>(localPos.x);
-        int y = static_cast<int>(viewportSize.y - localPos.y - 1.0f);
-
-        // Clamp to FBO bounds
-        int vpWidth = static_cast<int>(viewportSize.x);
-        int vpHeight = static_cast<int>(viewportSize.y);
-        x = glm::clamp(x, 0, vpWidth - 1);
-        y = glm::clamp(y, 0, vpHeight - 1);
-
-        // Verify FBO size matches viewport
-        if (pickingFBO->Width() != vpWidth || pickingFBO->Height() != vpHeight) {
-            // FBO size mismatch, picking not ready
-            return INVALID_ENTITY_ID;
-        }
-
-        // IMPORTANT: The RendererSystem uses Pixel Buffer Objects (PBOs) for async picking.
-        // This synchronous read will stall the GPU pipeline. For proper implementation,
-        // coordinate with RendererSystem's PBO-based async picking instead.
-        // For now, we perform a synchronous read as a fallback.
-        
-        GLint previousFBO = 0;
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
-
-        // Read pixel from picking FBO
-        // Note: We're const_cast'ing here because OpenGL's bind/unbind aren't const-correct
-        // but we're only reading, not modifying the FBO
-        Framebuffer* mutableFBO = const_cast<Framebuffer*>(pickingFBO);
-        mutableFBO->Bind();
-        
-        // Ensure we're reading from the color attachment
-        GLenum previousReadBuffer = GL_NONE;
-        glGetIntegerv(GL_READ_BUFFER, reinterpret_cast<GLint*>(&previousReadBuffer));
-        glReadBuffer(GL_COLOR_ATTACHMENT0);
-        
-        unsigned char pixel[4] = {0, 0, 0, 0};
-        glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-        
-        // Restore read buffer and FBO
-        glReadBuffer(previousReadBuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
-
-        // Decode entity ID from RGB channels
-        // The picking pass encodes entity IDs as: ID + 1 (so 0 = no entity)
-        uint32_t pickedID = pixel[0] | (pixel[1] << 8) | (pixel[2] << 16);
-
-        if (pickedID > 0) {
-            return pickedID - 1;  // Convert back to entity index
-        }
-
-        return INVALID_ENTITY_ID;
+    bool ViewportPicking::TryGetAsyncPickResult(uint32_t requestId, uint32_t& outEntityId, ECS::RendererSystem* rendererSystem)
+    {
+        if (!rendererSystem) return false;
+        return rendererSystem->TryGetPickResult(requestId, outEntityId);
     }
 
 }

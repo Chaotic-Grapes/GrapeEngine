@@ -86,7 +86,52 @@ void SceneViewport::_renderViewport() {
 
     auto* rendererSystem = _getRendererSystem();
     
-    // Get viewport size and position
+    // --- Toolbar (Translate / Rotate / Scale + Local/World) -----------------
+    ImGui::BeginGroup();
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
+
+    const float btnH = ImGui::GetFrameHeight();
+    // Operation buttons
+    auto curOp = Editor::EditorGizmo::GetOperation();
+
+    auto opButton = [&](const char* label, Editor::EditorGizmo::Operation op) {
+        const bool active = (curOp == op);
+        if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        if (ImGui::Button(label, ImVec2(0, btnH))) {
+            Editor::EditorGizmo::SetOperation(op);
+        }
+        if (active) ImGui::PopStyleColor();
+    };
+
+    ImGui::PushID("GizmoOps");
+    opButton("Translate", Editor::EditorGizmo::Operation::Translate);
+    ImGui::SameLine();
+    opButton("Rotate", Editor::EditorGizmo::Operation::Rotate);
+    ImGui::SameLine();
+    opButton("Scale", Editor::EditorGizmo::Operation::Scale);
+    ImGui::PopID();
+
+    ImGui::SameLine(); ImGui::Separator(); ImGui::SameLine();
+
+    // Mode toggle (Local / World)
+    auto curMode = Editor::EditorGizmo::GetMode();
+    if (curMode == Editor::EditorGizmo::Mode::Local) {
+        if (ImGui::Button("Local", ImVec2(0, btnH))) Editor::EditorGizmo::SetMode(Editor::EditorGizmo::Mode::Local);
+        ImGui::SameLine();
+        if (ImGui::Button("World", ImVec2(0, btnH))) Editor::EditorGizmo::SetMode(Editor::EditorGizmo::Mode::World);
+    }
+    else {
+        if (ImGui::Button("Local", ImVec2(0, btnH))) Editor::EditorGizmo::SetMode(Editor::EditorGizmo::Mode::Local);
+        ImGui::SameLine();
+        if (ImGui::Button("World", ImVec2(0, btnH))) Editor::EditorGizmo::SetMode(Editor::EditorGizmo::Mode::World);
+    }
+
+    ImGui::PopStyleVar();
+    ImGui::EndGroup();
+
+    ImGui::Separator();
+
+    // Get viewport size and position (remaining area after toolbar)
     const auto size = ImGui::GetContentRegionAvail();
     const auto pos = ImGui::GetCursorScreenPos();
     m_sceneDrawPos = pos;
@@ -128,23 +173,36 @@ void SceneViewport::_renderViewport() {
             ImVec2 gizmoPos = ImGui::GetItemRectMin();
 
             // Handle mouse click picking on the Scene viewport image
-            if (ImGui::IsItemHovered() && Input::IsMouseDown(MOUSE_LEFT) && !m_wasMouseDownLastFrame) {
+            // Use IsMousePressed to detect a single click event (edge-triggered)
+            if (ImGui::IsItemHovered() && Input::IsMousePressed(MOUSE_LEFT)) {
                 double mx = 0, my = 0;
                 Input::GetMousePosition(mx, my);
 
-                // Call picker with absolute mouse position and viewport rect
-                uint32_t picked = Editor::ViewportPicking::PickEntityAtScreenPosition(
+                // Enqueue async pick via renderer and store returned request id
+                // Only enqueue if no existing pending request to avoid spamming
+                if (m_pendingPickRequestId == 0) {
+                    uint32_t req = Editor::ViewportPicking::RequestAsyncPick(
                     static_cast<float>(mx), static_cast<float>(my),
                     glm::vec2(gizmoPos.x, gizmoPos.y), glm::vec2(size.x, size.y),
                     rendererSystem
-                );
+                    );
 
-                if (picked != 0) {
-                    SetSelectedEntity(picked);
+                    if (req != 0) {
+                        m_pendingPickRequestId = req;
+                        LOG_DEBUG("[SceneViewport] Enqueued pick request: " << req << " at (" << mx << ", " << my << ") viewport=(" << gizmoPos.x << "," << gizmoPos.y << "," << size.x << "," << size.y << ")");
+                    }
                 }
+            }
 
-                if (m_onSelectionChanged) {
-                    m_onSelectionChanged(GetSelectedEntityId());
+            // Poll for async pick result (non-blocking). If a result is ready
+            // resolve selection and notify callbacks.
+            if (m_pendingPickRequestId != 0) {
+                uint32_t pickedEntity = 0;
+                if (Editor::ViewportPicking::TryGetAsyncPickResult(m_pendingPickRequestId, pickedEntity, rendererSystem)) {
+                    m_pendingPickRequestId = 0; // consumed
+                    if (pickedEntity != 0 && pickedEntity != ECS::Entity::NPOS32) {
+                        SetSelectedEntity(pickedEntity);
+                    }
                 }
             }
 
@@ -157,22 +215,18 @@ void SceneViewport::_renderViewport() {
             if (m_selectedEntityId != 0 && m_editorCamera) {
                 auto* camera = m_editorCamera->GetCamera();
                 if (camera) {
-                    glm::mat4 view = camera->GetViewMatrix();
-                    glm::mat4 proj = camera->GetProjectionMatrix();
-                    const glm::mat4 viewProj = proj * view;
-
                     // Draw wireframe outline around selected entity
                     Editor::SelectionOutlineRenderer::RenderOutline(
                         *m_world,
                         m_selectedEntityId,
-                        rendererSystem->GetRenderer(),
-                        rendererSystem->GetShader(),
-                        viewProj,
+                        rendererSystem,
                         camera->OrthoSize,
                         size.y
                     );
 
                     // Draw gizmo for transform manipulation
+                    glm::mat4 view = camera->GetViewMatrix();
+                    glm::mat4 proj = camera->GetProjectionMatrix();
                     Editor::EditorGizmo::DrawGizmo(
                         *m_world,
                         m_selectedEntityId,
@@ -197,4 +251,7 @@ void SceneViewport::_renderViewport() {
     }
 
     ImGui::End();
+
+    // Update mouse-down latch so clicks only trigger once per press
+    m_wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
 }

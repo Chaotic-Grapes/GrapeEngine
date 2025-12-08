@@ -139,9 +139,13 @@ bool BaseViewport::IsViewportHovered() const {
 void BaseViewport::SetSelectedEntity(const EntityId id) {
     // Keep local state in sync
     m_selectedEntityId = id;
-    
-    // Selection is now managed entirely by editor
-    // No need to sync with renderer system
+    // Notify any registered callbacks so the rest of the editor can react
+    if (m_onSelectionChanged) {
+        m_onSelectionChanged(id);
+    }
+
+    // Broadcast a selection request message so other systems can observe
+    Messaging::MessageSystem::Broadcast(Messaging::EntitySelectionRequested(id, false));
 }
 
 void BaseViewport::FocusOnEntity(const EntityId entityId) {

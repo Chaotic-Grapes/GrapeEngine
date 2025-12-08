@@ -708,6 +708,78 @@ namespace ECS {
                         m_renderer->endFrame(); // Flush text batch
                     } //if m_textShader
 
+                    // Render queued wireframe submissions (debug/editor outlines)
+                    if (!m_wireframeQueue.empty()) {
+                        m_renderer->beginFrame();
+                        for (const auto& sub : m_wireframeQueue) {
+                            switch (sub.type) {
+                            case WireframeSubmission::Type::Quad: {
+                                if (sub.vertices.size() == 4) {
+                                    const auto& min = sub.vertices[0];
+                                    const auto& max = sub.vertices[2];
+                                    DebugDraw2D::RectStroke(*m_renderer, min, max, sub.thickness, sub.color, 0);
+                                }
+                                break;
+                            }
+                            case WireframeSubmission::Type::Circle: {
+                                if (sub.vertices.size() >= 2) {
+                                    for (size_t i = 0; i < sub.vertices.size(); ++i) {
+                                        size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
+                                        if (next < sub.vertices.size()) {
+                                            DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
+                                                sub.thickness, sub.color, 0);
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            case WireframeSubmission::Type::Polygon: {
+                                if (sub.vertices.size() >= 2) {
+                                    for (size_t i = 0; i < sub.vertices.size(); ++i) {
+                                        size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
+                                        if (next < sub.vertices.size()) {
+                                            DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
+                                                sub.thickness, sub.color, 0);
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            case WireframeSubmission::Type::Line: {
+                                if (sub.vertices.size() == 2) {
+                                    DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1],
+                                        sub.thickness, sub.color, 0);
+                                }
+                                break;
+                            }
+                            case WireframeSubmission::Type::Mesh: {
+                                if (!sub.indices.empty()) {
+                                    // Draw using indices
+                                    for (size_t i = 0; i < sub.indices.size(); i += 2) {
+                                        if (i + 1 < sub.indices.size()) {
+                                            uint32_t idx0 = sub.indices[i];
+                                            uint32_t idx1 = sub.indices[i + 1];
+                                            if (idx0 < sub.vertices.size() && idx1 < sub.vertices.size()) {
+                                                DebugDraw2D::Line(*m_renderer, sub.vertices[idx0], sub.vertices[idx1],
+                                                    sub.thickness, sub.color, 0);
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Draw as sequence of lines
+                                    for (size_t i = 0; i + 1 < sub.vertices.size(); i += 2) {
+                                        DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[i + 1],
+                                            sub.thickness, sub.color, 0);
+                                    }
+                                }
+                                break;
+                            }
+                            }
+                        }
+                        m_renderer->endFrame();
+                        m_wireframeQueue.clear(); // Clear queue for next frame
+                    }
+
                 }
                 Framebuffer::Unbind();
             });
@@ -716,11 +788,14 @@ namespace ECS {
         m_renderGraph->AddPass("Picking", {}, {},
             [this, &world, &viewProj, &buckets, &win](ResourceAccessor& res)
             {
-                // Skip picking when using external camera (typically in game window)
-                if (m_activeCamera) {
-                    LOG_DEBUG("[PICKING] Skipping picking - external camera active");
-                    return;
-                }
+                // Note: Do NOT skip picking simply because an external camera
+                // is set. Editor viewports set an external camera to preview
+                // their view; picking should still run if a mouse click or
+                // a pending async pick request exists. Earlier logic that
+                // unconditionally skipped when m_activeCamera was present
+                // prevented the editor from picking. The pass below will
+                // early-return when there's no interactive click and no
+                // pending request.
 
                 static bool prevMouseDown = false;
                 bool currMouseDown = Input::IsMouseDown(MOUSE_LEFT);
@@ -728,16 +803,30 @@ namespace ECS {
                 prevMouseDown = currMouseDown;
 
                 (void)res;
-                if (!currMouseDown && !mouseJustReleased) return;
+                // Allow the picking pass to run if there is a pending async request
+                if (!currMouseDown && !mouseJustReleased && !m_pendingPickRequest.has_value()) return;
 
                 // ============================================================
                 // GET VIEWPORT BOUNDS
                 // ============================================================
+                // By default the picking FBO covers the full window. If an
+                // async pick request was submitted by the editor for a
+                // sub-region viewport, use that viewport's rect for mapping
+                // screen coordinates into FBO texels.
                 glm::vec2 viewportMin(0, 0);
                 glm::vec2 viewportSize = glm::vec2(win->GetWidth(), win->GetHeight());
 
                 glm::dvec2 mousePos;
                 Input::GetMousePosition(mousePos.x, mousePos.y);
+
+                // If there is a pending async pick request, prefer its viewport
+                // rectangle for coordinate mapping (it contains viewportPos/Size).
+                bool usingPendingRequestForViewport = false;
+                if (m_pendingPickRequest.has_value()) {
+                    viewportMin = m_pendingPickRequest->ViewportPos;
+                    viewportSize = m_pendingPickRequest->ViewportSize;
+                    usingPendingRequestForViewport = true;
+                }
 
                 // ============================================================
                 // RESIZE PICKING FBO IF NEEDED
@@ -749,6 +838,33 @@ namespace ECS {
                 if (m_pickingFBO.Width() != vpWidth || m_pickingFBO.Height() != vpHeight) {
                     LOG_DEBUG("[PICKING] Resizing picking FBO: " << vpWidth << "x" << vpHeight);
                     m_pickingFBO.Resize(vpWidth, vpHeight, false, false);
+                }
+
+                // ----------------------------------------------------------------
+                // If a previous pick request was submitted last frame, its PBO
+                // now contains the pixel result. Map that PBO and move the
+                // decoded entity id into m_completedPickResults so clients can
+                // poll via TryGetPickResult().
+                // ----------------------------------------------------------------
+                if (m_inFlightPick.has_value()) {
+                    const int idx = m_inFlightPick->PBOIndex;
+                    if (idx >= 0 && idx < 2) {
+                        m_pbos[idx].Bind(GL_PIXEL_PACK_BUFFER);
+                        void* mapped = m_pbos[idx].Map(GL_READ_ONLY);
+                        if (mapped) {
+                            uint8_t* bytes = static_cast<uint8_t*>(mapped);
+                            uint32_t encoded = (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) | ((uint32_t)bytes[2] << 16);
+                            uint32_t pickedEntity = (encoded == 0) ? INVALID_ENTITY_ID : (encoded - 1);
+                            m_completedPickResults[m_inFlightPick->RequestId] = pickedEntity;
+                            LOG_DEBUG("[PICKING] In-flight PBO " << idx << " decoded request " << m_inFlightPick->RequestId << " -> entity " << pickedEntity);
+                            m_pbos[idx].Unmap();
+                        }
+                        else {
+                            LOG_DEBUG("[PICKING] Warning: failed to map PBO " << idx << " for readback");
+                        }
+                        m_pbos[idx].Unbind(GL_PIXEL_PACK_BUFFER);
+                    }
+                    m_inFlightPick.reset();
                 }
 
                 m_pickingFBO.BindAndClear(0, 0, 0, 1);
@@ -883,26 +999,64 @@ namespace ECS {
                 // ============================================================
                 // READ PIXEL (now in FBO-local coordinates)
                 // ============================================================
-                glm::vec2 localMouse = glm::vec2(mousePos) - viewportMin;
+                // Determine which screen coordinates to sample. If an async
+                // pick request exists, use its provided coordinates. Otherwise
+                // use the current mouse position (interactive click).
+                glm::vec2 sampleScreenPos;
+                bool usingPendingRequest = false;
+                if (m_pendingPickRequest.has_value()) {
+                    sampleScreenPos = glm::vec2(m_pendingPickRequest->ScreenX, m_pendingPickRequest->ScreenY);
+                    usingPendingRequest = true;
+                }
+                else {
+                    sampleScreenPos = glm::vec2(mousePos.x, mousePos.y);
+                }
 
-                int x = static_cast<int>(localMouse.x);
-                int y = static_cast<int>(viewportSize.y - localMouse.y);
+                // Convert sampleScreenPos into viewport-local coordinates
+                glm::vec2 localPos = sampleScreenPos - viewportMin;
 
-                x = glm::clamp(x, 0, vpWidth - 1);
-                y = glm::clamp(y, 0, vpHeight - 1);
+                // Map viewport-local coordinates to FBO pixel coordinates
+                const int fboWidth = m_pickingFBO.Width();
+                const int fboHeight = m_pickingFBO.Height();
 
-                LOG_DEBUG("[PICKING] FBO size: " << vpWidth << "x" << vpHeight);
-                LOG_DEBUG("[PICKING] Reading pixel: (" << x << ", " << y << ")");
+                int readX = 0;
+                int readY = 0;
+                vpWidth = static_cast<int>(viewportSize.x);
+                vpHeight = static_cast<int>(viewportSize.y);
 
+                if (fboWidth != vpWidth || fboHeight != vpHeight) {
+                    const float sx = static_cast<float>(fboWidth) / static_cast<float>(vpWidth);
+                    const float sy = static_cast<float>(fboHeight) / static_cast<float>(vpHeight);
+                    readX = glm::clamp(static_cast<int>(localPos.x * sx), 0, fboWidth - 1);
+                    // Flip Y: viewport local origin is top-left for screen coords
+                    readY = glm::clamp(static_cast<int>((vpHeight - localPos.y - 1.0f) * sy), 0, fboHeight - 1);
+                }
+                else {
+                    // 1:1 mapping
+                    readX = glm::clamp(static_cast<int>(localPos.x), 0, fboWidth - 1);
+                    readY = glm::clamp(static_cast<int>(vpHeight - localPos.y - 1.0f), 0, fboHeight - 1);
+                }
 
-                // Frame N: Write to PBO 0
-                // Write to current PBO (async transfer starts)
+                LOG_DEBUG("[PICKING] FBO size: " << fboWidth << "x" << fboHeight);
+                LOG_DEBUG("[PICKING] Reading pixel: (" << readX << ", " << readY << ")");
+                if (usingPendingRequest && m_pendingPickRequest.has_value()) {
+                    LOG_DEBUG("[PICKING] Servicing async request " << m_pendingPickRequest->RequestId);
+                }
+
+                // Frame N: Write to current PBO (async transfer starts)
                 m_pbos[m_currentPBO].Bind(GL_PIXEL_PACK_BUFFER);
-                glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+                glReadPixels(readX, readY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
                 m_pbos[m_currentPBO].Unbind(GL_PIXEL_PACK_BUFFER);
 
-                // Frame N: Swap for next frame
-                // Swap PBOs FIRST
+                // If this read corresponds to a pending async pick request,
+                // mark it as in-flight and associate it with the current PBO
+                // so the result can be consumed on the next frame.
+                if (usingPendingRequest) {
+                    m_inFlightPick = InFlightPick{ m_pendingPickRequest->RequestId, m_currentPBO };
+                    m_pendingPickRequest.reset();
+                }
+
+                // Swap PBOs for the next frame
                 m_currentPBO = 1 - m_currentPBO;
 
 
@@ -1051,5 +1205,115 @@ namespace ECS {
         m_bloomCombineShader.reset();
         m_pickingFBO.Destroy();
         s_instance = nullptr;
+    }
+
+    uint32_t RendererSystem::RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
+        uint32_t id = m_nextPickRequestId++;
+        PendingPickRequest req;
+        req.RequestId = id;
+        req.ScreenX = screenX;
+        req.ScreenY = screenY;
+        req.ViewportPos = viewportPos;
+        req.ViewportSize = viewportSize;
+        m_pendingPickRequest = req;
+        LOG_DEBUG("[Renderer] RequestPick id=" << id << " screen=(" << screenX << "," << screenY << ") viewport=(" << viewportPos.x << "," << viewportPos.y << "," << viewportSize.x << "," << viewportSize.y << ")");
+        return id;
+    }
+
+    bool RendererSystem::TryGetPickResult(uint32_t requestId, uint32_t& outEntityId) {
+        auto it = m_completedPickResults.find(requestId);
+        if (it == m_completedPickResults.end()) return false;
+        outEntityId = it->second;
+        m_completedPickResults.erase(it);
+        return true;
+    }
+
+    // ============================================================
+    // Wireframe/Debug Rendering API Implementations
+    // ============================================================
+
+    void RendererSystem::SubmitWireframeQuad(const glm::vec2& min, const glm::vec2& max,
+                                              const glm::vec4& color, float thickness) {
+        if (!m_renderer) return;
+
+        WireframeSubmission sub;
+        sub.type = WireframeSubmission::Type::Quad;
+        sub.vertices = {
+            { min.x, min.y },
+            { max.x, min.y },
+            { max.x, max.y },
+            { min.x, max.y }
+        };
+        sub.color = color;
+        sub.thickness = thickness;
+        sub.closed = true;
+        m_wireframeQueue.push_back(sub);
+    }
+
+    void RendererSystem::SubmitWireframeCircle(const glm::vec2& center, float radius,
+                                                const glm::vec4& color, float thickness) {
+        if (!m_renderer) return;
+
+        // Tessellate circle into line segments
+        constexpr int segments = 64;
+        std::vector<glm::vec2> verts;
+        verts.reserve(segments);
+
+        for (int i = 0; i < segments; ++i) {
+            float angle = (2.0f * 3.14159265f * i) / segments;
+            glm::vec2 pt = center + glm::vec2(cosf(angle), sinf(angle)) * radius;
+            verts.push_back(pt);
+        }
+
+        WireframeSubmission sub;
+        sub.type = WireframeSubmission::Type::Circle;
+        sub.vertices = std::move(verts);
+        sub.color = color;
+        sub.thickness = thickness;
+        sub.closed = true;
+        m_wireframeQueue.push_back(sub);
+    }
+
+    void RendererSystem::SubmitWireframePolygon(const glm::vec2* vertices, size_t vertexCount,
+                                                 const glm::vec4& color, float thickness, bool closed) {
+        if (!m_renderer || !vertices || vertexCount < 2) return;
+
+        WireframeSubmission sub;
+        sub.type = WireframeSubmission::Type::Polygon;
+        sub.vertices.assign(vertices, vertices + vertexCount);
+        sub.color = color;
+        sub.thickness = thickness;
+        sub.closed = closed;
+        m_wireframeQueue.push_back(sub);
+    }
+
+    void RendererSystem::SubmitWireframeLine(const glm::vec2& p1, const glm::vec2& p2,
+                                              const glm::vec4& color, float thickness) {
+        if (!m_renderer) return;
+
+        WireframeSubmission sub;
+        sub.type = WireframeSubmission::Type::Line;
+        sub.vertices = { p1, p2 };
+        sub.color = color;
+        sub.thickness = thickness;
+        sub.closed = false;
+        m_wireframeQueue.push_back(sub);
+    }
+
+    void RendererSystem::SubmitWireframeMesh(const glm::vec2* vertices, size_t vertexCount,
+                                              const uint32_t* indices, size_t indexCount,
+                                              const glm::vec4& color, float thickness) {
+        if (!m_renderer || !vertices || vertexCount < 2) return;
+
+        WireframeSubmission sub;
+        sub.type = WireframeSubmission::Type::Mesh;
+        sub.vertices.assign(vertices, vertices + vertexCount);
+        if (indices && indexCount > 0) {
+            sub.indices.assign(indices, indices + indexCount);
+        }
+        sub.color = color;
+        sub.thickness = thickness;
+        sub.closed = false;
+        m_wireframeQueue.push_back(sub);
     }
 }

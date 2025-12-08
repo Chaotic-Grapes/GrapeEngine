@@ -37,6 +37,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <functional>
+#include <optional>
+#include <unordered_map>
 
 namespace ECS {
     /**
@@ -65,9 +67,9 @@ namespace ECS {
         void Initialize(World& world) { OnCreate(world); }
         void Update(World& world, float dt) { OnUpdate(world, dt); }
 
-        /*!
-        \brief Get the number of batch flushes this frame (for profiling).
-        \return Flush count, or -1 if renderer not initialized.
+        /**
+         * @brief Get the number of batch flushes this frame (for profiling).
+         * @return Flush count, or -1 if renderer not initialized.
         */
         int GetFlushCount() const {
             return m_renderer ? m_renderer->flushCountThisFrame : -1;
@@ -95,6 +97,22 @@ namespace ECS {
         // Rebind the renderer to a new world
         void BindWorld(World& world);
 
+        // -----------------------
+        // Async Picking API
+        // -----------------------
+        /**
+         * @brief Request an async GPU pick at the given screen position (absolute coordinates).
+         * @returns Request id which can be polled via TryGetPickResult()
+         * @note The result will become available one frame later when the renderer's PBO readback completes.
+         */
+        uint32_t RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize);
+
+        /**
+         * @brief Try to retrieve a completed pick result for a previously requested pick.
+         * @returns true and sets outEntityId when ready; otherwise returns false.
+         */
+        bool TryGetPickResult(uint32_t requestId, uint32_t& outEntityId);
+
         void SetUILayer(uint16_t layerId) { m_uiLayerId = layerId; }
 
         /**
@@ -115,23 +133,83 @@ namespace ECS {
          */
         Shader* GetShader() { return m_shader.get(); }
 
+        // ====================================================================
+        // Wireframe/Debug Rendering APIs
+        // ====================================================================
+        /**
+         * @brief Submit a wireframe quad outline
+         * @param min Bottom-left corner in world space
+         * @param max Top-right corner in world space
+         * @param color RGBA color for the wireframe
+         * @param thickness Line thickness in world units
+         */
+        void SubmitWireframeQuad(const glm::vec2& min, const glm::vec2& max, 
+                                 const glm::vec4& color, float thickness);
+
+        /**
+         * @brief Submit a wireframe circle outline
+         * @param center Center position in world space
+         * @param radius Circle radius in world units
+         * @param color RGBA color for the wireframe
+         * @param thickness Line thickness in world units
+         */
+        void SubmitWireframeCircle(const glm::vec2& center, float radius,
+                                   const glm::vec4& color, float thickness);
+
+        /**
+         * @brief Submit a wireframe polygon outline
+         * @param vertices Array of vertex positions (world space)
+         * @param vertexCount Number of vertices
+         * @param color RGBA color for the wireframe
+         * @param thickness Line thickness in world units
+         * @param closed Whether to connect last vertex to first
+         */
+        void SubmitWireframePolygon(const glm::vec2* vertices, size_t vertexCount,
+                                    const glm::vec4& color, float thickness, bool closed = true);
+
+        /**
+         * @brief Submit a wireframe line segment
+         * @param p1 Start position in world space
+         * @param p2 End position in world space
+         * @param color RGBA color for the line
+         * @param thickness Line thickness in world units
+         */
+        void SubmitWireframeLine(const glm::vec2& p1, const glm::vec2& p2,
+                                 const glm::vec4& color, float thickness);
+
+        /**
+         * @brief Submit a wireframe mesh (collection of connected vertices)
+         * @param vertices Array of vertex positions (world space)
+         * @param vertexCount Number of vertices
+         * @param indices Index buffer (optional, if null assumes sequential)
+         * @param indexCount Number of indices
+         * @param color RGBA color for the wireframe
+         * @param thickness Line thickness in world units
+         */
+        void SubmitWireframeMesh(const glm::vec2* vertices, size_t vertexCount,
+                                 const uint32_t* indices, size_t indexCount,
+                                 const glm::vec4& color, float thickness);
+
     private:
         // ====================================================================
         // Conversion Helpers
         // ====================================================================
 
-        /*! \brief Convert engine Vector2D to GLM vec2. */
+        /**
+         * @brief Convert engine Vector2D to GLM vec2. 
+         * @return glm::vec2 representation of the Vector2D.
+         */
         glm::vec2 ToGlm(const Vector2D& v) {
             return glm::vec2{ v.X, v.Y };
         }
 
-        /*!
-        \brief Convert engine Color (0-255) to GLM vec4 (0.0-1.0).
-        \param c The Color to convert.
-        \return Normalized glm::vec4 suitable for shaders.
-        \note GLSL expects floats in [0.0-1.0]. Forgetting normalization
+        /**
+         * @brief Convert engine Color (0-255) to GLM vec4 (0.0-1.0).
+         * @param c The Color to convert.
+         * @return Normalized glm::vec4 suitable for shaders.
+         * @note GLSL expects floats in [0.0-1.0]. Forgetting normalization
               will cause washed-out or grayscale rendering.
-        */
+         */
         glm::vec4 ToGlm(const Color& c) {
             return glm::vec4{ c.R, c.G, c.B, c.A };
         }
@@ -171,6 +249,21 @@ namespace ECS {
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         Engine::Camera* m_activeCamera = nullptr;               ///< Active camera (editor or game)
 
+        // ====================================================================
+        // Member Variables - Wireframe Submissions
+        // ====================================================================
+        // Wireframe submissions are queued and rendered in the scene pass
+        struct WireframeSubmission {
+            enum class Type { Quad, Circle, Polygon, Line, Mesh };
+            Type type;
+            std::vector<glm::vec2> vertices;
+            std::vector<uint32_t> indices;
+            glm::vec4 color;
+            float thickness;
+            bool closed; // for polygons
+        };
+        std::vector<WireframeSubmission> m_wireframeQueue;
+
 
         // ====================================================================
         // Member Variables - Shaders
@@ -193,6 +286,25 @@ namespace ECS {
         Framebuffer m_pickingFBO;
         PixelBufferObject m_pbos[2];
         int m_currentPBO = 0;
+
+        // Async pick request state
+        struct PendingPickRequest {
+            uint32_t RequestId = 0;
+            float ScreenX = 0.0f;
+            float ScreenY = 0.0f;
+            glm::vec2 ViewportPos{0.0f, 0.0f};
+            glm::vec2 ViewportSize{0.0f, 0.0f};
+        };
+
+        std::optional<PendingPickRequest> m_pendingPickRequest; // single-slot request processed by picking pass
+        std::unordered_map<uint32_t, uint32_t> m_completedPickResults; // requestId -> picked entity id
+        uint32_t m_nextPickRequestId = 1;
+        struct InFlightPick {
+            uint32_t RequestId = 0;
+            int PBOIndex = -1;
+        };
+
+        std::optional<InFlightPick> m_inFlightPick;
 
         // Static instance pointer
         static RendererSystem* s_instance;
