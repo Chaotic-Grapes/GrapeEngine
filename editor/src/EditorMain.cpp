@@ -11,11 +11,14 @@ Launches the application in editor mode with the level editor interface.
 /* End Header *******************************************************************/
 
 #include <crtdbg.h>
+#include <filesystem>
 #include "core/Application.h"
 #include "EditorApplication.h"
 #include "EditorState.h"
 #include "services/TimeSystem.h"
 #include "platform/IPlatformContext.h"
+#include "scripting/ScriptManager.h"
+#include "core/Logger.h"
 
 /**
  * @brief Main entry point for the Grape Engine Level Editor
@@ -45,6 +48,25 @@ int main() {
     // Initialize systems after window is created
     ECS::World emptyWorld;
     engine.GetSystemManager().CreateAll(emptyWorld);
+
+    // Start hot reload watcher for C# scripts in editor mode
+    // Watch the "Scripts" directory for changes and auto-compile+reload
+    auto* scriptManager = engine.GetScriptManager();
+    if (scriptManager && scriptManager->IsInitialized()) {
+        std::filesystem::path scriptsDir = std::filesystem::current_path() / "Scripts";
+        
+        // Create scripts directory if it doesn't exist
+        if (!std::filesystem::exists(scriptsDir)) {
+            std::filesystem::create_directories(scriptsDir);
+            LOG_INFO("[EditorMain] Created Scripts directory: " << scriptsDir.string());
+        }
+        
+        if (scriptManager->StartScriptWatching(scriptsDir.string())) {
+            LOG_INFO("[EditorMain] C# script hot reload watcher started at: " << scriptsDir.string());
+        } else {
+            LOG_WARNING("[EditorMain] Failed to start C# script hot reload watcher");
+        }
+    }
 
     // Track previous state to detect transitions
     EditorState previousState = EditorState::Edit;
