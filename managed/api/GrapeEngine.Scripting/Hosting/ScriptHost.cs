@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using System.Runtime.InteropServices;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.IO;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -62,6 +63,8 @@ public static class ScriptHost
     private static readonly Dictionary<ulong, Type> s_systemTypes = [];
     private static readonly Dictionary<ulong, object> s_systemInstances = [];
     private static ulong s_nextSystemHandle = 1;
+    // Saved serialized state for hot-reload: assemblyPath -> (typeFullName -> blob)
+    private static readonly Dictionary<string, Dictionary<string, byte[]?>> s_savedSystemStateByAssemblyPath = new();
 
     /// <summary>
     /// Load a C# assembly containing scripted systems.
@@ -127,8 +130,36 @@ public static class ScriptHost
                 }
             }
 
+            // Before removing, capture state for IHotReloadable instances
             foreach (var handle in systemHandlesToRemove)
             {
+                if (s_systemInstances.TryGetValue(handle, out var inst))
+                {
+                    try
+                    {
+                        if (inst is IHotReloadable hot)
+                        {
+                            byte[]? blob = null;
+                            try { blob = hot.OnBeforeUnload(); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error OnBeforeUnload: {ex.Message}"); }
+
+                            if (blob != null)
+                            {
+                                string assemblyPathKey = entry.Assembly.Location ?? assemblyPath;
+                                if (!s_savedSystemStateByAssemblyPath.TryGetValue(assemblyPathKey, out var map))
+                                {
+                                    map = new Dictionary<string, byte[]?>();
+                                    s_savedSystemStateByAssemblyPath[assemblyPathKey] = map;
+                                }
+                                map[inst.GetType().FullName ?? inst.GetType().Name] = blob;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[ScriptHost] Error capturing state: {ex.Message}");
+                    }
+                }
+
                 s_systemInstances.Remove(handle);
                 s_systemTypes.Remove(handle);
                 Console.WriteLine($"[ScriptHost] Removed system instance: handle={handle}");
@@ -268,6 +299,49 @@ public static class ScriptHost
         }
     }
 
+    /// <summary>
+    /// Generate a minimal .csproj file in the specified directory to help external IDEs
+    /// (VS / Rider) open the script folder. Writes to <dir>/<projectName>.csproj.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int GenerateCsProj(char* scriptsDirPtr, char* projectNamePtr)
+    {
+        try
+        {
+            string dir = Marshal.PtrToStringUTF8((IntPtr)scriptsDirPtr) ?? "";
+            string projectName = Marshal.PtrToStringUTF8((IntPtr)projectNamePtr) ?? "ScriptsProject";
+
+            if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+            {
+                Console.WriteLine($"[ScriptHost] GenerateCsProj: invalid dir {dir}");
+                return -1;
+            }
+
+            string outPath = Path.Combine(dir, projectName + ".csproj");
+
+            string template = @"<Project Sdk=""Microsoft.NET.Sdk""> 
+                                    <PropertyGroup>
+                                        <TargetFramework>net9.0</TargetFramework>
+                                        <ImplicitUsings>enable</ImplicitUsings>
+                                        <Nullable>enable</Nullable>
+                                    </PropertyGroup>
+                                    <ItemGroup>
+                                        <Compile Include=""**\*.cs"" />
+                                    </ItemGroup>
+                                </Project>
+                             ";
+
+            File.WriteAllText(outPath, template);
+            Console.WriteLine($"[ScriptHost] Generated csproj: {outPath}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] GenerateCsProj error: {ex.Message}");
+            return -1;
+        }
+    }
+
     private static IntPtr StringToHGlobalUtf8(string? s)
     {
         if (s == null) return IntPtr.Zero;
@@ -373,8 +447,31 @@ public static class ScriptHost
             ulong handle = s_nextSystemHandle++;
             s_systemInstances[handle] = instance;
             s_systemTypes[handle] = systemType;
-            
             Console.WriteLine($"[ScriptHost] Created system instance: {typeName} (handle: {handle})");
+
+            // If we have saved state from a previous unload of the same assembly, restore it
+            try
+            {
+                // Find the assembly path that contains this type
+                string? assemblyPath = systemType.Assembly.Location;
+                if (!string.IsNullOrEmpty(assemblyPath) && s_savedSystemStateByAssemblyPath.TryGetValue(assemblyPath, out var map))
+                {
+                    string key = systemType.FullName ?? systemType.Name;
+                    if (map.TryGetValue(key, out var blob))
+                    {
+                        if (instance is IHotReloadable hot)
+                        {
+                            try { hot.OnAfterReload(blob); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error OnAfterReload: {ex.Message}"); }
+                        }
+                        // Remove saved blob once applied
+                        map.Remove(key);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ScriptHost] Error restoring state for {typeName}: {ex.Message}");
+            }
             return handle;
         }
         catch (Exception ex)

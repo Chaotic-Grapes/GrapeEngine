@@ -40,6 +40,20 @@ public class Query<T1>
         return new QueryEnumerator<T1>(_world, _componentHashes);
     }
 
+    public int Count()
+    {
+        int c = 0;
+        var en = GetEnumerator();
+        while (en.MoveNext()) c++;
+        return c;
+    }
+
+    public bool Any()
+    {
+        var en = GetEnumerator();
+        return en.MoveNext();
+    }
+
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
     {
         var b = new QueryFilterBuilder(_world, _componentHashes);
@@ -113,6 +127,20 @@ public class Query<T1, T2>
     public QueryEnumerator<T1, T2> GetEnumerator()
     {
         return new QueryEnumerator<T1, T2>(_world, _componentHashes);
+    }
+
+    public int Count()
+    {
+        int c = 0;
+        var en = GetEnumerator();
+        while (en.MoveNext()) c++;
+        return c;
+    }
+
+    public bool Any()
+    {
+        var en = GetEnumerator();
+        return en.MoveNext();
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -191,6 +219,20 @@ public class Query<T1, T2, T3>
     public QueryEnumerator<T1, T2, T3> GetEnumerator()
     {
         return new QueryEnumerator<T1, T2, T3>(_world, _componentHashes);
+    }
+
+    public int Count()
+    {
+        int c = 0;
+        var en = GetEnumerator();
+        while (en.MoveNext()) c++;
+        return c;
+    }
+
+    public bool Any()
+    {
+        var en = GetEnumerator();
+        return en.MoveNext();
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -276,6 +318,20 @@ public class Query<T1, T2, T3, T4>
         return new QueryEnumerator<T1, T2, T3, T4>(_world, _componentHashes);
     }
 
+    public int Count()
+    {
+        int c = 0;
+        var en = GetEnumerator();
+        while (en.MoveNext()) c++;
+        return c;
+    }
+
+    public bool Any()
+    {
+        var en = GetEnumerator();
+        return en.MoveNext();
+    }
+
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
     {
         var b = new QueryFilterBuilder(_world, _componentHashes);
@@ -358,6 +414,20 @@ public class Query<T1, T2, T3, T4, T5>
     public QueryEnumerator<T1, T2, T3, T4, T5> GetEnumerator()
     {
         return new QueryEnumerator<T1, T2, T3, T4, T5>(_world, _componentHashes);
+    }
+
+    public int Count()
+    {
+        int c = 0;
+        var en = GetEnumerator();
+        while (en.MoveNext()) c++;
+        return c;
+    }
+
+    public bool Any()
+    {
+        var en = GetEnumerator();
+        return en.MoveNext();
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -445,6 +515,20 @@ public class Query<T1, T2, T3, T4, T5, T6>
     public QueryEnumerator<T1, T2, T3, T4, T5, T6> GetEnumerator()
     {
         return new QueryEnumerator<T1, T2, T3, T4, T5, T6>(_world, _componentHashes);
+    }
+
+    public int Count()
+    {
+        int c = 0;
+        var en = GetEnumerator();
+        while (en.MoveNext()) c++;
+        return c;
+    }
+
+    public bool Any()
+    {
+        var en = GetEnumerator();
+        return en.MoveNext();
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -535,6 +619,20 @@ public class Query<T1, T2, T3, T4, T5, T6, T7>
     public QueryEnumerator<T1, T2, T3, T4, T5, T6, T7> GetEnumerator()
     {
         return new QueryEnumerator<T1, T2, T3, T4, T5, T6, T7>(_world, _componentHashes);
+    }
+
+    public int Count()
+    {
+        int c = 0;
+        var en = GetEnumerator();
+        while (en.MoveNext()) c++;
+        return c;
+    }
+
+    public bool Any()
+    {
+        var en = GetEnumerator();
+        return en.MoveNext();
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -628,6 +726,20 @@ public class Query<T1, T2, T3, T4, T5, T6, T7, T8>
     public QueryEnumerator<T1, T2, T3, T4, T5, T6, T7, T8> GetEnumerator()
     {
         return new QueryEnumerator<T1, T2, T3, T4, T5, T6, T7, T8>(_world, _componentHashes);
+    }
+
+    public int Count()
+    {
+        int c = 0;
+        var en = GetEnumerator();
+        while (en.MoveNext()) c++;
+        return c;
+    }
+
+    public bool Any()
+    {
+        var en = GetEnumerator();
+        return en.MoveNext();
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged

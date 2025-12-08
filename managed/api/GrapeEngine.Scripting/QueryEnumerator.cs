@@ -43,21 +43,13 @@ public unsafe struct QueryEnumerator<T1>
         }
     }
 
-    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
         _currentEntityId = 0;
 
-        fixed (uint* hashesPtr = componentHashes)
-        fixed (uint* optionalPtr = (optionalHashes != null && optionalHashes.Length > 0) ? optionalHashes : null)
-        fixed (uint* excludePtr = (excludeHashes != null && excludeHashes.Length > 0) ? excludeHashes : null)
-        {
-            fixed (QueryIterator* iterPtr = &_iterator)
-            {
-                QueryInteropAPI.CreateQuery(world.NativePtr, hashesPtr, componentHashes.Length, optionalPtr, optionalHashes?.Length ?? 0, excludePtr, excludeHashes?.Length ?? 0, iterPtr);
-            }
-        }
+        QueryInteropHelpers.CreateQueryWithArrays(world.NativePtr, componentHashes, optionalHashes, excludeHashes, out _iterator);
     }
 
     public QueryResult<T1> Current
@@ -113,21 +105,13 @@ public unsafe struct QueryEnumerator<T1, T2>
         }
     }
 
-    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
         _currentEntityId = 0;
 
-        fixed (uint* hashesPtr = componentHashes)
-        fixed (uint* optionalPtr = (optionalHashes != null && optionalHashes.Length > 0) ? optionalHashes : null)
-        fixed (uint* excludePtr = (excludeHashes != null && excludeHashes.Length > 0) ? excludeHashes : null)
-        {
-            fixed (QueryIterator* iterPtr = &_iterator)
-            {
-                QueryInteropAPI.CreateQuery(world.NativePtr, hashesPtr, componentHashes.Length, optionalPtr, optionalHashes?.Length ?? 0, excludePtr, excludeHashes?.Length ?? 0, iterPtr);
-            }
-        }
+        QueryInteropHelpers.CreateQueryWithArrays(world.NativePtr, componentHashes, optionalHashes, excludeHashes, out _iterator);
     }
 
     public QueryResult<T1, T2> Current
@@ -185,21 +169,13 @@ public unsafe struct QueryEnumerator<T1, T2, T3>
         }
     }
 
-    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
         _currentEntityId = 0;
 
-        fixed (uint* hashesPtr = componentHashes)
-        fixed (uint* optionalPtr = (optionalHashes != null && optionalHashes.Length > 0) ? optionalHashes : null)
-        fixed (uint* excludePtr = (excludeHashes != null && excludeHashes.Length > 0) ? excludeHashes : null)
-        {
-            fixed (QueryIterator* iterPtr = &_iterator)
-            {
-                QueryInteropAPI.CreateQuery(world.NativePtr, hashesPtr, componentHashes.Length, optionalPtr, optionalHashes?.Length ?? 0, excludePtr, excludeHashes?.Length ?? 0, iterPtr);
-            }
-        }
+        QueryInteropHelpers.CreateQueryWithArrays(world.NativePtr, componentHashes, optionalHashes, excludeHashes, out _iterator);
     }
 
     public QueryResult<T1, T2, T3> Current
@@ -261,21 +237,13 @@ public unsafe struct QueryEnumerator<T1, T2, T3, T4>
         }
     }
 
-    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
         _currentEntityId = 0;
 
-        fixed (uint* hashesPtr = componentHashes)
-        fixed (uint* optionalPtr = (optionalHashes != null && optionalHashes.Length > 0) ? optionalHashes : null)
-        fixed (uint* excludePtr = (excludeHashes != null && excludeHashes.Length > 0) ? excludeHashes : null)
-        {
-            fixed (QueryIterator* iterPtr = &_iterator)
-            {
-                QueryInteropAPI.CreateQuery(world.NativePtr, hashesPtr, componentHashes.Length, optionalPtr, optionalHashes?.Length ?? 0, excludePtr, excludeHashes?.Length ?? 0, iterPtr);
-            }
-        }
+        QueryInteropHelpers.CreateQueryWithArrays(world.NativePtr, componentHashes, optionalHashes, excludeHashes, out _iterator);
     }
 
     public QueryResult<T1, T2, T3, T4> Current
@@ -337,21 +305,13 @@ public unsafe struct QueryEnumerator<T1, T2, T3, T4, T5>
         }
     }
 
-    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
         _currentEntityId = 0;
 
-        fixed (uint* hashesPtr = componentHashes)
-        fixed (uint* optionalPtr = (optionalHashes != null && optionalHashes.Length > 0) ? optionalHashes : null)
-        fixed (uint* excludePtr = (excludeHashes != null && excludeHashes.Length > 0) ? excludeHashes : null)
-        {
-            fixed (QueryIterator* iterPtr = &_iterator)
-            {
-                QueryInteropAPI.CreateQuery(world.NativePtr, hashesPtr, componentHashes.Length, optionalPtr, optionalHashes?.Length ?? 0, excludePtr, excludeHashes?.Length ?? 0, iterPtr);
-            }
-        }
+        QueryInteropHelpers.CreateQueryWithArrays(world.NativePtr, componentHashes, optionalHashes, excludeHashes, out _iterator);
     }
 
     public QueryResult<T1, T2, T3, T4, T5> Current
@@ -415,21 +375,13 @@ public unsafe struct QueryEnumerator<T1, T2, T3, T4, T5, T6>
         }
     }
 
-    internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
+        internal QueryEnumerator(World world, uint[] componentHashes, uint[] optionalHashes, uint[] excludeHashes)
     {
         _world = world;
         _iterator = default;
         _currentEntityId = 0;
 
-        fixed (uint* hashesPtr = componentHashes)
-        fixed (uint* optionalPtr = (optionalHashes != null && optionalHashes.Length > 0) ? optionalHashes : null)
-        fixed (uint* excludePtr = (excludeHashes != null && excludeHashes.Length > 0) ? excludeHashes : null)
-        {
-            fixed (QueryIterator* iterPtr = &_iterator)
-            {
-                QueryInteropAPI.CreateQuery(world.NativePtr, hashesPtr, componentHashes.Length, optionalPtr, optionalHashes?.Length ?? 0, excludePtr, excludeHashes?.Length ?? 0, iterPtr);
-            }
-        }
+        QueryInteropHelpers.CreateQueryWithArrays(world.NativePtr, componentHashes, optionalHashes, excludeHashes, out _iterator);
     }
 
     public QueryResult<T1, T2, T3, T4, T5, T6> Current
