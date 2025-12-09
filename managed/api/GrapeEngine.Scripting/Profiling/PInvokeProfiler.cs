@@ -13,8 +13,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using GrapeEngine.Math;
 using System.Diagnostics;
-using System.Collections.Generic;
 
 namespace GrapeEngine.Scripting.Profiling;
 
@@ -38,16 +38,16 @@ public class PInvokeMetrics
 /// </summary>
 public static class PInvokeProfiler
 {
-    private static readonly Dictionary<string, PInvokeMetrics> s_metrics = [];
-    private static readonly object s_lockObj = new();
-    private static bool s_enabled = false;
+    private static readonly Dictionary<string, PInvokeMetrics> _metrics = [];
+    private static readonly Lock _lock = new();
+    private static bool _enabled = false;
 
     /// <summary>
     /// Enable or disable profiling.
     /// </summary>
     public static void SetEnabled(bool enabled)
     {
-        s_enabled = enabled;
+        _enabled = enabled;
         if (enabled)
         {
             Console.WriteLine("[PInvokeProfiler] Profiling enabled");
@@ -63,20 +63,20 @@ public static class PInvokeProfiler
     /// </summary>
     public static void RecordCall(string functionName, long microseconds)
     {
-        if (!s_enabled) return;
+        if (!_enabled) return;
 
-        lock (s_lockObj)
+        lock (_lock)
         {
-            if (!s_metrics.TryGetValue(functionName, out var metrics))
+            if (!_metrics.TryGetValue(functionName, out var metrics))
             {
                 metrics = new PInvokeMetrics { FunctionName = functionName };
-                s_metrics[functionName] = metrics;
+                _metrics[functionName] = metrics;
             }
 
             metrics.TotalCallCount++;
             metrics.TotalMicroseconds += microseconds;
-            metrics.MinMicroseconds = Math.Min(metrics.MinMicroseconds, microseconds);
-            metrics.MaxMicroseconds = Math.Max(metrics.MaxMicroseconds, microseconds);
+            metrics.MinMicroseconds = GMath.Min(metrics.MinMicroseconds, microseconds);
+            metrics.MaxMicroseconds = GMath.Max(metrics.MaxMicroseconds, microseconds);
         }
     }
 
@@ -85,9 +85,9 @@ public static class PInvokeProfiler
     /// </summary>
     public static PInvokeMetrics? GetMetrics(string functionName)
     {
-        lock (s_lockObj)
+        lock (_lock)
         {
-            return s_metrics.TryGetValue(functionName, out var metrics) ? metrics : null;
+            return _metrics.TryGetValue(functionName, out var metrics) ? metrics : null;
         }
     }
 
@@ -96,9 +96,9 @@ public static class PInvokeProfiler
     /// </summary>
     public static List<PInvokeMetrics> GetAllMetrics()
     {
-        lock (s_lockObj)
+        lock (_lock)
         {
-            return [..s_metrics.Values.OrderByDescending(m => m.TotalMicroseconds)];
+            return [.._metrics.Values.OrderByDescending(m => m.TotalMicroseconds)];
         }
     }
 
@@ -107,9 +107,9 @@ public static class PInvokeProfiler
     /// </summary>
     public static void Reset()
     {
-        lock (s_lockObj)
+        lock (_lock)
         {
-            s_metrics.Clear();
+            _metrics.Clear();
         }
     }
 
@@ -118,9 +118,9 @@ public static class PInvokeProfiler
     /// </summary>
     public static void PrintReport()
     {
-        lock (s_lockObj)
+        lock (_lock)
         {
-            if (s_metrics.Count == 0)
+            if (_metrics.Count == 0)
             {
                 Console.WriteLine("[PInvokeProfiler] No metrics recorded");
                 return;
@@ -139,7 +139,7 @@ public static class PInvokeProfiler
             );
             Console.WriteLine(new string('-', 100));
 
-            var sorted = s_metrics.Values.OrderByDescending(m => m.TotalMicroseconds);
+            var sorted = _metrics.Values.OrderByDescending(m => m.TotalMicroseconds);
             foreach (var metric in sorted)
             {
                 Console.WriteLine(
@@ -161,9 +161,9 @@ public static class PInvokeProfiler
     /// </summary>
     public static long GetTotalMicroseconds()
     {
-        lock (s_lockObj)
+        lock (_lock)
         {
-            return s_metrics.Values.Sum(m => m.TotalMicroseconds);
+            return _metrics.Values.Sum(m => m.TotalMicroseconds);
         }
     }
 
@@ -172,9 +172,9 @@ public static class PInvokeProfiler
     /// </summary>
     public static long GetTotalCalls()
     {
-        lock (s_lockObj)
+        lock (_lock)
         {
-            return s_metrics.Values.Sum(m => m.TotalCallCount);
+            return _metrics.Values.Sum(m => m.TotalCallCount);
         }
     }
 }
@@ -207,5 +207,7 @@ public class PInvokeTimer : IDisposable
         _stopwatch.Stop();
         var microseconds = _stopwatch.Elapsed.Ticks / 10;
         PInvokeProfiler.RecordCall(_functionName, microseconds);
+
+        GC.SuppressFinalize(this);
     }
 }

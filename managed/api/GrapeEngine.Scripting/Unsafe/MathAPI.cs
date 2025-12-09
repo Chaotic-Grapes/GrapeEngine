@@ -39,14 +39,99 @@ internal partial class MathAPI
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float RandomFloatSeeded(float min, float max, uint seed);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomDouble")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double RandomDouble(double min, double max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomDoubleSeeded")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double RandomDoubleSeeded(double min, double max, uint seed);
+
+    // Random - Additional Integral Types
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomByte")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial byte RandomByte(byte min, byte max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomSByte")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial sbyte RandomSByte(sbyte min, sbyte max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomShort")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial short RandomShort(short min, short max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomUShort")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial ushort RandomUShort(ushort min, ushort max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomUInt")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial uint RandomUInt(uint min, uint max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomLong")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nint RandomLong(nint min, nint max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomULong")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nuint RandomULong(nuint min, nuint max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomLong64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial long RandomLong64(long min, long max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_RandomULong64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial ulong RandomULong64(ulong min, ulong max);
+
     // Clamp/Lerp
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_Clamp")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float Clamp(float value, float min, float max);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampDouble")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double ClampDouble(double value, double min, double max);
+
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampInt")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int ClampInt(int value, int min, int max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampByte")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial byte ClampByte(byte value, byte min, byte max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampSByte")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial sbyte ClampSByte(sbyte value, sbyte min, sbyte max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampShort")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial short ClampShort(short value, short min, short max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampUShort")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial ushort ClampUShort(ushort value, ushort min, ushort max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampUInt")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial uint ClampUInt(uint value, uint min, uint max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampLong")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nint ClampLong(nint value, nint min, nint max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampULong")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nuint ClampULong(nuint value, nuint min, nuint max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampLong64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial long ClampLong64(long value, long min, long max);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_ClampULong64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial ulong ClampULong64(ulong value, ulong min, ulong max);
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_Lerp")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
@@ -81,9 +166,98 @@ internal partial class MathAPI
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float Min(float a, float b);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinDouble")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double MinDouble(double a, double b);
+
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_Max")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial float Max(float a, float b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxDouble")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial double MaxDouble(double a, double b);
+
+    // Min/Max - Integral Types
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinInt")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int MinInt(int a, int b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxInt")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int MaxInt(int a, int b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinByte")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial byte MinByte(byte a, byte b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxByte")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial byte MaxByte(byte a, byte b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinSByte")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial sbyte MinSByte(sbyte a, sbyte b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxSByte")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial sbyte MaxSByte(sbyte a, sbyte b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinShort")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial short MinShort(short a, short b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxShort")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial short MaxShort(short a, short b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinUShort")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial ushort MinUShort(ushort a, ushort b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxUShort")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial ushort MaxUShort(ushort a, ushort b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinUInt")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial uint MinUInt(uint a, uint b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxUInt")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial uint MaxUInt(uint a, uint b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinLong")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nint MinLong(nint a, nint b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxLong")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nint MaxLong(nint a, nint b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinULong")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nuint MinULong(nuint a, nuint b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxULong")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nuint MaxULong(nuint a, nuint b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinLong64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial long MinLong64(long a, long b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxLong64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial long MaxLong64(long a, long b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MinULong64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial ulong MinULong64(ulong a, ulong b);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_MaxULong64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial ulong MaxULong64(ulong a, ulong b);
 
     // Trigonometry
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Math_Sin")]

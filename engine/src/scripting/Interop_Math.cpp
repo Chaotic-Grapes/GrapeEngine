@@ -37,11 +37,78 @@ INTEROP_API int EngineInterop_Math_RandomInt(int min, int max) {
 }
 
 /// <summary>
+/// Generate a random byte between min and max (inclusive)
+/// </summary>
+INTEROP_API unsigned char EngineInterop_Math_RandomByte(unsigned char min, unsigned char max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
+/// Generate a random signed byte between min and max (inclusive)
+/// </summary>
+INTEROP_API signed char EngineInterop_Math_RandomSByte(signed char min, signed char max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
+/// Generate a random short between min and max (inclusive)
+/// </summary>
+INTEROP_API short EngineInterop_Math_RandomShort(short min, short max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
+/// Generate a random unsigned short between min and max (inclusive)
+/// </summary>
+INTEROP_API unsigned short EngineInterop_Math_RandomUShort(unsigned short min, unsigned short max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
+/// Generate a random unsigned integer between min and max (inclusive)
+/// </summary>
+INTEROP_API unsigned int EngineInterop_Math_RandomUInt(unsigned int min, unsigned int max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
+/// Generate a random long between min and max (inclusive)
+/// </summary>
+INTEROP_API long EngineInterop_Math_RandomLong(long min, long max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
+/// Generate a random unsigned long between min and max (inclusive)
+/// </summary>
+INTEROP_API unsigned long EngineInterop_Math_RandomULong(unsigned long min, unsigned long max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
+/// Generate a random 64-bit long between min and max (inclusive)
+/// </summary>
+INTEROP_API long long EngineInterop_Math_RandomLong64(long long min, long long max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
+/// Generate a random unsigned 64-bit long between min and max (inclusive)
+/// </summary>
+INTEROP_API unsigned long long EngineInterop_Math_RandomULong64(unsigned long long min, unsigned long long max) {
+    return MathUtils::Randomize(min, max);
+}
+
+/// <summary>
 /// Generate a random float between min and max
 /// </summary>
 INTEROP_API float EngineInterop_Math_RandomFloat(float min, float max) {
     return MathUtils::Randomize(min, max);
 }
+
+// ============================================================================
+// Math API - Random Number Generation (Seeded)
+// ============================================================================
 
 /// <summary>
 /// Generate a random integer with a specific seed
@@ -58,17 +125,15 @@ INTEROP_API float EngineInterop_Math_RandomFloatSeeded(float min, float max, uns
 }
 
 // ============================================================================
-// Math API - Common Math Functions
-// Note: C# Math class already provides many of these functions, but some of
-// which could potentially be non-CLS compliant. It is safer to provide our own
-// implementations to ensure consistent behavior across all scripting scenarios.
+// Math API - Clamping
+// Note: C# Math class already provides many of these functions, but some
+// could potentially be non-CLS compliant. We provide our own implementations
+// to ensure consistent behavior across all scripting scenarios.
 // https://learn.microsoft.com/en-us/dotnet/standard/clr#cls-compliance
-// Example: https://learn.microsoft.com/en-us/dotnet/api/system.math.clamp?view=net-10.0
-// Math.Clamp API is NOT CLS-compliant.
 // ============================================================================
 
 /// <summary>
-/// Clamp a value between min and max
+/// Clamp a float value between min and max
 /// </summary>
 INTEROP_API float EngineInterop_Math_Clamp(float value, float min, float max) {
     return MathUtils::Clamp(value, min, max);
@@ -82,6 +147,73 @@ INTEROP_API int EngineInterop_Math_ClampInt(int value, int min, int max) {
 }
 
 /// <summary>
+/// Clamp a byte value between min and max
+/// </summary>
+INTEROP_API unsigned char EngineInterop_Math_ClampByte(unsigned char value, unsigned char min, unsigned char max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+/// <summary>
+/// Clamp a signed byte value between min and max
+/// </summary>
+INTEROP_API signed char EngineInterop_Math_ClampSByte(signed char value, signed char min, signed char max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+/// <summary>
+/// Clamp a short value between min and max
+/// </summary>
+INTEROP_API short EngineInterop_Math_ClampShort(short value, short min, short max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+/// <summary>
+/// Clamp an unsigned short value between min and max
+/// </summary>
+INTEROP_API unsigned short EngineInterop_Math_ClampUShort(unsigned short value, unsigned short min, unsigned short max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+/// <summary>
+/// Clamp an unsigned integer value between min and max
+/// </summary>
+INTEROP_API unsigned int EngineInterop_Math_ClampUInt(unsigned int value, unsigned int min, unsigned int max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+/// <summary>
+/// Clamp a long value between min and max
+/// </summary>
+INTEROP_API long EngineInterop_Math_ClampLong(long value, long min, long max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+/// <summary>
+/// Clamp an unsigned long value between min and max
+/// </summary>
+INTEROP_API unsigned long EngineInterop_Math_ClampULong(unsigned long value, unsigned long min, unsigned long max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+/// <summary>
+/// Clamp a 64-bit long value between min and max
+/// </summary>
+INTEROP_API long long EngineInterop_Math_ClampLong64(long long value, long long min, long long max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+/// <summary>
+/// Clamp an unsigned 64-bit long value between min and max
+/// </summary>
+INTEROP_API unsigned long long EngineInterop_Math_ClampULong64(unsigned long long value, unsigned long long min, unsigned long long max) {
+    return MathUtils::Clamp(value, min, max);
+}
+
+// ============================================================================
+// Math API - Basic Operations
+// ============================================================================
+
+/// <summary>
 /// Linear interpolation between a and b by t (0-1)
 /// </summary>
 INTEROP_API float EngineInterop_Math_Lerp(float a, float b, float t) {
@@ -89,21 +221,21 @@ INTEROP_API float EngineInterop_Math_Lerp(float a, float b, float t) {
 }
 
 /// <summary>
-/// Get the absolute value of a number
+/// Get the absolute value of a float
 /// </summary>
 INTEROP_API float EngineInterop_Math_Abs(float value) {
     return std::abs(value);
 }
 
 /// <summary>
-/// Square root
+/// Get the square root
 /// </summary>
 INTEROP_API float EngineInterop_Math_Sqrt(float value) {
     return std::sqrt(value);
 }
 
 /// <summary>
-/// Power function
+/// Raise base to the power of exponent
 /// </summary>
 INTEROP_API float EngineInterop_Math_Pow(float base, float exponent) {
     return std::pow(base, exponent);
@@ -117,31 +249,175 @@ INTEROP_API float EngineInterop_Math_Round(float value) {
 }
 
 /// <summary>
-/// Round down to integer
+/// Round down to nearest integer
 /// </summary>
 INTEROP_API float EngineInterop_Math_Floor(float value) {
     return std::floor(value);
 }
 
 /// <summary>
-/// Round up to integer
+/// Round up to nearest integer
 /// </summary>
 INTEROP_API float EngineInterop_Math_Ceil(float value) {
     return std::ceil(value);
 }
 
+// ============================================================================
+// Math API - Min/Max Operations
+// ============================================================================
+
 /// <summary>
-/// Get the minimum of two values
+/// Get the minimum of two floats
 /// </summary>
 INTEROP_API float EngineInterop_Math_Min(float a, float b) {
     return a < b ? a : b;
 }
 
 /// <summary>
-/// Get the maximum of two values
+/// Get the maximum of two floats
 /// </summary>
 INTEROP_API float EngineInterop_Math_Max(float a, float b) {
     return a > b ? a : b;
+}
+
+/// <summary>
+/// Get the minimum of two integers
+/// </summary>
+INTEROP_API int EngineInterop_Math_MinInt(int a, int b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two integers
+/// </summary>
+INTEROP_API int EngineInterop_Math_MaxInt(int a, int b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two bytes
+/// </summary>
+INTEROP_API unsigned char EngineInterop_Math_MinByte(unsigned char a, unsigned char b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two bytes
+/// </summary>
+INTEROP_API unsigned char EngineInterop_Math_MaxByte(unsigned char a, unsigned char b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two signed bytes
+/// </summary>
+INTEROP_API signed char EngineInterop_Math_MinSByte(signed char a, signed char b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two signed bytes
+/// </summary>
+INTEROP_API signed char EngineInterop_Math_MaxSByte(signed char a, signed char b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two shorts
+/// </summary>
+INTEROP_API short EngineInterop_Math_MinShort(short a, short b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two shorts
+/// </summary>
+INTEROP_API short EngineInterop_Math_MaxShort(short a, short b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two unsigned shorts
+/// </summary>
+INTEROP_API unsigned short EngineInterop_Math_MinUShort(unsigned short a, unsigned short b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two unsigned shorts
+/// </summary>
+INTEROP_API unsigned short EngineInterop_Math_MaxUShort(unsigned short a, unsigned short b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two unsigned integers
+/// </summary>
+INTEROP_API unsigned int EngineInterop_Math_MinUInt(unsigned int a, unsigned int b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two unsigned integers
+/// </summary>
+INTEROP_API unsigned int EngineInterop_Math_MaxUInt(unsigned int a, unsigned int b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two longs
+/// </summary>
+INTEROP_API long EngineInterop_Math_MinLong(long a, long b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two longs
+/// </summary>
+INTEROP_API long EngineInterop_Math_MaxLong(long a, long b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two unsigned longs
+/// </summary>
+INTEROP_API unsigned long EngineInterop_Math_MinULong(unsigned long a, unsigned long b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two unsigned longs
+/// </summary>
+INTEROP_API unsigned long EngineInterop_Math_MaxULong(unsigned long a, unsigned long b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two 64-bit longs
+/// </summary>
+INTEROP_API long long EngineInterop_Math_MinLong64(long long a, long long b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two 64-bit longs
+/// </summary>
+INTEROP_API long long EngineInterop_Math_MaxLong64(long long a, long long b) {
+    return MathUtils::Max(a, b);
+}
+
+/// <summary>
+/// Get the minimum of two unsigned 64-bit longs
+/// </summary>
+INTEROP_API unsigned long long EngineInterop_Math_MinULong64(unsigned long long a, unsigned long long b) {
+    return MathUtils::Min(a, b);
+}
+
+/// <summary>
+/// Get the maximum of two unsigned 64-bit longs
+/// </summary>
+INTEROP_API unsigned long long EngineInterop_Math_MaxULong64(unsigned long long a, unsigned long long b) {
+    return MathUtils::Max(a, b);
 }
 
 // ============================================================================

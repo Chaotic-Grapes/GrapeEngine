@@ -8,14 +8,15 @@ Rendering and UI-related ECS component types.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Numerics;
 using GrapeEngine.Math;
+using GrapeEngine.Numerics;
+using GrapeEngine.Scripting.Components.Core;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting;
 
 [StructLayout(LayoutKind.Sequential)]
-public struct SpriteRenderer2D
+public record struct SpriteRenderer2D
 {
     public uint TextureId;
     public Color Color;
@@ -28,20 +29,20 @@ public struct SpriteRenderer2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct SpriteFlip2D
+public record struct SpriteFlip2D
 {
     public bool FlipX;
     public bool FlipY;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct SpriteShader2D
+public record struct SpriteShader2D
 {
     public bool Bloom;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct SpriteSheetAnimation2D
+public record struct SpriteSheetAnimation2D
 {
     public uint TextureId;
     public int FrameWidth;
@@ -56,7 +57,7 @@ public struct SpriteSheetAnimation2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct AnimationState2D
+public record struct AnimationState2D
 {
     public int CurrentFrame;
     public float TimeAccumulator;
@@ -64,7 +65,7 @@ public struct AnimationState2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct ShapeCircle2D
+public record struct ShapeCircle2D
 {
     public float Radius;
     public Vector2 Offset;
@@ -74,7 +75,7 @@ public struct ShapeCircle2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct ShapeBox2D
+public record struct ShapeBox2D
 {
     public Vector2 HalfExtents;
     public Vector2 Offset;
@@ -84,7 +85,7 @@ public struct ShapeBox2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct ShapeLine2D
+public record struct ShapeLine2D
 {
     public Vector2 A;
     public Vector2 B;
@@ -93,13 +94,13 @@ public struct ShapeLine2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct ZIndex2D
+public record struct ZIndex2D
 {
     public short ZOrder;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct Light2D
+public record struct Light2D
 {
     public enum Type : byte
     {
@@ -127,7 +128,7 @@ public enum TextAnchor : byte
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct Text
+public record struct Text
 {
     [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
     public char[] Content;
@@ -165,7 +166,7 @@ public struct Text
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct UIButton
+public record struct UIButton
 {
     public int ID;
     public float X, Y, W, H;

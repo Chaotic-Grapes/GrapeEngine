@@ -23,8 +23,8 @@ namespace GrapeEngine.Scripting.Core;
 /// </summary>
 public static class ComponentRegistry
 {
-    private static readonly HashSet<uint> _registeredHashes = new();
-    private static readonly object _lock = new();
+    private static readonly HashSet<uint> _registeredHashes = [];
+    private static readonly Lock _lock = new();
 
     /// <summary>
     /// Register a component type with the native ECS.

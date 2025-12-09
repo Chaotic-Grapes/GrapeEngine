@@ -13,22 +13,12 @@ using System.Runtime.InteropServices;
 namespace GrapeEngine.Scripting;
 
 [StructLayout(LayoutKind.Sequential)]
-public struct AudioSource
+public record struct AudioSource(uint CueId)
 {
-    public uint CueId;
-    public float Volume;
-    public float Pitch;
-    public bool Loop;
-    public bool PlayOnStart;
-    public bool Spatial3D;
-
-    public AudioSource(uint cueId)
-    {
-        CueId = cueId;
-        Volume = 1.0f;
-        Pitch = 1.0f;
-        Loop = false;
-        PlayOnStart = false;
-        Spatial3D = true;
-    }
+    public uint CueId = CueId;
+    public float Volume = 1.0f;
+    public float Pitch = 1.0f;
+    public bool Loop = false;
+    public bool PlayOnStart = false;
+    public bool Spatial3D = true;
 }

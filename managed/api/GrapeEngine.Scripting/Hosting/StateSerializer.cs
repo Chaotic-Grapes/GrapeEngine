@@ -12,8 +12,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using GrapeEngine.Numerics;
 using System.Reflection;
-using System.Runtime.Serialization;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -29,26 +29,24 @@ public static class StateSerializer
     public static byte[] SerializePreservedFields(object instance)
     {
         if (instance == null)
-            return Array.Empty<byte>();
+            return [];
 
-        using (var ms = new MemoryStream())
-        using (var writer = new BinaryWriter(ms))
+        using var ms = new MemoryStream();
+        using var writer = new BinaryWriter(ms);
+        var type = instance.GetType();
+        var preservedFields = GetPreservedFields(type);
+
+        // Write field count
+        writer.Write(preservedFields.Count);
+
+        // Write each preserved field
+        foreach (var field in preservedFields)
         {
-            var type = instance.GetType();
-            var preservedFields = GetPreservedFields(type);
-
-            // Write field count
-            writer.Write(preservedFields.Count);
-
-            // Write each preserved field
-            foreach (var field in preservedFields)
-            {
-                object? value = field.GetValue(instance);
-                WriteFieldValue(writer, field.Name, field.FieldType, value);
-            }
-
-            return ms.ToArray();
+            object? value = field.GetValue(instance);
+            WriteFieldValue(writer, field.Name, field.FieldType, value);
         }
+
+        return ms.ToArray();
     }
 
     /// <summary>
@@ -61,38 +59,36 @@ public static class StateSerializer
 
         try
         {
-            using (var ms = new MemoryStream(data))
-            using (var reader = new BinaryReader(ms))
+            using var ms = new MemoryStream(data);
+            using var reader = new BinaryReader(ms);
+            var type = instance.GetType();
+            var preservedFields = GetPreservedFields(type);
+            var fieldsByName = preservedFields.ToDictionary(f => f.Name);
+
+            // Read field count
+            int fieldCount = reader.ReadInt32();
+
+            // Read each field
+            for (int i = 0; i < fieldCount; i++)
             {
-                var type = instance.GetType();
-                var preservedFields = GetPreservedFields(type);
-                var fieldsByName = preservedFields.ToDictionary(f => f.Name);
+                string fieldName = reader.ReadString();
 
-                // Read field count
-                int fieldCount = reader.ReadInt32();
-
-                // Read each field
-                for (int i = 0; i < fieldCount; i++)
+                if (fieldsByName.TryGetValue(fieldName, out var field))
                 {
-                    string fieldName = reader.ReadString();
-                    
-                    if (fieldsByName.TryGetValue(fieldName, out var field))
+                    object? value = ReadFieldValue(reader, field.FieldType);
+                    try
                     {
-                        object? value = ReadFieldValue(reader, field.FieldType);
-                        try
-                        {
-                            field.SetValue(instance, value);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[StateSerializer] Failed to set field {fieldName}: {ex.Message}");
-                        }
+                        field.SetValue(instance, value);
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        // Field doesn't exist in new version, skip it
-                        SkipFieldValue(reader);
+                        Console.WriteLine($"[StateSerializer] Failed to set field {fieldName}: {ex.Message}");
                     }
+                }
+                else
+                {
+                    // Field doesn't exist in new version, skip it
+                    SkipFieldValue(reader);
                 }
             }
         }
@@ -107,9 +103,7 @@ public static class StateSerializer
     /// </summary>
     private static List<FieldInfo> GetPreservedFields(Type type)
     {
-        return type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Where(f => f.GetCustomAttribute<PreserveAttribute>() != null)
-            .ToList();
+        return [.. type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Where(f => f.GetCustomAttribute<PreserveAttribute>() != null)];
     }
 
     /// <summary>

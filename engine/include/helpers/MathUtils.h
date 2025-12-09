@@ -39,6 +39,31 @@ public:
             : (value > maxVal ? maxVal : value);
     }
 
+    // Min/Max for any comparable type
+    template <typename T>
+    static T Min(T a, T b) {
+        return a < b ? a : b;
+    }
+
+    template <typename T>
+    static T Max(T a, T b) {
+        return a > b ? a : b;
+    }
+
+    // Abs for integral and floating-point types
+    template <typename T>
+    static T Abs(T value) {
+        if constexpr (std::is_integral_v<T>) {
+            return value < 0 ? -value : value;
+        }
+        else if constexpr (std::is_floating_point_v<T>) {
+            return std::abs(value);
+        }
+        else {
+            return value;
+        }
+    }
+
     static Vector3D ToVector3D(const Vector2D& vec2, float z = 0.0f) {
         return Vector3D(vec2.X, vec2.Y, z);
     }

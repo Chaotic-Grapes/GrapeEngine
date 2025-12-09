@@ -34,27 +34,99 @@ public static class GMath
     // ============================================================================
 
     /// <summary>
-    /// Generate a random integer in the range [min, max].
+    /// Generate a random int in the range [min, max].
     /// </summary>
-    public static int RandomInt(int min, int max)
+    public static int Random(int min, int max)
     {
         SwapMinMax(ref min, ref max);
         return MathAPI.RandomInt(min, max);
     }
 
     /// <summary>
+    /// Generate a random byte in the range [min, max].
+    /// </summary>
+    public static byte Random(byte min, byte max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomByte(min, max);
+    }
+
+    /// <summary>
+    /// Generate a random sbyte in the range [min, max].
+    /// </summary>
+    public static sbyte Random(sbyte min, sbyte max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomSByte(min, max);
+    }
+
+    /// <summary>
+    /// Generate a random short in the range [min, max].
+    /// </summary>
+    public static short Random(short min, short max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomShort(min, max);
+    }
+
+    /// <summary>
+    /// Generate a random ushort in the range [min, max].
+    /// </summary>
+    public static ushort Random(ushort min, ushort max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomUShort(min, max);
+    }
+
+    /// <summary>
+    /// Generate a random uint in the range [min, max].
+    /// </summary>
+    public static uint Random(uint min, uint max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomUInt(min, max);
+    }
+
+    /// <summary>
+    /// Generate a random long in the range [min, max].
+    /// </summary>
+    public static long Random(long min, long max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomLong64(min, max);
+    }
+
+    /// <summary>
+    /// Generate a random ulong in the range [min, max].
+    /// </summary>
+    public static ulong Random(ulong min, ulong max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomULong64(min, max);
+    }
+
+    /// <summary>
     /// Generate a random float in the range [min, max].
     /// </summary>
-    public static float RandomFloat(float min, float max)
+    public static float Random(float min, float max)
     {
         SwapMinMax(ref min, ref max);
         return MathAPI.RandomFloat(min, max);
     }
 
     /// <summary>
-    /// Generate a random integer with a seed.
+    /// Generate a random double in the range [min, max].
     /// </summary>
-    public static int RandomInt(int min, int max, uint seed)
+    public static double Random(double min, double max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomDouble(min, max);
+    }
+
+    /// <summary>
+    /// Generate a random int with a seed.
+    /// </summary>
+    public static int Random(int min, int max, uint seed)
     {
         SwapMinMax(ref min, ref max);
         return MathAPI.RandomIntSeeded(min, max, seed);
@@ -63,10 +135,19 @@ public static class GMath
     /// <summary>
     /// Generate a random float with a seed.
     /// </summary>
-    public static float RandomFloat(float min, float max, uint seed)
+    public static float Random(float min, float max, uint seed)
     {
         SwapMinMax(ref min, ref max);
         return MathAPI.RandomFloatSeeded(min, max, seed);
+    }
+
+    /// <summary>
+    /// Generate a random double with a seed.
+    /// </summary>
+    public static double Random(double min, double max, uint seed)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.RandomDoubleSeeded(min, max, seed);
     }
 
     // ============================================================================
@@ -83,12 +164,84 @@ public static class GMath
     }
 
     /// <summary>
+    /// Clamp a double value between min and max.
+    /// </summary>
+    public static double Clamp(double value, double min, double max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampDouble(value, min, max);
+    }
+
+    /// <summary>
     /// Clamp an integer value between min and max.
     /// </summary>
     public static int Clamp(int value, int min, int max)
     {
         SwapMinMax(ref min, ref max);
         return MathAPI.ClampInt(value, min, max);
+    }
+
+    /// <summary>
+    /// Clamp a byte value between min and max.
+    /// </summary>
+    public static byte Clamp(byte value, byte min, byte max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampByte(value, min, max);
+    }
+
+    /// <summary>
+    /// Clamp a signed byte value between min and max.
+    /// </summary>
+    public static sbyte Clamp(sbyte value, sbyte min, sbyte max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampSByte(value, min, max);
+    }
+
+    /// <summary>
+    /// Clamp a short value between min and max.
+    /// </summary>
+    public static short Clamp(short value, short min, short max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampShort(value, min, max);
+    }
+
+    /// <summary>
+    /// Clamp an unsigned short value between min and max.
+    /// </summary>
+    public static ushort Clamp(ushort value, ushort min, ushort max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampUShort(value, min, max);
+    }
+
+    /// <summary>
+    /// Clamp an unsigned integer value between min and max.
+    /// </summary>
+    public static uint Clamp(uint value, uint min, uint max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampUInt(value, min, max);
+    }
+
+    /// <summary>
+    /// Clamp a 64-bit long value between min and max.
+    /// </summary>
+    public static long Clamp(long value, long min, long max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampLong64(value, min, max);
+    }
+
+    /// <summary>
+    /// Clamp an unsigned 64-bit long value between min and max.
+    /// </summary>
+    public static ulong Clamp(ulong value, ulong min, ulong max)
+    {
+        SwapMinMax(ref min, ref max);
+        return MathAPI.ClampULong64(value, min, max);
     }
 
     /// <summary>
@@ -136,9 +289,99 @@ public static class GMath
     public static float Min(float a, float b) => MathAPI.Min(a, b);
 
     /// <summary>
+    /// Get the minimum of two doubles.
+    /// </summary>
+    public static double Min(double a, double b) => MathAPI.MinDouble(a, b);
+
+    /// <summary>
     /// Get the maximum of two values.
     /// </summary>
     public static float Max(float a, float b) => MathAPI.Max(a, b);
+
+    /// <summary>
+    /// Get the maximum of two doubles.
+    /// </summary>
+    public static double Max(double a, double b) => MathAPI.MaxDouble(a, b);
+
+    /// <summary>
+    /// Get the minimum of two integers.
+    /// </summary>
+    public static int Min(int a, int b) => MathAPI.MinInt(a, b);
+
+    /// <summary>
+    /// Get the maximum of two integers.
+    /// </summary>
+    public static int Max(int a, int b) => MathAPI.MaxInt(a, b);
+
+    /// <summary>
+    /// Get the minimum of two bytes.
+    /// </summary>
+    public static byte Min(byte a, byte b) => MathAPI.MinByte(a, b);
+
+    /// <summary>
+    /// Get the maximum of two bytes.
+    /// </summary>
+    public static byte Max(byte a, byte b) => MathAPI.MaxByte(a, b);
+
+    /// <summary>
+    /// Get the minimum of two signed bytes.
+    /// </summary>
+    public static sbyte Min(sbyte a, sbyte b) => MathAPI.MinSByte(a, b);
+
+    /// <summary>
+    /// Get the maximum of two signed bytes.
+    /// </summary>
+    public static sbyte Max(sbyte a, sbyte b) => MathAPI.MaxSByte(a, b);
+
+    /// <summary>
+    /// Get the minimum of two shorts.
+    /// </summary>
+    public static short Min(short a, short b) => MathAPI.MinShort(a, b);
+
+    /// <summary>
+    /// Get the maximum of two shorts.
+    /// </summary>
+    public static short Max(short a, short b) => MathAPI.MaxShort(a, b);
+
+    /// <summary>
+    /// Get the minimum of two unsigned shorts.
+    /// </summary>
+    public static ushort Min(ushort a, ushort b) => MathAPI.MinUShort(a, b);
+
+    /// <summary>
+    /// Get the maximum of two unsigned shorts.
+    /// </summary>
+    public static ushort Max(ushort a, ushort b) => MathAPI.MaxUShort(a, b);
+
+    /// <summary>
+    /// Get the minimum of two unsigned integers.
+    /// </summary>
+    public static uint Min(uint a, uint b) => MathAPI.MinUInt(a, b);
+
+    /// <summary>
+    /// Get the maximum of two unsigned integers.
+    /// </summary>
+    public static uint Max(uint a, uint b) => MathAPI.MaxUInt(a, b);
+
+    /// <summary>
+    /// Get the minimum of two 64-bit longs.
+    /// </summary>
+    public static long Min(long a, long b) => MathAPI.MinLong64(a, b);
+
+    /// <summary>
+    /// Get the maximum of two 64-bit longs.
+    /// </summary>
+    public static long Max(long a, long b) => MathAPI.MaxLong64(a, b);
+
+    /// <summary>
+    /// Get the minimum of two unsigned 64-bit longs.
+    /// </summary>
+    public static ulong Min(ulong a, ulong b) => MathAPI.MinULong64(a, b);
+
+    /// <summary>
+    /// Get the maximum of two unsigned 64-bit longs.
+    /// </summary>
+    public static ulong Max(ulong a, ulong b) => MathAPI.MaxULong64(a, b);
 
     // ============================================================================
     // Trigonometry
@@ -279,12 +522,9 @@ public static class GMath
     // Helper to swap min and max if min > max
     private static void SwapMinMax(ref int min, ref int max)
     {
-        // Swap if min is greater than max
         if (min > max)
         {
-            // Swap values with Min and Max
             var temp = min;
-
             min = max;
             max = temp;
         }
@@ -292,12 +532,89 @@ public static class GMath
 
     private static void SwapMinMax(ref float min, ref float max)
     {
-        // Swap if min is greater than max
         if (min > max)
         {
-            // Swap values with Min and Max
             var temp = min;
+            min = max;
+            max = temp;
+        }
+    }
 
+    private static void SwapMinMax(ref double min, ref double max)
+    {
+        if (min > max)
+        {
+            var temp = min;
+            min = max;
+            max = temp;
+        }
+    }
+
+    private static void SwapMinMax(ref byte min, ref byte max)
+    {
+        if (min > max)
+        {
+            var temp = min;
+            min = max;
+            max = temp;
+        }
+    }
+
+    private static void SwapMinMax(ref sbyte min, ref sbyte max)
+    {
+        if (min > max)
+        {
+            var temp = min;
+            min = max;
+            max = temp;
+        }
+    }
+
+    private static void SwapMinMax(ref short min, ref short max)
+    {
+        if (min > max)
+        {
+            var temp = min;
+            min = max;
+            max = temp;
+        }
+    }
+
+    private static void SwapMinMax(ref ushort min, ref ushort max)
+    {
+        if (min > max)
+        {
+            var temp = min;
+            min = max;
+            max = temp;
+        }
+    }
+
+    private static void SwapMinMax(ref uint min, ref uint max)
+    {
+        if (min > max)
+        {
+            var temp = min;
+            min = max;
+            max = temp;
+        }
+    }
+
+    private static void SwapMinMax(ref long min, ref long max)
+    {
+        if (min > max)
+        {
+            var temp = min;
+            min = max;
+            max = temp;
+        }
+    }
+
+    private static void SwapMinMax(ref ulong min, ref ulong max)
+    {
+        if (min > max)
+        {
+            var temp = min;
             min = max;
             max = temp;
         }

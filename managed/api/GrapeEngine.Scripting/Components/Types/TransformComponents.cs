@@ -9,42 +9,23 @@ Transform-related ECS component types.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Numerics;
+using GrapeEngine.Scripting.Components.Core;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting;
 
 [StructLayout(LayoutKind.Sequential)]
-public struct Rotator
+public record struct LocalTransform(Vector3 Position, Quaternion Rotation, Vector3 Scale)
 {
-    public float RotationSpeed;
-    public float RotationOffset;
-
-    public Rotator(float speed, float offset = 0f)
-    {
-        RotationSpeed = speed;
-        RotationOffset = offset;
-    }
-}
-
-[StructLayout(LayoutKind.Sequential)]
-public struct LocalTransform
-{
-    public Vector3 Position;
-    public Quaternion Rotation;
-    public Vector3 Scale;
-
-    public LocalTransform(Vector3 position, Quaternion rotation, Vector3 scale)
-    {
-        Position = position;
-        Rotation = rotation;
-        Scale = scale;
-    }
+    public Vector3 Position = Position;
+    public Quaternion Rotation = Rotation;
+    public Vector3 Scale = Scale;
 
     public static LocalTransform Default => new(Vector3.Zero, Quaternion.Identity, Vector3.One);
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct WorldTransform
+public record struct WorldTransform
 {
     public Matrix4x4 Matrix;
     public bool Dirty;

@@ -8,13 +8,13 @@ Camera-related ECS component types.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Numerics;
+using GrapeEngine.Scripting.Components.Core;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting;
 
 [StructLayout(LayoutKind.Sequential)]
-public struct Camera3D
+public record struct Camera3D
 {
     public bool UsePerspective;
     public float FOV;
@@ -54,7 +54,7 @@ public struct Camera3D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct CameraMatrices
+public record struct CameraMatrices
 {
     public Matrix4x4 View;
     public Matrix4x4 Projection;

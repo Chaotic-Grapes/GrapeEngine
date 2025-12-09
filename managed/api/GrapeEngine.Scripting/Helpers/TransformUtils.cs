@@ -36,10 +36,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Numerics;
 using GrapeEngine.Math;
+using GrapeEngine.Numerics;
 using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Components.Core;
 
 namespace GrapeEngine.Scripting.Helpers;
 
@@ -47,7 +46,7 @@ namespace GrapeEngine.Scripting.Helpers;
 /// Helper class for transform operations.
 /// Provides convenient methods for working with LocalTransform components.
 /// </summary>
-public static class Transform
+public static class TransformUtils
 {
     // ============================================================================
     // Position Helpers

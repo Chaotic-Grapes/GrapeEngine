@@ -14,7 +14,7 @@ using System.Runtime.InteropServices;
 namespace GrapeEngine.Scripting;
 
 [StructLayout(LayoutKind.Sequential)]
-public struct LinearVelocity2D
+public record struct LinearVelocity2D
 {
     public Vector2 Value;
 
@@ -23,7 +23,7 @@ public struct LinearVelocity2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct Acceleration2D
+public record struct Acceleration2D
 {
     public Vector2 Value;
 
@@ -32,7 +32,7 @@ public struct Acceleration2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct AngularVelocity2D
+public record struct AngularVelocity2D
 {
     public float Value;
 
@@ -40,7 +40,7 @@ public struct AngularVelocity2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct Rigidbody2D
+public record struct Rigidbody2D
 {
     public float Mass;
     public float InverseMass;
@@ -100,7 +100,7 @@ public struct Rigidbody2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct PhysicsMaterial2D
+public record struct PhysicsMaterial2D
 {
     public float Friction;
     public float Restitution;
@@ -108,7 +108,7 @@ public struct PhysicsMaterial2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct BoxCollider2D
+public record struct BoxCollider2D
 {
     public Vector2 HalfExtents;
     public Vector2 Offset;
@@ -126,7 +126,7 @@ public struct BoxCollider2D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-public struct CircleCollider2D
+public record struct CircleCollider2D
 {
     public float Radius;
     public Vector2 Offset;

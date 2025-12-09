@@ -13,6 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using GrapeEngine.Math;
 using System.Diagnostics;
 
 namespace GrapeEngine.Scripting.Debugging;
@@ -23,8 +24,8 @@ namespace GrapeEngine.Scripting.Debugging;
 /// </summary>
 public static class DebuggerSupport
 {
-    private static bool s_debuggerAttached = false;
-    private static readonly object s_lockObj = new();
+    private static bool _debuggerAttached;
+    private static readonly Lock _lock = new();
 
     /// <summary>
     /// Check if a debugger is currently attached.
@@ -37,12 +38,12 @@ public static class DebuggerSupport
     /// </summary>
     public static void AttachDebugger()
     {
-        lock (s_lockObj)
+        lock (_lock)
         {
             if (Debugger.IsAttached)
             {
                 Console.WriteLine("[DebuggerSupport] Debugger already attached");
-                s_debuggerAttached = true;
+                _debuggerAttached = true;
                 return;
             }
 
@@ -50,7 +51,7 @@ public static class DebuggerSupport
             {
                 Console.WriteLine("[DebuggerSupport] Attempting to attach debugger...");
                 Debugger.Launch();
-                s_debuggerAttached = true;
+                _debuggerAttached = true;
                 
                 if (Debugger.IsAttached)
                 {
@@ -132,14 +133,14 @@ public class SystemDiagnostics
 public static class ScriptingDiagnostics
 {
     private static readonly Dictionary<ulong, SystemDiagnostics> s_systemDiagnostics = [];
-    private static readonly object s_lockObj = new();
+    private static readonly Lock _lockObj = new();
 
     /// <summary>
     /// Record a system's creation.
     /// </summary>
     public static void RecordSystemCreation(ulong handle, Type systemType, object instance, string name)
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             var diags = new SystemDiagnostics
             {
@@ -158,7 +159,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static void RecordSystemDestruction(ulong handle)
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             s_systemDiagnostics.Remove(handle);
         }
@@ -169,7 +170,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static void RecordSystemUpdate(ulong handle, double updateTimeMs)
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             if (s_systemDiagnostics.TryGetValue(handle, out var diags))
             {
@@ -177,7 +178,7 @@ public static class ScriptingDiagnostics
                 diags.AverageUpdateTimeMs = 
                     (diags.AverageUpdateTimeMs * (diags.TotalUpdateCalls - 1) + updateTimeMs) / 
                     diags.TotalUpdateCalls;
-                diags.MaxUpdateTimeMs = Math.Max(diags.MaxUpdateTimeMs, updateTimeMs);
+                diags.MaxUpdateTimeMs = GMath.Max(diags.MaxUpdateTimeMs, updateTimeMs);
             }
         }
     }
@@ -187,7 +188,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static void RecordSystemError(ulong handle, string errorMessage)
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             if (s_systemDiagnostics.TryGetValue(handle, out var diags))
             {
@@ -202,7 +203,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static SystemDiagnostics? GetSystemDiagnostics(ulong handle)
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             return s_systemDiagnostics.TryGetValue(handle, out var diags) ? diags : null;
         }
@@ -213,7 +214,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static List<SystemDiagnostics> GetAllSystemDiagnostics()
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             return [..s_systemDiagnostics.Values];
         }
@@ -224,7 +225,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static void PrintDiagnosticReport()
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             if (s_systemDiagnostics.Count == 0)
             {
@@ -248,7 +249,7 @@ public static class ScriptingDiagnostics
             {
                 var errorMsg = string.IsNullOrEmpty(diags.LastError) 
                     ? "None" 
-                    : diags.LastError.Substring(0, Math.Min(30, diags.LastError.Length));
+                    : diags.LastError[..GMath.Min(30, diags.LastError.Length)];
 
                 Console.WriteLine(
                     diags.SystemName.PadRight(40) +
@@ -268,7 +269,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static int GetLoadedSystemCount()
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             return s_systemDiagnostics.Count;
         }
@@ -279,7 +280,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static long GetTotalUpdateCalls()
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             return s_systemDiagnostics.Values.Sum(d => d.TotalUpdateCalls);
         }
@@ -290,7 +291,7 @@ public static class ScriptingDiagnostics
     /// </summary>
     public static void Reset()
     {
-        lock (s_lockObj)
+        lock (_lockObj)
         {
             s_systemDiagnostics.Clear();
         }
