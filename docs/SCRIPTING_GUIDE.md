@@ -1,13 +1,20 @@
 # GrapeEngine Scripting System Guide
 
-**Version:** 1.0  
+**Version:** 1.1
 **Last Updated:** December 9, 2025
 
 ---
 
 ## Changelogs
 
-None so far.
+### 2025-12-09
+- Documented component type style (`record struct` / `readonly record struct`)
+- Added `Attributes & Hot Reload` and `Advanced / Internals` sections
+- Clarified hot-reload preservation APIs and system attributes.
+- Added `Component Access Attributes` subsection documenting `ReadOnly<T>` and `WriteAccess<T>` and referencing `managed/api/GrapeEngine.Scripting/ComponentAccessAttributes.cs`.
+- Annotated all example systems with `[ReadOnly<T>]` / `[WriteAccess<T>]` to show proper usage and clarify intent.
+- Clarified `Query<T...>` return values: `QueryResult` includes `Entity` and `ref` component fields; deconstruction returns copies (added examples and guidance).
+- Small edits to examples to use `result.Component1/ComponentN`, `ref` usage, and `ref readonly` where appropriate for read-only components.
 
 ---
 
@@ -21,9 +28,11 @@ None so far.
 6. [Querying Entities](#querying-entities)
 7. [Services](#services)
 8. [Math Types](#math-types)
-9. [Common Patterns](#common-patterns)
-10. [Examples](#examples)
-11. [Best Practices](#best-practices)
+9. [Attributes & Hot Reload](#attributes--hot-reload)
+10. [Advanced / Internals](#advanced--internals)
+11. [Common Patterns](#common-patterns)
+12. [Examples](#examples)
+13. [Best Practices](#best-practices)
 
 ---
 
@@ -114,17 +123,32 @@ The ECS pattern separates **data** from **logic**:
 
 ### Component Registration
 
-Components must be **unmanaged structs** (no reference types) with sequential memory layout:
+Components are implemented as `record struct` types (value types). They must be unmanaged for safe native interop and should use sequential layout. When a component is intended to be immutable (its fields won't change after creation), prefer `readonly record struct` — this communicates intent and can help the compiler generate more efficient code.
+
+Important rules and recommendations:
+
+- Components must be unmanaged value types (no reference fields).
+- Use `record struct` for component types. Example:
 
 ```csharp
 [StructLayout(LayoutKind.Sequential)]
-public struct MyComponent
+public record struct MyComponent
 {
     public float Health;
     public int Level;
     public Vector3 Position;
 }
 ```
+
+- For immutable components prefer `readonly record struct`:
+
+```csharp
+[StructLayout(LayoutKind.Sequential)]
+public readonly record struct SpawnPoint(Vector3 Position);
+```
+
+- Always annotate with `[StructLayout(LayoutKind.Sequential)]` to guarantee C# memory layout matches the C++ side.
+- Component types are registered automatically on first use; the runtime calls `ComponentRegistry.EnsureRegistered<T>()` internally to compute type hashes used by the native side.
 
 The system automatically registers components when you first access them. No manual setup required!
 
@@ -145,6 +169,7 @@ Every system has three key moments:
 ### Example: A Complete System
 
 ```csharp
+[WriteAccess<Health>]
 public class HealthSystem : ISystem
 {
     private World _world;
@@ -270,6 +295,45 @@ foreach (var result in world.Query<LocalTransform>())
 {
     ref var transform = ref result.Component;
     transform.Position += new Vector3(0.1f, 0, 0);
+}
+```
+
+### What a Query Returns
+
+Each iteration returns a `QueryResult<T1,..,Tn>` value. Important details:
+
+- `QueryResult` exposes an `Entity` property (a managed `Entity` wrapper) so you can access the entity id, check `IsAlive()`, add/remove components, etc.
+- `QueryResult` also exposes component references as `Component1`, `Component2`, ... which are `ref` fields — use `ref var x = ref result.Component1;` to modify in-place.
+- `QueryResult` defines a `Deconstruct` method so you can write `foreach (var (entity, comp1, comp2) in world.Query<T1, T2>())`, but note: the deconstructed component values are returned as copies (not `ref`). If you need to modify a component, use the `ref` properties (`Component1`) instead of deconstructing.
+
+Examples:
+
+```csharp
+// Read and write using refs (recommended when modifying components)
+foreach (var result in world.Query<LocalTransform, Rigidbody2D>())
+{
+    var entity = result.Entity;                 // Managed Entity wrapper
+    ref var transform = ref result.Component1;  // modify in-place
+    ref var rb = ref result.Component2;
+
+    transform.Position += rb.LinearVelocity.Value * Time.DeltaTime;
+}
+
+// Deconstruction (convenient, but components are copies)
+foreach (var (entity, transformCopy, rbCopy) in world.Query<LocalTransform, Rigidbody2D>())
+{
+    // transformCopy is a value copy; modifying it does NOT write back to the ECS
+}
+
+// Optional component helper
+foreach (var result in world.Query<LocalTransform>().Optional<CollisionEvent>().GetEnumerator())
+{
+    // Use result.GetOptional<CollisionEvent>() to check presence and obtain a value
+    var opt = result.GetOptional<CollisionEvent>();
+    if (opt.HasValue)
+    {
+        var ev = opt.GetValueOrDefault(); // copy of optional component
+    }
 }
 ```
 
@@ -507,20 +571,123 @@ var transform = new LocalTransform
 
 ---
 
+## Attributes & Hot Reload
+
+This engine exposes several attributes and hot-reload primitives to control system behavior and preserve state across assembly reloads.
+
+- `ExecuteInEditModeAttribute` (in `GrapeEngine.Scripting.Hosting`) — mark a system class to run while the editor is in edit mode. Useful for editor previews and procedural content.
+
+- `PreserveAttribute` (in `GrapeEngine.Scripting.Hosting`) — mark fields to be preserved across hot reloads. Only applies to serializable field types (primitives, strings, and serializable complex types).
+
+- `IHotReloadable` (interface) — implement this on systems to get explicit hot-reload callbacks:
+  - `byte[]? OnBeforeUnload()` — return a serialized blob representing the instance state prior to unload.
+  - `void OnAfterReload(byte[]? data)` — receive the serialized state on the new instance after reload.
+
+- `SystemGroupAttribute` (in `GrapeEngine.Scripting.Systems.Attributes`) — annotate a system to select which execution group/phase it should run in (for example: PreUpdate, Update, PostUpdate). If omitted, systems default to the `Update` group.
+
+Usage examples:
+
+```csharp
+[ExecuteInEditMode]
+[SystemGroup(SystemGroup.PreUpdate)]
+public class PreviewSystem : ISystem
+{
+    [Preserve]
+    private int _counter; // value will be preserved across hot reloads
+
+    public void OnCreate(World world) { }
+    public void OnUpdate(World world, float dt) { }
+    public void OnDestroy(World world) { }
+}
+
+public class StatefulSystem : ISystem, IHotReloadable
+{
+    private int _someValue;
+
+    public byte[]? OnBeforeUnload()
+    {
+        // serialize custom state
+        return BitConverter.GetBytes(_someValue);
+    }
+
+    public void OnAfterReload(byte[]? data)
+    {
+        if (data != null) _someValue = BitConverter.ToInt32(data, 0);
+    }
+}
+```
+
+Notes:
+- Use `[Preserve]` for simple fields you want automatically kept across reloads. For complex state or to support versioned migrations, implement `IHotReloadable`.
+- Attributes must be applied to class/field targets as the attribute definitions require.
+
+### Component Access Attributes
+
+GrapeEngine provides attribute-based annotations to declare how systems access component data. These attributes are useful for documentation, dependency analysis, and enabling potential runtime optimizations.
+
+- `ReadOnly<T>` (`ReadOnlyAttribute<T>`) — declare that a system only reads component type `T` and will not modify it. Use for components like `Velocity`, `PlayerTag`, or other read-only data.
+- `WriteAccess<T>` (`WriteAccessAttribute<T>`) — declare that a system may write to component type `T`. This is the default behavior, but annotating it makes intent explicit.
+
+Both attributes are defined in `GrapeEngine.Scripting\ComponentAccessAttributes.cs` and are applied at the class level. Example:
+
+```csharp
+[ReadOnly<Velocity>]
+[WriteAccess<Position>]
+public class MovementSystem : ISystem
+{
+    public void OnUpdate(World world, float deltaTime)
+    {
+        foreach (var (entity, pos, vel) in world.Query<Position, Velocity>())
+        {
+            // pos is expected to be modified by this system
+            pos.Value += vel.Value * deltaTime;
+        }
+    }
+}
+```
+
+Use these attributes to help the engine reason about parallelism and to make your systems' intentions clearer to other developers.
+
+---
+
+## Advanced / Internals
+
+This section highlights important implementation details that can help advanced users and contributors.
+
+- Memory layout: All component types used in interop must match the native C++ layout. Use `[StructLayout(LayoutKind.Sequential)]` and only unmanaged fields.
+
+- Component registration: The runtime computes a type hash (FNV-1a compatible) for each component type and registers it via `ComponentRegistry.EnsureRegistered<T>()`. This happens automatically when you first access a component type or call component APIs.
+
+- Native pointers: `World` exposes an internal `NativePtr` (`void*`) used by the unsafe interop layer. Many services call into native APIs (e.g., `WorldAPI`, `PhysicsAPI`, `InputAPI`), so `unsafe` code and correct memory layout are required.
+
+- Query system limits: Queries support up to 8 component types in a single `Query<T1..T8>()` call. For broader matches, combine queries or reorganize components.
+
+- Hot reload internals: The host uses a collectible `AssemblyLoadContext` (`ScriptLoadContext`) to load script assemblies so they can be unloaded and reloaded. `AssemblyManager`, `StatePreserver`, and `ScriptHost` coordinate loading, discovery, and state preservation.
+
+- Attributes & grouping: The engine discovers systems via reflection and honors `SystemGroupAttribute` and `ExecuteInEditModeAttribute` to determine execution order and whether systems run in edit-mode.
+
+- Safety: Components must be `unmanaged` (C# `where T : unmanaged` is used in many APIs). Attempting to use reference types in components will cause marshaling and runtime failures.
+
+- Logging & debugging: Use `Logging.Log(message, LogLevel)` to route messages to the engine's debug output. For native interop errors, check the engine logs and console output (ScriptHost writes exception messages during load/unload).
+
+---
+
 ## Common Patterns
 
 ### Pattern 1: Player Movement System
 
 ```csharp
+[WriteAccess<LocalTransform>]
+[ReadOnly<PlayerTag>]
 public class PlayerMovementSystem : ISystem
 {
     private const float MoveSpeed = 5f;
 
     public void OnUpdate(World world, float deltaTime)
     {
-        foreach (var entity in world.Query<LocalTransform, PlayerTag>())
+        foreach (var result in world.Query<LocalTransform, PlayerTag>())
         {
-            ref var transform = ref entity.Component;
+            ref var transform = ref result.Component1;
 
             // Read input
             Vector3 movement = Vector3.Zero;
@@ -538,10 +705,12 @@ public class PlayerMovementSystem : ISystem
                 movement = movement.Normalized;
 
             // Apply movement
-            transform.Position += movement * MoveSpeed * deltaTime;
+            ref var tf = ref result.Component1;
+            tf.Position += movement * MoveSpeed * deltaTime;
         }
     }
 }
+
 ```
 
 ### Pattern 2: Lifetime System
@@ -553,6 +722,7 @@ public struct Lifetime
     public float RemainingSeconds;
 }
 
+[WriteAccess<Lifetime>]
 public class LifetimeSystem : ISystem
 {
     public void OnUpdate(World world, float deltaTime)
@@ -569,11 +739,14 @@ public class LifetimeSystem : ISystem
         }
     }
 }
+
 ```
 
 ### Pattern 3: Physics-Based Movement
 
 ```csharp
+[WriteAccess<Rigidbody2D>]
+[ReadOnly<LinearVelocity2D>]
 public class PhysicsMovementSystem : ISystem
 {
     public void OnUpdate(World world, float deltaTime)
@@ -590,33 +763,38 @@ public class PhysicsMovementSystem : ISystem
                 Physics.ApplyForce(world, result.Entity, gravity * rb.Mass);
             }
 
-            // Apply velocity
+            // Use velocity to influence physics (read-only)
             Physics.ApplyForce(world, result.Entity, vel.Value * rb.Mass);
         }
     }
 }
+
 ```
 
 ### Pattern 4: Collision Handling
 
 ```csharp
+[ReadOnly<LocalTransform>]
+[ReadOnly<CollisionEvent>]
 public class CollisionSystem : ISystem
 {
     public void OnUpdate(World world, float deltaTime)
     {
         // Check all entities that collided this frame
-        foreach (var entity in world.Query<LocalTransform>()
+        foreach (var result in world.Query<LocalTransform>()
             .Optional<CollisionEvent>())
         {
-            if (entity.Entity.HasComponent<CollisionEvent>())
+            // Optional component present?
+            if (result.Entity.HasComponent<CollisionEvent>())
             {
-                // Handle collision
-                var collision = entity.Entity.GetComponent<CollisionEvent>();
-                Logging.Log($"Entity {entity.Entity.Id} collided!", LogLevel.Debug);
+                // Read collision event (read-only)
+                var collision = result.Entity.GetComponent<CollisionEvent>();
+                Logging.Log($"Entity {result.Entity.Id} collided!", LogLevel.Debug);
             }
         }
     }
 }
+
 ```
 
 ---
@@ -629,6 +807,8 @@ public class CollisionSystem : ISystem
 // Component for marking enemies
 public struct EnemyTag { }
 
+[WriteAccess<LocalTransform>]
+[ReadOnly<EnemyTag>]
 public class EnemyMovementSystem : ISystem
 {
     private float _time = 0;
@@ -639,7 +819,7 @@ public class EnemyMovementSystem : ISystem
 
         foreach (var result in world.Query<LocalTransform, EnemyTag>())
         {
-            ref var transform = ref result.Component;
+            ref var transform = ref result.Component1;
             
             // Simple oscillating movement
             transform.Position = new Vector3(
@@ -662,6 +842,8 @@ public struct Score
     public int Level;
 }
 
+[WriteAccess<Score>]
+[ReadOnly<PlayerTag>]
 public class ScoreSystem : ISystem
 {
     public void OnUpdate(World world, float deltaTime)
@@ -669,7 +851,7 @@ public class ScoreSystem : ISystem
         // Find player and update score
         foreach (var result in world.Query<Score, PlayerTag>())
         {
-            ref var score = ref result.Component;
+            ref var score = ref result.Component1;
             
             // Increase score over time (for testing)
             score.Points += 1;
@@ -683,11 +865,15 @@ public class ScoreSystem : ISystem
         }
     }
 }
+
 ```
 
 ### Example 3: Animation System
 
 ```csharp
+[ReadOnly<SpriteSheetAnimation2D>]
+[WriteAccess<AnimationState2D>]
+[WriteAccess<SpriteRenderer2D>]
 public class AnimationSystem : ISystem
 {
     public void OnUpdate(World world, float deltaTime)
@@ -697,14 +883,14 @@ public class AnimationSystem : ISystem
             AnimationState2D, 
             SpriteRenderer2D>())
         {
-            var anim = result.Component1;
+            ref readonly var anim = ref result.Component1;
             ref var state = ref result.Component2;
             ref var sprite = ref result.Component3;
 
             if (!anim.Playing)
-                return;
+                continue;
 
-            // Update animation
+            // Update animation state (writes)
             state.TimeAccumulator += deltaTime;
             float frameDuration = 1f / anim.FramesPerSecond;
 
@@ -721,9 +907,13 @@ public class AnimationSystem : ISystem
                         state.Finished = true;
                 }
             }
+
+            // Optionally update sprite renderer based on current frame
+            sprite.TextureId = anim.TextureId;
         }
     }
 }
+
 ```
 
 ---
