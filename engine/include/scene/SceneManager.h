@@ -321,6 +321,18 @@ namespace Scenes {
                     << "\tVersion: " << sceneJson.value("Version", "Unknown") << '\n'
 					<< "\tEntities loaded: " << loadedCount);
 
+                // Rebuild LayerManager membership lists so editor UI (LayersPanel)
+                // sees the correct entities per layer. Deserialization writes the
+                // Layer component directly to the world, which does not update the
+                // Scene::LayerManager. Walk the restored entities and register
+                // them with the LayerManager.
+                for (const auto& ent : restoredEntities) {
+                    if (!ent.IsNull() && world.IsAlive(ent) && world.Has<ECS::Components::Layer>(ent)) {
+                        uint16_t lid = world.Get<ECS::Components::Layer>(ent).Id;
+                        scene.GetLayers().OnLayerSet(ent, lid);
+                    }
+                }
+
                 return true;
             }
             catch (const json::parse_error& e) {

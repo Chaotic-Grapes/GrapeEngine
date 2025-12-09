@@ -54,7 +54,6 @@ namespace ECS {
         ComponentRegistry::RegisterWithHash<Components::Layer>(FNV1a_Hash("Layer"));
 
         // Transforms
-        ComponentRegistry::RegisterWithHash<Components::Rotator>(FNV1a_Hash("Rotator"));
         ComponentRegistry::RegisterWithHash<Components::LocalTransform>(FNV1a_Hash("LocalTransform"));
         ComponentRegistry::RegisterWithHash<Components::WorldTransform>(FNV1a_Hash("WorldTransform"));
 
@@ -98,9 +97,6 @@ namespace ECS {
         // Lighting
         ComponentRegistry::RegisterWithHash<Components::Light2D>(FNV1a_Hash("Light2D"));
 
-        // UI
-        ComponentRegistry::RegisterWithHash<Components::Text>(FNV1a_Hash("Text"));
-        ComponentRegistry::RegisterWithHash<Components::UIButton>(FNV1a_Hash("UIButton"));
 
         // Scripting/Audio
         ComponentRegistry::RegisterWithHash<Components::ScriptInstance>(FNV1a_Hash("ScriptInstance"));

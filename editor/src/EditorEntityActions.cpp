@@ -19,6 +19,7 @@ direct ECS manipulation.
 #include "ecs/World.h"
 #include "ecs/Components.h" 
 #include "core/Logger.h"
+#include "UndoSystem.h"
 #include <functional>
 #include <unordered_map>
 #include <vector>
@@ -71,7 +72,14 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     world.Set<ECS::Components::WorldTransform>(e, wt);
 
     // Default render layer (0) so the renderer includes the entity
-    world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
+    // Use Scene::SetLayer instead of writing the component directly so
+    // the Scene's LayerManager is updated (keeps the editor counts in sync).
+    if (m_scene) {
+        m_scene->SetLayer(e, 0);
+    }
+    else {
+        world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
+    }
 
     // Optional parent
     if (parent != ECS::Entity::NPOS32) {
@@ -125,6 +133,38 @@ void EntityActions::RemoveEntity(EntityId id) {
     deleteRecursive(id);
 
     // MARK SCENE AS DIRTY
+    MarkSceneDirtyIfNeeded(m_fileMenu);
+}
+
+
+// Move (reorder) a layer and record undo
+void EntityActions::MoveLayer(uint16_t fromId, uint16_t toId) {
+    if (!m_scene) return;
+    auto& lm = m_scene->GetLayers();
+
+    // Early exit if no-op
+    if (fromId == toId) return;
+
+    // Apply move
+    lm.MoveLayer(fromId, toId);
+
+    // Create undo command
+    if (m_undoSystem) {
+        struct MoveLayerCommand : public Editor::ICommand {
+            Scenes::Scene* scene;
+            uint16_t from;
+            uint16_t to;
+
+            MoveLayerCommand(Scenes::Scene* s, uint16_t f, uint16_t t) : scene(s), from(f), to(t) {}
+
+            void Execute() override { if (!scene) return; scene->GetLayers().MoveLayer(from, to); }
+            void Undo() override { if (!scene) return; scene->GetLayers().MoveLayer(to, from); }
+        };
+
+        auto cmd = std::make_unique<MoveLayerCommand>(m_scene, fromId, toId);
+        m_undoSystem->ExecuteCommand(std::move(cmd));
+    }
+
     MarkSceneDirtyIfNeeded(m_fileMenu);
 }
 
@@ -272,5 +312,187 @@ void EntityActions::ReparentEntity(EntityId child, EntityId newParent) {
     }
 
     // MARK SCENE AS DIRTY (only if operation succeeded)
+    MarkSceneDirtyIfNeeded(m_fileMenu);
+}
+
+// Set layer with undo support
+void EntityActions::SetLayer(EntityId entityId, uint16_t layerId) {
+    if (!m_scene) return;
+
+    ECS::World& world = m_scene->GetWorld();
+    ECS::Entity ent = world.Resolve(entityId);
+    if (ent.IsNull() || !world.IsAlive(ent)) return;
+
+    // Capture previous layer state
+    bool hadPrev = world.Has<ECS::Components::Layer>(ent);
+    uint16_t prevId = hadPrev ? world.Get<ECS::Components::Layer>(ent).Id : 0;
+
+    // Apply new layer through Scene API so LayerManager is updated
+    m_scene->SetLayer(ent, layerId);
+
+    // Create undo command and push to undo system
+    if (m_undoSystem) {
+        struct LayerChangeCommand : public Editor::ICommand {
+            Scenes::Scene* scene;
+            ECS::Entity entity;
+            bool hadPrev;
+            uint16_t prevId;
+            uint16_t newId;
+
+            LayerChangeCommand(Scenes::Scene* s, ECS::Entity e, bool had, uint16_t prev, uint16_t nw)
+                : scene(s), entity(e), hadPrev(had), prevId(prev), newId(nw) {}
+
+            void Execute() override {
+                if (!scene) return;
+                scene->SetLayer(entity, newId);
+            }
+
+            void Undo() override {
+                if (!scene) return;
+                if (hadPrev) scene->SetLayer(entity, prevId);
+                else scene->RemoveFromLayer(entity);
+            }
+        };
+
+        auto cmd = std::make_unique<LayerChangeCommand>(m_scene, ent, hadPrev, prevId, layerId);
+        m_undoSystem->ExecuteCommand(std::move(cmd));
+    }
+
+    MarkSceneDirtyIfNeeded(m_fileMenu);
+}
+
+
+// Create a layer and record undo
+uint16_t EntityActions::CreateLayer(const std::string& name) {
+    if (!m_scene) return 0;
+    auto& lm = m_scene->GetLayers();
+    uint16_t id = lm.CreateLayer(name);
+
+    if (m_undoSystem) {
+        struct CreateLayerCommand : public Editor::ICommand {
+            Scenes::Scene* scene;
+            uint16_t createdId;
+            std::string name;
+
+            CreateLayerCommand(Scenes::Scene* s, uint16_t id, const std::string& n)
+                : scene(s), createdId(id), name(n) {}
+
+            void Execute() override {
+                if (!scene) return;
+                // Recreate the layer at the original slot so redo preserves the id
+                scene->GetLayers().CreateLayerAt(createdId, name);
+            }
+
+            void Undo() override {
+                if (!scene) return;
+                scene->GetLayers().RemoveLayer(createdId);
+            }
+        };
+
+        auto cmd = std::make_unique<CreateLayerCommand>(m_scene, id, name);
+        m_undoSystem->ExecuteCommand(std::move(cmd));
+    }
+
+    MarkSceneDirtyIfNeeded(m_fileMenu);
+    return id;
+}
+
+
+// Rename a layer and record undo
+void EntityActions::RenameLayer(uint16_t id, const std::string& newName) {
+    if (!m_scene) return;
+    auto& lm = m_scene->GetLayers();
+
+    // capture previous name
+    std::string prevName;
+    auto list = lm.ListLayers();
+    for (auto& p : list) {
+        if (p.first == id) { prevName = p.second; break; }
+    }
+
+    if (!lm.RenameLayer(id, newName)) return;
+
+    if (m_undoSystem) {
+        struct RenameLayerCommand : public Editor::ICommand {
+            Scenes::Scene* scene;
+            uint16_t id;
+            std::string prev;
+            std::string next;
+
+            RenameLayerCommand(Scenes::Scene* s, uint16_t i, const std::string& p, const std::string& n)
+                : scene(s), id(i), prev(p), next(n) {}
+
+            void Execute() override { if (!scene) return; scene->GetLayers().RenameLayer(id, next); }
+            void Undo() override { if (!scene) return; scene->GetLayers().RenameLayer(id, prev); }
+        };
+
+        auto cmd = std::make_unique<RenameLayerCommand>(m_scene, id, prevName, newName);
+        m_undoSystem->ExecuteCommand(std::move(cmd));
+    }
+
+    MarkSceneDirtyIfNeeded(m_fileMenu);
+}
+
+
+// Remove a layer and record undo (restores name, members, vis/lock on undo)
+void EntityActions::RemoveLayer(uint16_t id) {
+    if (!m_scene) return;
+    auto& lm = m_scene->GetLayers();
+
+    // Snapshot state
+    std::string prevName;
+    auto list = lm.ListLayers();
+    for (auto& p : list) {
+        if (p.first == id) { prevName = p.second; break; }
+    }
+
+    std::vector<EntityId> members;
+    for (const auto& e : lm.EntitiesIn(id)) members.push_back(e.Index);
+
+    bool prevVis = lm.IsVisible(id);
+    bool prevLocked = lm.IsLocked(id);
+
+    // Perform removal
+    lm.RemoveLayer(id);
+
+    if (m_undoSystem) {
+        struct RemoveLayerCommand : public Editor::ICommand {
+            Scenes::Scene* scene;
+            uint16_t id;
+            std::string name;
+            std::vector<EntityId> members;
+            bool vis;
+            bool locked;
+
+            RemoveLayerCommand(Scenes::Scene* s, uint16_t i, const std::string& n, const std::vector<EntityId>& m, bool v, bool l)
+                : scene(s), id(i), name(n), members(m), vis(v), locked(l) {}
+
+            void Execute() override {
+                if (!scene) return;
+                scene->GetLayers().RemoveLayer(id);
+            }
+
+            void Undo() override {
+                if (!scene) return;
+                // restore name
+                scene->GetLayers().RenameLayer(id, name);
+                scene->GetLayers().SetVisibility(id, vis);
+                scene->GetLayers().SetLocked(id, locked);
+
+                // reassign members back to this layer
+                ECS::World& world = scene->GetWorld();
+                for (auto eid : members) {
+                    ECS::Entity e = world.Resolve(eid);
+                    if (!e.IsNull() && world.IsAlive(e)) {
+                        scene->SetLayer(e, id);
+                    }
+                }
+            }
+        };
+
+        auto cmd = std::make_unique<RemoveLayerCommand>(m_scene, id, prevName, members, prevVis, prevLocked);
+        m_undoSystem->ExecuteCommand(std::move(cmd));
+    }
+
     MarkSceneDirtyIfNeeded(m_fileMenu);
 }

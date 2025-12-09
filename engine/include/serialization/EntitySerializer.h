@@ -92,7 +92,6 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Active, Enabled)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Lifetime, Time)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Layer, Id)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Rotator, RotationSpeed, RotationOffset)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(LocalTransform, Position, Rotation, Scale)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WorldTransform, Matrix, Dirty)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Velocity, Value)
@@ -251,30 +250,6 @@ namespace ECS {
 			light.CastsShadows = j.at("CastsShadows").get<bool>();
 		}
 
-		// Custom serialization for Text component (char arrays need special handling)
-		inline void to_json(nlohmann::json& j, const Text& text) {
-			j = nlohmann::json{
-				{"Content", std::string(text.Content)},
-				{"FontPath", std::string(text.FontPath)},
-				{"PixelSize", text.PixelSize},
-				{"Color", text.Color},
-				{"Anchor", static_cast<uint8_t>(text.Anchor)}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, Text& text) {
-			std::string content = j.at("Content").get<std::string>();
-			strncpy_s(text.Content, content.c_str(), sizeof(text.Content) - 1);
-			text.Content[sizeof(text.Content) - 1] = '\0';
-
-			std::string fontPath = j.at("FontPath").get<std::string>();
-			strncpy_s(text.FontPath, fontPath.c_str(), sizeof(text.FontPath) - 1);
-			text.FontPath[sizeof(text.FontPath) - 1] = '\0';
-
-			text.PixelSize = j.at("PixelSize").get<float>();
-			text.Color = j.at("Color").get<::Color>();
-			text.Anchor = static_cast<TextAnchor>(j.at("Anchor").get<uint8_t>());
-		}
 
 		// Custom serialization for ScriptInstance component (char array needs special handling)
 		inline void to_json(nlohmann::json& j, const ScriptInstance& s) {
@@ -544,7 +519,6 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(Active, ECS::Components::Active, "Active")
 	REGISTER_COMPONENT_SERIALIZER(Lifetime, ECS::Components::Lifetime, "Lifetime")
 	REGISTER_COMPONENT_SERIALIZER(Layer, ECS::Components::Layer, "Layer")
-	REGISTER_COMPONENT_SERIALIZER(Rotator, ECS::Components::Rotator, "Rotator")
 	REGISTER_COMPONENT_SERIALIZER(LocalTransform, ECS::Components::LocalTransform, "LocalTransform")
 	REGISTER_COMPONENT_SERIALIZER(WorldTransform, ECS::Components::WorldTransform, "WorldTransform")
 	REGISTER_COMPONENT_SERIALIZER(Velocity, ECS::Components::Velocity, "Velocity")
@@ -567,11 +541,8 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(ShapeCircle2D, ECS::Components::ShapeCircle2D, "ShapeCircle2D")
 	REGISTER_COMPONENT_SERIALIZER(ShapeBox2D, ECS::Components::ShapeBox2D, "ShapeBox2D")
 	REGISTER_COMPONENT_SERIALIZER(ShapeLine2D, ECS::Components::ShapeLine2D, "ShapeLine2D")
-	// ShapePolygon2D is a template, therefore it needs to be rewritten
-	// REGISTER_COMPONENT_SERIALIZER(ShapePolygon2D, ECS::Components::ShapePolygon2D, "ShapePolygon2D")
 	REGISTER_COMPONENT_SERIALIZER(ZIndex2D, ECS::Components::ZIndex2D, "ZIndex2D")
 	REGISTER_COMPONENT_SERIALIZER(Light2D, ECS::Components::Light2D, "Light2D")
-	REGISTER_COMPONENT_SERIALIZER(Text, ECS::Components::Text, "Text")
 	REGISTER_COMPONENT_SERIALIZER(Camera, ECS::Components::Camera3D, "Camera3D")
 	REGISTER_COMPONENT_SERIALIZER(CameraEditor, ECS::Components::CameraEditor3D, "CameraEditor3D")
 	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices, "CameraMatrices")

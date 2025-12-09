@@ -48,9 +48,6 @@ Key rules you must follow when adding or changing Components:
         invocation in `EntitySerializer.h`. The `REGISTER_COMPONENT_SERIALIZER`
         macro creates a static registration that maps the engine TypeId to the
         (de)serialisation callbacks used when persisting entities.
-    - Template/component containers (e.g. `ShapePolygon2D<TCapacity>`) cannot
-        be registered directly — provide a concrete typedef or custom handling in
-        `EntitySerializer.h` if you need to serialise them.
 
 Minimal example:
     // In Components.h
@@ -156,12 +153,6 @@ namespace ECS {
             uint16_t Id = 0; 
         };
         static_assert(std::is_trivially_copyable_v<Layer>, "Layer must be trivially copyable");
-
-        struct Rotator {
-            float RotationSpeed;   // degrees per second
-            float RotationOffset;  // starting phase
-        };
-        static_assert(std::is_trivially_copyable_v<Rotator>, "LocalTransform must be trivially copyable");
 
         // Local transform is relative to parent entity (if any)
         struct LocalTransform { 
@@ -394,19 +385,6 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<ShapeLine2D>, "ShapeLine2D must be trivially copyable");
 
-        // Fixed-capacity polyline/polygon for debug; avoids heap
-        // TODO: Change this to something more flexible AND without class template
-        template<size_t TCapacity = 16>
-        struct ShapePolygon2D {
-        public:
-            Vector2D Points[TCapacity]{}; // don't use std::aray<T>
-            uint8_t Count = 0;          // number of valid points
-            Color FillColor{ 1.f, 1.f, 1.f, 1.f };
-            Color OutlineColor{ 1.f, 1.f, 1.f, 1.f };
-            float OutlineThickness = 1.f;
-        };
-        static_assert(std::is_trivially_copyable_v<ShapePolygon2D<>>, "ShapePolygon2D must be trivially copyable");
-
         // This is the Z-order for 2D rendering; lower values drawn first
         // Can be used with Layer component
         struct ZIndex2D {
@@ -470,69 +448,6 @@ namespace ECS {
             bool      CastsShadows = false;             // for later extensions
         };
         static_assert(std::is_trivially_copyable_v<Light2D>, "Light2D must be trivially copyable");
-
-        enum class TextAnchor : uint8_t {
-            Absolute = 0,    ///< Position is absolute pixels (no anchoring)
-            TopLeft,         ///< Offset from top-left corner
-            TopRight,        ///< Offset from top-right corner
-            BottomLeft,      ///< Offset from bottom-left corner
-            BottomRight,     ///< Offset from bottom-right corner
-            Center           ///< Offset from screen center
-        };
-
-        struct Text {
-            static constexpr size_t MaxTextLength = 256;
-            char Content[MaxTextLength] = {};   // Text to display
-            char FontPath[128] = {};            // Initialize to empty, not with default path
-            float PixelSize = 24.0f;
-            Color Color = { 1.0f, 1.0f, 1.0f, 1.0f };
-            TextAnchor Anchor = TextAnchor::Absolute;
-
-            Text() {
-                // Default constructor sets default font
-                setFontPath("assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf");
-            }
-
-            Text(const char* content,
-                float pixelSize = 24.0f,
-                const ::Color& color = { 1.0f, 1.0f, 1.0f, 1.0f },
-                TextAnchor anchor = TextAnchor::Absolute,
-                const char* fontPath = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf")
-                : PixelSize(pixelSize)
-                , Color(color)
-                , Anchor(anchor)
-            {
-                setContent(content);
-                setFontPath(fontPath);  // this initializes the empty array
-            }
-
-            void setContent(const char* str) {
-                if (str) {
-                    strncpy_s(Content, str, MaxTextLength - 1);
-                    Content[MaxTextLength - 1] = '\0';
-                }
-            }
-
-            void setFontPath(const char* path) {
-                if (path) {
-                    strncpy_s(FontPath, path, 127);
-                    FontPath[127] = '\0';
-                }
-            }
-
-            std::string_view getContent() const { return { Content }; }
-            std::string_view getFontPath() const { return { FontPath }; }
-        };
-        static_assert(std::is_trivially_copyable_v<Text>, "Text must be trivially copyable");
-
-        struct UIButton {
-            int ID;                     // Unique button identifier
-            float X, Y, W, H;          // Screen-space coordinates (pixels)
-            bool Hovered;
-            bool Pressed;
-            uint32_t ActionID;         // Maps to action in registry
-        };
-        static_assert(std::is_trivially_copyable_v<UIButton>, "UIButton must be trivially copyable");
 
         // ---------- Scripting / Audio (kept minimal) ----------
 

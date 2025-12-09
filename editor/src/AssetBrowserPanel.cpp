@@ -1092,34 +1092,6 @@ void AssetBrowserPanel::_createScript() {
     }
 }
 
-    // Write file
-    try {
-        std::ofstream file(filePath);
-        if (!file.is_open()) {
-            m_statusMessage = "Failed to create script: " + fileName;
-            m_statusTimer = 3.0f;
-            LOG_ERROR("Failed to create script file: " << filePath.string());
-            return;
-        }
-
-        file << scriptContent;
-        file.close();
-
-        m_statusMessage = "Created script: " + fileName;
-        m_statusTimer = 3.0f;
-        LOG_INFO("Created script: " << filePath.string());
-
-        // Select the newly created file
-        m_selectedAsset = filePath.string();
-
-    }
-    catch (const std::exception& e) {
-        m_statusMessage = "Error creating script: " + std::string(e.what());
-        m_statusTimer = 3.0f;
-        LOG_ERROR("Exception creating script: " << e.what());
-    }
-}
-
 void AssetBrowserPanel::_createScene() {
     // Create file path with .scn extension
     std::string fileName = m_newAssetNameBuffer;

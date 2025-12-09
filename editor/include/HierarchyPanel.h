@@ -31,6 +31,7 @@ which entity the user is working with.
 #include <unordered_set>
 #include <functional>
 #include "EditorEntityActions.h"
+#include "ecs/gui/GUIHelpers.h"
 
 // Forward declaration
 class BaseViewport;
@@ -63,9 +64,10 @@ public:
     void OnSelectionChanged(SelectionCallback callback);
 
     void SetSelectedEntity(EntityId id);
+    void SetSelectedEntities(const std::unordered_set<EntityId>& ids);
     void SetViewport(BaseViewport* viewport) { m_viewport = viewport; }
     const std::unordered_set<EntityId>& GetSelectedEntities() const { return m_selectedEntityIds; }
-    EntityId GetPrimarySelectedEntity() const { return m_selectedEntityIds.empty() ? 0 : *m_selectedEntityIds.begin(); }
+    EntityId GetPrimarySelectedEntity() const { return m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin(); }
     void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
 
     // Entity order for scene serialization (preserves visual hierarchy order)
@@ -121,6 +123,9 @@ private:
 
     // Render the right-click context menu for entity operations
     void _renderEntityContextMenu();
+
+    // Render context menu when right-clicking empty space in the hierarchy
+    void _renderBackgroundContextMenu();
 
     // Ensure entity has a ScriptInstance component and set its script class name and path
     void _attachScriptComponent(EntityId entityId, const std::string& scriptName, const std::string& scriptPath); // scriptName must be fully qualified (e.g., "MyGame.PlayerController")

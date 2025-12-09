@@ -29,7 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
-#include "ecs/systems/UIEventSystem.h"
+#include "ecs/gui/GUISystem.h"
 #include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 
@@ -137,7 +137,7 @@ namespace Engine {
             Input::GetMousePosition(mouseX, mouseY);
             Vector2D mousePos(static_cast<float>(mouseX), static_cast<float>(mouseY));
 
-            ECS::UIEventSystem::Update(&world, pickedEntityID, mousePos);
+            // GUI input and layout are handled by the registered GUISystem via SystemManager
 
             // Game mode: always run systems
             // Editor mode: editor controls system execution via UpdateSystemsByMode()
@@ -306,8 +306,8 @@ namespace Engine {
         // Render Phase Systems
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
         
-        // UIEventSystem is initialized separately
-        ECS::UIEventSystem::Initialize();
+        // Register GUI system (replaces legacy UIEventSystem)
+        m_systemManager.RegisterSystem<ECS::GUISystem>();
         
         LOG_INFO("SystemManager: Registered " << m_systemManager.GetSystemCount() << " systems");
     }

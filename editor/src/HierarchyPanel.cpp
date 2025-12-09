@@ -268,6 +268,19 @@ void HierarchyPanel::SetSelectedEntity(EntityId id) {
     // Don't trigger the callback here to avoid circular updates
 }
 
+void HierarchyPanel::SetSelectedEntities(const std::unordered_set<EntityId>& ids) {
+    m_selectedEntityIds = ids;
+    if (m_selectedEntityIds.empty()) {
+        m_anchorEntityId = ECS::Entity::NPOS32;
+    } else {
+        m_anchorEntityId = *m_selectedEntityIds.begin();
+    }
+    if (m_selectionCallback) {
+        if (m_anchorEntityId == ECS::Entity::NPOS32) m_selectionCallback(ECS::Entity::NPOS32);
+        else m_selectionCallback(m_anchorEntityId);
+    }
+}
+
 // -------------------------------------------------------------------------
 // Rendering
 // -------------------------------------------------------------------------
@@ -363,12 +376,14 @@ void HierarchyPanel::Render() {
 
     // Click empty space to clear selection
     // Only clears if clicking on window background, not on any items
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered(ImGuiHoveredFlags_None)
-        && !ImGui::IsAnyItemHovered())
-    {
-        m_selectedEntityIds.clear();
-        m_anchorEntityId = ECS::Entity::NPOS32;
-        if (m_selectionCallback) m_selectionCallback(ECS::Entity::NPOS32);
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None) && !ImGui::IsAnyItemHovered()) {
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            m_selectedEntityIds.clear();
+            m_anchorEntityId = ECS::Entity::NPOS32;
+
+            if (m_selectionCallback)
+                m_selectionCallback(ECS::Entity::NPOS32);
+        }
     }
 
     // Clean up font and end window
@@ -397,16 +412,68 @@ void HierarchyPanel::_renderHeader() {
     ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.5f);
     ImGui::InputText("##NewEntityName", nameBuffer, sizeof(nameBuffer));
 
-    // Add entity button
+    // Add entity button: opens a dropdown menu with creation options
     ImGui::SameLine();
     if (ImGui::Button("Add")) {
-        // Use default name if buffer is empty
+        ImGui::OpenPopup("AddEntityMenu");
+    }
+
+    // Popup menu for Add button
+    if (ImGui::BeginPopup("AddEntityMenu")) {
+        // helper to select newly created entity and mark scene dirty
+        auto selectAndMark = [&](const ECS::Entity& e) {
+            if (e.IsNull())
+                return;
+            m_selectedEntityIds.clear();
+            m_selectedEntityIds.insert(e.Index);
+            m_anchorEntityId = e.Index;
+
+            if (m_selectionCallback)
+                m_selectionCallback(e.Index);
+            if (m_fileMenu)
+                m_fileMenu->MarkSceneDirty();
+            ImGui::CloseCurrentPopup();
+        };
+
         std::string entityName = (strlen(nameBuffer) > 0) ? nameBuffer : "New Entity";
-        if (m_entityActions) {
-            // Add as root entity (NPOS32 means no parent)
-            m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+
+        // Create root entity with specified name
+        if (ImGui::Selectable("Create Empty")) {
+            if (m_entityActions) {
+                m_entityActions->AddEntity(entityName, ECS::Entity::NPOS32);
+            }
+            ImGui::CloseCurrentPopup();
         }
-        // Don't clear the buffer: keep the name for easy repeated additions
+
+        if (ImGui::BeginMenu("Create UI")) {
+            if (ImGui::MenuItem("Button")) {
+                if (m_world) {
+                    ECS::Entity e = ECS::GUI::GUIFactory::CreateButton(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{120.0f, 30.0f}, "Button", 0U, entityName);
+                    selectAndMark(e);
+                }
+            }
+            if (ImGui::MenuItem("Panel")) {
+                if (m_world) {
+                    ECS::Entity e = ECS::GUI::GUIFactory::CreatePanel(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{300.0f, 200.0f}, {0.2f, 0.2f, 0.2f, 1.0f}, entityName);
+                    selectAndMark(e);
+                }
+            }
+            if (ImGui::MenuItem("Label")) {
+                if (m_world) {
+                    ECS::Entity e = ECS::GUI::GUIFactory::CreateLabel(*m_world, Vector2D{10.0f, 10.0f}, "Label", 16.0f, entityName);
+                    selectAndMark(e);
+                }
+            }
+            if (ImGui::MenuItem("Input Field")) {
+                if (m_world) {
+                    ECS::Entity e = ECS::GUI::GUIFactory::CreateInputField(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{200.0f, 30.0f}, "Enter text...", entityName);
+                    selectAndMark(e);
+                }
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndPopup();
     }
 
     // Visual spacing

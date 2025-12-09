@@ -29,6 +29,7 @@ prefab assets use the same UI path.
 #include "services/ResourceManager.h"
 #include <algorithm>
 #include "AudioAssetLibrary.h"
+#include "core/Application.h"
 
 // -----------------------------------------------------------------------------
 // Initialization
@@ -1045,6 +1046,43 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
     (void)entity;
     (void)world;
     EditorUI::BeginPropertySection({ "Layer" });
+    // Try to render as a dropdown of known layers from the active scene.
+    int currentId = static_cast<int>(data.value("Id", 0));
+    Scenes::Scene* scene = Engine::CORE ? Engine::CORE->GetSceneManager().GetActive() : nullptr;
+    if (scene) {
+        auto& lm = scene->GetLayers();
+        auto layers = lm.ListLayers();
+        if (!layers.empty()) {
+            // Build name list and id mapping
+            std::vector<std::string> names;
+            std::vector<uint16_t> ids;
+            names.reserve(layers.size()); ids.reserve(layers.size());
+            int selIndex = -1;
+            for (size_t i = 0; i < layers.size(); ++i) {
+                ids.push_back(layers[i].first);
+                names.push_back(layers[i].second);
+                if (static_cast<int>(layers[i].first) == currentId) selIndex = static_cast<int>(i);
+            }
+
+            std::vector<const char*> cstrs;
+            cstrs.reserve(names.size());
+            for (auto &s : names) cstrs.push_back(s.c_str());
+
+            int displayIndex = selIndex >= 0 ? selIndex : 0;
+            ImGui::Text("Id");
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+            ImGui::SetNextItemWidth(200.0f);
+            if (ImGui::Combo("##LayerId", &displayIndex, cstrs.data(), static_cast<int>(cstrs.size()))) {
+                data["Id"] = ids[displayIndex];
+            }
+
+            EditorUI::EndPropertySection();
+            return;
+        }
+    }
+
+    // Fallback: render raw integer if no scene or layers available
     EditorUI::RenderIntProperty("Id", data, "Id");
     EditorUI::EndPropertySection();
 }

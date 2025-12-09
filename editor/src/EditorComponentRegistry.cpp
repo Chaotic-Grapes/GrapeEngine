@@ -298,19 +298,6 @@ static std::vector<ComponentUIMetadata> m_registry = {
         COMPONENT_OPS(ECS::Components::Light2D)
     },
 
-    // Text
-    {
-        "Text", "Text", "ECS::Components::Text", true,
-        [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderText(d, e, w); },
-        []() { return nlohmann::json{
-            {"Content", "Text"},
-            {"FontPath", "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf"},
-            {"PixelSize", 24.0f},
-            {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
-            {"Anchor", 0}
-        }; },
-        COMPONENT_OPS(ECS::Components::Text)
-    },
 
     // Animation State 2D
     {

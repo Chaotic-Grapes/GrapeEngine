@@ -1,3 +1,17 @@
+/* Start Header *****************************************************************/
+/*!
+\file   MathUtils.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+Declares a collection of mathematical utility functions and templates.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #ifndef MATHHELPER_H
 #define MATHHELPER_H
 
@@ -22,14 +36,23 @@ public:
         }
 
         if constexpr (std::is_integral_v<T>) {
-            std::uniform_int_distribution<T> dist(minVal, maxVal);
-            return dist(engine);
+            // std::uniform_int_distribution does not accept char/byte-sized types
+            // as template parameters on some standard library implementations.
+            // Use a wider integer type for the distribution and cast back.
+            using DistT = std::conditional_t<(sizeof(T) < sizeof(int)), int, T>;
+            std::uniform_int_distribution<DistT> dist(static_cast<DistT>(minVal), static_cast<DistT>(maxVal));
+            return static_cast<T>(dist(engine));
         }
         else if constexpr (std::is_floating_point_v<T>) {
             std::uniform_real_distribution<T> dist(minVal, maxVal);
             return dist(engine);
         }
 		else return 0; // Unsupported type
+    }
+
+    template <typename T>
+    static T Lerp(T a, T b, float t) {
+        return a + (b - a) * t;
     }
 
     template <typename T>

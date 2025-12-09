@@ -320,7 +320,7 @@ void BaseViewport::_handleEntityDragToMove() {
         m_wasMouseDownLastFrame = false;
         return;
     }
-    if (!m_world || m_selectedEntityId == 0) {
+    if (!m_world || m_selectedEntityId == ECS::Entity::NPOS32) {
         m_isDragging = false;
         m_wasMouseDownLastFrame = false;
         return;

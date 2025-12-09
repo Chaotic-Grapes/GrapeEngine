@@ -25,6 +25,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "GameViewport.h"
 #include "HierarchyPanel.h"
 #include "InspectorPanel.h"
+#include "LayersPanel.h"
 #include "EditorEntityActions.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
@@ -104,6 +105,7 @@ private:
     GameViewport m_gameViewport;
     HierarchyPanel m_hierarchyWindow;
     InspectorPanel m_inspector;
+    LayersPanel m_layersPanel;
     EntityActions m_entityActions;
     ConsolePanel m_console;
     PerformancePanel m_performancePanel;

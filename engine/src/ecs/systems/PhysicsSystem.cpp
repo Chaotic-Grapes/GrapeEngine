@@ -47,7 +47,7 @@
 #include "helpers/EntityUtils.h"
 #include <iostream>
 #include "audio/FmodAudioDevice.h"
-#include "physics/CollisionEvents.h"
+#include "ecs/events/EventComponents.h"
 #include "ecs/events/EventDispatcher.h"
 #include "math/Vector3D.h"
 
@@ -344,8 +344,24 @@ namespace ECS {
         // Create event dispatcher for firing collision events
         ECS::Events::EventDispatcher eventDispatcher(&world);
 
-        //refresh event queue 
-        CollisionEventQueue::Clear();
+        // Clear any lingering event components from previous frames
+        // (old code used a global CollisionEventQueue; now remove components directly)
+        world.Each<ECS::Events::CollisionEvent>([&](Entity e, ECS::Events::CollisionEvent&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::CollisionEvent>(e))
+                world.Remove<ECS::Events::CollisionEvent>(e);
+        });
+        world.Each<ECS::Events::TriggerEvent>([&](Entity e, ECS::Events::TriggerEvent&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::TriggerEvent>(e))
+                world.Remove<ECS::Events::TriggerEvent>(e);
+        });
+        world.Each<ECS::Events::CollisionExitEvent>([&](Entity e, ECS::Events::CollisionExitEvent&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::CollisionExitEvent>(e))
+                world.Remove<ECS::Events::CollisionExitEvent>(e);
+        });
+        world.Each<ECS::Events::TriggerExitEvent>([&](Entity e, ECS::Events::TriggerExitEvent&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::TriggerExitEvent>(e))
+                world.Remove<ECS::Events::TriggerExitEvent>(e);
+        });
         //to clock currentcollision pairs between A and B entities
         std::unordered_set<uint64_t> currentCollisions;
       
@@ -590,14 +606,14 @@ namespace ECS {
                         // New collision detected
                         eventDispatcher.FireCollisionEvent(
                             A.Index, B.Index,
-                            manifold.points[0],
+                            Vector3D(manifold.points[0].X, manifold.points[0].Y, 0.0f),
                             Vector3D(manifold.normal.X, manifold.normal.Y, 0.0f),
                             Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
                             0.0f  // TODO: Compute impact magnitude
                         );
                         eventDispatcher.FireCollisionEvent(
                             B.Index, A.Index,
-                            manifold.points[0],
+                            Vector3D(manifold.points[0].X, manifold.points[0].Y, 0.0f),
                             Vector3D(-manifold.normal.X, -manifold.normal.Y, 0.0f),
                             Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
                             0.0f  // TODO: Compute impact magnitude

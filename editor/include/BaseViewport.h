@@ -110,7 +110,7 @@ protected:
     std::unique_ptr<Editor::EditorCamera> m_editorCamera;
 
     // State
-    EntityId m_selectedEntityId = 0;
+    EntityId m_selectedEntityId = ECS::Entity::NPOS32;
     bool m_isViewportHovered = false;
 
     // Stores the exact screen position and size of the drawn scene texture
@@ -129,7 +129,7 @@ protected:
     glm::vec3 m_dragStartEntityPos = {0, 0, 0};
     Quaternion m_dragStartEntityRot;
     Vector3D m_dragStartEntityScale;
-    uint32_t m_lastSelectedEntityID = 0;
+    uint32_t m_lastSelectedEntityID = ECS::Entity::NPOS32;
     bool m_wasMouseDownLastFrame = false;
 
     // Event callback

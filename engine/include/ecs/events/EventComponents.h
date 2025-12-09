@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "math/Vector3D.h"
 #include <cstdint>
+#include "ecs/Entity.h"
 
 namespace ECS::Events {
     /**

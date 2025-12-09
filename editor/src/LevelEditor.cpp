@@ -153,6 +153,7 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Game", sceneGameNode);
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
+    ImGui::DockBuilderDockWindow("Layers", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
@@ -268,13 +269,13 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
             LOG_INFO("[LevelEditor] Entity destroyed: " << evt.EntityId);
             // Clear selection if the destroyed entity was selected
             if (m_hierarchyWindow.GetPrimarySelectedEntity() == evt.EntityId) {
-                m_hierarchyWindow.SetSelectedEntity(0);
+                m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
                 m_inspector.ClearSelection();
                 if (m_sceneViewport.HasValidWorld()) {
-                    m_sceneViewport.SetSelectedEntity(0);
+                    m_sceneViewport.SetSelectedEntity(ECS::Entity::NPOS32);
                 }
                 if (m_gameViewport.HasValidWorld()) {
-                    m_gameViewport.SetSelectedEntity(0);
+                    m_gameViewport.SetSelectedEntity(ECS::Entity::NPOS32);
                 }
             }
         }
@@ -371,6 +372,15 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
     );
 
+    _registerPanel("Layers",
+        [this]() {
+            m_layersPanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
+            m_layersPanel.SetFileMenu(&m_fileMenu);
+        },
+        [this]() { m_layersPanel.Render(); },
+        [this](ECS::World* w) { m_layersPanel.SetWorld(w); }
+    );
+
     // Register Console Panel
     _registerPanel("Console",
         [this]() {
@@ -406,6 +416,10 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
 
     // Initialize all registered panels
     _initializePanels();
+
+    // Provide panels with cross-panel pointers
+    m_layersPanel.SetHierarchy(&m_hierarchyWindow);
+    m_layersPanel.SetEntityActions(&m_entityActions);
 
     // Wire up file menu to viewports after panels are initialized
     m_sceneViewport.SetFileMenu(&m_fileMenu);
@@ -572,7 +586,7 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
     if (newState == EditorState::Edit) {
         // Note: Entity IDs are now preserved during restore, so selection can remain valid
         // However, we still clear selection as a safe UX pattern when stopping play mode
-        m_hierarchyWindow.SetSelectedEntity(0);
+        m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
         m_inspector.ClearSelection();
 
         // Rebuild entity order to reflect restored hierarchy
@@ -584,13 +598,13 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
     if (!m_world) {
         m_inspector.ClearSelection();
-        m_hierarchyWindow.SetSelectedEntity(0);
+        m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
         return;
     }
 
-    if (id == 0 || id == ECS::Entity::NPOS32) {
+    if (id == ECS::Entity::NPOS32) {
         m_inspector.ClearSelection();
-        m_hierarchyWindow.SetSelectedEntity(0);
+        m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
         return;
     }
 
@@ -600,10 +614,10 @@ void LevelEditor::_onViewportSelectionChanged(const EntityId id) {
         m_inspector.InspectEntity(id);
         m_hierarchyWindow.SetSelectedEntity(id);
     }
-    else {
-        m_inspector.ClearSelection();
-        m_hierarchyWindow.SetSelectedEntity(0);
-    }
+        else {
+            m_inspector.ClearSelection();
+            m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
+        }
 }
 
 // -------------------------------------------------------------------------
@@ -658,6 +672,8 @@ void LevelEditor::SetScene(Scenes::Scene* scene) {
     m_entityActions.SetScene(scene);
     ECS::World* world = scene ? &scene->GetWorld() : nullptr;
     SetWorld(world);
+    // Propagate scene to panels that require Scene access
+    m_layersPanel.SetScene(scene);
 }
 
 // -------------------------------------------------------------------------

@@ -101,22 +101,6 @@ namespace Editor {
                 maxPt.y = std::max(maxPt.y, center.y + radius);
                 any = true;
             }
-            // POLYGON
-            if (world.Has<ECS::Components::ShapePolygon2D<32>>(e)) {
-                const auto& pl = world.Get<ECS::Components::ShapePolygon2D<32>>(e);
-                if (pl.Count >= 1) {
-                    const auto m = TransformUtils::MakeTRS(pos, rot, scale);
-                    for (uint32_t i = 0; i < pl.Count; ++i) {
-                        const Vector3D p3{ pl.Points[i].X, pl.Points[i].Y, 0.0f };
-                        const Vector4D hp = m * Vector4D{ p3.X, p3.Y, p3.Z, 1.0f };
-                        minPt.x = std::min(minPt.x, hp.X);
-                        minPt.y = std::min(minPt.y, hp.Y);
-                        maxPt.x = std::max(maxPt.x, hp.X);
-                        maxPt.y = std::max(maxPt.y, hp.Y);
-                        any = true;
-                    }
-                }
-            }
             // LINE
             if (world.Has<ECS::Components::ShapeLine2D>(e)) {
                 const auto& sl = world.Get<ECS::Components::ShapeLine2D>(e);
@@ -174,7 +158,7 @@ namespace Editor {
         float windowWidth,
         float windowHeight)
     {
-        if (selectedEntityID == 0 || !renderer || !shader) return;
+        if (selectedEntityID == ECS::Entity::NPOS32 || !renderer || !shader) return;
 
         ECS::Entity entity = world.Resolve(selectedEntityID);
         if (entity.IsNull() || !world.IsAlive(entity)) return;
@@ -316,33 +300,7 @@ namespace Editor {
 
             DebugDraw2D::RectStroke(*renderer, min, max, worldThickness, selColor, 0);
         }
-        // 4) POLYGONS
-        else if (world.Has<ECS::Components::ShapePolygon2D<32>>(entity))
-        {
-            const auto& pl = world.Get<ECS::Components::ShapePolygon2D<32>>(entity);
-            if (pl.Count >= 2)
-            {
-                const auto m = TransformUtils::MakeTRS(position, rotation, scale);
-                polyPoints.clear();
-                polyPoints.reserve(pl.Count);
-
-                for (uint32_t i = 0; i < pl.Count; ++i)
-                {
-                    const Vector3D p3{ pl.Points[i].X, pl.Points[i].Y, 0.0f };
-                    const Vector4D hp = m * Vector4D{ p3.X, p3.Y, p3.Z, 1.0f };
-                    polyPoints.push_back(glm::vec2(hp.X, hp.Y));
-                }
-
-                for (uint32_t i = 0; i < pl.Count; ++i)
-                {
-                    DebugDraw2D::Line(*renderer,
-                        polyPoints[i],
-                        polyPoints[(i + 1) % pl.Count],
-                        worldThickness, selColor, 0);
-                }
-            }
-        }
-        // 5) LINES
+        // 4) LINES
         else if (world.Has<ECS::Components::ShapeLine2D>(entity))
         {
             const auto& sl = world.Get<ECS::Components::ShapeLine2D>(entity);
