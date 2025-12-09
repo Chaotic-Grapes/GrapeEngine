@@ -19,7 +19,63 @@ using GrapeEngine.Scripting.Core;
 namespace GrapeEngine.Scripting.Query;
 
 /// <summary>
-/// Enumerator for single-component queries.
+/// QUERY ENUMERATORS - Native interop for entity iteration.
+/// 
+/// QueryEnumerator<T1..Tn> provides foreach support for Query results by implementing
+/// the IEnumerator pattern. Each overload (1-8 components) has its own enumerator.
+/// 
+/// MEMORY LAYOUT & ALLOCATION:
+/// - QueryEnumerator is a struct (stack-allocated, no heap overhead)
+/// - Contains QueryIterator struct (unmanaged, ~32 bytes)
+/// - Zero heap allocations during iteration
+/// - Safe fixed statements protect component pointers during iteration
+/// 
+/// COMPONENT ACCESS:
+/// - Current property returns QueryResult<T1..Tn>
+/// - QueryResult contains:
+///   * Entity: The entity ID and World reference
+///   * Component pointers: Direct managed pointers to component data
+///   * Iterator pointer: For internal C++ interop
+/// 
+/// NATIVE INTEROP:
+/// - MoveNext() calls QueryInteropAPI.QueryNext() in C++ engine
+/// - Component data is fetched directly from C++ memory via pointers
+/// - No marshaling or boxing occurs (zero-copy performance)
+/// - QueryIterator state is maintained across calls
+/// 
+/// FILTER SUPPORT:
+/// - Constructor with 1 component array: Required components only
+/// - Constructor with 3 arrays: Required + Optional + Exclude components
+/// - Filters are passed to C++ engine, filtering done natively
+/// 
+/// ITERATION SEMANTICS:
+/// - Enumerator is disposable (no-op Dispose() for pattern compliance)
+/// - Reset() throws NotSupportedException (per C# guidelines for manual iteration)
+/// - Not thread-safe - each thread needs its own enumerator instance
+/// - Current only valid after successful MoveNext() call
+/// 
+/// PERFORMANCE:
+/// - MoveNext() cost: ~1-2 cache hits, direct C++ iteration (highly optimized)
+/// - Component pointer dereferencing: Zero-cost (just pointer arithmetic)
+/// - No boxing, no allocation, no virtual dispatch in iteration loop
+/// 
+/// USAGE PATTERN:
+/// ```csharp
+/// // Compiler-generated (from foreach)
+/// var enumerator = query.GetEnumerator();
+/// while (enumerator.MoveNext())
+/// {
+///     var result = enumerator.Current;
+///     result.Component->Position += velocity;
+/// }
+/// 
+/// // Or manual enumeration for advanced control
+/// var en = query.GetEnumerator();
+/// while (en.MoveNext())
+/// {
+///     ProcessEntity(en.Current);
+/// }
+/// ```
 /// </summary>
 public unsafe struct QueryEnumerator<T1>
     where T1 : unmanaged

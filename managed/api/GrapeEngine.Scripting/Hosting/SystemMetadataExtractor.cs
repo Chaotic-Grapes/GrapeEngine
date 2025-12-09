@@ -19,7 +19,66 @@ using System.Reflection;
 namespace GrapeEngine.Scripting.Hosting;
 
 /// <summary>
-/// Extracts metadata from ISystem implementations using reflection.
+/// SYSTEM METADATA EXTRACTION - Reflection-based system configuration discovery.
+/// 
+/// SystemMetadataExtractor uses .NET reflection to analyze ISystem implementations
+/// and extract configuration metadata from interfaces and attributes at runtime.
+/// This allows systems to be configured declaratively without centralized registration.
+/// 
+/// REFLECTION PERFORMANCE:
+/// - All GetCustomAttribute() calls use fast Type reflection (cached by runtime)
+/// - Enumerating attributes: O(number of attributes on type)
+/// - Generic attribute detection: Uses Type.IsGenericType and name matching
+/// - Recommended: Call once during system initialization, cache results
+/// 
+/// METADATA PRIORITY:
+/// System configuration is resolved in priority order:
+/// 1. ISystemMetadata interface on instance (highest priority, most specific)
+/// 2. [SystemGroup] attribute on type (declarative attribute)
+/// 3. Default behavior (fallback - SystemGroup.Update)
+/// 
+/// This allows runtime overrides while maintaining sensible defaults.
+/// 
+/// ATTRIBUTE DETECTION:
+/// - ReadOnly and WriteAccess attributes are detected by:
+///   * Checking if type is generic
+///   * Comparing generic definition name to "ReadOnlyAttribute`1" etc
+///   * Extracting generic argument for component type
+/// - This pattern works because attributes are applied generically but
+///   reflection sees the closed generic types at runtime
+/// 
+/// SYSTEM PHASES (EXECUTION GROUPS):
+/// Systems can execute in different phases to control order:
+/// - Init: One-time initialization, before Update systems run
+/// - Update: Main game logic phase
+/// - LateUpdate: Post-processing, cleanup, deferred operations
+/// - FixedUpdate: Physics systems, deterministic calculations
+/// - Custom: User-defined phases for advanced control
+/// 
+/// EDIT MODE:
+/// [ExecuteInEditMode] systems run when editor is paused (not in play mode).
+/// Useful for editor-only systems (gizmos, debug visualization, prefab editing).
+/// 
+/// COMPONENT ACCESS ANNOTATIONS:
+/// Systems can declare component access requirements:
+/// - [ReadOnly<T>]: Component is read-only, concurrent reads allowed
+/// - [WriteAccess<T>]: Component has write access, exclusive access required
+/// - Helps validation and future parallelization
+/// 
+/// REFLECTION CACHING RECOMMENDATION:
+/// Extract metadata once during system registration, not per frame.
+/// Example:
+/// ```csharp
+/// // Bad (per-frame)
+/// var group = SystemMetadataExtractor.GetSystemGroup(systemType);
+/// 
+/// // Good (once during init)
+/// var systemConfig = new SystemConfig 
+/// { 
+///     Group = SystemMetadataExtractor.GetSystemGroup(systemType),
+///     ReadOnlyComponents = SystemMetadataExtractor.GetReadOnlyComponents(systemType).ToList()
+/// };
+/// ```
 /// </summary>
 public static class SystemMetadataExtractor
 {

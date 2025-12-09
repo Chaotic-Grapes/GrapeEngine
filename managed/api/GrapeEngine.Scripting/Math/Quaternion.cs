@@ -14,9 +14,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
-using GrapeEngine.Math;
 
-namespace GrapeEngine.Numerics;
+namespace GrapeEngine.Math;
 
 // ============================================================================
 // Math Types - MUST match C++ memory layout exactly for marshaling

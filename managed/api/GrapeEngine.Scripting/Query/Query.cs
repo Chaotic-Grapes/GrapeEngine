@@ -19,7 +19,61 @@ using GrapeEngine.Scripting.Unsafe;
 namespace GrapeEngine.Scripting.Query;
 
 /// <summary>
-/// Query for iterating over entities with one component type.
+/// QUERY SYSTEM - Type-safe entity iteration with component filtering.
+/// 
+/// The Query system provides the primary mechanism for iterating over entities based on
+/// component composition. It supports efficient bulk operations on entities with specific
+/// component types.
+/// 
+/// MAXIMUM COMPONENTS SUPPORTED:
+/// This implementation supports up to 8 components per single query (Query<T1> through Query<T1..T8>).
+/// For queries requiring more than 8 components, break them into multiple smaller queries or
+/// restructure your component organization.
+/// 
+/// PERFORMANCE CHARACTERISTICS:
+/// - Query construction: O(1) - just stores component hashes
+/// - GetEnumerator(): O(1) - minimal allocation, native side does heavy lifting
+/// - MoveNext() per entity: O(1) amortized - direct native API call
+/// - Count(): O(n) where n = matching entities - iterates all results
+/// - Any(): O(1) best case (first entity) to O(n) worst case (no entities match)
+/// 
+/// ALLOCATION BEHAVIOR:
+/// - QueryFilterBuilder.Optional/WithAll/Without: Accumulates in Lists, deallocated on GetEnumerator()
+/// - No per-entity allocations during iteration
+/// - Iterator state is stack-based (QueryIterator struct)
+/// 
+/// FILTERING API (Fluent Chain):
+/// - Without<T>(): Exclude entities with component T
+/// - Optional<T>(): Include component T if present, but don't exclude if absent
+/// - WithAll<T...>(): Require component T (up to 2 chained calls)
+/// 
+/// EXAMPLE USAGE:
+/// ```csharp
+/// // Basic iteration
+/// foreach (var result in world.Query<LocalTransform>())
+/// {
+///     result.Component.Position += velocity * deltaTime;
+/// }
+/// 
+/// // With filtering
+/// var filtered = world.Query<LocalTransform>()
+///     .Without<Frozen>()
+///     .WithAll<Rigidbody>();
+/// foreach (var result in filtered)
+/// {
+///     // Only active, unfrozen entities with physics bodies
+/// }
+/// 
+/// // Convenience helpers
+/// int count = world.Query<LocalTransform>().Count();
+/// bool hasAny = world.Query<LocalTransform>().Any();
+/// ```
+/// 
+/// IMPLEMENTATION NOTES:
+/// - Component hashing uses FNV-1a algorithm (matches C++ side)
+/// - QueryEnumerator interops with C++ engine for actual entity iteration
+/// - Iterator state is stored in QueryIterator struct (unmanaged)
+/// - All component types must be unmanaged structs with sequential layout
 /// </summary>
 public class Query<T1>
     where T1 : unmanaged

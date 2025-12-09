@@ -33,8 +33,14 @@ public enum LogLevel
     Error
 }
 
+/// <summary>
+/// Internal logging utility used by systems to log messages at different levels.
+/// </summary>
 internal static class Logging
 {
+    /// <summary>
+    /// Log a message at the specified level using the debug API.
+    /// </summary>
     internal static void Log(string message, LogLevel level)
     {
         switch (level)

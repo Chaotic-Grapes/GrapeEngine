@@ -8,10 +8,10 @@
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Numerics;
+using GrapeEngine.Math;
 using System.Runtime.InteropServices;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Components.Types;
 
 [StructLayout(LayoutKind.Sequential)]
 public record struct LinearVelocity2D

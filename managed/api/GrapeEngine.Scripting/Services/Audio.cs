@@ -13,7 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Numerics;
+using GrapeEngine.Math;
 using GrapeEngine.Scripting.Unsafe;
 using GrapeEngine.Scripting.Core;
 

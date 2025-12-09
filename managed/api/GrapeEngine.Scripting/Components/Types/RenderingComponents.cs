@@ -9,11 +9,11 @@ Rendering and UI-related ECS component types.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Math;
-using GrapeEngine.Numerics;
+using GrapeEngine.Math;
 using GrapeEngine.Scripting.Components.Core;
 using System.Runtime.InteropServices;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Components.Types;
 
 [StructLayout(LayoutKind.Sequential)]
 public record struct SpriteRenderer2D

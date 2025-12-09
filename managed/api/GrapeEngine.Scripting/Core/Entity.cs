@@ -40,11 +40,6 @@ public class Entity
     public ulong Id => _id;
 
     /// <summary>
-    /// The unique identifier for this entity (alias for Id).
-    /// </summary>
-    public ulong EntityId => _id;
-
-    /// <summary>
     /// Check if this entity is alive (valid).
     /// </summary>
     public bool IsAlive => _world.IsAlive(this);

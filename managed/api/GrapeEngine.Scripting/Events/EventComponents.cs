@@ -1,4 +1,4 @@
-using GrapeEngine.Numerics;
+using GrapeEngine.Math;
 
 namespace GrapeEngine.Scripting.Events;
 

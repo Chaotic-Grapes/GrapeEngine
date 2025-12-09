@@ -13,6 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Services;
 
 namespace GrapeEngine.Scripting.Systems;
 
@@ -42,4 +43,14 @@ public interface ISystem
     /// </summary>
     /// <param name="world">The ECS World instance</param>
     void OnDestroy(World world) { }
+
+    /// <summary>
+    /// Logs a message at the specified log level.
+    /// </summary>
+    /// <param name="message">The message to log</param>
+    /// <param name="level">The log level for this message</param>
+    protected void Log(string message, LogLevel level)
+    {
+        Logging.Log(message, level);
+    }
 }

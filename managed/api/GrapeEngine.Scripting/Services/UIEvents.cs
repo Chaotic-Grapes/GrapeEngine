@@ -69,69 +69,93 @@ public static class UIEvents
     /// <summary>
     /// Clear all UI events (typically called at start of frame).
     /// </summary>
-    public static unsafe void Clear(World world)
+    public static void Clear(World world)
     {
-        UIEventsAPI.Clear(world.NativePtr);
+        unsafe
+        {
+            UIEventsAPI.Clear(world.NativePtr);
+        }
     }
 
     /// <summary>
     /// Check if an entity was clicked this frame.
     /// </summary>
-    public static unsafe bool WasClicked(World world, Entity entity, int button = 0)
+    public static bool WasClicked(World world, Entity entity, int button = 0)
     {
-        return UIEventsAPI.WasClicked(world.NativePtr, entity.Id, button);
+        unsafe
+        {
+            return UIEventsAPI.WasClicked(world.NativePtr, entity.Id, button);
+        }
     }
 
     /// <summary>
     /// Check if an entity had hover enter this frame.
     /// </summary>
-    public static unsafe bool WasHoverEntered(World world, Entity entity)
+    public static bool WasHoverEntered(World world, Entity entity)
     {
-        return UIEventsAPI.WasHoverEntered(world.NativePtr, entity.Id);
+        unsafe
+        {
+            return UIEventsAPI.WasHoverEntered(world.NativePtr, entity.Id);
+        }
     }
 
     /// <summary>
     /// Check if an entity had hover exit this frame.
     /// </summary>
-    public static unsafe bool WasHoverExited(World world, Entity entity)
+    public static bool WasHoverExited(World world, Entity entity)
     {
-        return UIEventsAPI.WasHoverExited(world.NativePtr, entity.Id);
+        unsafe
+        {
+            return UIEventsAPI.WasHoverExited(world.NativePtr, entity.Id);
+        }
     }
 
     /// <summary>
     /// Get the number of UI events this frame.
     /// </summary>
-    public static unsafe int GetEventCount(World world)
+    public static int GetEventCount(World world)
     {
-        return UIEventsAPI.GetEventCount(world.NativePtr);
+        unsafe
+        {
+            return UIEventsAPI.GetEventCount(world.NativePtr);
+        }
     }
 
     /// <summary>
     /// Get a UI event by index.
     /// </summary>
-    public static unsafe (Entity entity, UIEventType eventType) GetEvent(World world, int index)
+    public static (Entity entity, UIEventType eventType) GetEvent(World world, int index)
     {
-        ulong entityId;
-        int eventType;
-        UIEventsAPI.GetEvent(world.NativePtr, index, &entityId, &eventType);
-        return (new Entity(world, entityId), (UIEventType)eventType);
+        unsafe
+        {
+            ulong entityId;
+            int eventType;
+            UIEventsAPI.GetEvent(world.NativePtr, index, &entityId, &eventType);
+            return (new Entity(world, entityId), (UIEventType)eventType);
+        }
     }
 
     /// <summary>
     /// Get the entity currently being hovered.
     /// </summary>
-    public static unsafe Entity? GetHoveredEntity(World world)
+    public static Entity? GetHoveredEntity(World world)
     {
-        ulong entityId = UIEventsAPI.GetHoveredEntity(world.NativePtr);
-        return entityId != 0 ? new Entity(world, entityId) : null;
+        unsafe
+        {
+            ulong entityId = UIEventsAPI.GetHoveredEntity(world.NativePtr);
+            return entityId != 0 ? new Entity(world, entityId) : null;
+        }
     }
 
     /// <summary>
     /// Check if the mouse is over any UI element.
     /// </summary>
-    public static unsafe bool IsMouseOverUI(World world)
+    public static bool IsMouseOverUI(World world)
     {
-        return UIEventsAPI.IsMouseOverUI(world.NativePtr);
+        unsafe
+        {
+            return UIEventsAPI.IsMouseOverUI(world.NativePtr);
+        }
     }
 
     /// <summary>

@@ -8,19 +8,18 @@ Transform-related ECS component types.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Numerics;
+using GrapeEngine.Math;
 using GrapeEngine.Scripting.Components.Core;
 using System.Runtime.InteropServices;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Components.Types;
 
 [StructLayout(LayoutKind.Sequential)]
-public record struct LocalTransform(Vector3 Position, Quaternion Rotation, Vector3 Scale)
+public record struct LocalTransform(
+    Vector3 Position = default,
+    Quaternion Rotation = default,
+    Vector3 Scale = default)
 {
-    public Vector3 Position = Position;
-    public Quaternion Rotation = Rotation;
-    public Vector3 Scale = Scale;
-
     public static LocalTransform Default => new(Vector3.Zero, Quaternion.Identity, Vector3.One);
 }
 

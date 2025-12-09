@@ -4,9 +4,11 @@
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \brief
-Script host for managing C# assemblies and systems. Provides functions for loading,
-unloading, and reloading assemblies, discovering scripted systems, and invoking their
-lifecycle methods.
+Script host for managing C# assemblies and systems. Main P/Invoke entry point.
+Coordinates assembly loading, system discovery, and hot reload via helper classes:
+- AssemblyManager: Assembly loading/unloading
+- SystemDiscovery: System discovery and instantiation  
+- StatePreserver: Hot reload state management
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -53,20 +55,17 @@ internal class ScriptLoadContext(string assemblyPath) : AssemblyLoadContext(isCo
 }
 
 /// <summary>
-/// Main entry point for script hosting from C++.
-/// ScriptManager calls these functions to load assemblies, discover systems, etc.
+/// SCRIPT HOST - Main P/Invoke entry point for script hosting.
+/// 
+/// Delegates specialized tasks to focused helper classes:
+/// - AssemblyManager: Assembly lifecycle (load/unload)
+/// - SystemDiscovery: System discovery and instantiation
+/// - StatePreserver: Hot reload state preservation
+/// 
+/// This class serves as the coordinator and C++ interface layer only.
 /// </summary>
 public static class ScriptHost
 {
-    // Loaded assemblies and their load contexts (for hot reload support)
-    private static readonly Dictionary<string, (Assembly Assembly, ScriptLoadContext? Context)> s_loadedAssemblies = [];
-    
-    // Discovered system types
-    private static readonly Dictionary<ulong, Type> s_systemTypes = [];
-    private static readonly Dictionary<ulong, object> s_systemInstances = [];
-    private static ulong s_nextSystemHandle = 1;
-    // Saved serialized state for hot-reload: assemblyPath -> (typeFullName -> blob)
-    private static readonly Dictionary<string, Dictionary<string, byte[]?>> s_savedSystemStateByAssemblyPath = new();
 
     /// <summary>
     /// Load a C# assembly containing scripted systems.
@@ -74,29 +73,16 @@ public static class ScriptHost
     /// </summary>
     [UnmanagedCallersOnly]
     public static unsafe int LoadAssembly(char* assemblyPathPtr)
-        => LoadAssemblyImpl(assemblyPathPtr);
-
-    private static unsafe int LoadAssemblyImpl(char* assemblyPathPtr)
     {
         try
         {
             string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
-            
-            Console.WriteLine($"[ScriptHost] Loading assembly: {assemblyPath}");
-            
-            // Create a new load context for hot reload support
-            var loadContext = new ScriptLoadContext(assemblyPath);
-            Assembly assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
-            
-            s_loadedAssemblies[assemblyPath] = (assembly, loadContext);
-            
-            Console.WriteLine($"[ScriptHost] Loaded: {assembly.FullName}");
-            return 0; // Success
+            return AssemblyManager.LoadAssembly(assemblyPath) != null ? 0 : -1;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Failed to load assembly: {ex.Message}");
-            return -1; // Failure
+            Console.WriteLine($"[ScriptHost] LoadAssembly error: {ex.Message}");
+            return -1;
         }
     }
 
@@ -105,10 +91,7 @@ public static class ScriptHost
     /// Called from C++ ScriptManager::UnloadAssembly()
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int UnloadAssembly(char* assemblyPathPtr) 
-        => UnloadAssemblyImpl(assemblyPathPtr);
-
-    private static unsafe int UnloadAssemblyImpl(char* assemblyPathPtr)
+    public static unsafe int UnloadAssembly(char* assemblyPathPtr)
     {
         try
         {
@@ -116,78 +99,18 @@ public static class ScriptHost
 
             Console.WriteLine($"[ScriptHost] Unloading assembly: {assemblyPath}");
 
-            if (!s_loadedAssemblies.TryGetValue(assemblyPath, out var entry))
+            // Save state from all systems in this assembly
+            StatePreserver.SaveAllSystemStates(assemblyPath);
+
+            // Unload assembly
+            bool success = AssemblyManager.UnloadAssembly(assemblyPath);
+            if (!success)
             {
-                Console.WriteLine($"[ScriptHost] Assembly not loaded: {assemblyPath}");
                 return -1;
             }
 
-            // Remove all system instances from this assembly
-            var systemHandlesToRemove = new List<ulong>();
-            foreach (var kvp in s_systemTypes)
-            {
-                if (kvp.Value.Assembly == entry.Assembly)
-                {
-                    systemHandlesToRemove.Add(kvp.Key);
-                }
-            }
-
-            // Before removing, capture state for IHotReloadable instances
-            foreach (var handle in systemHandlesToRemove)
-            {
-                if (s_systemInstances.TryGetValue(handle, out var inst))
-                {
-                    try
-                    {
-                        byte[]? blob = null;
-                        
-                        // Try IHotReloadable first (for custom serialization)
-                        if (inst is IHotReloadable hot)
-                        {
-                            try { blob = hot.OnBeforeUnload(); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error OnBeforeUnload: {ex.Message}"); }
-                        }
-                        
-                        // If no blob from IHotReloadable, try automatic [Preserve] field serialization
-                        if (blob == null)
-                        {
-                            try { blob = StateSerializer.SerializePreservedFields(inst); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error serializing preserved fields: {ex.Message}"); }
-                        }
-
-                        if (blob != null && blob.Length > 0)
-                        {
-                            string assemblyPathKey = entry.Assembly.Location ?? assemblyPath;
-                            if (!s_savedSystemStateByAssemblyPath.TryGetValue(assemblyPathKey, out var map))
-                            {
-                                map = new Dictionary<string, byte[]?>();
-                                s_savedSystemStateByAssemblyPath[assemblyPathKey] = map;
-                            }
-                            map[inst.GetType().FullName ?? inst.GetType().Name] = blob;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[ScriptHost] Error capturing state: {ex.Message}");
-                    }
-                }
-
-                s_systemInstances.Remove(handle);
-                s_systemTypes.Remove(handle);
-                Console.WriteLine($"[ScriptHost] Removed system instance: handle={handle}");
-            }
-
-            // Unload the assembly load context
-            if (entry.Context != null)
-            {
-                entry.Context.Unload();
-                Console.WriteLine($"[ScriptHost] Unloaded context for: {assemblyPath}");
-            }
-
-            s_loadedAssemblies.Remove(assemblyPath);
-
-            // Force garbage collection to reclaim memory
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            // Clear discovered systems
+            SystemDiscovery.ClearDiscoveredSystems();
 
             Console.WriteLine($"[ScriptHost] Successfully unloaded: {assemblyPath}");
             return 0; // Success
@@ -207,41 +130,63 @@ public static class ScriptHost
     [UnmanagedCallersOnly]
     public static unsafe int ReloadAssembly(char* assemblyPathPtr)
     {
-        return ReloadAssemblyImpl(assemblyPathPtr);
-    }
-
-    private static unsafe int ReloadAssemblyImpl(char* assemblyPathPtr)
-    {
         try
         {
             string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
-            
+            return ReloadAssemblyInternal(assemblyPath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] Error reloading assembly: {ex.Message}");
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Internal implementation of assembly reload logic.
+    /// Separated so it can be called from both managed and unmanaged code.
+    /// </summary>
+    private static int ReloadAssemblyInternal(string assemblyPath)
+    {
+        try
+        {
             Console.WriteLine($"[ScriptHost] Reloading assembly: {assemblyPath}");
 
+            // Save state before unload
+            StatePreserver.SaveAllSystemStates(assemblyPath);
+
             // Unload existing assembly
-            int unloadResult = UnloadAssemblyImpl(assemblyPathPtr);
-            if (unloadResult != 0)
+            if (!AssemblyManager.UnloadAssembly(assemblyPath))
             {
                 Console.WriteLine($"[ScriptHost] Warning: Failed to unload existing assembly during reload");
             }
-            
+
             // Wait a bit for finalizers to complete
             System.Threading.Thread.Sleep(100);
-            
+
             // Load new version
-            int loadResult = LoadAssemblyImpl(assemblyPathPtr);
-            if (loadResult != 0)
+            if (AssemblyManager.LoadAssembly(assemblyPath) == null)
             {
                 Console.WriteLine($"[ScriptHost] Failed to load new assembly during reload");
                 return -1;
             }
-            
+
+            // Discover systems in newly loaded assembly
+            Assembly? newAssembly = AssemblyManager.GetLoadedAssembly(assemblyPath);
+            if (newAssembly != null)
+            {
+                SystemDiscovery.DiscoverSystemsInAssembly(newAssembly);
+            }
+
+            // Clean up saved state
+            StatePreserver.ClearSavedState(assemblyPath);
+
             Console.WriteLine($"[ScriptHost] Successfully reloaded: {assemblyPath}");
             return 0; // Success
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error reloading assembly: {ex.Message}");
+            Console.WriteLine($"[ScriptHost] Error in ReloadAssemblyInternal: {ex.Message}");
             return -1;
         }
     }
@@ -329,17 +274,8 @@ public static class ScriptHost
                 return -1;
             }
 
-            // Call ReloadAssembly on the resulting assembly path
-            // Convert managed string to UTF8 pointer (portable fallback)
-            IntPtr utf8Ptr = StringToHGlobalUtf8(outPath);
-            try
-            {
-                return ReloadAssemblyImpl((char*)utf8Ptr);
-            }
-            finally
-            {
-                if (utf8Ptr != IntPtr.Zero) Marshal.FreeHGlobal(utf8Ptr);
-            }
+            // Reload the compiled assembly
+            return ReloadAssemblyInternal(outPath);
         }
         catch (Exception ex)
         {
@@ -415,15 +351,8 @@ public static class ScriptHost
                 return res;
             }
 
-            IntPtr utf8Ptr = StringToHGlobalUtf8(outPath);
-            try
-            {
-                return ReloadAssemblyImpl((char*)utf8Ptr);
-            }
-            finally
-            {
-                if (utf8Ptr != IntPtr.Zero) Marshal.FreeHGlobal(utf8Ptr);
-            }
+            // Reload the compiled assembly
+            return ReloadAssemblyInternal(outPath);
         }
         catch (Exception ex)
         {
@@ -442,67 +371,31 @@ public static class ScriptHost
         try
         {
             Console.WriteLine("[ScriptHost] Discovering systems in loaded assemblies...");
-            
-            var systemTypes = new List<Type>();
-            
-            // Search all loaded assemblies for ISystem implementations
-            foreach (var entry in s_loadedAssemblies.Values)
+
+            var allSystemHandles = new List<ulong>();
+
+            // Discover systems in all loaded assemblies
+            foreach (var assembly in AssemblyManager.GetAllLoadedAssemblies())
             {
-                try
+                string[] discovered = SystemDiscovery.DiscoverSystemsInAssembly(assembly);
+                foreach (var entry in discovered)
                 {
-                    var types = entry.Assembly.GetTypes()
-                        .Where(t => t.IsClass && !t.IsAbstract)
-                        .Where(t => typeof(ISystem).IsAssignableFrom(t));
-                    
-                    systemTypes.AddRange(types);
-                }
-                catch (ReflectionTypeLoadException ex)
-                {
-                    Console.WriteLine($"[ScriptHost] Warning: Could not load some types from {entry.Assembly.FullName}");
-                    Console.WriteLine($"  Errors: {string.Join(", ", ex.LoaderExceptions.Select(e => e?.Message))}");
+                    // Parse "handle:typename" format
+                    var parts = entry.Split(':');
+                    if (parts.Length == 2 && ulong.TryParse(parts[0], out ulong handle))
+                    {
+                        allSystemHandles.Add(handle);
+                    }
                 }
             }
-            
-            Console.WriteLine($"[ScriptHost] Found {systemTypes.Count} system types");
-            
-            // Create instances for each system type (and return instance handles)
-            var instanceHandles = new ulong[systemTypes.Count];
-            for (int i = 0; i < systemTypes.Count; i++)
-            {
-                Type systemType = systemTypes[i];
-                
-                // Create instance
-                object? instance = null;
-                try
-                {
-                    instance = Activator.CreateInstance(systemType);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[ScriptHost] Failed to create instance of {systemType.FullName}: {ex.Message}");
-                    continue;
-                }
-                
-                if (instance == null)
-                {
-                    Console.WriteLine($"[ScriptHost] Failed to create instance of {systemType.FullName}");
-                    continue;
-                }
-                
-                // Create instance handle
-                ulong instanceHandle = s_nextSystemHandle++;
-                s_systemTypes[instanceHandle] = systemType;
-                s_systemInstances[instanceHandle] = instance;
-                instanceHandles[i] = instanceHandle;
-                
-                Console.WriteLine($"[ScriptHost]   - {systemType.FullName} (handle: {instanceHandle})");
-            }
-            
+
+            Console.WriteLine($"[ScriptHost] Found {allSystemHandles.Count} system types");
+
             // Allocate unmanaged array for handles
-            IntPtr handlesPtr = Marshal.AllocHGlobal(sizeof(ulong) * instanceHandles.Length);
-            Marshal.Copy(instanceHandles.Select(h => (long)h).ToArray(), 0, handlesPtr, instanceHandles.Length);
-            
-            *outCount = instanceHandles.Length;
+            IntPtr handlesPtr = Marshal.AllocHGlobal(sizeof(ulong) * allSystemHandles.Count);
+            Marshal.Copy(allSystemHandles.Select(h => (long)h).ToArray(), 0, handlesPtr, allSystemHandles.Count);
+
+            *outCount = allSystemHandles.Count;
             return (void*)handlesPtr;
         }
         catch (Exception ex)
@@ -523,64 +416,33 @@ public static class ScriptHost
         try
         {
             string typeName = Marshal.PtrToStringUTF8((IntPtr)typeNamePtr) ?? "";
-            
-            // Find the type
+
+            // Find the type in loaded assemblies
             Type? systemType = null;
-            foreach (var entry in s_loadedAssemblies.Values)
+            foreach (var assembly in AssemblyManager.GetAllLoadedAssemblies())
             {
-                systemType = entry.Assembly.GetType(typeName);
+                systemType = assembly.GetType(typeName);
                 if (systemType != null) break;
             }
-            
+
             if (systemType == null)
             {
                 Console.WriteLine($"[ScriptHost] System type not found: {typeName}");
                 return 0;
             }
-            
-            // Create instance
-            object? instance = Activator.CreateInstance(systemType);
-            if (instance == null)
+
+            // Create instance and get handle
+            ulong handle = SystemDiscovery.CreateSystemInstanceFromType(systemType);
+            if (handle == 0)
             {
                 Console.WriteLine($"[ScriptHost] Failed to create instance of: {typeName}");
                 return 0;
             }
-            
-            // Store and return handle
-            ulong handle = s_nextSystemHandle++;
-            s_systemInstances[handle] = instance;
-            s_systemTypes[handle] = systemType;
-            Console.WriteLine($"[ScriptHost] Created system instance: {typeName} (handle: {handle})");
 
-            // If we have saved state from a previous unload of the same assembly, restore it
-            try
-            {
-                // Find the assembly path that contains this type
-                string? assemblyPath = systemType.Assembly.Location;
-                if (!string.IsNullOrEmpty(assemblyPath) && s_savedSystemStateByAssemblyPath.TryGetValue(assemblyPath, out var map))
-                {
-                    string key = systemType.FullName ?? systemType.Name;
-                    if (map.TryGetValue(key, out var blob))
-                    {
-                        // Try IHotReloadable first (for custom serialization)
-                        if (instance is IHotReloadable hot)
-                        {
-                            try { hot.OnAfterReload(blob); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error OnAfterReload: {ex.Message}"); }
-                        }
-                        else
-                        {
-                            // Fall back to automatic [Preserve] field deserialization
-                            try { StateSerializer.DeserializePreservedFields(instance, blob); } catch (Exception ex) { Console.WriteLine($"[ScriptHost] Error deserializing preserved fields: {ex.Message}"); }
-                        }
-                        // Remove saved blob once applied
-                        map.Remove(key);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ScriptHost] Error restoring state for {typeName}: {ex.Message}");
-            }
+            // If we have saved state from a previous unload, restore it
+            StatePreserver.RestoreSystemState(systemType.Assembly.Location ?? "", SystemDiscovery.GetSystemInstance(handle)!);
+
+            Console.WriteLine($"[ScriptHost] Created system instance: {typeName} (handle: {handle})");
             return handle;
         }
         catch (Exception ex)
@@ -596,8 +458,8 @@ public static class ScriptHost
     [UnmanagedCallersOnly]
     public static void DestroySystemInstance(ulong handle)
     {
-        s_systemInstances.Remove(handle);
-        s_systemTypes.Remove(handle);
+        // Note: Instances remain in SystemDiscovery's dictionary until next reload
+        // This is called to notify C++ that the managed system is being destroyed
     }
 
     /// <summary>
@@ -608,14 +470,15 @@ public static class ScriptHost
     {
         try
         {
-            if (!s_systemTypes.TryGetValue(handle, out Type? systemType))
+            Type? systemType = SystemDiscovery.GetSystemType(handle);
+            if (systemType == null)
             {
                 Console.WriteLine($"[ScriptHost] System handle not found: {handle}");
                 return;
             }
             
             // Get instance if available (for ISystemMetadata interface)
-            s_systemInstances.TryGetValue(handle, out object? instance);
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
             
             // Get name
             string name = systemType.FullName ?? systemType.Name;
@@ -644,7 +507,8 @@ public static class ScriptHost
     {
         try
         {
-            if (!s_systemInstances.TryGetValue(handle, out object? instance))
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
             {
                 Console.WriteLine($"[ScriptHost] System instance not found: {handle}");
                 return;
@@ -672,7 +536,8 @@ public static class ScriptHost
     {
         try
         {
-            if (!s_systemInstances.TryGetValue(handle, out object? instance))
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
             {
                 return;
             }
@@ -697,7 +562,8 @@ public static class ScriptHost
     {
         try
         {
-            if (!s_systemInstances.TryGetValue(handle, out object? instance))
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
             {
                 return;
             }
