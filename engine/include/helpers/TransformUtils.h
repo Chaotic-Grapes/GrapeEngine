@@ -1,4 +1,17 @@
-#pragma once
+/* Start Header *****************************************************************/
+/*!
+\file   TransformUtils.h
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+Declares utility functions for composing and decomposing transformation matrices.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
 #include "math/Vector3D.h"
 #include "math/Matrix4x4.h"
 #include "math/Quaternion.h"

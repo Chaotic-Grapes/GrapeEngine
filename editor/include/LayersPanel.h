@@ -26,6 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 class EditorFileMenu;
 class HierarchyPanel;
 class EntityActions;
+namespace Editor { class UndoSystem; }
 
 class LayersPanel {
 public:
@@ -38,8 +39,20 @@ public:
     void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
     void SetHierarchy(HierarchyPanel* h) { m_hierarchy = h; }
     void SetEntityActions(EntityActions* e) { m_entityActions = e; }
+    void SetUndoSystem(Editor::UndoSystem* u) { m_undoSystem = u; }
+    void MoveLayer(uint16_t fromId, uint16_t toId);
+    uint16_t CreateLayer(const std::string& name);
+    void SetLayer(EntityId entity, uint16_t layerId);
 
     void Render();
+
+private:
+    // Render helpers split out from the large Render() method
+    void _renderHeader();
+    void _renderCollisionMatrix();
+    void _renderLayersList();
+    void _renderImportConfirm();
+    void _renderStatusPopup();
 
 private:
     Scenes::Scene* m_scene = nullptr;
@@ -55,10 +68,32 @@ private:
     char m_newLayerName[128] = "New Layer";
     HierarchyPanel* m_hierarchy = nullptr;
     EntityActions* m_entityActions = nullptr;
+    Editor::UndoSystem* m_undoSystem = nullptr;
     
     // Subscription to scene modification messages so the panel can refresh
     Messaging::SubscriptionHandle m_sceneModifiedSubscription;
     bool m_needsRefresh = false;
+    // Buffer used for import/export JSON of layer masks
+    char m_layerJsonBuffer[4096] = {};
+    // Import state used when loading layers from file
+    struct LayerImportEntry {
+        uint16_t Id = 0;
+        std::string Name;
+        uint32_t Mask = 0xFFFFFFFFu;
+        bool HasMask = false;
+        bool HasVisible = false;
+        bool Visible = true;
+        bool HasLocked = false;
+        bool Locked = false;
+    };
+
+    std::vector<LayerImportEntry> m_pendingImport;
+    bool m_showImportConfirm = false;
+
+    // Simple status popup
+    std::string m_statusMessage;
+    enum class StatusType { Info = 0, Success = 1, Error = 2 };
+    StatusType m_statusType = StatusType::Info;
 };
 
 #endif

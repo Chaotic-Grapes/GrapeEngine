@@ -9,6 +9,7 @@
 /* End Header *******************************************************************/
 
 using GrapeEngine.Math;
+using GrapeEngine.Scripting.Components.Core;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Components.Types;
@@ -113,7 +114,7 @@ public record struct BoxCollider2D
     public Vector2 HalfExtents;
     public Vector2 Offset;
     public float Rotation;
-    public uint LayerMask;
+    public LayerMask LayerMask;
     public uint Flags;
 
     public const uint FLAG_IS_TRIGGER = 1 << 0;
@@ -130,7 +131,7 @@ public record struct CircleCollider2D
 {
     public float Radius;
     public Vector2 Offset;
-    public uint LayerMask;
+    public LayerMask LayerMask;
     public uint Flags;
 
     public const uint FLAG_IS_TRIGGER = 1 << 0;
@@ -145,7 +146,7 @@ public record struct CircleCollider2D
     {
         Radius = radius;
         Offset = Vector2.Zero;
-        LayerMask = 0xFFFFFFFF;
+        LayerMask = LayerMask.All;
         Flags = 0;
     }
 }

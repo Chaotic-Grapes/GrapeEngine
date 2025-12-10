@@ -37,6 +37,7 @@
 #include "services/TimeSystem.h"
 #include "physics/Collision.h"
 #include "physics/Physics.h"
+#include "physics/LayerMask.h"
 #include "ecs/Components.h"
 #include <unordered_map>
 #include <unordered_set>
@@ -532,6 +533,30 @@ namespace ECS {
                     const auto* boxB = world.TryGet<Components::BoxCollider2D>(B);
                     // If either side has no collider, this pair cannot collide.
                     if ((!circA && !boxA) || (!circB && !boxB)) continue;
+
+                    // --- Layer mask filtering ---
+                    // Determine each entity's layer id (default to 0) and the collider's mask
+                    uint16_t layerAId = 0u;
+                    uint16_t layerBId = 0u;
+                    if (const auto* la = world.TryGet<Components::Layer>(A))
+                        layerAId = la->Id;
+                    if (const auto* lb = world.TryGet<Components::Layer>(B))
+                        layerBId = lb->Id;
+
+                    uint32_t maskA = 0xFFFFFFFFu;
+                    uint32_t maskB = 0xFFFFFFFFu;
+                    if (circA)
+                        maskA = circA->LayerMask;
+                    else if (boxA)
+                        maskA = boxA->LayerMask;
+                    if (circB)
+                        maskB = circB->LayerMask;
+                    else if (boxB)
+                        maskB = boxB->LayerMask;
+
+                    // If masks/layers indicate no collision, skip early.
+                    if (!Engine::CanCollide(maskA, layerAId, maskB, layerBId))
+                        continue;
 
                     // Require at least one side to be physically simulated (has rb + velocity).
                     const bool hasPhysA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);

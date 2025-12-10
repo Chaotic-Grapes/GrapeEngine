@@ -63,15 +63,6 @@ public:
     // Moves an entity under a new parent in the hierarchy
     void ReparentEntity(EntityId child, EntityId newParent);
 
-    // Set the layer of an entity and record undo
-    void SetLayer(EntityId entity, uint16_t layerId);
-
-    // Layer management with undo support
-    uint16_t CreateLayer(const std::string& name);
-    void RenameLayer(uint16_t id, const std::string& newName);
-    void RemoveLayer(uint16_t id);
-    // Reorder layers (undoable)
-    void MoveLayer(uint16_t fromId, uint16_t toId);
 
     // Set file menu reference for dirty tracking
     void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }

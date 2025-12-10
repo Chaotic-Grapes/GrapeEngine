@@ -190,6 +190,22 @@ namespace Scenes {
                 sceneJson["SceneName"] = sceneName;
                 sceneJson["EntityCount"] = 0;
 
+                // Serialize layer manager state (names, masks, visibility, locks)
+                json layersJson = json::array();
+                const auto layerList = scene.GetLayers().ListLayers();
+                for (const auto& p : layerList) {
+                    uint16_t id = p.first;
+                    const std::string& name = p.second;
+                    json entry;
+                    entry["id"] = id;
+                    entry["name"] = name;
+                    entry["mask"] = scene.GetLayers().GetLayerMask(id);
+                    entry["visible"] = scene.GetLayers().IsVisible(id);
+                    entry["locked"] = scene.GetLayers().IsLocked(id);
+                    layersJson.push_back(entry);
+                }
+                sceneJson["Layers"] = std::move(layersJson);
+
                 json entities = json::array();
                 json hierarchyArray = json::array();
                 int entityCount = 0;
@@ -273,6 +289,26 @@ namespace Scenes {
                 if (!Serialization::Serializer::LoadJson(filename, ext, sceneJson)) {
                     LOG_ERROR("Error: Cannot open file: " << filename);
                     return false;
+                }
+
+                // Restore layer definitions (names, masks, visibility) before entity deserialization
+                if (sceneJson.contains("Layers") && sceneJson["Layers"].is_array()) {
+                    const auto& layersArr = sceneJson["Layers"];
+                    for (const auto& ent : layersArr) {
+                        if (!ent.contains("id") || !ent.contains("name")) continue;
+                        const uint16_t lid = ent["id"].get<uint16_t>();
+                        const std::string lname = ent["name"].get<std::string>();
+                        // Create at slot if missing; rename existing otherwise
+                        if (!scene.GetLayers().CreateLayerAt(lid, lname)) {
+                            scene.GetLayers().RenameLayer(lid, lname);
+                        }
+                        if (ent.contains("mask")) {
+                            uint32_t mask = ent["mask"].get<uint32_t>();
+                            scene.GetLayers().SetLayerMask(lid, mask);
+                        }
+                        if (ent.contains("visible")) scene.GetLayers().SetVisibility(lid, ent["visible"].get<bool>());
+                        if (ent.contains("locked")) scene.GetLayers().SetLocked(lid, ent["locked"].get<bool>());
+                    }
                 }
 
                 world.DestroyAll();

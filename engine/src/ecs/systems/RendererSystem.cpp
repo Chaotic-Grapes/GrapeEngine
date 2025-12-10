@@ -418,7 +418,18 @@ namespace ECS {
                 // ---------------------------------------
                 for (int layer = 0; layer <= maxLayerId; ++layer) {
                     if (layer >= static_cast<int>(buckets.size())) continue;
-                    const auto& list = buckets[layer];
+                    // Make a local copy of the bucket so we can sort by ZIndex2D
+                    auto list = buckets[layer];
+                    // Sort by ZIndex2D.ZOrder ascending (smaller drawn first). Entities
+                    // without ZIndex2D are treated as ZOrder = 0.
+                    std::sort(list.begin(), list.end(), [&](const ECS::Entity& A, const ECS::Entity& B) {
+                        int za = 0, zb = 0;
+                        if (world.Has<Components::ZIndex2D>(A)) za = world.Get<Components::ZIndex2D>(A).ZOrder;
+                        if (world.Has<Components::ZIndex2D>(B)) zb = world.Get<Components::ZIndex2D>(B).ZOrder;
+                        if (za != zb) return za < zb;
+                        // Stable tie-breaker: entity index
+                        return A.Index < B.Index;
+                    });
 
                     glm::mat4 layerViewProj = viewProj;
 

@@ -376,6 +376,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() {
             m_layersPanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
             m_layersPanel.SetFileMenu(&m_fileMenu);
+            m_layersPanel.SetUndoSystem(&m_undoSystem);
         },
         [this]() { m_layersPanel.Render(); },
         [this](ECS::World* w) { m_layersPanel.SetWorld(w); }
