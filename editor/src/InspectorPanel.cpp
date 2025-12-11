@@ -30,6 +30,8 @@ through a unified system shared by both entities and prefab templates.
 #include "UndoSystem.h"
 #include "ecs/World.h"
 #include "ecs/Entity.h"
+#include "ecs/PrefabManager.h"
+#include "helpers/PrefabUtils.h"
 #include <imgui.h>
 #include <filesystem>
 #include <fstream>
@@ -300,20 +302,27 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
     ImGui::TextDisabled("%s (ID: %u)", entityName, (unsigned)m_entityId);
 
     // If this entity came from a prefab show the link and an Open Prefab button
-    if (m_world->Has<ECS::Components::PrefabLink>(entity)) {
-        const auto& link = m_world->Get<ECS::Components::PrefabLink>(entity);
+    if (m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
+        const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
         ImGui::Separator();
         ImGui::Text("Prefab Instance");
 
-        // Show just the filename (not the full path)
+        // Show the prefab path (looked up from PrefabManager)
+        std::string prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", std::filesystem::path(link.prefabPath).filename().string().c_str());
+        ImGui::TextDisabled("%s", std::filesystem::path(prefabPath).filename().string().c_str());
+
+        // Show modification indicator if modified
+        if (PrefabUtils::IsModified(meta)) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "(Modified)");
+        }
 
         // Button to open the original prefab template for editing
         ImGui::SameLine();
         if (ImGui::Button("Open Prefab")) {
             // Switch inspector into prefab mode using the linked path
-            InspectPrefab(link.prefabPath);
+            InspectPrefab(prefabPath);
         }
 
         if (ImGui::IsItemHovered()) {
@@ -337,8 +346,16 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 
                 // Only allow .prefab files to be dropped here
                 if (std::filesystem::path(droppedPath).extension() == ".prefab") {
-                    // Add a PrefabLink component so we can later sync it
-                    m_world->Add<ECS::Components::PrefabLink>(entity, droppedPath);
+                    // Add PrefabInstanceMetadata with registered hash
+                    uint32_t hash = ECS::PrefabManager::ComputeHash(
+                        ECS::PrefabManager::NormalizePath(droppedPath)
+                    );
+
+                    ECS::Components::PrefabInstanceMetadata meta;
+                    meta.PrefabHash = hash;
+                    meta.Flags = 0;
+                    m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
+
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
                 }
@@ -355,7 +372,17 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     data += path.size() + 1;
                     if (path.empty()) continue;
                     if (std::filesystem::path(path).extension() != ".prefab") continue;
-                    m_world->Add<ECS::Components::PrefabLink>(entity, path);
+
+                    // Add PrefabInstanceMetadata with registered hash
+                    uint32_t hash = ECS::PrefabManager::ComputeHash(
+                        ECS::PrefabManager::NormalizePath(path)
+                    );
+
+                    ECS::Components::PrefabInstanceMetadata meta;
+                    meta.PrefabHash = hash;
+                    meta.Flags = 0;
+                    m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
+
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
                     break;
@@ -1027,16 +1054,21 @@ void InspectorPanel::_applyPrefabToInstances() {
     // Make sure the prefab file on disk is up to date
     _savePrefabData();
 
-    // Iterate over every entity that has a PrefabLink component
+    // Iterate over every entity that has a PrefabInstanceMetadata component
     int count = 0;
-    m_world->Each<ECS::Components::PrefabLink>([&](ECS::Entity entity, ECS::Components::PrefabLink& link) {
+
+    // Handle new format: PrefabInstanceMetadata
+    uint32_t targetHash = ECS::PrefabManager::ComputeHash(
+        ECS::PrefabManager::NormalizePath(m_prefabPath)
+    );
+
+    m_world->Each<ECS::Components::PrefabInstanceMetadata>([&](ECS::Entity entity, ECS::Components::PrefabInstanceMetadata& meta) {
         // Apply only to instances that match the prefab we are editing
-        if (link.prefabPath == m_prefabPath) {
+        if (meta.PrefabHash == targetHash) {
             _applyPrefabDataToEntity(entity);
-            // Increment count for status message
             count++;
         }
-        });
+    });
 
     m_statusMessage = "Applied to " + std::to_string(count) + " instance(s)";
     m_statusTimer = 2.0f;

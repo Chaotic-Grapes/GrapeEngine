@@ -25,6 +25,7 @@ Provides:
 #include "core/messaging/MessageTypes.h"
 #include "serialization/EntitySerializer.h"
 #include "ecs/Entity.h"
+#include "ecs/PrefabManager.h"
 #include "InspectorPanel.h"
 #include "services/Input.h"
 #include "ScriptTemplates.h"
@@ -765,10 +766,18 @@ void AssetBrowserPanel::_loadPrefab() {
                     entity = Serialization::EntitySerializer::DeserializeEntity(*m_world, entityJson);
                 }
 
-                // Add PrefabLink component to store normalized path of prefab
+                // Add PrefabInstanceMetadata component to store prefab hash
                 std::filesystem::path p(m_selectedAsset);
-                std::string linkPath = p.lexically_normal().string();
-                m_world->Set<ECS::Components::PrefabLink>(entity, ECS::Components::PrefabLink(linkPath));
+                std::string normalizedPath = p.lexically_normal().string();
+
+                uint32_t hash = ECS::PrefabManager::ComputeHash(
+                    ECS::PrefabManager::NormalizePath(normalizedPath)
+                );
+
+                ECS::Components::PrefabInstanceMetadata meta;
+                meta.PrefabHash = hash;
+                meta.Flags = 0;
+                m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
 
                 // Log info and update status message on successful load
                 LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());

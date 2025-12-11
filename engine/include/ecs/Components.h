@@ -117,27 +117,15 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
 
-        // Tracks source prefab asset for entity instantiation and editor re-import workflows
-        struct PrefabLink {
-        public:
-            // Fixed size buffer for prefab asset path to maintain 
-            // trivially copyable status for ECS performance
-            static constexpr size_t MaxPathLength = 256;
-            char prefabPath[MaxPathLength] = { 0 };     // Path to the prefab file this entity was created from
-            PrefabLink() = default;
-
-            // Construct from std::string
-            PrefabLink(const std::string& path) { setPath(path); }
-
-            // Safe string copy with null termination guarantee
-            void setPath(const std::string& path) {
-                strncpy_s(prefabPath, path.c_str(), MaxPathLength - 1);
-                prefabPath[MaxPathLength - 1] = '\0'; // Always null-terminate
-            }
-            // Convert back to std::string for convenience
-            std::string getPath() const { return std::string(prefabPath); }
+        // Prefab instance metadata: runtime tracking of prefab associations
+        // NOTE: This component is NEVER serialized. It's reconstructed during scene load.
+        struct PrefabInstanceMetadata {
+            uint32_t PrefabHash = 0;     // FNV-1a hash of prefab path (resolved by PrefabManager)
+            uint16_t Flags = 0;          // Bit 0: IsModified, Bit 1: Synced, rest reserved
+            uint16_t _padding = 0;       // Padding to maintain alignment (8 bytes total)
         };
-        static_assert(std::is_trivially_copyable_v<PrefabLink>, "PrefabLink must be trivially copyable");
+        static_assert(sizeof(PrefabInstanceMetadata) == 8, "PrefabInstanceMetadata must be 8 bytes");
+        static_assert(std::is_trivially_copyable_v<PrefabInstanceMetadata>, "PrefabInstanceMetadata must be trivially copyable");
 
         // Lifetime in seconds; entities with Time <= 0 can be culled by a system.
         struct Lifetime {

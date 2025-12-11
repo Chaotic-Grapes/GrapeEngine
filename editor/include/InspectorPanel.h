@@ -24,6 +24,7 @@ instantiation and synchronization between live entities and serialized prefab da
 #include "ComponentPropertyEditor.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
+#include "ecs/PrefabManager.h"
 #include <imgui.h>
 #include "EditorStyle.h"
 #include <string>
@@ -34,9 +35,8 @@ instantiation and synchronization between live entities and serialized prefab da
 using EntityId = uint32_t;
 class EditorFileMenu;
 
-namespace Editor {
-    class UndoSystem;
-}
+namespace Editor { class UndoSystem; }
+namespace ECS { class PrefabManager; }
 
 // Unified inspector panel capable of inspecting both entities and prefabs
 class InspectorPanel {
@@ -211,6 +211,7 @@ private:
     ComponentUI m_componentUI;
     EditorFileMenu* m_fileMenu = nullptr;
     Editor::UndoSystem* m_undoSystem = nullptr;
+    ECS::PrefabManager* m_prefabManager = nullptr; // Prefab manager (for prefab path lookup / instance management)
 
     // Selection state
     InspectionMode m_mode = InspectionMode::None;  // Current inspection context

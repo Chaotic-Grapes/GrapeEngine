@@ -35,6 +35,7 @@ which entity the user is working with.
 
 // Forward declaration
 class BaseViewport;
+namespace ECS { class PrefabManager; }
 
 // EntityId is a numeric identifier for entities in the ECS world
 using EntityId = uint32_t;
@@ -187,6 +188,7 @@ private:
     EntityActions* m_entityActions = nullptr;       // For entity operations
     BaseViewport* m_viewport = nullptr;             // For entity focus
     EditorFileMenu* m_fileMenu = nullptr;
+    ECS::PrefabManager* m_prefabManager = nullptr; // Prefab manager (from SceneManager)
 
     // Selection state
     std::unordered_set<EntityId> m_selectedEntityIds;   // Currently selected entity IDs (empty = no selection)

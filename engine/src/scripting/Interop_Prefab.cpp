@@ -97,14 +97,6 @@ INTEROP_API bool PrefabManagerInterop_IsRegistered(void* prefabManagerPtr, uint3
     return manager->IsRegistered(hash);
 }
 
-INTEROP_API bool PrefabManagerInterop_IsRegistered(void* prefabManagerPtr, uint32_t hash) {
-    if (!prefabManagerPtr)
-        return false;
-
-    ECS::PrefabManager* manager = static_cast<ECS::PrefabManager*>(prefabManagerPtr);
-    return manager->IsRegistered(hash);
-}
-
 // ============================================================================
 // Prefab Instantiation
 // ============================================================================
@@ -124,23 +116,9 @@ INTEROP_API uint32_t PrefabManagerInterop_Instantiate(void* prefabManagerPtr, co
  *
  * @param prefabManagerPtr Pointer to the PrefabManager
  * @param path Path to the prefab asset
+ * @param parentEntityId Entity id of the parent
  * @return uint32_t Entity id of the instantiated prefab, or 0 on failure
  */
-INTEROP_API uint32_t PrefabManagerInterop_InstantiateAsChild(void* prefabManagerPtr, const char* path, uint32_t parentEntityId) {
-    if (!prefabManagerPtr || !path)
-        return 0;
-
-    ECS::PrefabManager* manager = static_cast<ECS::PrefabManager*>(prefabManagerPtr);
-    
-    // Construct parent entity from ID
-    ECS::Entity parent;
-    parent.Index = parentEntityId;
-    
-    ECS::Entity entity = manager->InstantiateAsChild(path, parent);
-    
-    return entity.IsNull() ? 0 : entity.Index;
-}
-
 INTEROP_API uint32_t PrefabManagerInterop_InstantiateAsChild(void* prefabManagerPtr, const char* path, uint32_t parentEntityId) {
     if (!prefabManagerPtr || !path)
         return 0;
@@ -190,18 +168,6 @@ INTEROP_API void PrefabManagerInterop_UntrackInstance(void* prefabManagerPtr, ui
     manager->UntrackInstance(entity);
 }
 
-INTEROP_API void PrefabManagerInterop_UntrackInstance(void* prefabManagerPtr, uint32_t entityId) {
-    if (!prefabManagerPtr)
-        return;
-
-    ECS::PrefabManager* manager = static_cast<ECS::PrefabManager*>(prefabManagerPtr);
-    
-    ECS::Entity entity;
-    entity.Index = entityId;
-    
-    manager->UntrackInstance(entity);
-}
-
 INTEROP_API uint32_t PrefabManagerInterop_GetInstanceCount(void* prefabManagerPtr, uint32_t prefabHash) {
     if (!prefabManagerPtr)
         return 0;
@@ -209,6 +175,10 @@ INTEROP_API uint32_t PrefabManagerInterop_GetInstanceCount(void* prefabManagerPt
     ECS::PrefabManager* manager = static_cast<ECS::PrefabManager*>(prefabManagerPtr);
     return manager->GetInstanceCount(prefabHash);
 }
+
+// ============================================================================
+// Prefab Synchronization
+// ============================================================================
 
 /**
  * @brief Synchronize an entity's state with the prefab at the given path
@@ -228,34 +198,6 @@ INTEROP_API bool PrefabManagerInterop_SynchronizeInstance(void* prefabManagerPtr
     entity.Index = entityId;
     
     return manager->SynchronizeInstance(entity, prefabPath);
-}
-
-// ============================================================================
-// Prefab Synchronization
-// ============================================================================
-
-INTEROP_API bool PrefabManagerInterop_SynchronizeInstance(void* prefabManagerPtr, uint32_t entityId, const char* prefabPath) {
-    if (!prefabManagerPtr || !prefabPath)
-        return false;
-
-    ECS::PrefabManager* manager = static_cast<ECS::PrefabManager*>(prefabManagerPtr);
-    
-    ECS::Entity entity;
-    entity.Index = entityId;
-    
-    return manager->SynchronizeInstance(entity, prefabPath);
-}
-
-INTEROP_API bool PrefabManagerInterop_DetachInstance(void* prefabManagerPtr, uint32_t entityId) {
-    if (!prefabManagerPtr)
-        return false;
-
-    ECS::PrefabManager* manager = static_cast<ECS::PrefabManager*>(prefabManagerPtr);
-    
-    ECS::Entity entity;
-    entity.Index = entityId;
-    
-    return manager->DetachInstance(entity);
 }
 
 /**

@@ -43,6 +43,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "math/Matrix4x4.h"
 
 namespace ECS {
+    // Forward declarations
+    class PrefabManager;
+
     // Relationship component for hierarchy
     // Move this to Components.h?
     struct Parent { Entity ParentEntity{NULL_ENTITY}; };
@@ -1000,6 +1003,18 @@ namespace ECS {
          */
         const std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash>& Archetypes() const { return m_archetypes; }
 
+        /**
+         * @brief Get the PrefabManager associated with this world.
+         * @return PrefabManager* Pointer to the PrefabManager, or nullptr if not set
+         */
+        PrefabManager* GetPrefabManager() const { return m_prefabManager; }
+
+        /**
+         * @brief Set the PrefabManager for this world.
+         * @param manager Pointer to the PrefabManager
+         */
+        void SetPrefabManager(PrefabManager* manager) { m_prefabManager = manager; }
+
         // ************** Entity Location ************** //
 
         // Location of an entity within the world
@@ -1498,6 +1513,9 @@ namespace ECS {
         // Ordered list of all archetypes for incremental query processing
         // When m_archetypeVersion increases, queries only check archetypes added since last update
         std::vector<Archetype*> m_archetypeList;
+
+        // PrefabManager for managing prefab instances and registration
+        PrefabManager* m_prefabManager = nullptr;
     };
 }
 

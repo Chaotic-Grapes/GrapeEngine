@@ -31,6 +31,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scene/Scene.h"
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
+#include "ecs/PrefabManager.h"
 
 using json = nlohmann::json;
 
@@ -38,7 +39,7 @@ namespace Scenes {
     class SceneManager {
     public:
         // Default constructor
-        SceneManager() = default;
+        SceneManager() : m_prefabManager(std::make_unique<ECS::PrefabManager>()) { }
         
         // Delete copy constructor and copy assignment operator (non-copyable due to unique_ptr)
         SceneManager(const SceneManager&) = delete;
@@ -47,6 +48,22 @@ namespace Scenes {
         // Default move constructor and move assignment operator
         SceneManager(SceneManager&&) = default;
         SceneManager& operator=(SceneManager&&) = default;
+
+        /**
+         * @brief Gets the prefab manager for this scene manager.
+         * @return Pointer to the PrefabManager.
+         */
+        ECS::PrefabManager* GetPrefabManager() {
+            return m_prefabManager.get();
+        }
+
+        /**
+         * @brief Gets the prefab manager for this scene manager (const version).
+         * @return Const pointer to the PrefabManager.
+         */
+        const ECS::PrefabManager* GetPrefabManager() const {
+            return m_prefabManager.get();
+        }
 
         /**
          * @brief Adds a new scene to the manager.
@@ -275,8 +292,7 @@ namespace Scenes {
          * @param outEntityOrder Optional output vector to receive the loaded entity order.
          * @return true if load was successful, false otherwise.
          */
-        bool LoadScene(const size_t index, const std::string& filename,
-                       std::vector<uint32_t>* outEntityOrder = nullptr) const {
+        bool LoadScene(const size_t index, const std::string& filename, std::vector<uint32_t>* outEntityOrder = nullptr) {
             if (index >= m_scenes.size() || !m_scenes[index])
                 return false;
             
@@ -369,6 +385,10 @@ namespace Scenes {
                     }
                 }
 
+                // Reconstruct prefab metadata for all instances
+                // Converts legacy PrefabLink to runtime PrefabInstanceMetadata
+                _reconstructPrefabMetadata(world, restoredEntities);
+
                 return true;
             }
             catch (const json::parse_error& e) {
@@ -397,7 +417,30 @@ namespace Scenes {
             m_active = toIndex;
         }
 
+        // Initialize runtime prefab metadata post-load
+        void _reconstructPrefabMetadata(ECS::World& world, const std::vector<ECS::Entity>& restoredEntities) {
+            // Initialize PrefabManager if not already done
+            if (!m_prefabManager) {
+                m_prefabManager = std::make_unique<ECS::PrefabManager>(&world);
+            }
+            else {
+                m_prefabManager->SetWorld(&world);
+            }
+
+            // Just ensure all instances are tracked in the manager
+            for (const auto& entity : restoredEntities) {
+                if (!entity.IsNull() && world.IsAlive(entity)) {
+                    if (world.Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
+                        const auto& meta = world.Get<ECS::Components::PrefabInstanceMetadata>(entity);
+                        // Track instance in manager
+                        m_prefabManager->TrackInstance(entity, meta.PrefabHash);
+                    }
+                }
+            }
+        }
+
         std::vector<std::unique_ptr<Scene>> m_scenes;
+        std::unique_ptr<ECS::PrefabManager> m_prefabManager;
         static constexpr size_t NPOS = static_cast<size_t>(-1);
         size_t m_active = NPOS;
         size_t m_pendingActive = NPOS;
