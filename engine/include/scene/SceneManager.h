@@ -427,10 +427,35 @@ namespace Scenes {
                 m_prefabManager->SetWorld(&world);
             }
 
-            // Just ensure all instances are tracked in the manager
+            // Migrate legacy PrefabLink components to new PrefabInstanceMetadata format
             for (const auto& entity : restoredEntities) {
                 if (!entity.IsNull() && world.IsAlive(entity)) {
-                    if (world.Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
+                    // Check for legacy PrefabLink component and migrate it
+                    if (world.Has<ECS::Components::PrefabLink>(entity)) {
+                        const auto& link = world.Get<ECS::Components::PrefabLink>(entity);
+                        std::string path = link.getPath();
+
+                        if (!path.empty()) {
+                            // Register prefab and get hash
+                            uint32_t hash = m_prefabManager->RegisterPrefab(path);
+
+                            // Create PrefabInstanceMetadata
+                            ECS::Components::PrefabInstanceMetadata meta;
+                            meta.PrefabHash = hash;
+                            meta.Flags = 0;
+
+                            // Add metadata component (replaces PrefabLink)
+                            world.Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
+
+                            // Remove old PrefabLink
+                            world.Remove<ECS::Components::PrefabLink>(entity);
+
+                            // Track instance in manager
+                            m_prefabManager->TrackInstance(entity, hash);
+                        }
+                    }
+                    // Track any existing PrefabInstanceMetadata
+                    else if (world.Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
                         const auto& meta = world.Get<ECS::Components::PrefabInstanceMetadata>(entity);
                         // Track instance in manager
                         m_prefabManager->TrackInstance(entity, meta.PrefabHash);

@@ -59,6 +59,9 @@ public:
     // different world instances dynamically)
     void SetWorld(ECS::World* world);
 
+    // Set the prefab manager for displaying prefab instance information
+    void SetPrefabManager(ECS::PrefabManager* manager) { m_prefabManager = manager; }
+
     // -------------------------------------------------------------------------
     // Selection Management
     // -------------------------------------------------------------------------

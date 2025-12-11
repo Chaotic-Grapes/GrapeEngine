@@ -60,6 +60,9 @@ public:
     // Clears internal state like selection and expanded nodes
     void SetWorld(ECS::World* world);
 
+    // Set the prefab manager for displaying prefab instance information
+    void SetPrefabManager(ECS::PrefabManager* manager) { m_prefabManager = manager; }
+
     // Register a callback function to be notified when entity selection changes
     // Useful for synchronizing selection with other editor panels
     void OnSelectionChanged(SelectionCallback callback);

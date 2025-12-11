@@ -475,9 +475,24 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     // Append prefab indicator if this is a prefab instance
     if (isPrefabInstance && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
         const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
-        std::string prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
-        std::string prefabName = std::filesystem::path(prefabPath).stem().string();
-        oss << " [" << prefabName << "]";
+        oss << " [Prefab";
+        
+        // Try to show prefab name if manager is available, otherwise show hash
+        if (m_prefabManager) {
+            std::string prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
+            if (!prefabPath.empty()) {
+                std::string prefabName = std::filesystem::path(prefabPath).stem().string();
+                oss << ":" << prefabName;
+            }
+            else {
+                oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
+            }
+        }
+        else {
+            oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
+        }
+        
+        oss << "]";
 
         // Show modification indicator
         if (PrefabUtils::IsModified(meta)) {
@@ -969,7 +984,9 @@ void HierarchyPanel::_renderEntityContextMenu() {
                 if (hasMeta) {
                     if (ImGui::Selectable("Detach Prefab")) {
                         m_world->Remove<ECS::Components::PrefabInstanceMetadata>(entity);
-                        m_prefabManager->RemoveInstance(entity);
+                        if (m_prefabManager) {
+                            m_prefabManager->RemoveInstance(entity);
+                        }
                         LOG_INFO("Detached prefab from entity");
                     }
                 }

@@ -308,9 +308,17 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
         ImGui::Text("Prefab Instance");
 
         // Show the prefab path (looked up from PrefabManager)
-        std::string prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
+        std::string prefabPath;
+        if (m_prefabManager) {
+            prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
+        }
+        
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", std::filesystem::path(prefabPath).filename().string().c_str());
+        if (!prefabPath.empty()) {
+            ImGui::TextDisabled("%s", std::filesystem::path(prefabPath).filename().string().c_str());
+        } else {
+            ImGui::TextDisabled("0x%08X", meta.PrefabHash);
+        }
 
         // Show modification indicator if modified
         if (PrefabUtils::IsModified(meta)) {
@@ -318,15 +326,17 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "(Modified)");
         }
 
-        // Button to open the original prefab template for editing
-        ImGui::SameLine();
-        if (ImGui::Button("Open Prefab")) {
-            // Switch inspector into prefab mode using the linked path
-            InspectPrefab(prefabPath);
-        }
+        // Button to open the original prefab template for editing (only if we have path)
+        if (!prefabPath.empty()) {
+            ImGui::SameLine();
+            if (ImGui::Button("Open Prefab")) {
+                // Switch inspector into prefab mode using the linked path
+                InspectPrefab(prefabPath);
+            }
 
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Opens the prefab template file for editing");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Opens the prefab template file for editing");
+            }
         }
 
         ImGui::Separator();

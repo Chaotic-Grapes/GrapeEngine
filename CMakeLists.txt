@@ -162,9 +162,11 @@ if(BUILD_EDITOR)
         endif()
     elseif (MSVC)
         if(TARGET GrapeEditor)
-            target_compile_options(GrapeEditor PRIVATE /W4)
+            # /FS ensures the compiler uses shared PDB access when multiple cl.exe
+            # processes write to the same PDB (fixes C1041 in parallel builds).
+            target_compile_options(GrapeEditor PRIVATE /W4 /FS)
         elseif(TARGET GrapeEngineLib)
-            target_compile_options(GrapeEngineLib PRIVATE /W4)
+            target_compile_options(GrapeEngineLib PRIVATE /W4 /FS)
         endif()
     endif()
 endif()

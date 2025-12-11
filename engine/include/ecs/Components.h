@@ -117,6 +117,29 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
 
+        // [DEPRECATED] Legacy prefab link - kept for backward compatibility during migration
+        // Use PrefabInstanceMetadata instead in new code
+        struct PrefabLink {
+        public:
+            // Fixed size buffer for prefab asset path to maintain 
+            // trivially copyable status for ECS performance
+            static constexpr size_t MaxPathLength = 256;
+            char prefabPath[MaxPathLength] = { 0 };     // Path to the prefab file this entity was created from
+            PrefabLink() = default;
+
+            // Construct from std::string
+            PrefabLink(const std::string& path) { setPath(path); }
+
+            // Safe string copy with null termination guarantee
+            void setPath(const std::string& path) {
+                strncpy_s(prefabPath, path.c_str(), MaxPathLength - 1);
+                prefabPath[MaxPathLength - 1] = '\0'; // Always null-terminate
+            }
+            // Convert back to std::string for convenience
+            std::string getPath() const { return std::string(prefabPath); }
+        };
+        static_assert(std::is_trivially_copyable_v<PrefabLink>, "PrefabLink must be trivially copyable");
+
         // Prefab instance metadata: runtime tracking of prefab associations
         // NOTE: This component is NEVER serialized. It's reconstructed during scene load.
         struct PrefabInstanceMetadata {
