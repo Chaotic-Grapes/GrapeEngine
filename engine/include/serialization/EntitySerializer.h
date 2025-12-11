@@ -127,7 +127,8 @@ namespace ECS {
 
 			// CRITICAL: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
-			if (!texPath.empty()) {
+			// Only reload if TextureId is not already set (0 means not loaded)
+			if (!texPath.empty() && sprite.TextureId == 0) {
 				auto tex = RM.Get<Texture>(texPath);
 				if (tex) {
 					sprite.TextureId = static_cast<uint32_t>(tex->ID());
@@ -139,7 +140,7 @@ namespace ECS {
 					std::cerr << "[EntitySerializer] Warning: Failed to load texture from path: " << texPath << std::endl;
 				}
 			}
-			else {
+			else if (texPath.empty()) {
 				sprite.TextureId = 0; // No texture path provided
 			}
 
@@ -175,7 +176,8 @@ namespace ECS {
 
 			// CRITICAL: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
-			if (!texPath.empty()) {
+			// Only reload if TextureId is not already set (0 means not loaded)
+			if (!texPath.empty() && anim.TextureId == 0) {
 				auto tex = RM.Get<Texture>(texPath);
 				if (tex) {
 					anim.TextureId = static_cast<uint32_t>(tex->ID());
@@ -192,7 +194,7 @@ namespace ECS {
 					std::cerr << "[EntitySerializer] Warning: Failed to load sprite sheet from path: " << texPath << std::endl;
 				}
 			}
-			else {
+			else if (texPath.empty()) {
 				anim.TextureId = 0; // No texture path provided
 			}
 

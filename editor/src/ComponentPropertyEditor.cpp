@@ -248,19 +248,24 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
         // Show only the file name instead of the full path for readability
         valueText = std::filesystem::path(texPath).filename().string();
 
-        // Reload texture from path if TextureId is 0 or invalid
-        // This happens when loading a scene - TexturePath is saved but TextureId is not persistent
+        // Only reload texture if it's not already loaded (TextureId is 0)
+        // The reload happens once when a scene is first loaded, then texture ID persists
         uint32_t currentId = data.value("TextureId", 0u);
         if (currentId == 0) {
-            auto tex = RM.Get<Texture>(texPath);
-            if (tex) {
-                data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                data["Width"] = tex->Width();
-                data["Height"] = tex->Height();
-                LOG_DEBUG("Reloaded texture from path: " << texPath << ", id=" << tex->ID());
-            }
-            else {
-                LOG_WARNING("Failed to reload texture from path: " << texPath);
+            // Only try to load once - if it fails, don't retry on every frame
+            if (!data.contains("_TextureLoadAttempted")) {
+                auto tex = RM.Get<Texture>(texPath);
+                if (tex) {
+                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["Width"] = tex->Width();
+                    data["Height"] = tex->Height();
+                    LOG_DEBUG("Reloaded texture from path: " << texPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_WARNING("Failed to reload texture from path: " << texPath);
+                }
+                // Mark that we've attempted to load this texture (even if it failed)
+                data["_TextureLoadAttempted"] = true;
             }
         }
     }
@@ -655,19 +660,24 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         // Show only the file name instead of the full path for readability
         valueText = std::filesystem::path(texPath).filename().string();
 
-        // Reload texture from path if TextureId is 0 or invalid
-        // This happens when loading a scene - TexturePath is saved but TextureId is not persistent
+        // Only reload texture if it's not already loaded (TextureId is 0)
+        // The reload happens once when a scene is first loaded, then texture ID persists
         uint32_t currentId = data.value("TextureId", 0u);
         if (currentId == 0) {
-            auto tex = RM.Get<Texture>(texPath);
-            if (tex) {
-                data["TextureId"] = static_cast<uint32_t>(tex->ID());
-                data["SheetWidth"] = tex->Width();
-                data["SheetHeight"] = tex->Height();
-                LOG_DEBUG("Reloaded sprite sheet from path: " << texPath << ", id=" << tex->ID());
-            }
-            else {
-                LOG_WARNING("Failed to reload sprite sheet from path: " << texPath);
+            // Only try to load once - if it fails, don't retry on every frame
+            if (!data.contains("_TextureLoadAttempted")) {
+                auto tex = RM.Get<Texture>(texPath);
+                if (tex) {
+                    data["TextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["SheetWidth"] = tex->Width();
+                    data["SheetHeight"] = tex->Height();
+                    LOG_DEBUG("Reloaded sprite sheet from path: " << texPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_WARNING("Failed to reload sprite sheet from path: " << texPath);
+                }
+                // Mark that we've attempted to load this texture (even if it failed)
+                data["_TextureLoadAttempted"] = true;
             }
         }
     }
