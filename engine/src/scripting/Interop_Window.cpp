@@ -34,9 +34,11 @@ static Platform::IWindow* GetMainWindow() {
 // Window API - Window Queries
 // ============================================================================
 
-/// <summary>
-/// Get the width of the main window
-/// </summary>
+/**
+ * @brief Get the width of the main window
+ *
+ * @return int Width in pixels, or 0 on error
+ */
 INTEROP_API int EngineInterop_Window_GetWidth() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -46,9 +48,11 @@ INTEROP_API int EngineInterop_Window_GetWidth() {
     return window->GetWidth();
 }
 
-/// <summary>
-/// Get the height of the main window
-/// </summary>
+/**
+ * @brief Get the height of the main window
+ *
+ * @return int Height in pixels, or 0 on error
+ */
 INTEROP_API int EngineInterop_Window_GetHeight() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -58,9 +62,11 @@ INTEROP_API int EngineInterop_Window_GetHeight() {
     return window->GetHeight();
 }
 
-/// <summary>
-/// Check if the window should close
-/// </summary>
+/**
+ * @brief Check if the window should close
+ *
+ * @return true if window should close or main window is unavailable
+ */
 INTEROP_API bool EngineInterop_Window_ShouldClose() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -69,9 +75,9 @@ INTEROP_API bool EngineInterop_Window_ShouldClose() {
     return window->ShouldClose();
 }
 
-/// <summary>
-/// Request the window to close
-/// </summary>
+/**
+ * @brief Request the window to close
+ */
 INTEROP_API void EngineInterop_Window_Close() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -85,9 +91,11 @@ INTEROP_API void EngineInterop_Window_Close() {
 // Window API - Window State
 // ============================================================================
 
-/// <summary>
-/// Check if the window is focused
-/// </summary>
+/**
+ * @brief Check if the window is focused
+ *
+ * @return true if focused, false otherwise
+ */
 INTEROP_API bool EngineInterop_Window_IsFocused() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -96,9 +104,11 @@ INTEROP_API bool EngineInterop_Window_IsFocused() {
     return window->IsFocused();
 }
 
-/// <summary>
-/// Check if the window is minimized
-/// </summary>
+/**
+ * @brief Check if the window is minimized
+ *
+ * @return true if minimized, false otherwise
+ */
 INTEROP_API bool EngineInterop_Window_IsMinimized() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -107,9 +117,11 @@ INTEROP_API bool EngineInterop_Window_IsMinimized() {
     return window->IsMinimized();
 }
 
-/// <summary>
-/// Set the window minimized state
-/// </summary>
+/**
+ * @brief Set the window minimized state
+ *
+ * @param minimized True to minimize, false to restore
+ */
 INTEROP_API void EngineInterop_Window_SetMinimized(bool minimized) {
     auto* window = GetMainWindow();
     if (!window) {
@@ -119,9 +131,11 @@ INTEROP_API void EngineInterop_Window_SetMinimized(bool minimized) {
     window->SetMinimized(minimized);
 }
 
-/// <summary>
-/// Check if the window is maximized
-/// </summary>
+/**
+ * @brief Check if the window is maximized
+ *
+ * @return true if maximized, false otherwise
+ */
 INTEROP_API bool EngineInterop_Window_IsMaximized() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -130,9 +144,11 @@ INTEROP_API bool EngineInterop_Window_IsMaximized() {
     return window->IsMaximized();
 }
 
-/// <summary>
-/// Set the window maximized state
-/// </summary>
+/**
+ * @brief Set the window maximized state
+ *
+ * @param maximized True to maximize, false to restore
+ */
 INTEROP_API void EngineInterop_Window_SetMaximized(bool maximized) {
     auto* window = GetMainWindow();
     if (!window) {
@@ -142,9 +158,11 @@ INTEROP_API void EngineInterop_Window_SetMaximized(bool maximized) {
     window->SetMaximized(maximized);
 }
 
-/// <summary>
-/// Check if the window is visible
-/// </summary>
+/**
+ * @brief Check if the window is visible
+ *
+ * @return true if visible, false otherwise
+ */
 INTEROP_API bool EngineInterop_Window_IsVisible() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -153,9 +171,11 @@ INTEROP_API bool EngineInterop_Window_IsVisible() {
     return window->IsVisible();
 }
 
-/// <summary>
-/// Set the window visibility
-/// </summary>
+/**
+ * @brief Set the window visibility
+ *
+ * @param visible True to show, false to hide
+ */
 INTEROP_API void EngineInterop_Window_SetVisible(bool visible) {
     auto* window = GetMainWindow();
     if (!window) {
@@ -165,9 +185,11 @@ INTEROP_API void EngineInterop_Window_SetVisible(bool visible) {
     window->SetVisible(visible);
 }
 
-/// <summary>
-/// Check if the window is resizable
-/// </summary>
+/**
+ * @brief Check if the window is resizable
+ *
+ * @return true if resizable, false otherwise
+ */
 INTEROP_API bool EngineInterop_Window_IsResizable() {
     auto* window = GetMainWindow();
     if (!window) {
@@ -176,9 +198,11 @@ INTEROP_API bool EngineInterop_Window_IsResizable() {
     return window->IsResizable();
 }
 
-/// <summary>
-/// Set the window resizable state
-/// </summary>
+/**
+ * @brief Set the window resizable state
+ *
+ * @param resizable True to allow resizing, false to disable
+ */
 INTEROP_API void EngineInterop_Window_SetResizable(bool resizable) {
     auto* window = GetMainWindow();
     if (!window) {
@@ -192,9 +216,11 @@ INTEROP_API void EngineInterop_Window_SetResizable(bool resizable) {
 // Window API - Window Mode and Size
 // ============================================================================
 
-/// <summary>
-/// Set the window mode (Windowed = 1, Fullscreen = 2, Borderless = 4)
-/// </summary>
+/**
+ * @brief Set the window mode (Windowed = 1, Fullscreen = 2, Borderless = 4)
+ *
+ * @param mode Mode flags as integer matching Platform::WindowMode
+ */
 INTEROP_API void EngineInterop_Window_SetMode(int mode) {
     auto* window = GetMainWindow();
     if (!window) {
@@ -204,9 +230,12 @@ INTEROP_API void EngineInterop_Window_SetMode(int mode) {
     window->SetMode(static_cast<Platform::WindowMode>(mode));
 }
 
-/// <summary>
-/// Check if the window has a specific mode flag
-/// </summary>
+/**
+ * @brief Check if the window has a specific mode flag
+ *
+ * @param mode Mode flag to check
+ * @return true if the window has the mode, false otherwise
+ */
 INTEROP_API bool EngineInterop_Window_HasMode(int mode) {
     auto* window = GetMainWindow();
     if (!window) {
@@ -215,9 +244,12 @@ INTEROP_API bool EngineInterop_Window_HasMode(int mode) {
     return window->HasMode(static_cast<Platform::WindowMode>(mode));
 }
 
-/// <summary>
-/// Resize the window to the specified dimensions
-/// </summary>
+/**
+ * @brief Resize the window to the specified dimensions
+ *
+ * @param width New width in pixels
+ * @param height New height in pixels
+ */
 INTEROP_API void EngineInterop_Window_Resize(int width, int height) {
     auto* window = GetMainWindow();
     if (!window) {

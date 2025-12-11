@@ -47,25 +47,20 @@ public record struct TagMask(uint Mask);
 public record struct Active(bool Enabled);
 
 /// <summary>
-/// Prefab link component: Reference to the source prefab of this entity.
+/// Prefab instance metadata component: Runtime data for prefab instances.
+/// Contains the hash of the source prefab and instance flags.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public record struct PrefabLink
+public record struct PrefabInstanceMetadata
 {
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
-    public char[] PrefabPath;
+    public uint PrefabHash;
+    public uint Flags;
 
-    public PrefabLink(string path)
+    public PrefabInstanceMetadata(uint hash, uint flags = 0)
     {
-        PrefabPath = new char[256];
-        if (!string.IsNullOrEmpty(path))
-        {
-            var chars = path.ToCharArray();
-            Array.Copy(chars, PrefabPath, (int)GMath.Min(chars.Length, 255));
-        }
+        PrefabHash = hash;
+        Flags = flags;
     }
-
-    public readonly string GetPath() => new string(PrefabPath).TrimEnd('\0');
 }
 
 /// <summary>

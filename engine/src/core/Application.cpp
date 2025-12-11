@@ -109,6 +109,20 @@ namespace Engine {
         // Update time using platform timestamp and computed delta
         TimeSystem::Instance().Advance(rawDelta, frameStart);
 
+        // Apply FPS cap if set by sleeping the remainder of the frame
+        double maximumFPS = TimeSystem::Instance().GetMaximumFPS();
+        if (maximumFPS > 0.0) {
+            double minFrameTime = 1.0 / maximumFPS;
+            double elapsedTime = std::chrono::duration_cast<TimeSystem::Duration>(
+                TimeSystem::Clock::now().time_since_epoch()
+            ).count() - frameStart;
+
+            if (elapsedTime < minFrameTime) {
+                double sleepTime = minFrameTime - elapsedTime;
+                std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime));
+            }
+        }
+
         // --- Input Processing ---
         Input::_processInput();
         
@@ -136,8 +150,6 @@ namespace Engine {
             double mouseX, mouseY;
             Input::GetMousePosition(mouseX, mouseY);
             Vector2D mousePos(static_cast<float>(mouseX), static_cast<float>(mouseY));
-
-            // GUI input and layout are handled by the registered GUISystem via SystemManager
 
             // Game mode: always run systems
             // Editor mode: editor controls system execution via UpdateSystemsByMode()

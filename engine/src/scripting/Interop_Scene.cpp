@@ -28,6 +28,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // SceneManager Lifecycle
 // ============================================================================
 
+/**
+ * @brief Get the SceneManager instance from the Engine core
+ * @return void* Pointer to the SceneManager, or nullptr on error
+ */
 INTEROP_API void* SceneManagerInterop_GetInstance() {
     if (!Engine::CORE)
         return nullptr;
@@ -39,6 +43,11 @@ INTEROP_API void* SceneManagerInterop_GetInstance() {
 // Scene Management - Add/Remove/Query
 // ============================================================================
 
+/**
+ * @brief Add a new empty scene to the SceneManager
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @return uint64_t Index of the added scene, or -1 on error
+ */
 INTEROP_API uint64_t SceneManagerInterop_AddScene(void* sceneManagerPtr) {
     if (!sceneManagerPtr)
         return static_cast<uint64_t>(-1);
@@ -48,6 +57,12 @@ INTEROP_API uint64_t SceneManagerInterop_AddScene(void* sceneManagerPtr) {
     return manager->AddScene(newScene);
 }
 
+/**
+ * @brief Remove a scene by index from the SceneManager
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index of the scene to remove
+ * @return true if the scene was removed, false otherwise
+ */
 INTEROP_API bool SceneManagerInterop_RemoveScene(void* sceneManagerPtr, uint64_t sceneIndex) {
     if (!sceneManagerPtr)
         return false;
@@ -56,6 +71,11 @@ INTEROP_API bool SceneManagerInterop_RemoveScene(void* sceneManagerPtr, uint64_t
     return manager->RemoveScene(static_cast<size_t>(sceneIndex));
 }
 
+/**
+ * @brief Get the total number of scenes managed by the SceneManager
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @return uint64_t Number of scenes, or 0 on error
+ */
 INTEROP_API uint64_t SceneManagerInterop_GetSceneCount(void* sceneManagerPtr) {
     if (!sceneManagerPtr)
         return 0;
@@ -64,6 +84,12 @@ INTEROP_API uint64_t SceneManagerInterop_GetSceneCount(void* sceneManagerPtr) {
     return static_cast<uint64_t>(manager->GetSceneCount());
 }
 
+/**
+ * @brief Get a scene by index from the SceneManager
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index of the scene to retrieve
+ * @return void* Pointer to the Scene, or nullptr on error
+ */
 INTEROP_API void* SceneManagerInterop_GetScene(void* sceneManagerPtr, uint64_t sceneIndex) {
     if (!sceneManagerPtr)
         return nullptr;
@@ -77,6 +103,12 @@ INTEROP_API void* SceneManagerInterop_GetScene(void* sceneManagerPtr, uint64_t s
 // Scene Activation
 // ============================================================================
 
+/**
+ * @brief Request that the SceneManager set the active scene (deferred)
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index of the scene to make active
+ */
 INTEROP_API void SceneManagerInterop_SetActive(void* sceneManagerPtr, uint64_t sceneIndex) {
     if (!sceneManagerPtr)
         return;
@@ -85,6 +117,12 @@ INTEROP_API void SceneManagerInterop_SetActive(void* sceneManagerPtr, uint64_t s
     manager->SetActive(static_cast<size_t>(sceneIndex));
 }
 
+/**
+ * @brief Immediately set the active scene (synchronous)
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index of the scene to make active immediately
+ */
 INTEROP_API void SceneManagerInterop_SetActiveImmediate(void* sceneManagerPtr, uint64_t sceneIndex) {
     if (!sceneManagerPtr)
         return;
@@ -93,6 +131,12 @@ INTEROP_API void SceneManagerInterop_SetActiveImmediate(void* sceneManagerPtr, u
     manager->SetActiveImmediate(static_cast<size_t>(sceneIndex));
 }
 
+/**
+ * @brief Get the currently active scene
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @return void* Pointer to the active Scene, or nullptr on error
+ */
 INTEROP_API void* SceneManagerInterop_GetActive(void* sceneManagerPtr) {
     if (!sceneManagerPtr)
         return nullptr;
@@ -102,6 +146,12 @@ INTEROP_API void* SceneManagerInterop_GetActive(void* sceneManagerPtr) {
     return static_cast<void*>(scene);
 }
 
+/**
+ * @brief Get the index of the currently active scene
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @return uint64_t Index of active scene, or (uint64_t)-1 on error
+ */
 INTEROP_API uint64_t SceneManagerInterop_GetActiveIndex(void* sceneManagerPtr) {
     if (!sceneManagerPtr)
         return static_cast<uint64_t>(-1);
@@ -110,6 +160,12 @@ INTEROP_API uint64_t SceneManagerInterop_GetActiveIndex(void* sceneManagerPtr) {
     return static_cast<uint64_t>(manager->GetActiveIndex());
 }
 
+/**
+ * @brief Get the index of the pending scene to be activated
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @return uint64_t Index of pending scene, or (uint64_t)-1 if none or on error
+ */
 INTEROP_API uint64_t SceneManagerInterop_GetPendingIndex(void* sceneManagerPtr) {
     if (!sceneManagerPtr)
         return static_cast<uint64_t>(-1);
@@ -122,6 +178,11 @@ INTEROP_API uint64_t SceneManagerInterop_GetPendingIndex(void* sceneManagerPtr) 
 // Scene Update
 // ============================================================================
 
+/**
+ * @brief Update the SceneManager (typically advances scene logic)
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ */
 INTEROP_API void SceneManagerInterop_Update(void* sceneManagerPtr) {
     if (!sceneManagerPtr)
         return;
@@ -134,6 +195,16 @@ INTEROP_API void SceneManagerInterop_Update(void* sceneManagerPtr) {
 // Scene Serialization
 // ============================================================================
 
+/**
+ * @brief Save a scene to disk
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index of the scene to save
+ * @param filename Output filename/path
+ * @param sceneName Optional scene name (NULL uses default "Scene")
+ * @param version Optional version string (NULL uses default "1.0")
+ * @return true on success, false on failure
+ */
 INTEROP_API bool SceneManagerInterop_SaveScene(void* sceneManagerPtr, uint64_t sceneIndex, const char* filename, const char* sceneName, const char* version) {
     if (!sceneManagerPtr || !filename)
         return false;
@@ -151,6 +222,14 @@ INTEROP_API bool SceneManagerInterop_SaveScene(void* sceneManagerPtr, uint64_t s
     );
 }
 
+/**
+ * @brief Load a scene from disk into the specified index
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index to load the scene into
+ * @param filename Path to the scene file
+ * @return true on success, false on failure
+ */
 INTEROP_API bool SceneManagerInterop_LoadScene(void* sceneManagerPtr, uint64_t sceneIndex, const char* filename) {
     if (!sceneManagerPtr || !filename)
         return false;
@@ -163,6 +242,13 @@ INTEROP_API bool SceneManagerInterop_LoadScene(void* sceneManagerPtr, uint64_t s
 // Scene Properties
 // ============================================================================
 
+/**
+ * @brief Copy the scene's name into a caller buffer
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param buffer Destination buffer
+ * @param bufferSize Size of the destination buffer in bytes
+ */
 INTEROP_API void SceneInterop_GetName(void* scenePtr, char* buffer, int bufferSize) {
     if (!scenePtr || !buffer || bufferSize <= 0)
         return;
@@ -175,6 +261,12 @@ INTEROP_API void SceneInterop_GetName(void* scenePtr, char* buffer, int bufferSi
     buffer[copySize] = '\0';
 }
 
+/**
+ * @brief Set the scene's name
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param name Null-terminated name string
+ */
 INTEROP_API void SceneInterop_SetName(void* scenePtr, const char* name) {
     if (!scenePtr || !name)
         return;
@@ -183,6 +275,13 @@ INTEROP_API void SceneInterop_SetName(void* scenePtr, const char* name) {
     scene->SetName(name);
 }
 
+/**
+ * @brief Copy the scene's path into a caller buffer
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param buffer Destination buffer
+ * @param bufferSize Size of the destination buffer in bytes
+ */
 INTEROP_API void SceneInterop_GetPath(void* scenePtr, char* buffer, int bufferSize) {
     if (!scenePtr || !buffer || bufferSize <= 0)
         return;
@@ -195,6 +294,12 @@ INTEROP_API void SceneInterop_GetPath(void* scenePtr, char* buffer, int bufferSi
     buffer[copySize] = '\0';
 }
 
+/**
+ * @brief Set the scene's file path
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param path Null-terminated path string
+ */
 INTEROP_API void SceneInterop_SetPath(void* scenePtr, const char* path) {
     if (!scenePtr || !path)
         return;
@@ -207,6 +312,12 @@ INTEROP_API void SceneInterop_SetPath(void* scenePtr, const char* path) {
 // Scene World Access
 // ============================================================================
 
+/**
+ * @brief Get the ECS World associated with a Scene
+ *
+ * @param scenePtr Pointer to the Scene
+ * @return void* Pointer to the World, or nullptr on error
+ */
 INTEROP_API void* SceneInterop_GetWorld(void* scenePtr) {
     if (!scenePtr)
         return nullptr;
@@ -219,6 +330,12 @@ INTEROP_API void* SceneInterop_GetWorld(void* scenePtr) {
 // Scene Entity Operations
 // ============================================================================
 
+/**
+ * @brief Create a new entity in the scene and return its packed id
+ *
+ * @param scenePtr Pointer to the Scene
+ * @return uint64_t Packed entity id, or 0 on failure
+ */
 INTEROP_API uint64_t SceneInterop_CreateEntity(void* scenePtr) {
     if (!scenePtr)
         return 0;
@@ -228,6 +345,13 @@ INTEROP_API uint64_t SceneInterop_CreateEntity(void* scenePtr) {
     return ECS::EntityUtils::Pack(entity);
 }
 
+/**
+ * @brief Create a new entity with the specified parent
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param parentId Packed entity id of the parent
+ * @return uint64_t Packed entity id of the created entity, or 0 on failure
+ */
 INTEROP_API uint64_t SceneInterop_CreateEntityWithParent(void* scenePtr, uint64_t parentId) {
     if (!scenePtr)
         return 0;
@@ -238,6 +362,12 @@ INTEROP_API uint64_t SceneInterop_CreateEntityWithParent(void* scenePtr, uint64_
     return ECS::EntityUtils::Pack(entity);
 }
 
+/**
+ * @brief Destroy an entity in the scene
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param entityId Packed entity id to destroy
+ */
 INTEROP_API void SceneInterop_DestroyEntity(void* scenePtr, uint64_t entityId) {
     if (!scenePtr)
         return;
@@ -247,6 +377,13 @@ INTEROP_API void SceneInterop_DestroyEntity(void* scenePtr, uint64_t entityId) {
     scene->DestroyEntity(entity);
 }
 
+/**
+ * @brief Create a new entity on the specified layer
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param layerId Layer identifier
+ * @return uint64_t Packed entity id of the created entity, or 0 on failure
+ */
 INTEROP_API uint64_t SceneInterop_CreateOnLayer(void* scenePtr, uint16_t layerId) {
     if (!scenePtr)
         return 0;
@@ -256,6 +393,13 @@ INTEROP_API uint64_t SceneInterop_CreateOnLayer(void* scenePtr, uint16_t layerId
     return ECS::EntityUtils::Pack(entity);
 }
 
+/**
+ * @brief Set the layer of an entity
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param entityId Packed entity id
+ * @param layerId Layer identifier to assign
+ */
 INTEROP_API void SceneInterop_SetLayer(void* scenePtr, uint64_t entityId, uint16_t layerId) {
     if (!scenePtr)
         return;
@@ -265,6 +409,12 @@ INTEROP_API void SceneInterop_SetLayer(void* scenePtr, uint64_t entityId, uint16
     scene->SetLayer(entity, layerId);
 }
 
+/**
+ * @brief Remove an entity from its current layer
+ *
+ * @param scenePtr Pointer to the Scene
+ * @param entityId Packed entity id
+ */
 INTEROP_API void SceneInterop_RemoveFromLayer(void* scenePtr, uint64_t entityId) {
     if (!scenePtr)
         return;
@@ -272,4 +422,25 @@ INTEROP_API void SceneInterop_RemoveFromLayer(void* scenePtr, uint64_t entityId)
     Scenes::Scene* scene = static_cast<Scenes::Scene*>(scenePtr);
     ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
     scene->RemoveFromLayer(entity);
+}
+
+// ============================================================================
+// Prefab Management
+// ============================================================================
+
+/**
+ * @brief Get the PrefabManager associated with the scene manager
+ *
+ * @param scenePtr Pointer to the Scene
+ * @return void* Pointer to the PrefabManager, or nullptr on error
+ */
+INTEROP_API void* SceneInterop_GetPrefabManager(void* scenePtr) {
+    if (!scenePtr)
+        return nullptr;
+
+    if (!Engine::CORE)
+        return nullptr;
+
+    Scenes::SceneManager& sceneMgr = Engine::CORE->GetSceneManager();
+    return static_cast<void*>(sceneMgr.GetPrefabManager());
 }

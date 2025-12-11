@@ -48,6 +48,16 @@ public static class Time
     public static float UnscaledFixedDeltaTime => TimeAPI.GetUnscaledFixedDeltaTime();
 
     /// <summary>
+    /// The smoothed (moving average) delta time.
+    /// </summary>
+    public static float SmoothedDeltaTime => TimeAPI.GetSmoothedDeltaTime();
+
+    /// <summary>
+    /// The total unscaled time in seconds since the engine started.
+    /// </summary>
+    public static double RealTimeSinceStart => TimeAPI.GetRealTimeSinceStart();
+
+    /// <summary>
     /// The total time in seconds since the engine started.
     /// </summary>
     public static double ElapsedTime => TimeAPI.GetElapsedTime();
@@ -56,6 +66,16 @@ public static class Time
     /// The total number of frames that have passed since the engine started.
     /// </summary>
     public static int FrameCount => TimeAPI.GetFrameCount();
+
+    /// <summary>
+    /// The current frames per second.
+    /// </summary>
+    public static float FPS => TimeAPI.GetFPS();
+
+    /// <summary>
+    /// The frame time in milliseconds.
+    /// </summary>
+    public static float FrameTimeMs => TimeAPI.GetFrameTimeMs();
 
     // ============================================================================
     // Read/Write Properties
@@ -81,5 +101,19 @@ public static class Time
     {
         get => TimeAPI.GetMaximumDeltaTime();
         set => TimeAPI.SetMaximumDeltaTime(value);
+    }
+
+    /// <summary>
+    /// The maximum FPS cap (frames per second).
+    /// Default is 0 (no cap).
+    /// </summary>
+    /// <remarks>
+    /// Setting this to 0 disables the FPS cap.
+    /// When enabled, the engine will sleep to maintain the target FPS.
+    /// </remarks>
+    public static float MaximumFPS
+    {
+        get => TimeAPI.GetMaximumFPS();
+        set => TimeAPI.SetMaximumFPS(value);
     }
 }

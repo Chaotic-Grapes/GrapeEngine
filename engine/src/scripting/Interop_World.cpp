@@ -27,9 +27,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Query Iterator Structure
 // ============================================================================
 
-/// <summary>
-/// Structure representing query iteration state
-/// </summary>
+/**
+ * @brief Structure representing query iteration state
+ *
+ * Used by WorldInterop_CreateQuery and iteration helpers to keep track of
+ * matched archetypes, chunks, and entity positions during a query.
+ */
 struct QueryIterator {
     void* worldPtr;
     const void* archetypes;      // std::vector<Archetype*>*

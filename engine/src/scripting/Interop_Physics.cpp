@@ -28,9 +28,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Physics Control API
 // ============================================================================
 
-/// <summary>
-/// Set the global gravity for the physics world
-/// </summary>
+/**
+ * @brief Set the global gravity for the physics world
+ * @param worldPtr Pointer to the ECS World
+ * @param x Gravity X component
+ */
 INTEROP_API void WorldInterop_Physics_SetGravity(void* worldPtr, float x, float y) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
@@ -41,9 +43,12 @@ INTEROP_API void WorldInterop_Physics_SetGravity(void* worldPtr, float x, float 
     // This would set gravity in the physics engine (Box2D/Jolt)
 }
 
-/// <summary>
-/// Get the global gravity for the physics world
-/// </summary>
+/**
+ * @brief Get the global gravity for the physics world
+ * @param worldPtr Pointer to the ECS World
+ * @param outX Pointer to receive Gravity X component
+ * @param outY Pointer to receive Gravity Y component
+ */
 INTEROP_API void WorldInterop_Physics_GetGravity(void* worldPtr, float* outX, float* outY) {
     if (!worldPtr || !outX || !outY) {
         LOG_ERROR("[WorldInterop] Invalid parameters");
@@ -55,9 +60,11 @@ INTEROP_API void WorldInterop_Physics_GetGravity(void* worldPtr, float* outX, fl
     *outY = -9.81f;
 }
 
-/// <summary>
-/// Enable or disable the physics system
-/// </summary>
+/**
+ * @brief Enable or disable the physics system
+ * @param worldPtr Pointer to the ECS World
+ * @param enabled True to enable, false to disable
+ */
 INTEROP_API void WorldInterop_Physics_SetEnabled(void* worldPtr, bool enabled) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
@@ -67,9 +74,11 @@ INTEROP_API void WorldInterop_Physics_SetEnabled(void* worldPtr, bool enabled) {
     // TODO: Implement physics enable/disable
 }
 
-/// <summary>
-/// Check if the physics system is enabled
-/// </summary>
+/**
+ * @brief Check if the physics system is enabled
+ * @param worldPtr Pointer to the ECS World
+ * @return true if enabled, false otherwise
+ */
 INTEROP_API bool WorldInterop_Physics_IsEnabled(void* worldPtr) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
@@ -80,9 +89,13 @@ INTEROP_API bool WorldInterop_Physics_IsEnabled(void* worldPtr) {
     return true;
 }
 
-/// <summary>
-/// Apply a force to an entity with a Rigidbody2D
-/// </summary>
+/**
+ * @brief Apply a force to an entity with a Rigidbody2D
+ * @param worldPtr Pointer to the ECS World
+ * @param entityId Packed entity ID
+ * @param forceX Force X component
+ * @param forceY Force Y component
+ */
 INTEROP_API void WorldInterop_Physics_ApplyForce(void* worldPtr, uint64_t entityId, float forceX, float forceY) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
@@ -112,9 +125,13 @@ INTEROP_API void WorldInterop_Physics_ApplyForce(void* worldPtr, uint64_t entity
     vel->Value.Y += forceY / mass;
 }
 
-/// <summary>
-/// Apply an impulse to an entity with a Rigidbody2D
-/// </summary>
+/**
+ * @brief Apply an impulse to an entity with a Rigidbody2D
+ * @param worldPtr Pointer to the ECS World
+ * @param entityId Packed entity ID
+ * @param impulseX Impulse X component
+ * @param impulseY Impulse Y component
+ */
 INTEROP_API void WorldInterop_Physics_ApplyImpulse(void* worldPtr, uint64_t entityId, float impulseX, float impulseY) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");
@@ -143,9 +160,13 @@ INTEROP_API void WorldInterop_Physics_ApplyImpulse(void* worldPtr, uint64_t enti
     vel->Value.Y += impulseY / mass;
 }
 
-/// <summary>
-/// Get the velocity of an entity with a Rigidbody2D
-/// </summary>
+/**
+ * @brief Get the velocity of an entity with a Rigidbody2D
+ * @param worldPtr Pointer to the ECS World
+ * @param entityId Packed entity ID
+ * @param outX Pointer to receive Velocity X component
+ * @param outY Pointer to receive Velocity Y component
+ */
 INTEROP_API void WorldInterop_Physics_GetVelocity(void* worldPtr, uint64_t entityId, float* outX, float* outY) {
     if (!worldPtr || !outX || !outY) {
         LOG_ERROR("[WorldInterop] Invalid parameters");
@@ -171,9 +192,13 @@ INTEROP_API void WorldInterop_Physics_GetVelocity(void* worldPtr, uint64_t entit
     }
 }
 
-/// <summary>
-/// Set the velocity of an entity with a Rigidbody2D
-/// </summary>
+/**
+ * @brief Set the velocity of an entity with a Rigidbody2D
+ * @param worldPtr Pointer to the ECS World
+ * @param entityId Packed entity ID
+ * @param x Velocity X component
+ * @param y Velocity Y component
+ */
 INTEROP_API void WorldInterop_Physics_SetVelocity(void* worldPtr, uint64_t entityId, float x, float y) {
     if (!worldPtr) {
         LOG_ERROR("[WorldInterop] Invalid world pointer");

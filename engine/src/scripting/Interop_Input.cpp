@@ -25,23 +25,32 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Input API - Keyboard
 // ============================================================================
 
-/// <summary>
-/// Check if a key is currently pressed (true every frame while held)
-/// </summary>
+/**
+ * @brief Check if a key is currently pressed (true every frame while held)
+ *
+ * @param key The key code to query
+ * @return true if the key is currently pressed, false otherwise
+ */
 INTEROP_API bool EngineInterop_Input_IsKeyPressed(int key) {
     return Input::IsKeyPressed(key);
 }
 
-/// <summary>
-/// Check if a key was pressed this frame (true only on first frame)
-/// </summary>
+/**
+ * @brief Check if a key was pressed this frame (true only on first frame)
+ *
+ * @param key The key code to query
+ * @return true if the key was pressed this frame, false otherwise
+ */
 INTEROP_API bool EngineInterop_Input_IsKeyDown(int key) {
     return Input::IsKeyDown(key);
 }
 
-/// <summary>
-/// Check if a key was released this frame
-/// </summary>
+/**
+ * @brief Check if a key was released this frame
+ *
+ * @param key The key code to query
+ * @return true if the key was released this frame, false otherwise
+ */
 INTEROP_API bool EngineInterop_Input_IsKeyUp(int key) {
     return Input::IsKeyUp(key);
 }
@@ -50,37 +59,48 @@ INTEROP_API bool EngineInterop_Input_IsKeyUp(int key) {
 // Input API - Mouse
 // ============================================================================
 
-/// <summary>
-/// Check if a mouse button is currently pressed
-/// </summary>
+/**
+ * @brief Check if a mouse button is currently pressed
+ *
+ * @param button The mouse button index to query
+ * @return true if the button is currently pressed, false otherwise
+ */
 INTEROP_API bool EngineInterop_Input_IsMousePressed(int button) {
     return Input::IsMousePressed(button);
 }
 
-/// <summary>
-/// Get the current mouse X position
-/// </summary>
+/**
+ * @brief Get the current mouse X position
+ *
+ * @return double The current mouse X coordinate
+ */
 INTEROP_API double EngineInterop_Input_GetMouseX() {
     return Input::GetMouseX();
 }
 
-/// <summary>
-/// Get the current mouse Y position
-/// </summary>
+/**
+ * @brief Get the current mouse Y position
+ *
+ * @return double The current mouse Y coordinate
+ */
 INTEROP_API double EngineInterop_Input_GetMouseY() {
     return Input::GetMouseY();
 }
 
-/// <summary>
-/// Get the mouse scroll delta X (horizontal scroll)
-/// </summary>
+/**
+ * @brief Get the mouse scroll delta X (horizontal scroll)
+ *
+ * @return double The horizontal scroll delta
+ */
 INTEROP_API double EngineInterop_Input_GetScrollX() {
     return Input::GetScrollX();
 }
 
-/// <summary>
-/// Get the mouse scroll delta Y (vertical scroll)
-/// </summary>
+/**
+ * @brief Get the mouse scroll delta Y (vertical scroll)
+ *
+ * @return double The vertical scroll delta
+ */
 INTEROP_API double EngineInterop_Input_GetScrollY() {
     return Input::GetScrollY();
 }

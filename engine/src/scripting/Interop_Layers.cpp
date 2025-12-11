@@ -22,7 +22,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <string>
 #include <vector>
 
-// Get mask for layer id from active scene's LayerManager
+/**
+ * @brief Get mask for layer id from active scene's LayerManager
+ *
+ * @param layerId The layer identifier to query
+ * @return uint32_t The layer mask for the given id or 0xFFFFFFFF on error
+ */
 INTEROP_API uint32_t EngineInterop_Layers_GetMask(uint16_t layerId) {
     if (!Engine::CORE)
         return 0xFFFFFFFFu;
@@ -33,7 +38,12 @@ INTEROP_API uint32_t EngineInterop_Layers_GetMask(uint16_t layerId) {
     return scene->GetLayers().GetLayerMask(layerId);
 }
 
-// Set mask for layer id on active scene's LayerManager
+/**
+ * @brief Set mask for layer id on active scene's LayerManager
+ *
+ * @param layerId The layer identifier to modify
+ * @param mask The mask value to set for the layer
+ */
 INTEROP_API void EngineInterop_Layers_SetMask(uint16_t layerId, uint32_t mask) {
     if (!Engine::CORE)
         return;
@@ -44,7 +54,13 @@ INTEROP_API void EngineInterop_Layers_SetMask(uint16_t layerId, uint32_t mask) {
     scene->GetLayers().SetLayerMask(layerId, mask);
 }
 
-// Set collision between two layers (symmetrically)
+/**
+ * @brief Set collision between two layers (symmetrically)
+ *
+ * @param a First layer id
+ * @param b Second layer id
+ * @param enabled Non-zero to enable collision, zero to disable
+ */
 INTEROP_API void EngineInterop_Layers_SetCollisionBetween(uint16_t a, uint16_t b, uint8_t enabled) {
     if (!Engine::CORE)
         return;
@@ -55,7 +71,11 @@ INTEROP_API void EngineInterop_Layers_SetCollisionBetween(uint16_t a, uint16_t b
     scene->GetLayers().SetCollisionBetween(a, b, enabled != 0);
 }
 
-// Return number of registered layers
+/**
+ * @brief Return number of registered layers
+ *
+ * @return uint16_t Number of layers registered in the active scene
+ */
 INTEROP_API uint16_t EngineInterop_Layers_Count() {
     if (!Engine::CORE)
         return 0;
@@ -68,7 +88,12 @@ INTEROP_API uint16_t EngineInterop_Layers_Count() {
     return static_cast<uint16_t>(list.size());
 }
 
-// Get layer id at given index in ListLayers order. Returns -1 if invalid.
+/**
+ * @brief Get layer id at given index in ListLayers order
+ *
+ * @param index The index into the layer list
+ * @return int32_t Layer id at the index, or -1 if invalid
+ */
 INTEROP_API int32_t EngineInterop_Layers_GetIdAtIndex(uint16_t index) {
     if (!Engine::CORE)
         return -1;
@@ -84,7 +109,14 @@ INTEROP_API int32_t EngineInterop_Layers_GetIdAtIndex(uint16_t index) {
     return static_cast<int32_t>(list[index].first);
 }
 
-// Write layer name at index into provided buffer. Returns 0 on success, -1 on failure.
+/**
+ * @brief Write layer name at index into provided buffer
+ *
+ * @param index The index into the layer list
+ * @param outBuf Destination buffer to receive the name
+ * @param bufSize Size of the destination buffer in bytes
+ * @return int32_t 0 on success, -1 on failure
+ */
 INTEROP_API int32_t EngineInterop_Layers_GetNameAtIndex(uint16_t index, char* outBuf, int32_t bufSize) {
     if (!Engine::CORE)
         return -1;
@@ -104,7 +136,12 @@ INTEROP_API int32_t EngineInterop_Layers_GetNameAtIndex(uint16_t index, char* ou
     return 0;
 }
 
-// Get layer id by name. Returns -1 if not found.
+/**
+ * @brief Get layer id by name
+ *
+ * @param name Null-terminated layer name to look up
+ * @return int32_t Layer id if found, or -1 if not found or on error
+ */
 INTEROP_API int32_t EngineInterop_Layers_IdOf(const char* name) {
     if (!Engine::CORE)
         return -1;

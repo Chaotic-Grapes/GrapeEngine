@@ -24,7 +24,6 @@ namespace GrapeEngine.Scripting.Debugging;
 /// </summary>
 public static class DebuggerSupport
 {
-    private static bool _debuggerAttached;
     private static readonly Lock _lock = new();
 
     /// <summary>

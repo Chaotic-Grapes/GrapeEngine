@@ -183,6 +183,16 @@ public:
     /** @} */
 
     /**
+     * @name FPS capping
+     */
+    /** @{ */
+    /** @brief Set the maximum FPS cap (frames per second). 0 = disabled (no cap). */
+    void SetMaximumFPS(double fps);
+    /** @brief Get the currently configured maximum FPS cap. */
+    double GetMaximumFPS() const;
+    /** @} */
+
+    /**
      * @name Fixed timestep controls
      */
     /** @{ */
@@ -269,6 +279,8 @@ private:
     // FPS / frame time aggregation for profiler UI
     float m_frameTimeMs = 0.0f;
     float m_fps = 0.0f;
+    float m_currentFrameFPS = 0.0f;
+    double m_maximumFPS = 0.0; // 0 = disabled (no cap)
     std::deque<double> m_fpsWindow;
     size_t m_fpsWindowSize = 20;
 

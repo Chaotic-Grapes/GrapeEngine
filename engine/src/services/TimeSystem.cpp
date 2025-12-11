@@ -127,6 +127,7 @@ void TimeSystem::Advance(double rawDeltaSeconds, double nowSeconds) {
     // sampling hot path.
     // Update FPS / frame time stats
     m_frameTimeMs = (float)(unscaledSeconds * 1000.0);
+    m_currentFrameFPS = (float)(1.0 / std::max(1e-6, unscaledSeconds));
     m_fpsWindow.push_back(1.0 / std::max(1e-6, unscaledSeconds));
 
     if (m_fpsWindow.size() > (size_t)m_fpsWindowSize)
@@ -150,6 +151,16 @@ void TimeSystem::SetMaximumDeltaTime(double seconds) {
 double TimeSystem::GetMaximumDeltaTime() const {
     return m_maximumDeltaTime;
 }
+
+void TimeSystem::SetMaximumFPS(double fps) {
+    // Negative or zero => disabled (no cap)
+    if (fps <= 0.0)
+        fps = 0.0;
+
+    m_maximumFPS = fps;
+}
+
+double TimeSystem::GetMaximumFPS() const { return m_maximumFPS; }
 
 void TimeSystem::SetProfilerCollector(ProfilerCollector cb) {
     // The collector may be installed or replaced at runtime. Guard the

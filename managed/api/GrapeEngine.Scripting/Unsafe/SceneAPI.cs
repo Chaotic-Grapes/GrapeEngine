@@ -152,4 +152,12 @@ internal static partial class SceneAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "SceneInterop_RemoveFromLayer")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void RemoveFromLayer(void* scenePtr, ulong entityId);
+
+    // ============================================================================
+    // Prefab Management
+    // ============================================================================
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneInterop_GetPrefabManager")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial void* GetPrefabManager(void* scenePtr);
 }

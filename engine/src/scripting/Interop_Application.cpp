@@ -26,9 +26,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Application API - Application Control
 // ============================================================================
 
-/// <summary>
-/// Request the application to quit
-/// </summary>
+/**
+ * @brief Request the application to quit
+ */
 INTEROP_API void EngineInterop_Application_Quit() {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");
@@ -41,9 +41,11 @@ INTEROP_API void EngineInterop_Application_Quit() {
 // Application API - Configuration Queries
 // ============================================================================
 
-/// <summary>
-/// Get the application name from configuration
-/// </summary>
+/**
+ * @brief Get the application name from configuration
+ *
+ * @return const char* The application/project title or empty string if unavailable
+ */
 INTEROP_API const char* EngineInterop_Application_GetName() {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");
@@ -56,9 +58,11 @@ INTEROP_API const char* EngineInterop_Application_GetName() {
     return "";
 }
 
-/// <summary>
-/// Get the fixed time step from configuration (from project settings)
-/// </summary>
+/**
+ * @brief Get the fixed time step from configuration (from project settings)
+ *
+ * @return float The physics/time fixed timestep in seconds (fallback: 0.02f)
+ */
 INTEROP_API float EngineInterop_Application_GetFixedTimeStep() {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");
@@ -71,9 +75,11 @@ INTEROP_API float EngineInterop_Application_GetFixedTimeStep() {
     return 0.02f; // Default fallback
 }
 
-/// <summary>
-/// Check if VSync is enabled in configuration
-/// </summary>
+/**
+ * @brief Check if VSync is enabled in configuration
+ *
+ * @return true if VSync is enabled, false otherwise
+ */
 INTEROP_API bool EngineInterop_Application_IsVSyncEnabled() {
     if (!Engine::CORE) {
         LOG_ERROR("[ScriptAPI] Application core not initialized");

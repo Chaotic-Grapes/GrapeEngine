@@ -25,10 +25,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
     #include <Windows.h>
     #define NETHOST_LIB "nethost.dll"
     #define DOTNET_STRING(s) L##s
-#else
-    #include <dlfcn.h>
-    #define NETHOST_LIB "libnethost.so"
-    #define DOTNET_STRING(s) s
 #endif
 
 // typedef for nethost get_hostfxr_path function pointer
@@ -53,6 +49,13 @@ namespace ECS {
         ShutdownCLR();
     }
 
+    /**
+     * @brief Initialize the CoreCLR runtime.
+     * @param runtimeConfigPath Path to .NET runtime config (runtimeconfig.json)
+     * @return true if initialization succeeded
+     * 
+     * Must be called before loading any assemblies.
+     */
     bool ScriptManager::InitializeCLR(const char* runtimeConfigPath) {
         if (m_initialized) {
             std::cerr << "[ScriptManager] Already initialized" << std::endl;
@@ -90,6 +93,11 @@ namespace ECS {
         return true;
     }
 
+    /**
+     * @brief Shutdown the CoreCLR runtime and cleanup.
+     * 
+     * Unloads all assemblies, destroys scripted systems, and shuts down CLR.
+     */
     void ScriptManager::ShutdownCLR() {
         if (!m_initialized) return;
 
@@ -108,6 +116,11 @@ namespace ECS {
         std::cout << "[ScriptManager] CoreCLR shut down" << std::endl;
     }
 
+    /**
+     * @brief Load a managed assembly into the runtime.
+     * @param assemblyPath Path to the managed assembly DLL
+     * @return true if loading succeeded
+     */
     bool ScriptManager::LoadAssembly(const std::string& assemblyPath) {
         if (!m_initialized) {
             std::cerr << "[ScriptManager] Cannot load assembly - CLR not initialized" << std::endl;
@@ -133,6 +146,14 @@ namespace ECS {
         return true;
     }
 
+    /**
+     * @brief Unload a previously loaded assembly.
+     * @param assemblyPath Path to the assembly to unload
+     * @return true if unloaded successfully
+     * 
+     * Note: This will destroy all systems from that assembly.
+     * For hot reload, use ReloadAssembly() instead.
+     */
     bool ScriptManager::UnloadAssembly(const std::string& assemblyPath) {
         if (!m_initialized || !m_unloadAssembly) {
             return false;
@@ -143,6 +164,13 @@ namespace ECS {
         return false;
     }
 
+    /**
+     * @brief Reload an assembly for hot reload support.
+     * @param assemblyPath Path to the assembly to reload
+     * @return true if reloaded successfully
+     * 
+     * Preserves system state where possible during reload.
+     */
     bool ScriptManager::ReloadAssembly(const std::string& assemblyPath) {
         // TODO: Implement hot reload
         // 1. Save system state
@@ -153,6 +181,13 @@ namespace ECS {
         return false;
     }
 
+    /**
+     * @brief Discover ISystem implementations in all loaded assemblies.
+     * @return Vector of ScriptSystemWrapper instances
+     * 
+     * Reflects through loaded assemblies to find all types that
+     * implement ISystem interface. Creates wrappers for each.
+     */
     std::vector<ScriptSystemWrapper*> ScriptManager::DiscoverScriptedSystems() {
         std::vector<ScriptSystemWrapper*> systems;
 
@@ -189,6 +224,11 @@ namespace ECS {
         return systems;
     }
 
+    /**
+     * @brief Register discovered scripted systems with the SystemManager.
+     * @param systemManager Reference to the SystemManager
+     * @return Number of systems registered
+     */
     int ScriptManager::RegisterScriptedSystems(SystemManager& systemManager) {
         auto systems = DiscoverScriptedSystems();
 
@@ -200,6 +240,12 @@ namespace ECS {
         return static_cast<int>(systems.size());
     }
 
+    /**
+     * @brief Compile scripts from source files into a managed assembly.
+     * @param scriptPaths Vector of script file paths or directories
+     * @param outputAssembly Path to output compiled assembly DLL
+     * @return true if compilation succeeded
+     */
     bool ScriptManager::CompileScripts(const std::vector<std::string>& scriptPaths,
                                       const std::string& outputAssembly) {
         if (!m_initialized) {
@@ -240,6 +286,11 @@ namespace ECS {
         return rc == 0;
     }
 
+    /**
+     * @brief Start watching a directory for script changes to enable hot reload.
+     * @param directory Path to the directory to watch
+     * @return true if watching started successfully
+     */
     bool ScriptManager::StartScriptWatching(const std::string& directory) {
         if (!m_initialized || !m_startWatching) {
             std::cerr << "[ScriptManager] StartScriptWatching not available" << std::endl;
@@ -260,6 +311,9 @@ namespace ECS {
         return true;
     }
 
+    /**
+     * @brief Stop watching for script changes.
+     */
     void ScriptManager::StopScriptWatching() {
         if (!m_initialized || !m_stopWatching) return;
         m_stopWatching();
@@ -270,6 +324,10 @@ namespace ECS {
     // Private Helper Methods
     // ============================================================================
 
+    /**
+     * @brief Initialize hostfxr functions from nethost library.
+     * @return true if successful
+     */
     bool ScriptManager::InitializeHostFxr() {
         // Platform-specific loading of nethost library
     #ifdef _WIN32
@@ -281,14 +339,6 @@ namespace ECS {
 
         // Get function pointers
         auto get_hostfxr_path = (get_hostfxr_path_fn)GetProcAddress(nethostLib, "get_hostfxr_path");
-    #else
-        void* nethostLib = dlopen(NETHOST_LIB, RTLD_LAZY);
-        if (!nethostLib) {
-            std::cerr << "[ScriptManager] Failed to load " << NETHOST_LIB << std::endl;
-            return false;
-        }
-
-        auto get_hostfxr_path = (get_hostfxr_path_fn)dlsym(nethostLib, "get_hostfxr_path");
     #endif
 
         if (!get_hostfxr_path) {
@@ -317,16 +367,6 @@ namespace ECS {
         m_initFxr = (hostfxr_initialize_for_runtime_config_fn)GetProcAddress(hostfxrLib, "hostfxr_initialize_for_runtime_config");
         m_getRuntimeDelegate = (hostfxr_get_runtime_delegate_fn)GetProcAddress(hostfxrLib, "hostfxr_get_runtime_delegate");
         m_closeFxr = (hostfxr_close_fn)GetProcAddress(hostfxrLib, "hostfxr_close");
-    #else
-        void* hostfxrLib = dlopen(buffer, RTLD_LAZY);
-        if (!hostfxrLib) {
-            std::cerr << "[ScriptManager] Failed to load hostfxr library" << std::endl;
-            return false;
-        }
-
-        m_initFxr = (hostfxr_initialize_for_runtime_config_fn)dlsym(hostfxrLib, "hostfxr_initialize_for_runtime_config");
-        m_getRuntimeDelegate = (hostfxr_get_runtime_delegate_fn)dlsym(hostfxrLib, "hostfxr_get_runtime_delegate");
-        m_closeFxr = (hostfxr_close_fn)dlsym(hostfxrLib, "hostfxr_close");
     #endif
 
         if (!m_initFxr || !m_getRuntimeDelegate || !m_closeFxr) {
@@ -337,6 +377,11 @@ namespace ECS {
         return true;
     }
 
+    /**
+     * @brief Ensure the .NET runtime config file exists, generating it if needed.
+     * @param runtimeConfigPath Path to the runtimeconfig.json file
+     * @return true if the config exists or was created successfully
+     */
     bool ScriptManager::EnsureRuntimeConfigExists(const char* runtimeConfigPath) {
         // Check if the config file already exists
         std::filesystem::path configPath(runtimeConfigPath);
@@ -386,6 +431,11 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Load the .NET runtime using the specified config file.
+     * @param runtimeConfigPath Path to the runtimeconfig.json file
+     * @return true if successful
+     */
     bool ScriptManager::LoadRuntime(const char* runtimeConfigPath) {
         if (!m_initFxr) return false;
 
@@ -393,8 +443,6 @@ namespace ECS {
     #ifdef _WIN32
         std::wstring configPathW = std::filesystem::path(runtimeConfigPath).wstring();
         const char_t* configPath = configPathW.c_str();
-    #else
-        const char_t* configPath = runtimeConfigPath;
     #endif
 
         // Initialize hostfxr context
@@ -419,6 +467,10 @@ namespace ECS {
         return true;
     }
 
+    /**
+     * @brief Load managed delegates for interop with C# ScriptHost.
+     * @return true if all delegates loaded successfully
+     */
     bool ScriptManager::LoadManagedDelegates() {
         if (!m_loadAssemblyAndGetFunctionPtr) {
             std::cerr << "[ScriptManager] load_assembly_and_get_function_pointer not available" << std::endl;
@@ -447,8 +499,6 @@ namespace ECS {
 #ifdef _WIN32
         std::wstring scriptHostPathW = scriptHostPath.wstring();
         const char_t* scriptHostPathCStr = scriptHostPathW.c_str();
-#else
-        const char_t* scriptHostPathCStr = scriptHostPath.c_str();
 #endif
 
         // Type and method names in C# ScriptHost
@@ -459,8 +509,6 @@ namespace ECS {
 #ifdef _WIN32
             std::wstring methodNameW = std::wstring(functionName, functionName + strlen(functionName));
             const char_t* methodName = methodNameW.c_str();
-#else
-            const char_t* methodName = functionName;
 #endif
 
             int rc = loadAssemblyFn(
@@ -501,8 +549,6 @@ namespace ECS {
 #ifdef _WIN32
             std::wstring methodNameW = std::wstring(functionName, functionName + strlen(functionName));
             const char_t* methodName = methodNameW.c_str();
-#else
-            const char_t* methodName = functionName;
 #endif
 
             int rc = loadAssemblyFn(
@@ -539,6 +585,9 @@ namespace ECS {
         return true;
     }
 
+    /**
+     * @brief Cleanup all scripted systems and clear internal records.
+     */
     void ScriptManager::CleanupScriptedSystems() {
         m_scriptedSystems.clear();
         m_systemsByAssembly.clear();
@@ -549,6 +598,12 @@ namespace ECS {
     // ScriptSystemWrapper Implementation
     // ============================================================================
 
+    /**
+     * @brief Construct a ScriptSystemWrapper for a managed system instance.
+     * @param managedHandle Handle to the managed system instance
+     * @param scriptManager Pointer to the owning ScriptManager
+     * @param typeName Name of the managed system type
+     */
     ScriptSystemWrapper::ScriptSystemWrapper(uint64_t managedHandle,
                                             ScriptManager* scriptManager,
                                             const std::string& typeName)
@@ -557,13 +612,21 @@ namespace ECS {
         , m_typeName(typeName)
         , m_group(SystemGroup::Update)
         , m_runMode(SystemRunMode::PlayOnly)
-    {
-    }
+    { }
 
+    /**
+     * @brief Destructor for ScriptSystemWrapper.
+     * 
+     * Note: Managed system cleanup is handled by ScriptManager.
+     */
     ScriptSystemWrapper::~ScriptSystemWrapper() {
         // Managed system cleanup handled by ScriptManager
     }
 
+    /**
+     * @brief Call the OnCreate method of the managed system.
+     * @param world Reference to the World instance
+     */
     void ScriptSystemWrapper::OnCreate(World& world) {
         if (!m_scriptManager) {
             std::cerr << "[ScriptSystemWrapper] ScriptManager is null" << std::endl;
@@ -578,6 +641,11 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Call the OnUpdate method of the managed system.
+     * @param world Reference to the World instance
+     * @param deltaTime Time elapsed since last update
+     */
     void ScriptSystemWrapper::OnUpdate(World& world, float deltaTime) {
         if (!m_scriptManager) return;
 
@@ -587,6 +655,10 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Call the OnDestroy method of the managed system.
+     * @param world Reference to the World instance
+     */
     void ScriptSystemWrapper::OnDestroy(World& world) {
         if (!m_scriptManager) return;
 
@@ -596,6 +668,10 @@ namespace ECS {
         }
     }
 
+    /**
+     * @brief Get the metadata of the managed system.
+     * @return SystemMetadata structure
+     */
     SystemMetadata ScriptSystemWrapper::GetMetadata() const {
         if (!m_metadataCached) {
             CacheMetadata();
@@ -603,6 +679,10 @@ namespace ECS {
         return m_metadata;
     }
 
+    /**
+     * @brief Get the system group of the managed system.
+     * @return SystemGroup enum value
+     */
     SystemGroup ScriptSystemWrapper::GetSystemGroup() const {
         if (!m_metadataCached) {
             CacheMetadata();
@@ -610,6 +690,10 @@ namespace ECS {
         return m_group;
     }
 
+    /**
+     * @brief Get the run mode of the managed system.
+     * @return SystemRunMode enum value
+     */
     SystemRunMode ScriptSystemWrapper::GetRunMode() const {
         if (!m_metadataCached) {
             CacheMetadata();
@@ -617,6 +701,9 @@ namespace ECS {
         return m_runMode;
     }
 
+    /**
+     * @brief Cache the metadata of the managed system by calling into C#.
+     */
     void ScriptSystemWrapper::CacheMetadata() const {
         if (!m_scriptManager) {
             // Fallback to defaults
@@ -644,7 +731,8 @@ namespace ECS {
 
             m_group = static_cast<SystemGroup>(group);
             m_runMode = static_cast<SystemRunMode>(runMode);
-        } else {
+        }
+        else {
             // Fallback to defaults
             m_metadata.Name = m_typeName;
             m_metadata.ExecutionOrder = 0;
