@@ -47,10 +47,13 @@ public class World
     /// Create a new entity in the world.
     /// </summary>
     /// <returns>A new Entity instance</returns>
-    public unsafe Entity CreateEntity()
+    public Entity CreateEntity()
     {
-        ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
-        return new Entity(this, entityId);
+        unsafe
+        {
+            ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
+            return new Entity(this, entityId);
+        }
     }
 
     /// <summary>
@@ -58,9 +61,166 @@ public class World
     /// </summary>
     /// <param name="entity">The entity to check</param>
     /// <returns>True if the entity is alive, false otherwise</returns>
-    public unsafe bool IsAlive(Entity entity)
+    public bool IsAlive(Entity entity)
     {
-        return WorldAPI.IsEntityAlive((void*)_nativeWorldPtr, entity.Id);
+        unsafe
+        {
+            return WorldAPI.IsEntityAlive((void*)_nativeWorldPtr, entity.Id);
+        }
+    }
+
+    // ============================================================================
+    // Hierarchy Operations
+    // ============================================================================
+
+    /// <summary>
+    /// Attach a child entity to a parent entity in the hierarchy.
+    /// </summary>
+    /// <param name="child">The child entity</param>
+    /// <param name="parent">The parent entity</param>
+    public void Attach(Entity child, Entity parent)
+    {
+        if (child == null)
+            throw new ArgumentNullException(nameof(child));
+        if (parent == null)
+            throw new ArgumentNullException(nameof(parent));
+
+        unsafe
+        {
+            WorldAPI.AttachChild((void*)_nativeWorldPtr, child.Id, parent.Id);
+        }
+    }
+
+    /// <summary>
+    /// Detach a child entity from its parent.
+    /// </summary>
+    /// <param name="child">The child entity to detach</param>
+    public void Detach(Entity child)
+    {
+        if (child == null)
+            throw new ArgumentNullException(nameof(child));
+        
+        unsafe
+        {
+            WorldAPI.DetachChild((void*)_nativeWorldPtr, child.Id);
+        }
+    }
+
+    /// <summary>
+    /// Get the parent entity of a child entity.
+    /// </summary>
+    /// <param name="child">The child entity</param>
+    /// <returns>The parent entity, or null if no parent</returns>
+    public Entity? GetParent(Entity child)
+    {
+        if (child == null)
+            throw new ArgumentNullException(nameof(child));
+
+        unsafe
+        {
+            ulong parentId = WorldAPI.GetParent((void*)_nativeWorldPtr, child.Id);
+
+            if (parentId == ulong.MaxValue)
+                return null;
+
+            var parent = new Entity(this, parentId);
+            return IsAlive(parent) ? parent : null;
+        }
+    }
+
+    /// <summary>
+    /// Get the first child of a parent entity.
+    /// </summary>
+    /// <param name="parent">The parent entity</param>
+    /// <returns>The first child entity, or null if no children</returns>
+    public Entity? GetFirstChild(Entity parent)
+    {
+        if (parent == null)
+            throw new ArgumentNullException(nameof(parent));
+
+        unsafe
+        {
+            ulong childId = WorldAPI.GetFirstChild((void*)_nativeWorldPtr, parent.Id);
+
+            if (childId == ulong.MaxValue)
+                return null;
+
+            var child = new Entity(this, childId);
+            return IsAlive(child) ? child : null;
+        }
+    }
+
+    /// <summary>
+    /// Get the next sibling of an entity.
+    /// </summary>
+    /// <param name="child">The child entity</param>
+    /// <returns>The next sibling, or null if no more siblings</returns>
+    public Entity? GetNextSibling(Entity child)
+    {
+        if (child == null)
+            throw new ArgumentNullException(nameof(child));
+        
+        unsafe
+        {
+            ulong siblingId = WorldAPI.GetNextSibling((void*)_nativeWorldPtr, child.Id);
+
+            if (siblingId == ulong.MaxValue)
+                return null;
+
+            var sibling = new Entity(this, siblingId);
+            return IsAlive(sibling) ? sibling : null;
+        }
+    }
+
+    /// <summary>
+    /// Get the number of direct children a parent entity has.
+    /// </summary>
+    /// <param name="parent">The parent entity</param>
+    /// <returns>The child count</returns>
+    public int GetChildCount(Entity parent)
+    {
+        if (parent == null)
+            throw new ArgumentNullException(nameof(parent));
+        
+        unsafe
+        {
+            return WorldAPI.GetChildCount((void*)_nativeWorldPtr, parent.Id);
+        }
+    }
+
+    /// <summary>
+    /// Iterate over all direct children of a parent entity.
+    /// </summary>
+    /// <param name="parent">The parent entity</param>
+    /// <param name="action">Action to invoke for each child</param>
+    public void ForEachChild(Entity parent, Action<Entity> action)
+    {
+        if (parent == null)
+            throw new ArgumentNullException(nameof(parent));
+        if (action == null)
+            throw new ArgumentNullException(nameof(action));
+
+        Entity? child = GetFirstChild(parent);
+        while (child != null)
+        {
+            action(child);
+            child = GetNextSibling(child);
+        }
+    }
+
+    /// <summary>
+    /// Get all direct children of a parent entity as a list.
+    /// </summary>
+    /// <param name="parent">The parent entity</param>
+    /// <returns>List of child entities</returns>
+    public List<Entity> GetChildren(Entity parent)
+    {
+        if (parent == null)
+            throw new ArgumentNullException(nameof(parent));
+
+        var children = new List<Entity>(GetChildCount(parent));
+        ForEachChild(parent, child => children.Add(child));
+        return children;
     }
 
     // ============================================================================

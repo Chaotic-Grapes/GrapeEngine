@@ -251,33 +251,6 @@ namespace ECS {
 		}
 
 
-		// Custom serialization for ScriptInstance component (char array needs special handling)
-		inline void to_json(nlohmann::json& j, const ScriptInstance& s) {
-			j = nlohmann::json{ // convert char array to std::string
-				{"ManagedHandle", s.ManagedHandle},
-				{"TypeHash", s.TypeHash},
-				{"Initialized", s.Initialized},
-				{"TypeName", std::string(s.TypeName)},
-				{"ScriptPath", std::string(s.ScriptPath)}
-			};
-		}
-
-		inline void from_json(const nlohmann::json& j, ScriptInstance& s) {
-			s.ManagedHandle = j.at("ManagedHandle").get<uint64_t>(); // get managed handle as uint64_t
-			s.TypeHash = j.at("TypeHash").get<uint32_t>(); // get type hash as uint32_t
-			s.Initialized = j.at("Initialized").get<bool>(); // get initialized as bool
-			std::string typeName = j.at("TypeName").get<std::string>(); // get type name as std::string
-			strncpy_s(s.TypeName, typeName.c_str(), sizeof(s.TypeName) - 1); // copy to char array
-			s.TypeName[sizeof(s.TypeName) - 1] = '\0';
-
-			// Handle ScriptPath (may not exist in older save files)
-			if (j.contains("ScriptPath")) {
-				std::string scriptPath = j.at("ScriptPath").get<std::string>();
-				strncpy_s(s.ScriptPath, scriptPath.c_str(), sizeof(s.ScriptPath) - 1);
-				s.ScriptPath[sizeof(s.ScriptPath) - 1] = '\0';
-			}
-		}
-
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D)
 	}
 }
@@ -546,7 +519,6 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(Camera, ECS::Components::Camera3D, "Camera3D")
 	REGISTER_COMPONENT_SERIALIZER(CameraEditor, ECS::Components::CameraEditor3D, "CameraEditor3D")
 	REGISTER_COMPONENT_SERIALIZER(CameraMatrices, ECS::Components::CameraMatrices, "CameraMatrices")
-	REGISTER_COMPONENT_SERIALIZER(ScriptInstance, ECS::Components::ScriptInstance, "ScriptInstance")
 	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource, "AudioSource")
 	REGISTER_COMPONENT_SERIALIZER(PrefabLink, ECS::Components::PrefabLink, "PrefabLink")
 }

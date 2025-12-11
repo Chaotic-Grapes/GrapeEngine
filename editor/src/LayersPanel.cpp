@@ -407,21 +407,41 @@ void LayersPanel::_renderCollisionMatrix() {
                 if (collides != prevState) {
                     uint32_t prevRowMask = lm.GetLayerMask(rowId);
                     uint32_t prevColMask = lm.GetLayerMask(colId);
+
                     const uint32_t bitForCol = (colId < 32) ? (1u << colId) : 0u;
                     const uint32_t bitForRow = (rowId < 32) ? (1u << rowId) : 0u;
+
                     uint32_t newRowMask = prevRowMask;
                     uint32_t newColMask = prevColMask;
+
                     if (collides) { newRowMask |= bitForCol; newColMask |= bitForRow; }
                     else { newRowMask &= ~bitForCol; newColMask &= ~bitForRow; }
+
                     lm.SetLayerMask(rowId, newRowMask);
                     lm.SetLayerMask(colId, newColMask);
+
                     if (m_undoSystem) {
+                        // Command
                         struct CollisionCmd : public Editor::ICommand {
                             Scenes::Scene* scene; uint16_t a; uint16_t b; uint32_t prevA; uint32_t prevB; uint32_t nextA; uint32_t nextB;
                             CollisionCmd(Scenes::Scene* s, uint16_t aa, uint16_t bb, uint32_t pA, uint32_t pB, uint32_t nA, uint32_t nB)
                                 : scene(s), a(aa), b(bb), prevA(pA), prevB(pB), nextA(nA), nextB(nB) {}
-                            void Execute() override { if (!scene) return; scene->GetLayers().SetLayerMask(a, nextA); scene->GetLayers().SetLayerMask(b, nextB); }
-                            void Undo() override { if (!scene) return; scene->GetLayers().SetLayerMask(a, prevA); scene->GetLayers().SetLayerMask(b, prevB); }
+
+                            void Execute() override {
+                                if (!scene)
+                                    return;
+
+                                scene->GetLayers().SetLayerMask(a, nextA);
+                                scene->GetLayers().SetLayerMask(b, nextB);
+                            }
+
+                            void Undo() override {
+                                if (!scene)
+                                    return;
+
+                                scene->GetLayers().SetLayerMask(a, prevA);
+                                scene->GetLayers().SetLayerMask(b, prevB);
+                            }
                         };
                         auto cmd = std::make_unique<CollisionCmd>(m_scene, rowId, colId, prevRowMask, prevColMask, newRowMask, newColMask);
                         m_undoSystem->ExecuteCommand(std::move(cmd));
@@ -456,13 +476,28 @@ void LayersPanel::_renderLayersList() {
         if (visible != lm.IsVisible(id)) {
             bool prev = lm.IsVisible(id);
             lm.SetVisibility(id, visible);
+
             if (m_undoSystem) {
+                // Command
                 struct VisCmd : public Editor::ICommand {
                     Scenes::Scene* scene; uint16_t id; bool prev; bool next;
                     VisCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
-                    void Execute() override { if (!scene) return; scene->GetLayers().SetVisibility(id, next); }
-                    void Undo() override { if (!scene) return; scene->GetLayers().SetVisibility(id, prev); }
+
+                    void Execute() override {
+                        if (!scene)
+                            return;
+
+                        scene->GetLayers().SetVisibility(id, next); 
+                    }
+
+                    void Undo() override {
+                        if (!scene)
+                            return;
+
+                        scene->GetLayers().SetVisibility(id, prev); 
+                    }
                 };
+
                 auto cmd = std::make_unique<VisCmd>(m_scene, id, prev, visible);
                 m_undoSystem->ExecuteCommand(std::move(cmd));
             }
@@ -484,18 +519,32 @@ void LayersPanel::_renderLayersList() {
             if (newName != name) {
                 std::string prevName = name;
                 lm.RenameLayer(id, newName);
+
                 // Update the buffer to reflect the new name from the layer system
                 strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), newName.c_str());
+
                 if (m_undoSystem) {
+                    // Command
                     struct RenameCmd : public Editor::ICommand {
                         Scenes::Scene* scene; uint16_t id; std::string prev; std::string next;
                         RenameCmd(Scenes::Scene* s, uint16_t i, std::string p, std::string n) : scene(s), id(i), prev(std::move(p)), next(std::move(n)) {}
-                        void Execute() override { if (!scene) return; scene->GetLayers().RenameLayer(id, next); }
-                        void Undo() override { if (!scene) return; scene->GetLayers().RenameLayer(id, prev); }
+                        void Execute() override {
+                            if (!scene)
+                                return;
+                            scene->GetLayers().RenameLayer(id, next);
+                        }
+
+                        void Undo() override {
+                            if (!scene)
+                                return;
+                            scene->GetLayers().RenameLayer(id, prev);
+                        }
                     };
+
                     auto cmd = std::make_unique<RenameCmd>(m_scene, id, prevName, newName);
                     m_undoSystem->ExecuteCommand(std::move(cmd));
                 }
+
                 if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
         }
@@ -510,7 +559,9 @@ void LayersPanel::_renderLayersList() {
         if (locked != lm.IsLocked(id)) {
             bool prev = lm.IsLocked(id);
             lm.SetLocked(id, locked);
+
             if (m_undoSystem) {
+                // Command
                 struct LockCmd : public Editor::ICommand {
                     Scenes::Scene* scene; uint16_t id; bool prev; bool next;
                     LockCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}

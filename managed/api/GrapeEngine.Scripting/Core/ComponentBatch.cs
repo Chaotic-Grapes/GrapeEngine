@@ -246,21 +246,24 @@ public class EntityComponentBatchAccessor<T>(World world) where T : unmanaged
     /// Fetch all queued components as references for in-place modification.
     /// Returns an array of tuples: (Entity, ref T component).
     /// </summary>
-    public unsafe (Entity entity, T value)[] FetchBatchAsValues()
+    public (Entity entity, T value)[] FetchBatchAsValues()
     {
         ComponentRegistry.EnsureRegistered<T>();
         var results = new (Entity, T)[_entities.Count];
         int resultIndex = 0;
 
-        foreach (var entity in _entities)
+        unsafe
         {
-            if (entity.IsAlive)
+            foreach (var entity in _entities)
             {
-                void* componentPtr = WorldAPI.GetComponentPtr(_world.NativePtr, entity.Id, _componentTypeHash);
-
-                if (componentPtr != null)
+                if (entity.IsAlive)
                 {
-                    results[resultIndex++] = (entity, *(T*)componentPtr);
+                    void* componentPtr = WorldAPI.GetComponentPtr(_world.NativePtr, entity.Id, _componentTypeHash);
+
+                    if (componentPtr != null)
+                    {
+                        results[resultIndex++] = (entity, *(T*)componentPtr);
+                    }
                 }
             }
         }

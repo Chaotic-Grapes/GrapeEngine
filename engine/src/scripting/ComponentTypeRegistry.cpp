@@ -97,9 +97,7 @@ namespace ECS {
         // Lighting
         ComponentRegistry::RegisterWithHash<Components::Light2D>(FNV1a_Hash("Light2D"));
 
-
-        // Scripting/Audio
-        ComponentRegistry::RegisterWithHash<Components::ScriptInstance>(FNV1a_Hash("ScriptInstance"));
+        // Audio
         ComponentRegistry::RegisterWithHash<Components::AudioSource>(FNV1a_Hash("AudioSource"));
     }
 }

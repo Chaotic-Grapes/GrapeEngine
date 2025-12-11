@@ -43,7 +43,6 @@ public static class DebuggerSupport
             if (Debugger.IsAttached)
             {
                 Console.WriteLine("[DebuggerSupport] Debugger already attached");
-                _debuggerAttached = true;
                 return;
             }
 
@@ -51,7 +50,6 @@ public static class DebuggerSupport
             {
                 Console.WriteLine("[DebuggerSupport] Attempting to attach debugger...");
                 Debugger.Launch();
-                _debuggerAttached = true;
                 
                 if (Debugger.IsAttached)
                 {

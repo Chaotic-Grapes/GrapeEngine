@@ -111,10 +111,6 @@ public:
     // Renders entity layer
     void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders script instance component for C# scripting
-    void RenderScriptInstance(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
-
-
 private:
     // -------------------------------------------------------------------------
     // State

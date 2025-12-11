@@ -102,124 +102,6 @@ namespace {
     }
 }
 
-/**
- * @brief Opens a platform-specific file dialog to select a C# script and attaches it to an entity.
- *
- * This function is responsible for:
- *  - Opening a Windows file dialog (Win32 API) to let the user choose a `.cs` script file.
- *  - Extracting the script class name using the file stem.
- *  - Parsing the namespace declaration (if present) from the script file.
- *  - Constructing the full type name (`Namespace.ClassName`) used by the scripting backend.
- *  - Converting the file path to a project-relative path when possible.
- *  - Attaching the ScriptInstance component with the resolved type name and path.
- *  - Updating HierarchyPanel's entity selection state and invoking selection callbacks.
- *
- * On non-Windows platforms, the function simply logs a warning because no file dialog
- * implementation exists for Linux/macOS.
- *
- * @param entityId The target entity to attach the script to. If `ECS::Entity::NPOS32`,
- *                 the function exits immediately.
- */
-void HierarchyPanel::_importAndAttachScript(EntityId entityId) {
-    if (entityId == ECS::Entity::NPOS32) return;
-
-    // 1. Call your external file dialog utility.
-#ifdef _WIN32
-
-    char filename[512] = "";
-
-    // Win32 OPENFILENAMEA struct setup
-    OPENFILENAMEA ofn = {};
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFile = filename;
-    ofn.nMaxFile = sizeof(filename);
-
-    //Set the filter ONLY for C# Script files (*.cs)
-    // Format: "Description\0Pattern\0"
-    ofn.lpstrFilter = "C# Script Files\0*.cs\0All Files\0*.*\0";
-    ofn.nFilterIndex = 1;
-    ofn.lpstrTitle = "Select Script File to Attach"; // Custom title
-
-    // Flags remain the same to ensure the file exists and paths are valid
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-
-    // Show file dialog: execution pauses here until the user selects or cancels
-    if (GetOpenFileNameA(&ofn)) {
-        // User selected a file; the path is in the 'filename' buffer
-        std::string selectedFilePath(filename);
-
-        // 1. Extract the class name and namespace from the C# file
-        std::filesystem::path p(selectedFilePath);
-        std::string scriptClassName = p.stem().string();
-        std::string fullTypeName = scriptClassName; // Default to just class name
-
-        // Try to parse namespace from the file
-        std::ifstream fileStream(selectedFilePath);
-        if (fileStream.is_open()) {
-            std::string line;
-            std::string namespaceStr;
-            
-            // Look for "namespace" declaration in the file
-            while (std::getline(fileStream, line)) {
-                // Trim whitespace
-                size_t start = line.find_first_not_of(" \t\r\n");
-                if (start == std::string::npos) continue;
-                
-                // Check if line starts with "namespace"
-                if (line.substr(start, 9) == "namespace") {
-                    // Extract namespace (handle both "namespace X;" and "namespace X {")
-                    size_t nsStart = start + 9;
-                    size_t nsEnd = line.find_first_of(";{", nsStart);
-                    
-                    if (nsEnd != std::string::npos) {
-                        namespaceStr = line.substr(nsStart, nsEnd - nsStart);
-                        
-                        // Trim whitespace from namespace
-                        size_t nsFirst = namespaceStr.find_first_not_of(" \t\r\n");
-                        size_t nsLast = namespaceStr.find_last_not_of(" \t\r\n");
-                        if (nsFirst != std::string::npos && nsLast != std::string::npos) {
-                            namespaceStr = namespaceStr.substr(nsFirst, nsLast - nsFirst + 1);
-                            fullTypeName = namespaceStr + "." + scriptClassName;
-                        }
-                        break;
-                    }
-                }
-            }
-            fileStream.close();
-        }
-
-        // 2. Convert to relative path if within project
-        std::string relativePath = selectedFilePath;
-        try {
-            std::filesystem::path absPath = std::filesystem::absolute(selectedFilePath);
-            std::filesystem::path currentPath = std::filesystem::current_path();
-            relativePath = std::filesystem::relative(absPath, currentPath).string();
-        }
-        catch (const std::exception&) {
-            // If relative path conversion fails, use the original path
-            relativePath = selectedFilePath;
-        }
-        
-        // 3. Attach the ScriptInstance component with full type name and path
-        _attachScriptComponent(entityId, fullTypeName, relativePath);
-
-        // 4. Update selection state (using the correct member variable name)
-        m_selectedEntityIds.clear();
-        m_selectedEntityIds.insert(entityId);
-        m_anchorEntityId = entityId;
-        if (m_selectionCallback) m_selectionCallback(entityId);
-    }
-    else {
-        // User clicked cancel
-        // Optional: LOG_INFO("Script selection cancelled by user");
-    }
-
-#else // Not Windows (Linux, Mac, etc.)
-    // Matches the AssetLibrary's error handling for other platforms
-    LOG_WARNING("File dialog not implemented for this platform");
-#endif
-}
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -580,15 +462,6 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         }
     }
 
-    // Check if this entity has a script attached
-    bool hasScript = false;
-    if (m_world->Has<ECS::Components::ScriptInstance>(entity)) {
-        const auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(entity);
-        if (strlen(scriptComp.TypeName) > 0) {
-            hasScript = true;
-        }
-    }
-
     // Build display label with entity name
     std::stringstream oss;
     if (m_world->Has<ECS::Components::Name>(entity)) {
@@ -667,24 +540,16 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         // Calculate icon sizes to reserve space on the right BEFORE creating the tree node.
         const float iconPadding = 6.0f; // space between icons and edge
         float prefabIconWidth = 0.0f;
-        float scriptIconWidth = 0.0f;
         const char* prefabIcon = "\xEE\xA6\xA4";
-        const char* scriptIcon = "\xEE\xA1\xAF";
 
         if (m_symbolsFont && isPrefabInstance) {
             ImGui::PushFont(m_symbolsFont);
             prefabIconWidth = ImGui::CalcTextSize(prefabIcon).x;
             ImGui::PopFont();
         }
-        if (m_symbolsFont && hasScript) {
-            ImGui::PushFont(m_symbolsFont);
-            scriptIconWidth = ImGui::CalcTextSize(scriptIcon).x;
-            ImGui::PopFont();
-        }
 
         float iconsTotalWidth = 0.0f;
         if (prefabIconWidth > 0.0f) iconsTotalWidth += prefabIconWidth + iconPadding;
-        if (scriptIconWidth > 0.0f) iconsTotalWidth += scriptIconWidth + iconPadding;
 
         // Compute available width for label using content region (safer than querying item rect)
         ImVec2 contentMax = ImGui::GetWindowContentRegionMax();
@@ -722,19 +587,9 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         ImVec2 itemRectMin = ImGui::GetItemRectMin();
         ImVec2 itemRectMax = ImGui::GetItemRectMax();
 
-        // Draw icons on the right, script icon at the far right, prefab just left of it
+        // Draw icons on the right, prefab icon at the far right
         float drawX = itemRectMax.x - iconPadding;
         float itemCenterY = itemRectMin.y + (itemRectMax.y - itemRectMin.y) * 0.5f;
-
-        if (hasScript && m_symbolsFont) {
-            ImGui::PushFont(m_symbolsFont);
-            ImVec2 iconSize = ImGui::CalcTextSize(scriptIcon);
-            ImVec2 iconPos = ImVec2(drawX - iconSize.x, itemCenterY - iconSize.y * 0.5f);
-            ImGui::GetWindowDrawList()->AddText(m_symbolsFont, 26.f, iconPos,
-                ImGui::GetColorU32(ImVec4(0.7f, 0.8f, 0.9f, 0.9f)), scriptIcon);
-            ImGui::PopFont();
-            drawX -= (iconSize.x + iconPadding);
-        }
 
         if (isPrefabInstance && m_symbolsFont) {
             ImGui::PushFont(m_symbolsFont);
@@ -1121,21 +976,6 @@ void HierarchyPanel::_renderEntityContextMenu() {
                 }
             }
             ImGui::Separator();
-            // Script attachment/detachment - only for single selection
-            if (selectionCount == 1) {
-                ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
-                bool hasScriptComponent = m_world->Has<ECS::Components::ScriptInstance>(targetEntity);
-                if (!hasScriptComponent) {
-                    if (ImGui::Selectable("Attach Script")) {
-                        _importAndAttachScript(m_contextMenuTarget);
-                    }
-                }
-                else {
-                    if (ImGui::Selectable("Detach Script")) {
-                        m_world->Remove<ECS::Components::ScriptInstance>(targetEntity);
-                    }
-                }
-            }
             if (ImGui::BeginMenu("Add Component")) {
                 // You can add other component types (Renderer, Rigidbody, etc.) here later
                 ECS::Entity targetEntity = m_world->Resolve(m_contextMenuTarget);
@@ -1214,58 +1054,6 @@ void HierarchyPanel::_startRename(EntityId entityId) {
     }
 
     m_focusRenameInput = true;
-}
-
-/**
- * @brief Ensures an entity has a ScriptInstance component, and sets its TypeName and ScriptPath.
- * @param entityId The entity to modify.
- * @param scriptName The fully qualified C# type name including namespace (e.g., "MyGame.PlayerController").
- * @param scriptPath The relative path to the script file (e.g., "Assets/Scripts/PlayerController.cs").
- */
-void HierarchyPanel::_attachScriptComponent(EntityId entityId, const std::string& scriptName, const std::string& scriptPath) {
-    if (entityId == ECS::Entity::NPOS32 || !m_world) return;
-
-    ECS::Entity e = m_world->Resolve(entityId);
-    if (e.IsNull() || !m_world->IsAlive(e)) return;
-
-    // 1. Ensure the entity has an Active component (required by ScriptSystem)
-    if (!m_world->Has<ECS::Components::Active>(e)) {
-        ECS::Components::Active activeComp;
-        activeComp.Enabled = true;
-        m_world->Add<ECS::Components::Active>(e, activeComp);
-    }
-
-    // 2. Ensure the entity has a LocalTransform component (required by most scripts)
-    if (!m_world->Has<ECS::Components::LocalTransform>(e)) {
-        ECS::Components::LocalTransform transform;
-        transform.Position = Vector3D{0, 0, 0};
-        transform.Rotation = Quaternion{0, 0, 0, 1};
-        transform.Scale = Vector3D{1, 1, 1};
-        m_world->Add<ECS::Components::LocalTransform>(e, transform);
-    }
-
-    // 3. Ensure the ScriptInstance component exists (Add it if it doesn't)
-    if (!m_world->Has<ECS::Components::ScriptInstance>(e)) {
-        ECS::Components::ScriptInstance newScript;
-        m_world->Add<ECS::Components::ScriptInstance>(e, newScript);
-    }
-
-    // 3. Update the component's TypeName and ScriptPath
-    auto& scriptComp = m_world->Get<ECS::Components::ScriptInstance>(e);
-
-    // Set the fully qualified type name (e.g., "MyGame.PlayerController")
-    strncpy_s(scriptComp.TypeName, scriptName.c_str(), sizeof(scriptComp.TypeName) - 1);
-    scriptComp.TypeName[sizeof(scriptComp.TypeName) - 1] = '\0'; // Always null-terminate
-
-    // Set the script path
-    strncpy_s(scriptComp.ScriptPath, scriptPath.c_str(), sizeof(scriptComp.ScriptPath) - 1);
-    scriptComp.ScriptPath[sizeof(scriptComp.ScriptPath) - 1] = '\0'; // Always null-terminate
-
-    // 4. Mark for re-initialization by the ScriptingSystem at runtime
-    // Setting Initialized = false forces the runtime to load this C# class 
-    // and call its Start/Awake method.
-    scriptComp.Initialized = false;
-
 }
 
 // -------------------------------------------------------------------------
