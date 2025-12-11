@@ -39,6 +39,7 @@ std::unordered_map<int, bool> Input::m_mouseUp{ 0 };
 
 double Input::m_scrollX{ 0 };
 double Input::m_scrollY{ 0 };
+std::string Input::m_charInput{ "" };
 
 void Input::Initialize(GLFWwindow* pWin) {
     m_window = pWin;
@@ -100,6 +101,7 @@ void Input::SetupEventCallbacks() {
     glfwSetCursorPosCallback(m_window, _mousePosCallback);
     glfwSetScrollCallback(m_window, _mouseScrollCallback);
     glfwSetDropCallback(m_window, _fileDropCallback);
+    glfwSetCharCallback(m_window, _charCallback);
 }
 
 // Called when GLFW encounters an error
@@ -212,6 +214,26 @@ void Input::_fileDropCallback(GLFWwindow* pWin, int count, const char** paths) {
         for (int i = 0; i < count; ++i) {
             Messaging::MessageSystem::Broadcast(Messaging::FileDropped{ std::string(paths[i]) });
         }
+    }
+}
+
+void Input::_charCallback(GLFWwindow* pWin, unsigned int codepoint) {
+    (void)pWin;
+    // Convert Unicode codepoint to UTF-8 and append to character input buffer
+    if (codepoint < 0x80) {
+        m_charInput += static_cast<char>(codepoint);
+    } else if (codepoint < 0x800) {
+        m_charInput += static_cast<char>(0xC0 | (codepoint >> 6));
+        m_charInput += static_cast<char>(0x80 | (codepoint & 0x3F));
+    } else if (codepoint < 0x10000) {
+        m_charInput += static_cast<char>(0xE0 | (codepoint >> 12));
+        m_charInput += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+        m_charInput += static_cast<char>(0x80 | (codepoint & 0x3F));
+    } else if (codepoint < 0x110000) {
+        m_charInput += static_cast<char>(0xF0 | (codepoint >> 18));
+        m_charInput += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
+        m_charInput += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+        m_charInput += static_cast<char>(0x80 | (codepoint & 0x3F));
     }
 }
 

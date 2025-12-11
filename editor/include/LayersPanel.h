@@ -19,6 +19,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <array>
 #include "scene/Scene.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
@@ -94,6 +96,9 @@ private:
     std::string m_statusMessage;
     enum class StatusType { Info = 0, Success = 1, Error = 2 };
     StatusType m_statusType = StatusType::Info;
+
+    // Persistent rename buffers per layer ID to prevent ImGui from losing edits each frame
+    std::unordered_map<uint16_t, std::array<char, 256>> m_renameBuffers;
 };
 
 #endif

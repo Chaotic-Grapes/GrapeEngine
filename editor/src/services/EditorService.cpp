@@ -255,6 +255,41 @@ void EditorService::Render() {
         io.MouseDown[1] = Input::IsMouseDown(MOUSE_RIGHT);
         io.MouseDown[2] = Input::IsMouseDown(MOUSE_MIDDLE);
 
+        // Feed keyboard state to ImGui
+        io.KeyCtrl = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);
+        io.KeyShift = Input::IsKeyDown(KEY_LEFT_SHIFT) || Input::IsKeyDown(KEY_RIGHT_SHIFT);
+        io.KeyAlt = Input::IsKeyDown(KEY_LEFT_ALT) || Input::IsKeyDown(KEY_RIGHT_ALT);
+        io.KeySuper = Input::IsKeyDown(KEY_LEFT_SUPER) || Input::IsKeyDown(KEY_RIGHT_SUPER);
+
+        // Feed key presses to ImGui for input handling
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Tab, Input::IsKeyDown(KEY_TAB));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_LeftArrow, Input::IsKeyDown(KEY_LEFT));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_RightArrow, Input::IsKeyDown(KEY_RIGHT));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_UpArrow, Input::IsKeyDown(KEY_UP));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_DownArrow, Input::IsKeyDown(KEY_DOWN));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_PageUp, Input::IsKeyDown(KEY_PAGE_UP));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_PageDown, Input::IsKeyDown(KEY_PAGE_DOWN));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Home, Input::IsKeyDown(KEY_HOME));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_End, Input::IsKeyDown(KEY_END));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Insert, Input::IsKeyDown(KEY_INSERT));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Delete, Input::IsKeyDown(KEY_DELETE));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Backspace, Input::IsKeyDown(KEY_BACKSPACE));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter, Input::IsKeyDown(KEY_ENTER));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, Input::IsKeyDown(KEY_ESCAPE));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_A, Input::IsKeyDown(KEY_A));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_C, Input::IsKeyDown(KEY_C));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_V, Input::IsKeyDown(KEY_V));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_X, Input::IsKeyDown(KEY_X));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Y, Input::IsKeyDown(KEY_Y));
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Z, Input::IsKeyDown(KEY_Z));
+
+        // Feed character input to ImGui
+        const std::string& charInput = Input::GetCharInput();
+        for (unsigned char c : charInput) {
+            io.AddInputCharacter(c);
+        }
+        Input::ClearCharInput();
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui::NewFrame();
         

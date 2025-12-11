@@ -28,6 +28,7 @@ Features:
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <unordered_map>
+#include <string>
 
 namespace Engine { class Application; }
 
@@ -95,6 +96,12 @@ public:
     // GLFW error callback function
     static void ErrorCallback(int error, char const* description);
 
+    // Get the character input buffer for this frame
+    static const std::string& GetCharInput() { return m_charInput; }
+
+    // Clear the character input buffer (call once per frame after processing)
+    static void ClearCharInput() { m_charInput.clear(); }
+
     // Print OpenGL system specifications to the log
     static void PrintSpecs();
 
@@ -118,12 +125,16 @@ private:
     static double m_scrollX;      // Horizontal scroll offset from last scroll event
     static double m_scrollY;      // Vertical scroll offset from last scroll event
 
+    // Character input buffer
+    static std::string m_charInput;   // Characters typed this frame
+
     // GLFW callback functions
     static void _keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod);
     static void _mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod);
     static void _mousePosCallback(GLFWwindow* pWin, double xPos, double yPos);
     static void _mouseScrollCallback(GLFWwindow* pWin, double xOffset, double yOffset);
     static void _fileDropCallback(GLFWwindow* pWin, int count, const char** paths);
+    static void _charCallback(GLFWwindow* pWin, unsigned int codepoint);
 
     // Process input events and update internal state (called once per frame)
     static void _processInput();

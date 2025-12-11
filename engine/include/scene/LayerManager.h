@@ -24,6 +24,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <string>
 #include <vector>
 #include <optional>
+#include <algorithm>
+#include <utility>
 #include "ecs/World.h"
 
 namespace Scenes {
@@ -251,6 +253,46 @@ namespace Scenes {
         }
 
         /**
+         * @brief Swap contents of two layer slots (names, entities, flags, masks).
+         * This is an atomic swap that preserves indices but exchanges the layers' data.
+         * @param aId First layer id
+         * @param bId Second layer id
+         * @returns true on success
+         */
+        bool SwapLayers(uint16_t aId, uint16_t bId) {
+            if (aId >= m_idToName.size() || bId >= m_idToName.size())
+                return false;
+            if (aId == bId)
+                return true;
+
+            // Swap names and entity sets
+            std::swap(m_idToName[aId], m_idToName[bId]);
+            std::swap(m_idToEntities[aId], m_idToEntities[bId]);
+
+            // Ensure flags and masks capacity
+            if (m_visibility.size() <= std::max(aId, bId))
+                m_visibility.resize(m_idToName.size(), true);
+            if (m_locked.size() <= std::max(aId, bId))
+                m_locked.resize(m_idToName.size(), false);
+            if (m_layerMasks.size() <= std::max(aId, bId))
+                m_layerMasks.resize(m_idToName.size(), 0xFFFFFFFFu);
+
+            // Swap visibility, lock status, and layer masks
+            // Use iter_swap for vector<bool> proxy references
+            std::iter_swap(m_visibility.begin() + aId, m_visibility.begin() + bId);
+            std::iter_swap(m_locked.begin() + aId, m_locked.begin() + bId);
+            std::swap(m_layerMasks[aId], m_layerMasks[bId]);
+
+            // Rebuild name->id map
+            m_nameToId.clear();
+            for (uint16_t i = 0; i < m_idToName.size(); ++i) {
+                if (!m_idToName[i].empty()) m_nameToId[m_idToName[i]] = i;
+            }
+
+            return true;
+        }
+
+        /**
          * @brief Remove a layer by id. This clears its name and entities but preserves indices.
          * @param id The ID of the layer.
          */
@@ -283,26 +325,10 @@ namespace Scenes {
             return it->second;
         }
 
-    private:
-        void _ensureCapacity(uint16_t id) {
-            while (m_idToEntities.size() <= id)
-                m_idToEntities.emplace_back();
+        // ============================================================
+        // Layer Collision Mask API
+        // ============================================================
 
-            if (m_idToName.size() <= id) m_idToName.resize(m_idToEntities.size());
-            if (m_visibility.size() <= id) m_visibility.resize(m_idToEntities.size(), true);
-            if (m_locked.size() <= id) m_locked.resize(m_idToEntities.size(), false);
-            if (m_layerMasks.size() <= id) m_layerMasks.resize(m_idToEntities.size(), 0xFFFFFFFFu);
-        }
-
-    private:
-        std::unordered_map<std::string, uint16_t> m_nameToId;
-        std::vector<std::string> m_idToName;
-        std::vector<std::unordered_set<ECS::Entity, ECS::EntityHash>> m_idToEntities;
-        std::vector<bool> m_visibility; // editor-only visibility flags per layer
-        std::vector<bool> m_locked;     // editor-only lock flags per layer
-        std::vector<uint32_t> m_layerMasks; // collision masks per layer (32-bit)
-
-    public:
         // Get the collision mask for a layer (defaults to all ones)
         uint32_t GetLayerMask(uint16_t id) const {
             if (id >= m_layerMasks.size()) return 0xFFFFFFFFu;
@@ -388,6 +414,24 @@ namespace Scenes {
                 }
             }
         }
+
+    private:
+        void _ensureCapacity(uint16_t id) {
+            while (m_idToEntities.size() <= id)
+                m_idToEntities.emplace_back();
+
+            if (m_idToName.size() <= id) m_idToName.resize(m_idToEntities.size());
+            if (m_visibility.size() <= id) m_visibility.resize(m_idToEntities.size(), true);
+            if (m_locked.size() <= id) m_locked.resize(m_idToEntities.size(), false);
+            if (m_layerMasks.size() <= id) m_layerMasks.resize(m_idToEntities.size(), 0xFFFFFFFFu);
+        }
+
+        std::unordered_map<std::string, uint16_t> m_nameToId;
+        std::vector<std::string> m_idToName;
+        std::vector<std::unordered_set<ECS::Entity, ECS::EntityHash>> m_idToEntities;
+        std::vector<bool> m_visibility; // editor-only visibility flags per layer
+        std::vector<bool> m_locked;     // editor-only lock flags per layer
+        std::vector<uint32_t> m_layerMasks; // collision masks per layer (32-bit)
     };
 }
 

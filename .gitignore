@@ -478,3 +478,4 @@ http-client.private.env.json
 
 # VS Code Counter Extension
 /.VSCodeCounter/.VSCodeCounterCountRealtime
+.trunk/configs/.shellcheckrc
