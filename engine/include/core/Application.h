@@ -21,6 +21,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scene/SceneManager.h"
 #include "serialization/ConfigurationSerializer.h"
 #include "services/AudioService.h"
+#include "services/DeviceManager.h"
 #include "ecs/SystemManager.h"
 #include <functional>
 

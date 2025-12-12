@@ -81,6 +81,9 @@ namespace Engine {
         // Initialize services
         _initializeServices();
 
+        // Start audio device change detection
+        DeviceManager::StartAudioDeviceChangeDetection();
+
         // Initialize last-frame timestamp using the platform steady clock
         using Clock = TimeSystem::Clock;
         using Duration = TimeSystem::Duration;
@@ -125,6 +128,12 @@ namespace Engine {
 
         // --- Input Processing ---
         Input::_processInput();
+        
+        // --- Device Change Detection ---
+        if (DeviceManager::HasAudioDevicesChanged()) {
+            LOG_CRITICAL("Audio devices changed - audio may not be playing correctly");
+            // CRITICAL TODO: reinitialize audio service
+        }
         
         // Add fullscreen toggle (F11 key)
         if (Input::IsKeyPressed(GLFW_KEY_F11)) {
@@ -179,6 +188,9 @@ namespace Engine {
         }
 
         LOG_INFO("Shutting down engine...");
+
+        // Stop device change detection
+        DeviceManager::StopAudioDeviceChangeDetection();
 
         // Clean up services
         if (m_scriptManager) {
