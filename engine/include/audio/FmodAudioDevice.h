@@ -63,6 +63,7 @@ namespace Audio {
 
         // Lifecycle
         bool Initialize();
+        bool InitializeWithDevice(const std::string& deviceID);  // Initialize with specific device
         void Update();    // pumps FMOD and prunes stale singletons
         void Shutdown();
 

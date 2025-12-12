@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "services/Input.h"
+#include "services/DeviceManager.h"
 
 namespace Platform {
 
@@ -196,7 +197,8 @@ namespace Platform {
     }
 
     void GLFWWindow::SetMaximized(bool maximized) const {
-        if (!m_windowHandle) return;
+        if (!m_windowHandle)
+            return;
         if (maximized) {
             glfwMaximizeWindow(m_windowHandle);
         }
@@ -210,7 +212,8 @@ namespace Platform {
     }
 
     void GLFWWindow::SetVisible(bool visible) const {
-        if (!m_windowHandle) return;
+        if (!m_windowHandle)
+            return;
         if (visible) {
             glfwShowWindow(m_windowHandle);
         }
@@ -229,9 +232,7 @@ namespace Platform {
         }
     }
 
-    bool GLFWWindow::IsVSync() const {
-        return m_vsync;
-    }
+    bool GLFWWindow::IsVSync() const { return m_vsync; }
 
     void GLFWWindow::SetVSync(bool enabled) {
         m_vsync = enabled;
@@ -264,6 +265,117 @@ namespace Platform {
 
     void* GLFWWindow::GetNativeHandle() const {
         return m_windowHandle;
+    }
+
+    // ==================== Display Mode Queries ====================
+
+    std::vector<Engine::DisplayMode> GLFWWindow::GetSupportedDisplayModes() const {
+        // Query available display modes using DeviceManager
+        if (!m_windowHandle) {
+            return {};
+        }
+
+        // For now, use DeviceManager to get primary monitor modes
+        // In the future, could determine which monitor the window is on
+        auto modes = Engine::DeviceManager::GetDisplayModes(0);
+        return modes;
+    }
+
+    Engine::MonitorInfo GLFWWindow::GetMonitorInfo() const {
+        if (!m_windowHandle) {
+            return Engine::MonitorInfo{};
+        }
+
+        // For now, return primary monitor info
+        // In the future, could determine which monitor the window is on
+        auto monitors = Engine::DeviceManager::EnumerateMonitors();
+        if (!monitors.empty()) {
+            return monitors[0];
+        }
+
+        return Engine::MonitorInfo{};
+    }
+
+    bool GLFWWindow::SetDisplayMode(const Engine::DisplayMode& mode) {
+        if (!m_windowHandle) {
+            LOG_ERROR("Window handle invalid");
+            return false;
+        }
+
+        // Resize window to specified mode
+        glfwSetWindowSize(m_windowHandle, mode.Width, mode.Height);
+        m_width = mode.Width;
+        m_height = mode.Height;
+
+        LOG_INFO("Display mode set to " << mode.ToString());
+        return true;
+    }
+
+    bool GLFWWindow::SetFullscreen(bool fullscreen) {
+        if (!m_windowHandle) {
+            LOG_ERROR("Window handle invalid");
+            return false;
+        }
+
+        // Get the monitor this window is currently on
+        GLFWmonitor* monitor = glfwGetWindowMonitor(m_windowHandle);
+        
+        if (fullscreen && !monitor) {
+            // Switch to fullscreen on primary monitor
+            monitor = glfwGetPrimaryMonitor();
+            if (!monitor) {
+                LOG_ERROR("No monitor found for fullscreen");
+                return false;
+            }
+            
+            // Get current video mode for refresh rate
+            const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+            if (!mode) {
+                LOG_ERROR("Failed to get video mode");
+                return false;
+            }
+            
+            // Switch to fullscreen
+            glfwSetWindowMonitor(m_windowHandle, monitor, 0, 0, 
+                                 mode->width, mode->height, mode->refreshRate);
+            m_width = mode->width;
+            m_height = mode->height;
+            LOG_INFO("Switched to fullscreen mode: " << mode->width << "x" << mode->height 
+                     << " @ " << mode->refreshRate << "Hz");
+            return true;
+        }
+        else if (!fullscreen && monitor) {
+            // Switch to windowed mode
+            // Restore to a reasonable windowed size
+            int restoredWidth = 1600;
+            int restoredHeight = 900;
+            
+            // Get monitor position for window placement
+            int monitorX, monitorY;
+            glfwGetMonitorPos(monitor, &monitorX, &monitorY);
+            
+            // Center window on monitor
+            int posX = monitorX + (1920 / 2) - (restoredWidth / 2);
+            int posY = monitorY + (1080 / 2) - (restoredHeight / 2);
+            
+            glfwSetWindowMonitor(m_windowHandle, nullptr, posX, posY, 
+                                 restoredWidth, restoredHeight, 0);
+            m_width = restoredWidth;
+            m_height = restoredHeight;
+
+            LOG_INFO("Switched to windowed mode: " << restoredWidth << "x" << restoredHeight);
+            return true;
+        }
+        else {
+            // Already in requested mode
+            if (fullscreen) {
+                LOG_INFO("Already in fullscreen mode");
+            }
+            else {
+                LOG_INFO("Already in windowed mode");
+            }
+            return true;
+        }
     }
 
 }

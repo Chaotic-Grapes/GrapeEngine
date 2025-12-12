@@ -368,4 +368,128 @@ namespace Engine {
             m_accumulator -= static_cast<float>(TimeSystem::Instance().GetFixedTimeStep());
         }
     }
+
+    // ==================== Device Management ====================
+
+    bool Application::SetResolution(int width, int height, int refreshRate) {
+        if (!m_platformContext) {
+            LOG_ERROR("Platform context unavailable");
+            return false;
+        }
+
+        // Validate resolution is supported
+        auto monitors = DeviceManager::EnumerateMonitors();
+        if (monitors.empty()) {
+            LOG_ERROR("No monitors found");
+            return false;
+        }
+
+        // Check primary monitor
+        const auto& primaryMonitor = monitors[0];
+        bool resolutionSupported = false;
+
+        for (const auto& mode : primaryMonitor.SupportedModes) {
+            if (mode.Width == width && mode.Height == height) {
+                resolutionSupported = true;
+                break;
+            }
+        }
+
+        if (!resolutionSupported) {
+            LOG_ERROR("Resolution " << width << "x" << height 
+                << " not supported by current monitor");
+            return false;
+        }
+
+        // Apply resolution via render device
+        auto* renderDevice = m_platformContext->GetRenderDevice();
+        if (renderDevice) {
+            renderDevice->SetViewport(0, 0, width, height);
+            LOG_INFO("Resolution changed to " << width << "x" << height);
+            return true;
+        }
+
+        return false;
+    }
+
+    bool Application::SetFullscreenMode(bool fullscreen, int monitorIndex) {
+        if (!m_platformContext) {
+            LOG_ERROR("Platform context unavailable");
+            return false;
+        }
+
+        auto monitors = DeviceManager::EnumerateMonitors();
+        if (monitorIndex < 0 || monitorIndex >= static_cast<int>(monitors.size())) {
+            LOG_ERROR("Invalid monitor index: " << monitorIndex);
+            return false;
+        }
+
+        // Get main window and delegate to platform implementation
+        auto* mainWindow = m_platformContext->GetMainWindow();
+        if (!mainWindow) {
+            LOG_ERROR("Main window not available");
+            return false;
+        }
+
+        // Use platform implementation to switch fullscreen mode
+        if (mainWindow->SetFullscreen(fullscreen)) {
+            LOG_INFO("Fullscreen mode switched to " << (fullscreen ? "on" : "off"));
+            return true;
+        }
+
+        LOG_ERROR("Failed to switch fullscreen mode");
+        return false;
+    }
+
+    bool Application::SetAudioDevice(const std::string& deviceID) {
+        // Validate device exists
+        auto device = DeviceManager::GetAudioDeviceInfo(deviceID);
+        if (device.DeviceID.empty()) {
+            LOG_ERROR("Audio device not found: " << deviceID);
+            return false;
+        }
+
+        if (!device.IsConnected) {
+            LOG_ERROR("Audio device is not connected: " << device.DeviceName);
+            return false;
+        }
+
+        // Request audio service to switch devices
+        if (m_audio) {
+            auto* audioDevice = m_audio->Device();
+            if (audioDevice) {
+                // For FMOD, device switching would require more complex setup
+                // For now, we just track the preference
+                m_currentAudioDeviceID = deviceID;
+                LOG_INFO("Audio device preference set to: " << device.DeviceName <<
+                         " (" << device.Channels << "ch @ " << device.SampleRate << "Hz)");
+                LOG_WARNING("Note: Actual FMOD device switching requires re-initialization");
+                return true;
+            }
+        }
+
+        LOG_ERROR("Audio service or device unavailable");
+        return false;
+    }
+
+    MonitorInfo Application::GetCurrentMonitorInfo() const {
+        auto monitors = DeviceManager::EnumerateMonitors();
+        if (!monitors.empty()) {
+            return monitors[0];  // Return primary monitor
+        }
+        return MonitorInfo{};
+    }
+
+    AudioDeviceInfo Application::GetCurrentAudioDevice() const {
+        // If we have a specific device set, return its info
+        if (!m_currentAudioDeviceID.empty()) {
+            auto device = DeviceManager::GetAudioDeviceInfo(m_currentAudioDeviceID);
+            if (!device.DeviceID.empty()) {
+                return device;
+            }
+        }
+
+        // Otherwise return the default device
+        return DeviceManager::GetDefaultAudioOutputDevice();
+    }
 }

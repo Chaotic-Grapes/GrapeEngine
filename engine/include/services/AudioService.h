@@ -30,6 +30,7 @@
 #include "core/IService.h"
 #include "audio/FmodAudioDevice.h"
 #include "core/messaging/MessageSystem.h"
+#include "services/DeviceManager.h"
 
 namespace Services {
  
@@ -96,6 +97,49 @@ namespace Services {
 		void ResumeAll() const { m_device->ResumeAll(); }
 
 
+		// -----------------------------------------------------------------
+		// Device Management
+		// -----------------------------------------------------------------
+
+		/**
+		 * @brief Get list of available output audio devices
+		 * @return Vector of AudioDeviceInfo from DeviceManager
+		 */
+		std::vector<Engine::AudioDeviceInfo> GetAvailableOutputDevices() const;
+
+		/**
+		 * @brief Get list of available input audio devices
+		 * @return Vector of AudioDeviceInfo from DeviceManager
+		 */
+		std::vector<Engine::AudioDeviceInfo> GetAvailableInputDevices() const;
+
+		/**
+		 * @brief Get currently active audio output device
+		 * @return Current AudioDeviceInfo
+		 */
+		Engine::AudioDeviceInfo GetCurrentDevice() const;
+
+		/**
+		 * @brief Switch to a different audio output device
+		 * 
+		 * This reinitializes the FMOD system to use the new device.
+		 * Stops all currently playing audio and reloads active cues.
+		 * 
+		 * @param deviceID Device identifier from GetAvailableOutputDevices()
+		 * @return true if device switch was successful
+		 */
+		bool SetAudioDevice(const std::string& deviceID);
+
+		/**
+		 * @brief Handle audio device disconnection event
+		 * 
+		 * Called when the current audio device is disconnected.
+		 * Automatically switches to system default audio device.
+		 * Preserves loaded cues and attempts to resume audio.
+		 */
+		void OnAudioDeviceDisconnected();
+
+
 	private:
 		// Owns the FMOD-backed device; created in Initialize(), destroyed in Terminate().
 		std::unique_ptr<Audio::FmodAudioDevice> m_device;
@@ -103,6 +147,12 @@ namespace Services {
 		// Window focus handling for audio muting
 		Messaging::SubscriptionHandle m_focusHandle;
 		float m_volumeBeforeFocusLoss = 1.0f;
+
+		// Device tracking
+		std::string m_currentAudioDeviceID;
+		
+		// Helper to reinitialize FMOD with new device
+		bool _reinitializeAudioDevice(const std::string& deviceID);
 	};
 
 

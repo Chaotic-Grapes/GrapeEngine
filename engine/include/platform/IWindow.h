@@ -23,6 +23,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include <string>
 #include <cstdint>
+#include <vector>
+
+// Forward declarations for DeviceManager types
+namespace Engine {
+    struct DisplayMode;
+    struct MonitorInfo;
+}
 
 namespace Platform {
 
@@ -177,6 +184,46 @@ namespace Platform {
          * Note: May not work in fullscreen or borderless modes.
          */
         virtual void Resize(int width, int height) = 0;
+
+        // ==================== Display Mode Queries ====================
+
+        /**
+         * @brief Get supported display modes for this window's monitor
+         * @return Vector of available DisplayMode options
+         * 
+         * Queries the monitor that this window is currently on and returns
+         * all available resolution/refresh rate combinations.
+         */
+        virtual std::vector<Engine::DisplayMode> GetSupportedDisplayModes() const = 0;
+
+        /**
+         * @brief Get information about the monitor this window is on
+         * @return MonitorInfo for the current display
+         * 
+         * Returns detailed information including physical size, DPI, position,
+         * and currently active display mode.
+         */
+        virtual Engine::MonitorInfo GetMonitorInfo() const = 0;
+
+        /**
+         * @brief Apply a display mode to this window
+         * @param mode The DisplayMode to apply
+         * @return true if successfully applied
+         * 
+         * Attempts to set the window to the specified resolution and refresh rate.
+         * Validates that the mode is supported before applying.
+         */
+        virtual bool SetDisplayMode(const Engine::DisplayMode& mode) = 0;
+
+        /**
+         * @brief Set fullscreen state
+         * @param fullscreen true for fullscreen, false for windowed
+         * @return true if successfully changed
+         * 
+         * Transitions between fullscreen and windowed modes. In fullscreen mode,
+         * the window will use the monitor's native refresh rate.
+         */
+        virtual bool SetFullscreen(bool fullscreen) = 0;
 
         // ==================== Platform-Specific Handle ====================
         

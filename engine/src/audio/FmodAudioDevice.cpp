@@ -33,6 +33,52 @@ namespace Audio {
         return true;
     }
 
+    bool FmodAudioDevice::InitializeWithDevice(const std::string& deviceID) {
+        if (!FMOD_OK_OR_LOG(FMOD::System_Create(&m_system), "System_Create"))
+            return false;
+
+        // Convert device ID string to integer index
+        // Device IDs from DeviceManager are typically formatted as numeric strings or device names
+        int driverIndex = 0;
+        try {
+            // Try to parse as integer first (0, 1, 2, etc.)
+            driverIndex = std::stoi(deviceID);
+        }
+        catch (...) {
+            // If not a direct integer, search for device by name
+            int numDrivers = 0;
+            if (m_system->getNumDrivers(&numDrivers) == FMOD_OK) {
+                for (int i = 0; i < numDrivers; ++i) {
+                    char driverName[256] = { 0 };
+                    if (m_system->getDriverInfo(i, driverName, sizeof(driverName), nullptr, nullptr, nullptr, nullptr) == FMOD_OK) {
+                        if (deviceID == driverName) {
+                            driverIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Set the driver before initialization
+        if (!FMOD_OK_OR_LOG(m_system->setDriver(driverIndex), "setDriver"))
+            return false;
+
+        // Initialize FMOD with the selected driver
+        if (!FMOD_OK_OR_LOG(m_system->init(512, FMOD_INIT_NORMAL, nullptr), "init")) {
+            if (m_system) { m_system->release(); m_system = nullptr; }
+            return false;
+        }
+
+        if (!FMOD_OK_OR_LOG(m_system->getMasterChannelGroup(&m_master), "getMasterChannelGroup")) {
+            if (m_system) { m_system->release(); m_system = nullptr; }
+            return false;
+        }
+
+        SetMasterVolume(m_masterVolume);
+        return true;
+    }
+
     void FmodAudioDevice::Update() {
         if (m_system) m_system->update();
 

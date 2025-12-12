@@ -69,6 +69,12 @@ namespace Platform {
         bool HasMode(WindowMode mode) const override;
         void Resize(int width, int height) override;
 
+        // Display mode queries
+        std::vector<Engine::DisplayMode> GetSupportedDisplayModes() const override;
+        Engine::MonitorInfo GetMonitorInfo() const override;
+        bool SetDisplayMode(const Engine::DisplayMode& mode) override;
+        bool SetFullscreen(bool fullscreen) override;
+
         void* GetNativeHandle() const override;
 
         // ==================== GLFW-Specific Methods ====================

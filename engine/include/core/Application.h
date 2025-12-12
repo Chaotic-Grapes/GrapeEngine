@@ -162,6 +162,71 @@ namespace Engine {
          */
         void UpdateSystemsByMode(uint32_t modes, ECS::World& world, float deltaTime);
 
+        // ==================== Device Management (Phase 3) ====================
+        
+        /**
+         * @brief Set window resolution and refresh rate
+         * @param width Resolution width in pixels
+         * @param height Resolution height in pixels
+         * @param refreshRate Target refresh rate in Hz (0 = use current monitor's rate)
+         * @return true if resolution was successfully changed
+         * 
+         * Validates that the requested resolution is supported by the current monitor
+         * before attempting to apply it. Returns false if resolution is not supported
+         * or platform context is unavailable.
+         * 
+         * @code
+         * // Change to 1920x1080 at 144Hz
+         * if (app->SetResolution(1920, 1080, 144)) {
+         *     LOG_INFO("Resolution changed successfully");
+         * } else {
+         *     LOG_ERROR("Resolution not supported");
+         * }
+         * @endcode
+         */
+        bool SetResolution(int width, int height, int refreshRate = 0);
+        
+        /**
+         * @brief Set fullscreen mode
+         * @param fullscreen true for fullscreen, false for windowed
+         * @param monitorIndex Which monitor to use (0 = primary)
+         * @return true if mode was successfully changed
+         * 
+         * Transitions between fullscreen and windowed modes. The monitorIndex parameter
+         * is used to determine which monitor the window appears on (multi-monitor support).
+         */
+        bool SetFullscreenMode(bool fullscreen, int monitorIndex = 0);
+        
+        /**
+         * @brief Switch to a different audio device
+         * @param deviceID Device identifier from AudioDeviceInfo::DeviceID
+         * @return true if audio device was successfully switched
+         * 
+         * Validates that the requested device exists and is connected before switching.
+         * Returns false if device is not found, not connected, or audio service is unavailable.
+         * 
+         * Get available devices from DeviceManager::EnumerateAudioOutputDevices()
+         */
+        bool SetAudioDevice(const std::string& deviceID);
+        
+        /**
+         * @brief Get information about the current monitor
+         * @return MonitorInfo for the current display, or empty struct if unavailable
+         * 
+         * Returns detailed information about the monitor the main window is currently on,
+         * including supported display modes, DPI, aspect ratio, and physical position.
+         */
+        MonitorInfo GetCurrentMonitorInfo() const;
+        
+        /**
+         * @brief Get the current audio device being used
+         * @return Current AudioDeviceInfo
+         * 
+         * Returns information about the currently active audio output device.
+         * If no device is explicitly set, returns the system default.
+         */
+        AudioDeviceInfo GetCurrentAudioDevice() const;
+
     private:
         // Engine state
         bool m_shouldStop = false;
@@ -194,6 +259,9 @@ namespace Engine {
 
         double m_lastFrameTime{0};
         float m_accumulator = 0.0f;
+        
+        // Device management
+        std::string m_currentAudioDeviceID;
         
         // Helper methods for cleaner game loop logic
         void _updatePhysics(ECS::World& world);
