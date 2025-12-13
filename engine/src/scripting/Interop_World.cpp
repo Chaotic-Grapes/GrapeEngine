@@ -505,3 +505,9 @@ INTEROP_API bool WorldInterop_IsComponentRegistered(uint32_t typeNameHash) {
     std::lock_guard<std::mutex> lock(tracker.mutex);
     return tracker.registered.find(typeNameHash) != tracker.registered.end();
 }
+INTEROP_API void* WorldInterop_GetJobManager(void* worldPtr) {
+    if (!worldPtr) return nullptr;
+    
+    auto* world = static_cast<ECS::World*>(worldPtr);
+    return &world->GetJobManager();
+}

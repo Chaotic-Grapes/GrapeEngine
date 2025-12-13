@@ -26,6 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <functional>
 #include <unordered_map>
 #include "ecs/ComponentRegistry.h"
+#include "ecs/Entity.h"
 
 namespace ECS {
     // Signature represents a set of component types using their TypeIds.

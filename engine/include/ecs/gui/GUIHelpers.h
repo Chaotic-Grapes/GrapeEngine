@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file    GUIHelpers.h
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
 \brief
 Declares utility functions and helper classes for GUI system operations.
 

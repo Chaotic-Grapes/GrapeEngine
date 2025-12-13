@@ -369,6 +369,41 @@ namespace ECS {
             }
         }
 
+        /**
+         * @brief Update systems using job-based parallel execution.
+         * 
+         * Systems that support job-based execution (SupportsJobBasedExecution() == true)
+         * are scheduled as jobs and can run in parallel based on component dependencies.
+         * Other systems fall back to sequential execution.
+         * 
+         * @param world Active scene's World
+         * @param deltaTime Time since last frame
+         * 
+         * Note: This experimental feature enables parallel system execution when
+         * systems declare their component access patterns correctly.
+         */
+        void UpdateWithJobs(World& world, float deltaTime) {
+            _updateGroupWithJobs(SystemGroup::PreUpdate, world, deltaTime);
+            _updateGroupWithJobs(SystemGroup::Update, world, deltaTime);
+            _updateGroupWithJobs(SystemGroup::PostUpdate, world, deltaTime);
+            _updateGroupWithJobs(SystemGroup::PrePhysics, world, deltaTime);
+            _updateGroupWithJobs(SystemGroup::Physics, world, deltaTime);
+            _updateGroupWithJobs(SystemGroup::PostPhysics, world, deltaTime);
+            _updateGroupWithJobs(SystemGroup::PreRender, world, deltaTime);
+            _updateGroupWithJobs(SystemGroup::Render, world, deltaTime);
+            _updateGroupWithJobs(SystemGroup::PostRender, world, deltaTime);
+        }
+
+        /**
+         * @brief Update a system group using job-based parallel execution.
+         * @param group System group to execute
+         * @param world Active scene's World
+         * @param deltaTime Time since last frame
+         */
+        void UpdateGroupWithJobs(SystemGroup group, World& world, float deltaTime) {
+            _updateGroupWithJobs(group, world, deltaTime);
+        }
+
     private:
         /// Native C++ systems (owned)
         std::unordered_map<SystemGroup, std::vector<std::unique_ptr<ISystem>>> m_systemGroups;
@@ -445,6 +480,66 @@ namespace ECS {
                         system->OnUpdate(world, deltaTime);
                     }
                 }
+            }
+        }
+
+        /**
+         * @brief Update systems in a group using job-based parallel execution.
+         */
+        void _updateGroupWithJobs(SystemGroup group, World& world, float deltaTime) {
+            // Collect all enabled systems in this group that support jobs
+            std::vector<ISystem*> jobSystems;
+            std::vector<ISystem*> sequentialSystems;
+
+            auto itOwned = m_systemGroups.find(group);
+            if (itOwned != m_systemGroups.end()) {
+                for (auto& system : itOwned->second) {
+                    if (!system->IsEnabled()) continue;
+                    
+                    if (system->SupportsJobBasedExecution()) {
+                        jobSystems.push_back(system.get());
+                    }
+                    else {
+                        sequentialSystems.push_back(system.get());
+                    }
+                }
+            }
+
+            auto itScripted = m_scriptedSystemGroups.find(group);
+            if (itScripted != m_scriptedSystemGroups.end()) {
+                for (auto* system : itScripted->second) {
+                    if (!system->IsEnabled()) continue;
+                    
+                    if (system->SupportsJobBasedExecution()) {
+                        jobSystems.push_back(system);
+                    }
+                    else {
+                        sequentialSystems.push_back(system);
+                    }
+                }
+            }
+
+            // Execute sequential systems first (maintain backward compatibility)
+            for (auto* system : sequentialSystems) {
+                system->OnUpdate(world, deltaTime);
+            }
+
+            // Execute job-based systems in parallel (if any)
+            if (!jobSystems.empty()) {
+                _executeJobSystems(jobSystems, world, deltaTime);
+            }
+        }
+
+        /**
+         * @brief Execute systems using job parallelization.
+         */
+        void _executeJobSystems(const std::vector<ISystem*>& systems, World& world, float deltaTime) {
+            /* auto& jobManager = */ world.GetJobManager();
+
+            // Schedule all systems as jobs and wait for completion
+            for (auto* system : systems) {
+                auto handle = system->OnUpdateAsJobs(world, deltaTime);
+                handle.Complete();
             }
         }
     };

@@ -325,4 +325,31 @@ public class World
     {
         return new Query<T1, T2, T3, T4, T5, T6, T7, T8>(this);
     }
+
+    // ============================================================================
+    // Job System Access
+    // ============================================================================
+
+    private Job.JobManager? _jobManager;
+
+    /// <summary>
+    /// Access the job manager for this world.
+    /// Use this to schedule jobs and manage parallelized work.
+    /// </summary>
+    public Job.JobManager JobManager
+    {
+        get
+        {
+            if (_jobManager == null)
+            {
+                unsafe
+                {
+                    nint jobManagerPtr = WorldAPI.GetJobManager((void*)_nativeWorldPtr);
+                    _jobManager = new Job.JobManager(jobManagerPtr);
+                }
+            }
+            return _jobManager;
+        }
+    }
 }
+

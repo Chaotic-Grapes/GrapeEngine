@@ -26,6 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "Export.h"
 #include "ecs/World.h"
+#include "ecs/jobs/JobHandle.h"
 #include <string>
 #include <vector>
 
@@ -233,6 +234,76 @@ namespace ECS {
          * @param enabled New enabled state
          */
         void SetEnabled(bool enabled) { m_enabled = enabled; }
+
+        /**
+         * @brief Get component access patterns for dependency resolution.
+         * 
+         * Override to declare which components this system reads/writes.
+         * Used by SystemManager for automatic dependency detection.
+         * 
+         * @return Vector of component type IDs (read and write combined from metadata)
+         * 
+         * Example:
+         * @code
+         * std::vector<ComponentTypeId> GetComponentAccesses() const override {
+         *     return {
+         *         TypeIdOf<Transform>(),   // Read
+         *         TypeIdOf<Velocity>(),    // Read
+         *         // Writes are in WriteComponents from metadata
+         *     };
+         * }
+         * @endcode
+         */
+        virtual std::vector<ComponentTypeId> GetComponentAccesses() const {
+            // Default: combine read and write components from metadata
+            auto metadata = GetMetadata();
+            auto accesses = metadata.ReadComponents;
+            accesses.insert(accesses.end(), 
+                          metadata.WriteComponents.begin(),
+                          metadata.WriteComponents.end());
+            return accesses;
+        }
+
+        /**
+         * @brief Execute system as parallel jobs instead of sequential update.
+         * 
+         * Override to implement job-based system execution. The default
+         * implementation calls OnUpdate() sequentially.
+         * 
+         * @param world Active world
+         * @param deltaTime Time since last frame
+         * @return JobHandle for tracking execution (default: invalid handle)
+         * 
+         * Example:
+         * @code
+         * Jobs::JobHandle OnUpdateAsJobs(World& world, float deltaTime) override {
+         *     auto query = world.CreateParallelQuery<Transform, Velocity>();
+         *     auto chunks = query.GetChunks();
+         *     
+         *     std::vector<std::unique_ptr<IJob>> jobs;
+         *     for (auto* chunk : chunks) {
+         *         auto job = std::make_unique<UpdateChunkJob>();
+         *         job->DeltaTime = deltaTime;
+         *         jobs.push_back(std::move(job));
+         *     }
+         *     
+         *     return world.GetJobManager().ScheduleParallel(std::move(jobs));
+         * }
+         * @endcode
+         */
+        virtual Jobs::JobHandle OnUpdateAsJobs(World& world, float deltaTime) {
+            // Default: run sequentially
+            OnUpdate(world, deltaTime);
+            return Jobs::JobHandle{};
+        }
+
+        /**
+         * @brief Check if this system supports job-based execution.
+         * @return true if OnUpdateAsJobs() is overridden, false if using sequential execution
+         */
+        virtual bool SupportsJobBasedExecution() const {
+            return false;  // Override and return true if implementing OnUpdateAsJobs()
+        }
 
     private:
         bool m_enabled = true;

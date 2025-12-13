@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file    GUILayout.h
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
 \brief
 Declares the GUI layout calculation system for hierarchical positioning and sizing.
 

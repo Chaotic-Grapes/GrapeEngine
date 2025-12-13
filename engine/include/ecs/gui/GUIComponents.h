@@ -1,8 +1,8 @@
 /* Start Header *****************************************************************/
 /*!
 \file    GUIComponents.h
-\author Muhammad Nur Fadzly Bin Zulkifli (100%)
-\par    muhammadnurfadzly.b@digipen.edu
+\author  Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par     muhammadnurfadzly.b@digipen.edu
 \brief
 Declares ECS-compatible GUI component structures for the comprehensive GUI framework.
 These components follow the ECS pattern: pure data structures that are trivially copyable.

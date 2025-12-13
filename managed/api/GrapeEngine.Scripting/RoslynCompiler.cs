@@ -64,7 +64,11 @@ internal static class RoslynCompiler
                 var name = Path.GetFileName(asmPath);
                 if (name.StartsWith("System") || name.StartsWith("mscorlib") || name.StartsWith("netstandard") || name.StartsWith("Microsoft.CSharp") || name.StartsWith("System.Private.CoreLib"))
                 {
-                    try { refs.Add(MetadataReference.CreateFromFile(asmPath)); } catch { }
+                    try 
+                    {
+                        refs.Add(MetadataReference.CreateFromFile(asmPath)); 
+                    }
+                    catch { }
                 }
             }
 
@@ -84,7 +88,8 @@ internal static class RoslynCompiler
             {
                 foreach (var r in references)
                 {
-                    if (File.Exists(r)) refs.Add(MetadataReference.CreateFromFile(r));
+                    if (File.Exists(r))
+                        refs.Add(MetadataReference.CreateFromFile(r));
                 }
             }
 
