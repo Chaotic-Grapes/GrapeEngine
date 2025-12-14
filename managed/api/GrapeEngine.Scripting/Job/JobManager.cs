@@ -54,6 +54,7 @@ public class JobManager
 {
     private readonly nint _nativeJobManager;
     private readonly JobProfiler _profiler;
+    private readonly OptimizationProfiler _optimizationProfiler;
 
     /// <summary>
     /// Create a job manager (typically done by the engine).
@@ -62,6 +63,7 @@ public class JobManager
     {
         _nativeJobManager = nativeJobManager;
         _profiler = new JobProfiler(nativeJobManager);
+        _optimizationProfiler = new OptimizationProfiler();
     }
 
     /// <summary>
@@ -73,6 +75,11 @@ public class JobManager
     /// Get the job profiler for performance analysis.
     /// </summary>
     public JobProfiler Profiler => _profiler;
+
+    /// <summary>
+    /// Get the optimization profiler for hot path detection and SIMD recommendations.
+    /// </summary>
+    public OptimizationProfiler OptimizationProfiler => _optimizationProfiler;
 
     // ============================================================================
     // Job Scheduling

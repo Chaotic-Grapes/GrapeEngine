@@ -397,5 +397,21 @@ public class World
             return _jobManager;
         }
     }
+
+    /// <summary>
+    /// Access the optimization profiler for this world.
+    /// Use this to profile hot paths and get optimization recommendations.
+    /// </summary>
+    public OptimizationProfiler OptimizationProfiler => JobManager.OptimizationProfiler;
+
+    /// <summary>
+    /// Get optimization recommendations for hot paths in this world.
+    /// Returns methods that exceed performance thresholds and could benefit from optimization.
+    /// </summary>
+    /// <returns>Array of optimization recommendations sorted by priority</returns>
+    public OptimizationRecommendation[] GetOptimizationRecommendations()
+    {
+        return [.. JobManager.OptimizationProfiler.GetRecommendations().OrderBy(r => r.Priority)];
+    }
 }
 

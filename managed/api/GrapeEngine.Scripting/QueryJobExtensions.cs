@@ -45,11 +45,13 @@ public static class QueryJobExtensions
     /// 
     /// The job is scheduled on the job system and executed on worker threads.
     /// This is the parallel equivalent of foreach(var entity in query).
+    /// Automatically profiles execution and tracks hot paths.
     /// </summary>
     /// <typeparam name="T1">Component type</typeparam>
     /// <param name="query">Query to iterate</param>
     /// <param name="action">Function to execute per entity</param>
     /// <param name="dependsOn">Optional job to wait for</param>
+    /// <param name="batchingConfig">Optional batching configuration for load distribution</param>
     /// <returns>Job handle for synchronization</returns>
     /// 
     /// Example:
@@ -61,35 +63,55 @@ public static class QueryJobExtensions
     public static JobHandle ForEachEntity<T1>(
         this Query<T1> query,
         EntityAction<T1> action,
-        JobHandle? dependsOn = default) where T1 : unmanaged
+        JobHandle? dependsOn = default,
+        BatchingConfig? batchingConfig = default) where T1 : unmanaged
     {
         var helper = GetJobHelper(query);
-        return helper.ForEachEntity(query, action, dependsOn);
+        var methodName = $"ForEachEntity<{typeof(T1).Name}>";
+        
+        // Wrap with profiling scope for hot path detection
+        using var scope = helper.JobManager.OptimizationProfiler.BeginProfile(methodName, OptimizationSafety.Normal);
+        
+        return helper.ForEachEntity(query, action, dependsOn ?? default, batchingConfig);
     }
 
     /// <summary>
     /// Schedule a job for each entity with two components.
+    /// Automatically profiles execution and tracks hot paths.
     /// </summary>
     public static JobHandle ForEachEntity<T1, T2>(
         this Query<T1, T2> query,
         EntityAction<T1, T2> action,
-        JobHandle? dependsOn = default) where T1 : unmanaged where T2 : unmanaged
+        JobHandle? dependsOn = default,
+        BatchingConfig? batchingConfig = default) where T1 : unmanaged where T2 : unmanaged
     {
         var helper = GetJobHelper(query);
-        return helper.ForEachEntity(query, action, dependsOn);
+        var methodName = $"ForEachEntity<{typeof(T1).Name}, {typeof(T2).Name}>";
+        
+        // Wrap with profiling scope for hot path detection
+        using var scope = helper.JobManager.OptimizationProfiler.BeginProfile(methodName, OptimizationSafety.Normal);
+        
+        return helper.ForEachEntity(query, action, dependsOn ?? default, batchingConfig);
     }
 
     /// <summary>
     /// Schedule a job for each entity with three components.
+    /// Automatically profiles execution and tracks hot paths.
     /// </summary>
     public static JobHandle ForEachEntity<T1, T2, T3>(
         this Query<T1, T2, T3> query,
         EntityAction<T1, T2, T3> action,
-        JobHandle? dependsOn = default)
+        JobHandle? dependsOn = default,
+        BatchingConfig? batchingConfig = default)
         where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged
     {
         var helper = GetJobHelper(query);
-        return helper.ForEachEntity(query, action, dependsOn);
+        var methodName = $"ForEachEntity<{typeof(T1).Name}, {typeof(T2).Name}, {typeof(T3).Name}>";
+        
+        // Wrap with profiling scope for hot path detection
+        using var scope = helper.JobManager.OptimizationProfiler.BeginProfile(methodName, OptimizationSafety.Normal);
+        
+        return helper.ForEachEntity(query, action, dependsOn ?? default, batchingConfig);
     }
 
     /// <summary>

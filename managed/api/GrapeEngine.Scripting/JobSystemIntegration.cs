@@ -25,16 +25,24 @@ namespace GrapeEngine.Scripting;
 /// </summary>
 public struct JobExecutionResult
 {
-    /// <summary>Total time spent executing job</summary>
+    /// <summary>
+    /// Total time spent executing job
+    /// </summary>
     public float ElapsedMilliseconds { get; set; }
 
-    /// <summary>Number of entities processed</summary>
+    /// <summary>
+    /// Number of entities processed
+    /// </summary>
     public int EntitiesProcessed { get; set; }
 
-    /// <summary>Whether job completed successfully</summary>
+    /// <summary>
+    /// Whether job completed successfully
+    /// </summary>
     public bool IsComplete { get; set; }
 
-    /// <summary>Job handle for synchronization</summary>
+    /// <summary>
+    /// Job handle for synchronization
+    /// </summary>
     public JobHandle Handle { get; set; }
 }
 
@@ -84,11 +92,14 @@ public class JobSystemHelper(World world)
     /// 
     /// The function is scheduled as a parallel job and executed on worker threads.
     /// This is more efficient than sequential iteration for large entity counts.
+    /// 
+    /// Supports optional batching for better multi-core load distribution.
     /// </summary>
     /// <typeparam name="T1">First component type</typeparam>
     /// <param name="query">Query to iterate</param>
     /// <param name="action">Function to execute for each entity (ref parameters for writes)</param>
     /// <param name="dependsOn">Optional job to wait for before starting</param>
+    /// <param name="batchingConfig">Optional batching configuration for load distribution</param>
     /// <returns>Job handle for synchronization</returns>
     /// 
     /// Example:
@@ -96,57 +107,163 @@ public class JobSystemHelper(World world)
     /// var handle = helper.ForEachEntity<Transform>(
     ///     query,
     ///     (ref Transform t) => t.Position *= 0.99f,  // Decay position
-    ///     dependsOn: previousHandle
+    ///     dependsOn: previousHandle,
+    ///     batchingConfig: new BatchingConfig { Strategy = BatchingStrategy.Dynamic }
     /// );
     /// handle.Complete();  // Wait for completion
     /// </code>
     public JobHandle ForEachEntity<T1>(
         Query<T1> query,
         EntityAction<T1> action,
-        JobHandle? dependsOn = default) where T1 : unmanaged
+        JobHandle? dependsOn = default,
+        BatchingConfig? batchingConfig = null) where T1 : unmanaged
     {
-        var job = new EntityIterationJob<T1>
+        // Apply batching if configured
+        if (batchingConfig != null)
+        {
+            var batcher = new JobBatcher();
+            // Collect entities from query by enumerating
+            var entities = new List<Entity>();
+            var enumerator = query.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                var (entity, _) = enumerator.Current;
+                entities.Add(entity);
+            }
+            
+            if (entities.Count > batchingConfig.EntitiesPerBatch)
+            {
+                var batches = batcher.CreateBatches(entities, batchingConfig);
+                
+                var jobs = new IJob[batches.Count];
+                for (int i = 0; i < batches.Count; i++)
+                {
+                    jobs[i] = new EntityIterationJob<T1>
+                    {
+                        Query = query,
+                        Action = action,
+                        EntityBatch = batches[i]
+                    };
+                }
+                
+                return _jobManager.ScheduleParallel(jobs, (int)batchingConfig.Priority);
+            }
+        }
+        
+        var singleJob = new EntityIterationJob<T1>
         {
             Query = query,
             Action = action
         };
 
-        return _jobManager.Schedule(job, dependsOn);
+        return _jobManager.Schedule(singleJob, dependsOn);
     }
 
     /// <summary>
     /// Schedule a job for each entity with two components.
+    /// 
+    /// Supports optional batching for better multi-core load distribution.
     /// </summary>
+    /// <param name="batchingConfig">Optional batching configuration for load distribution</param>
     public JobHandle ForEachEntity<T1, T2>(
         Query<T1, T2> query,
         EntityAction<T1, T2> action,
-        JobHandle? dependsOn = default) where T1 : unmanaged where T2 : unmanaged
+        JobHandle? dependsOn = default,
+        BatchingConfig? batchingConfig = null) where T1 : unmanaged where T2 : unmanaged
     {
-        var job = new EntityIterationJob<T1, T2>
+        // Apply batching if configured
+        if (batchingConfig != null)
+        {
+            var batcher = new JobBatcher();
+            // Collect entities from query by enumerating
+            var entities = new List<Entity>();
+            var enumerator = query.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                var (entity, _, _) = enumerator.Current;
+                entities.Add(entity);
+            }
+            
+            if (entities.Count > batchingConfig.EntitiesPerBatch)
+            {
+                var batches = batcher.CreateBatches(entities, batchingConfig);
+                
+                var jobs = new IJob[batches.Count];
+                for (int i = 0; i < batches.Count; i++)
+                {
+                    jobs[i] = new EntityIterationJob<T1, T2>
+                    {
+                        Query = query,
+                        Action = action,
+                        EntityBatch = batches[i]
+                    };
+                }
+                
+                return _jobManager.ScheduleParallel(jobs, (int)batchingConfig.Priority);
+            }
+        }
+        
+        var singleJob = new EntityIterationJob<T1, T2>
         {
             Query = query,
             Action = action
         };
 
-        return _jobManager.Schedule(job, dependsOn);
+        return _jobManager.Schedule(singleJob, dependsOn);
     }
 
     /// <summary>
     /// Schedule a job for each entity with three components.
+    /// 
+    /// Supports optional batching for better multi-core load distribution.
     /// </summary>
+    /// <param name="batchingConfig">Optional batching configuration for load distribution</param>
     public JobHandle ForEachEntity<T1, T2, T3>(
         Query<T1, T2, T3> query,
         EntityAction<T1, T2, T3> action,
-        JobHandle? dependsOn = default) 
+        JobHandle? dependsOn = default,
+        BatchingConfig? batchingConfig = null) 
         where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged
     {
-        var job = new EntityIterationJob<T1, T2, T3>
+        // Apply batching if configured
+        if (batchingConfig != null)
+        {
+            var batcher = new JobBatcher();
+            // Collect entities from query by enumerating
+            var entities = new List<Entity>();
+            var enumerator = query.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                var (entity, _, _, _) = enumerator.Current;
+                entities.Add(entity);
+            }
+            
+            if (entities.Count > batchingConfig.EntitiesPerBatch)
+            {
+                var batches = batcher.CreateBatches(entities, batchingConfig);
+                
+                var jobs = new IJob[batches.Count];
+                for (int i = 0; i < batches.Count; i++)
+                {
+                    jobs[i] = new EntityIterationJob<T1, T2, T3>
+                    {
+                        Query = query,
+                        Action = action,
+                        EntityBatch = batches[i]
+                    };
+                }
+                
+                return _jobManager.ScheduleParallel(jobs, (int)batchingConfig.Priority);
+            }
+        }
+        
+        var singleJob = new EntityIterationJob<T1, T2, T3>
         {
             Query = query,
             Action = action
         };
 
-        return _jobManager.Schedule(job, dependsOn);
+        return _jobManager.Schedule(singleJob, dependsOn);
     }
 
     /// <summary>
@@ -280,19 +397,42 @@ public delegate void EntityAction<T1, T2, T3>(ref T1 component1, in T2 component
 
 /// <summary>
 /// Job for iterating entities with a single component.
+/// 
+/// Supports batch-based execution when EntityBatch is set.
 /// </summary>
 internal class EntityIterationJob<T1> : IJob where T1 : unmanaged
 {
     public required Query<T1> Query { get; set; }
     public EntityAction<T1>? Action { get; set; }
+    public EntityBatch? EntityBatch { get; set; }
 
     public void Execute()
     {
-        var enumerator = Query.GetEnumerator();
-        while (enumerator.MoveNext())
+        // Batch-based execution if EntityBatch is set
+        if (EntityBatch != null && EntityBatch.Entities != null && EntityBatch.Entities.Count > 0)
         {
-            var (entity, comp) = enumerator.Current;
-            Action?.Invoke(ref comp);
+            // Get a fresh enumerator and skip to entities in this batch
+            var batchSet = new HashSet<Entity>(EntityBatch.Entities);
+            var enumerator = Query.GetEnumerator();
+            
+            while (enumerator.MoveNext())
+            {
+                var (entity, comp) = enumerator.Current;
+                if (batchSet.Contains(entity))
+                {
+                    Action?.Invoke(ref comp);
+                }
+            }
+        }
+        else
+        {
+            // Non-batch execution (original behavior)
+            var enumerator = Query.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                var (entity, comp) = enumerator.Current;
+                Action?.Invoke(ref comp);
+            }
         }
     }
 
@@ -301,19 +441,42 @@ internal class EntityIterationJob<T1> : IJob where T1 : unmanaged
 
 /// <summary>
 /// Job for iterating entities with two components.
+/// 
+/// Supports batch-based execution when EntityBatch is set.
 /// </summary>
 internal class EntityIterationJob<T1, T2> : IJob where T1 : unmanaged where T2 : unmanaged
 {
     public required Query<T1, T2> Query { get; set; }
     public EntityAction<T1, T2>? Action { get; set; }
+    public EntityBatch? EntityBatch { get; set; }
 
     public void Execute()
     {
-        var enumerator = Query.GetEnumerator();
-        while (enumerator.MoveNext())
+        // Batch-based execution if EntityBatch is set
+        if (EntityBatch != null && EntityBatch.Entities != null && EntityBatch.Entities.Count > 0)
         {
-            var (entity, comp1, comp2) = enumerator.Current;
-            Action?.Invoke(ref comp1, in comp2);
+            // Get a fresh enumerator and skip to entities in this batch
+            var batchSet = new HashSet<Entity>(EntityBatch.Entities);
+            var enumerator = Query.GetEnumerator();
+            
+            while (enumerator.MoveNext())
+            {
+                var (entity, comp1, comp2) = enumerator.Current;
+                if (batchSet.Contains(entity))
+                {
+                    Action?.Invoke(ref comp1, in comp2);
+                }
+            }
+        }
+        else
+        {
+            // Non-batch execution (original behavior)
+            var enumerator = Query.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                var (entity, comp1, comp2) = enumerator.Current;
+                Action?.Invoke(ref comp1, in comp2);
+            }
         }
     }
 
@@ -322,20 +485,43 @@ internal class EntityIterationJob<T1, T2> : IJob where T1 : unmanaged where T2 :
 
 /// <summary>
 /// Job for iterating entities with three components.
+/// 
+/// Supports batch-based execution when EntityBatch is set.
 /// </summary>
 internal class EntityIterationJob<T1, T2, T3> : IJob 
     where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged
 {
     public required Query<T1, T2, T3> Query { get; set; }
     public EntityAction<T1, T2, T3>? Action { get; set; }
+    public EntityBatch? EntityBatch { get; set; }
 
     public void Execute()
     {
-        var enumerator = Query.GetEnumerator();
-        while (enumerator.MoveNext())
+        // Batch-based execution if EntityBatch is set
+        if (EntityBatch != null && EntityBatch.Entities != null && EntityBatch.Entities.Count > 0)
         {
-            var (entity, comp1, comp2, comp3) = enumerator.Current;
-            Action?.Invoke(ref comp1, in comp2, in comp3);
+            // Get a fresh enumerator and skip to entities in this batch
+            var batchSet = new HashSet<Entity>(EntityBatch.Entities);
+            var enumerator = Query.GetEnumerator();
+            
+            while (enumerator.MoveNext())
+            {
+                var (entity, comp1, comp2, comp3) = enumerator.Current;
+                if (batchSet.Contains(entity))
+                {
+                    Action?.Invoke(ref comp1, in comp2, in comp3);
+                }
+            }
+        }
+        else
+        {
+            // Non-batch execution (original behavior)
+            var enumerator = Query.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                var (entity, comp1, comp2, comp3) = enumerator.Current;
+                Action?.Invoke(ref comp1, in comp2, in comp3);
+            }
         }
     }
 

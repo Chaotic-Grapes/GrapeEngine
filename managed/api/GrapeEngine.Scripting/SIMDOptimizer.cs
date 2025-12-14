@@ -522,10 +522,10 @@ public static class OptimizedQueryExtensions
     /// <summary>
     /// Execute query as job with optimization tracking.
     /// </summary>
-    public static JobHandle ForEachOptimizedAsJob<T>(this Query<T> query, EntityAction<T> action//,
-        /* OptimizationProfiler? profiler = null */) where T : unmanaged
+    public static JobHandle ForEachOptimizedAsJob<T>(this Query<T> query, EntityAction<T> action,
+        OptimizationProfiler? profiler = null) where T : unmanaged
     {
-        // TODO: probably would wrap job execution with profiler
+        using var scope = profiler?.BeginProfile($"ForEachOptimizedAsJob<{typeof(T).Name}>", OptimizationSafety.Normal);
         return query.ForEachEntity(action);
     }
 }
