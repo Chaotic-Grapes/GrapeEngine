@@ -585,6 +585,14 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
 
         // Get registry and create sorted list
         const auto& registry = ComponentRegistryUI::GetAll();
+        
+        // Debug: if registry is empty, show message
+        if (registry.empty()) {
+            ImGui::TextDisabled("No components registered");
+            ImGui::EndPopup();
+            return;
+        }
+        
         std::vector<size_t> sortedIndices;
         for (size_t i = 0; i < registry.size(); ++i) {
             sortedIndices.push_back(i);

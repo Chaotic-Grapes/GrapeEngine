@@ -133,12 +133,13 @@ namespace ECS {
     }
 
     SystemMetadata RendererSystem::GetMetadata() const {
-        SystemMetadata metadata;
-        metadata.Name = "Renderer";
-        metadata.ReadComponents = {}; // Reads many components
-        metadata.WriteComponents = {};
-        metadata.ExecutionOrder = 0;
-        return metadata;
+        ComponentAccessBuilder builder("Renderer");
+        // Note: RendererSystem reads many components (SpriteRenderer2D, WorldTransform, etc.)
+        // but uses them through world iteration rather than static declaration.
+        // For now, marking as read-only with minimal dependency tracking.
+        // Full component access list documented in OnUpdate().
+        builder.SetExecutionOrder(0);
+        return builder.Build();
     }
 
     void RendererSystem::OnCreate(World& world) {

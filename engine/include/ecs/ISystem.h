@@ -44,13 +44,21 @@ namespace ECS {
 
     /**
      * @brief Metadata describing a system's component dependencies
+     * 
+     * Contains both the original Read/Write component lists for backward compatibility
+     * and the unified ComponentAccesses vector for new code.
+     * 
+     * New systems should use ComponentAccessBuilder which populates both fields automatically.
+     * 
+     * @see ComponentAccessBuilder
      */
     struct SystemMetadata {
-        std::string Name;                                   // System name (e.g., "Physics", "Animation")
-        std::vector<ComponentTypeId> ReadComponents;        // Components this system reads
-        std::vector<ComponentTypeId> WriteComponents;       // Components this system writes
-        int ExecutionOrder = 0;                             // Execution priority (lower = earlier)
-        bool Enabled = true;                                // Whether system is currently active
+        std::string Name;                                       // System name (e.g., "Physics", "Animation")
+        std::vector<ComponentTypeId> ReadComponents;            // Components this system reads (deprecated, for backward compat)
+        std::vector<ComponentTypeId> WriteComponents;           // Components this system writes (deprecated, for backward compat)
+        std::vector<ComponentAccess> ComponentAccesses;         // Unified access info (Read/Write/ReadWrite with modes)
+        int ExecutionOrder = 0;                                 // Execution priority (lower = earlier)
+        bool Enabled = true;                                    // Whether system is currently active
     };
 
     /**
@@ -66,6 +74,24 @@ namespace ECS {
         PreRender,      // Frustum culling, LOD selection
         Render,         // Actual rendering
         PostRender      // Cleanup, debug visualization
+    };
+
+    /**
+     * @brief Metadata about a system for dependency tracking.
+     * 
+     * Used internally by SystemDependencyGraph for group-based scheduling
+     * and by the jobs system for component access analysis.
+     * 
+     * @see SystemDependencyGraph
+     * @see SystemMetadata
+     */
+    struct SystemDependencyMetadata {
+        ISystem* System = nullptr;                              // Pointer to the system
+        std::string Name;                                       // System name
+        std::vector<ComponentTypeId> ReadComponents;            // Components this system reads
+        std::vector<ComponentTypeId> WriteComponents;           // Components this system writes
+        SystemGroup Group = SystemGroup::Update;                // Execution group
+        int ExecutionOrder = 0;                                 // Execution order within group
     };
 
     /**

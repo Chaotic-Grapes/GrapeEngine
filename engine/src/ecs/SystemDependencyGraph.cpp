@@ -15,6 +15,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/SystemDependencyGraph.h"
 #include "ecs/ComponentAccessAttribute.h"
+#include "ecs/ComponentConflictDetector.h"
+#include "ecs/CycleDetector.h"
+#include "ecs/DependencyTopologicalSort.h"
 #include <algorithm>
 #include <queue>
 #include <iostream>
@@ -31,6 +34,28 @@ namespace ECS {
             m_systems.push_back(system);
             m_dependencies[system] = {};
             m_dependents[system] = {};
+            
+            // Create metadata entry for this system
+            SystemDependencyMetadata meta;
+            meta.System = system;
+            meta.Name = system->GetMetadata().Name;
+            meta.ReadComponents = system->GetMetadata().ReadComponents;
+            meta.WriteComponents = system->GetMetadata().WriteComponents;
+            meta.ExecutionOrder = system->GetMetadata().ExecutionOrder;
+            m_systemMetadata.push_back(meta);
+        }
+    }
+
+    void SystemDependencyGraph::AddSystemMetadata(const SystemDependencyMetadata& metadata) {
+        if (!metadata.System) return;
+
+        // Check if already added
+        auto it = std::find(m_systems.begin(), m_systems.end(), metadata.System);
+        if (it == m_systems.end()) {
+            m_systems.push_back(metadata.System);
+            m_dependencies[metadata.System] = {};
+            m_dependents[metadata.System] = {};
+            m_systemMetadata.push_back(metadata);
         }
     }
 
@@ -95,6 +120,15 @@ namespace ECS {
         return true;  // No dependency relationship
     }
 
+    bool SystemDependencyGraph::CanRunInParallel(const SystemDependencyMetadata& sys1,
+                                                const SystemDependencyMetadata& sys2) const {
+        // Use unified conflict detector
+        return !ComponentConflictDetector::HasConflict(
+            sys1.WriteComponents, sys2.WriteComponents,
+            sys1.ReadComponents, sys2.ReadComponents
+        );
+    }
+
     std::vector<ISystem*> SystemDependencyGraph::GetDependencies(const ISystem* system) const {
         auto it = m_dependencies.find(const_cast<ISystem*>(system));
         if (it != m_dependencies.end()) {
@@ -125,6 +159,7 @@ namespace ECS {
 
     void SystemDependencyGraph::Clear() {
         m_systems.clear();
+        m_systemMetadata.clear();
         m_dependencies.clear();
         m_dependents.clear();
         m_allDependencies.clear();
@@ -134,136 +169,25 @@ namespace ECS {
         auto metaA = systemA->GetMetadata();
         auto metaB = systemB->GetMetadata();
 
-        // Check for write-write conflicts
-        for (const auto& compA : metaA.WriteComponents) {
-            for (const auto& compB : metaB.WriteComponents) {
-                if (compA == compB) {
-                    return true;  // Both write to same component
-                }
-            }
-        }
-
-        // Check for write-read conflicts (A writes, B reads)
-        for (const auto& compA : metaA.WriteComponents) {
-            for (const auto& compB : metaB.ReadComponents) {
-                if (compA == compB) {
-                    return true;
-                }
-            }
-        }
-
-        // Check for read-write conflicts (A reads, B writes)
-        for (const auto& compA : metaA.ReadComponents) {
-            for (const auto& compB : metaB.WriteComponents) {
-                if (compA == compB) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        // Use unified conflict detector
+        return ComponentConflictDetector::HasConflict(metaA, metaB);
     }
 
     bool SystemDependencyGraph::_hasCycle() const {
-        std::unordered_set<ISystem*> visited;
-        std::unordered_set<ISystem*> recStack;
-
-        for (auto* system : m_systems) {
-            if (visited.find(system) == visited.end()) {
-                if (_dfsHasCycle(system, visited, recStack)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    bool SystemDependencyGraph::_dfsHasCycle(ISystem* system,
-                                            std::unordered_set<ISystem*>& visited,
-                                            std::unordered_set<ISystem*>& recStack) const {
-        visited.insert(system);
-        recStack.insert(system);
-
-        auto it = m_dependencies.find(system);
-        if (it != m_dependencies.end()) {
-            for (auto* dep : it->second) {
-                if (visited.find(dep) == visited.end()) {
-                    if (_dfsHasCycle(dep, visited, recStack)) {
-                        return true;
-                    }
-                }
-                else if (recStack.find(dep) != recStack.end()) {
-                    return true;  // Back edge - cycle found
-                }
-            }
-        }
-
-        recStack.erase(system);
-        return false;
+        // Use unified cycle detector
+        return CycleDetector<ISystem*>::HasCycle(m_systems, m_dependencies);
     }
 
     std::vector<std::vector<ISystem*>> SystemDependencyGraph::_topologicalSort() const {
-        std::vector<std::vector<ISystem*>> levels;
-
-        if (m_systems.empty()) {
-            return levels;
-        }
-
-        // Compute in-degree for each system
-        std::unordered_map<ISystem*, size_t> inDegree;
-        for (auto* system : m_systems) {
-            inDegree[system] = 0;
-        }
-
-        for (auto* system : m_systems) {
-            auto it = m_dependencies.find(system);
-            if (it != m_dependencies.end()) {
-                inDegree[system] = it->second.size();
-            }
-        }
-
-        // Process level by level
-        while (!inDegree.empty()) {
-            std::vector<ISystem*> currentLevel;
-
-            // Find all systems with no dependencies
-            for (const auto& [system, degree] : inDegree) {
-                if (degree == 0) {
-                    currentLevel.push_back(system);
-                }
-            }
-
-            if (currentLevel.empty()) {
-                // This shouldn't happen if graph is valid
-                break;
-            }
-
-            levels.push_back(currentLevel);
-
-            // Remove processed systems and update in-degrees
-            for (auto* system : currentLevel) {
-                inDegree.erase(system);
-
-                // Reduce in-degree for dependents
-                auto depIt = m_dependents.find(system);
-                if (depIt != m_dependents.end()) {
-                    for (auto* dependent : depIt->second) {
-                        auto degIt = inDegree.find(dependent);
-                        if (degIt != inDegree.end()) {
-                            degIt->second--;
-                        }
-                    }
-                }
-            }
-        }
-
-        return levels;
+        // Use unified topological sorter
+        return TopologicalSorter<ISystem*>::Sort(m_systems, m_dependencies);
     }
 
     void SystemDependencyGraph::_dfsTopo(ISystem* system,
                                          std::unordered_set<ISystem*>& visited,
                                          std::vector<ISystem*>& stack) const {
+        // This method is now unused as _topologicalSort uses TopologicalSorter.
+        // Kept for potential backward compatibility if external code references it.
         visited.insert(system);
 
         auto it = m_dependencies.find(system);
@@ -345,43 +269,87 @@ namespace ECS {
         auto metaA = systemA->GetMetadata();
         auto metaB = systemB->GetMetadata();
 
-        // Check write-write conflicts
-        for (const auto& compA : metaA.WriteComponents) {
-            for (const auto& compB : metaB.WriteComponents) {
-                if (compA == compB) {
-                    std::stringstream ss;
-                    ss << "Both " << metaA.Name << " and " << metaB.Name 
-                       << " write to component 0x" << std::hex << compA.Hash;
-                    conflicts.push_back(ss.str());
+        // Use unified conflict detector for details
+        return ComponentConflictDetector::GetConflictDetails(metaA, metaB);
+    }
+
+    std::vector<std::vector<ISystem*>> SystemDependencyGraph::BuildExecutionStagesForGroup(SystemGroup group) const {
+        std::vector<std::vector<ISystem*>> stages;
+
+        // Filter systems by group
+        std::vector<ISystem*> groupSystems;
+        for (size_t i = 0; i < m_systemMetadata.size(); ++i) {
+            if (m_systemMetadata[i].Group == group) {
+                groupSystems.push_back(m_systems[i]);
+            }
+        }
+
+        if (groupSystems.empty()) {
+            return stages;
+        }
+
+        // Calculate in-degree for each system in group
+        std::unordered_map<ISystem*, size_t> inDegree;
+        for (auto* sys : groupSystems) {
+            inDegree[sys] = 0;
+        }
+
+        // Count incoming edges
+        for (auto* sys : groupSystems) {
+            auto it = m_dependencies.find(sys);
+            if (it != m_dependencies.end()) {
+                for (auto* dep : it->second) {
+                    if (std::find(groupSystems.begin(), groupSystems.end(), dep) != groupSystems.end()) {
+                        inDegree[sys]++;
+                    }
                 }
             }
         }
 
-        // Check write-read conflicts
-        for (const auto& compA : metaA.WriteComponents) {
-            for (const auto& compB : metaB.ReadComponents) {
-                if (compA == compB) {
-                    std::stringstream ss;
-                    ss << metaA.Name << " writes to component (0x" << std::hex << compA.Hash 
-                       << ") that " << metaB.Name << " reads";
-                    conflicts.push_back(ss.str());
+        // Topological sort with stage grouping
+        std::unordered_set<ISystem*> processed;
+
+        while (processed.size() < groupSystems.size()) {
+            // Find systems with zero in-degree in this group
+            std::vector<ISystem*> currentStage;
+
+            for (auto* sys : groupSystems) {
+                if (processed.find(sys) == processed.end() && inDegree[sys] == 0) {
+                    currentStage.push_back(sys);
+                }
+            }
+
+            if (currentStage.empty()) {
+                break;  // Should not happen if graph is valid DAG
+            }
+
+            stages.push_back(currentStage);
+
+            // Mark systems as processed and reduce in-degree of dependents
+            for (auto* sys : currentStage) {
+                processed.insert(sys);
+
+                auto depIt = m_dependents.find(sys);
+                if (depIt != m_dependents.end()) {
+                    for (auto* dependent : depIt->second) {
+                        if (inDegree.find(dependent) != inDegree.end()) {
+                            inDegree[dependent]--;
+                        }
+                    }
                 }
             }
         }
 
-        // Check read-write conflicts
-        for (const auto& compA : metaA.ReadComponents) {
-            for (const auto& compB : metaB.WriteComponents) {
-                if (compA == compB) {
-                    std::stringstream ss;
-                    ss << metaA.Name << " reads component (0x" << std::hex << compA.Hash 
-                       << ") that " << metaB.Name << " writes";
-                    conflicts.push_back(ss.str());
-                }
+        return stages;
+    }
+
+    const SystemDependencyMetadata* SystemDependencyGraph::GetSystemMetadata(ISystem* system) const {
+        for (size_t i = 0; i < m_systems.size(); ++i) {
+            if (m_systems[i] == system) {
+                return &m_systemMetadata[i];
             }
         }
-
-        return conflicts;
+        return nullptr;
     }
 
 }

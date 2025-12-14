@@ -162,12 +162,19 @@ private:
 namespace ECS {
 
     SystemMetadata PhysicsSystem::GetMetadata() const {
-        SystemMetadata metadata;
-        metadata.Name = "Physics";
-        metadata.ReadComponents = {ComponentRegistry::Type<Components::LocalTransform>(), ComponentRegistry::Type<Components::CircleCollider2D>(), ComponentRegistry::Type<Components::BoxCollider2D>(), ComponentRegistry::Type<Components::Rigidbody2D>(), ComponentRegistry::Type<Components::Active>()};
-        metadata.WriteComponents = {ComponentRegistry::Type<Components::LocalTransform>(), ComponentRegistry::Type<Components::Rigidbody2D>()};
-        metadata.ExecutionOrder = 0;
-        return metadata;
+        ComponentAccessBuilder builder("Physics");
+        // Read accesses
+        builder.ReadComponent<Components::LocalTransform>();
+        builder.ReadComponent<Components::CircleCollider2D>();
+        builder.ReadComponent<Components::BoxCollider2D>();
+        builder.ReadComponent<Components::Rigidbody2D>();
+        builder.ReadComponent<Components::Active>();
+        // Write accesses
+        builder.WriteComponent<Components::LocalTransform>();
+        builder.WriteComponent<Components::Rigidbody2D>();
+        // Execution order in Physics group
+        builder.SetExecutionOrder(0);
+        return builder.Build();
     }
 
     void PhysicsSystem::OnDestroy(World& world) {

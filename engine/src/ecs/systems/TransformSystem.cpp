@@ -12,12 +12,14 @@ Implements the TransformSystem which updates world transforms for entity hierarc
 
 namespace ECS {
     SystemMetadata TransformSystem::GetMetadata() const {
-        SystemMetadata md;
-        md.Name = "Transform";
-        md.ReadComponents = { ComponentRegistry::Type<Components::LocalTransform>() };
-        md.WriteComponents = { ComponentRegistry::Type<Components::WorldTransform>() };
-        md.ExecutionOrder = 50;
-        return md;
+        ComponentAccessBuilder builder("Transform");
+        // Read accesses
+        builder.ReadComponent<Components::LocalTransform>();
+        // Write accesses
+        builder.WriteComponent<Components::WorldTransform>();
+        // Execution order in Transform group
+        builder.SetExecutionOrder(50);
+        return builder.Build();
     }
 
     void TransformSystem::OnUpdate(World& world, float /*dt*/) {

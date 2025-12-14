@@ -25,40 +25,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <string>
 #include <vector>
 #include <cstdint>
-#include <typeinfo>
 #include "ecs/Entity.h"
+#include "ecs/ComponentAccessAttribute.h"
 
 namespace ECS {
     // Forward declaration
     class Chunk;
 
     namespace Jobs {
-
-        /**
-         * @brief Metadata for component access patterns.
-         * 
-         * Used to declare which components a job reads or writes,
-         * enabling the dependency system to detect conflicts and
-         * prevent race conditions.
-         */
-        enum class ComponentAccessType {
-            Read,       // Read-only access to component
-            Write,      // Exclusive write access to component
-            ReadWrite   // Read and write access (most restrictive)
-        };
-
-        /**
-         * @brief Declares access to a single component.
-         */
-        struct ComponentAccess {
-            const std::type_info* ComponentType = nullptr;  // Component type (from typeid)
-            ComponentAccessType AccessType = ComponentAccessType::Read;
-
-            ComponentAccess() = default;
-            ComponentAccess(const std::type_info& type, ComponentAccessType access)
-                : ComponentType(&type), AccessType(access) {
-            }
-        };
 
         /**
          * @brief Base interface for all jobs.
@@ -105,7 +79,20 @@ namespace ECS {
              * Override to declare which components this job reads/writes.
              * Default implementation returns empty (no dependencies).
              * 
+             * Uses the unified ComponentAccess structure with ComponentAccessMode.
+             * 
              * @return Vector of component accesses
+             * 
+             * Example:
+             * @code
+             * const std::vector<ComponentAccess>& GetComponentAccesses() const override {
+             *     static const std::vector<ComponentAccess> accesses = {
+             *         {TypeIdOf<Transform>(), ComponentAccessMode::Write},
+             *         {TypeIdOf<Velocity>(), ComponentAccessMode::Read}
+             *     };
+             *     return accesses;
+             * }
+             * @endcode
              */
             virtual const std::vector<ComponentAccess>& GetComponentAccesses() const {
                 static const std::vector<ComponentAccess> empty;

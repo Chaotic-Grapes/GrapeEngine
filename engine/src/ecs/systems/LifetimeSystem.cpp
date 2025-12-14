@@ -17,12 +17,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace ECS {
     SystemMetadata LifetimeSystem::GetMetadata() const {
-        SystemMetadata metadata;
-        metadata.Name = "Lifetime";
-        metadata.ReadComponents = {ComponentRegistry::Type<Components::Lifetime>(), ComponentRegistry::Type<Components::Active>()};
-        metadata.WriteComponents = {ComponentRegistry::Type<Components::Lifetime>()};
-        metadata.ExecutionOrder = 100;
-        return metadata;
+        ComponentAccessBuilder builder("Lifetime");
+        // Read accesses
+        builder.ReadComponent<Components::Lifetime>();
+        builder.ReadComponent<Components::Active>();
+        // Write accesses
+        builder.WriteComponent<Components::Lifetime>();
+        // Execution order in Lifetime group
+        builder.SetExecutionOrder(100);
+        return builder.Build();
     }
 
     void LifetimeSystem::OnUpdate(World& world, const float dt) {

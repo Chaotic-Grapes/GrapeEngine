@@ -23,7 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define COMPONENT_ACCESS_ATTRIBUTE_H
 
 #include "Export.h"
-#include "ecs/ComponentTypeId.h"
+#include "ecs/ComponentRegistry.h"
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -226,10 +226,31 @@ namespace ECS {
      * @brief Validates component access declarations.
      * 
      * Ensures that declared component accesses are valid and consistent.
+     * Automatically called by ComponentAccessBuilder::Build() to validate
+     * all declared component accesses before creating SystemMetadata.
+     * 
      * Can validate:
-     * - No duplicate declarations
+     * - No duplicate declarations for same component
      * - Proper read/write categorization
-     * - Consistency with actual system behavior
+     * - Consistency with component access modes
+     * 
+     * Example usage:
+     * @code
+     * ComponentAccessBuilder builder("MySystem");
+     * builder.Reads<Position>();
+     * builder.Writes<Velocity>();
+     * 
+     * // Validation is automatic in Build()
+     * auto metadata = builder.Build();  // Validates internally
+     * 
+     * // Or validate manually:
+     * std::vector<std::string> errors;
+     * if (!ComponentAccessValidator::ValidateWithErrors(builder, errors)) {
+     *     for (const auto& error : errors) {
+     *         LOG_ERROR("Validation error: " << error);
+     *     }
+     * }
+     * @endcode
      */
     class GRAPEENGINE_API ComponentAccessValidator {
     public:
@@ -269,7 +290,39 @@ namespace ECS {
     };
 
     /**
-     * @brief Helper functions for component access queries.
+     * @brief Helper functions for component access queries and analysis.
+     * 
+     * Provides utility functions for:
+     * - Checking if access modes conflict
+     * - Converting access modes to human-readable strings
+     * - Checking read/write capability of access modes
+     * - Determining precedence between conflicting accesses
+     * 
+     * These helpers work with ComponentAccessMode and are used by
+     * both ComponentAccessValidator and SystemDependencyGraph for
+     * dependency analysis.
+     * 
+     * Example usage:
+     * @code
+     * // Check if two systems can access same component safely
+     * ComponentAccessMode modeA = ComponentAccessMode::Read;
+     * ComponentAccessMode modeB = ComponentAccessMode::Read;
+     * 
+     * if (!ComponentAccessHelper::AccessesConflict(modeA, modeB)) {
+     *     // Both systems can read the component safely
+     * }
+     * 
+     * // Convert to string for logging
+     * std::string modeStr = ComponentAccessHelper::ModeToString(modeA);
+     * LOG_DEBUG("System accesses component in " << modeStr << " mode");
+     * 
+     * // Determine execution order for conflicting accesses
+     * int precedence = ComponentAccessHelper::DeterminePrecedence(
+     *     modeA, modeB, executionOrderA, executionOrderB);
+     * if (precedence < 0) {
+     *     LOG_DEBUG("System A must execute before System B");
+     * }
+     * @endcode
      */
     class GRAPEENGINE_API ComponentAccessHelper {
     public:

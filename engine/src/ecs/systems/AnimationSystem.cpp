@@ -27,12 +27,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace ECS {
     SystemMetadata AnimationSystem::GetMetadata() const {
-        SystemMetadata metadata;
-        metadata.Name = "Animation";
-        metadata.ReadComponents = {ComponentRegistry::Type<Components::SpriteSheetAnimation2D>(), ComponentRegistry::Type<Components::AnimationState2D>(), ComponentRegistry::Type<Components::Active>()};
-        metadata.WriteComponents = {ComponentRegistry::Type<Components::SpriteSheetAnimation2D>(), ComponentRegistry::Type<Components::AnimationState2D>(), ComponentRegistry::Type<Components::SpriteRenderer2D>()};
-        metadata.ExecutionOrder = 200;
-        return metadata;
+        ComponentAccessBuilder builder("Animation");
+        // Read accesses
+        builder.ReadComponent<Components::SpriteSheetAnimation2D>();
+        builder.ReadComponent<Components::AnimationState2D>();
+        builder.ReadComponent<Components::Active>();
+        // Write accesses
+        builder.WriteComponent<Components::SpriteSheetAnimation2D>();
+        builder.WriteComponent<Components::AnimationState2D>();
+        builder.WriteComponent<Components::SpriteRenderer2D>();
+        // Execution order in Animation group
+        builder.SetExecutionOrder(200);
+        return builder.Build();
     }
 
     void AnimationSystem::OnUpdate(World& world, float dt) {

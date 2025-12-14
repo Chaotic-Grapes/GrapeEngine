@@ -14,6 +14,7 @@
 
 #include "ecs/World.h"
 #include "ecs/ISystem.h"
+#include "ecs/ComponentAccessAttribute.h"
 #include <vector>
 #include <unordered_map>
 

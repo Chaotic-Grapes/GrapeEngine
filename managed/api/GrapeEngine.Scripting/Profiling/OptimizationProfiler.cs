@@ -516,7 +516,7 @@ public class AOTCompiler(AOTConfig? config = null)
     }
 
     /// <summary>
-    /// Compile all methods marked with [ManagedOptimize].
+    /// Compile all methods marked with <seealso cref="ManagedOptimizeAttribute"/>.
     /// </summary>
     public int CompileOptimizedMethods(Type[] types)
     {

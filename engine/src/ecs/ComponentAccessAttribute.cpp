@@ -14,6 +14,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/ComponentAccessAttribute.h"
 #include "ecs/ISystem.h"
+#include "core/Logger.h"
 #include <algorithm>
 #include <sstream>
 
@@ -22,10 +23,25 @@ namespace ECS {
     SystemMetadata ComponentAccessBuilder::Build() {
         SystemMetadata metadata;
         metadata.Name = m_name;
-        metadata.ReadComponents = m_readComponents;
-        metadata.WriteComponents = m_writeComponents;
+        metadata.ReadComponents = m_readComponents;         // Deprecated, for backward compat
+        metadata.WriteComponents = m_writeComponents;       // Deprecated, for backward compat
+        metadata.ComponentAccesses = m_accesses;            // New unified field
         metadata.ExecutionOrder = m_executionOrder;
         metadata.Enabled = m_enabled;
+        
+        // Validate component accesses
+        std::vector<std::string> validationErrors;
+        if (!ComponentAccessValidator::ValidateWithErrors(*this, validationErrors)) {
+            // Log validation errors
+            std::stringstream errorLog;
+            errorLog << "ComponentAccess validation failed for system '" << m_name << "':";
+            for (const auto& error : validationErrors) {
+                errorLog << "\n  - " << error;
+            }
+            
+            LOG_WARNING(errorLog.str());
+        }
+        
         return metadata;
     }
 

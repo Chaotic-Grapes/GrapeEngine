@@ -23,6 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "Export.h"
 #include "ecs/ISystem.h"
+#include "ecs/ComponentAccessAttribute.h"
 #include "ecs/World.h"
 #include "Color.h"
 #include "Math/Vector2D.h"

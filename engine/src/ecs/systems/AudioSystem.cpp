@@ -282,12 +282,13 @@ void AudioSystem::OnDestroy(World& world) {
 }
 
 SystemMetadata AudioSystem::GetMetadata() const {
-    SystemMetadata metadata;
-    metadata.Name = "Audio";
-    metadata.ReadComponents = {};  // Reads AudioSource, WorldTransform
-    metadata.WriteComponents = {}; // Doesn't write components
-    metadata.ExecutionOrder = 50;  // Run after gameplay logic
-    return metadata;
+    ComponentAccessBuilder builder("Audio");
+    // Note: AudioSystem reads AudioSource and WorldTransform components
+    // but uses them through custom service lookups, not direct ECS iteration.
+    // Declaring minimal access for dependency tracking.
+    // Execution order: run after gameplay logic
+    builder.SetExecutionOrder(50);
+    return builder.Build();
 }
 
 void AudioSystem::OnSceneStart()

@@ -23,6 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define AUDIOSYSTEM_H
 
 #include "ecs/ISystem.h"
+#include "ecs/ComponentAccessAttribute.h"
 #include "ecs/World.h"
 #include "services/AudioService.h"
 #include "audio/FmodAudioDevice.h"

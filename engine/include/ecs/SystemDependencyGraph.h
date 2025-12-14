@@ -52,35 +52,24 @@ namespace ECS {
      * The graph uses topological sorting to find valid execution schedules that
      * maximize parallelism while maintaining data safety.
      * 
-     * Usage:
+     * Supports both direct system pointers (ISystem*) and metadata structures,
+     * enabling use by both SystemManager and JobDependencyGraph.
+     * 
+     * Usage with ISystem*:
      * @code
      * SystemDependencyGraph graph;
-     * 
-     * // Add systems to analyze
      * graph.AddSystem(physicsSystem);
      * graph.AddSystem(movementSystem);
-     * graph.AddSystem(animationSystem);
-     * 
-     * // Build the dependency graph
      * graph.Build();
-     * 
-     * // Check if two systems can run in parallel
-     * if (graph.CanRunInParallel(physicsSystem, movementSystem)) {
-     *     // Schedule them in parallel
-     * }
-     * 
-     * // Get all systems that must complete before another system
-     * auto deps = graph.GetDependencies(animationSystem);
-     * for (auto* depSystem : deps) {
-     *     // Wait for depSystem to complete
-     * }
-     * 
-     * // Get execution levels for parallel scheduling
      * auto levels = graph.GetExecutionLevels();
-     * for (const auto& level : levels) {
-     *     // All systems in level can run in parallel
-     *     // Wait for all to complete before next level
-     * }
+     * @endcode
+     * 
+     * Usage with metadata (for group-based scheduling):
+     * @code
+     * SystemDependencyGraph graph;
+     * graph.AddSystemMetadata(metadata1);
+     * graph.AddSystemMetadata(metadata2);
+     * auto stages = graph.BuildExecutionStagesForGroup(SystemGroup::Update);
      * @endcode
      */
     class GRAPEENGINE_API SystemDependencyGraph {
@@ -93,12 +82,21 @@ namespace ECS {
         SystemDependencyGraph& operator=(const SystemDependencyGraph&) = delete;
 
         /**
-         * @brief Add a system to the graph.
+         * @brief Add a system to the graph (direct system pointer).
          * @param system System to add
          * 
          * Systems should be added before calling Build().
          */
         void AddSystem(ISystem* system);
+
+        /**
+         * @brief Add a system to the graph using metadata (for group-based scheduling).
+         * @param metadata System metadata
+         * 
+         * Alternative to AddSystem() for use cases that track systems by metadata.
+         * Both AddSystem() and AddSystemMetadata() can be used interchangeably.
+         */
+        void AddSystemMetadata(const SystemDependencyMetadata& metadata);
 
         /**
          * @brief Build the dependency graph.
@@ -121,6 +119,15 @@ namespace ECS {
          * that the other reads or writes to.
          */
         bool CanRunInParallel(const ISystem* systemA, const ISystem* systemB) const;
+
+        /**
+         * @brief Check if two systems can safely run in parallel (metadata version).
+         * @param sys1 First system metadata
+         * @param sys2 Second system metadata
+         * @return True if they have no read/write conflicts
+         */
+        bool CanRunInParallel(const SystemDependencyMetadata& sys1,
+                             const SystemDependencyMetadata& sys2) const;
 
         /**
          * @brief Get all systems that system B depends on.
@@ -150,6 +157,17 @@ namespace ECS {
         std::vector<std::vector<ISystem*>> GetExecutionLevels() const;
 
         /**
+         * @brief Build execution stages for a specific system group.
+         * 
+         * Creates stages where all systems in a stage can run in parallel.
+         * Stages must execute sequentially.
+         * 
+         * @param group System group to build stages for
+         * @return Vector of stages, each containing systems that can run in parallel
+         */
+        std::vector<std::vector<ISystem*>> BuildExecutionStagesForGroup(SystemGroup group) const;
+
+        /**
          * @brief Get all dependencies in the graph.
          * @return Vector of all system dependencies
          */
@@ -160,6 +178,12 @@ namespace ECS {
          * @return True if graph is acyclic, false if cycles exist
          */
         bool IsValid() const;
+
+        /**
+         * @brief Check for circular system dependencies (alias for IsValid).
+         * @return true if cycle detected, false if valid DAG
+         */
+        bool HasCircularDependencies() const { return !IsValid(); }
 
         /**
          * @brief Get the total number of systems in the graph.
@@ -204,9 +228,19 @@ namespace ECS {
         std::vector<std::string> GetConflictDetails(const ISystem* systemA, 
                                                    const ISystem* systemB) const;
 
+        /**
+         * @brief Get metadata for a system.
+         * @param system System pointer
+         * @return Pointer to metadata, or nullptr if not found
+         */
+        const SystemDependencyMetadata* GetSystemMetadata(ISystem* system) const;
+
     private:
-        /// All systems in the graph
+        /// All systems in the graph (by pointer)
         std::vector<ISystem*> m_systems;
+
+        /// All system metadata (parallel to m_systems, one entry per system)
+        std::vector<SystemDependencyMetadata> m_systemMetadata;
 
         /// Adjacency list: system -> systems it depends on
         std::unordered_map<ISystem*, std::vector<ISystem*>> m_dependencies;
@@ -237,7 +271,7 @@ namespace ECS {
                          std::unordered_set<ISystem*>& recStack) const;
 
         /**
-         * @brief Topological sort using DFS.
+         * @brief Topological sort using Kahn's algorithm.
          */
         std::vector<std::vector<ISystem*>> _topologicalSort() const;
 

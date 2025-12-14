@@ -23,6 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/World.h"
 #include "ecs/ISystem.h"
+#include "ecs/ComponentAccessAttribute.h"
 
 namespace ECS {
     /**
