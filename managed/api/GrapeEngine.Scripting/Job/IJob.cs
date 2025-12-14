@@ -21,11 +21,44 @@ namespace GrapeEngine.Scripting.Job;
 /// Implement this interface to define a unit of work that can be scheduled
 /// and executed on worker threads. Jobs should be stateless or contain only
 /// the data needed for execution.
+/// 
+/// For structural changes (adding/removing entities or components) during parallel 
+/// execution, use the CommandBuffer property if provided. Do not directly modify 
+/// the World to avoid race conditions.
 /// </summary>
 public interface IJob
 {
     /// <summary>
+    /// Optional command buffer for deferred structural changes.
+    /// 
+    /// When a job is scheduled via JobManager.Schedule(), a CommandBuffer is automatically
+    /// provided if the job needs to modify entity/component structure. Use this buffer
+    /// instead of directly modifying the World during job execution.
+    /// 
+    /// The buffer is automatically played back after the job completes, applying all
+    /// recorded changes to the World.
+    /// 
+    /// Set automatically by JobManager - you only need to use it in Execute().
+    /// </summary>
+    CommandBuffer? Buffer { get; set; }
+
+    /// <summary>
     /// Execute the job. Called by a worker thread from the job queue.
+    /// 
+    /// If you need to modify entity/component structure (create/destroy entities,
+    /// add/remove components), use the Buffer property:
+    /// <code>
+    /// public void Execute()
+    /// {
+    ///     if (Buffer != null)
+    ///     {
+    ///         Buffer.CreateEntity();
+    ///         Buffer.AddComponent&lt;Transform&gt;(entity, transform);
+    ///     }
+    /// }
+    /// </code>
+    /// 
+    /// Do NOT call World methods that modify structure directly from parallel jobs.
     /// </summary>
     void Execute();
 

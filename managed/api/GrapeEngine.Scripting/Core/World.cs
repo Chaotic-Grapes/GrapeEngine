@@ -45,10 +45,16 @@ public class World
 
     /// <summary>
     /// Create a new entity in the world.
+    /// 
+    /// NOTE: Entity creation is automatically profiled. If entity creation becomes a hot path,
+    /// consider batching entity creation or using prefabs for better performance.
     /// </summary>
     /// <returns>A new Entity instance</returns>
     public Entity CreateEntity()
     {
+        using var scope = JobManager.OptimizationProfiler.BeginProfile(
+            "World.CreateEntity",
+            OptimizationSafety.Normal);
         unsafe
         {
             ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
@@ -75,8 +81,7 @@ public class World
     /// <param name="entity">The entity to destroy</param>
     public void DestroyEntity(Entity entity)
     {
-        if (entity == null)
-            throw new ArgumentNullException(nameof(entity));
+        ArgumentNullException.ThrowIfNull(entity);
 
         unsafe
         {
@@ -86,11 +91,17 @@ public class World
 
     /// <summary>
     /// Instantiate an entity from an archetype.
+    /// 
+    /// NOTE: Instantiation is automatically profiled. If this becomes a hot path,
+    /// consider batching instantiation operations.
     /// </summary>
     /// <param name="archetypeId">The archetype ID to instantiate from</param>
     /// <returns>A new Entity instance</returns>
     public Entity InstantiateEntity(uint archetypeId)
     {
+        using var scope = JobManager.OptimizationProfiler.BeginProfile(
+            "World.InstantiateEntity",
+            OptimizationSafety.Normal);
         unsafe
         {
             ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
@@ -105,8 +116,7 @@ public class World
     /// <returns>A new cloned Entity instance</returns>
     public Entity CloneEntity(Entity sourceEntity)
     {
-        if (sourceEntity == null)
-            throw new ArgumentNullException(nameof(sourceEntity));
+        ArgumentNullException.ThrowIfNull(sourceEntity);
 
         unsafe
         {
@@ -126,10 +136,8 @@ public class World
     /// <param name="parent">The parent entity</param>
     public void Attach(Entity child, Entity parent)
     {
-        if (child == null)
-            throw new ArgumentNullException(nameof(child));
-        if (parent == null)
-            throw new ArgumentNullException(nameof(parent));
+        ArgumentNullException.ThrowIfNull(child);
+        ArgumentNullException.ThrowIfNull(parent);
 
         unsafe
         {
@@ -373,6 +381,45 @@ public class World
     }
 
     // ============================================================================
+    // Event System Access
+    // ============================================================================
+
+    private EventSystem? _eventSystem;
+
+    /// <summary>
+    /// Access the event system for this world.
+    /// Use this to query physics events (collisions, triggers, etc).
+    /// 
+    /// Events are represented as components and are automatically managed by the C++ physics system:
+    /// - Collision events are added when collisions occur
+    /// - Trigger events are added when triggers overlap
+    /// - All event components are automatically removed at the end of each frame
+    /// 
+    /// You can query events directly or use the EventSystem convenience methods:
+    /// <code>
+    /// // Direct query
+    /// foreach (var (entity, collision) in world.Query&lt;CollisionEvent&gt;())
+    /// {
+    ///     HandleCollision(entity, collision);
+    /// }
+    /// 
+    /// // Via EventSystem
+    /// if (world.Events.HasCollisionEvent(entityId))
+    /// {
+    ///     var collision = world.Events.GetCollisionEvent(entityId);
+    /// }
+    /// </code>
+    /// </summary>
+    public EventSystem Events
+    {
+        get
+        {
+            _eventSystem ??= new EventSystem(this);
+            return _eventSystem;
+        }
+    }
+
+    // ============================================================================
     // Job System Access
     // ============================================================================
 
@@ -391,7 +438,7 @@ public class World
                 unsafe
                 {
                     nint jobManagerPtr = WorldAPI.GetJobManager((void*)_nativeWorldPtr);
-                    _jobManager = new Job.JobManager(jobManagerPtr);
+                    _jobManager = new Job.JobManager(jobManagerPtr, this);
                 }
             }
             return _jobManager;

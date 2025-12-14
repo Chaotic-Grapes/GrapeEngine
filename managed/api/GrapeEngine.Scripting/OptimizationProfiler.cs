@@ -144,10 +144,12 @@ namespace GrapeEngine.Scripting
 
         /// <summary>
         /// Get optimization recommendations based on profiles.
+        /// Includes SIMD vectorization suggestions for high-throughput operations.
         /// </summary>
         public List<OptimizationRecommendation> GetRecommendations()
         {
             var recommendations = new List<OptimizationRecommendation>();
+            var hasSimdSupport = CapabilityDetection.HasAVX2 || CapabilityDetection.HasAVX;
 
             foreach (var profile in _profiles.Values)
             {
@@ -159,11 +161,15 @@ namespace GrapeEngine.Scripting
                 // High call count + significant time = candidate for AOT
                 if (profile.CallCount > 100 && avgNs > 1_000_000)
                 {
+                    var optimizations = new List<string> { "CompileToNative", "EnablePGO" };
+                    if (hasSimdSupport)
+                        optimizations.Insert(1, "EnableSIMD");
+                    
                     recommendations.Add(new OptimizationRecommendation
                     {
                         MethodName = profile.MethodName,
                         Reason = "High call frequency with significant execution time",
-                        SuggestedOptimizations = ["CompileToNative", "EnableSIMD", "EnablePGO"],
+                        SuggestedOptimizations = [.. optimizations],
                         Priority = 1
                     });
                 }
@@ -184,20 +190,100 @@ namespace GrapeEngine.Scripting
                     });
                 }
 
-                // High entity throughput = candidate for SIMD
+                // High entity throughput = candidate for SIMD vectorization
                 if (profile.EntityProcessed > 1000 && profile.TotalNanoseconds > 10_000_000)
                 {
+                    var throughputPerSec = (profile.EntityProcessed / (profile.TotalNanoseconds / 1_000_000_000.0));
+                    var estimatedSpeedup = hasSimdSupport ? "2-4x" : "potential 2-4x";
+                    
                     recommendations.Add(new OptimizationRecommendation
                     {
                         MethodName = profile.MethodName,
-                        Reason = "High-throughput loop, SIMD vectorization recommended",
-                        SuggestedOptimizations = ["EnableSIMD", "Vectorize"],
+                        Reason = $"High-throughput loop ({throughputPerSec:F0} entities/sec), SIMD vectorization recommended",
+                        SuggestedOptimizations = hasSimdSupport 
+                            ? ["EnableSIMD", "Vectorize", "UseForEachJobWithSIMD"] 
+                            : ["Vectorize"],
                         Priority = 1
                     });
+                }
+
+                // SIMD-specific recommendation for suitable operations
+                if (hasSimdSupport && profile.EntityProcessed > 500 && profile.CallCount > 20)
+                {
+                    // Check if operation name suggests it's vectorizable (contains common patterns)
+                    var lowerName = profile.MethodName.ToLower();
+                    var isVectorizable = lowerName.Contains("transform") || 
+                                       lowerName.Contains("position") || 
+                                       lowerName.Contains("rotation") ||
+                                       lowerName.Contains("scale") ||
+                                       lowerName.Contains("velocity") ||
+                                       lowerName.Contains("foreach");
+
+                    if (isVectorizable && avgNs > 500_000) // > 0.5ms
+                    {
+                        recommendations.Add(new OptimizationRecommendation
+                        {
+                            MethodName = profile.MethodName,
+                            Reason = $"Vectorizable operation with {profile.EntityProcessed} entities. SIMD available: {(CapabilityDetection.HasAVX512F ? "AVX-512" : CapabilityDetection.HasAVX2 ? "AVX2" : CapabilityDetection.HasAVX ? "AVX" : "SSE2")}",
+                            SuggestedOptimizations = ["EnableSIMD", "UseForEachJobWithSIMD", "ConsiderComponentOpsAPI"],
+                            Priority = 1
+                        });
+                    }
                 }
             }
 
             return [.. recommendations.OrderByDescending(r => r.Priority)];
+        }
+
+        /// <summary>
+        /// Static capability detection for SIMD instruction sets.
+        /// </summary>
+        public static class CapabilityDetection
+        {
+            /// <summary>
+            /// Check if the CPU supports AVX2 instructions.
+            /// </summary>
+            public static bool HasAVX2 => System.Runtime.Intrinsics.X86.Avx2.IsSupported;
+
+            /// <summary>
+            /// Check if the CPU supports AVX instructions.
+            /// </summary>
+            public static bool HasAVX => System.Runtime.Intrinsics.X86.Avx.IsSupported;
+
+            /// <summary>
+            /// Check if the CPU supports SSE4.2 instructions.
+            /// </summary>
+            public static bool HasSSE42 => System.Runtime.Intrinsics.X86.Sse42.IsSupported;
+
+            /// <summary>
+            /// Check if the CPU supports AVX-512F instructions.
+            /// </summary>
+            public static bool HasAVX512F => System.Runtime.Intrinsics.X86.Avx512F.IsSupported;
+
+            /// <summary>
+            /// Get human-readable description of available SIMD capabilities.
+            /// </summary>
+            public static string GetCapabilityDescription()
+            {
+                if (HasAVX512F) return "AVX-512F (512-bit vectors)";
+                if (HasAVX2) return "AVX2 (256-bit vectors)";
+                if (HasAVX) return "AVX (256-bit vectors)";
+                if (HasSSE42) return "SSE4.2 (128-bit vectors)";
+                return "No SIMD support";
+            }
+
+            /// <summary>
+            /// Estimate speedup for vectorizable operations based on available SIMD.
+            /// </summary>
+            public static double EstimateSpeedup()
+            {
+                if (HasAVX512F) return 8.0; // Up to 8x for 512-bit vectors
+                if (HasAVX2) return 4.0;    // Up to 4x for 256-bit vectors
+                if (HasAVX) return 4.0;
+                if (HasSSE42) return 2.0;   // Up to 2x for 128-bit vectors
+                return 1.0; // No speedup without SIMD
+            }
+        }
         }
 
         /// <summary>

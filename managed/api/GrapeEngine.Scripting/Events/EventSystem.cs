@@ -3,157 +3,183 @@ using GrapeEngine.Scripting.Core;
 namespace GrapeEngine.Scripting.Events;
 
 /// <summary>
-/// Manages event component lifecycle and provides utilities for working with events.
-/// This system is responsible for tracking event components and clearing them at appropriate times.
+/// Provides ergonomic access to physics event components.
+/// 
+/// The C++ EventDispatcher automatically adds CollisionEvent, TriggerEvent, and 
+/// CollisionExitEvent components to entities when physics events occur.
+/// This EventSystem provides convenience methods to query for these events.
+/// 
+/// Event components are automatically removed at the end of each frame by the C++ ECS.
 /// </summary>
 /// <remarks>
-/// Initialize the event system with a world reference.
+/// This is a thin wrapper around component queries. You can also query events directly:
+/// <code>
+/// foreach (var (entity, collision) in world.Query&lt;CollisionEvent&gt;())
+/// {
+///     HandleCollision(entity, collision);
+/// }
+/// </code>
 /// </remarks>
 public class EventSystem(World world)
 {
     private readonly World _world = world ?? throw new ArgumentNullException(nameof(world));
-    private readonly HashSet<ulong> _activeCollisionEvents = [];
-    private readonly HashSet<ulong> _activeTriggerEvents = [];
-    private readonly HashSet<ulong> _activeCollisionExitEvents = [];
-    private readonly HashSet<ulong> _activeTriggerExitEvents = [];
-
-    /// <summary>
-    /// Track a collision event that occurred this frame.
-    /// Typically called by the physics system.
-    /// </summary>
-    public void TrackCollisionEvent(ulong entityId)
-    {
-        _activeCollisionEvents.Add(entityId);
-    }
-
-    /// <summary>
-    /// Track a trigger event that occurred this frame.
-    /// Typically called by the physics system.
-    /// </summary>
-    public void TrackTriggerEvent(ulong entityId)
-    {
-        _activeTriggerEvents.Add(entityId);
-    }
-
-    /// <summary>
-    /// Track a collision exit event that occurred this frame.
-    /// Typically called by the physics system.
-    /// </summary>
-    public void TrackCollisionExitEvent(ulong entityId)
-    {
-        _activeCollisionExitEvents.Add(entityId);
-    }
-
-    /// <summary>
-    /// Track a trigger exit event that occurred this frame.
-    /// Typically called by the physics system.
-    /// </summary>
-    public void TrackTriggerExitEvent(ulong entityId)
-    {
-        _activeTriggerExitEvents.Add(entityId);
-    }
 
     /// <summary>
     /// Check if an entity has a collision event this frame.
+    /// 
+    /// Events are added by the C++ physics system when collisions occur
+    /// and are automatically removed at the end of each frame.
     /// </summary>
     public bool HasCollisionEvent(ulong entityId)
     {
-        return _activeCollisionEvents.Contains(entityId);
+        var entity = Entity.FromId(_world, entityId);
+        return entity.IsAlive && entity.HasComponent<CollisionEvent>();
+    }
+
+    /// <summary>
+    /// Get the collision event details for an entity (if any).
+    /// Returns null if the entity has no collision event this frame.
+    /// </summary>
+    public CollisionEvent? GetCollisionEvent(ulong entityId)
+    {
+        var entity = Entity.FromId(_world, entityId);
+        if (entity.IsAlive && entity.HasComponent<CollisionEvent>())
+        {
+            return entity.GetComponent<CollisionEvent>();
+        }
+        return null;
     }
 
     /// <summary>
     /// Check if an entity has a trigger event this frame.
+    /// 
+    /// Trigger events are added when a trigger collider overlaps another object.
+    /// Use TriggerEvent.IsEnter to distinguish between enter and stay events.
     /// </summary>
     public bool HasTriggerEvent(ulong entityId)
     {
-        return _activeTriggerEvents.Contains(entityId);
+        var entity = Entity.FromId(_world, entityId);
+        return entity.IsAlive && entity.HasComponent<TriggerEvent>();
+    }
+
+    /// <summary>
+    /// Get the trigger event details for an entity (if any).
+    /// Returns null if the entity has no trigger event this frame.
+    /// </summary>
+    public TriggerEvent? GetTriggerEvent(ulong entityId)
+    {
+        var entity = Entity.FromId(_world, entityId);
+        if (entity.IsAlive && entity.HasComponent<TriggerEvent>())
+        {
+            return entity.GetComponent<TriggerEvent>();
+        }
+        return null;
     }
 
     /// <summary>
     /// Check if an entity has a collision exit event this frame.
+    /// 
+    /// Collision exit events occur when two colliding entities separate.
     /// </summary>
     public bool HasCollisionExitEvent(ulong entityId)
     {
-        return _activeCollisionExitEvents.Contains(entityId);
+        var entity = Entity.FromId(_world, entityId);
+        return entity.IsAlive && entity.HasComponent<CollisionExitEvent>();
     }
 
     /// <summary>
-    /// Check if an entity has a trigger exit event this frame.
+    /// Get the collision exit event details for an entity (if any).
+    /// Returns null if the entity has no collision exit event this frame.
     /// </summary>
-    public bool HasTriggerExitEvent(ulong entityId)
+    public CollisionExitEvent? GetCollisionExitEvent(ulong entityId)
     {
-        return _activeTriggerExitEvents.Contains(entityId);
+        var entity = Entity.FromId(_world, entityId);
+        if (entity.IsAlive && entity.HasComponent<CollisionExitEvent>())
+        {
+            return entity.GetComponent<CollisionExitEvent>();
+        }
+        return null;
     }
 
     /// <summary>
-    /// Called at the end of each frame to clear all event components.
-    /// This ensures events only persist for a single frame.
+    /// Get the count of collision events this frame (all entities with CollisionEvent).
     /// </summary>
-    public void ClearFrameEvents()
+    public int CollisionEventCount
     {
-        // Clear collision events
-        foreach (ulong entityId in _activeCollisionEvents)
+        get
         {
-            var entity = Entity.FromId(_world, entityId);
-            if (entity.IsAlive && entity.HasComponent<CollisionEvent>())
+            int count = 0;
+            foreach (var _ in _world.Query<CollisionEvent>())
             {
-                entity.RemoveComponent<CollisionEvent>();
+                count++;
             }
+            return count;
         }
-        _activeCollisionEvents.Clear();
-
-        // Clear trigger events
-        foreach (ulong entityId in _activeTriggerEvents)
-        {
-            var entity = Entity.FromId(_world, entityId);
-            if (entity.IsAlive && entity.HasComponent<TriggerEvent>())
-            {
-                entity.RemoveComponent<TriggerEvent>();
-            }
-        }
-        _activeTriggerEvents.Clear();
-
-        // Clear collision exit events
-        foreach (ulong entityId in _activeCollisionExitEvents)
-        {
-            var entity = Entity.FromId(_world, entityId);
-            if (entity.IsAlive && entity.HasComponent<CollisionExitEvent>())
-            {
-                entity.RemoveComponent<CollisionExitEvent>();
-            }
-        }
-        _activeCollisionExitEvents.Clear();
-
-        // Clear trigger exit events
-        foreach (ulong entityId in _activeTriggerExitEvents)
-        {
-            var entity = Entity.FromId(_world, entityId);
-            if (entity.IsAlive && entity.HasComponent<TriggerExitEvent>())
-            {
-                entity.RemoveComponent<TriggerExitEvent>();
-            }
-        }
-        _activeTriggerExitEvents.Clear();
     }
 
     /// <summary>
-    /// Get the count of active collision events this frame.
+    /// Get the count of trigger events this frame (all entities with TriggerEvent).
     /// </summary>
-    public int CollisionEventCount => _activeCollisionEvents.Count;
+    public int TriggerEventCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var _ in _world.Query<TriggerEvent>())
+            {
+                count++;
+            }
+            return count;
+        }
+    }
 
     /// <summary>
-    /// Get the count of active trigger events this frame.
+    /// Get the count of collision exit events this frame.
     /// </summary>
-    public int TriggerEventCount => _activeTriggerEvents.Count;
+    public int CollisionExitEventCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var _ in _world.Query<CollisionExitEvent>())
+            {
+                count++;
+            }
+            return count;
+        }
+    }
 
     /// <summary>
-    /// Get the count of active collision exit events this frame.
+    /// Get all collision events that occurred this frame.
     /// </summary>
-    public int CollisionExitEventCount => _activeCollisionExitEvents.Count;
+    public IEnumerable<(Entity Entity, CollisionEvent Event)> GetAllCollisionEvents()
+    {
+        foreach (var (entity, collision) in _world.Query<CollisionEvent>())
+        {
+            yield return (entity, collision);
+        }
+    }
 
     /// <summary>
-    /// Get the count of active trigger exit events this frame.
+    /// Get all trigger events that occurred this frame.
     /// </summary>
-    public int TriggerExitEventCount => _activeTriggerExitEvents.Count;
+    public IEnumerable<(Entity Entity, TriggerEvent Event)> GetAllTriggerEvents()
+    {
+        foreach (var (entity, trigger) in _world.Query<TriggerEvent>())
+        {
+            yield return (entity, trigger);
+        }
+    }
+
+    /// <summary>
+    /// Get all collision exit events that occurred this frame.
+    /// </summary>
+    public IEnumerable<(Entity Entity, CollisionExitEvent Event)> GetAllCollisionExitEvents()
+    {
+        foreach (var (entity, exit) in _world.Query<CollisionExitEvent>())
+        {
+            yield return (entity, exit);
+        }
+    }
 }
 

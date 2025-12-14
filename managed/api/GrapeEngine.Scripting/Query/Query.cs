@@ -96,12 +96,43 @@ public class Query<T1>
         return new QueryEnumerator<T1>(_world, _componentHashes);
     }
 
+    /// <summary>
+    /// Get an enumerator for this query with automatic profiling.
+    /// Use this for profiling-enabled query execution that tracks performance metrics.
+    /// </summary>
+    /// <param name="profiler">The optimization profiler to use (defaults to world's profiler)</param>
+    /// <param name="queryName">Name for profiling (defaults to component type names)</param>
+    /// <returns>A profiling-enabled query result</returns>
+    public ProfiledQueryIterator<T1> GetEnumeratorWithProfiling(
+        OptimizationProfiler? profiler = null,
+        string? queryName = null)
+    {
+        profiler ??= _world.OptimizationProfiler;
+        queryName ??= $"Query<{typeof(T1).Name}>";
+        
+        return new ProfiledQueryIterator<T1>(_world, _componentHashes, profiler, queryName);
+    }
+
     public int Count()
     {
         int c = 0;
         var en = GetEnumerator();
         while (en.MoveNext()) c++;
         return c;
+    }
+
+    /// <summary>
+    /// Get the count of matching entities with profiling.
+    /// </summary>
+    public int CountWithProfiling(OptimizationProfiler? profiler = null)
+    {
+        profiler ??= _world.OptimizationProfiler;
+        using (var scope = profiler.BeginProfile(
+            $"Query<{typeof(T1).Name}>.Count",
+            OptimizationSafety.Normal))
+        {
+            return Count();
+        }
     }
 
     public bool Any()
@@ -212,12 +243,43 @@ public class Query<T1, T2>
         return new QueryEnumerator<T1, T2>(_world, _componentHashes);
     }
 
+    /// <summary>
+    /// Get an enumerator for this query with automatic profiling.
+    /// Use this for profiling-enabled query execution that tracks performance metrics.
+    /// </summary>
+    /// <param name="profiler">The optimization profiler to use (defaults to world's profiler)</param>
+    /// <param name="queryName">Name for profiling (defaults to component type names)</param>
+    /// <returns>A profiling-enabled query result</returns>
+    public ProfiledQueryIterator<T1, T2> GetEnumeratorWithProfiling(
+        OptimizationProfiler? profiler = null,
+        string? queryName = null)
+    {
+        profiler ??= _world.OptimizationProfiler;
+        queryName ??= $"Query<{typeof(T1).Name},{typeof(T2).Name}>";
+        
+        return new ProfiledQueryIterator<T1, T2>(_world, _componentHashes, profiler, queryName);
+    }
+
     public int Count()
     {
         int c = 0;
         var en = GetEnumerator();
         while (en.MoveNext()) c++;
         return c;
+    }
+
+    /// <summary>
+    /// Get the count of matching entities with profiling.
+    /// </summary>
+    public int CountWithProfiling(OptimizationProfiler? profiler = null)
+    {
+        profiler ??= _world.OptimizationProfiler;
+        using (var scope = profiler.BeginProfile(
+            $"Query<{typeof(T1).Name},{typeof(T2).Name}>.Count",
+            OptimizationSafety.Normal))
+        {
+            return Count();
+        }
     }
 
     public bool Any()
