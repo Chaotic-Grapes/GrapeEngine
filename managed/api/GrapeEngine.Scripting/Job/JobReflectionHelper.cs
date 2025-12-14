@@ -136,6 +136,97 @@ internal static class JobReflectionHelper
     }
 
     /// <summary>
+    /// Validate that a job's actual component accesses match declared accesses.
+    /// Checks Execute method parameters against JobComponentAccess attributes.
+    /// </summary>
+    /// <returns>Validation result with details if any mismatches found</returns>
+    public static ComponentAccessValidationResult ValidateComponentAccess(Type jobType)
+    {
+        var result = new ComponentAccessValidationResult { JobType = jobType };
+        
+        // Get declared access from attributes
+        var declaredAccess = GetComponentAccess(jobType);
+        
+        // Find Execute method and analyze parameters
+        var executeMethod = FindExecuteMethod(jobType);
+        if (executeMethod == null)
+        {
+            result.IsValid = true;
+            result.Message = "No Execute method found";
+            return result;
+        }
+
+        var parameters = executeMethod.GetParameters();
+        var actualReadComponents = new HashSet<Type>();
+        var actualWriteComponents = new HashSet<Type>();
+
+        foreach (var param in parameters)
+        {
+            // Skip Entity and non-component parameters
+            if (param.ParameterType == typeof(Entity))
+                continue;
+            if (param.ParameterType.IsPrimitive || param.ParameterType == typeof(string))
+                continue;
+
+            var paramType = param.ParameterType;
+
+            // Determine access mode from parameter modifier
+            if (param.GetCustomAttribute<System.Runtime.InteropServices.InAttribute>() != null)
+            {
+                // 'in' parameter - read-only
+                actualReadComponents.Add(paramType);
+            }
+            else if (paramType.IsByRef)
+            {
+                // 'ref' parameter - read-write
+                var elementType = paramType.GetElementType();
+                if (elementType != null)
+                {
+                    actualWriteComponents.Add(elementType);
+                    actualReadComponents.Add(elementType);
+                }
+            }
+            else
+            {
+                // Regular parameter - assume read access
+                actualReadComponents.Add(paramType);
+            }
+        }
+
+        // Check for undeclared reads
+        var undeclaredReads = actualReadComponents
+            .Where(t => !declaredAccess.ReadableComponents.Contains(t) && !declaredAccess.WritableComponents.Contains(t))
+            .ToList();
+
+        // Check for undeclared writes
+        var undeclaredWrites = actualWriteComponents
+            .Where(t => !declaredAccess.WritableComponents.Contains(t))
+            .ToList();
+
+        if (undeclaredReads.Any() || undeclaredWrites.Any())
+        {
+            result.IsValid = false;
+            result.UndeclaredReadComponents = undeclaredReads;
+            result.UndeclaredWriteComponents = undeclaredWrites;
+            
+            var messages = new List<string>();
+            if (undeclaredReads.Any())
+                messages.Add($"Undeclared read access: {string.Join(", ", undeclaredReads.Select(t => t.Name))}");
+            if (undeclaredWrites.Any())
+                messages.Add($"Undeclared write access: {string.Join(", ", undeclaredWrites.Select(t => t.Name))}");
+            
+            result.Message = string.Join("; ", messages);
+        }
+        else
+        {
+            result.IsValid = true;
+            result.Message = "All component accesses properly declared";
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Generate a debug report for job component access.
     /// </summary>
     public static string GenerateAccessReport(ComponentAccessInfo info)
@@ -149,6 +240,18 @@ internal static class JobReflectionHelper
 
         return string.Join("\n", lines);
     }
+}
+
+/// <summary>
+/// Result of validating a job's component access declarations.
+/// </summary>
+public class ComponentAccessValidationResult
+{
+    public Type? JobType { get; set; }
+    public bool IsValid { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public List<Type> UndeclaredReadComponents { get; set; } = [];
+    public List<Type> UndeclaredWriteComponents { get; set; } = [];
 }
 
 /// <summary>

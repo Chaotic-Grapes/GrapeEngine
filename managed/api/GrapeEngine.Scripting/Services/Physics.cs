@@ -14,6 +14,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Unsafe;
 using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Profiling;
 using GrapeEngine.Math;
 
 namespace GrapeEngine.Scripting.Services;
@@ -28,9 +29,12 @@ public static class Physics
     /// </summary>
     public static void SetGravity(World world, Vector2 gravity)
     {
-        unsafe
+        using (PInvokeTimer.Start("PhysicsAPI.SetGravity"))
         {
-            PhysicsAPI.SetGravity(world.NativePtr, gravity.X, gravity.Y);
+            unsafe
+            {
+                PhysicsAPI.SetGravity(world.NativePtr, gravity.X, gravity.Y);
+            }
         }
     }
 
@@ -39,19 +43,25 @@ public static class Physics
     /// </summary>
     public static Vector2 GetGravity(World world)
     {
-        unsafe
+        using (PInvokeTimer.Start("PhysicsAPI.GetGravity"))
         {
-            float x, y;
-            PhysicsAPI.GetGravity(world.NativePtr, &x, &y);
-            return new Vector2(x, y);
+            unsafe
+            {
+                float x, y;
+                PhysicsAPI.GetGravity(world.NativePtr, &x, &y);
+                return new Vector2(x, y);
+            }
         }
     }
 
     /// <summary>
     /// Enable or disable the physics system.
-    /// </summary>
-    public static void SetEnabled(World world, bool enabled)
-    {
+    /// <sing (PInvokeTimer.Start("PhysicsAPI.SetEnabled"))
+        {
+            unsafe
+            {
+                PhysicsAPI.SetEnabled(world.NativePtr, enabled);
+            }
         unsafe
         {
             PhysicsAPI.SetEnabled(world.NativePtr, enabled);
@@ -60,17 +70,23 @@ public static class Physics
 
     /// <summary>
     /// Check if the physics system is enabled.
-    /// </summary>
-    public static bool IsEnabled(World world)
-    {
+    /// <sing (PInvokeTimer.Start("PhysicsAPI.IsEnabled"))
+        {
+            unsafe
+            {
+                return PhysicsAPI.IsEnabled(world.NativePtr);
+            }
         unsafe
         {
             return PhysicsAPI.IsEnabled(world.NativePtr);
         }
     }
-
-    /// <summary>
-    /// Apply a force to an entity with a Rigidbody2D.
+sing (PInvokeTimer.Start("PhysicsAPI.ApplyForce"))
+        {
+            unsafe
+            {
+                PhysicsAPI.ApplyForce(world.NativePtr, entity.Id, force.X, force.Y);
+            }
     /// </summary>
     public static void ApplyForce(World world, Entity entity, Vector2 force)
     {
@@ -79,9 +95,12 @@ public static class Physics
             PhysicsAPI.ApplyForce(world.NativePtr, entity.Id, force.X, force.Y);
         }
     }
-
-    /// <summary>
-    /// Apply an impulse to an entity with a Rigidbody2D.
+sing (PInvokeTimer.Start("PhysicsAPI.ApplyImpulse"))
+        {
+            unsafe
+            {
+                PhysicsAPI.ApplyImpulse(world.NativePtr, entity.Id, impulse.X, impulse.Y);
+            }
     /// </summary>
     public static void ApplyImpulse(World world, Entity entity, Vector2 impulse)
     {
@@ -90,19 +109,25 @@ public static class Physics
             PhysicsAPI.ApplyImpulse(world.NativePtr, entity.Id, impulse.X, impulse.Y);
         }
     }
-
-    /// <summary>
-    /// Get the velocity of an entity with a Rigidbody2D.
-    /// </summary>
-    public static Vector2 GetVelocity(World world, Entity entity)
+sing (PInvokeTimer.Start("PhysicsAPI.GetVelocity"))
+        {
+            unsafe
+            {
+                float x, y;
+                PhysicsAPI.GetVelocity(world.NativePtr, entity.Id, &x, &y);
+                return new Vector2(x, y);
+            }(World world, Entity entity)
     {
         unsafe
         {
             float x, y;
             PhysicsAPI.GetVelocity(world.NativePtr, entity.Id, &x, &y);
-            return new Vector2(x, y);
-        }
-    }
+         sing (PInvokeTimer.Start("PhysicsAPI.SetVelocity"))
+        {
+            unsafe
+            {
+                PhysicsAPI.SetVelocity(world.NativePtr, entity.Id, velocity.X, velocity.Y);
+            }
 
     /// <summary>
     /// Set the velocity of an entity with a Rigidbody2D.

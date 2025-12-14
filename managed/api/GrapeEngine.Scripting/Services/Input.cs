@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 
 using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -34,21 +35,39 @@ public static class Input
     /// </summary>
     /// <param name="key">The key code to check.</param>
     /// <returns>True if the key was just pressed this frame.</returns>
-    public static bool IsKeyPressed(int key) => InputAPI.IsKeyPressed(key);
+    public static bool IsKeyPressed(int key)
+    {
+        using (PInvokeTimer.Start("InputAPI.IsKeyPressed"))
+        {
+            return InputAPI.IsKeyPressed(key);
+        }
+    }
 
     /// <summary>
     /// Check if a key is currently held down.
     /// </summary>
     /// <param name="key">The key code to check.</param>
     /// <returns>True if the key is currently down.</returns>
-    public static bool IsKeyDown(int key) => InputAPI.IsKeyDown(key);
+    public static bool IsKeyDown(int key)
+    {
+        using (PInvokeTimer.Start("InputAPI.IsKeyDown"))
+        {
+            return InputAPI.IsKeyDown(key);
+        }
+    }
 
     /// <summary>
     /// Check if a key was just released this frame.
     /// </summary>
     /// <param name="key">The key code to check.</param>
     /// <returns>True if the key was released this frame.</returns>
-    public static bool IsKeyUp(int key) => InputAPI.IsKeyUp(key);
+    public static bool IsKeyUp(int key)
+    {
+        using (PInvokeTimer.Start("InputAPI.IsKeyUp"))
+        {
+            return InputAPI.IsKeyUp(key);
+        }
+    }
 
     // ============================================================================
     // Mouse Input
@@ -59,27 +78,69 @@ public static class Input
     /// </summary>
     /// <param name="button">The mouse button to check.</param>
     /// <returns>True if the button is currently pressed.</returns>
-    public static bool IsMousePressed(int button) => InputAPI.IsMousePressed(button);
+    public static bool IsMousePressed(int button)
+    {
+        using (PInvokeTimer.Start("InputAPI.IsMousePressed"))
+        {
+            return InputAPI.IsMousePressed(button);
+        }
+    }
 
     /// <summary>
     /// Get the current mouse X coordinate in window space.
     /// </summary>
-    public static double MouseX => InputAPI.GetMouseX();
+    public static double MouseX
+    {
+        get
+        {
+            using (PInvokeTimer.Start("InputAPI.GetMouseX"))
+            {
+                return InputAPI.GetMouseX();
+            }
+        }
+    }
 
     /// <summary>
     /// Get the current mouse Y coordinate in window space.
     /// </summary>
-    public static double MouseY => InputAPI.GetMouseY();
+    public static double MouseY
+    {
+        get
+        {
+            using (PInvokeTimer.Start("InputAPI.GetMouseY"))
+            {
+                return InputAPI.GetMouseY();
+            }
+        }
+    }
 
     /// <summary>
     /// Get the current horizontal scroll offset.
     /// </summary>
-    public static double ScrollX => InputAPI.GetScrollX();
+    public static double ScrollX
+    {
+        get
+        {
+            using (PInvokeTimer.Start("InputAPI.GetScrollX"))
+            {
+                return InputAPI.GetScrollX();
+            }
+        }
+    }
 
     /// <summary>
     /// Get the current vertical scroll offset.
     /// </summary>
-    public static double ScrollY => InputAPI.GetScrollY();
+    public static double ScrollY
+    {
+        get
+        {
+            using (PInvokeTimer.Start("InputAPI.GetScrollY"))
+            {
+                return InputAPI.GetScrollY();
+            }
+        }
+    }
 }
 
 // ============================================================================

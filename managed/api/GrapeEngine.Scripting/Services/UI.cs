@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Unsafe;
 using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -27,10 +28,22 @@ public static class UI
     /// <summary>
     /// Returns true if any UI element was clicked this frame.
     /// </summary>
-    public static bool WasAnyClicked() => UIAPI.WasAnyClicked();
+    public static bool WasAnyClicked()
+    {
+        using (PInvokeTimer.Start("UIAPI.WasAnyClicked"))
+        {
+            return UIAPI.WasAnyClicked();
+        }
+    }
 
     /// <summary>
     /// Returns the ActionID of the last clicked UI element (0 if none).
     /// </summary>
-    public static uint GetClickedActionID() => UIAPI.GetClickedActionID();
+    public static uint GetClickedActionID()
+    {
+        using (PInvokeTimer.Start("UIAPI.GetClickedActionID"))
+        {
+            return UIAPI.GetClickedActionID();
+        }
+    }
 }

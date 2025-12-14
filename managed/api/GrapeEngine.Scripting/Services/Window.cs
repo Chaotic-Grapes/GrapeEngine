@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Unsafe;
 using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -42,17 +43,41 @@ public static class Window
     /// <summary>
     /// Get the current window width in pixels.
     /// </summary>
-    public static int Width => WindowAPI.GetWidth();
+    public static int Width
+    {
+        get
+        {
+            using (PInvokeTimer.Start("WindowAPI.GetWidth"))
+            {
+                return WindowAPI.GetWidth();
+            }
+        }
+    }
 
     /// <summary>
     /// Get the current window height in pixels.
     /// </summary>
-    public static int Height => WindowAPI.GetHeight();
+    public static int Height
+    {
+        get
+        {
+            using (PInvokeTimer.Start("WindowAPI.GetHeight"))
+            {
+                return WindowAPI.GetHeight();
+            }
+        }
+    }
 
     /// <summary>
     /// Resize the window to the specified dimensions.
     /// </summary>
-    public static void Resize(int width, int height) => WindowAPI.Resize(width, height);
+    public static void Resize(int width, int height)
+    {
+        using (PInvokeTimer.Start("WindowAPI.Resize"))
+        {
+            WindowAPI.Resize(width, height);
+        }
+    }
 
     // ============================================================================
     // Window State
@@ -61,25 +86,61 @@ public static class Window
     /// <summary>
     /// Check if the window should close.
     /// </summary>
-    public static bool ShouldClose => WindowAPI.ShouldClose();
+    public static bool ShouldClose
+    {
+        get
+        {
+            using (PInvokeTimer.Start("WindowAPI.ShouldClose"))
+            {
+                return WindowAPI.ShouldClose();
+            }
+        }
+    }
 
     /// <summary>
     /// Request the window to close.
     /// </summary>
-    public static void Close() => WindowAPI.Close();
+    public static void Close()
+    {
+        using (PInvokeTimer.Start("WindowAPI.Close"))
+        {
+            WindowAPI.Close();
+        }
+    }
 
     /// <summary>
     /// Check if the window is currently focused.
     /// </summary>
-    public static bool IsFocused => WindowAPI.IsFocused();
+    public static bool IsFocused
+    {
+        get
+        {
+            using (PInvokeTimer.Start("WindowAPI.IsFocused"))
+            {
+                return WindowAPI.IsFocused();
+            }
+        }
+    }
 
     /// <summary>
     /// Get or set whether the window is minimized.
     /// </summary>
     public static bool IsMinimized
     {
-        get => WindowAPI.IsMinimized();
-        set => WindowAPI.SetMinimized(value);
+        get
+        {
+            using (PInvokeTimer.Start("WindowAPI.IsMinimized"))
+            {
+                return WindowAPI.IsMinimized();
+            }
+        }
+        set
+        {
+            using (PInvokeTimer.Start("WindowAPI.SetMinimized"))
+            {
+                WindowAPI.SetMinimized(value);
+            }
+        }
     }
 
     /// <summary>
@@ -87,8 +148,20 @@ public static class Window
     /// </summary>
     public static bool IsMaximized
     {
-        get => WindowAPI.IsMaximized();
-        set => WindowAPI.SetMaximized(value);
+        get
+        {
+            using (PInvokeTimer.Start("WindowAPI.IsMaximized"))
+            {
+                return WindowAPI.IsMaximized();
+            }
+        }
+        set
+        {
+            using (PInvokeTimer.Start("WindowAPI.SetMaximized"))
+            {
+                WindowAPI.SetMaximized(value);
+            }
+        }
     }
 
     /// <summary>
@@ -96,8 +169,20 @@ public static class Window
     /// </summary>
     public static bool IsVisible
     {
-        get => WindowAPI.IsVisible();
-        set => WindowAPI.SetVisible(value);
+        get
+        {
+            using (PInvokeTimer.Start("WindowAPI.IsVisible"))
+            {
+                return WindowAPI.IsVisible();
+            }
+        }
+        set
+        {
+            using (PInvokeTimer.Start("WindowAPI.SetVisible"))
+            {
+                WindowAPI.SetVisible(value);
+            }
+        }
     }
 
     /// <summary>
@@ -105,8 +190,20 @@ public static class Window
     /// </summary>
     public static bool IsResizable
     {
-        get => WindowAPI.IsResizable();
-        set => WindowAPI.SetResizable(value);
+        get
+        {
+            using (PInvokeTimer.Start("WindowAPI.IsResizable"))
+            {
+                return WindowAPI.IsResizable();
+            }
+        }
+        set
+        {
+            using (PInvokeTimer.Start("WindowAPI.SetResizable"))
+            {
+                WindowAPI.SetResizable(value);
+            }
+        }
     }
 
     // ============================================================================
@@ -116,10 +213,22 @@ public static class Window
     /// <summary>
     /// Set the window mode.
     /// </summary>
-    public static void SetMode(WindowMode mode) => WindowAPI.SetMode((int)mode);
+    public static void SetMode(WindowMode mode)
+    {
+        using (PInvokeTimer.Start("WindowAPI.SetMode"))
+        {
+            WindowAPI.SetMode((int)mode);
+        }
+    }
 
     /// <summary>
     /// Check if the window has a specific mode flag.
     /// </summary>
-    public static bool HasMode(WindowMode mode) => WindowAPI.HasMode((int)mode);
+    public static bool HasMode(WindowMode mode)
+    {
+        using (PInvokeTimer.Start("WindowAPI.HasMode"))
+        {
+            return WindowAPI.HasMode((int)mode);
+        }
+    }
 }

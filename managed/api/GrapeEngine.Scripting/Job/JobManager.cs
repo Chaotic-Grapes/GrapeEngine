@@ -107,14 +107,28 @@ public class JobManager
     /// 
     /// NOTE: Job execution is automatically profiled through OptimizationProfiler for
     /// performance analysis and optimization recommendations.
+    /// 
+    /// NOTE: Component access is validated - all components accessed in the Execute method
+    /// must be declared via [JobComponentAccess] attribute or method parameters.
     /// </summary>
     /// <param name="job">The job to schedule</param>
     /// <param name="dependsOn">Optional job handle this job depends on</param>
     /// <param name="priority">Job priority (higher = earlier execution)</param>
     /// <returns>Handle to track job completion</returns>
+    /// <exception cref="InvalidOperationException">Thrown if job has undeclared component accesses</exception>
     public JobHandle Schedule(IJob job, JobHandle? dependsOn = null, int priority = 0)
     {
         ArgumentNullException.ThrowIfNull(job);
+
+        // Validate component access declarations
+        var jobType = job.GetType();
+        var validationResult = JobReflectionHelper.ValidateComponentAccess(jobType);
+        if (!validationResult.IsValid)
+        {
+            throw new InvalidOperationException(
+                $"Job {jobType.Name} has undeclared component accesses: {validationResult.Message}. " +
+                $"Declare accesses using [JobComponentAccess] attribute or using proper method parameters (ref for writes, in for reads).");
+        }
 
         // Provide a command buffer for deferred structural changes
         // This allows the job to safely record entity/component modifications

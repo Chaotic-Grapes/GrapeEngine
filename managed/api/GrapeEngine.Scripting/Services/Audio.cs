@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using GrapeEngine.Math;
 using GrapeEngine.Scripting.Unsafe;
 using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -95,7 +96,12 @@ public static class Audio
     /// <param name="paused">Start paused.</param>
     /// <returns>Audio handle for controlling playback.</returns>
     public static AudioHandle Play(string cueId, float volume = 1.0f, float pitch = 1.0f, bool paused = false)
-        => new(AudioAPI.Play(cueId, volume, pitch, paused));
+    {
+        using (PInvokeTimer.Start("AudioAPI.Play"))
+        {
+            return new(AudioAPI.Play(cueId, volume, pitch, paused));
+        }
+    }
 
     /// <summary>
     /// Play a sound cue with single-instance policy (prevents overlapping plays).
@@ -106,24 +112,45 @@ public static class Audio
     /// <param name="pitch">Pitch multiplier (default 1.0).</param>
     /// <returns>Audio handle for controlling playback.</returns>
     public static AudioHandle PlaySingle(string cueId, PlayPolicy policy = PlayPolicy.KeepOldest, float volume = 1.0f, float pitch = 1.0f)
-        => new(AudioAPI.PlaySingle(cueId, volume, pitch, (int)policy));
+    {
+        using (PInvokeTimer.Start("AudioAPI.PlaySingle"))
+        {
+            return new(AudioAPI.PlaySingle(cueId, volume, pitch, (int)policy));
+        }
+    }
 
     /// <summary>
     /// Stop a playing sound instance.
     /// </summary>
     public static void Stop(AudioHandle handle, StopMode mode = StopMode.Immediate)
-        => AudioAPI.Stop(handle.Id, (int)mode);
+    {
+        using (PInvokeTimer.Start("AudioAPI.Stop"))
+        {
+            AudioAPI.Stop(handle.Id, (int)mode);
+        }
+    }
 
     /// <summary>
     /// Stop all instances of a cue.
     /// </summary>
     public static void StopCue(string cueId, StopMode mode = StopMode.Immediate)
-        => AudioAPI.StopCue(cueId, (int)mode);
+    {
+        using (PInvokeTimer.Start("AudioAPI.StopCue"))
+        {
+            AudioAPI.StopCue(cueId, (int)mode);
+        }
+    }
 
     /// <summary>
     /// Check if a cue is currently playing.
     /// </summary>
-    public static bool IsCuePlaying(string cueId) => AudioAPI.IsCuePlaying(cueId);
+    public static bool IsCuePlaying(string cueId)
+    {
+        using (PInvokeTimer.Start("AudioAPI.IsCuePlaying"))
+        {
+            return AudioAPI.IsCuePlaying(cueId);
+        }
+    }
 
     // ============================================================================
     // Instance Control
@@ -133,19 +160,34 @@ public static class Audio
     /// Set the volume of a playing sound instance.
     /// </summary>
     public static void SetInstanceVolume(AudioHandle handle, float volume)
-        => AudioAPI.SetInstanceVolume(handle.Id, volume);
+    {
+        using (PInvokeTimer.Start("AudioAPI.SetInstanceVolume"))
+        {
+            AudioAPI.SetInstanceVolume(handle.Id, volume);
+        }
+    }
 
     /// <summary>
     /// Set the pitch of a playing sound instance.
     /// </summary>
     public static void SetInstancePitch(AudioHandle handle, float pitch)
-        => AudioAPI.SetInstancePitch(handle.Id, pitch);
+    {
+        using (PInvokeTimer.Start("AudioAPI.SetInstancePitch"))
+        {
+            AudioAPI.SetInstancePitch(handle.Id, pitch);
+        }
+    }
 
     /// <summary>
     /// Set the 3D position and velocity of a playing sound instance.
     /// </summary>
     public static void SetInstancePosition(AudioHandle handle, Vector3 position, Vector3 velocity)
-        => AudioAPI.SetInstancePosition(handle.Id, position.X, position.Y, position.Z, velocity.X, velocity.Y, velocity.Z);
+    {
+        using (PInvokeTimer.Start("AudioAPI.SetInstancePosition"))
+        {
+            AudioAPI.SetInstancePosition(handle.Id, position.X, position.Y, position.Z, velocity.X, velocity.Y, velocity.Z);
+        }
+    }
 
     // ============================================================================
     // Master Controls

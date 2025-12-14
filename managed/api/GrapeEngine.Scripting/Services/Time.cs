@@ -15,6 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 
 using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -30,52 +31,142 @@ public static class Time
     /// <summary>
     /// The time in seconds it took to complete the last frame (affected by TimeScale).
     /// </summary>
-    public static float DeltaTime => TimeAPI.GetDeltaTime();
+    public static float DeltaTime
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetDeltaTime"))
+            {
+                return TimeAPI.GetDeltaTime();
+            }
+        }
+    }
 
     /// <summary>
     /// The unscaled time in seconds it took to complete the last frame.
     /// </summary>
-    public static float UnscaledDeltaTime => TimeAPI.GetUnscaledDeltaTime();
+    public static float UnscaledDeltaTime
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetUnscaledDeltaTime"))
+            {
+                return TimeAPI.GetUnscaledDeltaTime();
+            }
+        }
+    }
 
     /// <summary>
     /// The interval in seconds at which physics is calculated (affected by TimeScale).
     /// </summary>
-    public static float FixedDeltaTime => TimeAPI.GetFixedDeltaTime();
+    public static float FixedDeltaTime
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetFixedDeltaTime"))
+            {
+                return TimeAPI.GetFixedDeltaTime();
+            }
+        }
+    }
 
     /// <summary>
     /// The unscaled interval in seconds at which physics is calculated.
     /// </summary>
-    public static float UnscaledFixedDeltaTime => TimeAPI.GetUnscaledFixedDeltaTime();
+    public static float UnscaledFixedDeltaTime
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetUnscaledFixedDeltaTime"))
+            {
+                return TimeAPI.GetUnscaledFixedDeltaTime();
+            }
+        }
+    }
 
     /// <summary>
     /// The smoothed (moving average) delta time.
     /// </summary>
-    public static float SmoothedDeltaTime => TimeAPI.GetSmoothedDeltaTime();
+    public static float SmoothedDeltaTime
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetSmoothedDeltaTime"))
+            {
+                return TimeAPI.GetSmoothedDeltaTime();
+            }
+        }
+    }
 
     /// <summary>
     /// The total unscaled time in seconds since the engine started.
     /// </summary>
-    public static double RealTimeSinceStart => TimeAPI.GetRealTimeSinceStart();
+    public static double RealTimeSinceStart
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetRealTimeSinceStart"))
+            {
+                return TimeAPI.GetRealTimeSinceStart();
+            }
+        }
+    }
 
     /// <summary>
     /// The total time in seconds since the engine started.
     /// </summary>
-    public static double ElapsedTime => TimeAPI.GetElapsedTime();
+    public static double ElapsedTime
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetElapsedTime"))
+            {
+                return TimeAPI.GetElapsedTime();
+            }
+        }
+    }
 
     /// <summary>
     /// The total number of frames that have passed since the engine started.
     /// </summary>
-    public static int FrameCount => TimeAPI.GetFrameCount();
+    public static int FrameCount
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetFrameCount"))
+            {
+                return TimeAPI.GetFrameCount();
+            }
+        }
+    }
 
     /// <summary>
     /// The current frames per second.
     /// </summary>
-    public static float FPS => TimeAPI.GetFPS();
+    public static float FPS
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetFPS"))
+            {
+                return TimeAPI.GetFPS();
+            }
+        }
+    }
 
     /// <summary>
     /// The frame time in milliseconds.
     /// </summary>
-    public static float FrameTimeMs => TimeAPI.GetFrameTimeMs();
+    public static float FrameTimeMs
+    {
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetFrameTimeMs"))
+            {
+                return TimeAPI.GetFrameTimeMs();
+            }
+        }
+    }
 
     // ============================================================================
     // Read/Write Properties
@@ -86,8 +177,20 @@ public static class Time
     /// </summary>
     public static float TimeScale
     {
-        get => TimeAPI.GetTimeScale();
-        set => TimeAPI.SetTimeScale(value);
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetTimeScale"))
+            {
+                return TimeAPI.GetTimeScale();
+            }
+        }
+        set
+        {
+            using (PInvokeTimer.Start("TimeAPI.SetTimeScale"))
+            {
+                TimeAPI.SetTimeScale(value);
+            }
+        }
     }
 
     /// <summary>
@@ -99,8 +202,20 @@ public static class Time
     /// </remarks>
     public static float MaximumDeltaTime
     {
-        get => TimeAPI.GetMaximumDeltaTime();
-        set => TimeAPI.SetMaximumDeltaTime(value);
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetMaximumDeltaTime"))
+            {
+                return TimeAPI.GetMaximumDeltaTime();
+            }
+        }
+        set
+        {
+            using (PInvokeTimer.Start("TimeAPI.SetMaximumDeltaTime"))
+            {
+                TimeAPI.SetMaximumDeltaTime(value);
+            }
+        }
     }
 
     /// <summary>
@@ -113,7 +228,19 @@ public static class Time
     /// </remarks>
     public static float MaximumFPS
     {
-        get => TimeAPI.GetMaximumFPS();
-        set => TimeAPI.SetMaximumFPS(value);
+        get
+        {
+            using (PInvokeTimer.Start("TimeAPI.GetMaximumFPS"))
+            {
+                return TimeAPI.GetMaximumFPS();
+            }
+        }
+        set
+        {
+            using (PInvokeTimer.Start("TimeAPI.SetMaximumFPS"))
+            {
+                TimeAPI.SetMaximumFPS(value);
+            }
+        }
     }
 }

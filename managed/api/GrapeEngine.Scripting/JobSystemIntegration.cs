@@ -88,6 +88,194 @@ public class JobSystemHelper(World world)
     public JobManager JobManager => _jobManager;
 
     /// <summary>
+    /// Apply the appropriate batching strategy based on configuration.
+    /// 
+    /// Handles all four batching strategies: FixedSize, Dynamic, PerThread, and Single.
+    /// </summary>
+    private JobHandle ApplyBatchingStrategy<T1>(
+        Query<T1> query,
+        EntityAction<T1> action,
+        BatchingConfig config,
+        JobHandle? dependsOn) where T1 : unmanaged
+    {
+        // Collect entities from query
+        var entities = new List<Entity>();
+        var enumerator = query.GetEnumerator();
+        while (enumerator.MoveNext())
+        {
+            var (entity, _) = enumerator.Current;
+            entities.Add(entity);
+        }
+
+        // If no entities or single strategy, schedule as single job
+        if (entities.Count == 0 || config.Strategy == BatchingStrategy.Single)
+        {
+            var singleJob = new EntityIterationJob<T1>
+            {
+                Query = query,
+                Action = action
+            };
+            return _jobManager.Schedule(singleJob, dependsOn ?? default);
+        }
+
+        // Apply batching strategy
+        var batcher = new JobBatcher();
+        var batches = batcher.CreateBatches(entities, config);
+
+        // If only one batch, schedule as single job
+        if (batches.Count == 1)
+        {
+            var singleJob = new EntityIterationJob<T1>
+            {
+                Query = query,
+                Action = action,
+                EntityBatch = batches[0]
+            };
+            return _jobManager.Schedule(singleJob, dependsOn ?? default);
+        }
+
+        // Schedule multiple jobs
+        JobHandle lastHandle = dependsOn ?? default;
+        foreach (var batch in batches)
+        {
+            var job = new EntityIterationJob<T1>
+            {
+                Query = query,
+                Action = action,
+                EntityBatch = batch
+            };
+            lastHandle = _jobManager.Schedule(job, lastHandle);
+            _pendingHandles.Add(lastHandle);
+        }
+
+        return lastHandle;
+    }
+
+    /// <summary>
+    /// Apply the appropriate batching strategy based on configuration for two components.
+    /// </summary>
+    private JobHandle ApplyBatchingStrategy<T1, T2>(
+        Query<T1, T2> query,
+        EntityAction<T1, T2> action,
+        BatchingConfig config,
+        JobHandle? dependsOn) where T1 : unmanaged where T2 : unmanaged
+    {
+        // Collect entities from query
+        var entities = new List<Entity>();
+        var enumerator = query.GetEnumerator();
+        while (enumerator.MoveNext())
+        {
+            var (entity, _, _) = enumerator.Current;
+            entities.Add(entity);
+        }
+
+        // If no entities or single strategy, schedule as single job
+        if (entities.Count == 0 || config.Strategy == BatchingStrategy.Single)
+        {
+            var singleJob = new EntityIterationJob<T1, T2>
+            {
+                Query = query,
+                Action = action
+            };
+            return _jobManager.Schedule(singleJob, dependsOn ?? default);
+        }
+
+        // Apply batching strategy
+        var batcher = new JobBatcher();
+        var batches = batcher.CreateBatches(entities, config);
+
+        // If only one batch, schedule as single job
+        if (batches.Count == 1)
+        {
+            var singleJob = new EntityIterationJob<T1, T2>
+            {
+                Query = query,
+                Action = action,
+                EntityBatch = batches[0]
+            };
+            return _jobManager.Schedule(singleJob, dependsOn ?? default);
+        }
+
+        // Schedule multiple jobs
+        JobHandle lastHandle = dependsOn ?? default;
+        foreach (var batch in batches)
+        {
+            var job = new EntityIterationJob<T1, T2>
+            {
+                Query = query,
+                Action = action,
+                EntityBatch = batch
+            };
+            lastHandle = _jobManager.Schedule(job, lastHandle);
+            _pendingHandles.Add(lastHandle);
+        }
+
+        return lastHandle;
+    }
+
+    /// <summary>
+    /// Apply the appropriate batching strategy based on configuration for three components.
+    /// </summary>
+    private JobHandle ApplyBatchingStrategy<T1, T2, T3>(
+        Query<T1, T2, T3> query,
+        EntityAction<T1, T2, T3> action,
+        BatchingConfig config,
+        JobHandle? dependsOn) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged
+    {
+        // Collect entities from query
+        var entities = new List<Entity>();
+        var enumerator = query.GetEnumerator();
+        while (enumerator.MoveNext())
+        {
+            var (entity, _, _, _) = enumerator.Current;
+            entities.Add(entity);
+        }
+
+        // If no entities or single strategy, schedule as single job
+        if (entities.Count == 0 || config.Strategy == BatchingStrategy.Single)
+        {
+            var singleJob = new EntityIterationJob<T1, T2, T3>
+            {
+                Query = query,
+                Action = action
+            };
+            return _jobManager.Schedule(singleJob, dependsOn ?? default);
+        }
+
+        // Apply batching strategy
+        var batcher = new JobBatcher();
+        var batches = batcher.CreateBatches(entities, config);
+
+        // If only one batch, schedule as single job
+        if (batches.Count == 1)
+        {
+            var singleJob = new EntityIterationJob<T1, T2, T3>
+            {
+                Query = query,
+                Action = action,
+                EntityBatch = batches[0]
+            };
+            return _jobManager.Schedule(singleJob, dependsOn ?? default);
+        }
+
+        // Schedule multiple jobs
+        JobHandle lastHandle = dependsOn ?? default;
+        foreach (var batch in batches)
+        {
+            var job = new EntityIterationJob<T1, T2, T3>
+            {
+                Query = query,
+                Action = action,
+                EntityBatch = batch
+            };
+            lastHandle = _jobManager.Schedule(job, lastHandle);
+            _pendingHandles.Add(lastHandle);
+        }
+
+        return lastHandle;
+    }
+
+    /// <summary>
     /// Schedule a job to execute a function for each entity in a query.
     /// 
     /// The function is scheduled as a parallel job and executed on worker threads.
@@ -118,45 +306,11 @@ public class JobSystemHelper(World world)
         JobHandle? dependsOn = default,
         BatchingConfig? batchingConfig = null) where T1 : unmanaged
     {
-        // Apply batching if configured
-        if (batchingConfig != null)
-        {
-            var batcher = new JobBatcher();
-            // Collect entities from query by enumerating
-            var entities = new List<Entity>();
-            var enumerator = query.GetEnumerator();
-            while (enumerator.MoveNext())
-            {
-                var (entity, _) = enumerator.Current;
-                entities.Add(entity);
-            }
-            
-            if (entities.Count > batchingConfig.EntitiesPerBatch)
-            {
-                var batches = batcher.CreateBatches(entities, batchingConfig);
-                
-                var jobs = new IJob[batches.Count];
-                for (int i = 0; i < batches.Count; i++)
-                {
-                    jobs[i] = new EntityIterationJob<T1>
-                    {
-                        Query = query,
-                        Action = action,
-                        EntityBatch = batches[i]
-                    };
-                }
-                
-                return _jobManager.ScheduleParallel(jobs, (int)batchingConfig.Priority);
-            }
-        }
-        
-        var singleJob = new EntityIterationJob<T1>
-        {
-            Query = query,
-            Action = action
-        };
+        // Use default configuration if not provided
+        batchingConfig ??= new BatchingConfig();
 
-        return _jobManager.Schedule(singleJob, dependsOn);
+        // Apply batching strategy
+        return ApplyBatchingStrategy(query, action, batchingConfig, dependsOn);
     }
 
     /// <summary>
@@ -171,45 +325,11 @@ public class JobSystemHelper(World world)
         JobHandle? dependsOn = default,
         BatchingConfig? batchingConfig = null) where T1 : unmanaged where T2 : unmanaged
     {
-        // Apply batching if configured
-        if (batchingConfig != null)
-        {
-            var batcher = new JobBatcher();
-            // Collect entities from query by enumerating
-            var entities = new List<Entity>();
-            var enumerator = query.GetEnumerator();
-            while (enumerator.MoveNext())
-            {
-                var (entity, _, _) = enumerator.Current;
-                entities.Add(entity);
-            }
-            
-            if (entities.Count > batchingConfig.EntitiesPerBatch)
-            {
-                var batches = batcher.CreateBatches(entities, batchingConfig);
-                
-                var jobs = new IJob[batches.Count];
-                for (int i = 0; i < batches.Count; i++)
-                {
-                    jobs[i] = new EntityIterationJob<T1, T2>
-                    {
-                        Query = query,
-                        Action = action,
-                        EntityBatch = batches[i]
-                    };
-                }
-                
-                return _jobManager.ScheduleParallel(jobs, (int)batchingConfig.Priority);
-            }
-        }
-        
-        var singleJob = new EntityIterationJob<T1, T2>
-        {
-            Query = query,
-            Action = action
-        };
+        // Use default configuration if not provided
+        batchingConfig ??= new BatchingConfig();
 
-        return _jobManager.Schedule(singleJob, dependsOn);
+        // Apply batching strategy
+        return ApplyBatchingStrategy(query, action, batchingConfig, dependsOn);
     }
 
     /// <summary>
@@ -225,45 +345,11 @@ public class JobSystemHelper(World world)
         BatchingConfig? batchingConfig = null) 
         where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged
     {
-        // Apply batching if configured
-        if (batchingConfig != null)
-        {
-            var batcher = new JobBatcher();
-            // Collect entities from query by enumerating
-            var entities = new List<Entity>();
-            var enumerator = query.GetEnumerator();
-            while (enumerator.MoveNext())
-            {
-                var (entity, _, _, _) = enumerator.Current;
-                entities.Add(entity);
-            }
-            
-            if (entities.Count > batchingConfig.EntitiesPerBatch)
-            {
-                var batches = batcher.CreateBatches(entities, batchingConfig);
-                
-                var jobs = new IJob[batches.Count];
-                for (int i = 0; i < batches.Count; i++)
-                {
-                    jobs[i] = new EntityIterationJob<T1, T2, T3>
-                    {
-                        Query = query,
-                        Action = action,
-                        EntityBatch = batches[i]
-                    };
-                }
-                
-                return _jobManager.ScheduleParallel(jobs, (int)batchingConfig.Priority);
-            }
-        }
-        
-        var singleJob = new EntityIterationJob<T1, T2, T3>
-        {
-            Query = query,
-            Action = action
-        };
+        // Use default configuration if not provided
+        batchingConfig ??= new BatchingConfig();
 
-        return _jobManager.Schedule(singleJob, dependsOn);
+        // Apply batching strategy
+        return ApplyBatchingStrategy(query, action, batchingConfig, dependsOn);
     }
 
     /// <summary>
