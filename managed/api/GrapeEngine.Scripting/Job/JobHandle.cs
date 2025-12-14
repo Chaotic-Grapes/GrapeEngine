@@ -60,6 +60,11 @@ public class JobHandle
     }
 
     /// <summary>
+    /// Check if this is a valid job handle.
+    /// </summary>
+    public bool IsValid => _nativeHandle != nint.Zero && !_isDisposed;
+
+    /// <summary>
     /// Block until this job completes.
     /// 
     /// This is a synchronous wait - the calling thread will block until

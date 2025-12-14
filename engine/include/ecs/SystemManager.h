@@ -21,7 +21,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define SYSTEMMANAGER_H
 
 #include "Export.h"
+#include "core/Logger.h"
 #include "ecs/ISystem.h"
+#include "ecs/SystemDependencyGraph.h"
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -404,6 +406,149 @@ namespace ECS {
             _updateGroupWithJobs(group, world, deltaTime);
         }
 
+        /**
+         * @brief Rebuild dependency graphs for all system groups.
+         * 
+         * Analyzes component access patterns and builds dependency graphs
+         * for each system group. Call this after registering all systems
+         * to enable dependency-aware scheduling.
+         * 
+         * This enables:
+         * - Automatic detection of safe parallel execution
+         * - Optimal ordering of independent systems
+         * - Component conflict detection
+         * 
+         * Time complexity: O(g * n^2 * m) where:
+         *   g = number of groups
+         *   n = systems per group
+         *   m = components per system
+         */
+        void BuildDependencyGraphs() {
+            for (auto& [group, graph] : m_dependencyGraphs) {
+                graph.Clear();
+            }
+            m_dependencyGraphs.clear();
+
+            // Build graph for each system group
+            for (const auto& [group, systems] : m_systemGroups) {
+                auto& graph = m_dependencyGraphs[group];
+                
+                for (const auto& system : systems) {
+                    graph.AddSystem(system.get());
+                }
+                
+                for (const auto* system : m_scriptedSystemGroups[group]) {
+                    graph.AddSystem(const_cast<ISystem*>(system));
+                }
+
+                graph.Build();
+
+                if (!graph.IsValid()) {
+                    // Log warning about cycles in dependency graph
+                    LOG_WARNING("SystemManager: Dependency graph for group " << static_cast<int>(group) << " has cycles. Parallel execution may be limited.");
+                }
+            }
+        }
+
+        /**
+         * @brief Get the dependency graph for a system group.
+         * @param group System group
+         * @return Reference to dependency graph (may be empty if not built)
+         */
+        SystemDependencyGraph& GetDependencyGraph(SystemGroup group) {
+            return m_dependencyGraphs[group];
+        }
+
+        /**
+         * @brief Get the dependency graph for a system group (const).
+         * @param group System group
+         * @return Const reference to dependency graph
+         */
+        const SystemDependencyGraph& GetDependencyGraph(SystemGroup group) const {
+            auto it = m_dependencyGraphs.find(group);
+            if (it != m_dependencyGraphs.end()) {
+                return it->second;
+            }
+            static SystemDependencyGraph empty;
+            return empty;
+        }
+
+        /**
+         * @brief Check if two systems can run in parallel based on dependencies.
+         * @param systemA First system
+         * @param systemB Second system
+         * @return True if they have no component access conflicts
+         */
+        bool CanSystemsRunInParallel(const ISystem* systemA, const ISystem* systemB) const {
+            if (!systemA || !systemB) return false;
+
+            SystemGroup groupA = systemA->GetSystemGroup();
+            SystemGroup groupB = systemB->GetSystemGroup();
+
+            // Can only run in parallel if in same group
+            if (groupA != groupB) return false;
+
+            auto it = m_dependencyGraphs.find(groupA);
+            if (it != m_dependencyGraphs.end()) {
+                return it->second.CanRunInParallel(systemA, systemB);
+            }
+
+            return false;
+        }
+
+        /**
+         * @brief Get execution levels for a system group.
+         * 
+         * Returns systems organized into levels where all systems in a level
+         * can run in parallel, and all levels must complete sequentially.
+         * 
+         * @param group System group
+         * @return Vector of system groups, one per execution level
+         */
+        std::vector<std::vector<ISystem*>> GetExecutionLevels(SystemGroup group) const {
+            auto it = m_dependencyGraphs.find(group);
+            if (it != m_dependencyGraphs.end()) {
+                return it->second.GetExecutionLevels();
+            }
+            return {};
+        }
+
+        /**
+         * @brief Update systems in a group using dependency-aware parallel execution.
+         * 
+         * Systems are organized into execution levels based on their component
+         * dependencies. All systems in a level can run in parallel if they
+         * support job-based execution, otherwise they run sequentially.
+         * 
+         * @param group System group to execute
+         * @param world Active scene's World
+         * @param deltaTime Time since last frame
+         * 
+         * This is more sophisticated than UpdateWithJobs - it analyzes actual
+         * component access patterns to maximize parallelism safely.
+         */
+        void UpdateGroupWithDependencies(SystemGroup group, World& world, float deltaTime) {
+            _updateGroupWithDependencies(group, world, deltaTime);
+        }
+
+        /**
+         * @brief Update all systems using dependency-aware parallel execution.
+         * 
+         * @param world Active scene's World
+         * @param deltaTime Time since last frame
+         */
+        void UpdateWithDependencies(World& world, float deltaTime) {
+            _updateGroupWithDependencies(SystemGroup::PreUpdate, world, deltaTime);
+            _updateGroupWithDependencies(SystemGroup::Update, world, deltaTime);
+            _updateGroupWithDependencies(SystemGroup::PostUpdate, world, deltaTime);
+            _updateGroupWithDependencies(SystemGroup::PrePhysics, world, deltaTime);
+            _updateGroupWithDependencies(SystemGroup::Physics, world, deltaTime);
+            _updateGroupWithDependencies(SystemGroup::PostPhysics, world, deltaTime);
+            _updateGroupWithDependencies(SystemGroup::PreRender, world, deltaTime);
+            _updateGroupWithDependencies(SystemGroup::Render, world, deltaTime);
+            _updateGroupWithDependencies(SystemGroup::PostRender, world, deltaTime);
+        }
+
     private:
         /// Native C++ systems (owned)
         std::unordered_map<SystemGroup, std::vector<std::unique_ptr<ISystem>>> m_systemGroups;
@@ -413,6 +558,9 @@ namespace ECS {
 
         /// Name -> System lookup
         std::unordered_map<std::string, ISystem*> m_systemsByName;
+
+        /// Dependency graphs for each system group (for parallel execution analysis)
+        std::unordered_map<SystemGroup, SystemDependencyGraph> m_dependencyGraphs;
 
         /**
          * @brief Sort systems within a group by execution order.
@@ -540,6 +688,51 @@ namespace ECS {
             for (auto* system : systems) {
                 auto handle = system->OnUpdateAsJobs(world, deltaTime);
                 handle.Complete();
+            }
+        }
+
+        /**
+         * @brief Update a group using dependency-aware parallel scheduling.
+         */
+        void _updateGroupWithDependencies(SystemGroup group, World& world, float deltaTime) {
+            // Get dependency graph for this group
+            auto it = m_dependencyGraphs.find(group);
+            if (it == m_dependencyGraphs.end() || it->second.GetSystemCount() == 0) {
+                // No dependency info - fall back to sequential update
+                _updateGroup(group, world, deltaTime);
+                return;
+            }
+
+            const auto& graph = it->second;
+
+            // Get execution levels (all systems per level can run in parallel)
+            auto levels = graph.GetExecutionLevels();
+
+            for (const auto& level : levels) {
+                // Within a level, separate job-based and sequential systems
+                std::vector<ISystem*> jobSystems;
+                std::vector<ISystem*> sequentialSystems;
+
+                for (auto* system : level) {
+                    if (!system->IsEnabled()) continue;
+                    
+                    if (system->SupportsJobBasedExecution()) {
+                        jobSystems.push_back(system);
+                    }
+                    else {
+                        sequentialSystems.push_back(system);
+                    }
+                }
+
+                // Execute sequential systems first (maintain order)
+                for (auto* system : sequentialSystems) {
+                    system->OnUpdate(world, deltaTime);
+                }
+
+                // Execute job-based systems in parallel
+                if (!jobSystems.empty()) {
+                    _executeJobSystems(jobSystems, world, deltaTime);
+                }
             }
         }
     };

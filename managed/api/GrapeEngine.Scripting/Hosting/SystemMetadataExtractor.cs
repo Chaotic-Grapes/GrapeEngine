@@ -148,6 +148,68 @@ public static class SystemMetadataExtractor
     }
 
     /// <summary>
+    /// Get all component access declarations for a system with their modes.
+    /// Returns tuples of (ComponentType, AccessMode).
+    /// </summary>
+    public static IEnumerable<(Type ComponentType, ComponentAccessMode Mode)> GetComponentAccesses(Type systemType)
+    {
+        var attrs = systemType.GetCustomAttributes();
+        foreach (var attr in attrs)
+        {
+            if (!attr.GetType().IsGenericType)
+                continue;
+
+            var genericDef = attr.GetType().GetGenericTypeDefinition().Name;
+            var componentType = attr.GetType().GetGenericArguments()[0];
+
+            if (genericDef == "ReadOnlyAttribute`1")
+            {
+                yield return (componentType, ComponentAccessMode.Read);
+            }
+            else if (genericDef == "WriteAccessAttribute`1")
+            {
+                yield return (componentType, ComponentAccessMode.Write);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get access mode for a specific component type in a system.
+    /// </summary>
+    public static ComponentAccessMode GetComponentAccessMode(Type systemType, Type componentType)
+    {
+        var componentHash = componentType.GetHashCode();
+        
+        foreach (var (compType, mode) in GetComponentAccesses(systemType))
+        {
+            if (compType.GetHashCode() == componentHash)
+            {
+                return mode;
+            }
+        }
+
+        // Default: assume read-only if not declared
+        return ComponentAccessMode.Read;
+    }
+
+    /// <summary>
+    /// Check if a system declares read-only access for a component.
+    /// </summary>
+    public static bool HasReadOnlyAccess(Type systemType, Type componentType)
+    {
+        return GetComponentAccessMode(systemType, componentType) == ComponentAccessMode.Read;
+    }
+
+    /// <summary>
+    /// Check if a system declares write access for a component.
+    /// </summary>
+    public static bool HasWriteAccess(Type systemType, Type componentType)
+    {
+        var mode = GetComponentAccessMode(systemType, componentType);
+        return mode == ComponentAccessMode.Write || mode == ComponentAccessMode.ReadWrite;
+    }
+
+    /// <summary>
     /// Get the system name (type name if no custom name is set).
     /// </summary>
     public static string GetSystemName(Type systemType)

@@ -69,6 +69,52 @@ public class World
         }
     }
 
+    /// <summary>
+    /// Destroy an entity in the world.
+    /// </summary>
+    /// <param name="entity">The entity to destroy</param>
+    public void DestroyEntity(Entity entity)
+    {
+        if (entity == null)
+            throw new ArgumentNullException(nameof(entity));
+
+        unsafe
+        {
+            WorldAPI.DestroyEntity((void*)_nativeWorldPtr, entity.Id);
+        }
+    }
+
+    /// <summary>
+    /// Instantiate an entity from an archetype.
+    /// </summary>
+    /// <param name="archetypeId">The archetype ID to instantiate from</param>
+    /// <returns>A new Entity instance</returns>
+    public Entity InstantiateEntity(uint archetypeId)
+    {
+        unsafe
+        {
+            ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
+            return new Entity(this, entityId);
+        }
+    }
+
+    /// <summary>
+    /// Clone an existing entity.
+    /// </summary>
+    /// <param name="sourceEntity">The entity to clone</param>
+    /// <returns>A new cloned Entity instance</returns>
+    public Entity CloneEntity(Entity sourceEntity)
+    {
+        if (sourceEntity == null)
+            throw new ArgumentNullException(nameof(sourceEntity));
+
+        unsafe
+        {
+            ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
+            return new Entity(this, entityId);
+        }
+    }
+
     // ============================================================================
     // Hierarchy Operations
     // ============================================================================

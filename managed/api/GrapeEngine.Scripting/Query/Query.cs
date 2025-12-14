@@ -110,6 +110,14 @@ public class Query<T1>
         return en.MoveNext();
     }
 
+    /// <summary>
+    /// Get the world this query belongs to.
+    /// </summary>
+    internal World GetWorld()
+    {
+        return _world;
+    }
+
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
     {
         var b = new QueryFilterBuilder(_world, _componentHashes);
@@ -216,6 +224,14 @@ public class Query<T1, T2>
     {
         var en = GetEnumerator();
         return en.MoveNext();
+    }
+
+    /// <summary>
+    /// Get the world this query belongs to.
+    /// </summary>
+    internal World GetWorld()
+    {
+        return _world;
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -327,6 +343,14 @@ public class Query<T1, T2, T3>
     {
         var en = GetEnumerator();
         return en.MoveNext();
+    }
+
+    /// <summary>
+    /// Get the world this query belongs to.
+    /// </summary>
+    internal World GetWorld()
+    {
+        return _world;
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -445,6 +469,14 @@ public class Query<T1, T2, T3, T4>
         return en.MoveNext();
     }
 
+    /// <summary>
+    /// Get the world this query belongs to.
+    /// </summary>
+    internal World GetWorld()
+    {
+        return _world;
+    }
+
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
     {
         var b = new QueryFilterBuilder(_world, _componentHashes);
@@ -560,6 +592,14 @@ public class Query<T1, T2, T3, T4, T5>
     {
         var en = GetEnumerator();
         return en.MoveNext();
+    }
+
+    /// <summary>
+    /// Get the world this query belongs to.
+    /// </summary>
+    internal World GetWorld()
+    {
+        return _world;
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -680,6 +720,14 @@ public class Query<T1, T2, T3, T4, T5, T6>
     {
         var en = GetEnumerator();
         return en.MoveNext();
+    }
+
+    /// <summary>
+    /// Get the world this query belongs to.
+    /// </summary>
+    internal World GetWorld()
+    {
+        return _world;
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -803,6 +851,14 @@ public class Query<T1, T2, T3, T4, T5, T6, T7>
     {
         var en = GetEnumerator();
         return en.MoveNext();
+    }
+
+    /// <summary>
+    /// Get the world this query belongs to.
+    /// </summary>
+    internal World GetWorld()
+    {
+        return _world;
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged
@@ -929,6 +985,14 @@ public class Query<T1, T2, T3, T4, T5, T6, T7, T8>
     {
         var en = GetEnumerator();
         return en.MoveNext();
+    }
+
+    /// <summary>
+    /// Get the world this query belongs to.
+    /// </summary>
+    internal World GetWorld()
+    {
+        return _world;
     }
 
     public QueryFilterBuilder Without<TExclude>() where TExclude : unmanaged

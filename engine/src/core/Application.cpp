@@ -168,8 +168,7 @@ namespace Engine {
                 
                 // Update systems - always run for game mode
                 const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
-                m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world, dt);
-                m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::PlayOnly, world, dt);
+                m_systemManager.UpdateWithDependencies(world, dt);
             }
         }
 
@@ -330,8 +329,11 @@ namespace Engine {
         // Render Phase Systems
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
         
-        // Register GUI system (replaces legacy UIEventSystem)
+        // Register GUI system
         m_systemManager.RegisterSystem<ECS::GUISystem>();
+
+        // Build dependency graphs (analyzes component access)
+        m_systemManager.BuildDependencyGraphs();
         
         LOG_INFO("SystemManager: Registered " << m_systemManager.GetSystemCount() << " systems");
     }

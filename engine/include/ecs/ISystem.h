@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include "ecs/World.h"
 #include "ecs/jobs/JobHandle.h"
+#include "ecs/ComponentAccessAttribute.h"
 #include <string>
 #include <vector>
 

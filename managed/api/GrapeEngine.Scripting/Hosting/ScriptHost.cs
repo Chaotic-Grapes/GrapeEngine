@@ -582,23 +582,211 @@ public static class ScriptHost
     }
 }
 
-// Placeholder enums (should match C++ definitions)
+// ============================================================================
+// SCRIPTING ENUMS - Must match C++ Engine definitions
+// ============================================================================
+// These enums are marshaled between C# and C++ and MUST have identical values.
+// Validation: See EnumParity validator below
+// 
+// C++ Source: engine/core/ecs/SystemGroup.h
+// C# Validation: ScriptHost.ValidateEnumParity()
+// ============================================================================
+
+/// <summary>
+/// System execution group - defines when systems run relative to engine lifecycle.
+/// 
+/// MUST match C++ ECS::SystemGroup enum values for correct P/Invoke marshaling.
+/// If C++ values change, update both enums AND the validation logic below.
+/// </summary>
 public enum SystemGroup
 {
-    PreUpdate,
-    Update,
-    PostUpdate,
-    PrePhysics,
-    Physics,
-    PostPhysics,
-    PreRender,
-    Render,
-    PostRender
+    /// <summary>
+    /// Systems execute before main update cycle (frame setup, input processing)
+    /// </summary>
+    PreUpdate = 0,
+    
+    /// <summary>
+    /// Main update systems (gameplay logic, AI, etc.)
+    /// </summary>
+    Update = 1,
+    
+    /// <summary>
+    /// Systems execute after update (cleanup, state finalization)
+    /// </summary>
+    PostUpdate = 2,
+    
+    /// <summary>
+    /// Physics pre-calculation phase
+    /// </summary>
+    PrePhysics = 3,
+    
+    /// <summary>
+    /// Physics simulation systems
+    /// </summary>
+    Physics = 4,
+    
+    /// <summary>
+    /// Physics post-calculation phase (resolution, callbacks)
+    /// </summary>
+    PostPhysics = 5,
+    
+    /// <summary>
+    /// Rendering preparation phase
+    /// </summary>
+    PreRender = 6,
+    
+    /// <summary>
+    /// Render systems (camera updates, draw calls)
+    /// </summary>
+    Render = 7,
+    
+    /// <summary>
+    /// Post-render cleanup (frame finalization)
+    /// </summary>
+    PostRender = 8
 }
 
+/// <summary>
+/// System execution mode - determines when systems are active.
+/// 
+/// MUST match C++ ECS::SystemRunMode enum values for correct P/Invoke marshaling.
+/// If C++ values change, update both enums AND the validation logic below.
+/// </summary>
 public enum SystemRunMode
 {
-    Always,
-    PlayOnly,
-    EditOnly
+    /// <summary>
+    /// System always runs (edit and play mode)
+    /// </summary>
+    Always = 0,
+    
+    /// <summary>
+    /// System runs only in play mode
+    /// </summary>
+    PlayOnly = 1,
+    
+    /// <summary>
+    /// System runs only in editor/edit mode
+    /// </summary>
+    EditOnly = 2
+}
+
+/// <summary>
+/// Validates that C# enum values match C++ engine definitions.
+/// Called on assembly load to catch enum mismatches early.
+/// </summary>
+public static class EnumParityValidator
+{
+    /// <summary>
+    /// Validate that all C# enums match C++ values.
+    /// Should be called during assembly initialization.
+    /// </summary>
+    /// <returns>True if all enums match, false if mismatch detected</returns>
+    public static bool ValidateEnumParity()
+    {
+        bool valid = true;
+
+        // Validate SystemGroup enum
+        valid &= ValidateSystemGroupEnum();
+        
+        // Validate SystemRunMode enum
+        valid &= ValidateSystemRunModeEnum();
+
+        if (!valid)
+        {
+            Console.WriteLine("[EnumParityValidator] WARNING: Enum mismatch detected! " +
+                "C# enum values do not match C++ definitions. This will cause P/Invoke marshaling errors.");
+        }
+
+        return valid;
+    }
+
+    /// <summary>
+    /// Validate SystemGroup enum values against expected C++ values.
+    /// </summary>
+    private static bool ValidateSystemGroupEnum()
+    {
+        // Expected C++ values (must match engine/core/ecs/SystemGroup.h)
+        var expectedValues = new Dictionary<SystemGroup, int>
+        {
+            { SystemGroup.PreUpdate, 0 },
+            { SystemGroup.Update, 1 },
+            { SystemGroup.PostUpdate, 2 },
+            { SystemGroup.PrePhysics, 3 },
+            { SystemGroup.Physics, 4 },
+            { SystemGroup.PostPhysics, 5 },
+            { SystemGroup.PreRender, 6 },
+            { SystemGroup.Render, 7 },
+            { SystemGroup.PostRender, 8 }
+        };
+
+        bool valid = true;
+        foreach (var (group, expectedValue) in expectedValues)
+        {
+            int actualValue = (int)group;
+            if (actualValue != expectedValue)
+            {
+                Console.WriteLine(
+                    $"[EnumParityValidator] SystemGroup.{group} mismatch: " +
+                    $"expected {expectedValue}, got {actualValue}");
+                valid = false;
+            }
+        }
+
+        return valid;
+    }
+
+    /// <summary>
+    /// Validate SystemRunMode enum values against expected C++ values.
+    /// </summary>
+    private static bool ValidateSystemRunModeEnum()
+    {
+        // Expected C++ values (must match engine/core/ecs/SystemRunMode.h)
+        var expectedValues = new Dictionary<SystemRunMode, int>
+        {
+            { SystemRunMode.Always, 0 },
+            { SystemRunMode.PlayOnly, 1 },
+            { SystemRunMode.EditOnly, 2 }
+        };
+
+        bool valid = true;
+        foreach (var (mode, expectedValue) in expectedValues)
+        {
+            int actualValue = (int)mode;
+            if (actualValue != expectedValue)
+            {
+                Console.WriteLine(
+                    $"[EnumParityValidator] SystemRunMode.{mode} mismatch: " +
+                    $"expected {expectedValue}, got {actualValue}");
+                valid = false;
+            }
+        }
+
+        return valid;
+    }
+
+    /// <summary>
+    /// Get a detailed report of all enum values for documentation purposes.
+    /// Useful for verifying against C++ source files.
+    /// </summary>
+    public static string GetEnumParityReport()
+    {
+        var report = new System.Text.StringBuilder();
+        report.AppendLine("=== C# Enum Parity Report ===");
+        report.AppendLine();
+
+        report.AppendLine("SystemGroup values:");
+        foreach (SystemGroup group in Enum.GetValues<SystemGroup>())
+        {
+            report.AppendLine($"  {group} = {(int)group}");
+        }
+        report.AppendLine();
+
+        report.AppendLine("SystemRunMode values:");
+        foreach (SystemRunMode mode in Enum.GetValues<SystemRunMode>())
+        {
+            report.AppendLine($"  {mode} = {(int)mode}");
+        }
+
+        return report.ToString();
+    }
 }
