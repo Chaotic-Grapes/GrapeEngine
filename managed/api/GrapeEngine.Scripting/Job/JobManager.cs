@@ -375,4 +375,74 @@ public class JobManager
             return report;
         }
     }
+
+    /// <summary>
+    /// Combine multiple job handles into a single handle that depends on all of them.
+    /// 
+    /// Creates a synchronization point that waits for all input handles to complete
+    /// before the returned handle is marked as complete. This is useful for merging
+    /// multiple dependency chains into one.
+    /// </summary>
+    /// <param name="handles">Array of job handles to combine</param>
+    /// <returns>A new handle that depends on all input handles</returns>
+    public JobHandle CombineHandles(JobHandle[] handles)
+    {
+        if (handles == null || handles.Length == 0)
+            return JobHandle.CreateInvalid();
+
+        if (handles.Length == 1)
+            return handles[0];
+
+        // Combine handles sequentially by chaining dependencies
+        // Each handle depends on the previous one, creating a serialization point
+        var combined = handles[0];
+
+        for (int i = 1; i < handles.Length; i++)
+        {
+            // Schedule a no-op job that depends on both the current combined handle
+            // and the next handle. This ensures all dependencies are respected.
+            unsafe
+            {
+                var syncJob = new SynchronizationJob();
+                var adapter = new ManagedJobAdapter(syncJob);
+                
+                try
+                {
+                    nint handle1 = combined.NativeHandle;
+                    nint handle2 = handles[i].NativeHandle;
+
+                    // Create a synchronization point that depends on both handles
+                    nint resultHandle = JobSystemAPI.JobManagerCombineHandles(
+                        _nativeJobManager.ToPointer(),
+                        handle1,
+                        handle2
+                    );
+
+                    combined = new JobHandle(resultHandle);
+                }
+                finally
+                {
+                    adapter?.Dispose();
+                }
+            }
+        }
+
+        return combined;
+    }
+}
+
+/// <summary>
+/// Internal no-op job used for creating synchronization points in dependency chains.
+/// </summary>
+internal class SynchronizationJob : IJob
+{
+    public CommandBuffer? Buffer { get; set; }
+
+    public void Execute()
+    {
+        // No-op: This job exists only to create a synchronization point
+        // between other jobs in the dependency graph.
+    }
+
+    public string GetJobName() => "Synchronize";
 }

@@ -15,10 +15,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Job;
 using GrapeEngine.Scripting.Query;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Job;
 
 /// <summary>
 /// Result of a job execution with timing information.
@@ -92,7 +91,7 @@ public class JobSystemHelper(World world)
     /// 
     /// Handles all four batching strategies: FixedSize, Dynamic, PerThread, and Single.
     /// </summary>
-    private JobHandle ApplyBatchingStrategy<T1>(
+    private JobHandle? ApplyBatchingStrategy<T1>(
         Query<T1> query,
         EntityAction<T1> action,
         BatchingConfig config,
@@ -135,7 +134,7 @@ public class JobSystemHelper(World world)
         }
 
         // Schedule multiple jobs
-        JobHandle lastHandle = dependsOn ?? default;
+        JobHandle? lastHandle = dependsOn ?? default;
         foreach (var batch in batches)
         {
             var job = new EntityIterationJob<T1>
@@ -154,7 +153,7 @@ public class JobSystemHelper(World world)
     /// <summary>
     /// Apply the appropriate batching strategy based on configuration for two components.
     /// </summary>
-    private JobHandle ApplyBatchingStrategy<T1, T2>(
+    private JobHandle? ApplyBatchingStrategy<T1, T2>(
         Query<T1, T2> query,
         EntityAction<T1, T2> action,
         BatchingConfig config,
@@ -197,7 +196,7 @@ public class JobSystemHelper(World world)
         }
 
         // Schedule multiple jobs
-        JobHandle lastHandle = dependsOn ?? default;
+        JobHandle? lastHandle = dependsOn ?? default;
         foreach (var batch in batches)
         {
             var job = new EntityIterationJob<T1, T2>
@@ -216,7 +215,7 @@ public class JobSystemHelper(World world)
     /// <summary>
     /// Apply the appropriate batching strategy based on configuration for three components.
     /// </summary>
-    private JobHandle ApplyBatchingStrategy<T1, T2, T3>(
+    private JobHandle? ApplyBatchingStrategy<T1, T2, T3>(
         Query<T1, T2, T3> query,
         EntityAction<T1, T2, T3> action,
         BatchingConfig config,
@@ -259,7 +258,7 @@ public class JobSystemHelper(World world)
         }
 
         // Schedule multiple jobs
-        JobHandle lastHandle = dependsOn ?? default;
+        JobHandle? lastHandle = dependsOn ?? default;
         foreach (var batch in batches)
         {
             var job = new EntityIterationJob<T1, T2, T3>
@@ -300,7 +299,7 @@ public class JobSystemHelper(World world)
     /// );
     /// handle.Complete();  // Wait for completion
     /// </code>
-    public JobHandle ForEachEntity<T1>(
+    public JobHandle? ForEachEntity<T1>(
         Query<T1> query,
         EntityAction<T1> action,
         JobHandle? dependsOn = default,
@@ -319,7 +318,7 @@ public class JobSystemHelper(World world)
     /// Supports optional batching for better multi-core load distribution.
     /// </summary>
     /// <param name="batchingConfig">Optional batching configuration for load distribution</param>
-    public JobHandle ForEachEntity<T1, T2>(
+    public JobHandle? ForEachEntity<T1, T2>(
         Query<T1, T2> query,
         EntityAction<T1, T2> action,
         JobHandle? dependsOn = default,
@@ -338,7 +337,7 @@ public class JobSystemHelper(World world)
     /// Supports optional batching for better multi-core load distribution.
     /// </summary>
     /// <param name="batchingConfig">Optional batching configuration for load distribution</param>
-    public JobHandle ForEachEntity<T1, T2, T3>(
+    public JobHandle? ForEachEntity<T1, T2, T3>(
         Query<T1, T2, T3> query,
         EntityAction<T1, T2, T3> action,
         JobHandle? dependsOn = default,
@@ -491,6 +490,7 @@ internal class EntityIterationJob<T1> : IJob where T1 : unmanaged
     public required Query<T1> Query { get; set; }
     public EntityAction<T1>? Action { get; set; }
     public EntityBatch? EntityBatch { get; set; }
+    public CommandBuffer? Buffer { get; set; }
 
     public void Execute()
     {
@@ -535,6 +535,7 @@ internal class EntityIterationJob<T1, T2> : IJob where T1 : unmanaged where T2 :
     public required Query<T1, T2> Query { get; set; }
     public EntityAction<T1, T2>? Action { get; set; }
     public EntityBatch? EntityBatch { get; set; }
+    public CommandBuffer? Buffer { get; set; }
 
     public void Execute()
     {
@@ -580,6 +581,7 @@ internal class EntityIterationJob<T1, T2, T3> : IJob
     public required Query<T1, T2, T3> Query { get; set; }
     public EntityAction<T1, T2, T3>? Action { get; set; }
     public EntityBatch? EntityBatch { get; set; }
+    public CommandBuffer? Buffer { get; set; }
 
     public void Execute()
     {

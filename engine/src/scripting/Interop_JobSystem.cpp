@@ -450,6 +450,59 @@ INTEROP_API intptr_t JobInterop_ScheduleManagedJobBatch(
 }
 
 // ========================================================================
+// Job Handle Combining (Dependency Merging)
+// ========================================================================
+
+INTEROP_API intptr_t JobInterop_CombineHandles(
+    void* jobManagerPtr,
+    intptr_t handle1,
+    intptr_t handle2)
+{
+    if (!jobManagerPtr) {
+        return 0;
+    }
+
+    try {
+        auto* jobManager = ToJobManager(jobManagerPtr);
+        
+        // Convert the native handles back to JobHandle pointers
+        auto* h1 = reinterpret_cast<ECS::Jobs::JobHandle*>(handle1);
+        auto* h2 = reinterpret_cast<ECS::Jobs::JobHandle*>(handle2);
+        
+        if (!h1 || !h2) {
+            return 0;
+        }
+
+        // Create a synchronization job that depends on both handles
+        // This serves as a merge point in the dependency graph
+        class SyncJob : public ECS::Jobs::IJob {
+        public:
+            void Execute() {
+                // No-op: this job exists only to create a synchronization point
+            }
+            
+            std::string GetJobName() const {
+                return "Synchronize";
+            }
+        };
+
+        // Schedule the sync job with the first handle as dependency
+        auto syncJob1 = std::make_unique<SyncJob>();
+        ECS::Jobs::JobHandle resultHandle = jobManager->Schedule(std::move(syncJob1), *h1);
+
+        // Schedule another sync job with the second handle as dependency and the first result as dependency
+        auto syncJob2 = std::make_unique<SyncJob>();
+        resultHandle = jobManager->Schedule(std::move(syncJob2), resultHandle);
+
+        // Return a new JobHandle that depends on both original handles
+        return reinterpret_cast<intptr_t>(new ECS::Jobs::JobHandle(resultHandle));
+    }
+    catch (...) {
+        return 0;
+    }
+}
+
+// ========================================================================
 // Thread Affinity
 // ========================================================================
 

@@ -15,102 +15,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Job;
 using GrapeEngine.Scripting.Query;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace GrapeEngine.Scripting;
-
-/// <summary>
-/// Batching strategy for distributing work across jobs.
-/// </summary>
-public enum BatchingStrategy
-{
-    /// <summary>
-    /// Fixed number of entities per job
-    /// </summary>
-    FixedSize,
-
-    /// <summary>
-    /// Dynamic batching based on entity count
-    /// </summary>
-    Dynamic,
-
-    /// <summary>
-    /// One job per worker thread
-    /// </summary>
-    PerThread,
-
-    /// <summary>
-    /// Single job for all entities (no batching)
-    /// </summary>
-    Single
-}
-
-/// <summary>
-/// Configuration for job batching.
-/// </summary>
-public class BatchingConfig
-{
-    /// <summary>
-    /// Batching strategy to use
-    /// </summary>
-    public BatchingStrategy Strategy { get; set; } = BatchingStrategy.Dynamic;
-
-    /// <summary>
-    /// Entities per batch (used by FixedSize)
-    /// </summary>
-    public int EntitiesPerBatch { get; set; } = 256;
-
-    /// <summary>
-    /// Minimum jobs to create (used by Dynamic)
-    /// </summary>
-    public int MinJobs { get; set; } = 1;
-
-    /// <summary>
-    /// Maximum jobs to create (used by Dynamic)
-    /// </summary>
-    public int MaxJobs { get; set; } = 16;
-
-    /// <summary>
-    /// Whether to enable profiling
-    /// </summary>
-    public bool EnableProfiling { get; set; } = false;
-
-    /// <summary>
-    /// Job priority for scheduler
-    /// </summary>
-    public JobPriority Priority { get; set; } = JobPriority.Normal;
-}
-
-/// <summary>
-/// Result from batching operation.
-/// </summary>
-public struct BatchingResult
-{
-    /// <summary>
-    /// Number of batches created
-    /// </summary>
-    public int BatchCount { get; set; }
-
-    /// <summary>
-    /// Total entities processed
-    /// </summary>
-    public int TotalEntities { get; set; }
-
-    /// <summary>
-    /// Entities per batch (average)
-    /// </summary>
-    public float AverageEntitiesPerBatch { get; set; }
-
-    /// <summary>
-    /// Time taken to execute (if profiling enabled)
-    /// </summary>
-    public float ElapsedMilliseconds { get; set; }
-}
+namespace GrapeEngine.Scripting.Job.Batching;
 
 /// <summary>
 /// Manages batching of entities into jobs for parallel processing.
@@ -248,7 +156,10 @@ public class JobBatcher
         BatchingConfig config,
         List<EntityBatch> result)
     {
-        var threadCount = Environment.ProcessorCount;
+        var threadCount = System.Math.Min(
+            System.Math.Max(Environment.ProcessorCount, config.MinJobs),
+            config.MaxJobs
+        );
         var entitiesPerBatch = System.Math.Max(1, entities.Count / threadCount);
 
         for (var i = 0; i < entities.Count; i += entitiesPerBatch)
@@ -313,10 +224,22 @@ public class EntityBatch
     /// </summary>
     public void Process<T1>(Query<T1> query, EntityAction<T1> action) where T1 : unmanaged
     {
-        foreach (var entity in Entities)
+        if (query == null || action == null)
+            return;
+
+        // Iterate through the batch and apply the action to each entity's component
+        var enumerator = query.GetEnumerator();
+        var batchSet = new HashSet<Entity>(Entities);
+
+        while (enumerator.MoveNext())
         {
-            // Would need query support for entity lookup
-            // action(ref component);
+            var (entity, component) = enumerator.Current;
+            
+            // Only process entities in this batch
+            if (batchSet.Contains(entity))
+            {
+                action(ref component);
+            }
         }
     }
 }
@@ -330,6 +253,11 @@ public abstract class BatchJob : IJob
     /// Batch of entities to process
     /// </summary>
     public EntityBatch? Batch { get; set; }
+
+    /// <summary>
+    /// Command buffer for deferred structural changes
+    /// </summary>
+    public CommandBuffer? Buffer { get; set; }
 
     /// <summary>
     /// Execute the job on the batch
@@ -570,14 +498,14 @@ public struct LoadBalancingHint
     /// <summary>
     /// Estimated speedup from parallelization.
     /// </summary>
-    public float EstimatedSpeedup => EstimatedSerialTimeMs > 0 
+    public readonly float EstimatedSpeedup => EstimatedSerialTimeMs > 0 
         ? EstimatedSerialTimeMs / EstimatedParallelTimeMs 
         : 1.0f;
 
     /// <summary>
     /// Get a human-readable summary of this hint.
     /// </summary>
-    public override string ToString()
+    public override readonly string ToString()
     {
         return $"JobType: {JobType}, Count: {Count}, " +
                $"Parallelism: {RecommendedParallelism}, " +
@@ -669,7 +597,7 @@ public static class JobBatchingUtilities
         // Topological sort to determine optimal scheduling order
         var sorted = TopologicalSort(jobList);
         
-        var jobManager = GetJobManager(sorted.Select(x => x.Job).ToArray());
+        var jobManager = GetJobManager([.. sorted.Select(x => x.Job)]);
         if (jobManager == null)
             return JobHandle.CreateInvalid();
 
@@ -759,7 +687,7 @@ public static class JobBatchingUtilities
         var adjList = new Dictionary<int, List<int>>();
         for (int i = 0; i < jobsWithDeps.Count; i++)
         {
-            adjList[i] = new List<int>();
+            adjList[i] = [];
         }
 
         // No direct way to infer dependencies from JobHandles,
@@ -776,7 +704,8 @@ public static class JobBatchingUtilities
     /// <summary>
     /// Combine multiple job handles into a single dependency handle.
     /// 
-    /// Merges multiple JobHandle dependencies into one for scheduling.
+    /// Merges multiple JobHandle dependencies into one for scheduling
+    /// by creating a synchronization point that depends on all inputs.
     /// </summary>
     private static JobHandle? CombineDependencies(
         JobManager jobManager,
@@ -788,9 +717,16 @@ public static class JobBatchingUtilities
         if (handles.Length == 1)
             return handles[0];
 
-        // Combine handles by taking the last one (most restrictive)
-        // In practice, a real implementation would merge all dependency info
-        return handles[handles.Length - 1];
+        // Use JobManager to properly merge all dependencies into a synchronization point
+        // that depends on all input handles completing before proceeding
+        if (jobManager != null)
+        {
+            return jobManager.CombineHandles(handles);
+        }
+
+        // Fallback: Return the last handle (most restrictive)
+        // This ensures we wait for at least the most recent dependency
+        return handles[^1];
     }
 
     /// <summary>

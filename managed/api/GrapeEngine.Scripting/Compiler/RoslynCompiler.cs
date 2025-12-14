@@ -21,7 +21,7 @@ using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Compiler;
 
 internal static class RoslynCompiler
 {

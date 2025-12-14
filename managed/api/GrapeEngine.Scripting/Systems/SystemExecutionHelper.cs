@@ -87,7 +87,7 @@ namespace GrapeEngine.Scripting.Systems
 
             using (var scope = profiler.BeginProfile(profileName, OptimizationSafety.Normal))
             {
-                system.OnUpdate(world);
+                system.OnUpdate(world, 0.016f); // Default 60 FPS delta time
             }
         }
 

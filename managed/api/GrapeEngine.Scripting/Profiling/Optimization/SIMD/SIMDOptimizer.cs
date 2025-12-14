@@ -1,11 +1,10 @@
-using GrapeEngine.Scripting.Job;
 using GrapeEngine.Scripting.Query;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Profiling.Optimization.SIMD;
 
 /// <summary>
 /// SIMD intrinsic helpers for vectorized operations on entity data.
@@ -522,7 +521,7 @@ public static class OptimizedQueryExtensions
     /// <summary>
     /// Execute query as job with optimization tracking.
     /// </summary>
-    public static JobHandle ForEachOptimizedAsJob<T>(this Query<T> query, EntityAction<T> action,
+    public static JobHandle? ForEachOptimizedAsJob<T>(this Query<T> query, EntityAction<T> action,
         OptimizationProfiler? profiler = null) where T : unmanaged
     {
         using var scope = profiler?.BeginProfile($"ForEachOptimizedAsJob<{typeof(T).Name}>", OptimizationSafety.Normal);

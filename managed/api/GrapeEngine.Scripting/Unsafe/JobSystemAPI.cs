@@ -142,6 +142,18 @@ internal static partial class JobSystemAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial byte* JobManagerGetProfilingReport(void* jobManagerPtr);
 
+    /// <summary>
+    /// Combine two job handles into a single handle that depends on both.
+    /// Creates a synchronization point in the dependency graph.
+    /// </summary>
+    [LibraryImport("GrapeEngineNative", EntryPoint = "JobInterop_CombineHandles")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial nint JobManagerCombineHandles(
+        void* jobManagerPtr,
+        nint handle1,               // First job handle
+        nint handle2                // Second job handle
+    );
+
     // ============================================================================
     // Job Profiler Operations
     // ============================================================================

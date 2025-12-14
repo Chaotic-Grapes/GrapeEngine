@@ -99,8 +99,8 @@ public static class SIMDOptimizedJobHelper
         if (!CanOptimizeSIMD<T>())
             return 1.0;
 
-        // Return capability-based estimate
-        return SIMDOptimizer.CapabilityDetection.EstimateSpeedup();
+        // Return capability-based estimate based on available SIMD
+        return SIMDOptimizer.CapabilityDetection.HasAVX2 ? 4.0 : 2.0;
     }
 
     /// <summary>
@@ -173,12 +173,15 @@ public static class SIMDOptimizedJobHelper
     /// <returns>Configuration with recommended settings for optimal performance</returns>
     public static SIMDJobConfig GetOptimalConfig<T>() where T : unmanaged
     {
+        var capability = SIMDOptimizer.CapabilityDetection.HasAVX2 ? "AVX2" :
+                        SIMDOptimizer.CapabilityDetection.HasSSE2 ? "SSE2" : "Scalar";
+        
         return new SIMDJobConfig
         {
             CanUseSIMD = CanOptimizeSIMD<T>(),
             RecommendedBatchSize = GetRecommendedBatchSize<T>(),
             EstimatedSpeedup = GetEstimatedSpeedup<T>(),
-            SIMDCapability = SIMDOptimizer.CapabilityDetection.GetCapabilityDescription()
+            SIMDCapability = capability
         };
     }
 }

@@ -56,87 +56,87 @@ public static class Physics
 
     /// <summary>
     /// Enable or disable the physics system.
-    /// <sing (PInvokeTimer.Start("PhysicsAPI.SetEnabled"))
+    /// </summary>
+    public static void SetEnabled(World world, bool enabled)
+    {
+        using (PInvokeTimer.Start("PhysicsAPI.SetEnabled"))
         {
             unsafe
             {
                 PhysicsAPI.SetEnabled(world.NativePtr, enabled);
             }
-        unsafe
-        {
-            PhysicsAPI.SetEnabled(world.NativePtr, enabled);
         }
     }
 
     /// <summary>
     /// Check if the physics system is enabled.
-    /// <sing (PInvokeTimer.Start("PhysicsAPI.IsEnabled"))
+    /// </summary>
+    public static bool IsEnabled(World world)
+    {
+        using (PInvokeTimer.Start("PhysicsAPI.IsEnabled"))
         {
             unsafe
             {
                 return PhysicsAPI.IsEnabled(world.NativePtr);
             }
-        unsafe
-        {
-            return PhysicsAPI.IsEnabled(world.NativePtr);
         }
     }
-sing (PInvokeTimer.Start("PhysicsAPI.ApplyForce"))
+
+    /// <summary>
+    /// Apply a force to an entity with a Rigidbody2D.
+    /// </summary>
+    public static void ApplyForce(World world, Entity entity, Vector2 force)
+    {
+        using (PInvokeTimer.Start("PhysicsAPI.ApplyForce"))
         {
             unsafe
             {
                 PhysicsAPI.ApplyForce(world.NativePtr, entity.Id, force.X, force.Y);
             }
-    /// </summary>
-    public static void ApplyForce(World world, Entity entity, Vector2 force)
-    {
-        unsafe
-        {
-            PhysicsAPI.ApplyForce(world.NativePtr, entity.Id, force.X, force.Y);
         }
     }
-sing (PInvokeTimer.Start("PhysicsAPI.ApplyImpulse"))
+
+    /// <summary>
+    /// Apply an impulse to an entity with a Rigidbody2D.
+    /// </summary>
+    public static void ApplyImpulse(World world, Entity entity, Vector2 impulse)
+    {
+        using (PInvokeTimer.Start("PhysicsAPI.ApplyImpulse"))
         {
             unsafe
             {
                 PhysicsAPI.ApplyImpulse(world.NativePtr, entity.Id, impulse.X, impulse.Y);
             }
-    /// </summary>
-    public static void ApplyImpulse(World world, Entity entity, Vector2 impulse)
-    {
-        unsafe
-        {
-            PhysicsAPI.ApplyImpulse(world.NativePtr, entity.Id, impulse.X, impulse.Y);
         }
     }
-sing (PInvokeTimer.Start("PhysicsAPI.GetVelocity"))
+
+    /// <summary>
+    /// Get the velocity of an entity with a Rigidbody2D.
+    /// </summary>
+    public static Vector2 GetVelocity(World world, Entity entity)
+    {
+        using (PInvokeTimer.Start("PhysicsAPI.GetVelocity"))
         {
             unsafe
             {
                 float x, y;
                 PhysicsAPI.GetVelocity(world.NativePtr, entity.Id, &x, &y);
                 return new Vector2(x, y);
-            }(World world, Entity entity)
-    {
-        unsafe
-        {
-            float x, y;
-            PhysicsAPI.GetVelocity(world.NativePtr, entity.Id, &x, &y);
-         sing (PInvokeTimer.Start("PhysicsAPI.SetVelocity"))
-        {
-            unsafe
-            {
-                PhysicsAPI.SetVelocity(world.NativePtr, entity.Id, velocity.X, velocity.Y);
             }
+        }
+    }
 
     /// <summary>
     /// Set the velocity of an entity with a Rigidbody2D.
     /// </summary>
     public static void SetVelocity(World world, Entity entity, Vector2 velocity)
     {
-        unsafe
+        using (PInvokeTimer.Start("PhysicsAPI.SetVelocity"))
         {
-            PhysicsAPI.SetVelocity(world.NativePtr, entity.Id, velocity.X, velocity.Y);
+            unsafe
+            {
+                PhysicsAPI.SetVelocity(world.NativePtr, entity.Id, velocity.X, velocity.Y);
+            }
         }
     }
 }

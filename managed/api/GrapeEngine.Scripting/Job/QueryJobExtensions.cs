@@ -15,10 +15,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Job;
 using GrapeEngine.Scripting.Query;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Job;
 
 /// <summary>
 /// Extension methods for Query to enable job-based execution.
@@ -60,7 +59,7 @@ public static class QueryJobExtensions
     ///     (ref Position p) => p.Value *= 0.5f
     /// );
     /// </code>
-    public static JobHandle ForEachEntity<T1>(
+    public static JobHandle? ForEachEntity<T1>(
         this Query<T1> query,
         EntityAction<T1> action,
         JobHandle? dependsOn = default,
@@ -79,7 +78,7 @@ public static class QueryJobExtensions
     /// Schedule a job for each entity with two components.
     /// Automatically profiles execution and tracks hot paths.
     /// </summary>
-    public static JobHandle ForEachEntity<T1, T2>(
+    public static JobHandle? ForEachEntity<T1, T2>(
         this Query<T1, T2> query,
         EntityAction<T1, T2> action,
         JobHandle? dependsOn = default,
@@ -98,7 +97,7 @@ public static class QueryJobExtensions
     /// Schedule a job for each entity with three components.
     /// Automatically profiles execution and tracks hot paths.
     /// </summary>
-    public static JobHandle ForEachEntity<T1, T2, T3>(
+    public static JobHandle? ForEachEntity<T1, T2, T3>(
         this Query<T1, T2, T3> query,
         EntityAction<T1, T2, T3> action,
         JobHandle? dependsOn = default,
@@ -188,24 +187,6 @@ public static class QueryJobExtensions
         return new JobSystemHelper(world);
     }
 
-    // Overloads for Query<T1, T2, T3, ...> would follow same pattern
-    // Extended versions for T1, T2 - use same approach
-}
-
-/// <summary>
-/// Action for chunk-based processing (single component).
-/// </summary>
-/// <typeparam name="T1">Component type in the chunk</typeparam>
-/// <param name="chunk">The entity chunk</param>
-/// <param name="count">Number of entities in chunk</param>
-public delegate void ChunkAction<T1>(in Chunk chunk, uint count) where T1 : unmanaged;
-
-/// <summary>
-/// Action for chunk-based processing (two components).
-/// </summary>
-public delegate void ChunkAction<T1, T2>(in Chunk chunk, uint count) 
-    where T1 : unmanaged where T2 : unmanaged;
-
     /// <summary>
     /// Schedule a job for each entity with automatic SIMD optimization detection.
     /// 
@@ -219,7 +200,7 @@ public delegate void ChunkAction<T1, T2>(in Chunk chunk, uint count)
     /// <param name="action">Function to execute per entity</param>
     /// <param name="dependsOn">Optional job to wait for</param>
     /// <returns>Job handle for synchronization</returns>
-    public static JobHandle ForEachEntityWithSIMD<T1>(
+    public static JobHandle? ForEachEntityWithSIMD<T1>(
         this Query<T1> query,
         EntityAction<T1> action,
         JobHandle? dependsOn = default) where T1 : unmanaged
@@ -238,7 +219,7 @@ public delegate void ChunkAction<T1, T2>(in Chunk chunk, uint count)
     /// <summary>
     /// Schedule a job for two components with automatic SIMD optimization.
     /// </summary>
-    public static JobHandle ForEachEntityWithSIMD<T1, T2>(
+    public static JobHandle? ForEachEntityWithSIMD<T1, T2>(
         this Query<T1, T2> query,
         EntityAction<T1, T2> action,
         JobHandle? dependsOn = default) where T1 : unmanaged where T2 : unmanaged
@@ -257,7 +238,7 @@ public delegate void ChunkAction<T1, T2>(in Chunk chunk, uint count)
     /// <summary>
     /// Schedule a job for three components with automatic SIMD optimization.
     /// </summary>
-    public static JobHandle ForEachEntityWithSIMD<T1, T2, T3>(
+    public static JobHandle? ForEachEntityWithSIMD<T1, T2, T3>(
         this Query<T1, T2, T3> query,
         EntityAction<T1, T2, T3> action,
         JobHandle? dependsOn = default) 
@@ -273,6 +254,24 @@ public delegate void ChunkAction<T1, T2>(in Chunk chunk, uint count)
         
         return helper.ForEachEntity(query, action, dependsOn ?? default);
     }
+
+    // Overloads for Query<T1, T2, T3, ...> would follow same pattern
+    // Extended versions for T1, T2 - use same approach
+}
+
+/// <summary>
+/// Action for chunk-based processing (single component).
+/// </summary>
+/// <typeparam name="T1">Component type in the chunk</typeparam>
+/// <param name="chunk">The entity chunk</param>
+/// <param name="count">Number of entities in chunk</param>
+public delegate void ChunkAction<T1>(in Chunk chunk, uint count) where T1 : unmanaged;
+
+/// <summary>
+/// Action for chunk-based processing (two components).
+/// </summary>
+public delegate void ChunkAction<T1, T2>(in Chunk chunk, uint count) 
+    where T1 : unmanaged where T2 : unmanaged;
 
 /// <summary>
 /// Represents a contiguous chunk of entities with their components.
@@ -354,6 +353,7 @@ internal class ChunkIterationJob<T1> : IJob where T1 : unmanaged
 {
     public required Query<T1> Query { get; set; }
     public ChunkAction<T1>? Action { get; set; }
+    public CommandBuffer? Buffer { get; set; }
 
     public void Execute()
     {
@@ -403,6 +403,7 @@ internal class ChunkIterationJob<T1, T2> : IJob where T1 : unmanaged where T2 : 
 {
     public required Query<T1, T2> Query { get; set; }
     public ChunkAction<T1, T2>? Action { get; set; }
+    public CommandBuffer? Buffer { get; set; }
 
     public void Execute()
     {
@@ -472,7 +473,7 @@ public class ParallelQueryExecutor<T1>(Query<T1> query, World world) where T1 : 
     /// <summary>
     /// Execute with automatic batching.
     /// </summary>
-    public JobHandle Execute(
+    public JobHandle? Execute(
         EntityAction<T1> action,
         JobHandle? dependsOn = default)
     {
@@ -574,12 +575,11 @@ public class QueryJobBuilder<T1> where T1 : unmanaged
     /// <summary>
     /// Schedule the job with the configured settings.
     /// </summary>
-    public JobHandle Schedule(EntityAction<T1> action)
+    public JobHandle? Schedule(EntityAction<T1> action)
     {
-        if (action == null)
-            throw new ArgumentNullException(nameof(action));
+        ArgumentNullException.ThrowIfNull(action);
 
-        var helper = GetJobHelper(_query);
+        var helper = new JobSystemHelper(_world);
         var methodName = _profilingName ?? $"QueryJob<{typeof(T1).Name}>";
         var simdCapable = _useSIMD && SIMDOptimizedJobHelper.CanOptimizeSIMD<T1>();
 
@@ -602,7 +602,7 @@ public class QueryJobBuilder<T1> where T1 : unmanaged
         return ScheduleJob(helper, action);
     }
 
-    private JobHandle ScheduleJob(JobSystemHelper helper, EntityAction<T1> action)
+    private JobHandle? ScheduleJob(JobSystemHelper helper, EntityAction<T1> action)
     {
         // Note: In a full implementation, we would create a custom job struct
         // that uses the CommandBuffer and respects the settings.
@@ -662,12 +662,11 @@ public class QueryJobBuilder<T1, T2> where T1 : unmanaged where T2 : unmanaged
         return this;
     }
 
-    public JobHandle Schedule(EntityAction<T1, T2> action)
+    public JobHandle? Schedule(EntityAction<T1, T2> action)
     {
-        if (action == null)
-            throw new ArgumentNullException(nameof(action));
+        ArgumentNullException.ThrowIfNull(action);
 
-        var helper = GetJobHelper(_query);
+        var helper = new JobSystemHelper(_world);
         var methodName = _profilingName ?? $"QueryJob<{typeof(T1).Name},{typeof(T2).Name}>";
         var simdCapable = _useSIMD && SIMDOptimizedJobHelper.CanOptimizeSIMD<T1>();
 
@@ -685,7 +684,7 @@ public class QueryJobBuilder<T1, T2> where T1 : unmanaged where T2 : unmanaged
         return ScheduleJob(helper, action);
     }
 
-    private JobHandle ScheduleJob(JobSystemHelper helper, EntityAction<T1, T2> action)
+    private JobHandle? ScheduleJob(JobSystemHelper helper, EntityAction<T1, T2> action)
     {
         return helper.ForEachEntity(_query, action, _dependsOn ?? default);
     }
@@ -742,12 +741,11 @@ public class QueryJobBuilder<T1, T2, T3> where T1 : unmanaged where T2 : unmanag
         return this;
     }
 
-    public JobHandle Schedule(EntityAction<T1, T2, T3> action)
+    public JobHandle? Schedule(EntityAction<T1, T2, T3> action)
     {
-        if (action == null)
-            throw new ArgumentNullException(nameof(action));
+        ArgumentNullException.ThrowIfNull(action);
 
-        var helper = GetJobHelper(_query);
+        var helper = new JobSystemHelper(_world);
         var methodName = _profilingName ?? $"QueryJob<{typeof(T1).Name},{typeof(T2).Name},{typeof(T3).Name}>";
         var simdCapable = _useSIMD && SIMDOptimizedJobHelper.CanOptimizeSIMD<T1>();
 
@@ -765,7 +763,7 @@ public class QueryJobBuilder<T1, T2, T3> where T1 : unmanaged where T2 : unmanag
         return ScheduleJob(helper, action);
     }
 
-    private JobHandle ScheduleJob(JobSystemHelper helper, EntityAction<T1, T2, T3> action)
+    private JobHandle? ScheduleJob(JobSystemHelper helper, EntityAction<T1, T2, T3> action)
     {
         return helper.ForEachEntity(_query, action, _dependsOn ?? default);
     }
@@ -817,7 +815,7 @@ public static class FluentJobExtensions
     /// Shorthand for building a job with default settings.
     /// Same as query.BuildJob(world).Schedule(action).
     /// </summary>
-    public static JobHandle ScheduleJob<T1>(
+    public static JobHandle? ScheduleJob<T1>(
         this Query<T1> query,
         World world,
         EntityAction<T1> action) where T1 : unmanaged
@@ -828,7 +826,7 @@ public static class FluentJobExtensions
     /// <summary>
     /// Shorthand for building a job with two components.
     /// </summary>
-    public static JobHandle ScheduleJob<T1, T2>(
+    public static JobHandle? ScheduleJob<T1, T2>(
         this Query<T1, T2> query,
         World world,
         EntityAction<T1, T2> action) where T1 : unmanaged where T2 : unmanaged
@@ -839,7 +837,7 @@ public static class FluentJobExtensions
     /// <summary>
     /// Shorthand for building a job with three components.
     /// </summary>
-    public static JobHandle ScheduleJob<T1, T2, T3>(
+    public static JobHandle? ScheduleJob<T1, T2, T3>(
         this Query<T1, T2, T3> query,
         World world,
         EntityAction<T1, T2, T3> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged

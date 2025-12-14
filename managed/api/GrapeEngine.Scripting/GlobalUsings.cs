@@ -5,11 +5,26 @@
 
 // Core ECS API
 global using GrapeEngine.Scripting.Core;
+global using GrapeEngine.Scripting.Core.StructuralChanges;
+global using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
+global using GrapeEngine.Scripting.Core.StructuralChanges.Changes;
+global using GrapeEngine.Scripting.Core.Dependencies;
 global using GrapeEngine.Scripting.Components.Types;
 global using GrapeEngine.Scripting.Services;
 global using GrapeEngine.Scripting.Systems;
 global using GrapeEngine.Scripting.Events;
 global using GrapeEngine.Scripting.Helpers;
+global using GrapeEngine.Scripting.Job;
+global using GrapeEngine.Scripting.Job.Batching;
 
 // Math & Numerics
 global using GrapeEngine.Math;
+
+// Profiling & Optimization
+global using GrapeEngine.Scripting.Profiling;
+global using GrapeEngine.Scripting.Profiling.Optimization;
+global using GrapeEngine.Scripting.Profiling.Optimization.SIMD;
+
+// Compiler
+global using GrapeEngine.Scripting.Compiler;
+

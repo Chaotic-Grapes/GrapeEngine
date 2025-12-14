@@ -17,8 +17,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Hosting;
+using GrapeEngine.Scripting.Core.Dependencies;
 
-namespace GrapeEngine.Scripting;
+namespace GrapeEngine.Scripting.Core.Dependencies;
 
 /// <summary>
 /// Bridge for converting C# component access declarations to C++ format.

@@ -65,8 +65,7 @@ internal static class JobReflectionHelper
                 if (param.GetCustomAttribute<System.Runtime.InteropServices.InAttribute>() != null)
                 {
                     // 'in' parameter - read-only
-                    if (!info.ReadableComponents.Contains(paramType))
-                        info.ReadableComponents.Add(paramType);
+                    info.ReadableComponents.Add(paramType);
                 }
                 else if (paramType.IsByRef)
                 {
@@ -74,15 +73,13 @@ internal static class JobReflectionHelper
                     var elementType = paramType.GetElementType();
                     if (elementType != null)
                     {
-                        if (!info.WritableComponents.Contains(elementType))
-                            info.WritableComponents.Add(elementType);
+                        info.WritableComponents.Add(elementType);
                     }
                 }
                 else
                 {
                     // Regular parameter - likely component type, treat as readable
-                    if (!info.ReadableComponents.Contains(paramType))
-                        info.ReadableComponents.Add(paramType);
+                    info.ReadableComponents.Add(paramType);
                 }
             }
         }
@@ -203,16 +200,16 @@ internal static class JobReflectionHelper
             .Where(t => !declaredAccess.WritableComponents.Contains(t))
             .ToList();
 
-        if (undeclaredReads.Any() || undeclaredWrites.Any())
+        if (undeclaredReads.Count != 0 || undeclaredWrites.Count != 0)
         {
             result.IsValid = false;
             result.UndeclaredReadComponents = undeclaredReads;
             result.UndeclaredWriteComponents = undeclaredWrites;
             
             var messages = new List<string>();
-            if (undeclaredReads.Any())
+            if (undeclaredReads.Count != 0)
                 messages.Add($"Undeclared read access: {string.Join(", ", undeclaredReads.Select(t => t.Name))}");
-            if (undeclaredWrites.Any())
+            if (undeclaredWrites.Count != 0)
                 messages.Add($"Undeclared write access: {string.Join(", ", undeclaredWrites.Select(t => t.Name))}");
             
             result.Message = string.Join("; ", messages);
