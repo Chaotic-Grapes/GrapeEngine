@@ -96,7 +96,7 @@ namespace ECS {
          * Alternative to AddSystem() for use cases that track systems by metadata.
          * Both AddSystem() and AddSystemMetadata() can be used interchangeably.
          */
-        void AddSystemMetadata(const SystemDependencyMetadata& metadata);
+        void AddSystemMetadata(const SystemMetadata& metadata);
 
         /**
          * @brief Build the dependency graph.
@@ -126,8 +126,8 @@ namespace ECS {
          * @param sys2 Second system metadata
          * @return True if they have no read/write conflicts
          */
-        bool CanRunInParallel(const SystemDependencyMetadata& sys1,
-                             const SystemDependencyMetadata& sys2) const;
+        bool CanRunInParallel(const SystemMetadata& sys1,
+                             const SystemMetadata& sys2) const;
 
         /**
          * @brief Get all systems that system B depends on.
@@ -233,14 +233,14 @@ namespace ECS {
          * @param system System pointer
          * @return Pointer to metadata, or nullptr if not found
          */
-        const SystemDependencyMetadata* GetSystemMetadata(ISystem* system) const;
+        const SystemMetadata* GetSystemMetadata(ISystem* system) const;
 
     private:
         /// All systems in the graph (by pointer)
         std::vector<ISystem*> m_systems;
 
         /// All system metadata (parallel to m_systems, one entry per system)
-        std::vector<SystemDependencyMetadata> m_systemMetadata;
+        std::vector<SystemMetadata> m_systemMetadata;
 
         /// Adjacency list: system -> systems it depends on
         std::unordered_map<ISystem*, std::vector<ISystem*>> m_dependencies;

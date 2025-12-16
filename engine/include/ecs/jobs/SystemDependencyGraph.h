@@ -24,8 +24,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Forward to the consolidated main version
 #include "ecs/SystemDependencyGraph.h"
 
-// For backward compatibility, maintain the SystemDependencyMetadata typedef
-// This struct is now defined in ecs/ISystem.h
+// For backward compatibility, maintain the SystemDependencyMetadata typedef (removed in favor of SystemMetadata)
+// typedef SystemMetadata SystemDependencyMetadata;
 
 #endif  // ECS_JOBS_SYSTEM_DEPENDENCY_GRAPH_H
 

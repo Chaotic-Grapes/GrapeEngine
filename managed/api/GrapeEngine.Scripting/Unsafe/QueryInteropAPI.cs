@@ -19,6 +19,12 @@ namespace GrapeEngine.Scripting.Unsafe;
 
 /// <summary>
 /// Query iterator structure matching C++ QueryIterator
+/// 
+/// SAFETY NOTES:
+/// - The 'Archetypes' pointer is only valid during the lifetime of the query iteration
+/// - Do NOT store QueryIterator instances across World structural changes (entity/archetype creation)
+/// - Do NOT iterate over the same world in nested loops (would invalidate the outer iterator)
+/// - Iterator should always be used in a contained scope (foreach, while loop, etc)
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct QueryIterator
@@ -38,6 +44,10 @@ internal unsafe struct QueryIterator
 
 /// <summary>
 /// Internal P/Invoke declarations for Query operations.
+/// 
+/// THREAD SAFETY:
+/// All Query operations must be called from the main thread.
+/// The C++ side does not provide thread synchronization for query iteration.
 /// </summary>
 internal static partial class QueryInteropAPI
 {

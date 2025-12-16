@@ -32,6 +32,17 @@ prior written consent of DigiPen Institute of Technology is prohibited.
  *
  * Used by WorldInterop_CreateQuery and iteration helpers to keep track of
  * matched archetypes, chunks, and entity positions during a query.
+ * 
+ * SAFETY NOTES:
+ * - The 'archetypes' pointer points to World::GetMatchingArchetypes(&matched) vector
+ * - This reference becomes INVALID if archetypes are created/destroyed during iteration
+ * - RISK: Nested queries or structural changes during iteration will cause undefined behavior
+ * - Current mitigation: Single-threaded execution and queries must complete before World changes
+ * 
+ * RECOMMENDED FIX:
+ * - Cache archetype list snapshot in the iterator at creation time, OR
+ * - Add reentrant guard to prevent structural changes during active queries, OR
+ * - Document clearly that queries are not reentrant-safe
  */
 struct QueryIterator {
     void* worldPtr;

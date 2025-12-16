@@ -14,6 +14,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "scripting/ScriptManager.h"
 #include "core/Application.h"
+#include "ecs/ComponentAccessAttribute.h"
 #include <iostream>
 #include <filesystem>
 #include <fstream>
@@ -538,6 +539,7 @@ namespace ECS {
         success &= loadFunction("CreateSystemInstance", reinterpret_cast<void**>(&m_createSystemWrapper));
         success &= loadFunction("DestroySystemInstance", reinterpret_cast<void**>(&m_destroySystemWrapper));
         success &= loadFunction("GetSystemMetadata", reinterpret_cast<void**>(&m_getSystemMetadata));
+        success &= loadFunction("GetSystemComponentAccesses", reinterpret_cast<void**>(&m_getSystemComponentAccesses));
         success &= loadFunction("CallSystemOnCreate", reinterpret_cast<void**>(&m_callSystemOnCreate));
         success &= loadFunction("CallSystemOnUpdate", reinterpret_cast<void**>(&m_callSystemOnUpdate));
         success &= loadFunction("CallSystemOnDestroy", reinterpret_cast<void**>(&m_callSystemOnDestroy));
@@ -673,10 +675,10 @@ namespace ECS {
      * @return SystemMetadata structure
      */
     SystemMetadata ScriptSystemWrapper::GetMetadata() const {
-        if (!m_metadataCached) {
+        if (!m_metadata) {
             CacheMetadata();
         }
-        return m_metadata;
+        return *m_metadata;
     }
 
     /**
@@ -684,7 +686,7 @@ namespace ECS {
      * @return SystemGroup enum value
      */
     SystemGroup ScriptSystemWrapper::GetSystemGroup() const {
-        if (!m_metadataCached) {
+        if (!m_metadata) {
             CacheMetadata();
         }
         return m_group;
@@ -695,7 +697,7 @@ namespace ECS {
      * @return SystemRunMode enum value
      */
     SystemRunMode ScriptSystemWrapper::GetRunMode() const {
-        if (!m_metadataCached) {
+        if (!m_metadata) {
             CacheMetadata();
         }
         return m_runMode;
@@ -703,45 +705,75 @@ namespace ECS {
 
     /**
      * @brief Cache the metadata of the managed system by calling into C#.
+     * Uses ComponentAccessBuilder to create immutable metadata.
      */
     void ScriptSystemWrapper::CacheMetadata() const {
-        if (!m_scriptManager) {
-            // Fallback to defaults
-            m_metadata.Name = m_typeName;
-            m_metadata.ExecutionOrder = 0;
-            m_metadata.Enabled = true;
-            m_group = SystemGroup::Update;
-            m_runMode = SystemRunMode::PlayOnly;
-            m_metadataCached = true;
-            return;
+        std::string systemName = m_typeName;
+        SystemGroup group = SystemGroup::Update;
+        SystemRunMode runMode = SystemRunMode::PlayOnly;
+
+        if (m_scriptManager) {
+            auto getMetadata = m_scriptManager->GetGetSystemMetadata();
+            if (getMetadata) {
+                char nameBuffer[256] = {0};
+                int groupInt = 0;
+                int runModeInt = 0;
+
+                getMetadata(m_managedHandle, nameBuffer, &groupInt, &runModeInt);
+
+                // Extract metadata from C# system
+                if (nameBuffer[0] != '\0') {
+                    systemName = std::string(nameBuffer);
+                }
+                group = static_cast<SystemGroup>(groupInt);
+                runMode = static_cast<SystemRunMode>(runModeInt);
+            }
         }
 
-        auto getMetadata = m_scriptManager->GetGetSystemMetadata();
-        if (getMetadata) {
-            char nameBuffer[256] = {0};
-            int group = 0;
-            int runMode = 0;
+        // Build immutable metadata using ComponentAccessBuilder
+        ComponentAccessBuilder builder(systemName);
+        builder.SetExecutionOrder(0)  // TODO: Get from C#
+            .SetGroup(group)
+            .SetRunMode(runMode)
+            .SetEnabled(true)
+            .SetSystemPtr(const_cast<ScriptSystemWrapper*>(this));
 
-            getMetadata(m_managedHandle, nameBuffer, &group, &runMode);
+        // Extract component accesses from C# attributes
+        if (m_scriptManager) {
+            auto getComponentAccesses = m_scriptManager->GetGetSystemComponentAccesses();
+            if (getComponentAccesses) {
+                // Allocate buffers for component hashes (max 64 of each type)
+                std::vector<uint32_t> readHashes(64);
+                std::vector<uint32_t> writeHashes(64);
 
-            // Set metadata from C# system
-            m_metadata.Name = nameBuffer[0] != '\0' ? std::string(nameBuffer) : m_typeName;
-            m_metadata.ExecutionOrder = 0;  // TODO: Get from C#
-            m_metadata.Enabled = true;
+                int result = getComponentAccesses(m_managedHandle, readHashes.data(), writeHashes.data(), 128);
+                
+                int readCount = result & 0xFFFF;  // Lower 16 bits
+                int writeCount = (result >> 16) & 0xFFFF;  // Upper 16 bits
 
-            m_group = static_cast<SystemGroup>(group);
-            m_runMode = static_cast<SystemRunMode>(runMode);
+                // Add read components to builder
+                if (readCount > 0) {
+                    std::vector<ComponentTypeId> readIds;
+                    for (int i = 0; i < readCount && i < static_cast<int>(readHashes.size()); ++i) {
+                        readIds.push_back(ComponentTypeId(readHashes[i]));
+                    }
+                    builder.ReadComponents(readIds);
+                }
+
+                // Add write components to builder
+                if (writeCount > 0) {
+                    std::vector<ComponentTypeId> writeIds;
+                    for (int i = 0; i < writeCount && i < static_cast<int>(writeHashes.size()); ++i) {
+                        writeIds.push_back(ComponentTypeId(writeHashes[i]));
+                    }
+                    builder.WriteComponents(writeIds);
+                }
+            }
         }
-        else {
-            // Fallback to defaults
-            m_metadata.Name = m_typeName;
-            m_metadata.ExecutionOrder = 0;
-            m_metadata.Enabled = true;
-            m_group = SystemGroup::Update;
-            m_runMode = SystemRunMode::PlayOnly;
-        }
-        
-        m_metadataCached = true;
+
+        m_metadata = builder.Build();
+        m_group = group;
+        m_runMode = runMode;
     }
 
 }

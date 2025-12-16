@@ -24,11 +24,16 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "Export.h"
 #include "ecs/ComponentRegistry.h"
+#include "ecs/SystemEnums.h"
 #include <vector>
 #include <string>
 #include <algorithm>
 
 namespace ECS {
+
+    // Forward declarations (pointers/references only)
+    class ISystem;
+    class SystemMetadata;
 
     /**
      * @brief Access mode for component reads/writes.
@@ -65,7 +70,8 @@ namespace ECS {
      * @brief Builder for declaring component access patterns in a system.
      * 
      * Provides a fluent API for declaring which components a system accesses.
-     * Used to populate SystemMetadata automatically.
+     * Used to populate SystemMetadata automatically. Consolidates all metadata
+     * into a single unified structure.
      * 
      * Example:
      * @code
@@ -76,6 +82,7 @@ namespace ECS {
      *             .ReadComponent<Velocity>()
      *             .WriteComponent<Transform>()
      *             .SetExecutionOrder(10)
+     *             .SetGroup(SystemGroup::Physics)
      *             .Build();
      *     }
      * };
@@ -98,7 +105,6 @@ namespace ECS {
         template<typename T>
         ComponentAccessBuilder& ReadComponent() {
             m_accesses.emplace_back(TypeIdOf<T>(), ComponentAccessMode::Read);
-            m_readComponents.push_back(TypeIdOf<T>());
             return *this;
         }
 
@@ -110,7 +116,6 @@ namespace ECS {
         template<typename T>
         ComponentAccessBuilder& WriteComponent() {
             m_accesses.emplace_back(TypeIdOf<T>(), ComponentAccessMode::Write);
-            m_writeComponents.push_back(TypeIdOf<T>());
             return *this;
         }
 
@@ -122,8 +127,6 @@ namespace ECS {
         template<typename T>
         ComponentAccessBuilder& ReadWriteComponent() {
             m_accesses.emplace_back(TypeIdOf<T>(), ComponentAccessMode::ReadWrite);
-            m_writeComponents.push_back(TypeIdOf<T>());
-            m_readComponents.push_back(TypeIdOf<T>());
             return *this;
         }
 
@@ -135,7 +138,6 @@ namespace ECS {
         ComponentAccessBuilder& ReadComponents(const std::vector<ComponentTypeId>& components) {
             for (auto id : components) {
                 m_accesses.emplace_back(id, ComponentAccessMode::Read);
-                m_readComponents.push_back(id);
             }
             return *this;
         }
@@ -148,7 +150,6 @@ namespace ECS {
         ComponentAccessBuilder& WriteComponents(const std::vector<ComponentTypeId>& components) {
             for (auto id : components) {
                 m_accesses.emplace_back(id, ComponentAccessMode::Write);
-                m_writeComponents.push_back(id);
             }
             return *this;
         }
@@ -164,6 +165,26 @@ namespace ECS {
         }
 
         /**
+         * @brief Set the execution group for this system.
+         * @param group System group (PreUpdate, Update, Physics, Render, etc.)
+         * @return This builder for chaining
+         */
+        ComponentAccessBuilder& SetGroup(SystemGroup group) {
+            m_group = group;
+            return *this;
+        }
+
+        /**
+         * @brief Set the run mode for this system.
+         * @param mode When system runs (edit/play/both)
+         * @return This builder for chaining
+         */
+        ComponentAccessBuilder& SetRunMode(SystemRunMode mode) {
+            m_runMode = mode;
+            return *this;
+        }
+
+        /**
          * @brief Set whether this system is enabled by default.
          * @param enabled True if system starts enabled
          * @return This builder for chaining
@@ -174,8 +195,18 @@ namespace ECS {
         }
 
         /**
+         * @brief Set the system pointer for dependency tracking.
+         * @param system Pointer to the system instance
+         * @return This builder for chaining
+         */
+        ComponentAccessBuilder& SetSystemPtr(ISystem* system) {
+            m_systemPtr = system;
+            return *this;
+        }
+
+        /**
          * @brief Build the SystemMetadata.
-         * @return Configured SystemMetadata
+         * @return Configured SystemMetadata (immutable after creation)
          */
         SystemMetadata Build();
 
@@ -195,8 +226,14 @@ namespace ECS {
         template<typename T>
         bool WritesComponent() const {
             ComponentTypeId id = TypeIdOf<T>();
-            return std::find(m_writeComponents.begin(), m_writeComponents.end(), id)
-                != m_writeComponents.end();
+            for (const auto& access : m_accesses) {
+                if (access.ComponentId == id && 
+                    (access.Mode == ComponentAccessMode::Write || 
+                     access.Mode == ComponentAccessMode::ReadWrite)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /**
@@ -207,17 +244,24 @@ namespace ECS {
         template<typename T>
         bool ReadsComponent() const {
             ComponentTypeId id = TypeIdOf<T>();
-            return std::find(m_readComponents.begin(), m_readComponents.end(), id)
-                != m_readComponents.end();
+            for (const auto& access : m_accesses) {
+                if (access.ComponentId == id && 
+                    (access.Mode == ComponentAccessMode::Read || 
+                     access.Mode == ComponentAccessMode::ReadWrite)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
     private:
         std::string m_name;
         std::vector<ComponentAccess> m_accesses;
-        std::vector<ComponentTypeId> m_readComponents;
-        std::vector<ComponentTypeId> m_writeComponents;
         int m_executionOrder = 0;
+        SystemGroup m_group = SystemGroup::Update;
+        SystemRunMode m_runMode = SystemRunMode::PlayOnly;
         bool m_enabled = true;
+        ISystem* m_systemPtr = nullptr;
 
         friend class ComponentAccessValidator;
     };

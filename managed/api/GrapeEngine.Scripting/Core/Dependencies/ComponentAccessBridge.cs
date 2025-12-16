@@ -110,8 +110,9 @@ public static class ComponentAccessBridge
     /// <summary>
     /// FNV-1a hash algorithm (32-bit) for component type names.
     /// Matches the C++ implementation in ComponentTypeId.
+    /// Public so it can be called from P/Invoke wrappers.
     /// </summary>
-    private static uint Fnv1aHash(string input)
+    public static uint Fnv1aHashPublic(string input)
     {
         const uint fnvOffset = 0x811c9dc5;  // 32-bit offset basis
         const uint fnvPrime = 0x01000193;   // 32-bit FNV prime
@@ -125,6 +126,15 @@ public static class ComponentAccessBridge
         }
 
         return hash;
+    }
+
+    /// <summary>
+    /// FNV-1a hash algorithm (32-bit) for component type names.
+    /// Matches the C++ implementation in ComponentTypeId.
+    /// </summary>
+    private static uint Fnv1aHash(string input)
+    {
+        return Fnv1aHashPublic(input);
     }
 
     /// <summary>

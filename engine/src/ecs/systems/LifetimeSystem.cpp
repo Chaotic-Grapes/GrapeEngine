@@ -23,8 +23,10 @@ namespace ECS {
         builder.ReadComponent<Components::Active>();
         // Write accesses
         builder.WriteComponent<Components::Lifetime>();
-        // Execution order in Lifetime group
+        // Execution parameters
         builder.SetExecutionOrder(100);
+        builder.SetGroup(SystemGroup::Update);
+        builder.SetRunMode(SystemRunMode::PlayOnly);
         return builder.Build();
     }
 

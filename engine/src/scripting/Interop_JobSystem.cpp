@@ -477,12 +477,13 @@ INTEROP_API intptr_t JobInterop_CombineHandles(
         // This serves as a merge point in the dependency graph
         class SyncJob : public ECS::Jobs::IJob {
         public:
-            void Execute() {
+            void Execute() override {
                 // No-op: this job exists only to create a synchronization point
             }
             
-            std::string GetJobName() const {
-                return "Synchronize";
+            const std::string& GetName() const override {
+                static const std::string name = "Synchronize";
+                return name;
             }
         };
 

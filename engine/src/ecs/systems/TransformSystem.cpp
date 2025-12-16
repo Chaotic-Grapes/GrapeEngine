@@ -17,8 +17,10 @@ namespace ECS {
         builder.ReadComponent<Components::LocalTransform>();
         // Write accesses
         builder.WriteComponent<Components::WorldTransform>();
-        // Execution order in Transform group
+        // Execution parameters
         builder.SetExecutionOrder(50);
+        builder.SetGroup(SystemGroup::PrePhysics);
+        builder.SetRunMode(SystemRunMode::Always);
         return builder.Build();
     }
 

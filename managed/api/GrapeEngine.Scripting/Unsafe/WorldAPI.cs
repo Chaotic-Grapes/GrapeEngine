@@ -19,6 +19,18 @@ namespace GrapeEngine.Scripting.Unsafe;
 
 /// <summary>
 /// Internal P/Invoke declarations for World/Entity operations.
+/// 
+/// ERROR HANDLING NOTES:
+/// - CreateEntity returns entity ID (0 = invalid, but doesn't distinguish error types)
+/// - GetComponentPtr returns nullptr when: component doesn't exist OR world is null OR entity is dead
+/// - AddComponent returns nullptr on failure (ambiguous error)
+/// - RemoveComponent is void (silent failure if world is null)
+/// - IsEntityAlive returns false on any error (including null world)
+/// 
+/// RECOMMENDATION FOR FUTURE IMPROVEMENT:
+/// Standardize to return error codes:
+///   public static unsafe partial int GetComponentPtr(..., void** outPtr)
+///   // Returns: 0 = success, 1 = null world, 2 = dead entity, 3 = component not found
 /// </summary>
 internal static partial class WorldAPI
 {

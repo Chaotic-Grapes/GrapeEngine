@@ -23,6 +23,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include "core/Logger.h"
 #include "ecs/ISystem.h"
+#include "ecs/ISystemMetadataProvider.h"
 #include "ecs/SystemDependencyGraph.h"
 #include <memory>
 #include <vector>
@@ -89,6 +90,15 @@ namespace ECS {
          * @param args Constructor arguments for the system
          * @return Pointer to the registered system
          * 
+         * METADATA PRIORITY SYSTEM:
+         * The system's execution group is resolved using this priority order:
+         * 1. ISystemMetadataProvider::GetMetadataSystemGroup() (if implemented)
+         * 2. ISystem::GetSystemGroup() override
+         * 3. Default SystemGroup::Update
+         * 
+         * This allows the same system class to execute in different groups
+         * per instance by implementing ISystemMetadataProvider.
+         * 
          * The system is default-constructed, OnCreate() is called, and it's
          * inserted into the execution order based on its metadata.
          * 
@@ -106,12 +116,12 @@ namespace ECS {
             // Get metadata
             const auto& metadata = system->GetMetadata();
 
-            // Store in appropriate group
-            SystemGroup group = system->GetSystemGroup();
+            // Store in appropriate group using metadata priority system
+            SystemGroup group = GetSystemMetadataGroup(ptr);
             m_systemGroups[group].push_back(std::move(system));
 
             // Track by name
-            m_systemsByName[metadata.Name] = ptr;
+            m_systemsByName[metadata.GetName()] = ptr;
 
             // Sort systems by execution order within group
             _sortSystemGroup(group);
@@ -123,6 +133,10 @@ namespace ECS {
          * @brief Register a C# scripted system.
          * @param system Raw pointer to C# system wrapper (managed externally)
          * 
+         * METADATA PRIORITY SYSTEM:
+         * The system's execution group is resolved using the metadata priority system.
+         * C# systems may implement ISystemMetadataProvider via direct casting.
+         * 
          * For C# systems, the lifetime is managed by the scripting layer.
          * The system is not owned by SystemManager.
          */
@@ -130,10 +144,10 @@ namespace ECS {
             if (!system) return;
 
             const auto& metadata = system->GetMetadata();
-            SystemGroup group = system->GetSystemGroup();
+            SystemGroup group = GetSystemMetadataGroup(system);
 
             m_scriptedSystemGroups[group].push_back(system);
-            m_systemsByName[metadata.Name] = system;
+            m_systemsByName[metadata.GetName()] = system;
 
             _sortSystemGroup(group);
         }
@@ -482,8 +496,11 @@ namespace ECS {
         bool CanSystemsRunInParallel(const ISystem* systemA, const ISystem* systemB) const {
             if (!systemA || !systemB) return false;
 
-            SystemGroup groupA = systemA->GetSystemGroup();
-            SystemGroup groupB = systemB->GetSystemGroup();
+            // Use metadata priority system to get execution groups
+            SystemGroup groupA = const_cast<ISystem*>(systemA) ? 
+                GetSystemMetadataGroup(const_cast<ISystem*>(systemA)) : SystemGroup::Update;
+            SystemGroup groupB = const_cast<ISystem*>(systemB) ? 
+                GetSystemMetadataGroup(const_cast<ISystem*>(systemB)) : SystemGroup::Update;
 
             // Can only run in parallel if in same group
             if (groupA != groupB) return false;
@@ -570,14 +587,14 @@ namespace ECS {
             auto& systems = m_systemGroups[group];
             std::sort(systems.begin(), systems.end(),
                 [](const std::unique_ptr<ISystem>& a, const std::unique_ptr<ISystem>& b) {
-                    return a->GetMetadata().ExecutionOrder < b->GetMetadata().ExecutionOrder;
+                    return a->GetMetadata().GetExecutionOrder() < b->GetMetadata().GetExecutionOrder();
                 });
 
             // Sort scripted systems
             auto& scriptedSystems = m_scriptedSystemGroups[group];
             std::sort(scriptedSystems.begin(), scriptedSystems.end(),
                 [](const ISystem* a, const ISystem* b) {
-                    return a->GetMetadata().ExecutionOrder < b->GetMetadata().ExecutionOrder;
+                    return a->GetMetadata().GetExecutionOrder() < b->GetMetadata().GetExecutionOrder();
                 });
         }
 

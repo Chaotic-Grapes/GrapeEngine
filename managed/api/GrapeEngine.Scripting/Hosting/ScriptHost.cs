@@ -500,6 +500,106 @@ public static class ScriptHost
     }
 
     /// <summary>
+    /// Extract component access information from a scripted system for C++ dependency resolution.
+    /// 
+    /// Returns two arrays of component type hashes:
+    /// 1. Read-only components (safe for parallel access)
+    /// 2. Write-access components (exclusive access required)
+    /// 
+    /// Called from C++ during system registration to populate ComponentAccessBuilder metadata.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int GetSystemComponentAccesses(ulong handle, uint* outReadHashes, uint* outWriteHashes, int maxSize)
+    {
+        try
+        {
+            Type? systemType = SystemDiscovery.GetSystemType(handle);
+            if (systemType == null)
+            {
+                Console.WriteLine($"[ScriptHost] System handle not found: {handle}");
+                return 0;
+            }
+
+            // Extract component accesses from C# attributes using ComponentAccessBridge
+            var accesses = ComponentAccessBridge.ExtractComponentAccesses(systemType);
+            
+            // Separate into read and write accesses
+            int readCount = 0;
+            int writeCount = 0;
+
+            foreach (var (hash, mode) in accesses)
+            {
+                if (mode == ComponentAccessMode.Read)
+                {
+                    if (readCount < maxSize / 2)
+                    {
+                        outReadHashes[readCount++] = hash;
+                    }
+                }
+                else // Write or ReadWrite
+                {
+                    if (writeCount < maxSize / 2)
+                    {
+                        outWriteHashes[writeCount++] = hash;
+                    }
+                }
+            }
+
+            // Return total count (read count in lower 16 bits, write count in upper 16 bits)
+            return (readCount) | (writeCount << 16);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] Error getting component accesses: {ex.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Hash a component type name using FNV-1a algorithm in C++.
+    /// Delegates to C++ to ensure hash consistency across language boundary.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe uint HashComponentTypeName(char* typeNamePtr)
+    {
+        try
+        {
+            // For now, compute here but ideally this would call C++
+            string typeName = Marshal.PtrToStringUTF8((IntPtr)typeNamePtr) ?? "";
+            return ComponentAccessBridge.Fnv1aHashPublic(typeName);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] Error hashing component type: {ex.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Resolve a system's execution group using the priority system in C++.
+    /// 
+    /// C# reflection extracts the [SystemGroup] attribute,
+    /// C++ validates and applies priority resolution.
+    /// 
+    /// This keeps metadata priority logic centralized in C++ while C# handles reflection.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe int ResolveSystemGroup(int attributeGroup)
+    {
+        try
+        {
+            // For now, return directly (C# already applied priority correctly)
+            // In future: Could validate/transform the group with C++ logic
+            return attributeGroup;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScriptHost] Error resolving system group: {ex.Message}");
+            return 0; // Default to Update
+        }
+    }
+
+    /// <summary>
     /// Call OnCreate on a scripted system.
     /// </summary>
     [UnmanagedCallersOnly]

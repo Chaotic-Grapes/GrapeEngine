@@ -27,71 +27,121 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include "ecs/World.h"
 #include "ecs/jobs/JobHandle.h"
+#include "ecs/SystemEnums.h"
 #include "ecs/ComponentAccessAttribute.h"
 #include <string>
 #include <vector>
 
+// Forward declaration - ISystemMetadataProvider is in a separate header
+namespace ECS {
+    class ISystemMetadataProvider;
+}
+
 namespace ECS {
 
     /**
-     * @brief System run mode for editor play/edit state control
-     */
-    enum class SystemRunMode {
-        Always,         // Runs in both edit and play mode (e.g., Render, Transform hierarchy)
-        PlayOnly,       // Only runs in play mode (e.g., Physics, Scripts, AI, Animation)
-        EditOnly        // Only runs in edit mode (e.g., Editor gizmos, debug visualization)
-    };
-
-    /**
-     * @brief Metadata describing a system's component dependencies
+     * @brief Metadata describing a system's properties and component dependencies.
      * 
-     * Contains both the original Read/Write component lists for backward compatibility
-     * and the unified ComponentAccesses vector for new code.
+     * Single source of truth for system metadata, consolidating all system information
+     * into one structure. IMMUTABLE after creation - prevents inconsistency between
+     * component accesses and derived data.
      * 
-     * New systems should use ComponentAccessBuilder which populates both fields automatically.
+     * Created exclusively by ComponentAccessBuilder::Build(). All fields are private
+     * to enforce immutability. Access is provided through const getter methods.
+     * 
+     * ComponentAccesses is the authoritative source; Read/Write component lists are
+     * computed on-demand for backward compatibility.
      * 
      * @see ComponentAccessBuilder
      */
-    struct SystemMetadata {
-        std::string Name;                                       // System name (e.g., "Physics", "Animation")
-        std::vector<ComponentTypeId> ReadComponents;            // Components this system reads (deprecated, for backward compat)
-        std::vector<ComponentTypeId> WriteComponents;           // Components this system writes (deprecated, for backward compat)
-        std::vector<ComponentAccess> ComponentAccesses;         // Unified access info (Read/Write/ReadWrite with modes)
-        int ExecutionOrder = 0;                                 // Execution priority (lower = earlier)
-        bool Enabled = true;                                    // Whether system is currently active
-    };
+    class SystemMetadata final {
+    public:
+        // ====================================================================
+        // Const Accessors (No Setters - Immutable)
+        // ====================================================================
 
-    /**
-     * @brief System execution group for phased updates
-     */
-    enum class SystemGroup {
-        PreUpdate,      // Input handling, pre-simulation setup
-        Update,         // Main gameplay logic (C# systems mostly here)
-        PostUpdate,     // Post-gameplay processing
-        PrePhysics,     // Physics preparation
-        Physics,        // Physics simulation
-        PostPhysics,    // Physics response, collision callbacks
-        PreRender,      // Frustum culling, LOD selection
-        Render,         // Actual rendering
-        PostRender      // Cleanup, debug visualization
-    };
+        /**
+         * @brief Get the system name.
+         * @return Const reference to system name string
+         */
+        const std::string& GetName() const { return m_name; }
 
-    /**
-     * @brief Metadata about a system for dependency tracking.
-     * 
-     * Used internally by SystemDependencyGraph for group-based scheduling
-     * and by the jobs system for component access analysis.
-     * 
-     * @see SystemDependencyGraph
-     * @see SystemMetadata
-     */
-    struct SystemDependencyMetadata {
-        ISystem* System = nullptr;                              // Pointer to the system
-        std::string Name;                                       // System name
-        std::vector<ComponentTypeId> ReadComponents;            // Components this system reads
-        std::vector<ComponentTypeId> WriteComponents;           // Components this system writes
-        SystemGroup Group = SystemGroup::Update;                // Execution group
-        int ExecutionOrder = 0;                                 // Execution order within group
+        /**
+         * @brief Get the component access declarations.
+         * @return Const reference to component accesses vector
+         */
+        const std::vector<ComponentAccess>& GetComponentAccesses() const {
+            return m_componentAccesses;
+        }
+
+        /**
+         * @brief Get the execution order priority.
+         * @return Execution order (lower = earlier)
+         */
+        int GetExecutionOrder() const { return m_executionOrder; }
+
+        /**
+         * @brief Get the system execution group (phase).
+         * @return SystemGroup enum value
+         */
+        SystemGroup GetGroup() const { return m_group; }
+
+        /**
+         * @brief Get when the system runs (edit/play/both).
+         * @return SystemRunMode enum value
+         */
+        SystemRunMode GetRunMode() const { return m_runMode; }
+
+        /**
+         * @brief Check if system is enabled.
+         * @return True if enabled, false otherwise
+         */
+        bool IsEnabled() const { return m_enabled; }
+
+        /**
+         * @brief Get the system pointer (if available).
+         * @return Pointer to ISystem instance, or nullptr if not set
+         */
+        ISystem* GetSystemPtr() const { return m_systemPtr; }
+
+        /**
+         * @brief Get all components this system reads (computed from ComponentAccesses).
+         * Provided for backward compatibility with older code.
+         * @return Vector of component type IDs with read access
+         */
+        std::vector<ComponentTypeId> GetReadComponents() const;
+
+        /**
+         * @brief Get all components this system writes (computed from ComponentAccesses).
+         * Provided for backward compatibility with older code.
+         * @return Vector of component type IDs with write access
+         */
+        std::vector<ComponentTypeId> GetWriteComponents() const;
+
+    private:
+        // ====================================================================
+        // Private Data (Immutable after construction)
+        // ====================================================================
+
+        std::string m_name;
+        std::vector<ComponentAccess> m_componentAccesses;
+        int m_executionOrder = 0;
+        SystemGroup m_group = SystemGroup::Update;
+        SystemRunMode m_runMode = SystemRunMode::PlayOnly;
+        bool m_enabled = true;
+        ISystem* m_systemPtr = nullptr;
+
+        // ====================================================================
+        // Private Constructor - Only ComponentAccessBuilder Can Create
+        // ====================================================================
+
+        /**
+         * @brief Private constructor for immutability.
+         * Only ComponentAccessBuilder::Build() can create instances.
+         */
+        SystemMetadata() = default;
+
+        friend class ComponentAccessBuilder;
     };
 
     /**
@@ -229,8 +279,20 @@ namespace ECS {
          * @brief Get the system group this system belongs to.
          * @return SystemGroup enum value
          * 
+         * METADATA PRIORITY SYSTEM:
+         * This method is part of a two-level priority system for resolving metadata:
+         * - Priority 1: ISystemMetadataProvider interface (if implemented)
+         * - Priority 2: This GetSystemGroup() override (this method)
+         * - Priority 3: Default SystemGroup::Update
+         * 
+         * If your system needs RUNTIME configuration of execution group (same class,
+         * different group per instance), implement ISystemMetadataProvider instead.
+         * 
          * Systems are executed in groups to ensure proper ordering:
          * PreUpdate -> Update -> PostUpdate -> PrePhysics -> Physics -> PostPhysics -> PreRender -> Render -> PostRender
+         * 
+         * @see ISystemMetadataProvider for runtime metadata flexibility
+         * @see GetSystemMetadataGroup() for priority-aware group resolution
          */
         virtual SystemGroup GetSystemGroup() const {
             return SystemGroup::Update; // Default to Update group
@@ -240,10 +302,22 @@ namespace ECS {
          * @brief Get the system's run mode.
          * @return System run mode (determines if system runs in edit/play/both)
          * 
+         * METADATA PRIORITY SYSTEM:
+         * This method is part of a two-level priority system for resolving metadata:
+         * - Priority 1: ISystemMetadataProvider interface (if implemented)
+         * - Priority 2: This GetRunMode() override (this method)
+         * - Priority 3: Default SystemRunMode::PlayOnly
+         * 
+         * If your system needs RUNTIME configuration of run mode (same class,
+         * different run mode per instance), implement ISystemMetadataProvider instead.
+         * 
          * Override to specify when the system should run:
          * - SystemRunMode::Always: Runs in both edit and play mode (e.g., Render, Transform)
          * - SystemRunMode::PlayOnly: Only in play mode (e.g., Physics, Scripts, AI) [DEFAULT]
          * - SystemRunMode::EditOnly: Only in edit mode (e.g., Editor gizmos)
+         * 
+         * @see ISystemMetadataProvider for runtime metadata flexibility
+         * @see GetSystemMetadataRunMode() for priority-aware run mode resolution
          */
         virtual SystemRunMode GetRunMode() const { return SystemRunMode::PlayOnly; }
 
@@ -284,10 +358,11 @@ namespace ECS {
         virtual std::vector<ComponentTypeId> GetComponentAccesses() const {
             // Default: combine read and write components from metadata
             auto metadata = GetMetadata();
-            auto accesses = metadata.ReadComponents;
+            auto accesses = metadata.GetReadComponents();
+            auto writes = metadata.GetWriteComponents();
             accesses.insert(accesses.end(), 
-                          metadata.WriteComponents.begin(),
-                          metadata.WriteComponents.end());
+                          writes.begin(),
+                          writes.end());
             return accesses;
         }
 

@@ -41,15 +41,13 @@ namespace ECS::Jobs {
 
         // Update last writer and reader tracking
         for (const auto& access : metadata.ComponentAccesses) {
-            if (!access.ComponentType) continue;
+            size_t compHash = static_cast<size_t>(access.ComponentId);
 
-            size_t compHash = _getComponentHash(*access.ComponentType);
-
-            if (access.AccessType == ComponentAccessType::Write ||
-                access.AccessType == ComponentAccessType::ReadWrite) {
+            if (access.Mode == ComponentAccessMode::Write ||
+                access.Mode == ComponentAccessMode::ReadWrite) {
                 m_lastWriterIndex[compHash] = jobIndex;
                 m_readerIndices[compHash].clear();  // Clear readers when new writer scheduled
-            } else if (access.AccessType == ComponentAccessType::Read) {
+            } else if (access.Mode == ComponentAccessMode::Read) {
                 m_readerIndices[compHash].push_back(jobIndex);
             }
         }
@@ -69,16 +67,12 @@ namespace ECS::Jobs {
         
         // Two jobs can run in parallel if they don't have conflicting component accesses
         for (const auto& access1 : job1.ComponentAccesses) {
-            if (!access1.ComponentType) continue;
-
             for (const auto& access2 : job2.ComponentAccesses) {
-                if (!access2.ComponentType) continue;
-
                 // Check if accessing same component
-                if (*access1.ComponentType == *access2.ComponentType) {
+                if (access1.ComponentId == access2.ComponentId) {
                     // Conflict if either is writing
-                    if (access1.AccessType != ComponentAccessType::Read ||
-                        access2.AccessType != ComponentAccessType::Read) {
+                    if (access1.Mode != ComponentAccessMode::Read ||
+                        access2.Mode != ComponentAccessMode::Read) {
                         return false;  // Conflict detected
                     }
                 }

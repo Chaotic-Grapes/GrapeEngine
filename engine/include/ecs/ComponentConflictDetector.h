@@ -17,7 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef ECS_COMPONENT_CONFLICT_DETECTOR_H
 #define ECS_COMPONENT_CONFLICT_DETECTOR_H
 
-#include "ecs/SystemMetadata.h"
+#include "ecs/ISystem.h"
 #include <vector>
 #include <string>
 

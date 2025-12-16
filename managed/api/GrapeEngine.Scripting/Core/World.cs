@@ -21,10 +21,17 @@ namespace GrapeEngine.Scripting.Core;
 /// <summary>
 /// Represents the ECS World, which contains all entities and their components.
 /// Use this to create, destroy, and query entities from C# systems.
+/// 
+/// THREAD SAFETY:
+/// - All entity/component operations must be called from the main thread
+/// - The job system (IJob) provides safe parallelism with proper synchronization
+/// - Query iterators are not reentrant-safe and must not be stored across thread boundaries
+/// - Do NOT access the World from multiple threads without IJob
 /// </summary>
-public class World
+public class World : IDisposable
 {
     private readonly IntPtr _nativeWorldPtr;
+    private bool _disposed;
 
     /// <summary>
     /// Internal constructor. World instances are created by the engine.
@@ -32,12 +39,34 @@ public class World
     internal unsafe World(void* nativeWorldPtr)
     {
         _nativeWorldPtr = (IntPtr)nativeWorldPtr;
+        _disposed = false;
     }
 
     /// <summary>
     /// Internal accessor for native World pointer.
     /// </summary>
-    internal unsafe void* NativePtr => (void*)_nativeWorldPtr;
+    internal unsafe void* NativePtr
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return (void*)_nativeWorldPtr;
+        }
+    }
+
+    /// <summary>
+    /// Check if this World instance has been disposed.
+    /// </summary>
+    public bool IsDisposed => _disposed;
+
+    /// <summary>
+    /// Throw if this World has been disposed.
+    /// </summary>
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(World), "Cannot access a disposed World instance");
+    }
 
     // ============================================================================
     // Entity Lifecycle
@@ -458,7 +487,36 @@ public class World
     /// <returns>Array of optimization recommendations sorted by priority</returns>
     public OptimizationRecommendation[] GetOptimizationRecommendations()
     {
+        ThrowIfDisposed();
         return [.. JobManager.OptimizationProfiler.GetRecommendations().OrderBy(r => r.Priority)];
+    }
+
+    // ============================================================================
+    // Lifetime Management (IDisposable)
+    // ============================================================================
+
+    /// <summary>
+    /// Dispose this World instance and release resources.
+    /// After disposal, any attempts to use this World will throw ObjectDisposedException.
+    /// 
+    /// NOTE: The C++ World itself is owned and managed by the C++ engine.
+    /// This managed wrapper only controls access to the native pointer.
+    /// </summary>
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _disposed = true;
+            GC.SuppressFinalize(this);
+        }
+    }
+
+    /// <summary>
+    /// Ensure proper cleanup if Dispose is not called.
+    /// </summary>
+    ~World()
+    {
+        Dispose();
     }
 }
 

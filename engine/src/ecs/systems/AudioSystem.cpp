@@ -286,8 +286,10 @@ SystemMetadata AudioSystem::GetMetadata() const {
     // Note: AudioSystem reads AudioSource and WorldTransform components
     // but uses them through custom service lookups, not direct ECS iteration.
     // Declaring minimal access for dependency tracking.
-    // Execution order: run after gameplay logic
+    // Execution parameters
     builder.SetExecutionOrder(50);
+    builder.SetGroup(SystemGroup::Update);
+    builder.SetRunMode(SystemRunMode::PlayOnly);
     return builder.Build();
 }
 

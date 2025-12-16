@@ -25,6 +25,12 @@ namespace GrapeEngine.Scripting.Query;
 /// component composition. It supports efficient bulk operations on entities with specific
 /// component types.
 /// 
+/// THREAD SAFETY:
+/// - All query operations must be called from the main thread
+/// - Query iterators are NOT reentrant-safe - do not store iterators across iterations
+/// - Do NOT call query methods from multiple threads simultaneously
+/// - For parallelized iteration, use the Job system (IJob) with WorldAPI directly
+/// 
 /// MAXIMUM COMPONENTS SUPPORTED:
 /// This implementation supports up to 8 components per single query (Query<T1> through Query<T1..T8>).
 /// For queries requiring more than 8 components, break them into multiple smaller queries or

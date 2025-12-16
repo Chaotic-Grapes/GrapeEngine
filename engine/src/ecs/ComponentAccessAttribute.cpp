@@ -22,12 +22,15 @@ namespace ECS {
 
     SystemMetadata ComponentAccessBuilder::Build() {
         SystemMetadata metadata;
-        metadata.Name = m_name;
-        metadata.ReadComponents = m_readComponents;         // Deprecated, for backward compat
-        metadata.WriteComponents = m_writeComponents;       // Deprecated, for backward compat
-        metadata.ComponentAccesses = m_accesses;            // New unified field
-        metadata.ExecutionOrder = m_executionOrder;
-        metadata.Enabled = m_enabled;
+        
+        // Use member initialization - direct access via friend class
+        metadata.m_name = m_name;
+        metadata.m_componentAccesses = m_accesses;
+        metadata.m_executionOrder = m_executionOrder;
+        metadata.m_group = m_group;
+        metadata.m_runMode = m_runMode;
+        metadata.m_enabled = m_enabled;
+        metadata.m_systemPtr = m_systemPtr;
         
         // Validate component accesses
         std::vector<std::string> validationErrors;
@@ -45,6 +48,30 @@ namespace ECS {
         return metadata;
     }
 
+    // Compute read components from the unified ComponentAccesses list
+    std::vector<ComponentTypeId> SystemMetadata::GetReadComponents() const {
+        std::vector<ComponentTypeId> result;
+        for (const auto& access : m_componentAccesses) {
+            if (access.Mode == ComponentAccessMode::Read || 
+                access.Mode == ComponentAccessMode::ReadWrite) {
+                result.push_back(access.ComponentId);
+            }
+        }
+        return result;
+    }
+
+    // Compute write components from the unified ComponentAccesses list
+    std::vector<ComponentTypeId> SystemMetadata::GetWriteComponents() const {
+        std::vector<ComponentTypeId> result;
+        for (const auto& access : m_componentAccesses) {
+            if (access.Mode == ComponentAccessMode::Write || 
+                access.Mode == ComponentAccessMode::ReadWrite) {
+                result.push_back(access.ComponentId);
+            }
+        }
+        return result;
+    }
+
     bool ComponentAccessValidator::Validate(const ComponentAccessBuilder& builder) {
         std::vector<std::string> errors;
         return ValidateWithErrors(builder, errors);
@@ -59,16 +86,6 @@ namespace ECS {
         if (HasDuplicates(builder.GetAccesses())) {
             outErrors.push_back("Duplicate component declarations found");
             isValid = false;
-        }
-
-        // Check for components declared in both read and write with conflicting modes
-        for (const auto& readComp : builder.m_readComponents) {
-            auto writeIt = std::find(builder.m_writeComponents.begin(),
-                                     builder.m_writeComponents.end(),
-                                     readComp);
-            
-            // Having same component in both read and write is OK (it's read-write mode)
-            // But we could add validation for intentional read-write vs separate read/write declarations
         }
 
         return isValid;

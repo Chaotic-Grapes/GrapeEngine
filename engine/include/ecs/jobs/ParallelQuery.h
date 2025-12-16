@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Chunk.h"
 #include "ecs/jobs/JobHandle.h"
 #include "ecs/jobs/IJob.h"
+#include "ecs/ComponentAccessAttribute.h"
 
 namespace ECS {
 
@@ -164,15 +165,16 @@ namespace ECS {
              */
             template<typename Component>
             void SetComponentAsWritable() {
+                ComponentTypeId id = TypeIdOf<Component>();
                 for (auto& access : m_accesses) {
-                    if (*access.ComponentType == typeid(Component)) {
-                        access.AccessType = ComponentAccessType::Write;
+                    if (access.ComponentId == id) {
+                        access.Mode = ComponentAccessMode::Write;
                         return;
                     }
                 }
                 // Not found, add it
                 m_accesses.emplace_back(
-                    ComponentAccess(typeid(Component), ComponentAccessType::Write)
+                    ComponentAccess(id, ComponentAccessMode::Write)
                 );
             }
 

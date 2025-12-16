@@ -92,13 +92,13 @@ namespace ECS {
     }
 
     SystemMetadata GUISystem::GetMetadata() const {
-        return {
-            "GUISystem",
-            {},  // ReadComponents
-            { ComponentRegistry::Type<GUI::GUIElement>() },  // WriteComponents
-            0,   // ExecutionOrder
-            true // Enabled
-        };
+        return ComponentAccessBuilder("GUISystem")
+            .WriteComponent<GUI::GUIElement>()
+            .SetExecutionOrder(0)
+            .SetGroup(SystemGroup::PreRender)
+            .SetRunMode(SystemRunMode::PlayOnly)
+            .SetEnabled(true)
+            .Build();
     }
 
     // ========================================================================

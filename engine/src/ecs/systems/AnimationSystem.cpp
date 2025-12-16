@@ -36,8 +36,10 @@ namespace ECS {
         builder.WriteComponent<Components::SpriteSheetAnimation2D>();
         builder.WriteComponent<Components::AnimationState2D>();
         builder.WriteComponent<Components::SpriteRenderer2D>();
-        // Execution order in Animation group
+        // Execution parameters
         builder.SetExecutionOrder(200);
+        builder.SetGroup(SystemGroup::Update);
+        builder.SetRunMode(SystemRunMode::PlayOnly);
         return builder.Build();
     }
 

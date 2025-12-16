@@ -23,20 +23,21 @@ namespace ECS {
         const SystemMetadata& metaA,
         const SystemMetadata& metaB)
     {
-        // Prefer using ComponentAccesses if available
-        // Fall back to Read/Write lists for backward compatibility
+        // Use the new unified ComponentAccesses API
+        const auto& accessesA = metaA.GetComponentAccesses();
+        const auto& accessesB = metaB.GetComponentAccesses();
         
-        if (!metaA.ComponentAccesses.empty() && !metaB.ComponentAccesses.empty()) {
+        if (!accessesA.empty() && !accessesB.empty()) {
             // Both have accesses in new format - use mode-aware conflict detection
-            return _hasAccessConflict(metaA.ComponentAccesses, metaB.ComponentAccesses);
+            return _hasAccessConflict(accessesA, accessesB);
         }
         
         // Fall back to simple Read/Write conflict detection for backward compatibility
         return HasConflict(
-            metaA.WriteComponents,
-            metaB.WriteComponents,
-            metaA.ReadComponents,
-            metaB.ReadComponents
+            metaA.GetWriteComponents(),
+            metaB.GetWriteComponents(),
+            metaA.GetReadComponents(),
+            metaB.GetReadComponents()
         );
     }
 
@@ -66,40 +67,46 @@ namespace ECS {
     {
         std::vector<std::string> conflicts;
 
+        // Get component lists from metadata
+        auto writeA = metaA.GetWriteComponents();
+        auto writeB = metaB.GetWriteComponents();
+        auto readA = metaA.GetReadComponents();
+        auto readB = metaB.GetReadComponents();
+
         // Check write-write conflicts
-        for (const auto& compA : metaA.WriteComponents) {
-            for (const auto& compB : metaB.WriteComponents) {
+        for (const auto& compA : writeA) {
+            for (const auto& compB : writeB) {
                 if (compA == compB) {
                     std::stringstream ss;
-                    ss << "Both " << metaA.Name << " and " << metaB.Name
+                    ss << "Both " << metaA.GetName() << " and " << metaB.GetName()
                        << " write to component 0x" << std::hex << std::setfill('0')
-                       << std::setw(8) << compA.Hash;
+                       << std::setw(8) << compA;
                     conflicts.push_back(ss.str());
                 }
             }
         }
 
         // Check write-read conflicts
-        for (const auto& compA : metaA.WriteComponents) {
-            for (const auto& compB : metaB.ReadComponents) {
+        for (const auto& compA : writeA) {
+            for (const auto& compB : readB) {
                 if (compA == compB) {
                     std::stringstream ss;
-                    ss << metaA.Name << " writes to component (0x" << std::hex
-                       << std::setfill('0') << std::setw(8) << compA.Hash
-                       << ") that " << metaB.Name << " reads";
+                    ss << metaA.GetName() << " writes to component (0x" << std::hex
+                       << std::setfill('0') << std::setw(8) << compA
+                       << ") that " << metaB.GetName() << " reads";
                     conflicts.push_back(ss.str());
                 }
             }
         }
 
         // Check read-write conflicts
-        for (const auto& compA : metaA.ReadComponents) {
-            for (const auto& compB : metaB.WriteComponents) {
+        for (const auto& compA : readA) {
+            for (const auto& compB : writeB) {
                 if (compA == compB) {
                     std::stringstream ss;
-                    ss << metaA.Name << " reads component (0x" << std::hex
-                       << std::setfill('0') << std::setw(8) << compA.Hash
-                       << ") that " << metaB.Name << " writes";
+                    ss << metaA.GetName() << " reads component (0x" << std::hex
+                       << std::setfill('0') << std::setw(8) << compA
+                       << ") that " << metaB.GetName() << " writes";
                     conflicts.push_back(ss.str());
                 }
             }

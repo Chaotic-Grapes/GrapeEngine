@@ -172,8 +172,10 @@ namespace ECS {
         // Write accesses
         builder.WriteComponent<Components::LocalTransform>();
         builder.WriteComponent<Components::Rigidbody2D>();
-        // Execution order in Physics group
+        // Execution parameters
         builder.SetExecutionOrder(0);
+        builder.SetGroup(SystemGroup::Physics);
+        builder.SetRunMode(SystemRunMode::PlayOnly);
         return builder.Build();
     }
 

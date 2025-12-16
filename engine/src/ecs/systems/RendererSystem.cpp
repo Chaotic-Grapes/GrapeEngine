@@ -139,6 +139,8 @@ namespace ECS {
         // For now, marking as read-only with minimal dependency tracking.
         // Full component access list documented in OnUpdate().
         builder.SetExecutionOrder(0);
+        builder.SetGroup(SystemGroup::Render);
+        builder.SetRunMode(SystemRunMode::Always);
         return builder.Build();
     }
 

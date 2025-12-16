@@ -36,25 +36,20 @@ namespace ECS {
             m_dependents[system] = {};
             
             // Create metadata entry for this system
-            SystemDependencyMetadata meta;
-            meta.System = system;
-            meta.Name = system->GetMetadata().Name;
-            meta.ReadComponents = system->GetMetadata().ReadComponents;
-            meta.WriteComponents = system->GetMetadata().WriteComponents;
-            meta.ExecutionOrder = system->GetMetadata().ExecutionOrder;
+            SystemMetadata meta = system->GetMetadata();
             m_systemMetadata.push_back(meta);
         }
     }
 
-    void SystemDependencyGraph::AddSystemMetadata(const SystemDependencyMetadata& metadata) {
-        if (!metadata.System) return;
+    void SystemDependencyGraph::AddSystemMetadata(const SystemMetadata& metadata) {
+        if (!metadata.GetSystemPtr()) return;
 
         // Check if already added
-        auto it = std::find(m_systems.begin(), m_systems.end(), metadata.System);
+        auto it = std::find(m_systems.begin(), m_systems.end(), metadata.GetSystemPtr());
         if (it == m_systems.end()) {
-            m_systems.push_back(metadata.System);
-            m_dependencies[metadata.System] = {};
-            m_dependents[metadata.System] = {};
+            m_systems.push_back(metadata.GetSystemPtr());
+            m_dependencies[metadata.GetSystemPtr()] = {};
+            m_dependents[metadata.GetSystemPtr()] = {};
             m_systemMetadata.push_back(metadata);
         }
     }
@@ -71,8 +66,8 @@ namespace ECS {
                 if (_hasComponentConflict(systemA, systemB)) {
                     // systemB must wait for systemA
                     // (based on execution order in metadata)
-                    int orderA = systemA->GetMetadata().ExecutionOrder;
-                    int orderB = systemB->GetMetadata().ExecutionOrder;
+                    int orderA = systemA->GetMetadata().GetExecutionOrder();
+                    int orderB = systemB->GetMetadata().GetExecutionOrder();
 
                     if (orderA < orderB) {
                         // A comes before B, so B depends on A
@@ -120,12 +115,12 @@ namespace ECS {
         return true;  // No dependency relationship
     }
 
-    bool SystemDependencyGraph::CanRunInParallel(const SystemDependencyMetadata& sys1,
-                                                const SystemDependencyMetadata& sys2) const {
-        // Use unified conflict detector
+    bool SystemDependencyGraph::CanRunInParallel(const SystemMetadata& sys1,
+                                                const SystemMetadata& sys2) const {
+        // Use unified conflict detector with computed read/write components
         return !ComponentConflictDetector::HasConflict(
-            sys1.WriteComponents, sys2.WriteComponents,
-            sys1.ReadComponents, sys2.ReadComponents
+            sys1.GetWriteComponents(), sys2.GetWriteComponents(),
+            sys1.GetReadComponents(), sys2.GetReadComponents()
         );
     }
 
@@ -214,7 +209,7 @@ namespace ECS {
         std::unordered_map<int, std::vector<std::string>> orderMap;
         for (auto* system : m_systems) {
             auto meta = system->GetMetadata();
-            orderMap[meta.ExecutionOrder].push_back(meta.Name);
+            orderMap[meta.GetExecutionOrder()].push_back(meta.GetName());
         }
 
         for (const auto& [order, names] : orderMap) {
@@ -237,23 +232,23 @@ namespace ECS {
 
             // Check for duplicate components within read/write lists
             std::unordered_set<uint32_t> seenRead;
-            for (auto compId : meta.ReadComponents) {
-                if (seenRead.count(compId.Hash)) {
+            for (auto compId : meta.GetReadComponents()) {
+                if (seenRead.count(compId)) {
                     std::stringstream ss;
-                    ss << "System " << meta.Name << " declares same component multiple times in ReadComponents";
+                    ss << "System " << meta.GetName() << " declares same component multiple times in ReadComponents";
                     errors.push_back(ss.str());
                 }
-                seenRead.insert(compId.Hash);
+                seenRead.insert(compId);
             }
 
             std::unordered_set<uint32_t> seenWrite;
-            for (auto compId : meta.WriteComponents) {
-                if (seenWrite.count(compId.Hash)) {
+            for (auto compId : meta.GetWriteComponents()) {
+                if (seenWrite.count(compId)) {
                     std::stringstream ss;
-                    ss << "System " << meta.Name << " declares same component multiple times in WriteComponents";
+                    ss << "System " << meta.GetName() << " declares same component multiple times in WriteComponents";
                     errors.push_back(ss.str());
                 }
-                seenWrite.insert(compId.Hash);
+                seenWrite.insert(compId);
             }
         }
 
@@ -279,7 +274,7 @@ namespace ECS {
         // Filter systems by group
         std::vector<ISystem*> groupSystems;
         for (size_t i = 0; i < m_systemMetadata.size(); ++i) {
-            if (m_systemMetadata[i].Group == group) {
+            if (m_systemMetadata[i].GetGroup() == group) {
                 groupSystems.push_back(m_systems[i]);
             }
         }
@@ -343,7 +338,7 @@ namespace ECS {
         return stages;
     }
 
-    const SystemDependencyMetadata* SystemDependencyGraph::GetSystemMetadata(ISystem* system) const {
+    const SystemMetadata* SystemDependencyGraph::GetSystemMetadata(ISystem* system) const {
         for (size_t i = 0; i < m_systems.size(); ++i) {
             if (m_systems[i] == system) {
                 return &m_systemMetadata[i];

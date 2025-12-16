@@ -19,6 +19,11 @@ namespace GrapeEngine.Scripting.Core;
 
 /// <summary>
 /// Represents an entity in the ECS World. Entities are containers for components.
+/// 
+/// THREAD SAFETY:
+/// - All operations on an Entity must be called from the main thread
+/// - Entities obtained from queries are only valid during the query iteration
+/// - Do NOT store entity references across frame boundaries without validating IsAlive
 /// </summary>
 public class Entity
 {
@@ -30,6 +35,9 @@ public class Entity
     /// </summary>
     internal Entity(World world, ulong id)
     {
+        ArgumentNullException.ThrowIfNull(world);
+        if (world.IsDisposed)
+            throw new ObjectDisposedException(nameof(World), "Cannot create entities in a disposed World");
         _world = world;
         _id = id;
     }
@@ -69,13 +77,21 @@ public class Entity
     /// </summary>
     /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
     /// <returns>True if component exists, false otherwise</returns>
+    /// <exception cref="ObjectDisposedException">If the world has been disposed</exception>
     public bool HasComponent<T>() where T : unmanaged
     {
+        if (_world.IsDisposed)
+            return false; // Disposed world has no components
+        
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
         unsafe
         {
-            return WorldAPI.HasComponent(_world.NativePtr, _id, typeHash);
+            void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                return false; // Invalid world state
+            
+            return WorldAPI.HasComponent(nativePtr, _id, typeHash);
         }
     }
 
@@ -84,20 +100,26 @@ public class Entity
     /// </summary>
     /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
     /// <returns>Reference to the component data</returns>
-    /// <exception cref="InvalidOperationException">If component doesn't exist</exception>
+    /// <exception cref="InvalidOperationException">If component doesn't exist or world is invalid</exception>
+    /// <exception cref="ObjectDisposedException">If the world has been disposed</exception>
     public ref T GetComponent<T>() where T : unmanaged
     {
+        if (_world.IsDisposed)
+            throw new ObjectDisposedException(nameof(World), "Cannot access components in a disposed World");
+        
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
 
         unsafe
         {
             void* nativePtr = _world.NativePtr;
-            void* componentPtr = WorldAPI.GetComponentPtr(nativePtr, _id, typeHash);
+            if (nativePtr == null)
+                throw new InvalidOperationException("World's native pointer is null - the World may have been released by the engine");
             
+            void* componentPtr = WorldAPI.GetComponentPtr(nativePtr, _id, typeHash);
             if (componentPtr == null)
                 throw new InvalidOperationException($"Entity {_id} does not have component {typeof(T).Name}");
-            
+
             return ref *(T*)componentPtr;
         }
     }
@@ -107,16 +129,23 @@ public class Entity
     /// </summary>
     public bool TryGetComponent<T>(out T component) where T : unmanaged
     {
+        component = default;
+        
+        if (_world.IsDisposed)
+            return false; // Disposed world
+        
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
         unsafe
         {
             void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                return false; // Invalid world state
+            
             void* componentPtr = WorldAPI.GetComponentPtr(nativePtr, _id, typeHash);
 
             if (componentPtr == null)
             {
-                component = default;
                 return false;
             }
 
@@ -128,8 +157,13 @@ public class Entity
     /// <summary>
     /// Add a component to this entity.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">If the world has been disposed</exception>
+    /// <exception cref="InvalidOperationException">If the component cannot be added</exception>
     public ref T AddComponent<T>(T component = default) where T : unmanaged
     {
+        if (_world.IsDisposed)
+            throw new ObjectDisposedException(nameof(World), "Cannot add components to entities in a disposed World");
+        
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
         int size = Marshal.SizeOf<T>();
@@ -137,12 +171,14 @@ public class Entity
         unsafe
         {
             void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                throw new InvalidOperationException("World's native pointer is null - the World may have been released by the engine");
+            
             void* componentData = &component;
             void* addedPtr = WorldAPI.AddComponent(nativePtr, _id, typeHash, componentData, size);
-            
             if (addedPtr == null)
                 throw new InvalidOperationException($"Failed to add component {typeof(T).Name} to entity {_id}");
-            
+
             return ref *(T*)addedPtr;
         }
     }
@@ -169,13 +205,21 @@ public class Entity
     /// Remove a component from this entity.
     /// </summary>
     /// <typeparam name="T">Component type (must be unmanaged struct)</typeparam>
+    /// <exception cref="ObjectDisposedException">If the world has been disposed</exception>
     public void RemoveComponent<T>() where T : unmanaged
     {
+        if (_world.IsDisposed)
+            return; // Already disposed, nothing to remove
+        
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
         unsafe
         {
-            WorldAPI.RemoveComponent(_world.NativePtr, _id, typeHash);
+            void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                return; // Invalid world state, can't remove
+            
+            WorldAPI.RemoveComponent(nativePtr, _id, typeHash);
         }
     }
 
@@ -198,14 +242,21 @@ public class Entity
     /// Attach this entity as a child to the specified parent entity.
     /// </summary>
     /// <param name="parent">The parent entity</param>
+    /// <exception cref="ObjectDisposedException">If the world has been disposed</exception>
     public void AttachTo(Entity parent)
     {
-        if (parent == null)
-            throw new ArgumentNullException(nameof(parent));
+        if (_world.IsDisposed)
+            throw new ObjectDisposedException(nameof(World), "Cannot attach entities in a disposed World");
+
+        ArgumentNullException.ThrowIfNull(parent);
 
         unsafe
         {
-            WorldAPI.AttachChild(_world.NativePtr, _id, parent._id);
+            void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                throw new InvalidOperationException("World's native pointer is null");
+            
+            WorldAPI.AttachChild(nativePtr, _id, parent._id);
         }
     }
 
@@ -214,9 +265,16 @@ public class Entity
     /// </summary>
     public void Detach()
     {
+        if (_world.IsDisposed)
+            return; // Already disposed, nothing to detach
+        
         unsafe
         {
-            WorldAPI.DetachChild(_world.NativePtr, _id);
+            void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                return; // Invalid world state
+            
+            WorldAPI.DetachChild(nativePtr, _id);
         }
     }
 
@@ -226,9 +284,16 @@ public class Entity
     /// <returns>The parent entity, or null if this entity has no parent</returns>
     public Entity? GetParent()
     {
+        if (_world.IsDisposed)
+            return null;
+        
         unsafe
         {
-            ulong parentId = WorldAPI.GetParent(_world.NativePtr, _id);
+            void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                return null;
+            
+            ulong parentId = WorldAPI.GetParent(nativePtr, _id);
 
             // Check for null/invalid entity (max uint64)
             if (parentId == ulong.MaxValue)
@@ -246,9 +311,16 @@ public class Entity
     /// <returns>The first child entity, or null if this entity has no children</returns>
     public Entity? GetFirstChild()
     {
+        if (_world.IsDisposed)
+            return null;
+        
         unsafe
         {
-            ulong childId = WorldAPI.GetFirstChild(_world.NativePtr, _id);
+            void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                return null;
+            
+            ulong childId = WorldAPI.GetFirstChild(nativePtr, _id);
 
             // Check for null/invalid entity
             if (childId == ulong.MaxValue)
@@ -266,9 +338,16 @@ public class Entity
     /// <returns>The next sibling entity, or null if this is the last child</returns>
     public Entity? GetNextSibling()
     {
+        if (_world.IsDisposed)
+            return null;
+        
         unsafe
         {
-            ulong siblingId = WorldAPI.GetNextSibling(_world.NativePtr, _id);
+            void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                return null;
+            
+            ulong siblingId = WorldAPI.GetNextSibling(nativePtr, _id);
 
             // Check for null/invalid entity
             if (siblingId == ulong.MaxValue)
@@ -286,9 +365,16 @@ public class Entity
     /// <returns>The child count</returns>
     public int GetChildCount()
     {
+        if (_world.IsDisposed)
+            return 0;
+        
         unsafe
         {
-            return WorldAPI.GetChildCount(_world.NativePtr, _id);
+            void* nativePtr = _world.NativePtr;
+            if (nativePtr == null)
+                return 0;
+            
+            return WorldAPI.GetChildCount(nativePtr, _id);
         }
     }
 
@@ -298,7 +384,10 @@ public class Entity
     /// <param name="action">Action to invoke for each child</param>
     public void ForEachChild(Action<Entity> action)
     {
-        if (action == null) throw new ArgumentNullException(nameof(action));
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_world.IsDisposed)
+            return; // No children to iterate over
 
         Entity? child = GetFirstChild();
         while (child != null)
@@ -314,6 +403,9 @@ public class Entity
     /// <returns>List of child entities</returns>
     public List<Entity> GetChildren()
     {
+        if (_world.IsDisposed)
+            return []; // Empty list for disposed world
+        
         var children = new List<Entity>(GetChildCount());
         ForEachChild(child => children.Add(child));
         return children;

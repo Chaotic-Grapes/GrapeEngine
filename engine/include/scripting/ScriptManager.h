@@ -34,6 +34,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_map>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 // CoreCLR handle
 using hostfxr_handle = void*;
@@ -222,6 +223,7 @@ namespace ECS {
         inline auto GetCallSystemOnUpdate() const { return m_callSystemOnUpdate; }
         inline auto GetCallSystemOnDestroy() const { return m_callSystemOnDestroy; }
         inline auto GetGetSystemMetadata() const { return m_getSystemMetadata; }
+        inline auto GetGetSystemComponentAccesses() const { return m_getSystemComponentAccesses; }
 
     private:
         // ====================================================================
@@ -248,6 +250,7 @@ namespace ECS {
         using CreateSystemWrapperFn     = uint64_t(*)(const char* typeName);
         using DestroySystemWrapperFn    = void(*)(uint64_t handle);
         using GetSystemMetadataFn       = void(*)(uint64_t handle, char* outName, int* outGroup, int* outRunMode);
+        using GetSystemComponentAccessesFn = int(*)(uint64_t handle, uint32_t* outReadHashes, uint32_t* outWriteHashes, int maxSize);
         using CallSystemOnCreateFn      = void(*)(uint64_t handle, void* worldPtr);
         using CallSystemOnUpdateFn      = void(*)(uint64_t handle, void* worldPtr, float deltaTime);
         using CallSystemOnDestroyFn     = void(*)(uint64_t handle, void* worldPtr);
@@ -259,6 +262,7 @@ namespace ECS {
         CreateSystemWrapperFn       m_createSystemWrapper = nullptr;
         DestroySystemWrapperFn      m_destroySystemWrapper = nullptr;
         GetSystemMetadataFn         m_getSystemMetadata = nullptr;
+        GetSystemComponentAccessesFn m_getSystemComponentAccesses = nullptr;
         CallSystemOnCreateFn        m_callSystemOnCreate = nullptr;
         CallSystemOnUpdateFn        m_callSystemOnUpdate = nullptr;
         CallSystemOnDestroyFn       m_callSystemOnDestroy = nullptr;
@@ -341,11 +345,10 @@ namespace ECS {
         ScriptManager* m_scriptManager;     // Parent script manager
         std::string m_typeName;             // C# type name (e.g., "MyGame.PlayerSystem")
 
-        // Cached metadata
-        mutable SystemMetadata m_metadata;
-        mutable SystemGroup m_group;
-        mutable SystemRunMode m_runMode;
-        mutable bool m_metadataCached = false;
+        // Cached metadata (initialized on first call to GetMetadata)
+        mutable std::optional<SystemMetadata> m_metadata;
+        mutable SystemGroup m_group = SystemGroup::Update;
+        mutable SystemRunMode m_runMode = SystemRunMode::PlayOnly;
 
         void CacheMetadata() const;
     };
