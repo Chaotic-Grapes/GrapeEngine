@@ -6,11 +6,22 @@
 \date   15th November 2025
 
 \brief
-UI-specific component registry for the inspector panel.
+Editor UI registry that bridges the native ECS ComponentRegistry with editor operations.
 
-This registry stores editor-only metadata for component UI presentation. It provides 
-display names, render functions and entity operations for all components. Unlike 
-the runtime ECS registry, this handles only UI concerns, not memory management.
+This registry queries the native ECS::ComponentRegistry (which is the single source of truth
+for all registered components - both C++ and C#) and provides editor-specific metadata:
+- Display names for UI presentation
+- Custom render functions for specialized component editors
+- Default JSON values for new instances
+
+The native registry is queried at runtime to discover all registered components. For each
+component, the editor either uses a hardcoded specialized renderer (C++ components) or a
+generic JSON editor (C# components).
+
+This approach ensures:
+1. Single source of truth: ECS::ComponentRegistry
+2. No redundancy: C# components discovered at runtime are automatically available
+3. Separation of concerns: Native registry handles ECS, editor registry handles UI
 */
 /* End Header *******************************************************************/
 
@@ -20,25 +31,26 @@ the runtime ECS registry, this handles only UI concerns, not memory management.
 #include <string>
 #include <vector>
 #include <functional>
+#include <unordered_map>
 #include <nlohmann/json.hpp>
 #include "ecs/World.h"
 
 class ComponentUI;
 
-// -----------------------------------------------------------------------------
+// =============================================================================
 // Metadata Structure
-// -----------------------------------------------------------------------------
+// =============================================================================
 
 struct ComponentUIMetadata {
     std::string DisplayName;    // "Sprite Renderer"
     std::string TypeName;       // "SpriteRenderer2D" 
     std::string FullTypeName;   // "ECS::Components::SpriteRenderer2D"
+    uint32_t TypeHash;          // FNV-1a hash from native registry
     bool CanDelete;             // Whether component can be removed from entities
 
-    // std::function wraps any callable object (function pointer, lambda, functor)
-    // Takes ComponentUI reference, JSON data, the entity being inspected and
-    // the world pointer (may be null for prefab editing) so renderers can
-    // access live ECS data when available.
+    // Render function for editing component properties
+    // For C++ components: calls specialized RenderXXX function
+    // For C# components: uses generic JSON editor
     std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)> RenderUI;
 
     // Returns default JSON values for creating new component instances
@@ -57,17 +69,26 @@ struct ComponentUIMetadata {
     std::function<void(ECS::World*, ECS::Entity, const nlohmann::json&)> ApplyToEntity;
 };
 
-// -----------------------------------------------------------------------------
+// =============================================================================
 // Registry Class
-// -----------------------------------------------------------------------------
+// =============================================================================
 
 class ComponentRegistryUI {
 public:
-    // Returns all registered component metadata for UI display and operations
+    // Returns all registered component metadata from the native ECS registry.
+    // Queries ECS::ComponentRegistry to discover C++ and C# components.
     static const std::vector<ComponentUIMetadata>& GetAll();
 
-    // Finds component metadata by type name, matches both short and full type names
+    // Finds component metadata by type name (short or full).
     static const ComponentUIMetadata* Find(const std::string& typeName);
+
+    // Rebuild the editor registry by querying the native ECS registry.
+    // Called after C# components have been registered.
+    static void RebuildFromNativeRegistry();
+
+private:
+    // Keep track of which native component IDs have been added to avoid duplicates
+    static std::unordered_map<uint32_t, size_t>& _idToEditorIndex();
 };
 
 #endif

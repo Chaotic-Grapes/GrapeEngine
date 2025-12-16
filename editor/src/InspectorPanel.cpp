@@ -102,6 +102,10 @@ void InspectorPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
 
     // Forward fonts into the smaller ComponentUI helper so it can draw fields
     m_componentUI.Initialize(mainFont, boldFont, symbolsFont);
+    
+    // Rebuild the editor component registry from the native ECS registry
+    // This discovers all registered components (both C++ and C# that were discovered)
+    ComponentRegistryUI::RebuildFromNativeRegistry();
 }
 
 // Update the world context and clear any stale selection from a previous world
@@ -583,6 +587,19 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
         ImGui::PopFont();
         ImGui::Separator();
 
+        // Reset search when popup first appears
+        if (ImGui::IsWindowAppearing()) {
+            m_addComponentSearchBuffer[0] = '\0';
+            m_addComponentSearchFilter.clear();
+        }
+
+        // Search input
+        if (ImGui::InputTextWithHint("##AddCompSearch", "Search...", m_addComponentSearchBuffer, sizeof(m_addComponentSearchBuffer))) {
+            m_addComponentSearchFilter = m_addComponentSearchBuffer;
+        }
+
+        ImGui::Separator();
+
         // Get registry and create sorted list
         const auto& registry = ComponentRegistryUI::GetAll();
         
@@ -592,7 +609,7 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
             ImGui::EndPopup();
             return;
         }
-        
+
         std::vector<size_t> sortedIndices;
         for (size_t i = 0; i < registry.size(); ++i) {
             sortedIndices.push_back(i);
@@ -603,9 +620,34 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
             return registry[a].DisplayName < registry[b].DisplayName;
             });
 
+        // Limit the popup height and make the list scrollable
+        float avail = ImGui::GetContentRegionAvail().y;
+        float maxListHeight = 400.f;
+        if (maxListHeight < 120.0f) maxListHeight = 120.0f;
+
+        ImGui::BeginChild("AddComponentList", ImVec2(0, maxListHeight), false, ImGuiWindowFlags_None);
+
+        // Helper to lowercase strings for case-insensitive search
+        auto toLower = [](const std::string& s) {
+            std::string out = s;
+            std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c){ return std::tolower(c); });
+            return out;
+        };
+
+        std::string filterLower = toLower(m_addComponentSearchFilter);
+
         // Iterate over sorted components
         for (size_t idx : sortedIndices) {
             const auto& meta = registry[idx];
+
+            // Apply search filter if present
+            if (!filterLower.empty()) {
+                std::string nameLower = toLower(meta.DisplayName);
+                std::string typeLower = toLower(meta.TypeName);
+                if (nameLower.find(filterLower) == std::string::npos && typeLower.find(filterLower) == std::string::npos) {
+                    continue;
+                }
+            }
 
             // Check if the entity already has this component
             bool hasComponent = meta.HasComponent(m_world, entity);
@@ -623,6 +665,8 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
                 ImGui::EndDisabled();
             }
         }
+
+        ImGui::EndChild();
         ImGui::EndPopup();
     }
 }
@@ -770,6 +814,19 @@ void InspectorPanel::_renderPrefabActions() {
         ImGui::PopFont();
         ImGui::Separator();
 
+        // Reset search when popup first appears
+        if (ImGui::IsWindowAppearing()) {
+            m_addComponentSearchBuffer[0] = '\0';
+            m_addComponentSearchFilter.clear();
+        }
+
+        // Search input
+        if (ImGui::InputTextWithHint("##AddCompSearchPrefab", "Search...", m_addComponentSearchBuffer, sizeof(m_addComponentSearchBuffer))) {
+            m_addComponentSearchFilter = m_addComponentSearchBuffer;
+        }
+
+        ImGui::Separator();
+
         // Get registry and create sorted list
         const auto& registry = ComponentRegistryUI::GetAll();
         std::vector<size_t> sortedIndices;
@@ -782,9 +839,34 @@ void InspectorPanel::_renderPrefabActions() {
             return registry[a].DisplayName < registry[b].DisplayName;
             });
 
+        // Limit popup height and make the list scrollable
+
+        float avail = ImGui::GetContentRegionAvail().y;
+        float maxListHeight = 400.0f;
+        if (maxListHeight < 120.0f) maxListHeight = 120.0f;
+        ImGui::BeginChild("AddComponentListPrefab", ImVec2(0, maxListHeight), false, ImGuiWindowFlags_None);
+
+        // Helper to lowercase strings for case-insensitive search
+        auto toLower = [](const std::string& s) {
+            std::string out = s;
+            std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c){ return std::tolower(c); });
+            return out;
+        };
+
+        std::string filterLower = toLower(m_addComponentSearchFilter);
+
         // Iterate over sorted components
         for (size_t idx : sortedIndices) {
             const auto& meta = registry[idx];
+
+            // Apply search filter if present
+            if (!filterLower.empty()) {
+                std::string nameLower = toLower(meta.DisplayName);
+                std::string typeLower = toLower(meta.TypeName);
+                if (nameLower.find(filterLower) == std::string::npos && typeLower.find(filterLower) == std::string::npos) {
+                    continue;
+                }
+            }
 
             // Check if the prefab already defines this component
             bool hasComponent = _prefabHasComponent(meta.TypeName);
@@ -801,6 +883,7 @@ void InspectorPanel::_renderPrefabActions() {
                 ImGui::EndDisabled();
             }
         }
+        ImGui::EndChild();
 
         ImGui::EndPopup();
     }
@@ -821,13 +904,19 @@ void InspectorPanel::_renderPrefabActions() {
 void InspectorPanel::_renderComponentMenuItem(const char* displayName, const char* componentType) {
     if (ImGui::MenuItem(displayName)) {
 
+        bool added = false;
         // If we are editing a live entity
         if (m_mode == InspectionMode::Entity) {
-            _addComponentToEntity(componentType);
+            added = _addComponentToEntity(componentType);
         }
         // If we are editing a prefab template
         else if (m_mode == InspectionMode::Prefab) {
-            _addComponentToPrefab(componentType);
+            added = _addComponentToPrefab(componentType);
+        }
+
+        // Close popup if a valid component was added
+        if (added) {
+            ImGui::CloseCurrentPopup();
         }
     }
 }
@@ -838,10 +927,10 @@ void InspectorPanel::_renderComponentMenuItem(const char* displayName, const cha
 
 // Attach a new component to the currently selected entity
 // We use metadata to create default JSON for the component and then apply it to the ECS
-void InspectorPanel::_addComponentToEntity(const std::string& componentType) {
-    if (!m_world) return;
+bool InspectorPanel::_addComponentToEntity(const std::string& componentType) {
+    if (!m_world) return false;
     ECS::Entity entity = m_world->Resolve(m_entityId);
-    if (!m_world->IsAlive(entity)) return;
+    if (!m_world->IsAlive(entity)) return false;
 
     // Shape components are mutually exclusive
     if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
@@ -860,7 +949,9 @@ void InspectorPanel::_addComponentToEntity(const std::string& componentType) {
 
         // MARK SCENE AS DIRTY
         MarkSceneDirtyIfNeeded(m_fileMenu);
+        return true;
     }
+    return false;
 }
 
 // Remove a component from the entity unless it is the Transform which must always exist
@@ -901,14 +992,14 @@ bool InspectorPanel::_entityHasComponent(EntityId id, const std::string& compone
 
 // Add a component entry to the prefab JSON
 // Prefabs are stored and edited entirely through JSON so we modify the data directly
-void InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
+bool InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
     // Ensure Components array exists
     if (!m_prefabData.contains("Components")) {
         m_prefabData["Components"] = nlohmann::json::array();
     }
 
     // No duplicates allowed
-    if (_prefabHasComponent(componentType)) return;
+    if (_prefabHasComponent(componentType)) return false;
 
     // Shape components are mutually exclusive
     if (componentType == "ShapeCircle2D" || componentType == "ShapeBox2D" || componentType == "ShapeLine2D") {
@@ -919,13 +1010,16 @@ void InspectorPanel::_addComponentToPrefab(const std::string& componentType) {
 
     // Look up metadata for defaults and full type name
     const auto* meta = ComponentRegistryUI::Find(componentType);
-    if (!meta) return;
+    if (!meta) return false;
 
     // Append new component entry into prefab JSON
     m_prefabData["Components"].push_back({ {"TypeName", meta->FullTypeName}, {"Data", meta->GetDefaults()} });
 
     // Prefab data changed so we sync the file right away
     _savePrefabData();
+    m_statusMessage = std::string("Added ") + componentType;
+    m_statusTimer = 2.0f;
+    return true;
 }
 
 // Removes a component entry from the prefab JSON

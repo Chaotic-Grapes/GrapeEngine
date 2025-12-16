@@ -172,7 +172,7 @@ private:
     // -------------------------------------------------------------------------
 
     // Adds a component of specified type to an entity using registry metadata
-    void _addComponentToEntity(const std::string& componentType);
+    bool _addComponentToEntity(const std::string& componentType);
 
     // Removes a component of specified type from an entity
     void _removeComponentFromEntity(const std::string& componentType);
@@ -185,7 +185,7 @@ private:
     // -------------------------------------------------------------------------
 
     // Adds a component definition to the prefab with default values
-    void _addComponentToPrefab(const std::string& componentType);
+    bool _addComponentToPrefab(const std::string& componentType);
 
     // Removes a component definition from the prefab JSON data
     void _removeComponentFromPrefab(const std::string& componentType);
@@ -229,6 +229,10 @@ private:
     std::vector<std::string> m_componentsToDelete; // Components scheduled for removal
     std::string m_statusMessage;                   // Current status message 
     float m_statusTimer = 0.0f;                    // Timer for status message
+
+    // Add Component popup search state
+    char m_addComponentSearchBuffer[128] = {0};    // Temporary input buffer for search
+    std::string m_addComponentSearchFilter;        // Filter string used to match component names
 
     // Undo - edit tracking
     struct EditState {

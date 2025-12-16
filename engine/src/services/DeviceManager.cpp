@@ -30,6 +30,12 @@ namespace Engine {
         bool g_audioDevicesChanged = false;
         int32_t g_lastAudioDeviceCount = 0;
         std::string g_lastDefaultAudioDevice;
+        
+        // Audio device caching
+        std::vector<AudioDeviceInfo> g_cachedOutputDevices;
+        std::vector<AudioDeviceInfo> g_cachedInputDevices;
+        bool g_outputDevicesCached = false;
+        bool g_inputDevicesCached = false;
     }
 
     // ==================== DisplayMode Implementation ====================
@@ -197,6 +203,11 @@ namespace Engine {
     }
 
     std::vector<AudioDeviceInfo> DeviceManager::EnumerateAudioOutputDevices() {
+        // Return cached result if available and devices haven't changed
+        if (g_outputDevicesCached && (!g_deviceChangeDetectionActive || !g_audioDevicesChanged)) {
+            return g_cachedOutputDevices;
+        }
+
         std::vector<AudioDeviceInfo> devices;
         FMOD::System* system = GetFmodSystem();
 
@@ -241,10 +252,20 @@ namespace Engine {
             }
         }
 
+        // Cache the results
+        g_cachedOutputDevices = devices;
+        g_outputDevicesCached = true;
+        g_audioDevicesChanged = false;  // Clear the change flag after re-enumeration
+
         return devices;
     }
 
     std::vector<AudioDeviceInfo> DeviceManager::EnumerateAudioInputDevices() {
+        // Return cached result if available and devices haven't changed
+        if (g_inputDevicesCached && (!g_deviceChangeDetectionActive || !g_audioDevicesChanged)) {
+            return g_cachedInputDevices;
+        }
+
         std::vector<AudioDeviceInfo> devices;
         FMOD::System* system = GetFmodSystem();
 
@@ -267,6 +288,11 @@ namespace Engine {
         
         devices.push_back(defaultMic);
         LOG_INFO("Audio input device: " << defaultMic.ToString());
+
+        // Cache the results
+        g_cachedInputDevices = devices;
+        g_inputDevicesCached = true;
+        g_audioDevicesChanged = false;  // Clear the change flag after re-enumeration
 
         return devices;
     }

@@ -39,6 +39,7 @@ namespace ECS {
   struct ComponentMeta {
         size_t Size{0};               // Size of the component type in bytes
         size_t Align{0};              // Alignment requirement of the component type
+        uint32_t TypeHash{0};         // FNV-1a hash of component type name (for C# interop)
         void (*ctor)(void*){nullptr}; // Constructor function pointer
         void (*dtor)(void*){nullptr}; // Destructor function pointer
   };
@@ -137,6 +138,12 @@ namespace ECS {
           return map;
       }
 
+      // Reverse mapping: ComponentTypeId to hash (for enumeration)
+      static std::unordered_map<ComponentTypeId, uint32_t>& _idToHash() {
+          static std::unordered_map<ComponentTypeId, uint32_t> map;
+          return map;
+      }
+
   public:
       /**
        * @brief Register a component type with its type name hash (for C# interop)
@@ -158,6 +165,32 @@ namespace ECS {
           auto& map = _hashToId();
           auto it = map.find(typeHash);
           return (it != map.end()) ? it->second : NULL_COMPONENT_ID;
+      }
+
+      /**
+       * @brief Get all registered component IDs
+       * @return Vector of all ComponentTypeIds that have been registered
+       */
+      static std::vector<ComponentTypeId> GetAllComponentIds() {
+          std::vector<ComponentTypeId> ids;
+          const auto& metas = _metas();
+          for (const auto& [id, meta] : metas) {
+              ids.push_back(id);
+          }
+          return ids;
+      }
+
+      /**
+       * @brief Get all registered component hashes
+       * @return Vector of all type hashes that have been registered with C# interop
+       */
+      static std::vector<uint32_t> GetAllComponentHashes() {
+          std::vector<uint32_t> hashes;
+          const auto& hashMap = _hashToId();
+          for (const auto& [hash, id] : hashMap) {
+              hashes.push_back(hash);
+          }
+          return hashes;
       }
   };
 

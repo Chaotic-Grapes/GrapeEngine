@@ -77,7 +77,15 @@ public static class ScriptHost
         try
         {
             string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
-            return AssemblyManager.LoadAssembly(assemblyPath) != null ? 0 : -1;
+            var result = AssemblyManager.LoadAssembly(assemblyPath);
+            
+            if (result != null)
+            {
+                // Discover and register all components in loaded assemblies
+                ComponentDiscovery.DiscoverAndRegisterAll();
+                return 0;
+            }
+            return -1;
         }
         catch (Exception ex)
         {

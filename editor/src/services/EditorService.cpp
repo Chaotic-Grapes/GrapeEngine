@@ -254,6 +254,7 @@ void EditorService::Render() {
         io.MouseDown[0] = Input::IsMouseDown(MOUSE_LEFT);
         io.MouseDown[1] = Input::IsMouseDown(MOUSE_RIGHT);
         io.MouseDown[2] = Input::IsMouseDown(MOUSE_MIDDLE);
+        io.MouseWheel = static_cast<float>(Input::GetScrollY());
 
         // Feed keyboard state to ImGui
         io.KeyCtrl = Input::IsKeyDown(KEY_LEFT_CONTROL) || Input::IsKeyDown(KEY_RIGHT_CONTROL);

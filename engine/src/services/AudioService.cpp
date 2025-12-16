@@ -132,11 +132,10 @@ namespace Services {
 
     Engine::AudioDeviceInfo AudioService::GetCurrentDevice() const {
         if (!m_currentAudioDeviceID.empty()) {
-            auto devices = Engine::DeviceManager::EnumerateAudioOutputDevices();
-            for (const auto& device : devices) {
-                if (device.DeviceID == m_currentAudioDeviceID) {
-                    return device;
-                }
+            // Use the direct lookup method instead of enumerating all devices
+            auto device = Engine::DeviceManager::GetAudioDeviceInfo(m_currentAudioDeviceID);
+            if (!device.DeviceID.empty()) {
+                return device;
             }
         }
         // Return default device if current is not set or found
