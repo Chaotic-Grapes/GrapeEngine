@@ -13,6 +13,7 @@ Launches the application in editor mode with the level editor interface.
 #include <crtdbg.h>
 #include <filesystem>
 #include "core/Application.h"
+#include "core/ProjectPaths.h"
 #include "EditorApplication.h"
 #include "EditorState.h"
 #include "services/TimeSystem.h"
@@ -49,22 +50,42 @@ int main() {
     ECS::World emptyWorld;
     engine.GetSystemManager().CreateAll(emptyWorld);
 
-    // Start hot reload watcher for C# scripts in editor mode
-    // Watch the "Scripts" directory for changes and auto-compile+reload
+    // Initialize C# script compilation and hot reload watcher
     auto* scriptManager = engine.GetScriptManager();
     if (scriptManager && scriptManager->IsInitialized()) {
-        std::filesystem::path scriptsDir = std::filesystem::current_path() / "Scripts";
-        
-        // Create scripts directory if it doesn't exist
-        if (!std::filesystem::exists(scriptsDir)) {
-            std::filesystem::create_directories(scriptsDir);
-            LOG_INFO("[EditorMain] Created Scripts directory: " << scriptsDir.string());
+        // Use ProjectPaths to get the current project's Scripts folder
+        if (Engine::ProjectPaths::IsInitialized()) {
+            std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
+            std::filesystem::path scriptsDir = projectRoot / "Scripts";
+            std::filesystem::path scriptsOutput = projectRoot / "GameScripts.dll"; // TODO: Move this to somewhere more discrete and temporary
+            
+            // Create scripts directory if it doesn't exist
+            if (!std::filesystem::exists(scriptsDir)) {
+                std::filesystem::create_directories(scriptsDir);
+                LOG_INFO("[EditorMain] Created Scripts directory: " << scriptsDir.string());
+            }
+            
+            // Compile scripts on startup
+            LOG_INFO("[EditorMain] Compiling C# scripts on startup...");
+            std::string diagnostics;
+            if (scriptManager->CompileScriptsWithDiagnostics(scriptsDir.string(), scriptsOutput.string(), diagnostics)) {
+                LOG_INFO("[EditorMain] Initial script compilation succeeded");
+            }
+            else {
+                // Log the error but don't crash the editor
+                LOG_ERROR("Failed to compile scripts:\n" << diagnostics);
+            }
+            
+            // Start file watcher for hot reload - it will handle compilation on changes
+            if (scriptManager->StartScriptWatching(scriptsDir.string())) {
+                LOG_INFO("[EditorMain] C# script hot reload watcher started at: " << scriptsDir.string());
+            }
+            else {
+                LOG_WARNING("[EditorMain] Failed to start C# script hot reload watcher (scripts will not auto-reload on changes)");
+            }
         }
-        
-        if (scriptManager->StartScriptWatching(scriptsDir.string())) {
-            LOG_INFO("[EditorMain] C# script hot reload watcher started at: " << scriptsDir.string());
-        } else {
-            LOG_WARNING("[EditorMain] Failed to start C# script hot reload watcher");
+        else {
+            LOG_WARNING("[EditorMain] ProjectPaths not initialized, cannot initialize script compilation");
         }
     }
 

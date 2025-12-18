@@ -31,7 +31,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace ECS {
 
-    // Forward declarations (pointers/references only)
+    // Forward declarations
     class ISystem;
     class SystemMetadata;
 

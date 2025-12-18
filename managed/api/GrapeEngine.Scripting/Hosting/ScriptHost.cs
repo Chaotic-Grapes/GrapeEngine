@@ -16,12 +16,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using System.Runtime.InteropServices;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Runtime.Loader;
-using System.IO;
-using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Systems;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -72,11 +69,11 @@ public static class ScriptHost
     /// Called from C++ ScriptManager::LoadAssembly()
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int LoadAssembly(char* assemblyPathPtr)
+    public static int LoadAssembly(IntPtr assemblyPathPtr)
     {
         try
         {
-            string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
+            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? "";
             var result = AssemblyManager.LoadAssembly(assemblyPath);
             
             if (result != null)
@@ -99,11 +96,11 @@ public static class ScriptHost
     /// Called from C++ ScriptManager::UnloadAssembly()
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int UnloadAssembly(char* assemblyPathPtr)
+    public static int UnloadAssembly(IntPtr assemblyPathPtr)
     {
         try
         {
-            string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
+            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? "";
 
             Console.WriteLine($"[ScriptHost] Unloading assembly: {assemblyPath}");
 
@@ -136,11 +133,11 @@ public static class ScriptHost
     /// Called from C++ ScriptManager::ReloadAssembly()
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int ReloadAssembly(char* assemblyPathPtr)
+    public static int ReloadAssembly(IntPtr assemblyPathPtr)
     {
         try
         {
-            string assemblyPath = Marshal.PtrToStringUTF8((IntPtr)assemblyPathPtr) ?? "";
+            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? "";
             return ReloadAssemblyInternal(assemblyPath);
         }
         catch (Exception ex)
@@ -204,12 +201,12 @@ public static class ScriptHost
     /// Called from C++ to compile scripts in-editor.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int CompileScriptsInDirectory(char* scriptsDirPtr, char* outputAssemblyPathPtr)
+    public static int CompileScriptsInDirectory(IntPtr scriptsDirPtr, IntPtr outputAssemblyPathPtr)
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8((IntPtr)scriptsDirPtr) ?? "";
-            string outPath = Marshal.PtrToStringUTF8((IntPtr)outputAssemblyPathPtr) ?? "";
+            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? "";
+            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? "";
 
             Console.WriteLine($"[ScriptHost] CompileScriptsInDirectory: {dir} -> {outPath}");
 
@@ -229,12 +226,12 @@ public static class ScriptHost
     /// Returns IntPtr.Zero on failure to allocate.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe IntPtr CompileDirectoryWithDiagnostics(char* scriptsDirPtr, char* outputAssemblyPathPtr)
+    public static IntPtr CompileDirectoryWithDiagnostics(IntPtr scriptsDirPtr, IntPtr outputAssemblyPathPtr)
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8((IntPtr)scriptsDirPtr) ?? "";
-            string outPath = Marshal.PtrToStringUTF8((IntPtr)outputAssemblyPathPtr) ?? "";
+            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? "";
+            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? "";
 
             Console.WriteLine($"[ScriptHost] CompileDirectoryWithDiagnostics: {dir} -> {outPath}");
 
@@ -256,7 +253,7 @@ public static class ScriptHost
     }
 
     [UnmanagedCallersOnly]
-    public static unsafe void FreeStringFromManaged(IntPtr ptr)
+    public static void FreeStringFromManaged(IntPtr ptr)
     {
         if (ptr == IntPtr.Zero) return;
         Marshal.FreeHGlobal(ptr);
@@ -266,12 +263,12 @@ public static class ScriptHost
     /// Compile scripts and reload resulting assembly.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int CompileAndReload(char* scriptsDirPtr, char* outputAssemblyPathPtr)
+    public static int CompileAndReload(IntPtr scriptsDirPtr, IntPtr outputAssemblyPathPtr)
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8((IntPtr)scriptsDirPtr) ?? "";
-            string outPath = Marshal.PtrToStringUTF8((IntPtr)outputAssemblyPathPtr) ?? "";
+            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? "";
+            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? "";
 
             Console.WriteLine($"[ScriptHost] CompileAndReload: {dir} -> {outPath}");
 
@@ -297,12 +294,12 @@ public static class ScriptHost
     /// (VS / Rider) open the script folder. Writes to <dir>/<projectName>.csproj.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int GenerateCsProj(char* scriptsDirPtr, char* projectNamePtr)
+    public static int GenerateCsProj(IntPtr scriptsDirPtr, IntPtr projectNamePtr)
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8((IntPtr)scriptsDirPtr) ?? "";
-            string projectName = Marshal.PtrToStringUTF8((IntPtr)projectNamePtr) ?? "ScriptsProject";
+            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? "";
+            string projectName = Marshal.PtrToStringUTF8(projectNamePtr) ?? "ScriptsProject";
 
             if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
             {
@@ -348,7 +345,7 @@ public static class ScriptHost
     /// Managed wrapper that compiles scripts in `dir` and reloads the resulting assembly at `outPath`.
     /// This is callable from other managed classes (e.g., file watcher).
     /// </summary>
-    public static unsafe int TriggerCompileAndReloadManaged(string dir, string outPath)
+    public static int TriggerCompileAndReloadManaged(string dir, string outPath)
     {
         try
         {
@@ -374,7 +371,7 @@ public static class ScriptHost
     /// Called from C++ ScriptManager::DiscoverScriptedSystems()
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe void* DiscoverSystems(int* outCount)
+    public static IntPtr DiscoverSystems(IntPtr outCountPtr)
     {
         try
         {
@@ -399,18 +396,29 @@ public static class ScriptHost
 
             Console.WriteLine($"[ScriptHost] Found {allSystemHandles.Count} system types");
 
-            // Allocate unmanaged array for handles
-            IntPtr handlesPtr = Marshal.AllocHGlobal(sizeof(ulong) * allSystemHandles.Count);
-            Marshal.Copy(allSystemHandles.Select(h => (long)h).ToArray(), 0, handlesPtr, allSystemHandles.Count);
+            // Allocate unmanaged array for handles and write each 64-bit value
+            int slotSize = Marshal.SizeOf<ulong>();
+            IntPtr handlesPtr = Marshal.AllocHGlobal(slotSize * allSystemHandles.Count);
+            for (int i = 0; i < allSystemHandles.Count; ++i)
+            {
+                IntPtr slot = IntPtr.Add(handlesPtr, i * slotSize);
+                Marshal.WriteInt64(slot, unchecked((long)allSystemHandles[i]));
+            }
 
-            *outCount = allSystemHandles.Count;
-            return (void*)handlesPtr;
+            if (outCountPtr != IntPtr.Zero)
+            {
+                Marshal.WriteInt32(outCountPtr, allSystemHandles.Count);
+            }
+            return handlesPtr;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[ScriptHost] Error discovering systems: {ex.Message}");
-            *outCount = 0;
-            return null;
+            if (outCountPtr != IntPtr.Zero)
+            {
+                Marshal.WriteInt32(outCountPtr, 0);
+            }
+            return IntPtr.Zero;
         }
     }
 
@@ -419,11 +427,11 @@ public static class ScriptHost
     /// Called from C++ when creating ScriptSystemWrapper.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe ulong CreateSystemInstance(char* typeNamePtr)
+    public static ulong CreateSystemInstance(IntPtr typeNamePtr)
     {
         try
         {
-            string typeName = Marshal.PtrToStringUTF8((IntPtr)typeNamePtr) ?? "";
+            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? "";
 
             // Find the type in loaded assemblies
             Type? systemType = null;
@@ -474,7 +482,7 @@ public static class ScriptHost
     /// Get metadata about a system (name, group, run mode).
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe void GetSystemMetadata(ulong handle, char* outNameBuffer, int* outGroup, int* outRunMode)
+    public static void GetSystemMetadata(ulong handle, IntPtr outNameBuffer, IntPtr outGroupPtr, IntPtr outRunModePtr)
     {
         try
         {
@@ -491,15 +499,24 @@ public static class ScriptHost
             // Get name
             string name = systemType.FullName ?? systemType.Name;
             byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
-            Marshal.Copy(nameBytes, 0, (IntPtr)outNameBuffer, System.Math.Min(nameBytes.Length, 256));
+            if (outNameBuffer != IntPtr.Zero)
+            {
+                Marshal.Copy(nameBytes, 0, outNameBuffer, System.Math.Min(nameBytes.Length, 256));
+            }
             
             // Get group - check ISystemMetadata interface first, then [SystemGroup] attribute
-            *outGroup = (int)SystemMetadataExtractor.GetSystemGroup(systemType, instance);
+            if (outGroupPtr != IntPtr.Zero)
+            {
+                Marshal.WriteInt32(outGroupPtr, (int)SystemMetadataExtractor.GetSystemGroup(systemType, instance));
+            }
             
             // Get run mode - check for [ExecuteInEditMode] attribute
-            *outRunMode = SystemMetadataExtractor.HasExecuteInEditMode(systemType) 
-                ? (int)SystemRunMode.Always 
-                : (int)SystemRunMode.PlayOnly;
+            if (outRunModePtr != IntPtr.Zero)
+            {
+                Marshal.WriteInt32(outRunModePtr, SystemMetadataExtractor.HasExecuteInEditMode(systemType) 
+                    ? (int)SystemRunMode.Always 
+                    : (int)SystemRunMode.PlayOnly);
+            }
         }
         catch (Exception ex)
         {
@@ -517,7 +534,7 @@ public static class ScriptHost
     /// Called from C++ during system registration to populate ComponentAccessBuilder metadata.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int GetSystemComponentAccesses(ulong handle, uint* outReadHashes, uint* outWriteHashes, int maxSize)
+    public static int GetSystemComponentAccesses(ulong handle, IntPtr outReadHashesPtr, IntPtr outWriteHashesPtr, int maxSize)
     {
         try
         {
@@ -534,6 +551,8 @@ public static class ScriptHost
             // Separate into read and write accesses
             int readCount = 0;
             int writeCount = 0;
+            var readHashes = new List<uint>();
+            var writeHashes = new List<uint>();
 
             foreach (var (hash, mode) in accesses)
             {
@@ -541,16 +560,33 @@ public static class ScriptHost
                 {
                     if (readCount < maxSize / 2)
                     {
-                        outReadHashes[readCount++] = hash;
+                        readHashes.Add(hash);
+                        readCount++;
                     }
                 }
                 else // Write or ReadWrite
                 {
                     if (writeCount < maxSize / 2)
                     {
-                        outWriteHashes[writeCount++] = hash;
+                        writeHashes.Add(hash);
+                        writeCount++;
                     }
                 }
+            }
+            
+            // Copy arrays to unmanaged memory
+            if (outReadHashesPtr != IntPtr.Zero && readCount > 0)
+            {
+                // Marshal.Copy does not have a uint[] overload, use int[] with identical bit-patterns
+                int[] tmp = new int[readCount];
+                for (int i = 0; i < readCount; ++i) tmp[i] = unchecked((int)readHashes[i]);
+                Marshal.Copy(tmp, 0, outReadHashesPtr, readCount);
+            }
+            if (outWriteHashesPtr != IntPtr.Zero && writeCount > 0)
+            {
+                int[] tmp = new int[writeCount];
+                for (int i = 0; i < writeCount; ++i) tmp[i] = unchecked((int)writeHashes[i]);
+                Marshal.Copy(tmp, 0, outWriteHashesPtr, writeCount);
             }
 
             // Return total count (read count in lower 16 bits, write count in upper 16 bits)
@@ -568,12 +604,12 @@ public static class ScriptHost
     /// Delegates to C++ to ensure hash consistency across language boundary.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe uint HashComponentTypeName(char* typeNamePtr)
+    public static uint HashComponentTypeName(IntPtr typeNamePtr)
     {
         try
         {
             // For now, compute here but ideally this would call C++
-            string typeName = Marshal.PtrToStringUTF8((IntPtr)typeNamePtr) ?? "";
+            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? "";
             return ComponentAccessBridge.Fnv1aHashPublic(typeName);
         }
         catch (Exception ex)
@@ -592,7 +628,7 @@ public static class ScriptHost
     /// This keeps metadata priority logic centralized in C++ while C# handles reflection.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int ResolveSystemGroup(int attributeGroup)
+    public static int ResolveSystemGroup(int attributeGroup)
     {
         try
         {
@@ -611,7 +647,7 @@ public static class ScriptHost
     /// Call OnCreate on a scripted system.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe void CallSystemOnCreate(ulong handle, void* worldPtr)
+    public static void CallSystemOnCreate(ulong handle, IntPtr worldPtr)
     {
         try
         {
@@ -640,7 +676,7 @@ public static class ScriptHost
     /// Call OnUpdate on a scripted system.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe void CallSystemOnUpdate(ulong handle, void* worldPtr, float deltaTime)
+    public static void CallSystemOnUpdate(ulong handle, IntPtr worldPtr, float deltaTime)
     {
         try
         {
@@ -666,7 +702,7 @@ public static class ScriptHost
     /// Call OnDestroy on a scripted system.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe void CallSystemOnDestroy(ulong handle, void* worldPtr)
+    public static void CallSystemOnDestroy(ulong handle, IntPtr worldPtr)
     {
         try
         {

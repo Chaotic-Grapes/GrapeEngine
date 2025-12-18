@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <coreclr/hostfxr.h>
 #include "ecs/ISystem.h"
 #include "ecs/SystemManager.h"
+#include "core/Logger.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -170,20 +171,32 @@ namespace ECS {
         int RegisterScriptedSystems(SystemManager& systemManager);
 
         // ====================================================================
-        // Compilation Support (Future: Roslyn integration)
+        // Compilation Support (Roslyn integration)
         // ====================================================================
 
         /**
-         * @brief Compile C# scripts to an assembly using Roslyn.
-         * @param scriptPaths Paths to .cs files to compile
-         * @param outputAssembly Path for output assembly
-         * @return true if compilation succeeded
+         * @brief Compile C# scripts in a directory to an assembly using Roslyn.
+         * @param scriptDirectory Path to directory containing .cs files
+         * @param outputAssembly Path for output assembly (e.g., "GameScripts.dll")
+         * @return true if compilation succeeded, false otherwise
          * 
-         * TODO: Implement Roslyn-based compilation for editor use.
-         * Runtime should load pre-compiled assemblies only.
+         * Compiles all .cs files in the specified directory using Roslyn.
+         * Errors are logged but do not crash the editor.
+         * Used by editor on startup and when file watcher detects changes.
          */
-        bool CompileScripts(const std::vector<std::string>& scriptPaths,
-                           const std::string& outputAssembly);
+        bool CompileScriptsInDirectory(const std::string& scriptDirectory,
+                                      const std::string& outputAssembly);
+
+        /**
+         * @brief Compile scripts and return diagnostics as a string.
+         * @param scriptDirectory Path to directory containing .cs files
+         * @param outputAssembly Path for output assembly
+         * @param outDiagnostics Reference to store compilation error/warning messages
+         * @return true if compilation succeeded
+         */
+        bool CompileScriptsWithDiagnostics(const std::string& scriptDirectory,
+                                          const std::string& outputAssembly,
+                                          std::string& outDiagnostics);
 
         // Start/stop the managed file watcher (used by editor Auto-Reload)
         bool StartScriptWatching(const std::string& directory);

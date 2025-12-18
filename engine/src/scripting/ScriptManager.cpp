@@ -20,12 +20,17 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <fstream>
 #include <cstring>
 #include <mutex>
+#include <coreclr/coreclr_delegates.h>
 
 // Platform-specific includes for loading nethost
 #ifdef _WIN32
     #include <Windows.h>
     #define NETHOST_LIB "nethost.dll"
     #define DOTNET_STRING(s) L##s
+#endif
+
+#ifdef ERROR
+#undef ERROR
 #endif
 
 // typedef for nethost get_hostfxr_path function pointer
@@ -135,8 +140,16 @@ namespace ECS {
 
         std::cout << "[ScriptManager] Loading assembly: " << assemblyPath << std::endl;
 
-        // Call managed LoadAssembly function
-        int result = m_loadAssembly(assemblyPath.c_str());
+        // Resolve to absolute path if a relative path was provided
+        std::filesystem::path p(assemblyPath);
+        if (!p.is_absolute()) {
+            p = std::filesystem::absolute(p);
+        }
+        std::string resolved = p.string();
+        std::cout << "[ScriptManager] Resolved assembly path: " << resolved << std::endl;
+
+        // Call managed LoadAssembly function with absolute path
+        int result = m_loadAssembly(resolved.c_str());
         if (result != 0) {
             std::cerr << "[ScriptManager] Failed to load assembly: " << assemblyPath << std::endl;
             return false;
@@ -242,49 +255,131 @@ namespace ECS {
     }
 
     /**
-     * @brief Compile scripts from source files into a managed assembly.
-     * @param scriptPaths Vector of script file paths or directories
-     * @param outputAssembly Path to output compiled assembly DLL
-     * @return true if compilation succeeded
+     * @brief Compile C# scripts in a directory to an assembly using Roslyn.
+     * @param scriptDirectory Path to directory containing .cs files
+     * @param outputAssembly Path for output assembly (e.g., "GameScripts.dll")
+     * @return true if compilation succeeded, false otherwise
      */
-    bool ScriptManager::CompileScripts(const std::vector<std::string>& scriptPaths,
-                                      const std::string& outputAssembly) {
+    bool ScriptManager::CompileScriptsInDirectory(const std::string& scriptDirectory,
+                                                  const std::string& outputAssembly) {
         if (!m_initialized) {
-            std::cerr << "[ScriptManager] Cannot compile - CLR not initialized" << std::endl;
+            LOG_ERROR("[ScriptManager] Cannot compile - CLR not initialized");
             return false;
         }
 
         if (!m_compileDirectory) {
-            std::cerr << "[ScriptManager] Compile delegate not available" << std::endl;
+            LOG_ERROR("[ScriptManager] Compile delegate not available");
             return false;
         }
 
-        // For simplicity, accept a single directory path in scriptPaths.
-        if (scriptPaths.empty()) {
-            std::cerr << "[ScriptManager] No script paths provided" << std::endl;
+        if (scriptDirectory.empty() || outputAssembly.empty()) {
+            LOG_ERROR("[ScriptManager] Invalid directory or output assembly path");
             return false;
         }
 
-        std::string dir = scriptPaths.size() == 1 ? scriptPaths[0] : scriptPaths[0];
+        LOG_INFO("[ScriptManager] Compiling scripts from: " << scriptDirectory);
 
-        int rc = m_compileDirectory(dir.c_str(), outputAssembly.c_str());
+        int rc = m_compileDirectory(scriptDirectory.c_str(), outputAssembly.c_str());
 
-        // If diagnostics-aware delegate is available, fetch diagnostics and store message
+        if (rc == 0) {
+            LOG_INFO("[ScriptManager] Script compilation succeeded: " << outputAssembly);
+            {
+                std::lock_guard<std::mutex> lock(m_compileMutex);
+                m_compileMessage = "Compilation successful";
+            }
+            return true;
+        }
+        else {
+            LOG_ERROR("Script compilation failed with error code: " << rc);
+            // Try to get diagnostics if available
+            if (m_compileDirectoryWithDiag && m_freeManagedString) {
+                void* p = m_compileDirectoryWithDiag(scriptDirectory.c_str(), outputAssembly.c_str());
+
+                if (p != nullptr) {
+                    const char* diagC = static_cast<const char*>(p);
+                    std::string diags = diagC ? std::string(diagC) : std::string("(no diagnostics)");
+                    LOG_ERROR("Failed to compile scripts:\n" << diags);
+                    {
+                        std::lock_guard<std::mutex> lock(m_compileMutex);
+                        m_compileMessage = diags;
+                    }
+                    m_freeManagedString(p);
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * @brief Compile scripts and return diagnostics as a string.
+     * @param scriptDirectory Path to directory containing .cs files
+     * @param outputAssembly Path for output assembly
+     * @param outDiagnostics Reference to store compilation error/warning messages
+     * @return true if compilation succeeded
+     */
+    bool ScriptManager::CompileScriptsWithDiagnostics(const std::string& scriptDirectory,
+                                                      const std::string& outputAssembly,
+                                                      std::string& outDiagnostics) {
+        if (!m_initialized) {
+            outDiagnostics = "CLR not initialized";
+            LOG_ERROR("[ScriptManager] Cannot compile - " << outDiagnostics);
+            return false;
+        }
+
+        if (!m_compileDirectory) {
+            outDiagnostics = "Compile delegate not available";
+            LOG_ERROR("[ScriptManager] " << outDiagnostics);
+            return false;
+        }
+
+        if (scriptDirectory.empty() || outputAssembly.empty()) {
+            outDiagnostics = "Invalid directory or output assembly path";
+            LOG_ERROR("[ScriptManager] " << outDiagnostics);
+            return false;
+        }
+
+        LOG_INFO("[ScriptManager] Compiling scripts from: " << scriptDirectory);
+
+        // Try to get diagnostics
         if (m_compileDirectoryWithDiag && m_freeManagedString) {
-            void* p = m_compileDirectoryWithDiag(dir.c_str(), outputAssembly.c_str());
+            void* p = m_compileDirectoryWithDiag(scriptDirectory.c_str(), outputAssembly.c_str());
             if (p != nullptr) {
                 const char* diagC = static_cast<const char*>(p);
-                std::lock_guard<std::mutex> lock(m_compileMutex);
-                m_compileMessage = diagC ? std::string(diagC) : std::string();
+                outDiagnostics = diagC ? std::string(diagC) : std::string("(no diagnostics)");
                 m_freeManagedString(p);
+                
+                // Check if output assembly was created (success indicator)
+                if (!std::filesystem::exists(outputAssembly)) {
+                    LOG_ERROR("[ScriptManager] Compilation failed:\n" << outDiagnostics);
+                    {
+                        std::lock_guard<std::mutex> lock(m_compileMutex);
+                        m_compileMessage = outDiagnostics;
+                    }
+                    return false;
+                }
+            }
+        }
+        else {
+            // Fallback to basic compile without diagnostics
+            int rc = m_compileDirectory(scriptDirectory.c_str(), outputAssembly.c_str());
+            if (rc != 0) {
+                outDiagnostics = "Compilation failed with return code: " + std::to_string(rc);
+                LOG_ERROR("[ScriptManager] " << outDiagnostics);
+                {
+                    std::lock_guard<std::mutex> lock(m_compileMutex);
+                    m_compileMessage = outDiagnostics;
+                }
+                return false;
             }
         }
 
-        // Update status
-        std::lock_guard<std::mutex> lock(m_compileMutex);
-        m_compileStatus = (rc == 0) ? 3 : 4;
-        m_compileProgress = (rc == 0) ? 100 : 0;
-        return rc == 0;
+        LOG_INFO("[ScriptManager] Script compilation succeeded: " << outputAssembly);
+        outDiagnostics = "Compilation successful";
+        {
+            std::lock_guard<std::mutex> lock(m_compileMutex);
+            m_compileMessage = "Compilation successful";
+        }
+        return true;
     }
 
     /**
@@ -406,6 +501,7 @@ namespace ECS {
                                                     "name": "Microsoft.NETCore.App",
                                                     "version": "9.0.0"
                                                     },
+                                                    "rollForward": "disable",
                                                     "configProperties": {
                                                     "System.GC.Server": true,
                                                     "System.Runtime.TieredCompilation": true
@@ -480,7 +576,7 @@ namespace ECS {
 
         std::cout << "[ScriptManager] Loading managed delegates from ScriptHost..." << std::endl;
 
-        // Cast the delegate
+        // Cast delegate
         using load_assembly_and_get_function_pointer_fn = int(*)(
             const char_t* assembly_path,
             const char_t* type_name,
@@ -497,26 +593,36 @@ namespace ECS {
         // Path to ScriptHost assembly (now part of GrapeEngine.Scripting)
         std::filesystem::path scriptHostPath = std::filesystem::current_path() / "GrapeEngine.Scripting.dll";
         
+        // Log the path being used for debugging
+        std::cout << "[ScriptManager] Looking for GrapeEngine.Scripting.dll at: " << scriptHostPath.string() << std::endl;
+        std::cout << "[ScriptManager] Assembly exists: " << (std::filesystem::exists(scriptHostPath) ? "YES" : "NO") << std::endl;
+        
 #ifdef _WIN32
         std::wstring scriptHostPathW = scriptHostPath.wstring();
         const char_t* scriptHostPathCStr = scriptHostPathW.c_str();
 #endif
 
         // Type and method names in C# ScriptHost
+        // Use assembly-qualified type names so hostfxr can resolve UnmanagedCallersOnly methods
         const char_t* typeName = DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptHost, GrapeEngine.Scripting");
 
         // Helper lambda to load a function pointer
         auto loadFunction = [&](const char* functionName, void** outDelegate) -> bool {
+            // Convert function name to wide string on Windows
 #ifdef _WIN32
-            std::wstring methodNameW = std::wstring(functionName, functionName + strlen(functionName));
+            // Convert const char* to wchar_t*
+            int len = strlen(functionName) + 1;
+            std::wstring methodNameW(functionName, functionName + len - 1);
             const char_t* methodName = methodNameW.c_str();
+#else
+            const char_t* methodName = functionName;
 #endif
 
             int rc = loadAssemblyFn(
                 scriptHostPathCStr,
                 typeName,
                 methodName,
-                nullptr,  // delegate_type_name (let runtime infer)
+                UNMANAGEDCALLERSONLY_METHOD,  // method marked with UnmanagedCallersOnly
                 nullptr,  // reserved
                 outDelegate
             );
@@ -545,19 +651,25 @@ namespace ECS {
         success &= loadFunction("CallSystemOnDestroy", reinterpret_cast<void**>(&m_callSystemOnDestroy));
 
         // Additionally load ScriptFileWatcher methods from the same assembly
+        // Use assembly-qualified type name
         const char_t* watcherTypeName = DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptFileWatcher, GrapeEngine.Scripting");
 
         auto loadWatcherFunc = [&](const char* functionName, void** outDelegate) -> bool {
+            // Convert function name to wide string on Windows
 #ifdef _WIN32
-            std::wstring methodNameW = std::wstring(functionName, functionName + strlen(functionName));
+            // Convert const char* to wchar_t*
+            int len = strlen(functionName) + 1;
+            std::wstring methodNameW(functionName, functionName + len - 1);
             const char_t* methodName = methodNameW.c_str();
+#else
+            const char_t* methodName = functionName;
 #endif
 
             int rc = loadAssemblyFn(
                 scriptHostPathCStr,
                 watcherTypeName,
                 methodName,
-                nullptr,
+                UNMANAGEDCALLERSONLY_METHOD,
                 nullptr,
                 outDelegate
             );
@@ -573,10 +685,15 @@ namespace ECS {
 
         success &= loadWatcherFunc("StartWatching", reinterpret_cast<void**>(&m_startWatching));
         success &= loadWatcherFunc("StopWatching", reinterpret_cast<void**>(&m_stopWatching));
-        success &= loadWatcherFunc("SetCompileCallback", reinterpret_cast<void**>(&m_setCompileCallback));
-        success &= loadWatcherFunc("CompileScriptsInDirectory", reinterpret_cast<void**>(&m_compileDirectory));
-        success &= loadWatcherFunc("CompileDirectoryWithDiagnostics", reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
-        success &= loadWatcherFunc("FreeStringFromManaged", reinterpret_cast<void**>(&m_freeManagedString));
+        // ScriptFileWatcher_SetCompileCallback is optional: some builds may not expose it.
+        if (!loadWatcherFunc("ScriptFileWatcher_SetCompileCallback", reinterpret_cast<void**>(&m_setCompileCallback))) {
+            std::cout << "[ScriptManager] Optional watcher compile-callback not available" << std::endl;
+        }
+        
+        // Compile functions are from ScriptHost, not ScriptFileWatcher
+        success &= loadFunction("CompileScriptsInDirectory", reinterpret_cast<void**>(&m_compileDirectory));
+        success &= loadFunction("CompileDirectoryWithDiagnostics", reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
+        success &= loadFunction("FreeStringFromManaged", reinterpret_cast<void**>(&m_freeManagedString));
 
         if (!success) {
             std::cerr << "[ScriptManager] Failed to load all managed delegates" << std::endl;

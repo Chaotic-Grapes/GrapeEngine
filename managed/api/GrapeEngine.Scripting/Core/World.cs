@@ -42,6 +42,14 @@ public class World : IDisposable
         _disposed = false;
     }
 
+    // Added overload to accept IntPtr directly to avoid requiring callers
+    // to use unsafe ToPointer() conversions at call sites.
+    internal World(IntPtr nativeWorldPtr)
+    {
+        _nativeWorldPtr = nativeWorldPtr;
+        _disposed = false;
+    }
+
     /// <summary>
     /// Internal accessor for native World pointer.
     /// </summary>
