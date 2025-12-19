@@ -73,7 +73,7 @@ public static class ScriptHost
     {
         try
         {
-            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? "";
+            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? string.Empty;
             var result = AssemblyManager.LoadAssembly(assemblyPath);
             
             if (result != null)
@@ -100,7 +100,7 @@ public static class ScriptHost
     {
         try
         {
-            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? "";
+            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? string.Empty;
 
             Console.WriteLine($"[ScriptHost] Unloading assembly: {assemblyPath}");
 
@@ -137,7 +137,7 @@ public static class ScriptHost
     {
         try
         {
-            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? "";
+            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? string.Empty;
             return ReloadAssemblyInternal(assemblyPath);
         }
         catch (Exception ex)
@@ -205,8 +205,8 @@ public static class ScriptHost
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? "";
-            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? "";
+            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
+            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
             Console.WriteLine($"[ScriptHost] CompileScriptsInDirectory: {dir} -> {outPath}");
 
@@ -230,8 +230,8 @@ public static class ScriptHost
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? "";
-            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? "";
+            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
+            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
             Console.WriteLine($"[ScriptHost] CompileDirectoryWithDiagnostics: {dir} -> {outPath}");
 
@@ -267,8 +267,8 @@ public static class ScriptHost
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? "";
-            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? "";
+            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
+            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
             Console.WriteLine($"[ScriptHost] CompileAndReload: {dir} -> {outPath}");
 
@@ -298,7 +298,7 @@ public static class ScriptHost
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? "";
+            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
             string projectName = Marshal.PtrToStringUTF8(projectNamePtr) ?? "ScriptsProject";
 
             if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
@@ -334,11 +334,40 @@ public static class ScriptHost
 
     private static IntPtr StringToHGlobalUtf8(string? s)
     {
-        if (s == null) return IntPtr.Zero;
+        if (s == null)
+            return IntPtr.Zero;
+
+        // Encode as UTF8 and allocate unmanaged memory
         var bytes = System.Text.Encoding.UTF8.GetBytes(s + '\0');
-        IntPtr p = Marshal.AllocHGlobal(bytes.Length);
-        Marshal.Copy(bytes, 0, p, bytes.Length);
+        IntPtr p = Marshal.AllocHGlobal(bytes.Length); // +1 for null terminator
+        Marshal.Copy(bytes, 0, p, bytes.Length); // copy including null terminator
+
         return p;
+    }
+
+    /// <summary>
+    /// Map an HRESULT to the runtime's managed Exception representation and
+    /// return a UTF8 pointer describing the exception type and message.
+    /// Caller must free the returned pointer with FreeStringFromManaged.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static IntPtr GetManagedExceptionForHResult(int hr)
+    {
+        try
+        {
+            // Get the managed exception for the HRESULT
+            Exception? ex = Marshal.GetExceptionForHR(hr);
+            string s = ex == null 
+                ? "(no managed mapping)" 
+                : $"{ex.GetType().FullName}: {ex.Message}";
+
+            // Allocate unmanaged UTF8 string
+            return StringToHGlobalUtf8(s);
+        }
+        catch (Exception e)
+        {
+            return StringToHGlobalUtf8($"GetExceptionForHR threw: {e.GetType().FullName}: {e.Message}");
+        }
     }
 
     /// <summary>
@@ -431,7 +460,7 @@ public static class ScriptHost
     {
         try
         {
-            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? "";
+            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? string.Empty;
 
             // Find the type in loaded assemblies
             Type? systemType = null;
@@ -456,7 +485,7 @@ public static class ScriptHost
             }
 
             // If we have saved state from a previous unload, restore it
-            StatePreserver.RestoreSystemState(systemType.Assembly.Location ?? "", SystemDiscovery.GetSystemInstance(handle)!);
+            StatePreserver.RestoreSystemState(systemType.Assembly.Location ?? string.Empty, SystemDiscovery.GetSystemInstance(handle)!);
 
             Console.WriteLine($"[ScriptHost] Created system instance: {typeName} (handle: {handle})");
             return handle;
@@ -609,7 +638,7 @@ public static class ScriptHost
         try
         {
             // For now, compute here but ideally this would call C++
-            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? "";
+            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? string.Empty;
             return ComponentAccessBridge.Fnv1aHashPublic(typeName);
         }
         catch (Exception ex)
@@ -661,7 +690,7 @@ public static class ScriptHost
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new World(worldPtr);
+                World managedWorld = new(worldPtr);
                 Console.WriteLine($"[ScriptHost] CallSystemOnCreate for {instance.GetType().Name}");
                 system.OnCreate(managedWorld);
             }
@@ -689,7 +718,7 @@ public static class ScriptHost
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new World(worldPtr);
+                World managedWorld = new(worldPtr);
                 system.OnUpdate(managedWorld, deltaTime);
             }
         }
@@ -715,7 +744,7 @@ public static class ScriptHost
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new World(worldPtr);
+                World managedWorld = new(worldPtr);
                 system.OnDestroy(managedWorld);
             }
         }

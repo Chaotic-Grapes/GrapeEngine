@@ -15,9 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Hosting;
-using GrapeEngine.Scripting.Core.Dependencies;
 
 namespace GrapeEngine.Scripting.Core.Dependencies;
 

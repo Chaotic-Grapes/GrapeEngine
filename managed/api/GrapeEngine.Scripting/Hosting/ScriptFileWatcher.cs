@@ -13,6 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -95,7 +96,7 @@ public static class ScriptFileWatcher
     /// Called by native code (ScriptManager) to register a callback that
     /// receives compile start/progress/finish notifications.
     /// </summary>
-    [UnmanagedCallersOnly(EntryPoint = "ScriptFileWatcher_SetCompileCallback")]
+    [UnmanagedCallersOnly]
     public static unsafe void SetCompileCallback(nint callbackPtr)
     {
         s_compileCallback = (delegate* unmanaged[Cdecl]<int, int, sbyte*, void>)callbackPtr;

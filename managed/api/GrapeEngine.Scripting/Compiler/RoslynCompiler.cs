@@ -12,24 +12,19 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using System;
-using System.IO;
-using System.Linq;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using System.Reflection;
 
 namespace GrapeEngine.Scripting.Compiler;
 
 internal static class RoslynCompiler
 {
-    private static string s_lastDiagnostics = string.Empty;
+    private static string _lastDiagnostics = string.Empty;
 
-    public static unsafe int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath, IEnumerable<string>? references = null)
+    public static int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath, IEnumerable<string>? references = null)
     {
-        s_lastDiagnostics = string.Empty;
+        _lastDiagnostics = string.Empty;
         try
         {
             if (!Directory.Exists(dirPath))
@@ -38,6 +33,7 @@ internal static class RoslynCompiler
                 return -1;
             }
 
+            // Gather all .cs files
             var csFiles = Directory.GetFiles(dirPath, "*.cs", SearchOption.AllDirectories);
             if (csFiles.Length == 0)
             {
@@ -48,7 +44,9 @@ internal static class RoslynCompiler
             var syntaxTrees = new List<SyntaxTree>();
             foreach (var file in csFiles)
             {
+                // Read source code
                 var src = File.ReadAllText(file);
+                // Parse and add to syntax trees
                 syntaxTrees.Add(CSharpSyntaxTree.ParseText(src, path: file));
             }
 
@@ -58,7 +56,7 @@ internal static class RoslynCompiler
             var refs = new List<MetadataReference>();
 
             // Add commonly available references
-            var trustedAssemblies = (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string)?.Split(Path.PathSeparator) ?? Array.Empty<string>();
+            var trustedAssemblies = (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string)?.Split(Path.PathSeparator) ?? [];
             foreach (var asmPath in trustedAssemblies)
             {
                 var name = Path.GetFileName(asmPath);
@@ -113,25 +111,25 @@ internal static class RoslynCompiler
                         Console.WriteLine($"[RoslynCompiler] {line}");
                         sb.AppendLine(line);
                     }
-                    s_lastDiagnostics = sb.ToString();
+                    _lastDiagnostics = sb.ToString();
                     return -1;
                 }
             }
 
             Console.WriteLine($"[RoslynCompiler] Compilation succeeded: {outputAssemblyPath}");
-            s_lastDiagnostics = "";
+            _lastDiagnostics = "";
             return 0;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[RoslynCompiler] Compilation error: {ex}");
-            s_lastDiagnostics = ex.ToString();
+            _lastDiagnostics = ex.ToString();
             return -1;
         }
     }
 
     public static string GetLastDiagnostics()
     {
-        return s_lastDiagnostics ?? string.Empty;
+        return _lastDiagnostics ?? string.Empty;
     }
 }

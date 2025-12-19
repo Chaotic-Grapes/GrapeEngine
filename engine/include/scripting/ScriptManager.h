@@ -224,6 +224,13 @@ namespace ECS {
             return m_scriptedSystems.size();
         }
 
+        /**
+         * @brief Convert a HRESULT to a managed exception string using managed helper.
+         * @param hr HRESULT value
+         * @return string with managed exception type and message, empty if helper not available
+         */
+        std::string GetManagedExceptionString(int hr);
+
         // ====================================================================
         // Internal Access (for ScriptSystemWrapper)
         // ====================================================================
@@ -257,43 +264,55 @@ namespace ECS {
         // ====================================================================
 
         // Function pointer types for calling into C#
-        using LoadAssemblyFn            = int(*)(const char* assemblyPath);
-        using UnloadAssemblyFn          = int(*)(const char* assemblyPath);
-        using DiscoverSystemsFn         = void*(*)(int* outCount);  // Returns array of system handles
-        using CreateSystemWrapperFn     = uint64_t(*)(const char* typeName);
-        using DestroySystemWrapperFn    = void(*)(uint64_t handle);
-        using GetSystemMetadataFn       = void(*)(uint64_t handle, char* outName, int* outGroup, int* outRunMode);
-        using GetSystemComponentAccessesFn = int(*)(uint64_t handle, uint32_t* outReadHashes, uint32_t* outWriteHashes, int maxSize);
-        using CallSystemOnCreateFn      = void(*)(uint64_t handle, void* worldPtr);
-        using CallSystemOnUpdateFn      = void(*)(uint64_t handle, void* worldPtr, float deltaTime);
-        using CallSystemOnDestroyFn     = void(*)(uint64_t handle, void* worldPtr);
+        using LoadAssemblyFn                    = int(*)(const char* assemblyPath);
+        using UnloadAssemblyFn                  = int(*)(const char* assemblyPath);
+        using DiscoverSystemsFn                 = void*(*)(int* outCount);  // Returns array of system handles
+        using CreateSystemWrapperFn             = uint64_t(*)(const char* typeName);
+        using DestroySystemWrapperFn            = void(*)(uint64_t handle);
+        using GetSystemMetadataFn               = void(*)(uint64_t handle, char* outName, int* outGroup, int* outRunMode);
+        using GetSystemComponentAccessesFn      = int(*)(uint64_t handle, uint32_t* outReadHashes, uint32_t* outWriteHashes, int maxSize);
+        using GetManagedExceptionForHResultFn   = void*(*)(int hr);
+        using ReloadAssemblyFn                  = int(*)(const char* assemblyPath);
+        using CompileAndReloadFn                = int(*)(const char* scriptsDir, const char* outputAssemblyPath);
+        using GenerateCsProjFn                  = int(*)(const char* scriptsDir, const char* projectName);
+        using HashComponentTypeNameFn           = uint32_t(*)(const char* typeName);
+        using ResolveSystemGroupFn              = int(*)(int attributeGroup);
+        using CallSystemOnCreateFn              = void(*)(uint64_t handle, void* worldPtr);
+        using CallSystemOnUpdateFn              = void(*)(uint64_t handle, void* worldPtr, float deltaTime);
+        using CallSystemOnDestroyFn             = void(*)(uint64_t handle, void* worldPtr);
+        using CompileDirectoryFn                = int(*)(const char* directoryPath, const char* outputAssemblyPath);
+        using CompileDirectoryWithDiagFn        = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
+        using FreeManagedStringFn               = void(*)(void* ptr);
 
         // Managed function delegates
-        LoadAssemblyFn              m_loadAssembly = nullptr;
-        UnloadAssemblyFn            m_unloadAssembly = nullptr;
-        DiscoverSystemsFn           m_discoverSystems = nullptr;
-        CreateSystemWrapperFn       m_createSystemWrapper = nullptr;
-        DestroySystemWrapperFn      m_destroySystemWrapper = nullptr;
-        GetSystemMetadataFn         m_getSystemMetadata = nullptr;
-        GetSystemComponentAccessesFn m_getSystemComponentAccesses = nullptr;
-        CallSystemOnCreateFn        m_callSystemOnCreate = nullptr;
-        CallSystemOnUpdateFn        m_callSystemOnUpdate = nullptr;
-        CallSystemOnDestroyFn       m_callSystemOnDestroy = nullptr;
+        LoadAssemblyFn                      m_loadAssembly = nullptr;
+        UnloadAssemblyFn                    m_unloadAssembly = nullptr;
+        DiscoverSystemsFn                   m_discoverSystems = nullptr;
+        CreateSystemWrapperFn               m_createSystemWrapper = nullptr;
+        DestroySystemWrapperFn              m_destroySystemWrapper = nullptr;
+        GetSystemMetadataFn                 m_getSystemMetadata = nullptr;
+        GetSystemComponentAccessesFn        m_getSystemComponentAccesses = nullptr;
+        GetManagedExceptionForHResultFn     m_getExceptionInfoForHR = nullptr;
+        CallSystemOnCreateFn                m_callSystemOnCreate = nullptr;
+        CallSystemOnUpdateFn                m_callSystemOnUpdate = nullptr;
+        CallSystemOnDestroyFn               m_callSystemOnDestroy = nullptr;
+        CompileDirectoryFn                  m_compileDirectory = nullptr;
+        CompileDirectoryWithDiagFn          m_compileDirectoryWithDiag = nullptr;
+        FreeManagedStringFn                 m_freeManagedString = nullptr;
+        ReloadAssemblyFn                    m_reloadAssembly = nullptr;
+        CompileAndReloadFn                  m_compileAndReload = nullptr;
+        GenerateCsProjFn                    m_generateCsProj = nullptr;
+        HashComponentTypeNameFn             m_hashComponentTypeName = nullptr;
+        ResolveSystemGroupFn                m_resolveSystemGroup = nullptr;
         
         // File-watcher managed delegates (Start/Stop) and setter for native compile callback
-        using StartWatchingFn = int(*)(const char* directoryPath, void* userData);
-        using StopWatchingFn = void(*)();
-        using SetCompileCallbackFn = void(*)(void* callbackPtr);
-        using CompileDirectoryFn = int(*)(const char* directoryPath, const char* outputAssemblyPath);
-        using CompileDirectoryWithDiagFn = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
-        using FreeManagedStringFn = void(*)(void* ptr);
+        using StartWatchingFn                   = int(*)(const char* directoryPath, void* userData);
+        using StopWatchingFn                    = void(*)();
+        using SetCompileCallbackFn              = void(*)(void* callbackPtr);
 
-        StartWatchingFn             m_startWatching = nullptr;
-        StopWatchingFn              m_stopWatching = nullptr;
-        SetCompileCallbackFn        m_setCompileCallback = nullptr;
-        CompileDirectoryFn          m_compileDirectory = nullptr;
-        CompileDirectoryWithDiagFn  m_compileDirectoryWithDiag = nullptr;
-        FreeManagedStringFn         m_freeManagedString = nullptr;
+        StartWatchingFn                     m_startWatching = nullptr;
+        StopWatchingFn                      m_stopWatching = nullptr;
+        SetCompileCallbackFn                m_setCompileCallback = nullptr;
 
         // ====================================================================
         // Internal State

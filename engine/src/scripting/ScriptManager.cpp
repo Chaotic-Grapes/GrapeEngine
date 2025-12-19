@@ -64,38 +64,38 @@ namespace ECS {
      */
     bool ScriptManager::InitializeCLR(const char* runtimeConfigPath) {
         if (m_initialized) {
-            std::cerr << "[ScriptManager] Already initialized" << std::endl;
+            LOG_WARNING("[ScriptManager] Already initialized");
             return true;
         }
 
-        std::cout << "[ScriptManager] Initializing CoreCLR..." << std::endl;
+        LOG_INFO("[ScriptManager] Initializing CoreCLR...");
 
         // Step 0: Ensure runtime config file exists
         if (!EnsureRuntimeConfigExists(runtimeConfigPath)) {
-            std::cerr << "[ScriptManager] Failed to ensure runtime config exists" << std::endl;
+            LOG_CRITICAL("[ScriptManager] Failed to ensure runtime config exists");
             return false;
         }
 
         // Step 1: Load hostfxr functions from nethost.dll
         if (!InitializeHostFxr()) {
-            std::cerr << "[ScriptManager] Failed to initialize hostfxr" << std::endl;
+            LOG_CRITICAL("[ScriptManager] Failed to initialize hostfxr");
             return false;
         }
 
         // Step 2: Initialize runtime with config file
         if (!LoadRuntime(runtimeConfigPath)) {
-            std::cerr << "[ScriptManager] Failed to load .NET runtime" << std::endl;
+            LOG_CRITICAL("[ScriptManager] Failed to load .NET runtime");
             return false;
         }
 
         // Step 3: Load managed delegates for interop
         if (!LoadManagedDelegates()) {
-            std::cerr << "[ScriptManager] Failed to load managed delegates" << std::endl;
+            LOG_CRITICAL("[ScriptManager] Failed to load managed delegates");
             return false;
         }
 
         m_initialized = true;
-        std::cout << "[ScriptManager] CoreCLR initialized successfully" << std::endl;
+        LOG_INFO("[ScriptManager] CoreCLR initialized successfully");
         return true;
     }
 
@@ -107,7 +107,7 @@ namespace ECS {
     void ScriptManager::ShutdownCLR() {
         if (!m_initialized) return;
 
-        std::cout << "[ScriptManager] Shutting down CoreCLR..." << std::endl;
+        LOG_INFO("[ScriptManager] Shutting down CoreCLR...");
 
         // Cleanup scripted systems
         CleanupScriptedSystems();
@@ -119,7 +119,7 @@ namespace ECS {
         }
 
         m_initialized = false;
-        std::cout << "[ScriptManager] CoreCLR shut down" << std::endl;
+        LOG_INFO("[ScriptManager] CoreCLR shut down");
     }
 
     /**
@@ -129,34 +129,33 @@ namespace ECS {
      */
     bool ScriptManager::LoadAssembly(const std::string& assemblyPath) {
         if (!m_initialized) {
-            std::cerr << "[ScriptManager] Cannot load assembly - CLR not initialized" << std::endl;
+            LOG_ERROR("[ScriptManager] Cannot load assembly - CLR not initialized");
             return false;
         }
 
         if (!m_loadAssembly) {
-            std::cerr << "[ScriptManager] LoadAssembly delegate not available" << std::endl;
+            LOG_ERROR("[ScriptManager] LoadAssembly delegate not available");
             return false;
         }
 
-        std::cout << "[ScriptManager] Loading assembly: " << assemblyPath << std::endl;
-
+        LOG_INFO("[ScriptManager] Loading assembly: " << assemblyPath.c_str());
         // Resolve to absolute path if a relative path was provided
         std::filesystem::path p(assemblyPath);
         if (!p.is_absolute()) {
             p = std::filesystem::absolute(p);
         }
         std::string resolved = p.string();
-        std::cout << "[ScriptManager] Resolved assembly path: " << resolved << std::endl;
+        LOG_INFO("[ScriptManager] Resolved assembly path: " << resolved.c_str());
 
         // Call managed LoadAssembly function with absolute path
         int result = m_loadAssembly(resolved.c_str());
         if (result != 0) {
-            std::cerr << "[ScriptManager] Failed to load assembly: " << assemblyPath << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to load assembly: " << assemblyPath.c_str());
             return false;
         }
 
         m_loadedAssemblies.push_back(assemblyPath);
-        std::cout << "[ScriptManager] Assembly loaded successfully" << std::endl;
+        LOG_INFO("[ScriptManager] Assembly loaded successfully");
         return true;
     }
 
@@ -174,7 +173,7 @@ namespace ECS {
         }
 
         // TODO: Implement AssemblyLoadContext unloading
-        std::cerr << "[ScriptManager] UnloadAssembly not yet implemented (requires AssemblyLoadContext)" << std::endl;
+        LOG_WARNING("[ScriptManager] UnloadAssembly not yet implemented (requires AssemblyLoadContext)");
         return false;
     }
 
@@ -191,7 +190,7 @@ namespace ECS {
         // 2. Unload old assembly
         // 3. Load new assembly
         // 4. Restore system state
-        std::cerr << "[ScriptManager] ReloadAssembly not yet implemented (hot reload)" << std::endl;
+        LOG_WARNING("[ScriptManager] ReloadAssembly not yet implemented (hot reload)");
         return false;
     }
 
@@ -206,19 +205,18 @@ namespace ECS {
         std::vector<ScriptSystemWrapper*> systems;
 
         if (!m_initialized || !m_discoverSystems) {
-            std::cerr << "[ScriptManager] Cannot discover systems - not initialized" << std::endl;
+            LOG_ERROR("[ScriptManager] Cannot discover systems - not initialized");
             return systems;
         }
 
-        std::cout << "[ScriptManager] Discovering scripted systems..." << std::endl;
-
+        LOG_INFO("[ScriptManager] Discovering scripted systems...");
         // Call managed function to discover all ISystem implementations
         // DiscoverSystems now creates instances and returns INSTANCE handles
         int systemCount = 0;
         void* systemHandlesPtr = m_discoverSystems(&systemCount);
 
         if (systemCount == 0 || !systemHandlesPtr) {
-            std::cout << "[ScriptManager] No scripted systems found" << std::endl;
+            LOG_INFO("[ScriptManager] No scripted systems found");
             return systems;
         }
 
@@ -234,7 +232,7 @@ namespace ECS {
             m_scriptedSystems.push_back(std::move(wrapper));
         }
 
-        std::cout << "[ScriptManager] Discovered " << systemCount << " scripted systems" << std::endl;
+        LOG_INFO("[ScriptManager] Discovered " << systemCount << " scripted systems");
         return systems;
     }
 
@@ -250,7 +248,7 @@ namespace ECS {
             systemManager.RegisterScriptedSystem(system);
         }
 
-        std::cout << "[ScriptManager] Registered " << systems.size() << " scripted systems with SystemManager" << std::endl;
+        LOG_INFO("[ScriptManager] Registered " << static_cast<int>(systems.size()) << " scripted systems with SystemManager");
         return static_cast<int>(systems.size());
     }
 
@@ -282,6 +280,39 @@ namespace ECS {
         int rc = m_compileDirectory(scriptDirectory.c_str(), outputAssembly.c_str());
 
         if (rc == 0) {
+            // Even if the simple compile returned success, try to fetch diagnostics
+            // from the richer diagnostic API if available. Some managed builds
+            // may log exceptions but still return 0; ensure we detect that.
+            if (m_compileDirectoryWithDiag && m_freeManagedString) {
+                void* p = m_compileDirectoryWithDiag(scriptDirectory.c_str(), outputAssembly.c_str());
+                if (p != nullptr) {
+                    const char* diagC = static_cast<const char*>(p);
+                    std::string diags = diagC ? std::string(diagC) : std::string("(no diagnostics)");
+                    m_freeManagedString(p);
+
+                    auto toLower = [](const std::string& s) {
+                        std::string r; r.reserve(s.size());
+                        for (char c : s) r.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+                        return r;
+                    };
+
+                    std::string diagLower = toLower(diags);
+                    bool hasError = (diagLower.find("error") != std::string::npos) ||
+                                    (diagLower.find("exception") != std::string::npos) ||
+                                    (diagLower.find("failed") != std::string::npos) ||
+                                    (diagLower.find("could not load file or assembly") != std::string::npos);
+
+                    if (hasError) {
+                        LOG_ERROR("[ScriptManager] Compilation reported diagnostics despite success return code:\n" << diags);
+                        {
+                            std::lock_guard<std::mutex> lock(m_compileMutex);
+                            m_compileMessage = diags;
+                        }
+                        return false;
+                    }
+                }
+            }
+
             LOG_INFO("[ScriptManager] Script compilation succeeded: " << outputAssembly);
             {
                 std::lock_guard<std::mutex> lock(m_compileMutex);
@@ -343,20 +374,45 @@ namespace ECS {
         // Try to get diagnostics
         if (m_compileDirectoryWithDiag && m_freeManagedString) {
             void* p = m_compileDirectoryWithDiag(scriptDirectory.c_str(), outputAssembly.c_str());
+            
             if (p != nullptr) {
                 const char* diagC = static_cast<const char*>(p);
-                outDiagnostics = diagC ? std::string(diagC) : std::string("(no diagnostics)");
-                m_freeManagedString(p);
-                
-                // Check if output assembly was created (success indicator)
-                if (!std::filesystem::exists(outputAssembly)) {
-                    LOG_ERROR("[ScriptManager] Compilation failed:\n" << outDiagnostics);
-                    {
-                        std::lock_guard<std::mutex> lock(m_compileMutex);
-                        m_compileMessage = outDiagnostics;
+                    outDiagnostics = diagC ? std::string(diagC) : std::string("(no diagnostics)");
+                    m_freeManagedString(p);
+
+                    // If diagnostics contain error-like text, treat as failure even if an assembly exists
+                    auto toLower = [](const std::string& s) {
+                        std::string r; r.reserve(s.size());
+                        for (char c : s) r.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+                        return r;
+                    };
+
+                    std::string diagLower = toLower(outDiagnostics);
+                    bool hasError = (diagLower.find("error") != std::string::npos) ||
+                                    (diagLower.find("exception") != std::string::npos) ||
+                                    (diagLower.find("failed") != std::string::npos) ||
+                                    (diagLower.find("could not load file or assembly") != std::string::npos) ||
+                                    (diagLower.find("filenotfoundexception") != std::string::npos) ||
+                                    (diagLower.find("microsoft.codeanalysis") != std::string::npos);
+
+                    if (hasError) {
+                        LOG_ERROR("[ScriptManager] Compilation failed:\n" << outDiagnostics);
+                        {
+                            std::lock_guard<std::mutex> lock(m_compileMutex);
+                            m_compileMessage = outDiagnostics;
+                        }
+                        return false;
                     }
-                    return false;
-                }
+
+                    // Check if output assembly was created (success indicator)
+                    if (!std::filesystem::exists(outputAssembly)) {
+                        LOG_ERROR("[ScriptManager] Compilation failed (no output assembly):\n" << outDiagnostics);
+                        {
+                            std::lock_guard<std::mutex> lock(m_compileMutex);
+                            m_compileMessage = outDiagnostics;
+                        }
+                        return false;
+                    }
             }
         }
         else {
@@ -389,13 +445,13 @@ namespace ECS {
      */
     bool ScriptManager::StartScriptWatching(const std::string& directory) {
         if (!m_initialized || !m_startWatching) {
-            std::cerr << "[ScriptManager] StartScriptWatching not available" << std::endl;
+            LOG_ERROR("[ScriptManager] StartScriptWatching not available");
             return false;
         }
 
         int rc = m_startWatching(directory.c_str(), nullptr);
         if (rc != 0) {
-            std::cerr << "[ScriptManager] StartWatching returned error: " << rc << std::endl;
+            LOG_ERROR("[ScriptManager] StartWatching returned error: " << rc);
             return false;
         }
         // If managed watcher supports setting a native compile-status callback, register it now
@@ -403,7 +459,7 @@ namespace ECS {
             // Pass pointer to native function that will be called by managed code
             m_setCompileCallback(reinterpret_cast<void*>(&Native_CompileStatusCallback));
         }
-        std::cout << "[ScriptManager] Started watching: " << directory << std::endl;
+        LOG_INFO("[ScriptManager] Started watching: " << directory.c_str());
         return true;
     }
 
@@ -413,7 +469,7 @@ namespace ECS {
     void ScriptManager::StopScriptWatching() {
         if (!m_initialized || !m_stopWatching) return;
         m_stopWatching();
-        std::cout << "[ScriptManager] Stopped script watching" << std::endl;
+        LOG_INFO("[ScriptManager] Stopped script watching");
     }
 
     // ============================================================================
@@ -429,7 +485,7 @@ namespace ECS {
     #ifdef _WIN32
         HMODULE nethostLib = LoadLibraryA(NETHOST_LIB);
         if (!nethostLib) {
-            std::cerr << "[ScriptManager] Failed to load " << NETHOST_LIB << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to load " << NETHOST_LIB);
             return false;
         }
 
@@ -438,7 +494,7 @@ namespace ECS {
     #endif
 
         if (!get_hostfxr_path) {
-            std::cerr << "[ScriptManager] Failed to find get_hostfxr_path" << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to find get_hostfxr_path");
             return false;
         }
 
@@ -448,7 +504,7 @@ namespace ECS {
         int rc = get_hostfxr_path(buffer, &buffer_size, nullptr);
 
         if (rc != 0) {
-            std::cerr << "[ScriptManager] Failed to get hostfxr path" << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to get hostfxr path");
             return false;
         }
 
@@ -456,7 +512,7 @@ namespace ECS {
     #ifdef _WIN32
         HMODULE hostfxrLib = LoadLibraryW(buffer);
         if (!hostfxrLib) {
-            std::cerr << "[ScriptManager] Failed to load hostfxr library" << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to load hostfxr library from path");
             return false;
         }
 
@@ -466,7 +522,7 @@ namespace ECS {
     #endif
 
         if (!m_initFxr || !m_getRuntimeDelegate || !m_closeFxr) {
-            std::cerr << "[ScriptManager] Failed to load hostfxr functions" << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to load hostfxr functions");
             return false;
         }
 
@@ -482,12 +538,12 @@ namespace ECS {
         // Check if the config file already exists
         std::filesystem::path configPath(runtimeConfigPath);
         if (std::filesystem::exists(configPath)) {
-            std::cout << "[ScriptManager] Runtime config found: " << runtimeConfigPath << std::endl;
+            LOG_INFO("[ScriptManager] Runtime config found: " << runtimeConfigPath);
             return true;
         }
 
         // Create the runtime config JSON at runtime
-        std::cout << "[ScriptManager] Runtime config not found, generating: " << runtimeConfigPath << std::endl;
+        LOG_INFO("[ScriptManager] Runtime config not found, generating: " << runtimeConfigPath);
         
         try {
             // Create parent directories if needed
@@ -501,7 +557,6 @@ namespace ECS {
                                                     "name": "Microsoft.NETCore.App",
                                                     "version": "9.0.0"
                                                     },
-                                                    "rollForward": "disable",
                                                     "configProperties": {
                                                     "System.GC.Server": true,
                                                     "System.Runtime.TieredCompilation": true
@@ -512,18 +567,18 @@ namespace ECS {
             // Write the config file
             std::ofstream configFile(configPath);
             if (!configFile.is_open()) {
-                std::cerr << "[ScriptManager] Failed to open config file for writing: " << runtimeConfigPath << std::endl;
+                LOG_ERROR("[ScriptManager] Failed to open config file for writing: " << runtimeConfigPath);
                 return false;
             }
 
             configFile << runtimeConfigJson;
             configFile.close();
 
-            std::cout << "[ScriptManager] Runtime config generated successfully: " << runtimeConfigPath << std::endl;
+            LOG_INFO("[ScriptManager] Runtime config generated successfully: " << runtimeConfigPath);
             return true;
         }
         catch (const std::exception& ex) {
-            std::cerr << "[ScriptManager] Failed to generate runtime config: " << ex.what() << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to generate runtime config: " << ex.what());
             return false;
         }
     }
@@ -545,7 +600,7 @@ namespace ECS {
         // Initialize hostfxr context
         int rc = m_initFxr(configPath, nullptr, &m_hostfxrContext);
         if (rc != 0 || !m_hostfxrContext) {
-            std::cerr << "[ScriptManager] Failed to initialize runtime config" << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to initialize runtime config");
             return false;
         }
 
@@ -557,7 +612,7 @@ namespace ECS {
         );
 
         if (rc != 0 || !m_loadAssemblyAndGetFunctionPtr) {
-            std::cerr << "[ScriptManager] Failed to get runtime delegate" << std::endl;
+            LOG_ERROR("[ScriptManager] Failed to get runtime delegate");
             return false;
         }
 
@@ -570,11 +625,11 @@ namespace ECS {
      */
     bool ScriptManager::LoadManagedDelegates() {
         if (!m_loadAssemblyAndGetFunctionPtr) {
-            std::cerr << "[ScriptManager] load_assembly_and_get_function_pointer not available" << std::endl;
+            LOG_ERROR("[ScriptManager] load_assembly_and_get_function_pointer not available");
             return false;
         }
 
-        std::cout << "[ScriptManager] Loading managed delegates from ScriptHost..." << std::endl;
+        LOG_INFO("[ScriptManager] Loading managed delegates from ScriptHost...");
 
         // Cast delegate
         using load_assembly_and_get_function_pointer_fn = int(*)(
@@ -594,24 +649,31 @@ namespace ECS {
         std::filesystem::path scriptHostPath = std::filesystem::current_path() / "GrapeEngine.Scripting.dll";
         
         // Log the path being used for debugging
-        std::cout << "[ScriptManager] Looking for GrapeEngine.Scripting.dll at: " << scriptHostPath.string() << std::endl;
-        std::cout << "[ScriptManager] Assembly exists: " << (std::filesystem::exists(scriptHostPath) ? "YES" : "NO") << std::endl;
+        LOG_INFO("[ScriptManager] Looking for GrapeEngine.Scripting.dll at: " << scriptHostPath.string() << '\n'
+                << "  - Assembly exists: " << std::boolalpha << (std::filesystem::exists(scriptHostPath)) << std::noboolalpha);
         
-#ifdef _WIN32
+#ifdef _WIN32 // Windows uses wide strings
         std::wstring scriptHostPathW = scriptHostPath.wstring();
         const char_t* scriptHostPathCStr = scriptHostPathW.c_str();
+#else // POSIX
+        std::string scriptHostPathStr = scriptHostPath.string();
+        const char_t* scriptHostPathCStr = scriptHostPathStr.c_str();
 #endif
 
-        // Type and method names in C# ScriptHost
+        // Type and method names in C# ScriptHost/ScriptFileWatcher
         // Use assembly-qualified type names so hostfxr can resolve UnmanagedCallersOnly methods
-        const char_t* typeName = DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptHost, GrapeEngine.Scripting");
+        const char_t* scriptHostTypeName =  DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptHost, GrapeEngine.Scripting");
+        const char_t* watcherTypeName =     DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptFileWatcher, GrapeEngine.Scripting");
+        std::stringstream sucstream{};
+        std::stringstream errstream{};
 
-        // Helper lambda to load a function pointer
-        auto loadFunction = [&](const char* functionName, void** outDelegate) -> bool {
-            // Convert function name to wide string on Windows
+        // *********************** Helper Lambda to load function pointers *********************** //
+        // Helper lambda to load a method from a given managed type and reports a label
+        // PS: C# uses the term "method"
+        enum class LoadLabel { Function, Watcher }; // Differentiate function vs watcher methods, can add more if needed
+        auto loadMethod = [&](const char* functionName, const char_t* typeName, void** outDelegate, LoadLabel label = LoadLabel::Function) -> bool {
 #ifdef _WIN32
-            // Convert const char* to wchar_t*
-            int len = strlen(functionName) + 1;
+            int len = static_cast<int>(strlen(functionName) + 1);
             std::wstring methodNameW(functionName, functionName + len - 1);
             const char_t* methodName = methodNameW.c_str();
 #else
@@ -622,86 +684,97 @@ namespace ECS {
                 scriptHostPathCStr,
                 typeName,
                 methodName,
-                UNMANAGEDCALLERSONLY_METHOD,  // method marked with UnmanagedCallersOnly
-                nullptr,  // reserved
-                outDelegate
-            );
-
-            if (rc != 0 || !*outDelegate) {
-                std::cerr << "[ScriptManager] Failed to load function: " << functionName << " (error: " << rc << ")" << std::endl;
-                return false;
-            }
-
-            std::cout << "[ScriptManager]   Loaded: " << functionName << std::endl;
-            return true;
-        };
-
-        // Load all managed functions
-        bool success = true;
-        
-        success &= loadFunction("LoadAssembly", reinterpret_cast<void**>(&m_loadAssembly));
-        success &= loadFunction("UnloadAssembly", reinterpret_cast<void**>(&m_unloadAssembly));
-        success &= loadFunction("DiscoverSystems", reinterpret_cast<void**>(&m_discoverSystems));
-        success &= loadFunction("CreateSystemInstance", reinterpret_cast<void**>(&m_createSystemWrapper));
-        success &= loadFunction("DestroySystemInstance", reinterpret_cast<void**>(&m_destroySystemWrapper));
-        success &= loadFunction("GetSystemMetadata", reinterpret_cast<void**>(&m_getSystemMetadata));
-        success &= loadFunction("GetSystemComponentAccesses", reinterpret_cast<void**>(&m_getSystemComponentAccesses));
-        success &= loadFunction("CallSystemOnCreate", reinterpret_cast<void**>(&m_callSystemOnCreate));
-        success &= loadFunction("CallSystemOnUpdate", reinterpret_cast<void**>(&m_callSystemOnUpdate));
-        success &= loadFunction("CallSystemOnDestroy", reinterpret_cast<void**>(&m_callSystemOnDestroy));
-
-        // Additionally load ScriptFileWatcher methods from the same assembly
-        // Use assembly-qualified type name
-        const char_t* watcherTypeName = DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptFileWatcher, GrapeEngine.Scripting");
-
-        auto loadWatcherFunc = [&](const char* functionName, void** outDelegate) -> bool {
-            // Convert function name to wide string on Windows
-#ifdef _WIN32
-            // Convert const char* to wchar_t*
-            int len = strlen(functionName) + 1;
-            std::wstring methodNameW(functionName, functionName + len - 1);
-            const char_t* methodName = methodNameW.c_str();
-#else
-            const char_t* methodName = functionName;
-#endif
-
-            int rc = loadAssemblyFn(
-                scriptHostPathCStr,
-                watcherTypeName,
-                methodName,
                 UNMANAGEDCALLERSONLY_METHOD,
                 nullptr,
                 outDelegate
             );
 
+            const char* labelStr = (label == LoadLabel::Watcher) ? "watcher" : "function";
+
             if (rc != 0 || !*outDelegate) {
-                std::cerr << "[ScriptManager] Failed to load watcher function: " << functionName << " (error: " << rc << ")" << std::endl;
-                return false;
+                if (errstream.str().empty()) // First error
+                    errstream << "[ScriptManager] Failed to load managed delegates:\n";
+                else
+                    errstream << '\n'; // New line for multiple errors
+                
+                // Log error
+                if (m_getExceptionInfoForHR) { // Try to get managed exception info
+                    std::string exStr = GetManagedExceptionString(rc);
+                    errstream << "  - " << labelStr << ": " << functionName << " (error: " << rc << ", exception: " << exStr << ")";
+                }
+                else // No exception info available
+                    errstream << "  - " << labelStr << ": " << functionName << " (error: " << rc << ")";
+                return false; // failure
             }
 
-            std::cout << "[ScriptManager]   Loaded watcher: " << functionName << std::endl;
+            if (sucstream.str().empty()) // First success
+                sucstream << "[ScriptManager] Loaded managed delegates:\n";
+            else
+                sucstream << '\n'; // New line for multiple successes
+            sucstream << "  - " << labelStr << ": " << functionName;
             return true;
         };
+        // *************************************************************************************** //
 
-        success &= loadWatcherFunc("StartWatching", reinterpret_cast<void**>(&m_startWatching));
-        success &= loadWatcherFunc("StopWatching", reinterpret_cast<void**>(&m_stopWatching));
-        // ScriptFileWatcher_SetCompileCallback is optional: some builds may not expose it.
-        if (!loadWatcherFunc("ScriptFileWatcher_SetCompileCallback", reinterpret_cast<void**>(&m_setCompileCallback))) {
-            std::cout << "[ScriptManager] Optional watcher compile-callback not available" << std::endl;
-        }
+        // Load all managed functions
+        bool success = true;
         
-        // Compile functions are from ScriptHost, not ScriptFileWatcher
-        success &= loadFunction("CompileScriptsInDirectory", reinterpret_cast<void**>(&m_compileDirectory));
-        success &= loadFunction("CompileDirectoryWithDiagnostics", reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
-        success &= loadFunction("FreeStringFromManaged", reinterpret_cast<void**>(&m_freeManagedString));
+        // Core ScriptHost methods
+        success &= loadMethod("GetManagedExceptionForHResult",    scriptHostTypeName, reinterpret_cast<void**>(&m_getExceptionInfoForHR));
+        success &= loadMethod("LoadAssembly",                     scriptHostTypeName, reinterpret_cast<void**>(&m_loadAssembly));
+        success &= loadMethod("UnloadAssembly",                   scriptHostTypeName, reinterpret_cast<void**>(&m_unloadAssembly));
+        success &= loadMethod("ReloadAssembly",                   scriptHostTypeName, reinterpret_cast<void**>(&m_reloadAssembly));
+        success &= loadMethod("DiscoverSystems",                  scriptHostTypeName, reinterpret_cast<void**>(&m_discoverSystems));
+        success &= loadMethod("CreateSystemInstance",             scriptHostTypeName, reinterpret_cast<void**>(&m_createSystemWrapper));
+        success &= loadMethod("DestroySystemInstance",            scriptHostTypeName, reinterpret_cast<void**>(&m_destroySystemWrapper));
+        success &= loadMethod("GetSystemMetadata",                scriptHostTypeName, reinterpret_cast<void**>(&m_getSystemMetadata));
+        success &= loadMethod("GetSystemComponentAccesses",       scriptHostTypeName, reinterpret_cast<void**>(&m_getSystemComponentAccesses));
+        success &= loadMethod("HashComponentTypeName",            scriptHostTypeName, reinterpret_cast<void**>(&m_hashComponentTypeName));
+        success &= loadMethod("ResolveSystemGroup",               scriptHostTypeName, reinterpret_cast<void**>(&m_resolveSystemGroup));
+        success &= loadMethod("CallSystemOnCreate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnCreate));
+        success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
+        success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
+        success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
+        success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
+        success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));
+        success &= loadMethod("GenerateCsProj",                   scriptHostTypeName, reinterpret_cast<void**>(&m_generateCsProj));
+        success &= loadMethod("FreeStringFromManaged",            scriptHostTypeName, reinterpret_cast<void**>(&m_freeManagedString));
 
-        if (!success) {
-            std::cerr << "[ScriptManager] Failed to load all managed delegates" << std::endl;
+        // ScriptFileWatcher methods
+        success &= loadMethod("StartWatching", watcherTypeName, reinterpret_cast<void**>(&m_startWatching), LoadLabel::Watcher);
+        success &= loadMethod("StopWatching", watcherTypeName, reinterpret_cast<void**>(&m_stopWatching), LoadLabel::Watcher);
+        success &= loadMethod("SetCompileCallback", watcherTypeName, reinterpret_cast<void**>(&m_setCompileCallback), LoadLabel::Watcher);
+        
+        // Log results
+        if (!sucstream.str().empty()) // Log any successes
+            LOG_INFO(sucstream.str());
+        if (!success) { // Log any errors, then return failure
+            LOG_CRITICAL(errstream.str());
             return false;
         }
 
-        std::cout << "[ScriptManager] All managed delegates loaded successfully" << std::endl;
+        // All delegates loaded successfully, so return true
+        LOG_INFO("[ScriptManager] All managed delegates loaded successfully");
         return true;
+    }
+
+    /**
+     * @brief Convert a HRESULT to a managed exception string using managed helper.
+     * @param hr HRESULT value
+     * @return string with managed exception type and message, empty if helper not available
+     */
+    std::string ScriptManager::GetManagedExceptionString(int hr) {
+        if (!m_getExceptionInfoForHR || !m_freeManagedString) return std::string();
+
+        void* p = m_getExceptionInfoForHR(hr);
+        if (!p) return std::string();
+
+        const char* s = static_cast<const char*>(p);
+        std::string result = s ? std::string(s) : std::string();
+
+        // Free the unmanaged string allocated by managed helper
+        m_freeManagedString(p);
+        return result;
     }
 
     /**
@@ -748,15 +821,16 @@ namespace ECS {
      */
     void ScriptSystemWrapper::OnCreate(World& world) {
         if (!m_scriptManager) {
-            std::cerr << "[ScriptSystemWrapper] ScriptManager is null" << std::endl;
+            LOG_ERROR("[ScriptSystemWrapper] ScriptManager is null");
             return;
         }
 
         auto callOnCreate = m_scriptManager->GetCallSystemOnCreate();
         if (callOnCreate) {
             callOnCreate(m_managedHandle, &world);
-        } else {
-            std::cerr << "[ScriptSystemWrapper] CallSystemOnCreate delegate not available" << std::endl;
+        }
+        else {
+            LOG_ERROR("[ScriptSystemWrapper] CallSystemOnCreate delegate not available");
         }
     }
 

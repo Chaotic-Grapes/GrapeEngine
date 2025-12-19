@@ -12,6 +12,9 @@ Launches the application in editor mode with the level editor interface.
 
 #include <crtdbg.h>
 #include <filesystem>
+#include <thread>
+#include <chrono>
+#include <atomic>
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
 #include "EditorApplication.h"
@@ -65,17 +68,44 @@ int main() {
                 LOG_INFO("[EditorMain] Created Scripts directory: " << scriptsDir.string());
             }
             
-            // Compile scripts on startup
+            // Compile scripts on startup with progress logging
             LOG_INFO("[EditorMain] Compiling C# scripts on startup...");
             std::string diagnostics;
-            if (scriptManager->CompileScriptsWithDiagnostics(scriptsDir.string(), scriptsOutput.string(), diagnostics)) {
+
+            // Set initial compile status and start a background poller to log progress
+            scriptManager->SetCompileStatus(1, 0, "Starting compilation");
+            std::atomic<bool> compileDone{false};
+            std::thread progressThread([&]() {
+                int status = 0;
+                int progress = -1;
+                std::string message;
+                while (!compileDone.load()) {
+                    scriptManager->GetCompileStatus(status, progress, message);
+                    LOG_INFO("[EditorMain] Script compile status=" << status << " progress=" << progress << " msg=" << message);
+                    if (status == 3 || status == 4) break; // success or failure
+                    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+                }
+                // Final read to capture terminal state
+                scriptManager->GetCompileStatus(status, progress, message);
+                LOG_INFO("[EditorMain] Script compile finished status=" << status << " progress=" << progress << " msg=" << message);
+            });
+
+            bool compileSuccess = scriptManager->CompileScriptsWithDiagnostics(scriptsDir.string(), scriptsOutput.string(), diagnostics);
+
+            // Ensure final status is set if managed side didn't update it
+            if (compileSuccess) {
+                scriptManager->SetCompileStatus(3, 100, "Compilation successful");
                 LOG_INFO("[EditorMain] Initial script compilation succeeded");
             }
             else {
-                // Log the error but don't crash the editor
+                scriptManager->SetCompileStatus(4, 100, diagnostics.c_str());
                 LOG_ERROR("Failed to compile scripts:\n" << diagnostics);
             }
-            
+
+            // Signal the poller to exit and join
+            compileDone.store(true);
+            if (progressThread.joinable()) progressThread.join();
+
             // Start file watcher for hot reload - it will handle compilation on changes
             if (scriptManager->StartScriptWatching(scriptsDir.string())) {
                 LOG_INFO("[EditorMain] C# script hot reload watcher started at: " << scriptsDir.string());
