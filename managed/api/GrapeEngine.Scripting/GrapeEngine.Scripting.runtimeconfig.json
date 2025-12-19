@@ -5,7 +5,6 @@
       "name": "Microsoft.NETCore.App",
       "version": "9.0.0"
     },
-    "rollForward": "disable",
     "configProperties": {
       "System.GC.Server": true,
       "System.Runtime.TieredCompilation": true

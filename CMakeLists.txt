@@ -377,11 +377,12 @@ if(DOTNET_EXECUTABLE)
     if(BUILD_EDITOR)
         if(TARGET GrapeEditor)
             add_custom_target(Copy_Scripting_Editor ALL
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CMAKE_BINARY_DIR}/$<CONFIG>/GrapeEngine.Scripting.dll"
+                # Copy managed build output (produced by BuildScripting) into the editor output directory
+                COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${CMAKE_BINARY_DIR}/$<CONFIG>"
                     "$<TARGET_FILE_DIR:GrapeEditor>"
                 DEPENDS BuildScripting GrapeEditor
-                COMMENT "Copying GrapeEngine.Scripting.dll to editor output directory"
+                COMMENT "Copying GrapeEngine.Scripting and dependencies to editor output directory"
             )
         endif()
     endif()
@@ -403,11 +404,12 @@ if(DOTNET_EXECUTABLE)
     if(BUILD_GAME)
         if(TARGET GrapeRuntime)
             add_custom_target(Copy_Scripting_Runtime ALL
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CMAKE_BINARY_DIR}/$<CONFIG>/GrapeEngine.Scripting.dll"
+                # Copy managed build output (produced by BuildScripting) into the runtime output directory
+                COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${CMAKE_BINARY_DIR}/$<CONFIG>"
                     "$<TARGET_FILE_DIR:GrapeRuntime>"
                 DEPENDS BuildScripting GrapeRuntime
-                COMMENT "Copying GrapeEngine.Scripting.dll to game output directory"
+                COMMENT "Copying GrapeEngine.Scripting and dependencies to game output directory"
             )
         endif()
     endif()

@@ -1,0 +1,12 @@
+If hostfxr failed to load managed delegates with error code:
+* -2146233069
+	1. ildasm GrapeEngine.Scripting.dll /text > output.txt
+	2. Check if methods are in assembly
+	3a. Not in assembly:
+		A. Clean csproj, rebuild, OR
+		B. dotnet build -v detailed > build.log
+		C. dll is not being copied to output (not scripting output)
+
+* Anything else
+	1. Convert HResult into known exception
+	2. Troubleshoot yourself and note it down here
