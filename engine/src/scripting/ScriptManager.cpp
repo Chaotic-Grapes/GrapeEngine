@@ -43,6 +43,39 @@ extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, c
 
 namespace ECS {
 
+    // Helper: produce a single-line summary from possibly multi-line diagnostics
+    static std::string SummarizeDiagnostics(const std::string& diags) {
+        if (diags.empty())
+            return std::string();
+
+        // Trim leading newlines/spaces
+        size_t pos = 0;
+        while (pos < diags.size() && (diags[pos] == '\r' || diags[pos] == '\n'))
+            ++pos;
+
+        // Find end of first line
+        size_t end = diags.find_first_of('\r', pos);
+        size_t nl = diags.find_first_of('\n', pos);
+
+        // Take the earliest line ending
+        if (end == std::string::npos || (nl != std::string::npos && nl < end))
+            end = nl;
+        std::string firstLine = (end == std::string::npos)
+            ? diags.substr(pos)
+            : diags.substr(pos, end - pos);
+
+        // Trim trailing whitespace
+        while (!firstLine.empty() && (firstLine.back() == '\r' || firstLine.back() == '\n'))
+            firstLine.pop_back();
+
+        // If there are additional lines, indicate truncation
+        if (diags.find_first_of('\n', pos) != std::string::npos || diags.find_first_of('\r', pos) != std::string::npos) {
+            return firstLine + " ...";
+        }
+
+        return firstLine;
+    }
+
     // ============================================================================
     // ScriptManager Implementation
     // ============================================================================
@@ -303,7 +336,8 @@ namespace ECS {
                                     (diagLower.find("could not load file or assembly") != std::string::npos);
 
                     if (hasError) {
-                        LOG_ERROR("[ScriptManager] Compilation reported diagnostics despite success return code:\n" << diags);
+                        std::string summary = SummarizeDiagnostics(diags);
+                        LOG_ERROR("Compilation reported diagnostics despite success return code: " << summary);
                         {
                             std::lock_guard<std::mutex> lock(m_compileMutex);
                             m_compileMessage = diags;
@@ -329,7 +363,8 @@ namespace ECS {
                 if (p != nullptr) {
                     const char* diagC = static_cast<const char*>(p);
                     std::string diags = diagC ? std::string(diagC) : std::string("(no diagnostics)");
-                    LOG_ERROR("Failed to compile scripts:\n" << diags);
+                    std::string summary = SummarizeDiagnostics(diags);
+                    LOG_ERROR("Failed to compile scripts: " << summary);
                     {
                         std::lock_guard<std::mutex> lock(m_compileMutex);
                         m_compileMessage = diags;
@@ -396,7 +431,8 @@ namespace ECS {
                                     (diagLower.find("microsoft.codeanalysis") != std::string::npos);
 
                     if (hasError) {
-                        LOG_ERROR("[ScriptManager] Compilation failed:\n" << outDiagnostics);
+                        std::string summary = SummarizeDiagnostics(outDiagnostics);
+                        LOG_ERROR("Compilation failed: " << summary);
                         {
                             std::lock_guard<std::mutex> lock(m_compileMutex);
                             m_compileMessage = outDiagnostics;
@@ -406,7 +442,8 @@ namespace ECS {
 
                     // Check if output assembly was created (success indicator)
                     if (!std::filesystem::exists(outputAssembly)) {
-                        LOG_ERROR("[ScriptManager] Compilation failed (no output assembly):\n" << outDiagnostics);
+                        std::string summary = SummarizeDiagnostics(outDiagnostics);
+                        LOG_ERROR("Compilation failed (no output assembly): " << summary);
                         {
                             std::lock_guard<std::mutex> lock(m_compileMutex);
                             m_compileMessage = outDiagnostics;
@@ -738,12 +775,14 @@ namespace ECS {
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
         success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));
         success &= loadMethod("GenerateCsProj",                   scriptHostTypeName, reinterpret_cast<void**>(&m_generateCsProj));
+        success &= loadMethod("GetLastDiagnosticsCount",          scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticsCount));
+        success &= loadMethod("GetLastDiagnosticAt",              scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticAt));
         success &= loadMethod("FreeStringFromManaged",            scriptHostTypeName, reinterpret_cast<void**>(&m_freeManagedString));
 
         // ScriptFileWatcher methods
-        success &= loadMethod("StartWatching", watcherTypeName, reinterpret_cast<void**>(&m_startWatching), LoadLabel::Watcher);
-        success &= loadMethod("StopWatching", watcherTypeName, reinterpret_cast<void**>(&m_stopWatching), LoadLabel::Watcher);
-        success &= loadMethod("SetCompileCallback", watcherTypeName, reinterpret_cast<void**>(&m_setCompileCallback), LoadLabel::Watcher);
+        success &= loadMethod("StartWatching",                    watcherTypeName, reinterpret_cast<void**>(&m_startWatching), LoadLabel::Watcher);
+        success &= loadMethod("StopWatching",                     watcherTypeName, reinterpret_cast<void**>(&m_stopWatching), LoadLabel::Watcher);
+        success &= loadMethod("SetCompileCallback",               watcherTypeName, reinterpret_cast<void**>(&m_setCompileCallback), LoadLabel::Watcher);
         
         // Log results
         if (!sucstream.str().empty()) // Log any successes
@@ -967,6 +1006,51 @@ namespace ECS {
         m_runMode = runMode;
     }
 
+}
+
+void ECS::ScriptManager::GetLastDiagnosticsLines(std::vector<std::string>& outLines) {
+    outLines.clear();
+
+    // If managed indexed accessors are available, use them
+    if (m_getLastDiagnosticsCount && m_getLastDiagnosticAt && m_freeManagedString) {
+        int count = 0;
+        try {
+            count = m_getLastDiagnosticsCount();
+        } catch (...) {
+            count = 0;
+        }
+
+        for (int i = 0; i < count; ++i) {
+            void* p = nullptr;
+            try {
+                p = m_getLastDiagnosticAt(i);
+            } catch (...) {
+                p = nullptr;
+            }
+
+            if (p != nullptr) {
+                const char* s = static_cast<const char*>(p);
+                outLines.emplace_back(s ? std::string(s) : std::string());
+                m_freeManagedString(p);
+            }
+        }
+        if (!outLines.empty()) return;
+    }
+
+    // Fallback: split stored compile message by lines
+    std::lock_guard<std::mutex> lock(m_compileMutex);
+    if (m_compileMessage.empty()) return;
+    std::string temp = m_compileMessage;
+    size_t pos = 0;
+    while (pos < temp.size()) {
+        size_t nl = temp.find_first_of('\n', pos);
+        if (nl == std::string::npos) {
+            outLines.push_back(temp.substr(pos));
+            break;
+        }
+        outLines.push_back(temp.substr(pos, nl - pos));
+        pos = nl + 1;
+    }
 }
 
 // ============================================================================

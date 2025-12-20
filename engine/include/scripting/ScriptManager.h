@@ -231,6 +231,9 @@ namespace ECS {
          */
         std::string GetManagedExceptionString(int hr);
 
+        // Retrieve the last compilation diagnostics as an array of lines.
+        void GetLastDiagnosticsLines(std::vector<std::string>& outLines);
+
         // ====================================================================
         // Internal Access (for ScriptSystemWrapper)
         // ====================================================================
@@ -282,6 +285,8 @@ namespace ECS {
         using CallSystemOnDestroyFn             = void(*)(uint64_t handle, void* worldPtr);
         using CompileDirectoryFn                = int(*)(const char* directoryPath, const char* outputAssemblyPath);
         using CompileDirectoryWithDiagFn        = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
+        using GetLastDiagnosticsCountFn         = int(*)();
+        using GetLastDiagnosticAtFn             = void*(*)(int index);
         using FreeManagedStringFn               = void(*)(void* ptr);
 
         // Managed function delegates
@@ -298,6 +303,8 @@ namespace ECS {
         CallSystemOnDestroyFn               m_callSystemOnDestroy = nullptr;
         CompileDirectoryFn                  m_compileDirectory = nullptr;
         CompileDirectoryWithDiagFn          m_compileDirectoryWithDiag = nullptr;
+        GetLastDiagnosticsCountFn            m_getLastDiagnosticsCount = nullptr;
+        GetLastDiagnosticAtFn                m_getLastDiagnosticAt = nullptr;
         FreeManagedStringFn                 m_freeManagedString = nullptr;
         ReloadAssemblyFn                    m_reloadAssembly = nullptr;
         CompileAndReloadFn                  m_compileAndReload = nullptr;

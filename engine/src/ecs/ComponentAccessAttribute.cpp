@@ -92,15 +92,20 @@ namespace ECS {
     }
 
     bool ComponentAccessValidator::HasDuplicates(const std::vector<ComponentAccess>& accesses) {
+        // Treat identical duplicate declarations (same component, same mode)
+        // as a real duplicate. Combinations of Read/Write/ReadWrite are
+        // mergeable into a single effective access (e.g. Read + Write -> ReadWrite)
+        // and should not be considered an error here.
         for (size_t i = 0; i < accesses.size(); ++i) {
             for (size_t j = i + 1; j < accesses.size(); ++j) {
                 if (accesses[i].ComponentId == accesses[j].ComponentId &&
-                    accesses[i].Mode != accesses[j].Mode) {
-                    // Same component with conflicting modes is a duplicate
+                    accesses[i].Mode == accesses[j].Mode) {
+                    // Exact duplicate declaration (same component and same mode)
                     return true;
                 }
             }
         }
+
         return false;
     }
 

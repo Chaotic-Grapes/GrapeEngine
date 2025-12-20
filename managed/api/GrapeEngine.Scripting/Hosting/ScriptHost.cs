@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 
@@ -86,7 +87,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] LoadAssembly error: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] LoadAssembly error: {ex.Message}", LogLevel.Error);
             return -1;
         }
     }
@@ -102,7 +103,7 @@ public static class ScriptHost
         {
             string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? string.Empty;
 
-            Console.WriteLine($"[ScriptHost] Unloading assembly: {assemblyPath}");
+            Logging.LogInternal($"[ScriptHost] Unloading assembly: {assemblyPath}", LogLevel.Info);
 
             // Save state from all systems in this assembly
             StatePreserver.SaveAllSystemStates(assemblyPath);
@@ -117,12 +118,12 @@ public static class ScriptHost
             // Clear discovered systems
             SystemDiscovery.ClearDiscoveredSystems();
 
-            Console.WriteLine($"[ScriptHost] Successfully unloaded: {assemblyPath}");
+            Logging.LogInternal($"[ScriptHost] Successfully unloaded: {assemblyPath}", LogLevel.Info);
             return 0; // Success
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error unloading assembly: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error unloading assembly: {ex.Message}", LogLevel.Error);
             return -1;
         }
     }
@@ -142,7 +143,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error reloading assembly: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error reloading assembly: {ex.Message}", LogLevel.Error);
             return -1;
         }
     }
@@ -155,7 +156,7 @@ public static class ScriptHost
     {
         try
         {
-            Console.WriteLine($"[ScriptHost] Reloading assembly: {assemblyPath}");
+            Logging.LogInternal($"[ScriptHost] Reloading assembly: {assemblyPath}", LogLevel.Info);
 
             // Save state before unload
             StatePreserver.SaveAllSystemStates(assemblyPath);
@@ -163,7 +164,7 @@ public static class ScriptHost
             // Unload existing assembly
             if (!AssemblyManager.UnloadAssembly(assemblyPath))
             {
-                Console.WriteLine($"[ScriptHost] Warning: Failed to unload existing assembly during reload");
+                Logging.LogInternal($"[ScriptHost] Warning: Failed to unload existing assembly during reload", LogLevel.Warning);
             }
 
             // Wait a bit for finalizers to complete
@@ -172,7 +173,7 @@ public static class ScriptHost
             // Load new version
             if (AssemblyManager.LoadAssembly(assemblyPath) == null)
             {
-                Console.WriteLine($"[ScriptHost] Failed to load new assembly during reload");
+                Logging.LogInternal($"[ScriptHost] Failed to load new assembly during reload", LogLevel.Error);
                 return -1;
             }
 
@@ -186,12 +187,12 @@ public static class ScriptHost
             // Clean up saved state
             StatePreserver.ClearSavedState(assemblyPath);
 
-            Console.WriteLine($"[ScriptHost] Successfully reloaded: {assemblyPath}");
+            Logging.LogInternal($"[ScriptHost] Successfully reloaded: {assemblyPath}", LogLevel.Info);
             return 0; // Success
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error in ReloadAssemblyInternal: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error in ReloadAssemblyInternal: {ex.Message}", LogLevel.Error);
             return -1;
         }
     }
@@ -208,14 +209,14 @@ public static class ScriptHost
             string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
             string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
-            Console.WriteLine($"[ScriptHost] CompileScriptsInDirectory: {dir} -> {outPath}");
+            Logging.LogInternal($"[ScriptHost] CompileScriptsInDirectory: {dir} -> {outPath}", LogLevel.Info);
 
             int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
             return res;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] CompileScriptsInDirectory error: {ex}");
+            Logging.LogInternal($"[ScriptHost] CompileScriptsInDirectory error: {ex}", LogLevel.Error);
             return -1;
         }
     }
@@ -233,7 +234,7 @@ public static class ScriptHost
             string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
             string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
-            Console.WriteLine($"[ScriptHost] CompileDirectoryWithDiagnostics: {dir} -> {outPath}");
+            Logging.LogInternal($"[ScriptHost] CompileDirectoryWithDiagnostics: {dir} -> {outPath}", LogLevel.Info);
 
             int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
 
@@ -247,7 +248,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] CompileDirectoryWithDiagnostics error: {ex}");
+            Logging.LogInternal($"[ScriptHost] CompileDirectoryWithDiagnostics error: {ex}", LogLevel.Error);
             return IntPtr.Zero;
         }
     }
@@ -270,12 +271,12 @@ public static class ScriptHost
             string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
             string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
-            Console.WriteLine($"[ScriptHost] CompileAndReload: {dir} -> {outPath}");
+            Logging.LogInternal($"[ScriptHost] CompileAndReload: {dir} -> {outPath}", LogLevel.Info);
 
             int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
             if (res != 0)
             {
-                Console.WriteLine("[ScriptHost] Compilation failed, aborting reload.");
+                Logging.LogInternal("[ScriptHost] Compilation failed, aborting reload.", LogLevel.Error);
                 return -1;
             }
 
@@ -284,7 +285,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] CompileAndReload error: {ex}");
+            Logging.LogInternal($"[ScriptHost] CompileAndReload error: {ex}", LogLevel.Error);
             return -1;
         }
     }
@@ -303,7 +304,7 @@ public static class ScriptHost
 
             if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
             {
-                Console.WriteLine($"[ScriptHost] GenerateCsProj: invalid dir {dir}");
+                Logging.LogInternal($"[ScriptHost] GenerateCsProj: invalid dir {dir}", LogLevel.Warning);
                 return -1;
             }
 
@@ -322,12 +323,12 @@ public static class ScriptHost
                              ";
 
             File.WriteAllText(outPath, template);
-            Console.WriteLine($"[ScriptHost] Generated csproj: {outPath}");
+            Logging.LogInternal($"[ScriptHost] Generated csproj: {outPath}", LogLevel.Info);
             return 0;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] GenerateCsProj error: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] GenerateCsProj error: {ex.Message}", LogLevel.Error);
             return -1;
         }
     }
@@ -371,6 +372,40 @@ public static class ScriptHost
     }
 
     /// <summary>
+    /// Return the number of diagnostics produced by the last Roslyn compilation.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static int GetLastDiagnosticsCount()
+    {
+        try
+        {
+            return RoslynCompiler.GetLastDiagnosticsCount();
+        }
+        catch (Exception)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Return the diagnostic message at the specified index as an unmanaged UTF8 string.
+    /// Caller must free the pointer with FreeStringFromManaged.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static IntPtr GetLastDiagnosticAt(int index)
+    {
+        try
+        {
+            string? s = RoslynCompiler.GetLastDiagnosticAt(index);
+            return StringToHGlobalUtf8(s ?? string.Empty);
+        }
+        catch (Exception)
+        {
+            return IntPtr.Zero;
+        }
+    }
+
+    /// <summary>
     /// Managed wrapper that compiles scripts in `dir` and reloads the resulting assembly at `outPath`.
     /// This is callable from other managed classes (e.g., file watcher).
     /// </summary>
@@ -381,7 +416,7 @@ public static class ScriptHost
             int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
             if (res != 0)
             {
-                Console.WriteLine("[ScriptHost] Compilation failed in TriggerCompileAndReloadManaged");
+                Logging.LogInternal("[ScriptHost] Compilation failed in TriggerCompileAndReloadManaged", LogLevel.Error);
                 return res;
             }
 
@@ -460,7 +495,7 @@ public static class ScriptHost
     {
         try
         {
-            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? string.Empty;
+            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? "";
 
             // Find the type in loaded assemblies
             Type? systemType = null;
@@ -485,7 +520,7 @@ public static class ScriptHost
             }
 
             // If we have saved state from a previous unload, restore it
-            StatePreserver.RestoreSystemState(systemType.Assembly.Location ?? string.Empty, SystemDiscovery.GetSystemInstance(handle)!);
+            StatePreserver.RestoreSystemState(systemType.Assembly.Location ?? "", SystemDiscovery.GetSystemInstance(handle)!);
 
             Console.WriteLine($"[ScriptHost] Created system instance: {typeName} (handle: {handle})");
             return handle;
@@ -562,7 +597,7 @@ public static class ScriptHost
     /// 
     /// Called from C++ during system registration to populate ComponentAccessBuilder metadata.
     /// </summary>
-    [UnmanagedCallersOnly]
+    [UnmanagedCallersOnly(EntryPoint = "GetSystemComponentAccesses")]
     public static int GetSystemComponentAccesses(ulong handle, IntPtr outReadHashesPtr, IntPtr outWriteHashesPtr, int maxSize)
     {
         try
@@ -638,7 +673,7 @@ public static class ScriptHost
         try
         {
             // For now, compute here but ideally this would call C++
-            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? string.Empty;
+            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? "";
             return ComponentAccessBridge.Fnv1aHashPublic(typeName);
         }
         catch (Exception ex)
@@ -690,7 +725,7 @@ public static class ScriptHost
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new(worldPtr);
+                World managedWorld = new World(worldPtr);
                 Console.WriteLine($"[ScriptHost] CallSystemOnCreate for {instance.GetType().Name}");
                 system.OnCreate(managedWorld);
             }
@@ -718,7 +753,7 @@ public static class ScriptHost
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new(worldPtr);
+                World managedWorld = new World(worldPtr);
                 system.OnUpdate(managedWorld, deltaTime);
             }
         }
@@ -744,7 +779,7 @@ public static class ScriptHost
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new(worldPtr);
+                World managedWorld = new World(worldPtr);
                 system.OnDestroy(managedWorld);
             }
         }

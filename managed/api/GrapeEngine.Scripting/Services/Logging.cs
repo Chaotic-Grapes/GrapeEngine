@@ -59,4 +59,44 @@ internal static class Logging
                 break;
         }
     }
+
+    internal static void LogInternal(string message, LogLevel level)
+    {
+        // Log level colors:
+        // Info: White
+        // Debug: Cyan
+        // Warning: Yellow
+        // Error: Red
+
+        // Also add background color to differentiate from unmanaged logs
+
+        // Timestamp in hh:mm format
+        var time = TimeOnly.FromDateTime(DateTime.Now)
+            .ToString(@"hh:mm");
+
+        Console.BackgroundColor = ConsoleColor.Gray;
+        switch (level)
+        {
+            case LogLevel.Info:
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine($"[{time}][INF C#] {message}");
+                Console.ResetColor();
+                break;
+            case LogLevel.Debug:
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"[{time}][DBG C#] {message}");
+                Console.ResetColor();
+                break;
+            case LogLevel.Warning:
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[{time}][WRN C#] {message}");
+                Console.ResetColor();
+                break;
+            case LogLevel.Error:
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[{time}][ERR C#] {message}");
+                Console.ResetColor();
+                break;
+        }
+    }
 }

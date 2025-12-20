@@ -11,6 +11,7 @@
 #include <imgui.h>
 #include <algorithm>
 #include <string>
+#include <vector>
 
 bool s_compileModalOpened = false;
 
@@ -33,24 +34,24 @@ void CompilePanel::Render() {
     }
 
     const char* statusText = "Idle";
-    if (status == 1) statusText = "Compiling...";
+    if (status == 1) statusText = "Compiling C# Scripts...";
     else if (status == 3) statusText = "Last compile: OK";
-    else if (status == 4) statusText = "Last compile: ERR";
+    else if (status == 4) statusText = "Last compile: ERROR";
 
-    // Open/close modal according to compile state
+    // Open modal when compilation starts
     if (status == 1 && !s_compileModalOpened) {
         ImGui::OpenPopup("Compile Status");
         s_compileModalOpened = true;
     }
-    if (status != 1 && s_compileModalOpened) {
-        if (status == 4 && !msg.empty()) LOG_ERROR("Script compile failed:\n" << msg);
-        else if (status == 3) LOG_INFO("Scripts compiled successfully.");
-
-        ImGui::CloseCurrentPopup();
-        s_compileModalOpened = false;
-    }
 
     if (ImGui::BeginPopupModal("Compile Status", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+        // If compilation finished (success or failure), close the popup immediately
+        if (status != 1 && s_compileModalOpened) {
+            ImGui::CloseCurrentPopup();
+            s_compileModalOpened = false;
+            ImGui::EndPopup();
+            return;
+        }
         ImGui::TextUnformatted(statusText);
         ImGui::Separator();
 
@@ -61,13 +62,28 @@ void CompilePanel::Render() {
                 ImGui::Text("%d%%", progress);
             }
             else {
-                ImGui::TextUnformatted("Compiling... Please wait.");
+                ImGui::TextUnformatted("Compiling C# Scripts...");
                 ImGui::ProgressBar(0.5f, ImVec2(400, 0));
             }
         }
         else {
-            if (status == 4 && !msg.empty()) {
-                ImGui::TextWrapped("%s", msg.c_str());
+            if (status == 4) {
+                std::vector<std::string> diags;
+                if (scriptMgr) {
+                    scriptMgr->GetLastDiagnosticsLines(diags);
+                }
+
+                if (!diags.empty()) {
+                    for (const auto& d : diags) {
+                        ImGui::TextWrapped("%s", d.c_str());
+                    }
+                }
+                else if (!msg.empty()) {
+                    ImGui::TextWrapped("%s", msg.c_str());
+                }
+                else {
+                    ImGui::TextUnformatted("Compilation failed");
+                }
             }
             else {
                 ImGui::TextUnformatted("Done");

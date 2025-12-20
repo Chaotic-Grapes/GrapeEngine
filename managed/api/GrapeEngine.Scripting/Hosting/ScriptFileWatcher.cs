@@ -209,8 +209,17 @@ public static class ScriptFileWatcher
                 Task.Run(() => {
                     int r = ScriptHost.TriggerCompileAndReloadManaged(s_watchedDirectory, outPath);
 
-                    // Prepare message
-                    string msg = r == 0 ? "OK" : "Compilation failed";
+                    // Collect Roslyn diagnostics (if any) so we can forward full details to native callback
+                    string diags = RoslynCompiler.GetLastDiagnostics() ?? string.Empty;
+
+                    // If diagnostics are empty, fallback to simple messages
+                    string msg;
+                    if (!string.IsNullOrWhiteSpace(diags)) {
+                        msg = diags;
+                    }
+                    else {
+                        msg = r == 0 ? "OK" : "Compilation failed";
+                    }
 
                     // Notify native of completion: status 3 = success, 4 = failure
                     if (s_compileCallback != null)

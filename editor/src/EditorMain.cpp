@@ -55,12 +55,26 @@ int main() {
 
     // Initialize C# script compilation and hot reload watcher
     auto* scriptManager = engine.GetScriptManager();
+    // Background threads for compilation/progress (declared outer so we can join on shutdown)
+    std::thread bgCompileThread;
+    std::thread bgProgressThread;
+    // Temp output root for compiled scripts (if created) and cleanup flag
+    std::filesystem::path tempRoot;
+    bool shouldCleanTemp = false;
     if (scriptManager && scriptManager->IsInitialized()) {
         // Use ProjectPaths to get the current project's Scripts folder
         if (Engine::ProjectPaths::IsInitialized()) {
             std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
             std::filesystem::path scriptsDir = projectRoot / "Scripts";
-            std::filesystem::path scriptsOutput = projectRoot / "GameScripts.dll"; // TODO: Move this to somewhere more discrete and temporary
+
+            // Write compiled script assemblies to an OS temp area so they're
+            // kept out of the user's project source tree and are easy to clean.
+            // Use a per-project subfolder under the system temp directory.
+            std::string projName = projectRoot.filename().string();
+            tempRoot = std::filesystem::temp_directory_path() / "GrapeEngine" / projName;
+            std::filesystem::create_directories(tempRoot);
+            shouldCleanTemp = true;
+            std::filesystem::path scriptsOutput = tempRoot / "GameScripts.dll";
             
             // Create scripts directory if it doesn't exist
             if (!std::filesystem::exists(scriptsDir)) {
@@ -68,51 +82,65 @@ int main() {
                 LOG_INFO("[EditorMain] Created Scripts directory: " << scriptsDir.string());
             }
             
-            // Compile scripts on startup with progress logging
-            LOG_INFO("[EditorMain] Compiling C# scripts on startup...");
-            std::string diagnostics;
+            // Compile scripts after the editor has loaded, on a background thread,
+            // so the UI becomes responsive immediately. A progress poller logs
+            // compile status until compilation finishes. The file watcher is
+            // started after the initial compilation completes.
+            LOG_INFO("[EditorMain] Scheduling background C# script compilation...");
 
-            // Set initial compile status and start a background poller to log progress
-            scriptManager->SetCompileStatus(1, 0, "Starting compilation");
             std::atomic<bool> compileDone{false};
             std::thread progressThread([&]() {
                 int status = 0;
                 int progress = -1;
                 std::string message;
+
                 while (!compileDone.load()) {
                     scriptManager->GetCompileStatus(status, progress, message);
-                    LOG_INFO("[EditorMain] Script compile status=" << status << " progress=" << progress << " msg=" << message);
                     if (status == 3 || status == 4) break; // success or failure
                     std::this_thread::sleep_for(std::chrono::milliseconds(150));
                 }
+                
                 // Final read to capture terminal state
                 scriptManager->GetCompileStatus(status, progress, message);
                 LOG_INFO("[EditorMain] Script compile finished status=" << status << " progress=" << progress << " msg=" << message);
             });
 
-            bool compileSuccess = scriptManager->CompileScriptsWithDiagnostics(scriptsDir.string(), scriptsOutput.string(), diagnostics);
+            // Launch compilation on a worker thread so main loop can run immediately
+            std::thread compileThread([=, &compileDone]() mutable {
+                std::string diagnostics;
+                try {
+                    scriptManager->SetCompileStatus(1, 0, "Starting compilation");
+                    LOG_INFO("[EditorMain] Background script compilation started");
 
-            // Ensure final status is set if managed side didn't update it
-            if (compileSuccess) {
-                scriptManager->SetCompileStatus(3, 100, "Compilation successful");
-                LOG_INFO("[EditorMain] Initial script compilation succeeded");
-            }
-            else {
-                scriptManager->SetCompileStatus(4, 100, diagnostics.c_str());
-                LOG_ERROR("Failed to compile scripts:\n" << diagnostics);
-            }
+                    bool compileSuccess = scriptManager->CompileScriptsWithDiagnostics(scriptsDir.string(), scriptsOutput.string(), diagnostics);
 
-            // Signal the poller to exit and join
-            compileDone.store(true);
-            if (progressThread.joinable()) progressThread.join();
+                    if (compileSuccess) {
+                        scriptManager->SetCompileStatus(3, 100, "Compilation successful");
+                        LOG_INFO("[EditorMain] Initial script compilation succeeded");
+                    }
+                    else {
+                        // Set compile status/message; detailed diagnostics are logged by ScriptManager
+                        scriptManager->SetCompileStatus(4, 100, diagnostics.c_str());
+                    }
 
-            // Start file watcher for hot reload - it will handle compilation on changes
-            if (scriptManager->StartScriptWatching(scriptsDir.string())) {
-                LOG_INFO("[EditorMain] C# script hot reload watcher started at: " << scriptsDir.string());
-            }
-            else {
-                LOG_WARNING("[EditorMain] Failed to start C# script hot reload watcher (scripts will not auto-reload on changes)");
-            }
+                    // Start file watcher for hot reload - it will handle compilation on changes
+                    if (scriptManager->StartScriptWatching(scriptsDir.string())) {
+                        LOG_INFO("[EditorMain] C# script hot reload watcher started at: " << scriptsDir.string());
+                    }
+                    else {
+                        LOG_WARNING("[EditorMain] Failed to start C# script hot reload watcher (scripts will not auto-reload on changes)");
+                    }
+                }
+                catch (const std::exception& e) {
+                    scriptManager->SetCompileStatus(4, 100, e.what());
+                    LOG_ERROR("[EditorMain] Exception during background script compilation: " << e.what());
+                }
+                compileDone.store(true);
+            });
+
+            // Move threads into outer-scope variables so we can join them on shutdown
+            bgCompileThread = std::move(compileThread);
+            bgProgressThread = std::move(progressThread);
         }
         else {
             LOG_WARNING("[EditorMain] ProjectPaths not initialized, cannot initialize script compilation");
@@ -208,6 +236,23 @@ int main() {
     // Shutdown
     editor.Shutdown();
     engine.Shutdown();
+
+    // Ensure background compile/poller threads are finished before exiting
+    try { if (bgCompileThread.joinable()) bgCompileThread.join(); } catch (...) {}
+    try { if (bgProgressThread.joinable()) bgProgressThread.join(); } catch (...) {}
+
+    // Clean up temp compiled scripts folder if we created one
+    if (shouldCleanTemp) {
+        try {
+            if (!tempRoot.empty() && std::filesystem::exists(tempRoot)) {
+                std::filesystem::remove_all(tempRoot);
+                LOG_INFO("[EditorMain] Removed temp script output: " << tempRoot.string());
+            }
+        }
+        catch (const std::exception& e) {
+            LOG_WARNING("[EditorMain] Failed to remove temp script output: " << e.what());
+        }
+    }
 
     return 0;
 }
