@@ -319,7 +319,7 @@ namespace Serialization {
 			};
 		}
 
-		// Serialize a single entity
+		// Serialize a single entity (including both C++ and C# components)
 		static json SerializeEntity(const ECS::World& world, const ECS::Entity e) {
 			json entityJson;
 			entityJson["Components"] = json::array();
@@ -345,6 +345,7 @@ namespace Serialization {
 					return a.second.Name < b.second.Name;
 				});
 
+			// Serialize all registered C++ components
 			for (const auto& [tid, info] : sortedComponents) {
 				json compJson;
 				info.Serialize(world, e, compJson);
@@ -355,6 +356,52 @@ namespace Serialization {
 						});
 				}
 			}
+
+			// Also serialize any C# components registered in the native ECS but not in EntitySerializer
+			// These are components discovered at runtime that don't have C++ serialization
+			auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
+			for (ECS::ComponentTypeId id : allIds) {
+				const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
+				
+				// Skip invalid entries
+				if (nativeMeta.TypeHash == 0) continue;
+				
+				// Check if this component is already handled by C++ registry
+				bool alreadyHandled = false;
+				for (const auto& [tid, info] : Registry()) {
+					if (ECS::ComponentRegistry::Meta(id).TypeHash == nativeMeta.TypeHash) {
+						alreadyHandled = true;
+						break;
+					}
+				}
+				
+				if (alreadyHandled) continue;
+				
+				// Only serialize C# components that the entity actually has
+				bool hasById = world.HasById(e, id);
+
+				if (!hasById) continue;
+
+				// Log that we're serializing a discovered C# component
+				LOG_INFO("[EntitySerializer] Entity " << e.Index << " has C# component ID " << id << " (hash=0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
+
+				// This is a C# component - create empty JSON entry with component metadata
+				// The inspector will use this to create the UI section and fetch data via P/Invoke
+				std::string componentName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
+				if (componentName.empty()) {
+					// Fallback to hash-based name
+					char buffer[64];
+					snprintf(buffer, sizeof(buffer), "Component_0x%08x", nativeMeta.TypeHash);
+					componentName = buffer;
+				}
+				
+				json compJson = json::object();  // Empty object for now
+				entityJson["Components"].push_back({
+					{"TypeName", componentName},
+					{"Data", compJson}
+					});
+			}
+
 			return entityJson;
 		}
 

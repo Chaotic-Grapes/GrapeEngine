@@ -470,9 +470,15 @@ namespace {
         }
     };
     
-    // Registry for tracking which component types have been registered
+    // Metadata for C# components
+    struct CSharpComponentMeta {
+        int Size;
+        int Alignment;
+    };
+    
+    // Registry for tracking which component types have been registered from C#
     struct ComponentRegistrationTracker {
-        std::unordered_map<uint32_t, bool> registered;
+        std::unordered_map<uint32_t, CSharpComponentMeta> registered;
         std::mutex mutex;
     };
     
@@ -482,24 +488,28 @@ namespace {
     }
 }
 
-INTEROP_API bool WorldInterop_RegisterComponent(uint32_t typeNameHash, int size, int alignment) {
-    auto& tracker = GetRegistrationTracker();
-    std::lock_guard<std::mutex> lock(tracker.mutex);
+INTEROP_API bool WorldInterop_RegisterComponent(uint32_t typeNameHash, int size, int alignment, const char* typeName) {
+    LOG_INFO("[WorldInterop_RegisterComponent] CALLED with hash=0x" << std::hex << typeNameHash << std::dec << ", size=" << size << ", alignment=" << alignment << ", name=" << (typeName ? typeName : "null"));
     
-    // Check if already registered
-    if (tracker.registered.find(typeNameHash) != tracker.registered.end()) {
-        return false; // Already registered
+    // Check if already registered in the C++ ComponentRegistry
+    ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeNameHash);
+    if (id != ECS::NULL_COMPONENT_ID) {
+        LOG_INFO("[WorldInterop_RegisterComponent] Already registered with ID " << id);
+        return true; // Already registered in C++ registry
     }
     
-    // Note: We can't dynamically create template instantiations at runtime
-    // This function primarily serves to mark components as "known" for validation
-    // The actual C++ component types should be registered separately using
-    // ComponentRegistry::RegisterWithHash<T>() in engine initialization code
-    
-    // For now, we just track that C# requested registration
-    tracker.registered[typeNameHash] = true;
-    
-    LOG_INFO("[WorldInterop] Component registered from C#: hash=" << typeNameHash << ", size=" << size << ", alignment=" << alignment);
+    // Register as a C# component in the native ComponentRegistry
+    // This makes it available to the editor and all engine systems
+    if (typeName && typeName[0] != '\0') {
+        // Register with name
+        std::string name = typeName;
+        ECS::ComponentTypeId newId = ECS::ComponentRegistry::RegisterCSharpComponentWithName(typeNameHash, size, alignment, name);
+        LOG_INFO("[WorldInterop_RegisterComponent] Registered C# component '" << name << "' with ID " << newId);
+    } else {
+        // Register without name (fallback for legacy calls)
+        ECS::ComponentTypeId newId = ECS::ComponentRegistry::RegisterCSharpComponent(typeNameHash, size, alignment);
+        LOG_INFO("[WorldInterop_RegisterComponent] Registered new C# component (no name) with ID " << newId);
+    }
     
     return true;
 }
@@ -516,6 +526,36 @@ INTEROP_API bool WorldInterop_IsComponentRegistered(uint32_t typeNameHash) {
     std::lock_guard<std::mutex> lock(tracker.mutex);
     return tracker.registered.find(typeNameHash) != tracker.registered.end();
 }
+
+INTEROP_API int WorldInterop_GetAllRegisteredComponentHashes(uint32_t* outHashes, int maxCount) {
+    auto& tracker = GetRegistrationTracker();
+    std::lock_guard<std::mutex> lock(tracker.mutex);
+    
+    int count = 0;
+    for (const auto& [hash, meta] : tracker.registered) {
+        if (count >= maxCount) break;
+        if (outHashes) {
+            outHashes[count] = hash;
+        }
+        count++;
+    }
+    return count;
+}
+
+INTEROP_API bool WorldInterop_GetComponentMetaFromHash(uint32_t typeNameHash, int* outSize, int* outAlignment) {
+    auto& tracker = GetRegistrationTracker();
+    std::lock_guard<std::mutex> lock(tracker.mutex);
+    
+    auto it = tracker.registered.find(typeNameHash);
+    if (it == tracker.registered.end()) {
+        return false;
+    }
+    
+    if (outSize) *outSize = it->second.Size;
+    if (outAlignment) *outAlignment = it->second.Alignment;
+    return true;
+}
+
 INTEROP_API void* WorldInterop_GetJobManager(void* worldPtr) {
     if (!worldPtr) return nullptr;
     

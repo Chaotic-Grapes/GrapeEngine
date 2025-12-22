@@ -19,13 +19,8 @@ The discovery process:
 */
 /* End Header *******************************************************************/
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using GrapeEngine.Scripting.Components.Core;
-using GrapeEngine.Scripting.Core;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -44,14 +39,12 @@ internal static class ComponentDiscovery
     public static void DiscoverAndRegisterAll()
     {
         var components = DiscoverComponents();
-        Console.WriteLine($"[ComponentDiscovery] Found {components.Count} component types");
+        Logging.LogInternal($"[ComponentDiscovery] Found {components.Count} component types", LogLevel.Info);
 
         foreach (var componentType in components)
         {
             RegisterComponent(componentType);
         }
-
-        Console.WriteLine("[ComponentDiscovery] Component discovery complete");
     }
 
     /// <summary>
@@ -62,23 +55,62 @@ internal static class ComponentDiscovery
         var components = new List<Type>();
 
         // Get all loaded assemblies in the current script context
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic && a.GetName().Name?.StartsWith("GrapeEngine") == true)
+        // Include all kinds of assemblies and user script assemblies (e.g., GameScripts)
+        var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+        Logging.LogInternal($"[ComponentDiscovery] Total assemblies loaded: {allAssemblies.Length}", LogLevel.Info);
+        
+        var assemblies = allAssemblies
+            .Where(a => !a.IsDynamic && ShouldScanAssembly(a))
             .ToList();
+        
+        Logging.LogInternal($"[ComponentDiscovery] Assemblies to scan: {assemblies.Count}", LogLevel.Info);
 
         foreach (var assembly in assemblies)
         {
+            // Skip System assemblies and GrapeEngine assemblies
+            if (assembly.GetName()?.Name is { } asmName &&
+                (asmName.StartsWith("System") ||
+                 asmName.StartsWith("Microsoft") ||
+                 asmName.StartsWith("GrapeEngine")))
+                continue;
+
             try
             {
-                var types = assembly.GetTypes()
-                    .Where(IsComponent)
-                    .ToList();
+                // Commented is for logging purposes only
+                // NOTE: If uncommented, the editor may take longer time to start due to the extra logging
 
-                components.AddRange(types);
+                // === Logging for debugging ===
+                // var allTypes = assembly.GetTypes();
+                // Logging.LogInternal($"[ComponentDiscovery] {assembly.GetName().Name} has {allTypes.Length} total types:", LogLevel.Info);
+                // foreach (var t in allTypes)
+                // {
+                //     Logging.LogInternal($"[ComponentDiscovery] Type: {t.FullName}", LogLevel.Info);
+                // }
+
+                // var types = allTypes
+                //     .Where(IsComponent)
+                //     .ToList();
+
+                // Logging.LogInternal($"[ComponentDiscovery] {assembly.GetName().Name}: {types.Count} components", LogLevel.Info);
+                // foreach (var t in types)
+                // {
+                //     Logging.LogInternal($"[ComponentDiscovery] Component found: {t.FullName}", LogLevel.Info);
+                // }
+
+                // components.AddRange(types);
+                // =============================
+
+                // Directly add discovered components if not logging
+                // Comment this out if you want detailed logging above
+                // Filter out System types and GrapeEngine assembly types
+                components.AddRange(assembly
+                    .GetTypes()
+                    .Where(IsComponent)
+                );
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ComponentDiscovery] Failed to scan assembly {assembly.GetName().Name}: {ex.Message}");
+                Logging.LogInternal($"[ComponentDiscovery] Failed to scan assembly {assembly.GetName().Name}: {ex.Message}", LogLevel.Error);
             }
         }
 
@@ -86,45 +118,97 @@ internal static class ComponentDiscovery
     }
 
     /// <summary>
-    /// Check if a type is a valid component (unmanaged struct).
+    /// Check if a type is a valid component (has [Component] attribute and is unmanaged struct).
     /// </summary>
     private static bool IsComponent(Type type)
     {
+        // Must have [Component] attribute!
+        // Check by name to avoid assembly binding issues
+        var hasComponentAttr = type.GetCustomAttributes()
+            .Any(attr => attr.GetType().Name == "ComponentAttribute");
+
+        Logging.LogInternal($"[ComponentDiscovery] Checking type: {type.FullName}", LogLevel.Debug);
+
+        foreach (var attr in type.GetCustomAttributes())
+        {
+            //if (string.IsNullOrWhiteSpace(type.FullName) || !type.FullName.StartsWith("EchoesBelow"))
+            //    continue;
+
+            Logging.LogInternal($"[ComponentDiscovery] {type.FullName} has attribute: {attr.GetType().FullName}", LogLevel.Debug);
+        }
+
+        if (!hasComponentAttr)
+        {
+            return false;  // Not marked as component, skip it
+        }
+
         // Must be a value type (struct)
         if (!type.IsValueType)
+        {
+            Logging.LogInternal($"[ComponentDiscovery] {type.FullName} rejected: not a value type (IsValueType={type.IsValueType})", LogLevel.Warning);
             return false;
+        }
 
         // Must not be a primitive or built-in type
         if (type.IsPrimitive || type.IsEnum)
+        {
+            Logging.LogInternal($"[ComponentDiscovery] {type.FullName} rejected: is primitive or enum", LogLevel.Warning);
             return false;
+        }
 
         // Skip special types
         if (type.Namespace?.StartsWith("System") == true)
+        {
             return false;
+        }
 
         // Must be unmanaged (blittable)
-        try
+        if (!IsUnmanagedType(type))
         {
-            var method = typeof(Type).GetMethod("IsUnmanagedType", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (method != null)
-            {
-                var isUnmanaged = (bool)method.Invoke(type, null)!;
-                if (!isUnmanaged)
-                    return false;
-            }
-            else
-            {
-                // Fallback: check for StructLayout attribute
-                if (type.GetCustomAttribute<StructLayoutAttribute>() == null)
-                    return false;
-            }
-        }
-        catch
-        {
+            Logging.LogInternal($"[ComponentDiscovery] {type.FullName} rejected: not unmanaged", LogLevel.Warning);
             return false;
         }
 
+        Logging.LogInternal($"[ComponentDiscovery] {type.FullName} is a valid component!", LogLevel.Info);
         return true;
+    }
+
+    /// <summary>
+    /// Check if a type is unmanaged (can be used in P/Invoke and unsafe code).
+    /// </summary>
+    private static bool IsUnmanagedType(Type type)
+    {
+        // Try the reflection method first
+        try
+        {
+            var method = typeof(Type).GetMethod("IsUnmanagedType", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (method != null)
+            {
+                var result = (bool)method.Invoke(type, null)!;
+                return result;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentDiscovery] IsUnmanagedType reflection failed: {ex.Message}", LogLevel.Warning);
+        }
+
+        // Fallback: try to use Marshal.SizeOf - if it works, the type is unmanaged
+        try
+        {
+            Marshal.SizeOf(type);
+            Logging.LogInternal($"[ComponentDiscovery] {type.FullName}: unmanaged via Marshal.SizeOf", LogLevel.Info);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentDiscovery] {type.FullName}: Marshal.SizeOf failed: {ex.Message}", LogLevel.Warning);
+        }
+
+        // Last resort: check if it has StructLayout attribute
+        var hasStructLayout = type.GetCustomAttribute<StructLayoutAttribute>() != null;
+        Logging.LogInternal($"[ComponentDiscovery] {type.FullName}: StructLayout={hasStructLayout}", LogLevel.Info);
+        return hasStructLayout;
     }
 
     /// <summary>
@@ -139,7 +223,7 @@ internal static class ComponentDiscovery
                 .GetMethod("Register", BindingFlags.Public | BindingFlags.Static)
                 ?.MakeGenericMethod(componentType);
 
-            registerMethod?.Invoke(null, Array.Empty<object>());
+            registerMethod?.Invoke(null, []);
 
             // Get component metadata for logging
             var getHashMethod = typeof(ComponentTypeHelper)
@@ -148,18 +232,43 @@ internal static class ComponentDiscovery
 
             if (getHashMethod != null)
             {
-                var hash = (uint)getHashMethod.Invoke(null, Array.Empty<object>())!;
-                Console.WriteLine($"[ComponentDiscovery] Registered {componentType.Name} (hash: 0x{hash:X8})");
+                var hash = (uint)getHashMethod.Invoke(null, [])!;
+                Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name} (hash: 0x{hash:X8})", LogLevel.Info);
             }
             else
             {
-                Console.WriteLine($"[ComponentDiscovery] Registered {componentType.Name}");
+                Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name}", LogLevel.Info);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ComponentDiscovery] Failed to register {componentType.Name}: {ex.Message}");
+            Logging.LogInternal($"[ComponentDiscovery] Failed to register {componentType.Name}: {ex.Message}", LogLevel.Error);
         }
+    }
+
+    /// <summary>
+    /// Determine if an assembly should be scanned for components.
+    /// Scans GrapeEngine.* assemblies and user script assemblies (e.g., GameScripts).
+    /// Excludes System.* and other framework assemblies.
+    /// </summary>
+    private static bool ShouldScanAssembly(Assembly assembly)
+    {
+        var assemblyName = assembly.GetName().Name ?? string.Empty;
+
+        // Always include GrapeEngine assemblies
+        if (assemblyName.StartsWith("GrapeEngine"))
+            return true;
+
+        // Include user script assemblies (GameScripts, EchoesBelow, etc.)
+        // Exclude System, Microsoft, and other framework assemblies
+        if (assemblyName.StartsWith("System") || 
+            assemblyName.StartsWith("Microsoft") ||
+            assemblyName.StartsWith("netstandard") ||
+            assemblyName.StartsWith("mscorlib"))
+            return false;
+
+        // Include everything else (user scripts)
+        return true;
     }
 
 }

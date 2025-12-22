@@ -15,8 +15,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Reflection;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace GrapeEngine.Scripting.Compiler;
 
@@ -41,8 +39,11 @@ internal static class RoslynCompiler
                 return -1;
             }
 
-            // Gather all .cs files
-            var csFiles = Directory.GetFiles(dirPath, "*.cs", SearchOption.AllDirectories);
+            // Gather all .cs files (exclude build artifacts)
+            var csFiles = Directory.GetFiles(dirPath, "*.cs", SearchOption.AllDirectories)
+                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && 
+                            !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+                .ToArray();
             if (csFiles.Length == 0)
             {
                 Logging.Log($"No .cs files found in {dirPath}", LogLevel.Warning);
@@ -155,6 +156,27 @@ internal static class RoslynCompiler
                 {
                     var bytes = ms.ToArray();
                     File.WriteAllBytes(outputAssemblyPath, bytes);
+                    
+                    // Copy GrapeEngine.Scripting dependency to the same directory so it can be found
+                    var outputDir = Path.GetDirectoryName(outputAssemblyPath);
+                    if (!string.IsNullOrEmpty(outputDir))
+                    {
+                        try
+                        {
+                            var scriptingAsm = Assembly.Load("GrapeEngine.Scripting");
+                            if (scriptingAsm != null && !string.IsNullOrEmpty(scriptingAsm.Location))
+                            {
+                                var scriptingDllName = Path.GetFileName(scriptingAsm.Location);
+                                var scriptingDstPath = Path.Combine(outputDir, scriptingDllName);
+                                File.Copy(scriptingAsm.Location, scriptingDstPath, overwrite: true);
+                                Logging.LogInternal($"Copied GrapeEngine.Scripting to output directory: {scriptingDstPath}", LogLevel.Info);
+                            }
+                        }
+                        catch (Exception depEx)
+                        {
+                            Logging.Log($"Warning: Failed to copy GrapeEngine.Scripting dependency: {depEx.Message}", LogLevel.Warning);
+                        }
+                    }
                 }
                 catch
                 {

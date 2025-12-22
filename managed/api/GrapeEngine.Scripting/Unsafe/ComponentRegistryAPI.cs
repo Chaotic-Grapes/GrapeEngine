@@ -25,7 +25,8 @@ internal static partial class ComponentRegistryAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_RegisterComponent")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static partial bool RegisterComponent(uint typeNameHash, int size, int alignment);
+    public static partial bool RegisterComponent(uint typeNameHash, int size, int alignment, 
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? typeName = null);
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_IsComponentRegistered")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

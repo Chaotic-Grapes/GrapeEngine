@@ -12,7 +12,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Unsafe;
 
 namespace GrapeEngine.Scripting.Core;
@@ -21,7 +24,7 @@ namespace GrapeEngine.Scripting.Core;
 /// Component registration utilities for C# systems.
 /// Use this to register C# component types with the native ECS.
 /// </summary>
-public static class ComponentRegistry
+public static partial class ComponentRegistry
 {
     private static readonly HashSet<uint> _registeredHashes = [];
     private static readonly Lock _lock = new();
@@ -38,21 +41,23 @@ public static class ComponentRegistry
         int size = Marshal.SizeOf<T>();
         int alignment = GetAlignment<T>();
 
+        // Extract custom name from [Component] attribute if present
+        string? customName = GetComponentName(typeof(T));
+
         lock (_lock)
         {
             // Check local cache first
             if (_registeredHashes.Contains(hash))
-            {
                 return false;
-            }
 
-            // Register with native code
-            bool success = ComponentRegistryAPI.RegisterComponent(hash, size, alignment);
+            // Register with native code, passing the custom name if available
+            bool success = ComponentRegistryAPI.RegisterComponent(hash, size, alignment, customName);
             
             if (success)
             {
                 _registeredHashes.Add(hash);
-                Console.WriteLine($"[ComponentRegistry] Registered {typeof(T).Name} (hash: 0x{hash:X8}, size: {size}, align: {alignment})");
+                string displayName = customName ?? typeof(T).Name;
+                Console.WriteLine($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})");
             }
 
             return success;
@@ -71,9 +76,7 @@ public static class ComponentRegistry
         lock (_lock)
         {
             if (_registeredHashes.Contains(hash))
-            {
                 return true;
-            }
         }
 
         // Check with native code in case it was registered in C++
@@ -87,9 +90,7 @@ public static class ComponentRegistry
     internal static void EnsureRegistered<T>() where T : unmanaged
     {
         if (!IsRegistered<T>())
-        {
             Register<T>();
-        }
     }
 
     /// <summary>
@@ -108,4 +109,31 @@ public static class ComponentRegistry
         if (size >= 2) return 2;
         return 1;
     }
+
+    /// <summary>
+    /// Get the custom component name from the [Component] attribute.
+    /// </summary>
+    private static string? GetComponentName(Type componentType)
+    {
+        // Look for [Component] attribute without referencing its type directly
+        var componentAttr = componentType.GetCustomAttributes()
+            .FirstOrDefault(attr => attr.GetType().Name == "ComponentAttribute");
+
+        // Get default name if no attribute found (from type name)
+        // Remove "Component" suffix
+        var displayName = componentType.Name.Replace("Component", "");
+
+        // Insert spaces before capital letters for readability
+        displayName = ComponentNameRegex().Replace(displayName, " $1");
+
+        // However, if the attribute specifies a custom name, use that instead
+        if (componentAttr is ComponentAttribute attribute && !string.IsNullOrWhiteSpace(attribute.Name))
+            displayName = attribute.Name;
+
+        return displayName;
+    }
+
+    [GeneratedRegex("(?<=[a-z])([A-Z])")]
+    private static partial Regex ComponentNameRegex();
+
 }

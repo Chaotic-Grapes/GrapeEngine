@@ -18,6 +18,7 @@ Launches the application in editor mode with the level editor interface.
 #include "core/Application.h"
 #include "core/ProjectPaths.h"
 #include "EditorApplication.h"
+#include "EditorComponentRegistry.h"
 #include "EditorState.h"
 #include "services/TimeSystem.h"
 #include "platform/IPlatformContext.h"
@@ -62,10 +63,9 @@ int main() {
     std::filesystem::path tempRoot;
     bool shouldCleanTemp = false;
     if (scriptManager && scriptManager->IsInitialized()) {
-        // Use ProjectPaths to get the current project's Scripts folder
+        // Use ProjectPaths to get the current project root and watch all directories
         if (Engine::ProjectPaths::IsInitialized()) {
             std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
-            std::filesystem::path scriptsDir = projectRoot / "Scripts";
 
             // Write compiled script assemblies to an OS temp area so they're
             // kept out of the user's project source tree and are easy to clean.
@@ -75,12 +75,6 @@ int main() {
             std::filesystem::create_directories(tempRoot);
             shouldCleanTemp = true;
             std::filesystem::path scriptsOutput = tempRoot / "GameScripts.dll";
-            
-            // Create scripts directory if it doesn't exist
-            if (!std::filesystem::exists(scriptsDir)) {
-                std::filesystem::create_directories(scriptsDir);
-                LOG_INFO("[EditorMain] Created Scripts directory: " << scriptsDir.string());
-            }
             
             // Compile scripts after the editor has loaded, on a background thread,
             // so the UI becomes responsive immediately. A progress poller logs
@@ -112,11 +106,23 @@ int main() {
                     scriptManager->SetCompileStatus(1, 0, "Starting compilation");
                     LOG_INFO("[EditorMain] Background script compilation started");
 
-                    bool compileSuccess = scriptManager->CompileScriptsWithDiagnostics(scriptsDir.string(), scriptsOutput.string(), diagnostics);
+                    bool compileSuccess = scriptManager->CompileScriptsWithDiagnostics(projectRoot.string(), scriptsOutput.string(), diagnostics);
 
                     if (compileSuccess) {
                         scriptManager->SetCompileStatus(3, 100, "Compilation successful");
                         LOG_INFO("[EditorMain] Initial script compilation succeeded");
+                        
+                        // Load the compiled assembly into the managed runtime so components are discovered
+                        if (scriptManager->LoadAssembly(scriptsOutput.string())) {
+                            LOG_INFO("[EditorMain] Loaded compiled script assembly");
+                            
+                            // Rebuild the editor's component registry now that C# components are registered
+                            ComponentRegistryUI::RebuildFromNativeRegistry();
+                            LOG_INFO("[EditorMain] Rebuilt editor component registry with C# components");
+                        }
+                        else {
+                            LOG_ERROR("[EditorMain] Failed to load compiled script assembly");
+                        }
                     }
                     else {
                         // Set compile status/message; detailed diagnostics are logged by ScriptManager
@@ -124,8 +130,9 @@ int main() {
                     }
 
                     // Start file watcher for hot reload - it will handle compilation on changes
-                    if (scriptManager->StartScriptWatching(scriptsDir.string())) {
-                        LOG_INFO("[EditorMain] C# script hot reload watcher started at: " << scriptsDir.string());
+                    // Watch the entire project root so users can organize scripts however they want
+                    if (scriptManager->StartScriptWatching(projectRoot.string())) {
+                        LOG_INFO("[EditorMain] C# script hot reload watcher started at: " << projectRoot.string());
                     }
                     else {
                         LOG_WARNING("[EditorMain] Failed to start C# script hot reload watcher (scripts will not auto-reload on changes)");

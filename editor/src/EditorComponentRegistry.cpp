@@ -323,12 +323,75 @@ static auto& _getCppComponentDefaults() {
 
 // Generic renderer for C# components (using JSON editor)
 static void RenderGenericComponent(ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w) {
-    // Display that this is a C# component
-    ImGui::TextDisabled("(C# Component)");
-    
-    // For now, just display the raw JSON in a text area
-    // A more sophisticated editor could be added later
-    ImGui::TextWrapped("%s", data.dump(2).c_str());
+    // If data is empty, show a message indicating this is a C# component
+    if (data.empty()) {
+        ImGui::TextDisabled("(C# Component)");
+        ImGui::Spacing();
+        ImGui::TextWrapped("Component data will be displayed here. Currently, C# component editing requires full field discovery via reflection.");
+        return;
+    }
+
+    // If data is not an object, display message and return
+    if (!data.is_object()) {
+        ImGui::TextDisabled("(Invalid C# Component Data)");
+        return;
+    }
+
+    // Iterate through each field in the component's JSON
+    for (auto it = data.begin(); it != data.end(); ++it) {
+        const std::string& fieldName = it.key();
+        nlohmann::json& fieldValue = it.value();
+
+        // Render based on field type
+        if (fieldValue.is_boolean()) {
+            bool boolValue = fieldValue.get<bool>();
+            if (ImGui::Checkbox(("##" + fieldName).c_str(), &boolValue)) {
+                fieldValue = boolValue;
+            }
+            ImGui::SameLine();
+            ImGui::Text("%s", fieldName.c_str());
+        }
+        else if (fieldValue.is_number_integer()) {
+            int intValue = fieldValue.get<int>();
+            if (ImGui::InputInt(("##" + fieldName).c_str(), &intValue)) {
+                fieldValue = intValue;
+            }
+            ImGui::SameLine();
+            ImGui::Text("%s", fieldName.c_str());
+        }
+        else if (fieldValue.is_number_float()) {
+            float floatValue = fieldValue.get<float>();
+            if (ImGui::InputFloat(("##" + fieldName).c_str(), &floatValue)) {
+                fieldValue = floatValue;
+            }
+            ImGui::SameLine();
+            ImGui::Text("%s", fieldName.c_str());
+        }
+        else if (fieldValue.is_string()) {
+            std::string stringValue = fieldValue.get<std::string>();
+            char buffer[512];
+            strncpy_s(buffer, stringValue.c_str(), sizeof(buffer) - 1);
+            buffer[sizeof(buffer) - 1] = '\0';
+            
+            if (ImGui::InputText(("##" + fieldName).c_str(), buffer, sizeof(buffer))) {
+                fieldValue = std::string(buffer);
+            }
+            ImGui::SameLine();
+            ImGui::Text("%s", fieldName.c_str());
+        }
+        else if (fieldValue.is_array()) {
+            // For arrays, show as a collapsible section
+            ImGui::Text("%s (array with %zu elements)", fieldName.c_str(), fieldValue.size());
+        }
+        else if (fieldValue.is_object()) {
+            // For nested objects, show as a collapsible section
+            ImGui::Text("%s (object)", fieldName.c_str());
+        }
+        else {
+            // Unknown type
+            ImGui::TextDisabled("%s: (unknown type)", fieldName.c_str());
+        }
+    }
 }
 
 // =============================================================================
@@ -609,9 +672,21 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
     
     // Get all registered component IDs from the native registry
     auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
+    LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry: Found " << allIds.size() << " total component IDs in native registry");
     
-    // Check if there are any C# components (those not in our hardcoded list)
+    // Debug: log the hardcoded registry count
+    LOG_INFO("[EditorComponentRegistry] Hardcoded C++ components in s_registry: " << s_registry.size());
+    
+    // Add C++ components that aren't hardcoded
+    int newComponentsFound = 0;
     for (ECS::ComponentTypeId id : allIds) {
+        const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
+        
+        // Skip invalid/uninitialized entries (hash 0x0 is impossible for real components)
+        if (nativeMeta.TypeHash == 0) {
+            continue;
+        }
+        
         // Check if this component is already in our registry
         bool alreadyExists = false;
         for (const auto& meta : s_registry) {
@@ -621,17 +696,38 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             }
         }
         
-        if (alreadyExists) continue;  // Skip C++ components, they're already added
+        if (alreadyExists) {
+            continue;  // Skip C++ components, they're already added
+        }
         
         // This is a new C# component - add it with generic operations
-        const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
+        LOG_INFO("[EditorComponentRegistry] Found new C# component: ID " << id << ", hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ", size " << nativeMeta.Size);
+        newComponentsFound++;
         
         std::string displayName;
-        char buffer[64];
-        snprintf(buffer, sizeof(buffer), "Component_0x%08x", nativeMeta.TypeHash);
-        displayName = buffer;
+        std::string typeName;
         
-        std::string typeName = displayName;
+        // Try to get the component name from the native registry
+        std::string nativeName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
+        if (!nativeName.empty()) {
+            // Use the actual component name if available
+            displayName = nativeName;
+            // Extract just the class name from the full type name (e.g., "EchoesBelow.Scripts.Health" -> "Health")
+            size_t lastDot = nativeName.rfind('.');
+            if (lastDot != std::string::npos) {
+                displayName = nativeName.substr(lastDot + 1);
+            }
+            typeName = nativeName;
+            LOG_INFO("[EditorComponentRegistry]   -> Using native name: " << displayName);
+        }
+        else {
+            // Fallback to hash-based name if no name registered
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "Component_0x%08x", nativeMeta.TypeHash);
+            displayName = buffer;
+            typeName = displayName;
+            LOG_WARNING("[EditorComponentRegistry]   -> No native name found, using hash-based name: " << displayName);
+        }
         
         // Create generic operations for C# components
         auto hasComponentFunc = [id](ECS::World* w, ECS::Entity e) {
@@ -640,10 +736,30 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         };
         
         auto addComponentFunc = [id](ECS::World* w, ECS::Entity e, const nlohmann::json& data) {
-            if (!w) return;
+            if (!w) {
+                LOG_WARNING("[EditorComponentRegistry] addComponentFunc called with null world");
+                return;
+            }
             const auto& meta = ECS::ComponentRegistry::Meta(id);
-            if (meta.Size == 0) return;
-            w->AddComponentById(e, id, nullptr, 0);
+            if (meta.Size == 0) {
+                LOG_WARNING("[EditorComponentRegistry] Component ID " << id << " has zero size");
+                return;
+            }
+            
+            // Allocate zero-initialized buffer for the component
+            std::vector<uint8_t> buffer(meta.Size, 0);
+            void* result = w->AddComponentById(e, id, buffer.data(), meta.Size);
+            
+            if (result) {
+                LOG_INFO("[EditorComponentRegistry] Successfully added C# component ID " << id << " to entity (ptr=" << result << ", size=" << meta.Size << ")");
+                
+                // Verify the component was actually added
+                if (!w->HasById(e, id)) {
+                    LOG_ERROR("[EditorComponentRegistry] ERROR: Component was added but HasComponent check failed!");
+                }
+            } else {
+                LOG_ERROR("[EditorComponentRegistry] AddComponentById returned null for component ID " << id);
+            }
         };
         
         auto removeComponentFunc = [id](ECS::World* w, ECS::Entity e) {
@@ -653,10 +769,14 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         
         auto applyComponentFunc = [id](ECS::World* w, ECS::Entity e, const nlohmann::json& data) {
             if (!w) return;
+            const auto& meta = ECS::ComponentRegistry::Meta(id);
             void* componentPtr = w->GetRawComponentPtr(e, id);
             if (!componentPtr) {
-                w->AddComponentById(e, id, nullptr, 0);
+                // Allocate zero-initialized buffer
+                std::vector<uint8_t> buffer(meta.Size, 0);
+                w->AddComponentById(e, id, buffer.data(), meta.Size);
             }
+            // TODO: Parse JSON data and copy into component buffer
         };
         
         // Add to registry with generic renderer
@@ -673,12 +793,22 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             removeComponentFunc,
             applyComponentFunc
         );
+        
+        LOG_INFO("[EditorComponentRegistry] Added C# component to editor registry: " << displayName << " (hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
     }
+    
+    LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry complete: Found " << newComponentsFound << " new C# components. Total in editor registry = " << s_registry.size());
 }
 
 // Returns the full component metadata list (C++ + C# components)
 const std::vector<ComponentUIMetadata>& ComponentRegistryUI::GetAll() {
     std::lock_guard<std::mutex> lock(s_registryLock);
+    
+    // Ensure default registry is initialized
+    if (s_registry.empty()) {
+        _initializeDefaultRegistry();
+    }
+    
     return s_registry;
 }
 
@@ -691,5 +821,6 @@ const ComponentUIMetadata* ComponentRegistryUI::Find(const std::string& typeName
             return &meta;
         }
     }
+    LOG_WARNING("[EditorComponentRegistry] Find: No metadata for component type '" << typeName << "'");
     return nullptr;
 }

@@ -24,6 +24,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #ifndef COMPONENTREGISTRY_H
 #define COMPONENTREGISTRY_H
 
+#include "core/Logger.h"
+#include "Export.h"
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -45,7 +47,7 @@ namespace ECS {
   };
 
   // Registry for component types, providing unique IDs and metadata
-  class ComponentRegistry {
+    class GRAPEENGINE_API ComponentRegistry {
   public:
         /**
          * @brief Registers a component type T and returns its unique ComponentTypeId.
@@ -117,32 +119,17 @@ namespace ECS {
       }
 
       static ComponentTypeId _nextId() {
-          // Atomic increment ensures thread-safe ID generation without mutex overhead
-          // Each component type gets a unique ID even when multiple threads register simultaneously
-          static std::atomic<ComponentTypeId> counter{0};
-          
-          return counter.fetch_add(1, std::memory_order_relaxed); 
-          // std::memory_order_relaxed, no synchronization guarantees beyond atomicity
+          // Call the implementation in ComponentRegistry.cpp
+          return _nextIdCounter().fetch_add(1, std::memory_order_relaxed);
       }
 
-      static std::unordered_map<ComponentTypeId, ComponentMeta>& _metas() {
-          // We don't need synchronization here because writes are protected by std::call_once
-          // and reads happen only after registration is complete (happens before relationship I think)
-          static std::unordered_map<ComponentTypeId, ComponentMeta> m;
-          return m;
-      }
-
-      // Hash to ComponentId mapping for C# interop
-      static std::unordered_map<uint32_t, ComponentTypeId>& _hashToId() {
-          static std::unordered_map<uint32_t, ComponentTypeId> map;
-          return map;
-      }
-
-      // Reverse mapping: ComponentTypeId to hash (for enumeration)
-      static std::unordered_map<ComponentTypeId, uint32_t>& _idToHash() {
-          static std::unordered_map<ComponentTypeId, uint32_t> map;
-          return map;
-      }
+      // These are defined in ComponentRegistry.cpp to ensure single instance across all compilation units
+      // If they were defined here as inline statics, each .cpp file would get its own instance!
+      static std::unordered_map<ComponentTypeId, ComponentMeta>& _metas();
+      static std::atomic<ComponentTypeId>& _nextIdCounter();
+      static std::unordered_map<uint32_t, ComponentTypeId>& _hashToId();
+      static std::unordered_map<ComponentTypeId, uint32_t>& _idToHash();
+      static std::unordered_map<uint32_t, std::string>& _hashToName();
 
   public:
       /**
@@ -174,10 +161,66 @@ namespace ECS {
       static std::vector<ComponentTypeId> GetAllComponentIds() {
           std::vector<ComponentTypeId> ids;
           const auto& metas = _metas();
+          
           for (const auto& [id, meta] : metas) {
               ids.push_back(id);
           }
+          
           return ids;
+      }
+
+      /**
+       * @brief Get component type name from its hash
+       * @param typeHash FNV-1a hash of component type name
+       * @return Component name or empty string if not found
+       */
+      static std::string GetComponentNameFromHash(uint32_t typeHash) {
+          auto& nameMap = _hashToName();
+          auto it = nameMap.find(typeHash);
+          return (it != nameMap.end()) ? it->second : "";
+      }
+
+      /**
+       * @brief Register a component type with only its type name hash (for C# runtime components)
+       * This creates a synthetic entry for C# components that don't have C++ type equivalents.
+       * @param typeHash FNV-1a hash of the component type name
+       * @param size Size of the component in bytes
+       * @param alignment Alignment requirement of the component
+       * @return ComponentTypeId of the registered component
+       */
+      static ComponentTypeId RegisterCSharpComponent(uint32_t typeHash, size_t size, size_t alignment) {
+          ComponentTypeId id = _nextId();
+          auto& metas = _metas();
+          auto& hashMap = _hashToId();
+          
+          LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] BEFORE: _metas has " << metas.size() << " entries");
+          
+          // Create a synthetic metadata entry for the C# component
+          ComponentMeta meta;
+          meta.Size = size;
+          meta.Align = alignment;
+          meta.TypeHash = typeHash;
+          // C# components don't have C++ constructors/destructors
+          meta.ctor = [](void* p) { std::memset(p, 0, 1); }; // Zero-initialize
+          meta.dtor = [](void*) { /* No cleanup for C# components */ };
+          
+          metas[id] = meta;
+          hashMap[typeHash] = id;
+          
+          LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] AFTER: _metas has " << metas.size() << " entries, added ID " << id);
+          
+          return id;
+      }
+
+      /**
+       * @brief Register a C# component with its name
+       */
+      static ComponentTypeId RegisterCSharpComponentWithName(uint32_t typeHash, size_t size, size_t alignment, const std::string& typeName) {
+          ComponentTypeId id = RegisterCSharpComponent(typeHash, size, alignment);
+          auto& nameMap = _hashToName();
+          nameMap[typeHash] = typeName;
+          LOG_INFO("[ComponentRegistry::RegisterCSharpComponentWithName] Registered " << typeName << " with hash 0x" << std::hex << typeHash << std::dec);
+          return id;
       }
 
       /**

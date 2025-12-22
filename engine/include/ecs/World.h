@@ -491,7 +491,16 @@ namespace ECS {
         inline void* AddComponentById(Entity e, ComponentTypeId componentId, void* data, size_t size) {
             // Ensure component info exists
             if (m_componentSizes.find(componentId) == m_componentSizes.end()) {
-                return nullptr; // Component type not registered
+                // Try to get metadata from ComponentRegistry (for C# components)
+                const auto& meta = ComponentRegistry::Meta(componentId);
+                if (meta.Size == 0) {
+                    return nullptr; // Component type not registered
+                }
+                
+                // Register this component with the world
+                size_t alignment = meta.Align > 0 ? meta.Align : meta.Size;
+                m_componentSizes[componentId] = { meta.Size, alignment };
+                LOG_INFO("[World::AddComponentById] Auto-registered component ID " << componentId << " (size=" << meta.Size << ", align=" << alignment << ")");
             }
 
             auto& loc = m_locations[e.Index];
@@ -554,6 +563,18 @@ namespace ECS {
             _onComponentAdded(e, componentId);
             
             return componentPtr;
+        }
+
+        /**
+         * @brief Register component size/alignment info for a component id.
+         * This is used by C# interop to inform an existing World about
+         * synthetic (C#) component types so that archetypes can be created
+         * correctly when components are added via AddComponentById.
+         */
+        inline void RegisterComponentSizeById(ComponentTypeId id, size_t size, size_t align) {
+            if (m_componentSizes.find(id) == m_componentSizes.end()) {
+                m_componentSizes[id] = { size, align };
+            }
         }
 
         /**

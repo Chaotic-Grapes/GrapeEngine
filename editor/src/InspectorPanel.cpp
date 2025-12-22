@@ -103,9 +103,9 @@ void InspectorPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
     // Forward fonts into the smaller ComponentUI helper so it can draw fields
     m_componentUI.Initialize(mainFont, boldFont, symbolsFont);
     
-    // Rebuild the editor component registry from the native ECS registry
-    // This discovers all registered components (both C++ and C# that were discovered)
-    ComponentRegistryUI::RebuildFromNativeRegistry();
+    // NOTE: Do NOT call RebuildFromNativeRegistry() here!
+    // The native registry won't have C# components yet (they're loaded on a background thread)
+    // Instead, we rebuild after LoadAssembly() succeeds in EditorMain
 }
 
 // Update the world context and clear any stale selection from a previous world
@@ -457,6 +457,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
             // Look up metadata which tells us how to draw this component
             const auto* meta = ComponentRegistryUI::Find(typeName);
+            if (!meta) {
+                LOG_WARNING("[InspectorPanel] No UI metadata for component '" << typeName << "' while rendering entity " << entity.Index);
+            }
             if (meta) {
                 auto& data = componentEntry["Data"];
 
