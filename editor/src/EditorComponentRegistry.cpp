@@ -321,79 +321,6 @@ static auto& _getCppComponentDefaults() {
     return defaults;
 }
 
-// Generic renderer for C# components (using JSON editor)
-static void RenderGenericComponent(ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w) {
-    // If data is empty, show a message indicating this is a C# component
-    if (data.empty()) {
-        ImGui::TextDisabled("(C# Component)");
-        ImGui::Spacing();
-        ImGui::TextWrapped("Component data will be displayed here. Currently, C# component editing requires full field discovery via reflection.");
-        return;
-    }
-
-    // If data is not an object, display message and return
-    if (!data.is_object()) {
-        ImGui::TextDisabled("(Invalid C# Component Data)");
-        return;
-    }
-
-    // Iterate through each field in the component's JSON
-    for (auto it = data.begin(); it != data.end(); ++it) {
-        const std::string& fieldName = it.key();
-        nlohmann::json& fieldValue = it.value();
-
-        // Render based on field type
-        if (fieldValue.is_boolean()) {
-            bool boolValue = fieldValue.get<bool>();
-            if (ImGui::Checkbox(("##" + fieldName).c_str(), &boolValue)) {
-                fieldValue = boolValue;
-            }
-            ImGui::SameLine();
-            ImGui::Text("%s", fieldName.c_str());
-        }
-        else if (fieldValue.is_number_integer()) {
-            int intValue = fieldValue.get<int>();
-            if (ImGui::InputInt(("##" + fieldName).c_str(), &intValue)) {
-                fieldValue = intValue;
-            }
-            ImGui::SameLine();
-            ImGui::Text("%s", fieldName.c_str());
-        }
-        else if (fieldValue.is_number_float()) {
-            float floatValue = fieldValue.get<float>();
-            if (ImGui::InputFloat(("##" + fieldName).c_str(), &floatValue)) {
-                fieldValue = floatValue;
-            }
-            ImGui::SameLine();
-            ImGui::Text("%s", fieldName.c_str());
-        }
-        else if (fieldValue.is_string()) {
-            std::string stringValue = fieldValue.get<std::string>();
-            char buffer[512];
-            strncpy_s(buffer, stringValue.c_str(), sizeof(buffer) - 1);
-            buffer[sizeof(buffer) - 1] = '\0';
-            
-            if (ImGui::InputText(("##" + fieldName).c_str(), buffer, sizeof(buffer))) {
-                fieldValue = std::string(buffer);
-            }
-            ImGui::SameLine();
-            ImGui::Text("%s", fieldName.c_str());
-        }
-        else if (fieldValue.is_array()) {
-            // For arrays, show as a collapsible section
-            ImGui::Text("%s (array with %zu elements)", fieldName.c_str(), fieldValue.size());
-        }
-        else if (fieldValue.is_object()) {
-            // For nested objects, show as a collapsible section
-            ImGui::Text("%s (object)", fieldName.c_str());
-        }
-        else {
-            // Unknown type
-            ImGui::TextDisabled("%s: (unknown type)", fieldName.c_str());
-        }
-    }
-}
-
 // =============================================================================
 // Dynamic Registry Implementation
 // =============================================================================
@@ -673,6 +600,13 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
     // Get all registered component IDs from the native registry
     auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
     LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry: Found " << allIds.size() << " total component IDs in native registry");
+    // Dump details for debugging
+    for (ECS::ComponentTypeId aid : allIds) {
+        const auto& ameta = ECS::ComponentRegistry::Meta(aid);
+        std::string aname = ECS::ComponentRegistry::GetComponentNameFromHash(ameta.TypeHash);
+        if (aname.empty()) aname = "<no-name>";
+        LOG_INFO("[EditorComponentRegistry]   NativeID " << aid << " hash=0x" << std::hex << ameta.TypeHash << std::dec << " size=" << ameta.Size << " name=" << aname);
+    }
     
     // Debug: log the hardcoded registry count
     LOG_INFO("[EditorComponentRegistry] Hardcoded C++ components in s_registry: " << s_registry.size());
@@ -786,7 +720,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             typeName,
             id,
             true,  // C# components can be deleted
-            &RenderGenericComponent,
+            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); },
             []() { return nlohmann::json::object(); },
             hasComponentFunc,
             addComponentFunc,
@@ -821,6 +755,6 @@ const ComponentUIMetadata* ComponentRegistryUI::Find(const std::string& typeName
             return &meta;
         }
     }
-    LOG_WARNING("[EditorComponentRegistry] Find: No metadata for component type '" << typeName << "'");
+    // LOG_WARNING("[EditorComponentRegistry] Find: No metadata for component type '" << typeName << "'");
     return nullptr;
 }

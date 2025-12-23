@@ -22,6 +22,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "helpers/EntityUtils.h"
 #include "core/Logger.h"
 #include <cstring>
+#include <combaseapi.h>
+
+#ifdef ERROR
+#undef ERROR
+#endif
 
 // ============================================================================
 // Query Iterator Structure
@@ -485,6 +490,51 @@ namespace {
     ComponentRegistrationTracker& GetRegistrationTracker() {
         static ComponentRegistrationTracker tracker;
         return tracker;
+    }
+
+    // --- Managed serialization callback support ---
+    namespace {
+        using SerializeCallback = const char*(__cdecl*)(uint32_t typeHash, const void* data, int size);
+        SerializeCallback g_serializeCallback = nullptr;
+        std::mutex g_serializerMutex;
+    }
+
+    INTEROP_API void WorldInterop_RegisterSerializeCallback(void* fnPtr) {
+        std::lock_guard<std::mutex> lock(g_serializerMutex);
+        g_serializeCallback = reinterpret_cast<SerializeCallback>(fnPtr);
+        LOG_INFO("[WorldInterop] Registered managed serialize callback: " << fnPtr);
+    }
+
+    INTEROP_API const char* WorldInterop_SerializeComponentToJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash) {
+        if (!worldPtr) return nullptr;
+        ECS::World* world = GetWorld(worldPtr);
+        ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
+        if (!world->IsAlive(entity)) return nullptr;
+
+        ECS::ComponentTypeId id = GetComponentIdFromHash(componentTypeHash);
+        if (id == ECS::NULL_COMPONENT_ID) {
+            LOG_WARNING("[WorldInterop] Serialize: Unknown component type hash: " << componentTypeHash);
+            return nullptr;
+        }
+
+        const auto& meta = ECS::ComponentRegistry::Meta(id);
+        void* ptr = world->GetRawComponentPtr(entity, id);
+        if (!ptr) return nullptr;
+
+        std::lock_guard<std::mutex> lock(g_serializerMutex);
+        if (!g_serializeCallback) {
+            LOG_WARNING("[WorldInterop] No managed serializer callback registered");
+            return nullptr;
+        }
+
+        // Call managed callback which must return a CoTaskMem-allocated UTF8 C string
+        const char* result = g_serializeCallback(meta.TypeHash, ptr, static_cast<int>(meta.Size));
+        return result;
+    }
+
+    INTEROP_API void WorldInterop_FreeSerializedString(const char* s) {
+        if (!s) return;
+        CoTaskMemFree(const_cast<char*>(s));
     }
 }
 

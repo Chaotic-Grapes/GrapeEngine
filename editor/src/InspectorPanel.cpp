@@ -457,9 +457,11 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
             // Look up metadata which tells us how to draw this component
             const auto* meta = ComponentRegistryUI::Find(typeName);
-            if (!meta) {
-                LOG_WARNING("[InspectorPanel] No UI metadata for component '" << typeName << "' while rendering entity " << entity.Index);
-            }
+
+            // To log missing metadata for debugging
+            // if (!meta) {
+            //     LOG_WARNING("[InspectorPanel] No UI metadata for component '" << typeName << "' while rendering entity " << entity.Index);
+            // }
             if (meta) {
                 auto& data = componentEntry["Data"];
 
@@ -949,6 +951,26 @@ bool InspectorPanel::_addComponentToEntity(const std::string& componentType) {
         meta->AddComponent(m_world, entity, meta->GetDefaults());
         m_statusMessage = std::string("Added ") + componentType;
         m_statusTimer = 3.0f;
+
+        // DEBUG: dump all known native components and whether this entity has them
+        {
+            auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
+            for (auto aid : allIds) {
+                const auto& ameta = ECS::ComponentRegistry::Meta(aid);
+                std::string aname = ECS::ComponentRegistry::GetComponentNameFromHash(ameta.TypeHash);
+                if (aname.empty()) {
+                    char buffer[64];
+                    snprintf(buffer, sizeof(buffer), "Component_0x%08x", ameta.TypeHash);
+                    aname = buffer;
+                }
+                bool has = m_world->HasById(entity, aid);
+                LOG_INFO("[DebugComponents] Entity " << entity.Index << " HasById id=" << aid << " name=" << aname << " -> " << (has ? "YES" : "NO"));
+                if (has) {
+                    void* ptr = m_world->GetRawComponentPtr(entity, aid);
+                    LOG_INFO("[DebugComponents]    ptr=" << ptr);
+                }
+            }
+        }
 
         // MARK SCENE AS DIRTY
         MarkSceneDirtyIfNeeded(m_fileMenu);

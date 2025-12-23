@@ -107,4 +107,22 @@ internal static partial class WorldAPI
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_GetJobManager")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial nint GetJobManager(void* worldPtr);
+
+    // ============================================================================
+    // Component Serialization Callback Registration
+    // ============================================================================
+    
+    // Managed serializer callback registration (native will call into managed callback)
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_RegisterSerializeCallback")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial void RegisterSerializeCallback(nint callbackPtr);
+
+    // Serialize a component (engine-owned entrypoint) — returns CoTaskMem UTF8 pointer (must be freed)
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_SerializeComponentToJson")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial nint SerializeComponentToJson(void* worldPtr, ulong entityId, uint componentTypeHash);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_FreeSerializedString")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial void FreeSerializedString(nint ptr);
 }

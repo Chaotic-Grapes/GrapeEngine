@@ -37,6 +37,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Serializer.h"
 #include <string.h>
 #include "services/ResourceManager.h"  // For texture loading during deserialization
+#include "core/Logger.h"
+
+// Forward declarations for managed serialization interop (defined in Interop_World.cpp)
+extern "C" const char* WorldInterop_SerializeComponentToJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash);
+extern "C" void WorldInterop_FreeSerializedString(const char* s);
 
 using json = nlohmann::json;
 
@@ -137,7 +142,7 @@ namespace ECS {
 				}
 				else {
 					sprite.TextureId = 0; // Invalid texture
-					std::cerr << "[EntitySerializer] Warning: Failed to load texture from path: " << texPath << std::endl;
+					LOG_WARNING("Failed to load texture from path: " << texPath);
 				}
 			}
 			else if (texPath.empty()) {
@@ -191,7 +196,7 @@ namespace ECS {
 				}
 				else {
 					anim.TextureId = 0; // Invalid texture
-					std::cerr << "[EntitySerializer] Warning: Failed to load sprite sheet from path: " << texPath << std::endl;
+					LOG_WARNING("Failed to load sprite sheet from path: " << texPath);
 				}
 			}
 			else if (texPath.empty()) {
@@ -366,40 +371,51 @@ namespace Serialization {
 				// Skip invalid entries
 				if (nativeMeta.TypeHash == 0) continue;
 				
-				// Check if this component is already handled by C++ registry
+				// Determine the component name (from native registry or fallback)
+				std::string componentName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
+				if (componentName.empty()) {
+					char buffer[64];
+					snprintf(buffer, sizeof(buffer), "Component_0x%08x", nativeMeta.TypeHash);
+					componentName = buffer;
+				}
+
+				// Check if this component is already handled by the C++ serialization registry
 				bool alreadyHandled = false;
 				for (const auto& [tid, info] : Registry()) {
-					if (ECS::ComponentRegistry::Meta(id).TypeHash == nativeMeta.TypeHash) {
+					if (info.Name == componentName) {
 						alreadyHandled = true;
 						break;
 					}
 				}
-				
+
 				if (alreadyHandled) continue;
-				
+
 				// Only serialize C# components that the entity actually has
 				bool hasById = world.HasById(e, id);
 
 				if (!hasById) continue;
 
 				// Log that we're serializing a discovered C# component
-				LOG_INFO("[EntitySerializer] Entity " << e.Index << " has C# component ID " << id << " (hash=0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
+				// LOG_INFO("[EntitySerializer] Entity " << e.Index << " has C# component ID " << id << " (hash=0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
 
-				// This is a C# component - create empty JSON entry with component metadata
-				// The inspector will use this to create the UI section and fetch data via P/Invoke
-				std::string componentName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
-				if (componentName.empty()) {
-					// Fallback to hash-based name
-					char buffer[64];
-					snprintf(buffer, sizeof(buffer), "Component_0x%08x", nativeMeta.TypeHash);
-					componentName = buffer;
+				// Try to get per-entity serialized JSON from managed serializer
+				const char* jsonPtr = WorldInterop_SerializeComponentToJson((void*)&world, ECS::EntityUtils::Pack(e), nativeMeta.TypeHash);
+				if (jsonPtr) {
+					try {
+						std::string s(jsonPtr);
+						WorldInterop_FreeSerializedString(jsonPtr);
+						json compJson = json::parse(s);
+						entityJson["Components"].push_back({{"TypeName", componentName}, {"Data", compJson}});
+					}
+					catch (...) {
+						WorldInterop_FreeSerializedString(jsonPtr);
+						json compJson = json::object();
+						entityJson["Components"].push_back({{"TypeName", componentName}, {"Data", compJson}});
+					}
+				} else {
+					json compJson = json::object();
+					entityJson["Components"].push_back({{"TypeName", componentName}, {"Data", compJson}});
 				}
-				
-				json compJson = json::object();  // Empty object for now
-				entityJson["Components"].push_back({
-					{"TypeName", componentName},
-					{"Data", compJson}
-					});
 			}
 
 			return entityJson;
@@ -415,18 +431,45 @@ namespace Serialization {
 					}
 
 					std::string typeName = comp["TypeName"].get<std::string>();
-					// Find component by name instead of TypeId
+					// Try C++ registry first
+					bool found = false;
 					for (const auto& [tid, info] : Registry()) {
 						if (info.Name == typeName) {
 							try {
 								info.Deserialize(world, e, comp["Data"]);
+								found = true;
 							}
 							catch (const std::exception& ex) {
 								// Log error but continue with other components
-								std::cerr << "Failed to deserialize component " << typeName << ": " << ex.what() << std::endl;
+								LOG_ERROR("Failed to deserialize component " << typeName << ": " << ex.what());
 							}
 							break;
 						}
+					}
+					
+					// If not found in C++ registry, try to add as C# component
+					if (!found) {
+						// Attempt to look up by name in native registry (C# components)
+						auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
+						for (ECS::ComponentTypeId id : allIds) {
+							const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
+							if (nativeMeta.TypeHash == 0) continue;
+							std::string nativeName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
+							if (nativeName == typeName) {
+								// Found the C# component by name, add it with zero-initialized data
+								std::vector<uint8_t> buffer(nativeMeta.Size, 0);
+								void* ptr = world.AddComponentById(e, id, buffer.data(), nativeMeta.Size);
+								if (ptr) {
+									LOG_INFO("[EntitySerializer] Deserialized C# component '" << typeName << "' on entity " << e.Index);
+								}
+								found = true;
+								break;
+							}
+						}
+					}
+
+					if (!found) {
+						LOG_WARNING("[EntitySerializer] Component '" << typeName << "' not found during deserialization (not in C++ or C# registry)");
 					}
 				}
 			}

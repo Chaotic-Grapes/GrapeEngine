@@ -111,6 +111,10 @@ public:
     // Renders entity layer
     void RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    // Generic renderer for unknown (C#) components. Uses JSON field types to
+    // render simple editors for booleans, integers, floats and strings.
+    void RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
 private:
     // -------------------------------------------------------------------------
     // State

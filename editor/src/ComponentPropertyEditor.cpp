@@ -909,6 +909,61 @@ void ComponentUI::RenderAnimationState2D(nlohmann::json& data, ECS::Entity entit
     EditorUI::EndPropertySection();
 }
 
+// Generic renderer for C# / unknown components. Uses EditorUI helpers where possible
+// so the look & feel matches other component UIs.
+void ComponentUI::RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity; (void)world;
+
+    if (data.empty()) {
+        ImGui::TextDisabled("(C# Component)");
+        ImGui::Spacing();
+        ImGui::TextWrapped("Component data will be displayed here. Currently, C# component editing requires full field discovery via reflection.");
+        return;
+    }
+
+    if (!data.is_object()) {
+        ImGui::TextDisabled("(Invalid C# Component Data)");
+        return;
+    }
+
+    // Begin a generic section so fields align with other component rows
+    EditorUI::BeginPropertySection({});
+
+    for (auto it = data.begin(); it != data.end(); ++it) {
+        const std::string& fieldName = it.key();
+        nlohmann::json& fieldValue = it.value();
+
+        if (fieldValue.is_boolean()) {
+            EditorUI::RenderCheckboxProperty(fieldName, data, fieldName);
+        }
+        else if (fieldValue.is_number_integer()) {
+            EditorUI::RenderIntProperty(fieldName, data, fieldName);
+        }
+        else if (fieldValue.is_number_float()) {
+            EditorUI::RenderFloatRow(fieldName, "", data, fieldName, 0.1f);
+        }
+        else if (fieldValue.is_string()) {
+            EditorUI::RenderTextProperty(fieldName, data, fieldName);
+        }
+        else if (fieldValue.is_array()) {
+            ImGui::Text("%s (array with %zu elements)", fieldName.c_str(), fieldValue.size());
+        }
+        else if (fieldValue.is_object()) {
+            // Allow expanding nested objects
+            if (ImGui::TreeNode(fieldName.c_str())) {
+                // Recursively render nested object fields
+                RenderGenericComponent(fieldValue, entity, world);
+                ImGui::TreePop();
+            }
+        }
+        else {
+            ImGui::TextDisabled("%s: (unknown type)", fieldName.c_str());
+        }
+    }
+
+    EditorUI::EndPropertySection();
+}
+
 // Static variab/flags
 static bool s_showUnsupportedPopup = false;
 static std::string s_unsupportedPath;

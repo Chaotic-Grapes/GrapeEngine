@@ -17,6 +17,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Hosting;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -58,6 +59,14 @@ public static partial class ComponentRegistry
                 _registeredHashes.Add(hash);
                 string displayName = customName ?? typeof(T).Name;
                 Console.WriteLine($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})");
+                
+                // Let the managed serializer know about this managed type so it can
+                // marshal bytes into a typed object for JSON serialization.
+                try
+                {
+                    ComponentSerializer.RegisterManagedType(hash, typeof(T));
+                }
+                catch { /* ignore if hosting not available */ }
             }
 
             return success;
