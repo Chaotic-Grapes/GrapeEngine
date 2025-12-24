@@ -13,10 +13,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -26,15 +24,16 @@ namespace GrapeEngine.Scripting.Hosting;
 /// </summary>
 public static class ScriptFileWatcher
 {
-    private static FileSystemWatcher? s_watcher;
-    private static System.Timers.Timer? s_debounceTimer;
-    private static readonly HashSet<string> s_changedFiles = [];
+    private static FileSystemWatcher? _watcher;
+    private static System.Timers.Timer? _debounceTimer;
+    private static readonly HashSet<string> _changedFiles = [];
     private static readonly Lock _lock = new();
-    private static Action<string>? s_onFileChanged;
-    private static string? s_watchedDirectory;
+    private static Action<string>? _onFileChanged;
+    private static string? _watchedDirectory;
+
     // Native compile status callback (function pointer set by native ScriptManager)
     // Signature: void callback(int status, int progress, sbyte* messageUtf8)
-    private static unsafe delegate* unmanaged[Cdecl]<int, int, sbyte*, void> s_compileCallback = null;
+    private static unsafe delegate* unmanaged[Cdecl]<int, int, sbyte*, void> _compileCallback = null;
 
     /// <summary>
     /// Start watching a directory for C# file changes.
@@ -45,24 +44,24 @@ public static class ScriptFileWatcher
     {
         try
         {
-            string directoryPath = Marshal.PtrToStringUTF8((IntPtr)directoryPathPtr) ?? "";
+            var directoryPath = Marshal.PtrToStringUTF8((IntPtr)directoryPathPtr) ?? "";
             
             if (!Directory.Exists(directoryPath))
             {
-                Console.WriteLine($"[ScriptFileWatcher] Directory does not exist: {directoryPath}");
+                Logging.LogInternal($"[ScriptFileWatcher] Directory does not exist: {directoryPath}", LogLevel.Warning);
                 return -1;
             }
 
-            Console.WriteLine($"[ScriptFileWatcher] Starting file watcher for: {directoryPath}");
+            Logging.LogInternal($"[ScriptFileWatcher] Starting file watcher for: {directoryPath}", LogLevel.Info);
 
             // Remember watched directory for compile+reload
-            s_watchedDirectory = directoryPath;
+            _watchedDirectory = directoryPath;
 
             // Stop existing watcher if any
             StopWatchingImpl();
 
             // Create file system watcher
-            s_watcher = new FileSystemWatcher(directoryPath)
+            _watcher = new FileSystemWatcher(directoryPath)
             {
                 Filter = "*.cs",
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime,
@@ -71,22 +70,22 @@ public static class ScriptFileWatcher
             };
 
             // Setup event handlers
-            s_watcher.Changed += OnFileChanged;
-            s_watcher.Created += OnFileChanged;
-            s_watcher.Deleted += OnFileChanged;
-            s_watcher.Renamed += OnFileRenamed;
+            _watcher.Changed += OnFileChanged;
+            _watcher.Created += OnFileChanged;
+            _watcher.Deleted += OnFileChanged;
+            _watcher.Renamed += OnFileRenamed;
 
             // Setup debounce timer (avoid multiple triggers for same file)
-            s_debounceTimer = new System.Timers.Timer(500); // 500ms debounce
-            s_debounceTimer.Elapsed += OnDebounceTimerElapsed;
-            s_debounceTimer.AutoReset = false;
+            _debounceTimer = new System.Timers.Timer(500); // 500ms debounce
+            _debounceTimer.Elapsed += OnDebounceTimerElapsed;
+            _debounceTimer.AutoReset = false;
 
-            Console.WriteLine($"[ScriptFileWatcher] File watcher started successfully");
+            Logging.LogInternal($"[ScriptFileWatcher] File watcher started successfully", LogLevel.Info);
             return 0;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptFileWatcher] Error starting watcher: {ex.Message}");
+            Logging.LogInternal($"[ScriptFileWatcher] Error starting watcher: {ex.Message}", LogLevel.Error);
             return -1;
         }
     }
@@ -99,7 +98,7 @@ public static class ScriptFileWatcher
     [UnmanagedCallersOnly]
     public static unsafe void SetCompileCallback(nint callbackPtr)
     {
-        s_compileCallback = (delegate* unmanaged[Cdecl]<int, int, sbyte*, void>)callbackPtr;
+        _compileCallback = (delegate* unmanaged[Cdecl]<int, int, sbyte*, void>)callbackPtr;
     }
 
     /// <summary>
@@ -111,19 +110,19 @@ public static class ScriptFileWatcher
 
     private static void StopWatchingImpl()
     {
-        if (s_watcher != null)
+        if (_watcher != null)
         {
-            s_watcher.EnableRaisingEvents = false;
-            s_watcher.Dispose();
-            s_watcher = null;
-            Console.WriteLine($"[ScriptFileWatcher] File watcher stopped");
+            _watcher.EnableRaisingEvents = false;
+            _watcher.Dispose();
+            _watcher = null;
+            Logging.LogInternal($"[ScriptFileWatcher] File watcher stopped", LogLevel.Info);
         }
 
-        if (s_debounceTimer != null)
+        if (_debounceTimer != null)
         {
-            s_debounceTimer.Stop();
-            s_debounceTimer.Dispose();
-            s_debounceTimer = null;
+            _debounceTimer.Stop();
+            _debounceTimer.Dispose();
+            _debounceTimer = null;
         }
     }
 
@@ -132,7 +131,7 @@ public static class ScriptFileWatcher
     /// </summary>
     internal static void RegisterCallback(Action<string> callback)
     {
-        s_onFileChanged = callback;
+        _onFileChanged = callback;
     }
 
     private static void OnFileChanged(object sender, FileSystemEventArgs e)
@@ -140,13 +139,13 @@ public static class ScriptFileWatcher
         lock (_lock)
         {
             // Add to changed files set
-            s_changedFiles.Add(e.FullPath);
+            _changedFiles.Add(e.FullPath);
             
             // Reset debounce timer
-            s_debounceTimer?.Stop();
-            s_debounceTimer?.Start();
+            _debounceTimer?.Stop();
+            _debounceTimer?.Start();
             
-            Console.WriteLine($"[ScriptFileWatcher] Detected change: {e.ChangeType} - {e.Name}");
+            Logging.LogInternal($"[ScriptFileWatcher] Detected change: {e.ChangeType} - {e.Name}", LogLevel.Info);
         }
     }
 
@@ -154,12 +153,12 @@ public static class ScriptFileWatcher
     {
         lock (_lock)
         {
-            s_changedFiles.Add(e.FullPath);
+            _changedFiles.Add(e.FullPath);
             
-            s_debounceTimer?.Stop();
-            s_debounceTimer?.Start();
+            _debounceTimer?.Stop();
+            _debounceTimer?.Start();
             
-            Console.WriteLine($"[ScriptFileWatcher] Detected rename: {e.OldName} -> {e.Name}");
+            Logging.LogInternal($"[ScriptFileWatcher] Detected rename: {e.OldName} -> {e.Name}", LogLevel.Info);
         }
     }
 
@@ -168,8 +167,8 @@ public static class ScriptFileWatcher
         HashSet<string> filesToProcess;
         lock (_lock)
         {
-            filesToProcess = [.. s_changedFiles];
-            s_changedFiles.Clear();
+            filesToProcess = [.. _changedFiles];
+            _changedFiles.Clear();
         }
 
         if (filesToProcess.Count == 0)
@@ -177,70 +176,89 @@ public static class ScriptFileWatcher
             return;
         }
 
-        Console.WriteLine($"[ScriptFileWatcher] Processing {filesToProcess.Count} changed file(s)");
+        Logging.LogInternal($"[ScriptFileWatcher] Processing {filesToProcess.Count} changed file(s)", LogLevel.Info);
 
         // Notify callback (if registered)
         foreach (var file in filesToProcess)
         {
-            s_onFileChanged?.Invoke(file);
+            _onFileChanged?.Invoke(file);
         }
 
         // Trigger recompilation and reload in background; report status via callback
         try
         {
-            if (!string.IsNullOrEmpty(s_watchedDirectory))
+            if (!string.IsNullOrEmpty(_watchedDirectory))
             {
                 // Default output assembly path inside watched dir
-                string outPath = Path.Combine(s_watchedDirectory, "CompiledScripts.dll");
-                Console.WriteLine($"[ScriptFileWatcher] Hot reload triggered - compiling and reloading: {s_watchedDirectory} -> {outPath}");
+                string outPath = Path.Combine(_watchedDirectory, "CompiledScripts.dll");
+                Logging.LogInternal($"[ScriptFileWatcher] Hot reload triggered - compiling and reloading: {_watchedDirectory} -> {outPath}", LogLevel.Info);
 
                 // Notify native that compilation started (status 1, progress indeterminate (-1))
-                if (s_compileCallback != null)
+                if (_compileCallback != null)
                 {
                     unsafe
                     {
                         IntPtr p = ToUtf8Ptr("Compiling...");
-                        try { s_compileCallback(1, -1, (sbyte*)p.ToPointer()); }
-                        finally { if (p != IntPtr.Zero) Marshal.FreeHGlobal(p); }
+                        try 
+                        { 
+                            _compileCallback(1, -1, (sbyte*)p.ToPointer()); 
+                        }
+                        finally
+                        { 
+                            if (p != IntPtr.Zero)
+                                Marshal.FreeHGlobal(p); 
+                        }
                     }
                 }
 
                 // Run compile+reload asynchronously so file-watcher thread isn't blocked
-                Task.Run(() => {
-                    int r = ScriptHost.TriggerCompileAndReloadManaged(s_watchedDirectory, outPath);
+                Task.Run(() => 
+                {
+                    var r = ScriptHost.TriggerCompileAndReloadManaged(_watchedDirectory, outPath);
 
                     // Collect Roslyn diagnostics (if any) so we can forward full details to native callback
-                    string diags = RoslynCompiler.GetLastDiagnostics() ?? string.Empty;
+                    var diags = RoslynCompiler.GetLastDiagnostics() ?? string.Empty;
 
                     // If diagnostics are empty, fallback to simple messages
                     string msg;
-                    if (!string.IsNullOrWhiteSpace(diags)) {
+                    if (!string.IsNullOrWhiteSpace(diags)) 
+                    {
                         msg = diags;
                     }
-                    else {
+                    else 
+                    {
                         msg = r == 0 ? "OK" : "Compilation failed";
                     }
 
                     // Notify native of completion: status 3 = success, 4 = failure
-                    if (s_compileCallback != null)
+                    if (_compileCallback != null)
                     {
                         unsafe
                         {
                             IntPtr pmsg = ToUtf8Ptr(msg);
-                            try { s_compileCallback(r == 0 ? 3 : 4, r == 0 ? 100 : 0, (sbyte*)pmsg.ToPointer()); }
-                            finally { if (pmsg != IntPtr.Zero) Marshal.FreeHGlobal(pmsg); }
+                            try
+                            {
+                                _compileCallback(r == 0 ? 3 : 4, r == 0 
+                                    ? 100 
+                                    : 0, (sbyte*)pmsg.ToPointer()); 
+                            }
+                            finally
+                            { 
+                                if (pmsg != IntPtr.Zero)
+                                    Marshal.FreeHGlobal(pmsg); 
+                            }
                         }
                     }
                 });
             }
             else
             {
-                Console.WriteLine("[ScriptFileWatcher] No watched directory registered for hot reload");
+                Logging.LogInternal("[ScriptFileWatcher] No watched directory registered for hot reload", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptFileWatcher] Error during hot reload: {ex.Message}");
+            Logging.LogInternal($"[ScriptFileWatcher] Error during hot reload: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -249,6 +267,7 @@ public static class ScriptFileWatcher
         var bytes = Encoding.UTF8.GetBytes(s + '\0');
         IntPtr p = Marshal.AllocHGlobal(bytes.Length);
         Marshal.Copy(bytes, 0, p, bytes.Length);
+
         return p;
     }
 }

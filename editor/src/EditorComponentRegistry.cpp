@@ -93,9 +93,6 @@ static auto& _getCppComponentRenderers() {
         renderers[ECS::ComponentRegistry::Type<TagMask>()] = 
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTagMask(d, e, w); };
         
-        renderers[ECS::ComponentRegistry::Type<Lifetime>()] = 
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLifetime(d, e, w); };
-        
         renderers[ECS::ComponentRegistry::Type<Camera3D>()] = 
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCamera3D(d, e, w); };
         
@@ -179,10 +176,6 @@ static auto& _getCppComponentDefaults() {
         
         defaults[ECS::ComponentRegistry::Type<TagMask>()] = []() { 
             return nlohmann::json{{"Mask", 0}}; 
-        };
-        
-        defaults[ECS::ComponentRegistry::Type<Lifetime>()] = []() { 
-            return nlohmann::json{{"Time", 0.0f}}; 
         };
         
         defaults[ECS::ComponentRegistry::Type<Camera3D>()] = []() { 
@@ -373,14 +366,6 @@ static void _initializeDefaultRegistry() {
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTagMask(d, e, w); },
             []() { return nlohmann::json{{"Mask", 0}}; },
             COMPONENT_OPS(TagMask)
-        },
-        // Lifetime
-        {
-            "Lifetime", "Lifetime", "ECS::Components::Lifetime",
-            ECS::ComponentRegistry::Type<Lifetime>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLifetime(d, e, w); },
-            []() { return nlohmann::json{{"Time", 0.0f}}; },
-            COMPONENT_OPS(Lifetime)
         },
         // Camera 3D
         {

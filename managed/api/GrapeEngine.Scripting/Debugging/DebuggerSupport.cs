@@ -41,27 +41,23 @@ public static class DebuggerSupport
         {
             if (Debugger.IsAttached)
             {
-                Console.WriteLine("[DebuggerSupport] Debugger already attached");
+                Logging.LogInternal("[DebuggerSupport] Debugger already attached", LogLevel.Info);
                 return;
             }
 
             try
             {
-                Console.WriteLine("[DebuggerSupport] Attempting to attach debugger...");
+                Logging.LogInternal("[DebuggerSupport] Attempting to attach debugger...", LogLevel.Info);
                 Debugger.Launch();
                 
                 if (Debugger.IsAttached)
-                {
-                    Console.WriteLine("[DebuggerSupport] Debugger attached successfully");
-                }
+                    Logging.LogInternal("[DebuggerSupport] Debugger attached successfully", LogLevel.Info);
                 else
-                {
-                    Console.WriteLine("[DebuggerSupport] Debugger attach was cancelled");
-                }
+                    Logging.LogInternal("[DebuggerSupport] Debugger attach was cancelled", LogLevel.Info);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DebuggerSupport] Failed to attach debugger: {ex.Message}");
+                Logging.LogInternal($"[DebuggerSupport] Failed to attach debugger: {ex.Message}", LogLevel.Error);
             }
         }
     }
@@ -77,34 +73,6 @@ public static class DebuggerSupport
             Debugger.Break();
         }
     }
-
-    /// <summary>
-    /// Log a debug message (writes to debug output).
-    /// </summary>
-    public static void Log(string message)
-    {
-        Debug.WriteLine($"[ScriptDebug] {message}");
-    }
-
-    /// <summary>
-    /// Log a warning message.
-    /// </summary>
-    public static void LogWarning(string message)
-    {
-        Debug.WriteLine($"[ScriptWarning] {message}");
-    }
-
-    /// <summary>
-    /// Log an error message.
-    /// </summary>
-    public static void LogError(string message)
-    {
-        Debug.WriteLine($"[ScriptError] {message}");
-        if (Debugger.IsAttached)
-        {
-            Debugger.Break();
-        }
-    }
 }
 
 /// <summary>
@@ -112,7 +80,7 @@ public static class DebuggerSupport
 /// </summary>
 public class SystemDiagnostics
 {
-    public string SystemName { get; set; } = "";
+    public string SystemName { get; set; } = string.Empty;
     public Type? SystemType { get; set; }
     public object? Instance { get; set; }
     public bool IsLoaded { get; set; }
@@ -120,7 +88,7 @@ public class SystemDiagnostics
     public long TotalUpdateCalls { get; set; }
     public double AverageUpdateTimeMs { get; set; }
     public double MaxUpdateTimeMs { get; set; }
-    public string? LastError { get; set; }
+    public string LastError { get; set; } = string.Empty;
     public DateTime? LastErrorTime { get; set; }
 }
 
@@ -226,21 +194,15 @@ public static class ScriptingDiagnostics
         {
             if (s_systemDiagnostics.Count == 0)
             {
-                Console.WriteLine("[ScriptingDiagnostics] No systems loaded");
+                Logging.LogInternal("[ScriptingDiagnostics] No systems loaded", LogLevel.Info);
                 return;
             }
 
-            Console.WriteLine("\n" + new string('=', 120));
-            Console.WriteLine("System Diagnostics Report".PadRight(120));
-            Console.WriteLine(new string('=', 120));
-            Console.WriteLine(
-                "System Name".PadRight(40) +
-                "Updates".PadRight(12) +
-                "Avg Time (ms)".PadRight(15) +
-                "Max Time (ms)".PadRight(15) +
-                "Last Error".PadRight(40)
-            );
-            Console.WriteLine(new string('-', 120));
+            Logging.LogInternal("\n" + new string('=', 120), LogLevel.Info);
+            Logging.LogInternal("System Diagnostics Report".PadRight(120), LogLevel.Info);
+            Logging.LogInternal(new string('=', 120), LogLevel.Info);
+            Logging.LogInternal("System Name".PadRight(40) + "Updates".PadRight(12) + "Avg Time (ms)".PadRight(15) + "Max Time (ms)".PadRight(15) + "Last Error".PadRight(40), LogLevel.Info);
+            Logging.LogInternal(new string('-', 120), LogLevel.Info);
 
             foreach (var diags in s_systemDiagnostics.Values.OrderBy(d => d.SystemName))
             {
@@ -248,16 +210,10 @@ public static class ScriptingDiagnostics
                     ? "None" 
                     : diags.LastError[..GMath.Min(30, diags.LastError.Length)];
 
-                Console.WriteLine(
-                    diags.SystemName.PadRight(40) +
-                    diags.TotalUpdateCalls.ToString().PadRight(12) +
-                    diags.AverageUpdateTimeMs.ToString("F3").PadRight(15) +
-                    diags.MaxUpdateTimeMs.ToString("F3").PadRight(15) +
-                    errorMsg.PadRight(40)
-                );
+                Logging.LogInternal(diags.SystemName.PadRight(40) + diags.TotalUpdateCalls.ToString().PadRight(12) + diags.AverageUpdateTimeMs.ToString("F3").PadRight(15) + diags.MaxUpdateTimeMs.ToString("F3").PadRight(15) + errorMsg.PadRight(40), LogLevel.Info);
             }
 
-            Console.WriteLine(new string('=', 120) + "\n");
+            Logging.LogInternal(new string('=', 120) + "\n", LogLevel.Info);
         }
     }
 

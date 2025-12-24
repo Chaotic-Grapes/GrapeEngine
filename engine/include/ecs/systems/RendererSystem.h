@@ -57,7 +57,7 @@ namespace ECS {
 
         // ISystem interface
         void OnCreate(World& world) override;
-        void OnUpdate(World& world, float deltaTime) override;
+        void OnUpdate(World& world) override;
         void OnDestroy(World& world) override;
         
         SystemMetadata GetMetadata() const override;

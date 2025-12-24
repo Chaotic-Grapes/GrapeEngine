@@ -333,8 +333,7 @@ namespace ECS {
         return false;
     }
 
-    void RendererSystem::OnUpdate(World& world, const float deltaTime) {
-        (void)deltaTime;
+    void RendererSystem::OnUpdate(World& world) {
         if (!m_renderer)
             return;
 

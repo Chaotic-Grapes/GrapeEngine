@@ -75,7 +75,7 @@ internal class ManagedJobAdapter : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Job {JobName} execution failed: {ex}");
+            Logging.LogInternal($"Job {JobName} execution failed: {ex}", LogLevel.Error);
             throw;
         }
     }
@@ -98,7 +98,7 @@ internal class ManagedJobAdapter : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Managed job execution failed: {ex}");
+            Logging.LogInternal($"Managed job execution failed: {ex}", LogLevel.Error);
         }
     }
 

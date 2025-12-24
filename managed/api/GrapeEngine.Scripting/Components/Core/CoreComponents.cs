@@ -62,9 +62,3 @@ public record struct PrefabInstanceMetadata
         Flags = flags;
     }
 }
-
-/// <summary>
-/// Lifetime component: Time remaining before entity is destroyed.
-/// </summary>
-[StructLayout(LayoutKind.Sequential)]
-public record struct Lifetime(float Time);

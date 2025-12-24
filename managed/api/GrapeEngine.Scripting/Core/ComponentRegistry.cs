@@ -58,7 +58,7 @@ public static partial class ComponentRegistry
             {
                 _registeredHashes.Add(hash);
                 string displayName = customName ?? typeof(T).Name;
-                Console.WriteLine($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})");
+                Logging.LogInternal($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})", LogLevel.Info);
                 
                 // Let the managed serializer know about this managed type so it can
                 // marshal bytes into a typed object for JSON serialization.

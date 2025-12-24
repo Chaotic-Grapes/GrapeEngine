@@ -505,7 +505,7 @@ public class AOTCompiler(AOTConfig? config = null)
             _compiledMethods.Add(methodFullName);
 
             // Log compilation success
-            Console.WriteLine($"[AOT] Compiled {methodFullName} with args: {GetCompilerArgs()}");
+            Logging.LogInternal($"[AOT] Compiled {methodFullName} with args: {GetCompilerArgs()}", LogLevel.Info);
 
             return true;
         }

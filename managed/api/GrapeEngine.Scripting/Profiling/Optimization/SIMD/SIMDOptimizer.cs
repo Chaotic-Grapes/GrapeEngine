@@ -198,7 +198,7 @@ public static class SIMDOptimizer
             catch
             {
                 // Type is not blittable, continue with scalar fallback
-                Console.WriteLine($"[SIMDOptimizer] Warning: {typeof(T).Name} is not blittable; using scalar transform");
+                Logging.LogInternal($"[SIMDOptimizer] Warning: {typeof(T).Name} is not blittable; using scalar transform", LogLevel.Warning);
             }
 
             // Process in cache-friendly chunks for better memory locality

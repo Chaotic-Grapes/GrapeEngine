@@ -36,7 +36,7 @@ namespace ECS {
         ~TransformSystem() override = default;
 
         void OnCreate(World& world) override {}
-        void OnUpdate(World& world, float dt) override;
+        void OnUpdate(World& world) override;
         void OnDestroy(World& world) override {}
 
         SystemMetadata GetMetadata() const override;

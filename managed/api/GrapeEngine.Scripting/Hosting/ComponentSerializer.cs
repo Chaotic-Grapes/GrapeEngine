@@ -67,7 +67,7 @@ internal static class ComponentSerializer
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ComponentSerializer] Serialize error: {ex.Message}");
+            Logging.LogInternal($"[ComponentSerializer] Serialize error: {ex.Message}", LogLevel.Error);
             return IntPtr.Zero;
         }
     }

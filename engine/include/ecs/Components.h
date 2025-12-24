@@ -150,13 +150,6 @@ namespace ECS {
         static_assert(sizeof(PrefabInstanceMetadata) == 8, "PrefabInstanceMetadata must be 8 bytes");
         static_assert(std::is_trivially_copyable_v<PrefabInstanceMetadata>, "PrefabInstanceMetadata must be trivially copyable");
 
-        // Lifetime in seconds; entities with Time <= 0 can be culled by a system.
-        struct Lifetime {
-        public:
-            float Time = 0.0f;
-        };
-        static_assert(std::is_trivially_copyable_v<Lifetime>, "Lifetime must be trivially copyable");
-
         // ---------------------------------- Layers and Transforms ----------------------------------
         // Layers: one component holding a small integer id per entity
         struct Layer { 

@@ -50,11 +50,11 @@ public static class PInvokeProfiler
         _enabled = enabled;
         if (enabled)
         {
-            Console.WriteLine("[PInvokeProfiler] Profiling enabled");
+            Logging.LogInternal("[PInvokeProfiler] Profiling enabled", LogLevel.Info);
         }
         else
         {
-            Console.WriteLine("[PInvokeProfiler] Profiling disabled");
+            Logging.LogInternal("[PInvokeProfiler] Profiling disabled", LogLevel.Info);
         }
     }
 
@@ -63,7 +63,8 @@ public static class PInvokeProfiler
     /// </summary>
     public static void RecordCall(string functionName, long microseconds)
     {
-        if (!_enabled) return;
+        if (!_enabled)
+            return;
 
         lock (_lock)
         {
@@ -122,37 +123,37 @@ public static class PInvokeProfiler
         {
             if (_metrics.Count == 0)
             {
-                Console.WriteLine("[PInvokeProfiler] No metrics recorded");
+                Logging.LogInternal("[PInvokeProfiler] No metrics recorded", LogLevel.Info);
                 return;
             }
 
-            Console.WriteLine("\n" + new string('=', 100));
-            Console.WriteLine("P/Invoke Performance Report".PadRight(100));
-            Console.WriteLine(new string('=', 100));
-            Console.WriteLine(
+            Logging.LogInternal("\n" + new string('=', 100), LogLevel.Debug);
+            Logging.LogInternal("P/Invoke Performance Report".PadRight(100), LogLevel.Debug);
+            Logging.LogInternal(new string('=', 100), LogLevel.Debug);
+            Logging.LogInternal(
                 "Function Name".PadRight(40) +
                 "Calls".PadRight(12) +
                 "Total (μs)".PadRight(15) +
                 "Avg (μs)".PadRight(12) +
                 "Min (μs)".PadRight(12) +
                 "Max (μs)".PadRight(12)
-            );
-            Console.WriteLine(new string('-', 100));
+            , LogLevel.Debug);
+            Logging.LogInternal(new string('-', 100), LogLevel.Debug);
 
             var sorted = _metrics.Values.OrderByDescending(m => m.TotalMicroseconds);
             foreach (var metric in sorted)
             {
-                Console.WriteLine(
+                Logging.LogInternal(
                     metric.FunctionName.PadRight(40) +
                     metric.TotalCallCount.ToString().PadRight(12) +
                     metric.TotalMicroseconds.ToString().PadRight(15) +
                     metric.AverageMicroseconds.ToString("F2").PadRight(12) +
                     metric.MinMicroseconds.ToString().PadRight(12) +
                     metric.MaxMicroseconds.ToString().PadRight(12)
-                );
+                , LogLevel.Debug);
             }
 
-            Console.WriteLine(new string('=', 100) + "\n");
+            Logging.LogInternal(new string('=', 100) + "\n", LogLevel.Debug);
         }
     }
 

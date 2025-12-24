@@ -337,7 +337,7 @@ public readonly struct Chunk(uint startIndex, uint endIndex, World world)
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Chunk] GetComponentData error: {ex.Message}");
+            Logging.LogInternal($"[Chunk] GetComponentData error: {ex.Message}", LogLevel.Error);
             return [];
         }
     }

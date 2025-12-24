@@ -48,11 +48,11 @@ internal static class AssemblyManager
         {
             if (!File.Exists(assemblyPath))
             {
-                Console.WriteLine($"[AssemblyManager] File not found: {assemblyPath}");
+                Logging.LogInternal($"[AssemblyManager] File not found: {assemblyPath}", LogLevel.Warning);
                 return null;
             }
 
-            Console.WriteLine($"[AssemblyManager] Loading assembly: {assemblyPath}");
+            Logging.LogInternal($"[AssemblyManager] Loading assembly: {assemblyPath}", LogLevel.Info);
 
             // Create a new load context for hot reload support
             var loadContext = new ScriptLoadContext(assemblyPath);
@@ -60,12 +60,12 @@ internal static class AssemblyManager
 
             s_loadedAssemblies[assemblyPath] = (assembly, loadContext);
 
-            Console.WriteLine($"[AssemblyManager] Loaded: {assembly.FullName}");
+            Logging.LogInternal($"[AssemblyManager] Loaded: {assembly.FullName}", LogLevel.Info);
             return assembly;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AssemblyManager] Failed to load assembly: {ex.Message}");
+            Logging.LogInternal($"[AssemblyManager] Failed to load assembly: {ex.Message}", LogLevel.Error);
             return null;
         }
     }
@@ -85,13 +85,13 @@ internal static class AssemblyManager
         {
             if (!s_loadedAssemblies.TryGetValue(assemblyPath, out var entry))
             {
-                Console.WriteLine($"[AssemblyManager] Assembly not loaded: {assemblyPath}");
+                Logging.LogInternal($"[AssemblyManager] Assembly not loaded: {assemblyPath}", LogLevel.Warning);
                 return false;
             }
 
             var (assembly, loadContext) = entry;
 
-            Console.WriteLine($"[AssemblyManager] Unloading assembly: {assemblyPath}");
+            Logging.LogInternal($"[AssemblyManager] Unloading assembly: {assemblyPath}", LogLevel.Info);
 
             if (loadContext != null)
             {
@@ -102,12 +102,12 @@ internal static class AssemblyManager
             }
 
             s_loadedAssemblies.Remove(assemblyPath);
-            Console.WriteLine($"[AssemblyManager] Unloaded: {assembly.FullName}");
+            Logging.LogInternal($"[AssemblyManager] Unloaded: {assembly.FullName}", LogLevel.Info);
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AssemblyManager] Error unloading assembly: {ex.Message}");
+            Logging.LogInternal($"[AssemblyManager] Error unloading assembly: {ex.Message}", LogLevel.Error);
             return false;
         }
     }

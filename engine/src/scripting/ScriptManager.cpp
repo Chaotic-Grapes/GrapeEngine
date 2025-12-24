@@ -243,6 +243,15 @@ namespace ECS {
         }
 
         LOG_INFO("[ScriptManager] Discovering scripted systems...");
+        // Log native-tracked loaded assemblies for diagnostics
+        if (!m_loadedAssemblies.empty()) {
+            std::stringstream ss;
+            ss << "[ScriptManager] Native loaded assemblies (" << m_loadedAssemblies.size() << "):\n";
+            for (const auto& a : m_loadedAssemblies) ss << "  - " << a << "\n";
+            LOG_INFO(ss.str());
+        } else {
+            LOG_INFO("[ScriptManager] No native-loaded assemblies recorded");
+        }
         // Call managed function to discover all ISystem implementations
         // DiscoverSystems now creates instances and returns INSTANCE handles
         int systemCount = 0;
@@ -878,12 +887,12 @@ namespace ECS {
      * @param world Reference to the World instance
      * @param deltaTime Time elapsed since last update
      */
-    void ScriptSystemWrapper::OnUpdate(World& world, float deltaTime) {
+    void ScriptSystemWrapper::OnUpdate(World& world) {
         if (!m_scriptManager) return;
 
         auto callOnUpdate = m_scriptManager->GetCallSystemOnUpdate();
         if (callOnUpdate) {
-            callOnUpdate(m_managedHandle, &world, deltaTime);
+            callOnUpdate(m_managedHandle, &world);
         }
     }
 

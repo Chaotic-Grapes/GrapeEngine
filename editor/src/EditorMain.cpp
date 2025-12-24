@@ -100,7 +100,7 @@ int main() {
             });
 
             // Launch compilation on a worker thread so main loop can run immediately
-            std::thread compileThread([=, &compileDone]() mutable {
+            std::thread compileThread([scriptManager, scriptsOutput, projectRoot, &engine, &compileDone]() mutable {
                 std::string diagnostics;
                 try {
                     scriptManager->SetCompileStatus(1, 0, "Starting compilation");
@@ -115,6 +115,10 @@ int main() {
                         // Load the compiled assembly into the managed runtime so components are discovered
                         if (scriptManager->LoadAssembly(scriptsOutput.string())) {
                             LOG_INFO("[EditorMain] Loaded compiled script assembly");
+                            
+                            // Register discovered C# systems with the SystemManager
+                            int systemCount = scriptManager->RegisterScriptedSystems(engine.GetSystemManager());
+                            LOG_INFO("[EditorMain] Registered " << systemCount << " C# systems with SystemManager");
                             
                             // Rebuild the editor's component registry now that C# components are registered
                             ComponentRegistryUI::RebuildFromNativeRegistry();
@@ -228,7 +232,7 @@ int main() {
             }
             
             // Execute the filtered systems
-            engine.UpdateSystemsByMode(systemModes, world, deltaTime);
+            engine.UpdateSystemsByMode(systemModes, world);
         }
         
         // Render editor UI

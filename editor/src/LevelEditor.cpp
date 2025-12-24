@@ -29,6 +29,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui_internal.h>
 #include "CompilePanel.h"
 
+#ifdef ERROR
+#undef ERROR
+#endif
+
+#ifdef max
+#undef max
+#endif
+
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
     : m_world(world), m_config(config), m_playback(world), m_inspector(), m_entityActions(scene) {
@@ -157,6 +165,7 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
+    ImGui::DockBuilderDockWindow("Systems", assetBrowserNode);
 
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
     
@@ -413,6 +422,22 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         },
         [this]() { m_performancePanel.Render(m_playback.IsPlaying()); },
         nullptr//[this](ECS::World* w) { void(*w); } // No world needed
+    );
+
+    // Register Systems panel (shows registered C# and C++ systems)
+    _registerPanel("Systems",
+        [this]() {
+            m_systemsPanel.Initialize(m_mainFont, m_boldFont);
+        },
+        [this]() { 
+            // Get SystemManager from engine
+            ECS::SystemManager* systemManager = nullptr;
+            if (Engine::CORE) {
+                systemManager = &Engine::CORE->GetSystemManager();
+            }
+            m_systemsPanel.Render(systemManager);
+        },
+        [this](ECS::World* w) { m_systemsPanel.SetWorld(w); }
     );
 
     // Initialize all registered panels

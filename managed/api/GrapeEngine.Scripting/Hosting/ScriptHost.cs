@@ -17,9 +17,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using System.Linq;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -33,6 +33,14 @@ internal class ScriptLoadContext(string assemblyPath) : AssemblyLoadContext(isCo
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
+        // Prefer already-loaded assemblies in the default context to preserve
+        // type identity for shared API assemblies (e.g. GrapeEngine.Scripting).
+        var already = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(a => string.Equals(a.GetName().Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase));
+        if (already != null)
+            return already;
+
+        // Fallback to resolving within the custom load context
         string? assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
         if (assemblyPath != null)
         {
@@ -74,7 +82,7 @@ public static class ScriptHost
     {
         try
         {
-            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? string.Empty;
+            var assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? string.Empty;
             var result = AssemblyManager.LoadAssembly(assemblyPath);
             
             if (result != null)
@@ -101,7 +109,7 @@ public static class ScriptHost
     {
         try
         {
-            string assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? string.Empty;
+            var assemblyPath = Marshal.PtrToStringUTF8(assemblyPathPtr) ?? string.Empty;
 
             Logging.LogInternal($"[ScriptHost] Unloading assembly: {assemblyPath}", LogLevel.Info);
 
@@ -206,8 +214,8 @@ public static class ScriptHost
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
-            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
+            var dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
+            var outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
             Logging.LogInternal($"[ScriptHost] CompileScriptsInDirectory: {dir} -> {outPath}", LogLevel.Info);
 
@@ -231,14 +239,14 @@ public static class ScriptHost
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
-            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
+            var dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
+            var outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
             Logging.LogInternal($"[ScriptHost] CompileDirectoryWithDiagnostics: {dir} -> {outPath}", LogLevel.Info);
 
             int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
 
-            string diags = RoslynCompiler.GetLastDiagnostics() ?? string.Empty;
+            var diags = RoslynCompiler.GetLastDiagnostics() ?? string.Empty;
             // Encode as UTF8 and allocate unmanaged memory
             var bytes = System.Text.Encoding.UTF8.GetBytes(diags + '\0');
             IntPtr p = Marshal.AllocHGlobal(bytes.Length);
@@ -256,7 +264,8 @@ public static class ScriptHost
     [UnmanagedCallersOnly]
     public static void FreeStringFromManaged(IntPtr ptr)
     {
-        if (ptr == IntPtr.Zero) return;
+        if (ptr == IntPtr.Zero)
+            return;
         Marshal.FreeHGlobal(ptr);
     }
 
@@ -268,8 +277,8 @@ public static class ScriptHost
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
-            string outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
+            var dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
+            var outPath = Marshal.PtrToStringUTF8(outputAssemblyPathPtr) ?? string.Empty;
 
             Logging.LogInternal($"[ScriptHost] CompileAndReload: {dir} -> {outPath}", LogLevel.Info);
 
@@ -299,8 +308,14 @@ public static class ScriptHost
     {
         try
         {
-            string dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
-            string projectName = Marshal.PtrToStringUTF8(projectNamePtr) ?? "ScriptsProject";
+            var dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
+            var projectName = Marshal.PtrToStringUTF8(projectNamePtr) ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(projectName))
+            {
+                Logging.LogInternal($"[ScriptHost] GenerateCsProj: invalid project name!", LogLevel.Error);
+                return -1;
+            }
 
             if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
             {
@@ -425,7 +440,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] TriggerCompileAndReloadManaged error: {ex}");
+            Logging.LogInternal($"[ScriptHost] TriggerCompileAndReloadManaged error: {ex}", LogLevel.Error);
             return -1;
         }
     }
@@ -439,14 +454,16 @@ public static class ScriptHost
     {
         try
         {
-            Console.WriteLine("[ScriptHost] Discovering systems in loaded assemblies...");
+            Logging.LogInternal("[ScriptHost] Discovering systems in loaded assemblies...", LogLevel.Info);
 
             var allSystemHandles = new List<ulong>();
 
             // Discover systems in all loaded assemblies
             foreach (var assembly in AssemblyManager.GetAllLoadedAssemblies())
             {
+                Logging.LogInternal($"[ScriptHost] Inspecting assembly: {assembly.FullName} (Location: {assembly.Location})", LogLevel.Info);
                 string[] discovered = SystemDiscovery.DiscoverSystemsInAssembly(assembly);
+                Logging.LogInternal($"[ScriptHost] DiscoverSystemsInAssembly returned {discovered.Length} entries for {assembly.FullName}", LogLevel.Info);
                 foreach (var entry in discovered)
                 {
                     // Parse "handle:typename" format
@@ -458,12 +475,12 @@ public static class ScriptHost
                 }
             }
 
-            Console.WriteLine($"[ScriptHost] Found {allSystemHandles.Count} system types");
+            Logging.LogInternal($"[ScriptHost] Found {allSystemHandles.Count} system types", LogLevel.Info);
 
             // Allocate unmanaged array for handles and write each 64-bit value
             int slotSize = Marshal.SizeOf<ulong>();
             IntPtr handlesPtr = Marshal.AllocHGlobal(slotSize * allSystemHandles.Count);
-            for (int i = 0; i < allSystemHandles.Count; ++i)
+            for (var i = 0; i < allSystemHandles.Count; ++i)
             {
                 IntPtr slot = IntPtr.Add(handlesPtr, i * slotSize);
                 Marshal.WriteInt64(slot, unchecked((long)allSystemHandles[i]));
@@ -477,7 +494,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error discovering systems: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error discovering systems: {ex.Message}", LogLevel.Error);
             if (outCountPtr != IntPtr.Zero)
             {
                 Marshal.WriteInt32(outCountPtr, 0);
@@ -495,19 +512,20 @@ public static class ScriptHost
     {
         try
         {
-            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? "";
+            var typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? string.Empty;
 
             // Find the type in loaded assemblies
             Type? systemType = null;
             foreach (var assembly in AssemblyManager.GetAllLoadedAssemblies())
             {
                 systemType = assembly.GetType(typeName);
-                if (systemType != null) break;
+                if (systemType != null)
+                    break;
             }
 
             if (systemType == null)
             {
-                Console.WriteLine($"[ScriptHost] System type not found: {typeName}");
+                Logging.LogInternal($"[ScriptHost] System type not found: {typeName}", LogLevel.Warning);
                 return 0;
             }
 
@@ -515,19 +533,19 @@ public static class ScriptHost
             ulong handle = SystemDiscovery.CreateSystemInstanceFromType(systemType);
             if (handle == 0)
             {
-                Console.WriteLine($"[ScriptHost] Failed to create instance of: {typeName}");
+                Logging.LogInternal($"[ScriptHost] Failed to create instance of: {typeName}", LogLevel.Warning);
                 return 0;
             }
 
             // If we have saved state from a previous unload, restore it
-            StatePreserver.RestoreSystemState(systemType.Assembly.Location ?? "", SystemDiscovery.GetSystemInstance(handle)!);
+            StatePreserver.RestoreSystemState(systemType.Assembly.Location ?? string.Empty, SystemDiscovery.GetSystemInstance(handle)!);
 
-            Console.WriteLine($"[ScriptHost] Created system instance: {typeName} (handle: {handle})");
+            Logging.LogInternal($"[ScriptHost] Created system instance: {typeName} (handle: {handle})", LogLevel.Info);
             return handle;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error creating system instance: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error creating system instance: {ex.Message}", LogLevel.Error);
             return 0;
         }
     }
@@ -553,7 +571,7 @@ public static class ScriptHost
             Type? systemType = SystemDiscovery.GetSystemType(handle);
             if (systemType == null)
             {
-                Console.WriteLine($"[ScriptHost] System handle not found: {handle}");
+                Logging.LogInternal($"[ScriptHost] System handle not found: {handle}", LogLevel.Warning);
                 return;
             }
             
@@ -584,7 +602,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error getting metadata: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error getting metadata: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -605,7 +623,7 @@ public static class ScriptHost
             Type? systemType = SystemDiscovery.GetSystemType(handle);
             if (systemType == null)
             {
-                Console.WriteLine($"[ScriptHost] System handle not found: {handle}");
+                Logging.LogInternal($"[ScriptHost] System handle not found: {handle}", LogLevel.Warning);
                 return 0;
             }
 
@@ -643,13 +661,17 @@ public static class ScriptHost
             {
                 // Marshal.Copy does not have a uint[] overload, use int[] with identical bit-patterns
                 int[] tmp = new int[readCount];
-                for (int i = 0; i < readCount; ++i) tmp[i] = unchecked((int)readHashes[i]);
+                for (int i = 0; i < readCount; ++i)
+                    tmp[i] = unchecked((int)readHashes[i]);
+
                 Marshal.Copy(tmp, 0, outReadHashesPtr, readCount);
             }
             if (outWriteHashesPtr != IntPtr.Zero && writeCount > 0)
             {
                 int[] tmp = new int[writeCount];
-                for (int i = 0; i < writeCount; ++i) tmp[i] = unchecked((int)writeHashes[i]);
+                for (var i = 0; i < writeCount; ++i)
+                    tmp[i] = unchecked((int)writeHashes[i]);
+
                 Marshal.Copy(tmp, 0, outWriteHashesPtr, writeCount);
             }
 
@@ -658,7 +680,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error getting component accesses: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error getting component accesses: {ex.Message}", LogLevel.Error);
             return 0;
         }
     }
@@ -673,12 +695,12 @@ public static class ScriptHost
         try
         {
             // For now, compute here but ideally this would call C++
-            string typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? "";
+            var typeName = Marshal.PtrToStringUTF8(typeNamePtr) ?? string.Empty;
             return ComponentAccessBridge.Fnv1aHashPublic(typeName);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error hashing component type: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error hashing component type: {ex.Message}", LogLevel.Error);
             return 0;
         }
     }
@@ -702,7 +724,7 @@ public static class ScriptHost
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error resolving system group: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error resolving system group: {ex.Message}", LogLevel.Error);
             return 0; // Default to Update
         }
     }
@@ -718,21 +740,21 @@ public static class ScriptHost
             object? instance = SystemDiscovery.GetSystemInstance(handle);
             if (instance == null)
             {
-                Console.WriteLine($"[ScriptHost] System instance not found: {handle}");
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
                 return;
             }
             
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new World(worldPtr);
-                Console.WriteLine($"[ScriptHost] CallSystemOnCreate for {instance.GetType().Name}");
+                World managedWorld = new(worldPtr);
+                Logging.LogInternal($"[ScriptHost] CallSystemOnCreate for {instance.GetType().Name}", LogLevel.Info);
                 system.OnCreate(managedWorld);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error in OnCreate: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error in OnCreate: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -740,7 +762,7 @@ public static class ScriptHost
     /// Call OnUpdate on a scripted system.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static void CallSystemOnUpdate(ulong handle, IntPtr worldPtr, float deltaTime)
+    public static void CallSystemOnUpdate(ulong handle, IntPtr worldPtr)
     {
         try
         {
@@ -753,13 +775,13 @@ public static class ScriptHost
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new World(worldPtr);
-                system.OnUpdate(managedWorld, deltaTime);
+                World managedWorld = new(worldPtr);
+                system.OnUpdate(managedWorld);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error in OnUpdate: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error in OnUpdate: {ex.Message}", LogLevel.Error);
         }
     }
     /// <summary>
@@ -779,13 +801,13 @@ public static class ScriptHost
             if (instance is ISystem system)
             {
                 // Wrap native World pointer in managed World wrapper
-                World managedWorld = new World(worldPtr);
+                World managedWorld = new(worldPtr);
                 system.OnDestroy(managedWorld);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ScriptHost] Error in OnDestroy: {ex.Message}");
+            Logging.LogInternal($"[ScriptHost] Error in OnDestroy: {ex.Message}", LogLevel.Error);
         }
     }
 }
@@ -901,8 +923,8 @@ public static class EnumParityValidator
 
         if (!valid)
         {
-            Console.WriteLine("[EnumParityValidator] WARNING: Enum mismatch detected! " +
-                "C# enum values do not match C++ definitions. This will cause P/Invoke marshaling errors.");
+            Logging.LogInternal("[EnumParityValidator] WARNING: Enum mismatch detected! " +
+                "C# enum values do not match C++ definitions. This will cause P/Invoke marshaling errors.", LogLevel.Warning);
         }
 
         return valid;
@@ -933,9 +955,9 @@ public static class EnumParityValidator
             int actualValue = (int)group;
             if (actualValue != expectedValue)
             {
-                Console.WriteLine(
+                Logging.LogInternal(
                     $"[EnumParityValidator] SystemGroup.{group} mismatch: " +
-                    $"expected {expectedValue}, got {actualValue}");
+                    $"expected {expectedValue}, got {actualValue}", LogLevel.Warning);
                 valid = false;
             }
         }
@@ -962,9 +984,9 @@ public static class EnumParityValidator
             int actualValue = (int)mode;
             if (actualValue != expectedValue)
             {
-                Console.WriteLine(
+                Logging.LogInternal(
                     $"[EnumParityValidator] SystemRunMode.{mode} mismatch: " +
-                    $"expected {expectedValue}, got {actualValue}");
+                    $"expected {expectedValue}, got {actualValue}", LogLevel.Warning);
                 valid = false;
             }
         }

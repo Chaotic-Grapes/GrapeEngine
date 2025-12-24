@@ -281,7 +281,7 @@ namespace ECS {
         using HashComponentTypeNameFn           = uint32_t(*)(const char* typeName);
         using ResolveSystemGroupFn              = int(*)(int attributeGroup);
         using CallSystemOnCreateFn              = void(*)(uint64_t handle, void* worldPtr);
-        using CallSystemOnUpdateFn              = void(*)(uint64_t handle, void* worldPtr, float deltaTime);
+        using CallSystemOnUpdateFn              = void(*)(uint64_t handle, void* worldPtr);
         using CallSystemOnDestroyFn             = void(*)(uint64_t handle, void* worldPtr);
         using CompileDirectoryFn                = int(*)(const char* directoryPath, const char* outputAssemblyPath);
         using CompileDirectoryWithDiagFn        = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
@@ -368,7 +368,7 @@ namespace ECS {
 
         // ISystem interface
         void OnCreate(World& world) override;
-        void OnUpdate(World& world, float deltaTime) override;
+        void OnUpdate(World& world) override;
         void OnDestroy(World& world) override;
 
         SystemMetadata GetMetadata() const override;
