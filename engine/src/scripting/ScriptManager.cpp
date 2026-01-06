@@ -278,6 +278,58 @@ namespace ECS {
         return systems;
     }
 
+    // ------------------------------------------------------------------------
+    // Native wrapper implementations
+    // ------------------------------------------------------------------------
+
+    uint64_t ScriptManager::CreateSystemInstanceFromTypeName(const char* typeName)
+    {
+        if (!m_initialized || !m_createSystemWrapper || typeName == nullptr) return 0;
+        try {
+            return m_createSystemWrapper(typeName);
+        } catch (...) {
+            return 0;
+        }
+    }
+
+    void ScriptManager::CallSystemOnCreate(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemOnCreate) return;
+        try {
+            m_callSystemOnCreate(handle, worldPtr);
+        } catch (...) {
+            // swallow exceptions at native boundary
+        }
+    }
+
+    intptr_t ScriptManager::CallSystemOnUpdateJob(uint64_t handle, void* worldPtr, intptr_t dependsOn)
+    {
+        if (!m_initialized) return 0;
+        // Prefer job-capable delegate if available
+        if (m_callSystemOnUpdateJob) {
+            try {
+                return m_callSystemOnUpdateJob(handle, worldPtr, dependsOn);
+            } catch (...) {
+                return 0;
+            }
+        }
+        // Fallback to non-job update
+        if (m_callSystemOnUpdate) {
+            try {
+                m_callSystemOnUpdate(handle, worldPtr);
+            } catch (...) {}
+        }
+        return 0;
+    }
+
+    void ScriptManager::CallSystemOnDestroy(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemOnDestroy) return;
+        try {
+            m_callSystemOnDestroy(handle, worldPtr);
+        } catch (...) {}
+    }
+
     /**
      * @brief Register discovered scripted systems with the SystemManager.
      * @param systemManager Reference to the SystemManager
@@ -779,6 +831,7 @@ namespace ECS {
         success &= loadMethod("ResolveSystemGroup",               scriptHostTypeName, reinterpret_cast<void**>(&m_resolveSystemGroup));
         success &= loadMethod("CallSystemOnCreate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnCreate));
         success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
+        success &= loadMethod("CallSystemOnUpdateJob",            scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdateJob));
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
@@ -873,9 +926,11 @@ namespace ECS {
             return;
         }
 
+        LOG_INFO("[ScriptSystemWrapper] OnCreate invoked (handle=0x" << std::hex << m_managedHandle << ")");
         auto callOnCreate = m_scriptManager->GetCallSystemOnCreate();
         if (callOnCreate) {
             callOnCreate(m_managedHandle, &world);
+            LOG_INFO("[ScriptSystemWrapper] OnCreate forwarded to managed (handle=0x" << std::hex << m_managedHandle << ")");
         }
         else {
             LOG_ERROR("[ScriptSystemWrapper] CallSystemOnCreate delegate not available");
@@ -890,9 +945,11 @@ namespace ECS {
     void ScriptSystemWrapper::OnUpdate(World& world) {
         if (!m_scriptManager) return;
 
+        LOG_INFO("[ScriptSystemWrapper] OnUpdate invoked (handle=0x" << std::hex << m_managedHandle << ")");
         auto callOnUpdate = m_scriptManager->GetCallSystemOnUpdate();
         if (callOnUpdate) {
             callOnUpdate(m_managedHandle, &world);
+            LOG_INFO("[ScriptSystemWrapper] OnUpdate forwarded to managed (handle=0x" << std::hex << m_managedHandle << ")");
         }
     }
 

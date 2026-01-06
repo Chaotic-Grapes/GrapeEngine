@@ -51,6 +51,8 @@ public abstract class SystemBase : ISystem
 
     void ISystem.OnUpdate(World world)
     {
+        // Ensure the protected World property is up-to-date for derived systems
+        World = world;
         // Keep compatibility: call derived OnUpdate which may schedule jobs
         OnUpdate();
     }
@@ -73,6 +75,16 @@ public abstract class SystemBase : ISystem
             _queryCache = null;
             World = null;
         }
+    }
+
+    /// <summary>
+    /// Log a message prefixed with the system's type name.
+    /// </summary>
+    /// <param name="message">Message text</param>
+    /// <param name="level">Log level</param>
+    protected void Log(string message, LogLevel level = LogLevel.Info)
+    {
+        Logging.Log(message, level);
     }
 
     /// <summary>

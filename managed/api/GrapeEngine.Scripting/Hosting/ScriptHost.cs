@@ -20,6 +20,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Linq;
+using GrapeEngine.Scripting.Job;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -466,11 +467,20 @@ public static class ScriptHost
                 Logging.LogInternal($"[ScriptHost] DiscoverSystemsInAssembly returned {discovered.Length} entries for {assembly.FullName}", LogLevel.Info);
                 foreach (var entry in discovered)
                 {
-                    // Parse "handle:typename" format
+                    // Parse "handle:typename" format (DiscoverSystemsInAssembly returns type handles)
                     var parts = entry.Split(':');
-                    if (parts.Length == 2 && ulong.TryParse(parts[0], out ulong handle))
+                    if (parts.Length == 2 && ulong.TryParse(parts[0], out ulong typeHandle))
                     {
-                        allSystemHandles.Add(handle);
+                        // Ensure we create an instance for this type so native receives an INSTANCE handle
+                        var instance = SystemDiscovery.CreateSystemInstance(typeHandle);
+                        if (instance != null)
+                        {
+                            allSystemHandles.Add(typeHandle);
+                        }
+                        else
+                        {
+                            Logging.LogInternal($"[ScriptHost] Failed to create instance for discovered system handle={typeHandle}", LogLevel.Warning);
+                        }
                     }
                 }
             }
@@ -758,6 +768,7 @@ public static class ScriptHost
         }
     }
 
+
     /// <summary>
     /// Call OnUpdate on a scripted system.
     /// </summary>
@@ -766,14 +777,17 @@ public static class ScriptHost
     {
         try
         {
+            Logging.LogInternal($"[ScriptHost] CallSystemOnUpdate invoked for handle=0x{handle:X}", LogLevel.Debug);
             object? instance = SystemDiscovery.GetSystemInstance(handle);
             if (instance == null)
             {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
                 return;
             }
             
             if (instance is ISystem system)
             {
+                Logging.LogInternal($"[ScriptHost] CallSystemOnUpdate for {instance.GetType().Name}", LogLevel.Info);
                 // Wrap native World pointer in managed World wrapper
                 World managedWorld = new(worldPtr);
                 system.OnUpdate(managedWorld);
@@ -782,6 +796,48 @@ public static class ScriptHost
         catch (Exception ex)
         {
             Logging.LogInternal($"[ScriptHost] Error in OnUpdate: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Call OnUpdate on a scripted system that may schedule jobs.
+    /// Returns a native job handle (IntPtr) when the system implements ISystemJob
+    /// and schedules work. Returns IntPtr.Zero otherwise.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static IntPtr CallSystemOnUpdateJob(ulong handle, IntPtr worldPtr, IntPtr dependsOnNativeHandle)
+    {
+        try
+        {
+            Logging.LogInternal($"[ScriptHost] CallSystemOnUpdateJob invoked for handle=0x{handle:X}, dependsOn=0x{dependsOnNativeHandle.ToInt64():X}", LogLevel.Debug);
+            object? instance = SystemDiscovery.GetSystemInstance(handle);
+            if (instance == null)
+            {
+                return IntPtr.Zero;
+            }
+
+            if (instance is ISystemJob jobSystem)
+            {
+                World managedWorld = new(worldPtr);
+                JobHandle? depends = dependsOnNativeHandle == IntPtr.Zero ? null : new JobHandle(dependsOnNativeHandle);
+                var result = jobSystem.OnUpdateWithJob(managedWorld, depends);
+                return result != null ? new IntPtr(result.NativeHandle) : IntPtr.Zero;
+            }
+            else
+            {
+                // Fallback: call legacy OnUpdate
+                if (instance is ISystem system)
+                {
+                    World managedWorld = new(worldPtr);
+                    system.OnUpdate(managedWorld);
+                }
+                return IntPtr.Zero;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in CallSystemOnUpdateJob: {ex.Message}", LogLevel.Error);
+            return IntPtr.Zero;
         }
     }
     /// <summary>

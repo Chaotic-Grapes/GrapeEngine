@@ -248,6 +248,14 @@ namespace ECS {
         inline auto GetGetSystemMetadata() const { return m_getSystemMetadata; }
         inline auto GetGetSystemComponentAccesses() const { return m_getSystemComponentAccesses; }
 
+        // --------------------------------------------------------------------
+        // Convenience native wrappers used by engine code
+        // --------------------------------------------------------------------
+        uint64_t CreateSystemInstanceFromTypeName(const char* typeName);
+        void CallSystemOnCreate(uint64_t handle, void* worldPtr);
+        intptr_t CallSystemOnUpdateJob(uint64_t handle, void* worldPtr, intptr_t dependsOn);
+        void CallSystemOnDestroy(uint64_t handle, void* worldPtr);
+
     private:
         // ====================================================================
         // CoreCLR Runtime State
@@ -282,6 +290,7 @@ namespace ECS {
         using ResolveSystemGroupFn              = int(*)(int attributeGroup);
         using CallSystemOnCreateFn              = void(*)(uint64_t handle, void* worldPtr);
         using CallSystemOnUpdateFn              = void(*)(uint64_t handle, void* worldPtr);
+        using CallSystemOnUpdateJobFn           = intptr_t(*)(uint64_t handle, void* worldPtr, intptr_t dependsOn);
         using CallSystemOnDestroyFn             = void(*)(uint64_t handle, void* worldPtr);
         using CompileDirectoryFn                = int(*)(const char* directoryPath, const char* outputAssemblyPath);
         using CompileDirectoryWithDiagFn        = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
@@ -300,11 +309,12 @@ namespace ECS {
         GetManagedExceptionForHResultFn     m_getExceptionInfoForHR = nullptr;
         CallSystemOnCreateFn                m_callSystemOnCreate = nullptr;
         CallSystemOnUpdateFn                m_callSystemOnUpdate = nullptr;
+        CallSystemOnUpdateJobFn             m_callSystemOnUpdateJob = nullptr;
         CallSystemOnDestroyFn               m_callSystemOnDestroy = nullptr;
         CompileDirectoryFn                  m_compileDirectory = nullptr;
         CompileDirectoryWithDiagFn          m_compileDirectoryWithDiag = nullptr;
-        GetLastDiagnosticsCountFn            m_getLastDiagnosticsCount = nullptr;
-        GetLastDiagnosticAtFn                m_getLastDiagnosticAt = nullptr;
+        GetLastDiagnosticsCountFn           m_getLastDiagnosticsCount = nullptr;
+        GetLastDiagnosticAtFn               m_getLastDiagnosticAt = nullptr;
         FreeManagedStringFn                 m_freeManagedString = nullptr;
         ReloadAssemblyFn                    m_reloadAssembly = nullptr;
         CompileAndReloadFn                  m_compileAndReload = nullptr;
