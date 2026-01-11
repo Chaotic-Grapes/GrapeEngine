@@ -3,14 +3,14 @@
 \file   ResourceManager.h
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   26th October 2025
+\date   11th January 2026
 \brief
 Defines the ResourceManager class for loading, caching and managing game
-assets (textures, audio files and fonts).
+assets (textures, audio files, fonts, shaders and prefabs).
 
 Features:
 - Template-based asset retrieval with automatic caching
-- Support for Texture, AudioData, and Font asset types
+- Support for Texture, AudioData, Font, Shader, and PrefabData asset types
 - Cache management utilities (clear, unload, size tracking)
 - File validation and error handling with logging
 - Global singleton instance (RM) for engine-wide access
@@ -18,6 +18,8 @@ Features:
 Usage:
   auto texture = RM.Get<Texture>("assets/player.png");
   auto audio = RM.Get<AudioData>("assets/music.wav");
+  auto shader = RM.Get<Shader>("assets/shaders/sprite");
+  auto prefab = RM.Get<PrefabData>("assets/prefabs/enemy.prefab");
 
   auto font = RM.Get<Font>("assets/arial.ttf");           // Default 48px
   auto bigFont = RM.GetFont("assets/arial.ttf", 72);      // Custom size
@@ -30,6 +32,7 @@ Usage:
 
 #ifndef RESOURCE_MANAGER_H
 #define RESOURCE_MANAGER_H
+
 #include "Export.h"
 #include <unordered_map>
 #include <memory>
@@ -39,6 +42,7 @@ Usage:
 #include <glad/glad.h>
 #include "graphics/Texture.hpp"
 #include "graphics/Font.hpp"
+#include "graphics/Shader.hpp"
 
 // A struct is created for audio data since there's no audio class
 struct AudioData {
@@ -48,8 +52,15 @@ struct AudioData {
     bool IsValid = false;       // Flag indicating if the audio data was loaded successfully
 };
 
+// Prefab data structure for storing serialized prefab content
+struct PrefabData {
+    std::string Path;           // Original file path of the prefab
+    std::string JsonContent;    // Raw JSON content from the .prefab file
+    bool IsValid = false;       // Flag indicating if the prefab was loaded successfully
+};
+
 // Centralized resource management system for game assets
-// Supports textures, audio and fonts
+// Supports textures, audio, fonts, shaders and prefabs
 class GRAPEENGINE_API ResourceManager {
 public:
     // Default constructor
@@ -96,6 +107,8 @@ private:
     std::unordered_map<std::string, std::shared_ptr<Texture>> m_textures;
     std::unordered_map<std::string, std::shared_ptr<AudioData>> m_audioFiles;
     std::unordered_map<std::string, std::shared_ptr<Font>> m_fonts;
+    std::unordered_map<std::string, std::shared_ptr<Shader>> m_shaders;
+    std::unordered_map<std::string, std::shared_ptr<PrefabData>> m_prefabs;
 };
 
 // Global ResourceManager instance
