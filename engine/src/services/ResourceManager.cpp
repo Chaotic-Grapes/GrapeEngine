@@ -3,15 +3,17 @@
 \file   ResourceManager.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   26th October 2025
+\date   11th January 2026
 \brief
 Implements the ResourceManager class for centralized asset management.
 
 Features:
-- Template specializations for Texture, AudioData and Font loading
+- Template specializations for Texture, AudioData, Font, Shader and PrefabData loading
 - Automatic caching system to prevent redundant file operations
 - File validation and error handling with logging
 - Support for multiple audio formats (WAV, MP3, OGG, FLAC, M4A, AAC)
+- Shader loading with automatic .vert/.frag extension handling
+- Prefab loading with JSON content storage
 - Cache management utilities for memory optimization
 */
 /* End Header *******************************************************************/
@@ -38,9 +40,18 @@ template<>
 std::unordered_map<std::string, std::shared_ptr<Font>>&
 ResourceManager::GetCacheMap<Font>() { return m_fonts; }
 
+// When T = Shader, return shader cache
+template<>
+std::unordered_map<std::string, std::shared_ptr<Shader>>&
+ResourceManager::GetCacheMap<Shader>() { return m_shaders; }
+
+// When T = PrefabData, return prefab cache
+template<>
+std::unordered_map<std::string, std::shared_ptr<PrefabData>>&
+ResourceManager::GetCacheMap<PrefabData>() { return m_prefabs; }
+
 // Generic Get function: handles caching logic for all asset types
-template <typename T>
-std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
+template<typename T>std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
     // Get reference to appropriate cache (m_textures or m_audioFiles)
     auto& cache = GetCacheMap<T>();
 
@@ -72,10 +83,11 @@ std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
 template GRAPEENGINE_API std::shared_ptr<Texture> ResourceManager::Get<Texture>(const std::string&);
 template GRAPEENGINE_API std::shared_ptr<AudioData> ResourceManager::Get<AudioData>(const std::string&);
 template GRAPEENGINE_API std::shared_ptr<Font> ResourceManager::Get<Font>(const std::string&);
+template GRAPEENGINE_API std::shared_ptr<Shader> ResourceManager::Get<Shader>(const std::string&);
+template GRAPEENGINE_API std::shared_ptr<PrefabData> ResourceManager::Get<PrefabData>(const std::string&);
 
 // Loading function for textures
-template<>
-std::shared_ptr<Texture> ResourceManager::Load<Texture>(const std::string& filePath) {
+template<>std::shared_ptr<Texture> ResourceManager::Load<Texture>(const std::string& filePath) {
     // Check if the file actually exists before trying to open it
     // If not found, return nullptr immediately (fail fast)
     if (!std::filesystem::exists(filePath)) {
@@ -92,11 +104,9 @@ std::shared_ptr<Texture> ResourceManager::Load<Texture>(const std::string& fileP
             LOG_ERROR("Texture failed to load: " << filePath);
             return nullptr;
         }
-        // Successful - send success message
-        Messaging::MessageSystem::Notify(
-            Messaging::ResourceLoaded{filePath, "Texture", true}
-        );
-        
+
+        // Successful: send success message
+        Messaging::MessageSystem::Notify(Messaging::ResourceLoaded{filePath, "Texture", true});
         return texture;
     }
     catch (const std::exception& e) {
@@ -106,8 +116,7 @@ std::shared_ptr<Texture> ResourceManager::Load<Texture>(const std::string& fileP
 }
 
 // Loading function for audio
-template<>
-std::shared_ptr<AudioData> ResourceManager::Load<AudioData>(const std::string& filePath) {
+template<>std::shared_ptr<AudioData> ResourceManager::Load<AudioData>(const std::string& filePath) {
     // Check if the file actually exists before trying to open it
     if (!std::filesystem::exists(filePath)) {
         LOG_ERROR("File not found: " << filePath);
@@ -169,8 +178,7 @@ std::shared_ptr<AudioData> ResourceManager::Load<AudioData>(const std::string& f
 }
 
 // Loading function for fonts
-template<>
-std::shared_ptr<Font> ResourceManager::Load<Font>(const std::string& filePath) {
+template<>std::shared_ptr<Font> ResourceManager::Load<Font>(const std::string& filePath) {
     // Check if file exists
     if (!std::filesystem::exists(filePath)) {
         LOG_ERROR("File not found: " << filePath);
@@ -192,6 +200,82 @@ std::shared_ptr<Font> ResourceManager::Load<Font>(const std::string& filePath) {
     }
     catch (const std::exception& e) {
         LOG_ERROR("Exception loading font " << filePath << ": " << e.what());
+        return nullptr;
+    }
+}
+
+// Loading function for shaders
+template<>std::shared_ptr<Shader> ResourceManager::Load<Shader>(const std::string& basePath) {
+    // Shader files are expected to have .vert and .frag extensions
+    // Example: "assets/shaders/sprite" -> "sprite.vert" and "sprite.frag"
+    std::string vertPath = basePath + ".vert";
+    std::string fragPath = basePath + ".frag";
+
+    // Check if both shader files exist
+    if (!std::filesystem::exists(vertPath)) {
+        LOG_ERROR("Vertex shader not found: " << vertPath);
+        return nullptr;
+    }
+
+    if (!std::filesystem::exists(fragPath)) {
+        LOG_ERROR("Fragment shader not found: " << fragPath);
+        return nullptr;
+    }
+
+    try {
+        // Use the existing Shader constructor to load and compile
+        auto shader = std::make_shared<Shader>(vertPath, fragPath);
+
+        // Shader constructor throws on failure, so if we get here it succeeded
+        LOG_INFO("Loaded shader: " << basePath);
+        return shader;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Exception loading shader " << basePath << ": " << e.what());
+        return nullptr;
+    }
+}
+
+// Loading function for prefabs
+template<>std::shared_ptr<PrefabData> ResourceManager::Load<PrefabData>(const std::string& filePath) {
+    // Check if file exists
+    if (!std::filesystem::exists(filePath)) {
+        LOG_ERROR("File not found: " << filePath);
+        return nullptr;
+    }
+
+    // Validate extension
+    std::string extension = std::filesystem::path(filePath).extension().string();
+    if (extension != ".prefab") {
+        LOG_WARNING("Not a .prefab file: " << filePath);
+        return nullptr;
+    }
+
+    try {
+        // Open file and read JSON content
+        std::ifstream file(filePath);
+        if (!file) {
+            LOG_ERROR("Failed to open file: " << filePath);
+            return nullptr;
+        }
+
+        // Read entire file into string
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string jsonContent = buffer.str();
+
+        // Create prefab data object
+        auto prefab = std::make_shared<PrefabData>();
+        prefab->Path = filePath;
+        prefab->JsonContent = jsonContent;
+        prefab->IsValid = true;
+
+        // Success
+        LOG_INFO("Loaded prefab: " << filePath);
+        return prefab;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Exception loading prefab " << filePath << ": " << e.what());
         return nullptr;
     }
 }
@@ -243,6 +327,8 @@ void ResourceManager::ClearCache() {
     m_textures.clear();
     m_audioFiles.clear();
     m_fonts.clear();
+    m_shaders.clear();
+    m_prefabs.clear();
     LOG_INFO("Cleared all cached assets");
 }
 
@@ -255,11 +341,11 @@ void ResourceManager::UnloadAsset(const std::string& name) {
     // Or: if (m_textures.erase(name) > 0) { removed = true; } i.e. keep true if already true
     removed |= m_textures.erase(name) > 0;
 
-    // Try to remove from audio cache
+    // Try to remove from all caches
     removed |= m_audioFiles.erase(name) > 0;
-
-    // Try to remove from font cache
     removed |= m_fonts.erase(name) > 0;
+    removed |= m_shaders.erase(name) > 0;
+    removed |= m_prefabs.erase(name) > 0;
 
     if (removed) {
         LOG_INFO("Unloaded asset: " << name);
@@ -271,7 +357,7 @@ void ResourceManager::UnloadAsset(const std::string& name) {
 
 // Get total number of cached assets
 size_t ResourceManager::GetCacheSize() const {
-    return m_textures.size() + m_audioFiles.size() + m_fonts.size();
+    return m_textures.size() + m_audioFiles.size() + m_fonts.size() + m_shaders.size() + m_prefabs.size();
 }
 
 // Get cache info broken down by type
@@ -280,6 +366,8 @@ void ResourceManager::PrintCacheInfo() const {
     LOG_INFO("Textures: " << m_textures.size());
     LOG_INFO("Audio files: " << m_audioFiles.size());
     LOG_INFO("Fonts: " << m_fonts.size());
+    LOG_INFO("Shaders: " << m_shaders.size());
+    LOG_INFO("Prefabs: " << m_prefabs.size());
     LOG_INFO("Total assets: " << GetCacheSize());
 }
 
@@ -299,7 +387,9 @@ std::vector<std::string> ResourceManager::ListCachedAudioPaths() const {
 bool ResourceManager::IsAssetCached(const std::string& name) const {
     return (m_textures.find(name) != m_textures.end()) ||
         (m_audioFiles.find(name) != m_audioFiles.end()) ||
-        (m_fonts.find(name) != m_fonts.end());
+        (m_fonts.find(name) != m_fonts.end()) ||
+        (m_shaders.find(name) != m_shaders.end()) ||
+        (m_prefabs.find(name) != m_prefabs.end());
 }
 
 // Define the global ResourceManager instance
