@@ -148,4 +148,14 @@ internal static class StatePreserver
             _savedSystemStateByAssemblyPath.Clear();
         }
     }
+
+    /// <summary>
+    /// Clear all saved state from all assemblies.
+    /// Used before unload to break any remaining references.
+    /// </summary>
+    public static void ClearAllSavedState()
+    {
+        _savedSystemStateByAssemblyPath.Clear();
+        Logging.LogInternal($"[StatePreserver] Cleared all saved state", LogLevel.Info);
+    }
 }

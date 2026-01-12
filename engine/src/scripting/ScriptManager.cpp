@@ -40,6 +40,7 @@ using get_hostfxr_path_fn = int(*)(char_t* path, size_t* path_size, void* reserv
 // Forward-declare native callback so managed watcher registration can pass
 // its address before the function definition appears later in this file.
 extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, const char* message);
+extern "C" void __cdecl Native_HotReloadCallback(const char* assemblyPath);
 
 namespace ECS {
 
@@ -228,6 +229,35 @@ namespace ECS {
     }
 
     /**
+     * @brief Handle hot reload completion callback from C#.
+     * @param assemblyPath Path to the reloaded assembly
+     * 
+     * Called when C# finishes hot reload. Calls registered callback to allow
+     * editor to re-discover and re-register systems.
+     */
+    void ScriptManager::HandleHotReloadCompletion(const std::string& assemblyPath) {
+        LOG_INFO("[ScriptManager] Hot reload completed for: " << assemblyPath);
+
+        if (!m_initialized) {
+            LOG_ERROR("[ScriptManager] Cannot handle hot reload - CLR not initialized");
+            return;
+        }
+
+        // Invoke registered callback if any
+        if (m_hotReloadCallback) {
+            try {
+                m_hotReloadCallback(assemblyPath);
+            }
+            catch (const std::exception& ex) {
+                LOG_ERROR("[ScriptManager] Error in hot reload callback: " << ex.what());
+            }
+        }
+        else {
+            LOG_WARNING("[ScriptManager] No hot reload callback registered - systems may not be properly reinitialized");
+        }
+    }
+
+    /**
      * @brief Discover ISystem implementations in all loaded assemblies.
      * @return Vector of ScriptSystemWrapper instances
      * 
@@ -333,13 +363,14 @@ namespace ECS {
     /**
      * @brief Register discovered scripted systems with the SystemManager.
      * @param systemManager Reference to the SystemManager
+     * @param world Optional World to pass for immediate OnCreate initialization
      * @return Number of systems registered
      */
-    int ScriptManager::RegisterScriptedSystems(SystemManager& systemManager) {
+    int ScriptManager::RegisterScriptedSystems(SystemManager& systemManager, ECS::World* world) {
         auto systems = DiscoverScriptedSystems();
 
         for (auto* system : systems) {
-            systemManager.RegisterScriptedSystem(system);
+            systemManager.RegisterScriptedSystem(system, world);
         }
 
         LOG_INFO("[ScriptManager] Registered " << static_cast<int>(systems.size()) << " scripted systems with SystemManager");
@@ -840,11 +871,14 @@ namespace ECS {
         success &= loadMethod("GetLastDiagnosticsCount",          scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticsCount));
         success &= loadMethod("GetLastDiagnosticAt",              scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticAt));
         success &= loadMethod("FreeStringFromManaged",            scriptHostTypeName, reinterpret_cast<void**>(&m_freeManagedString));
+        success &= loadMethod("RegisterHotReloadCallback",        scriptHostTypeName, reinterpret_cast<void**>(&m_registerHotReloadCallback));
+        success &= loadMethod("DeserializeComponentFromJson",     scriptHostTypeName, reinterpret_cast<void**>(&m_deserializeComponentFromJson));
 
         // ScriptFileWatcher methods
         success &= loadMethod("StartWatching",                    watcherTypeName, reinterpret_cast<void**>(&m_startWatching), LoadLabel::Watcher);
         success &= loadMethod("StopWatching",                     watcherTypeName, reinterpret_cast<void**>(&m_stopWatching), LoadLabel::Watcher);
         success &= loadMethod("SetCompileCallback",               watcherTypeName, reinterpret_cast<void**>(&m_setCompileCallback), LoadLabel::Watcher);
+        success &= loadMethod("SetOutputAssemblyPath",            watcherTypeName, reinterpret_cast<void**>(&m_setOutputAssemblyPath), LoadLabel::Watcher);
         
         // Log results
         if (!sucstream.str().empty()) // Log any successes
@@ -852,6 +886,12 @@ namespace ECS {
         if (!success) { // Log any errors, then return failure
             LOG_CRITICAL(errstream.str());
             return false;
+        }
+
+        // Register the hot reload callback so C# can notify us when reload completes
+        if (m_registerHotReloadCallback) {
+            m_registerHotReloadCallback(reinterpret_cast<void*>(&Native_HotReloadCallback));
+            LOG_INFO("[ScriptManager] Registered hot reload callback");
         }
 
         // All delegates loaded successfully, so return true
@@ -1131,12 +1171,39 @@ extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, c
     mgr->SetCompileStatus(status, progress, message ? message : "");
 }
 
+/**
+ * @brief Native callback invoked when C# hot reload completes.
+ * Receives the assembly path that was reloaded.
+ */
+extern "C" void __cdecl Native_HotReloadCallback(const char* assemblyPath)
+{
+    if (Engine::CORE == nullptr) {
+        return;
+    }
+
+    if (assemblyPath == nullptr || assemblyPath[0] == '\0') {
+        LOG_WARNING("[Native_HotReloadCallback] Invalid assembly path");
+        return;
+    }
+
+    LOG_INFO("[Native_HotReloadCallback] Hot reload completed for: " << assemblyPath);
+
+    ECS::ScriptManager* scriptMgr = Engine::CORE->GetScriptManager();
+    if (!scriptMgr) {
+        LOG_ERROR("[Native_HotReloadCallback] ScriptManager not available");
+        return;
+    }
+
+    // Notify script manager of hot reload completion
+    scriptMgr->HandleHotReloadCompletion(assemblyPath);
+}
+
 void ECS::ScriptManager::SetCompileStatus(int status, int progress, const char* message)
 {
     std::lock_guard<std::mutex> lock(m_compileMutex);
     m_compileStatus = status;
     m_compileProgress = progress;
-    m_compileMessage = message ? std::string(message) : std::string();
+    m_compileMessage = message ? message : "";
 }
 
 void ECS::ScriptManager::GetCompileStatus(int& outStatus, int& outProgress, std::string& outMessage)

@@ -169,13 +169,31 @@ internal static class SystemDiscovery
 
     /// <summary>
     /// Clear all discovered systems and instances.
-    /// Used during assembly reload.
+    /// Used during assembly reload. Disposes IDisposable instances first.
     /// </summary>
     public static void ClearDiscoveredSystems()
     {
+        // Try to dispose instances that implement IDisposable
+        foreach (var instance in _systemInstances.Values)
+        {
+            try
+            {
+                if (instance is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.LogInternal($"[SystemDiscovery] Error disposing system instance: {ex.Message}", LogLevel.Warning);
+            }
+        }
+
         _systemTypes.Clear();
         _systemInstances.Clear();
         _nextSystemHandle = 1;
+        
+        Logging.LogInternal($"[SystemDiscovery] Cleared all discovered systems and instances", LogLevel.Info);
     }
 
     /// <summary>

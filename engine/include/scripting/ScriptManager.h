@@ -36,6 +36,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <functional>
 
 // CoreCLR handle
 using hostfxr_handle = void*;
@@ -145,6 +146,26 @@ namespace ECS {
          */
         bool ReloadAssembly(const std::string& assemblyPath);
 
+        /**
+         * @brief Handle hot reload completion (called by C# when reload finishes).
+         * @param assemblyPath Path to the reloaded assembly
+         * 
+         * Unregisters old systems (calling OnDestroy) and re-discovers/registers new systems.
+         * This is invoked by the managed runtime when hot reload completes.
+         */
+        void HandleHotReloadCompletion(const std::string& assemblyPath);
+
+        /**
+         * @brief Register a callback to be invoked when hot reload completes.
+         * @param callback Function pointer to call with assembly path
+         * 
+         * The callback receives the assembly path that was reloaded.
+         * This is typically called by the editor to re-discover and re-register systems.
+         */
+        void SetHotReloadCallback(std::function<void(const std::string&)> callback) {
+            m_hotReloadCallback = callback;
+        }
+
         // ====================================================================
         // System Discovery and Registration
         // ====================================================================
@@ -161,14 +182,14 @@ namespace ECS {
         /**
          * @brief Discover and register scripted systems with SystemManager.
          * @param systemManager The global system manager
+         * @param world Optional World to pass to RegisterScriptedSystem for immediate OnCreate
          * @return Number of systems registered
          * 
          * Convenience method that discovers systems and registers them
-         * in one call. Equivalent to:
-         *   auto systems = DiscoverScriptedSystems();
-         *   for (auto* sys : systems) systemManager.RegisterScriptedSystem(sys);
+         * in one call. If world is provided, OnCreate is called immediately.
+         * Otherwise, OnCreate must be called separately via CreateAll().
          */
-        int RegisterScriptedSystems(SystemManager& systemManager);
+        int RegisterScriptedSystems(SystemManager& systemManager, ECS::World* world = nullptr);
 
         // ====================================================================
         // Compilation Support (Roslyn integration)
@@ -247,6 +268,8 @@ namespace ECS {
         inline auto GetCallSystemOnDestroy() const { return m_callSystemOnDestroy; }
         inline auto GetGetSystemMetadata() const { return m_getSystemMetadata; }
         inline auto GetGetSystemComponentAccesses() const { return m_getSystemComponentAccesses; }
+        inline auto GetDeserializeComponentFromJson() const { return m_deserializeComponentFromJson; }
+        inline auto GetSetOutputAssemblyPath() const { return m_setOutputAssemblyPath; }
 
         // --------------------------------------------------------------------
         // Convenience native wrappers used by engine code
@@ -297,6 +320,9 @@ namespace ECS {
         using GetLastDiagnosticsCountFn         = int(*)();
         using GetLastDiagnosticAtFn             = void*(*)(int index);
         using FreeManagedStringFn               = void(*)(void* ptr);
+        using RegisterHotReloadCallbackFn       = void(*)(void* callbackPtr);  // Register C++ callback for reload notifications
+        using DeserializeComponentFromJsonFn    = void(*)(uint32_t typeHash, void* componentPtr, int size, const char* jsonStr);  // Deserialize component from JSON
+        using SetOutputAssemblyPathFn           = void(*)(const char* outputPath);  // Set the standardized output path for compiled scripts
 
         // Managed function delegates
         LoadAssemblyFn                      m_loadAssembly = nullptr;
@@ -321,6 +347,9 @@ namespace ECS {
         GenerateCsProjFn                    m_generateCsProj = nullptr;
         HashComponentTypeNameFn             m_hashComponentTypeName = nullptr;
         ResolveSystemGroupFn                m_resolveSystemGroup = nullptr;
+        RegisterHotReloadCallbackFn         m_registerHotReloadCallback = nullptr;
+        DeserializeComponentFromJsonFn      m_deserializeComponentFromJson = nullptr;
+        SetOutputAssemblyPathFn             m_setOutputAssemblyPath = nullptr;
         
         // File-watcher managed delegates (Start/Stop) and setter for native compile callback
         using StartWatchingFn                   = int(*)(const char* directoryPath, void* userData);
@@ -344,6 +373,9 @@ namespace ECS {
         int m_compileProgress = -1; // -1 = indeterminate, 0-100 progress
         std::string m_compileMessage;
         std::mutex m_compileMutex;
+
+        // Hot reload callback registered by editor
+        std::function<void(const std::string&)> m_hotReloadCallback = nullptr;
 
         // ====================================================================
         // Helper Methods

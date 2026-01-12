@@ -132,6 +132,7 @@ namespace ECS {
         /**
          * @brief Register a C# scripted system.
          * @param system Raw pointer to C# system wrapper (managed externally)
+         * @param world Optional World to call OnCreate immediately (nullptr = defer)
          * 
          * METADATA PRIORITY SYSTEM:
          * The system's execution group is resolved using the metadata priority system.
@@ -139,8 +140,11 @@ namespace ECS {
          * 
          * For C# systems, the lifetime is managed by the scripting layer.
          * The system is not owned by SystemManager.
+         * 
+         * If world is provided, OnCreate() is called immediately on registration.
+         * Otherwise, OnCreate() must be called separately via CreateAll().
          */
-        void RegisterScriptedSystem(ISystem* system) {
+        void RegisterScriptedSystem(ISystem* system, World* world = nullptr) {
             if (!system) return;
 
             const auto& metadata = system->GetMetadata();
@@ -150,6 +154,11 @@ namespace ECS {
             m_systemsByName[metadata.GetName()] = system;
 
             _sortSystemGroup(group);
+            
+            // If world is provided, initialize the system immediately
+            if (world) {
+                system->OnCreate(*world);
+            }
         }
 
         /**
@@ -224,6 +233,31 @@ namespace ECS {
                     system->OnDestroy(world);
                 }
             }
+        }
+
+        /**
+         * @brief Unregister all scripted systems.
+         * @param world World to pass to OnDestroy
+         * 
+         * Calls OnDestroy() on all scripted systems and removes them from
+         * the SystemManager. Used during hot reload to clean up old systems
+         * before reloading new ones.
+         */
+        void UnregisterScriptedSystems(World& world) {
+            // Call OnDestroy on all scripted systems
+            for (auto& [group, systems] : m_scriptedSystemGroups) {
+                for (auto* system : systems) {
+                    if (system) {
+                        system->OnDestroy(world);
+                        // Remove from name map
+                        const auto& metadata = system->GetMetadata();
+                        m_systemsByName.erase(metadata.GetName());
+                    }
+                }
+            }
+
+            // Clear all scripted system groups
+            m_scriptedSystemGroups.clear();
         }
 
         /**

@@ -29,6 +29,18 @@ This registry is only responsible for UI presentation.
 #include <nlohmann/json.hpp>
 #include <imgui.h> 
 
+// Callback function pointer for deserializing C# components from JSON
+// Called when editor applies component property changes to entities at runtime
+using DeserializeComponentCallback = void(*)(ECS::ComponentTypeId id, void* componentPtr, int size, const char* jsonStr);
+static DeserializeComponentCallback s_deserializeComponentCallback = nullptr;
+
+// Function to register the deserialize callback from managed code
+extern "C" void RegisterComponentDeserializeCallback(DeserializeComponentCallback callback)
+{
+    s_deserializeComponentCallback = callback;
+    LOG_INFO("[EditorComponentRegistry] Component deserialize callback registered");
+}
+
 /* 
 Helper macro to reduce repetition when registering components
 
@@ -323,7 +335,6 @@ static auto& _getCppComponentDefaults() {
 static std::vector<ComponentUIMetadata> s_registry;
 static std::mutex s_registryLock;
 
-// Initialize registry with hardcoded C++ components
 static void _initializeDefaultRegistry() {
     if (!s_registry.empty()) return;  // Already initialized
     
@@ -334,7 +345,7 @@ static void _initializeDefaultRegistry() {
         // Transform: cannot be deleted (every entity has one)
         {
             "Transform", "LocalTransform", "ECS::Components::LocalTransform",
-            ECS::ComponentRegistry::Type<LocalTransform>(), false,
+            ECS::ComponentRegistry::Type<LocalTransform>(), false, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLocalTransform(d, e, w); },
             []() { return nlohmann::json{
                 {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
@@ -346,7 +357,7 @@ static void _initializeDefaultRegistry() {
         // Name
         {
             "Name", "Name", "ECS::Components::Name",
-            ECS::ComponentRegistry::Type<Name>(), true,
+            ECS::ComponentRegistry::Type<Name>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderName(d, e, w); },
             []() { return nlohmann::json{{"Value", "Entity"}}; },
             COMPONENT_OPS(Name)
@@ -354,7 +365,7 @@ static void _initializeDefaultRegistry() {
         // Active
         {
             "Active", "Active", "ECS::Components::Active",
-            ECS::ComponentRegistry::Type<Active>(), true,
+            ECS::ComponentRegistry::Type<Active>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderActive(d, e, w); },
             []() { return nlohmann::json{{"Enabled", true}}; },
             COMPONENT_OPS(Active)
@@ -362,7 +373,7 @@ static void _initializeDefaultRegistry() {
         // Tag Mask
         {
             "Tag Mask", "TagMask", "ECS::Components::TagMask",
-            ECS::ComponentRegistry::Type<TagMask>(), true,
+            ECS::ComponentRegistry::Type<TagMask>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTagMask(d, e, w); },
             []() { return nlohmann::json{{"Mask", 0}}; },
             COMPONENT_OPS(TagMask)
@@ -370,7 +381,7 @@ static void _initializeDefaultRegistry() {
         // Camera 3D
         {
             "Camera 3D", "Camera3D", "ECS::Components::Camera3D",
-            ECS::ComponentRegistry::Type<Camera3D>(), true,
+            ECS::ComponentRegistry::Type<Camera3D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCamera3D(d, e, w); },
             []() { return nlohmann::json{
                 {"UsePerspective", false}, {"FOV", 45.0f}, {"NearPlane", 0.1f},
@@ -382,7 +393,7 @@ static void _initializeDefaultRegistry() {
         // Sprite Renderer 2D
         {
             "Sprite Renderer 2D", "SpriteRenderer2D", "ECS::Components::SpriteRenderer2D",
-            ECS::ComponentRegistry::Type<SpriteRenderer2D>(), true,
+            ECS::ComponentRegistry::Type<SpriteRenderer2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteRenderer2D(d, e, w); },
             []() { return nlohmann::json{
                 {"TextureId", 0},
@@ -396,7 +407,7 @@ static void _initializeDefaultRegistry() {
         // Sprite Sheet Animation 2D
         {
             "Sprite Sheet Animation 2D", "SpriteSheetAnimation2D", "ECS::Components::SpriteSheetAnimation2D",
-            ECS::ComponentRegistry::Type<SpriteSheetAnimation2D>(), true,
+            ECS::ComponentRegistry::Type<SpriteSheetAnimation2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteSheetAnimation2D(d, e, w); },
             []() { return nlohmann::json{
                 {"TextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
@@ -409,7 +420,7 @@ static void _initializeDefaultRegistry() {
         // Z-Index 2D
         {
             "Z-Index 2D", "ZIndex2D", "ECS::Components::ZIndex2D",
-            ECS::ComponentRegistry::Type<ZIndex2D>(), true,
+            ECS::ComponentRegistry::Type<ZIndex2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderZIndex2D(d, e, w); },
             []() { return nlohmann::json{{"ZOrder", 0}}; },
             COMPONENT_OPS(ZIndex2D)
@@ -417,7 +428,7 @@ static void _initializeDefaultRegistry() {
         // Rigidbody 2D
         {
             "Rigidbody 2D", "Rigidbody2D", "ECS::Components::Rigidbody2D",
-            ECS::ComponentRegistry::Type<Rigidbody2D>(), true,
+            ECS::ComponentRegistry::Type<Rigidbody2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderRigidbody2D(d, e, w); },
             []() { return nlohmann::json{
                 {"Mass", 1.0f}, {"InverseMass", 1.0f},
@@ -429,7 +440,7 @@ static void _initializeDefaultRegistry() {
         // Linear Velocity 2D
         {
             "Linear Velocity 2D", "LinearVelocity2D", "ECS::Components::LinearVelocity2D",
-            ECS::ComponentRegistry::Type<LinearVelocity2D>(), true,
+            ECS::ComponentRegistry::Type<LinearVelocity2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLinearVelocity2D(d, e, w); },
             []() { return nlohmann::json{{"Value", {{"X", 0.0f}, {"Y", 0.0f}}}}; },
             COMPONENT_OPS(LinearVelocity2D)
@@ -437,7 +448,7 @@ static void _initializeDefaultRegistry() {
         // Angular Velocity 2D
         {
             "Angular Velocity 2D", "AngularVelocity2D", "ECS::Components::AngularVelocity2D",
-            ECS::ComponentRegistry::Type<AngularVelocity2D>(), true,
+            ECS::ComponentRegistry::Type<AngularVelocity2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAngularVelocity2D(d, e, w); },
             []() { return nlohmann::json{{"Value", 0.0f}}; },
             COMPONENT_OPS(AngularVelocity2D)
@@ -445,7 +456,7 @@ static void _initializeDefaultRegistry() {
         // Acceleration 2D
         {
             "Acceleration 2D", "Acceleration2D", "ECS::Components::Acceleration2D",
-            ECS::ComponentRegistry::Type<Acceleration2D>(), true,
+            ECS::ComponentRegistry::Type<Acceleration2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAcceleration2D(d, e, w); },
             []() { return nlohmann::json{{"Value", {{"X", 0.0f}, {"Y", 0.0f}}}}; },
             COMPONENT_OPS(Acceleration2D)
@@ -453,7 +464,7 @@ static void _initializeDefaultRegistry() {
         // Physics Material 2D
         {
             "Physics Material 2D", "PhysicsMaterial2D", "ECS::Components::PhysicsMaterial2D",
-            ECS::ComponentRegistry::Type<PhysicsMaterial2D>(), true,
+            ECS::ComponentRegistry::Type<PhysicsMaterial2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderPhysicsMaterial2D(d, e, w); },
             []() { return nlohmann::json{
                 {"Friction", 0.5f}, {"Restitution", 0.0f}, {"PositionCorrectPercent", 0.2f}
@@ -463,7 +474,7 @@ static void _initializeDefaultRegistry() {
         // Circle Collider 2D
         {
             "Circle Collider 2D", "CircleCollider2D", "ECS::Components::CircleCollider2D",
-            ECS::ComponentRegistry::Type<CircleCollider2D>(), true,
+            ECS::ComponentRegistry::Type<CircleCollider2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCircleCollider2D(d, e, w); },
             []() { return nlohmann::json{
                 {"Radius", 0.5f},
@@ -475,7 +486,7 @@ static void _initializeDefaultRegistry() {
         // Box Collider 2D
         {
             "Box Collider 2D", "BoxCollider2D", "ECS::Components::BoxCollider2D",
-            ECS::ComponentRegistry::Type<BoxCollider2D>(), true,
+            ECS::ComponentRegistry::Type<BoxCollider2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderBoxCollider2D(d, e, w); },
             []() { return nlohmann::json{
                 {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
@@ -488,7 +499,7 @@ static void _initializeDefaultRegistry() {
         // Shape Circle 2D
         {
             "Shape Circle", "ShapeCircle2D", "ECS::Components::ShapeCircle2D",
-            ECS::ComponentRegistry::Type<ShapeCircle2D>(), true,
+            ECS::ComponentRegistry::Type<ShapeCircle2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeCircle2D(d, e, w); },
             []() { return nlohmann::json{
                 {"Radius", 0.5f},
@@ -501,7 +512,7 @@ static void _initializeDefaultRegistry() {
         // Shape Box 2D
         {
             "Shape Box", "ShapeBox2D", "ECS::Components::ShapeBox2D",
-            ECS::ComponentRegistry::Type<ShapeBox2D>(), true,
+            ECS::ComponentRegistry::Type<ShapeBox2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeBox2D(d, e, w); },
             []() { return nlohmann::json{
                 {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
@@ -514,7 +525,7 @@ static void _initializeDefaultRegistry() {
         // Shape Line 2D
         {
             "Shape Line", "ShapeLine2D", "ECS::Components::ShapeLine2D",
-            ECS::ComponentRegistry::Type<ShapeLine2D>(), true,
+            ECS::ComponentRegistry::Type<ShapeLine2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeLine2D(d, e, w); },
             []() { return nlohmann::json{
                 {"A", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -527,7 +538,7 @@ static void _initializeDefaultRegistry() {
         // Light 2D
         {
             "Light 2D", "Light2D", "ECS::Components::Light2D",
-            ECS::ComponentRegistry::Type<Light2D>(), true,
+            ECS::ComponentRegistry::Type<Light2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLight2D(d, e, w); },
             []() { return nlohmann::json{
                 {"LightType", 0},
@@ -541,7 +552,7 @@ static void _initializeDefaultRegistry() {
         // Animation State 2D
         {
             "Animation State 2D", "AnimationState2D", "ECS::Components::AnimationState2D",
-            ECS::ComponentRegistry::Type<AnimationState2D>(), true,
+            ECS::ComponentRegistry::Type<AnimationState2D>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationState2D(d, e, w); },
             []() { return nlohmann::json{
                 {"CurrentFrame", 0}, {"TimeAccumulator", 0.0f}, {"Finished", false}
@@ -551,7 +562,7 @@ static void _initializeDefaultRegistry() {
         // Audio Source
         {
             "Audio Source", "AudioSource", "ECS::Components::AudioSource",
-            ECS::ComponentRegistry::Type<AudioSource>(), true,
+            ECS::ComponentRegistry::Type<AudioSource>(), true, true,
             [](ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w) { ui.RenderAudioSource(data, e, w); },
             []() { return nlohmann::json{
                 { "CueId", 0 },
@@ -566,7 +577,7 @@ static void _initializeDefaultRegistry() {
         // Layer
         {
             "Layer 2D", "Layer", "ECS::Components::Layer",
-            ECS::ComponentRegistry::Type<Layer>(), true,
+            ECS::ComponentRegistry::Type<Layer>(), true, true,
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); },
             []() { return nlohmann::json{{"Id", 0}}; },
             COMPONENT_OPS(Layer)
@@ -579,8 +590,21 @@ static void _initializeDefaultRegistry() {
 void ComponentRegistryUI::RebuildFromNativeRegistry() {
     std::lock_guard<std::mutex> lock(s_registryLock);
     
-    // Initialize with hardcoded C++ components first
-    _initializeDefaultRegistry();
+    // First, remove all C# components (those with IsBuiltin = false)
+    // Keep only hardcoded C++ components (IsBuiltin = true)
+    auto newEnd = std::remove_if(s_registry.begin(), s_registry.end(),
+        [](const ComponentUIMetadata& meta) {
+            return !meta.IsBuiltin;  // Remove non-builtin (C#) components
+        }
+    );
+    s_registry.erase(newEnd, s_registry.end());
+    
+    LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry: Cleared old C# components, keeping " << s_registry.size() << " hardcoded C++ components");
+    
+    // Initialize with hardcoded C++ components on first call
+    if (s_registry.empty()) {
+        _initializeDefaultRegistry();
+    }
     
     // Get all registered component IDs from the native registry
     auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
@@ -592,9 +616,6 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         if (aname.empty()) aname = "<no-name>";
         LOG_INFO("[EditorComponentRegistry]   NativeID " << aid << " hash=0x" << std::hex << ameta.TypeHash << std::dec << " size=" << ameta.Size << " name=" << aname);
     }
-    
-    // Debug: log the hardcoded registry count
-    LOG_INFO("[EditorComponentRegistry] Hardcoded C++ components in s_registry: " << s_registry.size());
     
     // Add C++ components that aren't hardcoded
     int newComponentsFound = 0;
@@ -688,14 +709,34 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         
         auto applyComponentFunc = [id](ECS::World* w, ECS::Entity e, const nlohmann::json& data) {
             if (!w) return;
+            
             const auto& meta = ECS::ComponentRegistry::Meta(id);
             void* componentPtr = w->GetRawComponentPtr(e, id);
+            
+            // If component doesn't exist, add it first
             if (!componentPtr) {
-                // Allocate zero-initialized buffer
                 std::vector<uint8_t> buffer(meta.Size, 0);
                 w->AddComponentById(e, id, buffer.data(), meta.Size);
+                componentPtr = w->GetRawComponentPtr(e, id);
+                
+                if (!componentPtr) {
+                    LOG_ERROR("[EditorComponentRegistry] Failed to add component for deserialization (ID " << id << ")");
+                    return;
+                }
             }
-            // TODO: Parse JSON data and copy into component buffer
+            
+            // Serialize the JSON to a string for the managed deserializer
+            std::string jsonStr = data.dump();
+            
+            // Call the managed deserializer to populate component fields from JSON
+            // Pass the type hash (not the component ID) so C# can look up the type
+            if (s_deserializeComponentCallback) {
+                s_deserializeComponentCallback(meta.TypeHash, componentPtr, meta.Size, jsonStr.c_str());
+                // LOG_INFO("[EditorComponentRegistry] Applied C# component (ID " << id << ", hash 0x" << std::hex << meta.TypeHash << std::dec << ") from JSON data");
+            }
+            else {
+                LOG_WARNING("[EditorComponentRegistry] No deserialize callback available for C# component (ID " << id << ")");
+            }
         };
         
         // Add to registry with generic renderer
@@ -705,12 +746,13 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             typeName,
             id,
             true,  // C# components can be deleted
+            false,  // IsBuiltin - false because this is a dynamically discovered C# component
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); },
             []() { return nlohmann::json::object(); },
-            hasComponentFunc,
-            addComponentFunc,
-            removeComponentFunc,
-            applyComponentFunc
+            static_cast<std::function<bool(ECS::World*, ECS::Entity)>>(hasComponentFunc),
+            static_cast<std::function<void(ECS::World*, ECS::Entity, const nlohmann::json&)>>(addComponentFunc),
+            static_cast<std::function<void(ECS::World*, ECS::Entity)>>(removeComponentFunc),
+            static_cast<std::function<void(ECS::World*, ECS::Entity, const nlohmann::json&)>>(applyComponentFunc)
         );
         
         LOG_INFO("[EditorComponentRegistry] Added C# component to editor registry: " << displayName << " (hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");

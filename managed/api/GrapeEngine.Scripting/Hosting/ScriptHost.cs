@@ -73,9 +73,47 @@ internal class ScriptLoadContext(string assemblyPath) : AssemblyLoadContext(isCo
 /// </summary>
 public static class ScriptHost
 {
+    /// <summary>
+    /// Delegate type for the native C++ callback function.
+    /// Called when hot reload completes with the reloaded assembly path.
+    /// </summary>
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void NativeHotReloadCallback(string assemblyPath);
 
     /// <summary>
-    /// Load a C# assembly containing scripted systems.
+    /// Callback function pointer passed from C++ native code.
+    /// </summary>
+    private static IntPtr _nativeHotReloadCallback = IntPtr.Zero;
+
+    /// <summary>
+    /// Register a callback to be invoked when hot reload completes.
+    /// Called from C++ to provide the native callback function pointer.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void RegisterHotReloadCallback(IntPtr callbackPtr)
+    {
+        _nativeHotReloadCallback = callbackPtr;
+        Logging.LogInternal("[ScriptHost] Hot reload callback registered", LogLevel.Info);
+    }
+
+    /// <summary>
+    /// Notify C++ that hot reload is complete by invoking the native callback.
+    /// </summary>
+    private static void NotifyHotReloadComplete(string assemblyPath)
+    {
+        if (_nativeHotReloadCallback != IntPtr.Zero)
+        {
+            try
+            {
+                var callback = Marshal.GetDelegateForFunctionPointer<NativeHotReloadCallback>(_nativeHotReloadCallback);
+                callback?.Invoke(assemblyPath);
+            }
+            catch (Exception ex)
+            {
+                Logging.LogInternal($"[ScriptHost] Error invoking hot reload callback: {ex.Message}", LogLevel.Error);
+            }
+        }
+    }
     /// Called from C++ ScriptManager::LoadAssembly()
     /// </summary>
     [UnmanagedCallersOnly]
@@ -170,14 +208,7 @@ public static class ScriptHost
             // Save state before unload
             StatePreserver.SaveAllSystemStates(assemblyPath);
 
-            // Unload existing assembly
-            if (!AssemblyManager.UnloadAssembly(assemblyPath))
-            {
-                Logging.LogInternal($"[ScriptHost] Warning: Failed to unload existing assembly during reload", LogLevel.Warning);
-            }
-
-            // Wait a bit for finalizers to complete
-            System.Threading.Thread.Sleep(100);
+            // TODO: Check if assembly is loaded; if not, just load it
 
             // Load new version
             if (AssemblyManager.LoadAssembly(assemblyPath) == null)
@@ -185,6 +216,9 @@ public static class ScriptHost
                 Logging.LogInternal($"[ScriptHost] Failed to load new assembly during reload", LogLevel.Error);
                 return -1;
             }
+
+            // Clear discovered systems before discovering new ones to avoid duplication
+            SystemDiscovery.ClearDiscoveredSystems();
 
             // Discover systems in newly loaded assembly
             Assembly? newAssembly = AssemblyManager.GetLoadedAssembly(assemblyPath);
@@ -195,6 +229,9 @@ public static class ScriptHost
 
             // Clean up saved state
             StatePreserver.ClearSavedState(assemblyPath);
+
+            // Notify C++ that reload is complete so it can re-discover and re-register systems
+            NotifyHotReloadComplete(assemblyPath);
 
             Logging.LogInternal($"[ScriptHost] Successfully reloaded: {assemblyPath}", LogLevel.Info);
             return 0; // Success
@@ -429,6 +466,25 @@ public static class ScriptHost
     {
         try
         {
+            // Unload the old assembly BEFORE compilation
+            // This releases the DLL file lock so we can overwrite it
+            Logging.LogInternal($"[ScriptHost] Unloading old assembly before recompilation: {outPath}", LogLevel.Info);
+            if (!AssemblyManager.UnloadAssembly(outPath))
+            {
+                Logging.LogInternal($"[ScriptHost] Warning: Failed to unload existing assembly before compilation", LogLevel.Warning);
+            }
+
+            // CRITICAL: Wait for CLR to fully release the file lock
+            // - GC.Collect() forces garbage collection (inside AssemblyManager.UnloadAssembly)
+            // - GC.WaitForPendingFinalizers() waits for finalizers (inside AssemblyManager.UnloadAssembly)
+            // - We do additional GC passes here to be extra sure
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect(); // Second pass to catch any objects freed by finalizers
+            
+            // Sleep to allow OS to release file handles
+            Thread.Sleep(300);
+
             int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
             if (res != 0)
             {
@@ -436,8 +492,17 @@ public static class ScriptHost
                 return res;
             }
 
+            // Use the actual compiled assembly path (may be versioned to avoid file locks)
+            string actualAssemblyPath = RoslynCompiler.GetLastCompiledAssemblyPath();
+            if (string.IsNullOrEmpty(actualAssemblyPath))
+            {
+                actualAssemblyPath = outPath; // Fallback to original path if versioning didn't happen
+            }
+
+            Logging.LogInternal($"[ScriptHost] Will reload assembly from: {actualAssemblyPath}", LogLevel.Info);
+
             // Reload the compiled assembly
-            return ReloadAssemblyInternal(outPath);
+            return ReloadAssemblyInternal(actualAssemblyPath);
         }
         catch (Exception ex)
         {
@@ -864,6 +929,57 @@ public static class ScriptHost
         catch (Exception ex)
         {
             Logging.LogInternal($"[ScriptHost] Error in OnDestroy: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Deserialize component data from JSON and apply to component in memory.
+    /// Called from the editor when component properties are modified at runtime.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void DeserializeComponentFromJson(uint typeHash, IntPtr componentPtr, int size, IntPtr jsonStrPtr)
+    {
+        try
+        {
+            if (componentPtr == IntPtr.Zero || size <= 0)
+            {
+                Logging.LogInternal("[ScriptHost] DeserializeComponentFromJson: Invalid component pointer or size", LogLevel.Warning);
+                return;
+            }
+
+            var jsonStr = Marshal.PtrToStringUTF8(jsonStrPtr) ?? "{}";
+
+            // Try to get the registered type for this hash
+            if (!ComponentDiscovery.TypeHashToType.TryGetValue(typeHash, out var componentType))
+            {
+                Logging.LogInternal($"[ScriptHost] DeserializeComponentFromJson: No type registered for hash 0x{typeHash:X8}", LogLevel.Warning);
+                return;
+            }
+
+            // Deserialize JSON to the component type using reflection
+            var options = new System.Text.Json.JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                // Allow reading properties that match fields
+                IncludeFields = true
+            };
+            
+            var deserializedObj = System.Text.Json.JsonSerializer.Deserialize(jsonStr, componentType, options);
+
+            if (deserializedObj == null)
+            {
+                Logging.LogInternal($"[ScriptHost] DeserializeComponentFromJson: Failed to deserialize type {componentType.Name}", LogLevel.Warning);
+                return;
+            }
+
+            // Copy the deserialized object back to the native component memory
+            // This works for both mutable structs and record structs
+            Marshal.StructureToPtr(deserializedObj, componentPtr, false);
+            // Logging.LogInternal($"[ScriptHost] Applied component {componentType.Name} from JSON", LogLevel.Info);
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in DeserializeComponentFromJson: {ex.Message}", LogLevel.Error);
         }
     }
 }

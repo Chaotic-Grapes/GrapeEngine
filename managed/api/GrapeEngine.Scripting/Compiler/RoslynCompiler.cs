@@ -15,6 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Reflection;
+using GrapeEngine.Scripting.Hosting;
 
 namespace GrapeEngine.Scripting.Compiler;
 
@@ -23,6 +24,9 @@ internal static class RoslynCompiler
     // Store diagnostics as a list of individual messages so callers can
     // choose how to present them (UI can enumerate, logs can summarize).
     private readonly static List<string> _lastDiagnosticsList = [];
+    
+    // Store the path to the last compiled assembly (may be versioned)
+    private static string _lastCompiledAssemblyPath = "";
 
     public static int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath, IEnumerable<string>? references = null)
     {
@@ -155,10 +159,30 @@ internal static class RoslynCompiler
                 try
                 {
                     var bytes = ms.ToArray();
-                    File.WriteAllBytes(outputAssemblyPath, bytes);
                     
-                    // Copy GrapeEngine.Scripting dependency to the same directory so it can be found
-                    var outputDir = Path.GetDirectoryName(outputAssemblyPath);
+                    // Use versioned assembly loading to avoid file-locking issues
+                    // Instead of overwriting GameScripts.dll, we create GameScripts_hotreload_1.dll, 
+                    // GameScripts_hotreload_2.dll, etc. This eliminates file locks when unloading old versions.
+                    string versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes);
+                    
+                    if (versionedPath == null)
+                    {
+                        _lastDiagnosticsList.Clear();
+                        string errMsg = $"Failed to write versioned assembly {outputAssemblyPath}.\nCheck AssemblyManager logs for details.";
+                        _lastDiagnosticsList.Add(errMsg);
+                        try 
+                        {
+                            Logging.Log(errMsg, LogLevel.Error);
+                        }
+                        catch { }
+                        return -1;
+                    }
+                    
+                    // Update the output path to point to the versioned assembly
+                    // The caller (TriggerCompileAndReloadManaged) will use this path to load the new version
+                    string outputDir = Path.GetDirectoryName(outputAssemblyPath) ?? "";
+                    
+                    // Copy GrapeEngine.Scripting dependency to the same directory so it can be found at runtime
                     if (!string.IsNullOrEmpty(outputDir))
                     {
                         try
@@ -177,15 +201,20 @@ internal static class RoslynCompiler
                             Logging.Log($"Warning: Failed to copy GrapeEngine.Scripting dependency: {depEx.Message}", LogLevel.Warning);
                         }
                     }
+                    
+                    // Store the versioned path for retrieval by the caller
+                    // This is a bit of a hack but avoids changing the public API
+                    _lastCompiledAssemblyPath = versionedPath;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // If we fail to write the file, record an error
+                    // If we fail to write the file, record an error with details
                     _lastDiagnosticsList.Clear();
-                    _lastDiagnosticsList.Add("Failed to write output assembly");
+                    string errMsg = $"Failed to write assembly {outputAssemblyPath}:\n{ex}";
+                    _lastDiagnosticsList.Add(errMsg);
                     try 
-                    { 
-                        Logging.Log("Failed to write output assembly", LogLevel.Error); 
+                    {
+                        Logging.Log(errMsg, LogLevel.Error);
                     }
                     catch { }
                     return -1;
@@ -203,6 +232,11 @@ internal static class RoslynCompiler
             try { Logging.Log(ex.ToString(), LogLevel.Error); } catch { }
             return -1;
         }
+    }
+
+    public static string GetLastCompiledAssemblyPath()
+    {
+        return _lastCompiledAssemblyPath;
     }
 
     public static string GetLastDiagnostics()

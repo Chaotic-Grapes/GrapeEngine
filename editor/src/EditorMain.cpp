@@ -25,6 +25,9 @@ Launches the application in editor mode with the level editor interface.
 #include "scripting/ScriptManager.h"
 #include "core/Logger.h"
 
+// Forward declare the component deserialize callback registration function
+extern "C" void RegisterComponentDeserializeCallback(void(*callback)(uint32_t, void*, int, const char*));
+
 /**
  * @brief Main entry point for the Grape Engine Level Editor
  */
@@ -56,6 +59,39 @@ int main() {
 
     // Initialize C# script compilation and hot reload watcher
     auto* scriptManager = engine.GetScriptManager();
+    
+    // Register hot reload callback so systems get reinitialized when scripts are reloaded
+    if (scriptManager && scriptManager->IsInitialized()) {
+        scriptManager->SetHotReloadCallback([&engine, &emptyWorld](const std::string& assemblyPath) {
+            LOG_INFO("[EditorMain] Hot reload callback triggered for: " << assemblyPath);
+            
+            // Unregister old C# systems (calls OnDestroy)
+            engine.GetSystemManager().UnregisterScriptedSystems(emptyWorld);
+            LOG_INFO("[EditorMain] Unregistered old scripted systems");
+            
+            // Re-discover and re-register C# systems
+            // Pass emptyWorld so OnCreate is called immediately during registration
+            int systemCount = engine.GetScriptManager()->RegisterScriptedSystems(engine.GetSystemManager(), &emptyWorld);
+            
+            if (systemCount > 0) {
+                LOG_INFO("[EditorMain] Hot reload: re-discovered and initialized " << systemCount << " C# systems");
+            }
+
+            // Rebuild the editor's component registry to reflect any changes to C# component structures
+            // This ensures the inspector shows the correct properties for updated components
+            ComponentRegistryUI::RebuildFromNativeRegistry();
+            LOG_INFO("[EditorMain] Rebuilt editor component registry after hot reload");
+        });
+        LOG_INFO("[EditorMain] Hot reload callback registered with ScriptManager");
+
+        // Register the component deserialization callback so C# components can be edited in the editor
+        auto deserializeCallback = scriptManager->GetDeserializeComponentFromJson();
+        if (deserializeCallback) {
+            RegisterComponentDeserializeCallback(deserializeCallback);
+            LOG_INFO("[EditorMain] Registered component deserialize callback with editor");
+        }
+    }
+
     // Background threads for compilation/progress (declared outer so we can join on shutdown)
     std::thread bgCompileThread;
     std::thread bgProgressThread;
@@ -75,6 +111,13 @@ int main() {
             std::filesystem::create_directories(tempRoot);
             shouldCleanTemp = true;
             std::filesystem::path scriptsOutput = tempRoot / "GameScripts.dll";
+            
+            // Set the standardized output path for hot reload watcher so compilations use consistent location
+            auto setOutputPath = scriptManager->GetSetOutputAssemblyPath();
+            if (setOutputPath) {
+                setOutputPath(scriptsOutput.string().c_str());
+                LOG_INFO("[EditorMain] Set output assembly path for hot reload: " << scriptsOutput.string());
+            }
             
             // Compile scripts after the editor has loaded, on a background thread,
             // so the UI becomes responsive immediately. A progress poller logs
@@ -100,7 +143,7 @@ int main() {
             });
 
             // Launch compilation on a worker thread so main loop can run immediately
-            std::thread compileThread([scriptManager, scriptsOutput, projectRoot, &engine, &compileDone]() mutable {
+            std::thread compileThread([scriptManager, scriptsOutput, projectRoot, &engine, &emptyWorld, &compileDone]() mutable {
                 std::string diagnostics;
                 try {
                     scriptManager->SetCompileStatus(1, 0, "Starting compilation");
@@ -117,7 +160,8 @@ int main() {
                             LOG_INFO("[EditorMain] Loaded compiled script assembly");
                             
                             // Register discovered C# systems with the SystemManager
-                            int systemCount = scriptManager->RegisterScriptedSystems(engine.GetSystemManager());
+                            // Pass emptyWorld so OnCreate is called immediately during registration
+                            int systemCount = scriptManager->RegisterScriptedSystems(engine.GetSystemManager(), &emptyWorld);
                             LOG_INFO("[EditorMain] Registered " << systemCount << " C# systems with SystemManager");
                             
                             // Rebuild the editor's component registry now that C# components are registered

@@ -30,6 +30,7 @@ public static class ScriptFileWatcher
     private static readonly Lock _lock = new();
     private static Action<string>? _onFileChanged;
     private static string? _watchedDirectory;
+    private static string? _outputAssemblyPath;  // Output path for compiled scripts
 
     // Native compile status callback (function pointer set by native ScriptManager)
     // Signature: void callback(int status, int progress, sbyte* messageUtf8)
@@ -38,9 +39,11 @@ public static class ScriptFileWatcher
     /// <summary>
     /// Start watching a directory for C# file changes.
     /// Called from C++ via interop.
+    /// directoryPathPtr: Source scripts directory to watch
+    /// userData: Reserved for future use (normally would be output path as string)
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe int StartWatching(char* directoryPathPtr, void* callbackPtr)
+    public static unsafe int StartWatching(char* directoryPathPtr, void* userData)
     {
         try
         {
@@ -99,6 +102,20 @@ public static class ScriptFileWatcher
     public static unsafe void SetCompileCallback(nint callbackPtr)
     {
         _compileCallback = (delegate* unmanaged[Cdecl]<int, int, sbyte*, void>)callbackPtr;
+    }
+
+    /// <summary>
+    /// Set the output assembly path for hot reload compilations.
+    /// Called from C++ to standardize where compiled scripts are written.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static unsafe void SetOutputAssemblyPath(char* outputPathPtr)
+    {
+        if (outputPathPtr != null)
+        {
+            _outputAssemblyPath = Marshal.PtrToStringUTF8((IntPtr)outputPathPtr);
+            Logging.LogInternal($"[ScriptFileWatcher] Output assembly path set to: {_outputAssemblyPath}", LogLevel.Info);
+        }
     }
 
     /// <summary>
@@ -189,8 +206,12 @@ public static class ScriptFileWatcher
         {
             if (!string.IsNullOrEmpty(_watchedDirectory))
             {
-                // Default output assembly path inside watched dir
-                string outPath = Path.Combine(_watchedDirectory, "CompiledScripts.dll");
+                // Use the output assembly path if set, otherwise default to temp location
+                // For consistency, this should always be set to the temp path by C++
+                string outPath = !string.IsNullOrEmpty(_outputAssemblyPath) 
+                    ? _outputAssemblyPath
+                    : Path.Combine(_watchedDirectory, "GameScripts.dll");
+                    
                 Logging.LogInternal($"[ScriptFileWatcher] Hot reload triggered - compiling and reloading: {_watchedDirectory} -> {outPath}", LogLevel.Info);
 
                 // Notify native that compilation started (status 1, progress indeterminate (-1))
