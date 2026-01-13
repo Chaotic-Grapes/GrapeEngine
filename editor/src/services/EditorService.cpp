@@ -291,14 +291,16 @@ void EditorService::Render() {
         }
         Input::ClearCharInput();
 
+        // Start the ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui::NewFrame();
         
-        m_levelEditor->Update(); 
-        m_levelEditor->Render(); 
-        
-        ImGui::Render();
+        m_levelEditor->Update();
+        m_levelEditor->Render();
+
         ImGui::EndFrame();
+        ImGui::Render();
+        
         auto* drawData = ImGui::GetDrawData();
         if (drawData)
             ImGui_ImplOpenGL3_RenderDrawData(drawData);
