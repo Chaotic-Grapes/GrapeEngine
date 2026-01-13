@@ -103,6 +103,19 @@ public static partial class ComponentRegistry
     }
 
     /// <summary>
+    /// Clear the component registry cache.
+    /// Called during hot reload to allow re-registration of modified component types.
+    /// </summary>
+    internal static void ClearRegistrationCache()
+    {
+        lock (_lock)
+        {
+            _registeredHashes.Clear();
+            Logging.LogInternal("[ComponentRegistry] Cleared registration cache for hot reload", LogLevel.Info);
+        }
+    }
+
+    /// <summary>
     /// Get alignment requirement for a type.
     /// </summary>
     private static unsafe int GetAlignment<T>() where T : unmanaged

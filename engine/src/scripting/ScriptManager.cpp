@@ -533,7 +533,34 @@ namespace ECS {
                     }
 
                     // Check if output assembly was created (success indicator)
-                    if (!std::filesystem::exists(outputAssembly)) {
+                    // Note: The compiler may write to a versioned path (GameScripts_hotreload_1.dll),
+                    // so we query the actual compiled path instead of checking the original output path.
+                    if (m_getLastCompiledAssemblyPath) {
+                        void* pathPtr = m_getLastCompiledAssemblyPath();
+                        if (pathPtr == nullptr) {
+                            std::string errMsg = "Compilation reported success, but no compiled assembly path was returned";
+                            LOG_ERROR(errMsg);
+                            {
+                                std::lock_guard<std::mutex> lock(m_compileMutex);
+                                m_compileMessage = errMsg;
+                            }
+                            return false;
+                        }
+                        const char* compiledPath = static_cast<const char*>(pathPtr);
+                        std::string compiledPathStr(compiledPath ? compiledPath : "");
+                        m_freeManagedString(pathPtr);
+
+                        if (compiledPathStr.empty() || !std::filesystem::exists(compiledPathStr)) {
+                            std::string summary = SummarizeDiagnostics(outDiagnostics);
+                            LOG_ERROR("Compilation failed (no output assembly at " << compiledPathStr << "): " << summary);
+                            {
+                                std::lock_guard<std::mutex> lock(m_compileMutex);
+                                m_compileMessage = outDiagnostics;
+                            }
+                            return false;
+                        }
+                    } else if (!std::filesystem::exists(outputAssembly)) {
+                        // Fallback if GetLastCompiledAssemblyPath is not available
                         std::string summary = SummarizeDiagnostics(outDiagnostics);
                         LOG_ERROR("Compilation failed (no output assembly): " << summary);
                         {
@@ -871,6 +898,7 @@ namespace ECS {
         success &= loadMethod("GetLastDiagnosticsCount",          scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticsCount));
         success &= loadMethod("GetLastDiagnosticAt",              scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticAt));
         success &= loadMethod("FreeStringFromManaged",            scriptHostTypeName, reinterpret_cast<void**>(&m_freeManagedString));
+        success &= loadMethod("GetLastCompiledAssemblyPath",      scriptHostTypeName, reinterpret_cast<void**>(&m_getLastCompiledAssemblyPath));
         success &= loadMethod("RegisterHotReloadCallback",        scriptHostTypeName, reinterpret_cast<void**>(&m_registerHotReloadCallback));
         success &= loadMethod("DeserializeComponentFromJson",     scriptHostTypeName, reinterpret_cast<void**>(&m_deserializeComponentFromJson));
 

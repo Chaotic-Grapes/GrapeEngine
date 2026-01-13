@@ -33,6 +33,33 @@ internal static class StatePreserver
     /// </summary>
     private static readonly Dictionary<string, Dictionary<string, byte[]?>> _savedSystemStateByAssemblyPath = [];
 
+    private static string NormalizeAssemblyKey(string assemblyPath)
+    {
+        if (string.IsNullOrWhiteSpace(assemblyPath))
+            return assemblyPath;
+
+        try
+        {
+            assemblyPath = Path.GetFullPath(assemblyPath);
+        }
+        catch
+        {
+            // Best-effort normalization; keep original string.
+        }
+
+        string dir = Path.GetDirectoryName(assemblyPath) ?? "";
+        string filename = Path.GetFileNameWithoutExtension(assemblyPath);
+        string ext = Path.GetExtension(assemblyPath);
+
+        int hotreloadIndex = filename.LastIndexOf("_hotreload_", StringComparison.OrdinalIgnoreCase);
+        if (hotreloadIndex > 0)
+        {
+            filename = filename.Substring(0, hotreloadIndex);
+        }
+
+        return Path.Combine(dir, filename + ext);
+    }
+
     /// <summary>
     /// Save state from all IHotReloadable systems before unload.
     /// 
@@ -44,6 +71,7 @@ internal static class StatePreserver
     {
         try
         {
+            assemblyPath = NormalizeAssemblyKey(assemblyPath);
             var stateDict = new Dictionary<string, byte[]?>();
 
             foreach (var (handle, instance) in SystemDiscovery.GetAllSystemInstances())
@@ -92,6 +120,7 @@ internal static class StatePreserver
     {
         try
         {
+            assemblyPath = NormalizeAssemblyKey(assemblyPath);
             if (instance is not IHotReloadable hotReloadable)
             {
                 return; // Not a hot-reloadable system
@@ -141,7 +170,7 @@ internal static class StatePreserver
     {
         if (assemblyPath != null)
         {
-            _savedSystemStateByAssemblyPath.Remove(assemblyPath);
+            _savedSystemStateByAssemblyPath.Remove(NormalizeAssemblyKey(assemblyPath));
         }
         else
         {

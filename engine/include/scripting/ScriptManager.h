@@ -320,6 +320,7 @@ namespace ECS {
         using GetLastDiagnosticsCountFn         = int(*)();
         using GetLastDiagnosticAtFn             = void*(*)(int index);
         using FreeManagedStringFn               = void(*)(void* ptr);
+        using GetLastCompiledAssemblyPathFn     = void*(*)();  // Returns UTF8 path to last compiled assembly (may be versioned), must free with FreeManagedStringFn
         using RegisterHotReloadCallbackFn       = void(*)(void* callbackPtr);  // Register C++ callback for reload notifications
         using DeserializeComponentFromJsonFn    = void(*)(uint32_t typeHash, void* componentPtr, int size, const char* jsonStr);  // Deserialize component from JSON
         using SetOutputAssemblyPathFn           = void(*)(const char* outputPath);  // Set the standardized output path for compiled scripts
@@ -342,6 +343,7 @@ namespace ECS {
         GetLastDiagnosticsCountFn           m_getLastDiagnosticsCount = nullptr;
         GetLastDiagnosticAtFn               m_getLastDiagnosticAt = nullptr;
         FreeManagedStringFn                 m_freeManagedString = nullptr;
+        GetLastCompiledAssemblyPathFn       m_getLastCompiledAssemblyPath = nullptr;
         ReloadAssemblyFn                    m_reloadAssembly = nullptr;
         CompileAndReloadFn                  m_compileAndReload = nullptr;
         GenerateCsProjFn                    m_generateCsProj = nullptr;

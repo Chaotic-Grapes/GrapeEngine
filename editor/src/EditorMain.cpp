@@ -65,6 +65,13 @@ int main() {
         scriptManager->SetHotReloadCallback([&engine, &emptyWorld](const std::string& assemblyPath) {
             LOG_INFO("[EditorMain] Hot reload callback triggered for: " << assemblyPath);
             
+            // IMPORTANT: Clear all entities to ensure component schema changes are applied
+            // When hot reload updates component types (added/removed/modified fields),
+            // existing entity instances still have the old binary layout.
+            // Clearing entities forces them to be recreated with the new schema.
+            emptyWorld.Clear();
+            LOG_INFO("[EditorMain] Cleared all entities to sync with updated component schema");
+            
             // Unregister old C# systems (calls OnDestroy)
             engine.GetSystemManager().UnregisterScriptedSystems(emptyWorld);
             LOG_INFO("[EditorMain] Unregistered old scripted systems");

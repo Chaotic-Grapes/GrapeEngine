@@ -27,6 +27,9 @@ internal static class RoslynCompiler
     
     // Store the path to the last compiled assembly (may be versioned)
     private static string _lastCompiledAssemblyPath = "";
+    
+    // Store the last compiled PDB bytes for retrieval
+    private static byte[]? _lastCompiledPdbBytes = null;
 
     public static int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath, IEnumerable<string>? references = null)
     {
@@ -57,10 +60,13 @@ internal static class RoslynCompiler
             var syntaxTrees = new List<SyntaxTree>();
             foreach (var file in csFiles)
             {
-                // Read source code
-                var src = File.ReadAllText(file);
-                // Parse and add to syntax trees
-                syntaxTrees.Add(CSharpSyntaxTree.ParseText(src, path: file));
+                // Read source code with encoding for PDB emission
+                var sourceText = Microsoft.CodeAnalysis.Text.SourceText.From(
+                    File.ReadAllText(file), 
+                    System.Text.Encoding.UTF8);
+                
+                // Parse and add to syntax trees with encoding metadata
+                syntaxTrees.Add(CSharpSyntaxTree.ParseText(sourceText, path: file));
             }
 
             var assemblyName = Path.GetFileNameWithoutExtension(outputAssemblyPath);
@@ -115,8 +121,9 @@ internal static class RoslynCompiler
             // if the compilation actually succeeds. This prevents producing a
             // corrupt/partial assembly when there are errors.
             using (var ms = new MemoryStream())
+            using (var pdbStream = new MemoryStream())
             {
-                var emitResult = compilation.Emit(ms);
+                var emitResult = compilation.Emit(ms, pdbStream);
                 if (!emitResult.Success)
                 {
                     _lastDiagnosticsList.Clear();
@@ -159,11 +166,15 @@ internal static class RoslynCompiler
                 try
                 {
                     var bytes = ms.ToArray();
+                    var pdbBytes = pdbStream.ToArray();
+                    
+                    // Store PDB bytes for retrieval
+                    _lastCompiledPdbBytes = pdbBytes.Length > 0 ? pdbBytes : null;
                     
                     // Use versioned assembly loading to avoid file-locking issues
                     // Instead of overwriting GameScripts.dll, we create GameScripts_hotreload_1.dll, 
                     // GameScripts_hotreload_2.dll, etc. This eliminates file locks when unloading old versions.
-                    string versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes);
+                    string versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes, pdbBytes);
                     
                     if (versionedPath == null)
                     {
@@ -257,5 +268,10 @@ internal static class RoslynCompiler
         if (_lastDiagnosticsList == null) return null;
         if (index < 0 || index >= _lastDiagnosticsList.Count) return null;
         return _lastDiagnosticsList[index];
+    }
+
+    public static byte[]? GetLastCompiledPdbBytes()
+    {
+        return _lastCompiledPdbBytes;
     }
 } 

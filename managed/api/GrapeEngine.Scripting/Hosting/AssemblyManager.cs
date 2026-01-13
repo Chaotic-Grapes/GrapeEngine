@@ -11,6 +11,7 @@ Manages assembly loading/unloading lifecycle.
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 
@@ -32,7 +33,65 @@ internal static class AssemblyManager
     /// Key: Assembly file path
     /// Value: (Assembly instance, Custom LoadContext for hot reload)
     /// </summary>
-    private static readonly Dictionary<string, (Assembly Assembly, ScriptLoadContext? Context)> s_loadedAssemblies = [];
+    private static readonly Dictionary<string, (Assembly Assembly, ScriptLoadContext? Context)> s_loadedAssemblies = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string NormalizeAssemblyKey(string assemblyPath)
+    {
+        if (string.IsNullOrWhiteSpace(assemblyPath))
+            return assemblyPath;
+
+        try
+        {
+            assemblyPath = Path.GetFullPath(assemblyPath);
+        }
+        catch
+        {
+            // Best-effort normalization; keep original string.
+        }
+
+        string dir = Path.GetDirectoryName(assemblyPath) ?? "";
+        string filename = Path.GetFileNameWithoutExtension(assemblyPath);
+        string ext = Path.GetExtension(assemblyPath);
+
+        int hotreloadIndex = filename.LastIndexOf("_hotreload_", StringComparison.OrdinalIgnoreCase);
+        if (hotreloadIndex > 0)
+        {
+            filename = filename.Substring(0, hotreloadIndex);
+        }
+
+        return Path.Combine(dir, filename + ext);
+    }
+
+    private static string? FindLatestVersionedAssemblyPath(string originalAssemblyPath)
+    {
+        var dir = Path.GetDirectoryName(originalAssemblyPath) ?? "";
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+            return null;
+
+        var filename = Path.GetFileNameWithoutExtension(originalAssemblyPath);
+        var ext = Path.GetExtension(originalAssemblyPath);
+        var pattern = $"{filename}_hotreload_*{ext}";
+
+        int bestVersion = -1;
+        string? bestPath = null;
+
+        foreach (var file in Directory.EnumerateFiles(dir, pattern))
+        {
+            var name = Path.GetFileNameWithoutExtension(file);
+            int idx = name.LastIndexOf("_hotreload_", StringComparison.OrdinalIgnoreCase);
+            if (idx <= 0)
+                continue;
+
+            var suffix = name.Substring(idx + "_hotreload_".Length);
+            if (int.TryParse(suffix, out int version) && version > bestVersion)
+            {
+                bestVersion = version;
+                bestPath = file;
+            }
+        }
+
+        return bestPath;
+    }
 
     /// <summary>
     /// Load a C# assembly from the specified path.
@@ -49,38 +108,36 @@ internal static class AssemblyManager
     {
         try
         {
-            // If the original path doesn't exist, look for the latest versioned assembly
-            string pathToLoad = assemblyPath;
-            if (!File.Exists(pathToLoad))
+            bool isVersionedPath = assemblyPath.Contains("_hotreload_", StringComparison.OrdinalIgnoreCase);
+            string trackingKey = NormalizeAssemblyKey(assemblyPath);
+
+            string pathToLoad;
+            if (isVersionedPath)
             {
-                string dir = Path.GetDirectoryName(assemblyPath) ?? "";
-                string filename = Path.GetFileNameWithoutExtension(assemblyPath);
-                string ext = Path.GetExtension(assemblyPath);
-
-                // Look for versioned assemblies
-                int latestVersion = 0;
-                string? latestVersionedPath = null;
-
-                for (int v = 1; v <= 100; v++)
+                pathToLoad = assemblyPath;
+            }
+            else
+            {
+                // If we're asked to load the original path, prefer the most recent versioned build.
+                var latest = FindLatestVersionedAssemblyPath(trackingKey);
+                if (!string.IsNullOrEmpty(latest))
                 {
-                    string versionedPath = Path.Combine(dir, $"{filename}_hotreload_{v}{ext}");
-                    if (File.Exists(versionedPath))
-                    {
-                        latestVersion = v;
-                        latestVersionedPath = versionedPath;
-                    }
-                    else if (latestVersion > 0)
-                    {
-                        // Found a gap, stop searching
-                        break;
-                    }
+                    pathToLoad = latest;
+                    Logging.LogInternal($"[AssemblyManager] Found versioned assembly, loading: {pathToLoad}", LogLevel.Info);
                 }
-
-                if (latestVersionedPath != null)
+                else
                 {
-                    pathToLoad = latestVersionedPath;
-                    Logging.LogInternal($"[AssemblyManager] Original not found, using versioned: {pathToLoad}", LogLevel.Info);
+                    pathToLoad = trackingKey;
+                    Logging.LogInternal($"[AssemblyManager] No versioned assembly found, loading original: {pathToLoad}", LogLevel.Info);
                 }
+            }
+
+            // If this assembly is already loaded under the tracking key, unload it first.
+            // Overwriting the dictionary entry without unloading would leak the old context.
+            if (s_loadedAssemblies.ContainsKey(trackingKey))
+            {
+                Logging.LogInternal($"[AssemblyManager] Assembly already loaded, unloading previous instance: {trackingKey}", LogLevel.Info);
+                UnloadAssembly(trackingKey);
             }
 
             if (!File.Exists(pathToLoad))
@@ -95,8 +152,8 @@ internal static class AssemblyManager
             var loadContext = new ScriptLoadContext(pathToLoad);
             Assembly assembly = loadContext.LoadFromAssemblyPath(pathToLoad);
 
-            // Track by the original path so we can reload it consistently
-            s_loadedAssemblies[assemblyPath] = (assembly, loadContext);
+            // Track by the (original) path so we can reload it consistently
+            s_loadedAssemblies[trackingKey] = (assembly, loadContext);
 
             Logging.LogInternal($"[AssemblyManager] Loaded: {assembly.FullName}", LogLevel.Info);
             return assembly;
@@ -121,7 +178,9 @@ internal static class AssemblyManager
     {
         try
         {
-            if (!s_loadedAssemblies.TryGetValue(assemblyPath, out var entry))
+            string trackingKey = NormalizeAssemblyKey(assemblyPath);
+
+            if (!s_loadedAssemblies.TryGetValue(trackingKey, out var entry))
             {
                 Logging.LogInternal($"[AssemblyManager] Assembly not loaded: {assemblyPath}", LogLevel.Warning);
                 return false;
@@ -129,17 +188,36 @@ internal static class AssemblyManager
 
             var (assembly, loadContext) = entry;
 
-            Logging.LogInternal($"[AssemblyManager] Unloading assembly: {assemblyPath}", LogLevel.Info);
+            Logging.LogInternal($"[AssemblyManager] Unloading assembly: {trackingKey}", LogLevel.Info);
 
+            // Remove strong references first; otherwise the collectible ALC cannot be collected.
+            s_loadedAssemblies.Remove(trackingKey);
+
+            WeakReference? weakRef = null;
             if (loadContext != null)
             {
+                weakRef = new WeakReference(loadContext);
                 loadContext.Unload();
-                // Force GC to complete finalization
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
             }
 
-            s_loadedAssemblies.Remove(assemblyPath);
+            // Force GC to complete finalization and allow the ALC to unload.
+            for (int i = 0; i < 8; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+
+                if (weakRef == null || !weakRef.IsAlive)
+                    break;
+
+                System.Threading.Thread.Sleep(10);
+            }
+
+            if (weakRef != null && weakRef.IsAlive)
+            {
+                Logging.LogInternal($"[AssemblyManager] Warning: Load context still alive after unload attempts for {trackingKey}", LogLevel.Warning);
+            }
+
             Logging.LogInternal($"[AssemblyManager] Unloaded: {assembly.FullName}", LogLevel.Info);
             return true;
         }
@@ -155,7 +233,8 @@ internal static class AssemblyManager
     /// </summary>
     public static Assembly? GetLoadedAssembly(string assemblyPath)
     {
-        return s_loadedAssemblies.TryGetValue(assemblyPath, out var entry) ? entry.Assembly : null;
+        string trackingKey = NormalizeAssemblyKey(assemblyPath);
+        return s_loadedAssemblies.TryGetValue(trackingKey, out var entry) ? entry.Assembly : null;
     }
 
     /// <summary>
@@ -171,26 +250,163 @@ internal static class AssemblyManager
     /// </summary>
     public static bool IsAssemblyLoaded(string assemblyPath)
     {
-        return s_loadedAssemblies.ContainsKey(assemblyPath);
+        string trackingKey = NormalizeAssemblyKey(assemblyPath);
+        return s_loadedAssemblies.ContainsKey(trackingKey);
     }
 
     /// <summary>
-    /// Write compiled assembly bytes and clean up old versions.
-    /// 
-    /// Creates a temporary versioned file during compilation, then attempts to delete all
-    /// old versions and rename the new version to the original filename.
-    /// If the original file is still locked (even after unload), retries with backoff.
+    /// Verify that a file is unlocked and can be written to.
+    /// Retries with progressive backoff if file is locked.
+    /// </summary>
+    /// <param name="path">File path to check</param>
+    /// <param name="maxRetries">Maximum number of retry attempts</param>
+    /// <returns>true if file is unlocked or doesn't exist, false if still locked after retries</returns>
+    public static bool VerifyFileUnlocked(string path, int maxRetries = 10)
+    {
+        // If file doesn't exist, it's already "unlocked"
+        if (!File.Exists(path))
+        {
+            return true;
+        }
+
+        for (var i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                // Try to delete the file - this is the ultimate test of whether it's unlocked
+                File.Delete(path);
+                Logging.LogInternal($"[AssemblyManager] File deleted (was unlocked) after {i} attempts: {path}", LogLevel.Debug);
+                return true; // Success - file was unlocked and is now deleted
+            }
+            catch (FileNotFoundException)
+            {
+                return true; // File doesn't exist anymore, that's fine
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return true; // Directory doesn't exist, safe to create
+            }
+            catch (IOException)
+            {
+                // File is locked, retry with backoff
+                if (i < maxRetries - 1)
+                {
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    System.Threading.Thread.Sleep(50 + i * 50); // Progressive backoff: 50, 100, 150ms...
+                }
+                else
+                {
+                    Logging.LogInternal($"[AssemblyManager] File still locked (IOException) after {maxRetries} attempts: {path}", LogLevel.Warning);
+                    return false;
+                }
+            }
+            catch (UnauthorizedAccessException accessEx)
+            {
+                // File is locked by system (antivirus, indexing, etc.) or permissions issue
+                if (i < maxRetries - 1)
+                {
+                    Logging.LogInternal($"[AssemblyManager] Access denied to file (attempt {i + 1}/{maxRetries}), retrying: {path}", LogLevel.Debug);
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    System.Threading.Thread.Sleep(50 + i * 50); // Progressive backoff
+                }
+                else
+                {
+                    Logging.LogInternal($"[AssemblyManager] File still locked (UnauthorizedAccessException) after {maxRetries} attempts: {accessEx.Message}", LogLevel.Warning);
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Cleanup stale versioned assembly files on startup or before loading.
+    /// Removes old _hotreload_* files that accumulated from previous sessions.
     /// </summary>
     /// <param name="originalPath">Original assembly path (e.g., GameScripts.dll)</param>
-    /// <param name="compiledBytes">The compiled assembly bytes</param>
-    /// <returns>Original path (since the new assembly is renamed to it)</returns>
-    public static string? LoadVersionedAssembly(string originalPath, byte[] compiledBytes)
+    public static void CleanupStaleVersionedAssemblies(string originalPath)
     {
         try
         {
-            string dir = Path.GetDirectoryName(originalPath) ?? "";
-            string filename = Path.GetFileNameWithoutExtension(originalPath);
-            string ext = Path.GetExtension(originalPath);
+            var dir = Path.GetDirectoryName(originalPath) ?? "";
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+                return;
+
+            var filename = Path.GetFileNameWithoutExtension(originalPath);
+            var ext = Path.GetExtension(originalPath);
+
+            // Find all versioned DLL files
+            var pattern = $"{filename}_hotreload_*{ext}";
+            var staleFiles = Directory.GetFiles(dir, pattern);
+
+            var deletedCount = 0;
+            foreach (var file in staleFiles)
+            {
+                try
+                {
+                    File.Delete(file);
+                    deletedCount++;
+                }
+                catch (Exception ex)
+                {
+                    // File might still be locked if editor crashed during hot reload
+                    Logging.LogInternal($"[AssemblyManager] Could not delete stale file {Path.GetFileName(file)}: {ex.Message}", LogLevel.Debug);
+                }
+            }
+
+            // Also cleanup companion files (.pdb, .xml, .deps.json)
+            var companionExtensions = new[] { ".pdb", ".xml", ".deps.json" };
+            foreach (var companionExt in companionExtensions)
+            {
+                var companionPattern = $"{filename}_hotreload_*{companionExt}";
+                try
+                {
+                    foreach (var file in Directory.GetFiles(dir, companionPattern))
+                    {
+                        try
+                        {
+                            File.Delete(file);
+                            deletedCount++;
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+
+            if (deletedCount > 0)
+            {
+                Logging.LogInternal($"[AssemblyManager] Cleaned up {deletedCount} stale file(s) for {Path.GetFileName(originalPath)}", LogLevel.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[AssemblyManager] Error in CleanupStaleVersionedAssemblies: {ex.Message}", LogLevel.Warning);
+        }
+    }
+
+    /// <summary>
+    /// Write compiled assembly to a versioned filename.
+    /// 
+    /// Strategy: Always write to a new versioned file (GameScripts_hotreload_1.dll, etc.)
+    /// and return that path. Never try to overwrite or rename the original file.
+    /// Old versioned files are cleaned up after successful load.
+    /// 
+    /// This avoids all file-locking issues that occur when trying to delete/rename locked files.
+    /// </summary>
+    /// <param name="originalPath">Original assembly path (e.g., GameScripts.dll) - used only to derive directory and name</param>
+    /// <param name="compiledBytes">The compiled assembly bytes</param>
+    /// <param name="pdbBytes">Optional PDB debug symbols bytes</param>
+    /// <returns>Path to the newly written versioned assembly</returns>
+    public static string? LoadVersionedAssembly(string originalPath, byte[] compiledBytes, byte[]? pdbBytes = null)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(originalPath) ?? "";
+            var filename = Path.GetFileNameWithoutExtension(originalPath);
+            var ext = Path.GetExtension(originalPath);
 
             // Ensure the output directory exists
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -207,114 +423,108 @@ internal static class AssemblyManager
                 }
             }
 
-            // Write to a temporary versioned file first (in case the original still exists/is locked)
+            // Find the next available version number
             int version = 1;
-            string tempVersionedPath;
-            while (File.Exists(tempVersionedPath = Path.Combine(dir, $"{filename}_hotreload_{version}{ext}")))
+            string versionedPath;
+            while (File.Exists(versionedPath = Path.Combine(dir, $"{filename}_hotreload_{version}{ext}")))
             {
                 version++;
             }
 
-            Logging.LogInternal($"[AssemblyManager] LoadVersionedAssembly: dir='{dir}', filename='{filename}', ext='{ext}'", LogLevel.Debug);
+            Logging.LogInternal($"[AssemblyManager] Writing versioned assembly: {versionedPath}", LogLevel.Info);
 
-            File.WriteAllBytes(tempVersionedPath, compiledBytes);
-            Logging.LogInternal($"[AssemblyManager] Wrote temporary assembly: {tempVersionedPath}", LogLevel.Info);
+            // Write DLL
+            File.WriteAllBytes(versionedPath, compiledBytes);
+            Logging.LogInternal($"[AssemblyManager] Wrote assembly: {versionedPath}", LogLevel.Info);
 
-            // Attempt to clean up old files - try multiple times with backoff since file locks can persist
-            const int maxRetries = 3;
-            const int retryDelayMs = 100;
-
-            for (int attempt = 0; attempt < maxRetries; attempt++)
+            // Write PDB if provided
+            if (pdbBytes != null && pdbBytes.Length > 0)
             {
+                string pdbPath = Path.ChangeExtension(versionedPath, ".pdb");
                 try
                 {
-                    // Force aggressive garbage collection to release any lingering references
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
-                    GC.Collect();
-
-                    if (attempt > 0)
-                    {
-                        // Wait before retrying
-                        System.Threading.Thread.Sleep(retryDelayMs * (int)System.Math.Pow(2, attempt - 1));
-                    }
-
-                    // Delete the original if it exists (old assembly should be unloaded by now)
-                    if (File.Exists(originalPath))
-                    {
-                        try
-                        {
-                            File.Delete(originalPath);
-                            Logging.LogInternal($"[AssemblyManager] Deleted old assembly: {originalPath}", LogLevel.Debug);
-                        }
-                        catch (Exception delEx)
-                        {
-                            // File is locked, will try again on next iteration or keep the versioned file
-                            if (attempt < maxRetries - 1)
-                            {
-                                Logging.LogInternal($"[AssemblyManager] Could not delete old assembly (attempt {attempt + 1}/{maxRetries}): {delEx.Message}", LogLevel.Debug);
-                                continue;
-                            }
-                            else
-                            {
-                                Logging.LogInternal($"[AssemblyManager] Could not delete old assembly after {maxRetries} attempts: {delEx.Message}", LogLevel.Warning);
-                            }
-                        }
-                    }
-
-                    // Delete ALL old versioned files
-                    for (int v = 1; v < version; v++)
-                    {
-                        string oldVersionedPath = Path.Combine(dir, $"{filename}_hotreload_{v}{ext}");
-                        if (File.Exists(oldVersionedPath))
-                        {
-                            try
-                            {
-                                File.Delete(oldVersionedPath);
-                                Logging.LogInternal($"[AssemblyManager] Deleted old version: {oldVersionedPath}", LogLevel.Debug);
-                            }
-                            catch (Exception delEx)
-                            {
-                                Logging.LogInternal($"[AssemblyManager] Could not delete old version {oldVersionedPath}: {delEx.Message}", LogLevel.Warning);
-                            }
-                        }
-                    }
-
-                    // Try to rename the temporary versioned file back to the original name
-                    try
-                    {
-                        File.Move(tempVersionedPath, originalPath, overwrite: true);
-                        Logging.LogInternal($"[AssemblyManager] Renamed to original: {originalPath}", LogLevel.Info);
-                        return originalPath;
-                    }
-                    catch (Exception renameEx)
-                    {
-                        if (attempt < maxRetries - 1)
-                        {
-                            Logging.LogInternal($"[AssemblyManager] Could not rename (attempt {attempt + 1}/{maxRetries}): {renameEx.Message}", LogLevel.Debug);
-                            continue;
-                        }
-                        else
-                        {
-                            // Final attempt failed - keep the versioned file and return that path instead
-                            Logging.LogInternal($"[AssemblyManager] Could not rename to original after {maxRetries} attempts. File will remain as: {tempVersionedPath}", LogLevel.Warning);
-                            return tempVersionedPath;
-                        }
-                    }
+                    File.WriteAllBytes(pdbPath, pdbBytes);
+                    Logging.LogInternal($"[AssemblyManager] Wrote PDB: {pdbPath}", LogLevel.Debug);
                 }
-                catch (Exception ex)
+                catch (Exception pdbEx)
                 {
-                    Logging.LogInternal($"[AssemblyManager] Unexpected error in retry loop (attempt {attempt + 1}): {ex.Message}", LogLevel.Warning);
+                    Logging.LogInternal($"[AssemblyManager] Warning: Failed to write PDB: {pdbEx.Message}", LogLevel.Warning);
                 }
             }
 
-            // If we get here, return the versioned path as fallback
-            return tempVersionedPath;
+            // Return the versioned path - caller will load from this
+            return versionedPath;
         }
         catch (Exception ex)
         {
             Logging.LogInternal($"[AssemblyManager] Error in LoadVersionedAssembly: {ex.Message}", LogLevel.Error);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Clean up old versioned assemblies, keeping only recent ones.
+    /// Call this after successfully loading a new versioned assembly.
+    /// </summary>
+    /// <param name="originalPath">Original assembly path (e.g., GameScripts.dll)</param>
+    /// <param name="keepCount">Number of recent versions to keep</param>
+    public static void CleanupOldVersionedAssemblies(string originalPath, int keepCount = 3)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(originalPath) ?? "";
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+                return;
+
+            var filename = Path.GetFileNameWithoutExtension(originalPath);
+            var ext = Path.GetExtension(originalPath);
+
+            // Find all versioned files
+            var versionedFiles = new List<(int version, string path)>();
+            for (int v = 1; v <= 1000; v++)
+            {
+                string versionedPath = Path.Combine(dir, $"{filename}_hotreload_{v}{ext}");
+                if (File.Exists(versionedPath))
+                {
+                    versionedFiles.Add((v, versionedPath));
+                }
+                else if (v > 10 && versionedFiles.Count > 0)
+                {
+                    // If we haven't found a file in 10 attempts after finding some, stop searching
+                    break;
+                }
+            }
+
+            // Keep only the most recent keepCount versions
+            if (versionedFiles.Count > keepCount)
+            {
+                // Sort by version (descending) and delete older ones
+                var toDelete = versionedFiles.OrderByDescending(x => x.version).Skip(keepCount).ToList();
+
+                foreach (var (version, path) in toDelete)
+                {
+                    try
+                    {
+                        File.Delete(path);
+                        Logging.LogInternal($"[AssemblyManager] Deleted old versioned assembly: {Path.GetFileName(path)}", LogLevel.Debug);
+
+                        // Also delete associated PDB
+                        string pdbPath = Path.ChangeExtension(path, ".pdb");
+                        if (File.Exists(pdbPath))
+                        {
+                            try { File.Delete(pdbPath); } catch { }
+                        }
+                    }
+                    catch (Exception delEx)
+                    {
+                        Logging.LogInternal($"[AssemblyManager] Could not delete {Path.GetFileName(path)}: {delEx.Message}", LogLevel.Debug);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[AssemblyManager] Error in CleanupOldVersionedAssemblies: {ex.Message}", LogLevel.Warning);
         }
     }
 }

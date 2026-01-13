@@ -37,13 +37,16 @@ internal static class ComponentDiscovery
     /// Used by the editor when deserializing component values from JSON at runtime.
     /// </summary>
     public static Dictionary<uint, Type> TypeHashToType { get; } = new();
-
     /// <summary>
     /// Discover all unmanaged component types in loaded assemblies and register them.
     /// Called from ScriptHost initialization.
     /// </summary>
     public static void DiscoverAndRegisterAll()
     {
+        // Clear the registration cache to allow re-registration of modified component types
+        // This is REQUIRED for hot reload to work otherwise modified components won't be re-registered
+        ComponentRegistry.ClearRegistrationCache();
+
         var components = DiscoverComponents();
         Logging.LogInternal($"[ComponentDiscovery] Found {components.Count} component types", LogLevel.Info);
 

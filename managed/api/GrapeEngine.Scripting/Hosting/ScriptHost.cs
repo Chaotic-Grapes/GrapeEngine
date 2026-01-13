@@ -74,6 +74,28 @@ internal class ScriptLoadContext(string assemblyPath) : AssemblyLoadContext(isCo
 public static class ScriptHost
 {
     /// <summary>
+    /// Extract the original assembly path from a versioned path.
+    /// GameScripts_hotreload_1.dll -> GameScripts.dll
+    /// </summary>
+    private static string ExtractOriginalPathFromVersioned(string versionedPath)
+    {
+        string dir = Path.GetDirectoryName(versionedPath) ?? "";
+        string filename = Path.GetFileNameWithoutExtension(versionedPath);
+        string ext = Path.GetExtension(versionedPath);
+
+        // Remove _hotreload_X suffix
+        // GameScripts_hotreload_1 -> GameScripts
+        int hotreloadIndex = filename.LastIndexOf("_hotreload_");
+        if (hotreloadIndex > 0)
+        {
+            string originalFilename = filename.Substring(0, hotreloadIndex);
+            return Path.Combine(dir, originalFilename + ext);
+        }
+
+        return versionedPath; // Not a versioned path, return as-is
+    }
+
+    /// <summary>
     /// Delegate type for the native C++ callback function.
     /// Called when hot reload completes with the reloaded assembly path.
     /// </summary>
@@ -203,35 +225,60 @@ public static class ScriptHost
     {
         try
         {
-            Logging.LogInternal($"[ScriptHost] Reloading assembly: {assemblyPath}", LogLevel.Info);
+            string logicalPath = ExtractOriginalPathFromVersioned(assemblyPath);
 
-            // Save state before unload
-            StatePreserver.SaveAllSystemStates(assemblyPath);
+            Logging.LogInternal($"[ScriptHost] Reloading assembly: {assemblyPath} (logical: {logicalPath})", LogLevel.Info);
 
-            // TODO: Check if assembly is loaded; if not, just load it
+            // Save state before unload (keyed by logical path to survive version changes)
+            StatePreserver.SaveAllSystemStates(logicalPath);
 
-            // Load new version
+            // If an older version is loaded, unload it first.
+            if (AssemblyManager.IsAssemblyLoaded(logicalPath))
+            {
+                Logging.LogInternal($"[ScriptHost] Unloading old assembly before reload: {logicalPath}", LogLevel.Info);
+                AssemblyManager.UnloadAssembly(logicalPath);
+            }
+
+            // Load new version (can be a versioned path or an original path; AssemblyManager will resolve latest)
             if (AssemblyManager.LoadAssembly(assemblyPath) == null)
             {
                 Logging.LogInternal($"[ScriptHost] Failed to load new assembly during reload", LogLevel.Error);
                 return -1;
             }
 
+            // Re-discover and register all components in loaded assemblies
+            // This is CRITICAL for hot reload to work - components must be re-registered
+            // so that the C++ side sees updated component structures
+            ComponentDiscovery.DiscoverAndRegisterAll();
+            Logging.LogInternal($"[ScriptHost] Re-discovered components after reload", LogLevel.Info);
+
             // Clear discovered systems before discovering new ones to avoid duplication
             SystemDiscovery.ClearDiscoveredSystems();
 
             // Discover systems in newly loaded assembly
-            Assembly? newAssembly = AssemblyManager.GetLoadedAssembly(assemblyPath);
+            Assembly? newAssembly = AssemblyManager.GetLoadedAssembly(logicalPath);
             if (newAssembly != null)
             {
                 SystemDiscovery.DiscoverSystemsInAssembly(newAssembly);
             }
 
             // Clean up saved state
-            StatePreserver.ClearSavedState(assemblyPath);
+            StatePreserver.ClearSavedState(logicalPath);
 
-            // Notify C++ that reload is complete so it can re-discover and re-register systems
-            NotifyHotReloadComplete(assemblyPath);
+            // Clean up old versioned assemblies - but only if we loaded a versioned file
+            // (i.e., if a new hot reload compilation created a new _hotreload_X.dll)
+            // If we loaded the original GameScripts.dll on startup, don't delete anything
+            if (newAssembly?.Location?.Contains("_hotreload_", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                AssemblyManager.CleanupOldVersionedAssemblies(logicalPath, keepCount: 3);
+            }
+
+            // Notify C++ that reload is complete
+            // C++ will clear all entities and re-register systems to sync with updated component schema
+            Logging.LogInternal($"[ScriptHost] Hot reload complete - C++ will clear entities and reinitialize systems", LogLevel.Info);
+
+            // Prefer notifying with the actual loaded file path (important when original path doesn't exist and we load a versioned DLL).
+            NotifyHotReloadComplete(newAssembly?.Location ?? assemblyPath);
 
             Logging.LogInternal($"[ScriptHost] Successfully reloaded: {assemblyPath}", LogLevel.Info);
             return 0; // Success
@@ -305,6 +352,32 @@ public static class ScriptHost
         if (ptr == IntPtr.Zero)
             return;
         Marshal.FreeHGlobal(ptr);
+    }
+
+    /// <summary>
+    /// Get the actual path to the last compiled assembly (may be versioned).
+    /// Returns pointer to UTF8 string allocated with Marshal.AllocHGlobal.
+    /// Returns IntPtr.Zero if no assembly has been compiled yet.
+    /// Caller must free with FreeStringFromManaged.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static IntPtr GetLastCompiledAssemblyPath()
+    {
+        try
+        {
+            var path = RoslynCompiler.GetLastCompiledAssemblyPath();
+            if (string.IsNullOrEmpty(path))
+                return IntPtr.Zero;
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(path + '\0');
+            IntPtr p = Marshal.AllocHGlobal(bytes.Length);
+            Marshal.Copy(bytes, 0, p, bytes.Length);
+            return p;
+        }
+        catch
+        {
+            return IntPtr.Zero;
+        }
     }
 
     /// <summary>
@@ -481,9 +554,6 @@ public static class ScriptHost
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect(); // Second pass to catch any objects freed by finalizers
-            
-            // Sleep to allow OS to release file handles
-            Thread.Sleep(300);
 
             int res = RoslynCompiler.CompileDirectoryToAssembly(dir, outPath);
             if (res != 0)
@@ -492,17 +562,19 @@ public static class ScriptHost
                 return res;
             }
 
-            // Use the actual compiled assembly path (may be versioned to avoid file locks)
-            string actualAssemblyPath = RoslynCompiler.GetLastCompiledAssemblyPath();
-            if (string.IsNullOrEmpty(actualAssemblyPath))
+            // Get the actual compiled assembly path (will be versioned, e.g., GameScripts_hotreload_1.dll)
+            string actualCompiledPath = RoslynCompiler.GetLastCompiledAssemblyPath();
+            if (string.IsNullOrEmpty(actualCompiledPath))
             {
-                actualAssemblyPath = outPath; // Fallback to original path if versioning didn't happen
+                Logging.LogInternal("[ScriptHost] Error: Compilation succeeded but no assembly path returned", LogLevel.Error);
+                return -1;
             }
 
-            Logging.LogInternal($"[ScriptHost] Will reload assembly from: {actualAssemblyPath}", LogLevel.Info);
+            Logging.LogInternal($"[ScriptHost] Compilation successful, reloading from: {actualCompiledPath}", LogLevel.Info);
 
-            // Reload the compiled assembly
-            return ReloadAssemblyInternal(actualAssemblyPath);
+            // Reload via the logical/original path so state saving + unloading happens in the correct order.
+            // AssemblyManager.LoadAssembly(outPath) will resolve and load the latest versioned build.
+            return ReloadAssemblyInternal(outPath);
         }
         catch (Exception ex)
         {
