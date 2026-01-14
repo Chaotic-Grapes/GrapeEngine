@@ -52,6 +52,11 @@ private:
     double m_cachedTotalTime = 0.0;
     
     std::map<std::string, CachedScopeData> m_cachedScopes;
+
+    // Private rendering methods
+    void _updateCachedData(bool isPlaying);
+    void _renderHeader();
+    void _renderSystemsTable();
 };
 
 #endif

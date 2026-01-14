@@ -41,27 +41,180 @@ void PerformancePanel::ResetForNewScene() {
 void PerformancePanel::Render(bool isPlaying) {
     if (!m_initialized) return;
 
-    ImGui::PushFont(m_mainFont);
-    ImGui::Begin("Performance");
-
-    // Show paused message only if we haven't collected any data yet
-    if (!isPlaying && !m_hasCollectedData) {
-        ImGui::TextColored(ImVec4(1,1,0,1), "Monitoring paused — enter Play (Run) to collect data");
+    if (!ImGui::Begin("Performance", nullptr, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
-        ImGui::PopFont();
         return;
     }
-    
-    // Mark that we've collected data once play mode is active
+
+    // Update cached data each frame
+    _updateCachedData(isPlaying);
+
+    // Show paused message only if we haven't collected any TimeSystem scope data yet
+    if (!isPlaying && !m_hasCollectedData) {
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Scope monitoring paused — enter Play (Run) to collect per-system scope data");
+        ImGui::End();
+        return;
+    }
+
+    // Render header with FPS and frame time
+    _renderHeader();
+
+    ImGui::Separator();
+
+    // Render system usage table
+    _renderSystemsTable();
+
+    ImGui::End();
+}
+
+// -------------------------------------------------------------------------
+// Private Rendering Methods
+// -------------------------------------------------------------------------
+
+void PerformancePanel::_renderHeader() {
+    ImGui::PushFont(m_mainFont);
+    ImGui::Text("FPS: %.1f", m_cachedFps);
+    ImGui::SameLine(150);
+    ImGui::Text("Frame: %.2f ms", m_cachedFrameMs);
+    ImGui::PopFont();
+}
+
+void PerformancePanel::_renderSystemsTable() {
+    ImGui::PushFont(m_boldFont);
+    ImGui::Text("System Usage");
+    ImGui::PopFont();
+
+    // Use cached total time. Ensure it's not smaller than the frame time
+    // (some profilers report scope totals that are smaller due to sampling
+    // or nested/overlapping scopes). Using at least the frame time prevents
+    // usage percentages from exceeding 100% unexpectedly.
+    double totalTime = m_cachedTotalTime;
+    if (totalTime < 0.001)
+        totalTime = m_cachedFrameMs; // Fallback to frame time if no scopes
+    else
+        totalTime = std::max(totalTime, static_cast<double>(m_cachedFrameMs));
+
+    // Compute sum of scoped averages so we can show any "unattributed" time
+    double sumScopeAvgMs = 0.0;
+    for (const auto &kv : m_cachedScopes) {
+        sumScopeAvgMs += static_cast<double>(kv.second.AverageTimeMs);
+    }
+
+    double unaccountedMs = totalTime - sumScopeAvgMs;
+    if (unaccountedMs < 0.0)
+        unaccountedMs = 0.0; // avoid negative due to rounding
+
+    // Render table with columns: System Name, %, Avg (ms), Max (ms)
+    if (ImGui::BeginTable("PerformanceTable", 4,
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit)) {
+
+        ImGui::TableSetupColumn("System", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Usage", ImGuiTableColumnFlags_WidthFixed, 70);
+        ImGui::TableSetupColumn("Avg (ms)", ImGuiTableColumnFlags_WidthFixed, 100);
+        ImGui::TableSetupColumn("Max (ms)", ImGuiTableColumnFlags_WidthFixed, 100);
+        ImGui::TableHeadersRow();
+
+        // Render each system
+        for (const auto &kv : m_cachedScopes) {
+            const std::string &name = kv.first;
+            const auto &data = kv.second;
+
+            // Calculate usage percentage and clamp to [0, 100].
+            float usagePercent = 0.0f;
+            if (totalTime > 0.001) {
+                double percent = (static_cast<double>(data.AverageTimeMs) / totalTime) * 100.0;
+                if (percent < 0.0) percent = 0.0;
+                if (percent > 100.0) percent = 100.0;
+                usagePercent = static_cast<float>(percent);
+            }
+
+            // Determine bar color based on usage percentage
+            ImVec4 barColor;
+            if (usagePercent >= 80.0f) {
+                barColor = ImVec4(0.9f, 0.2f, 0.2f, 1.0f); // Red
+            }
+            else if (usagePercent >= 60.0f) {
+                barColor = ImVec4(0.9f, 0.6f, 0.2f, 1.0f); // Orange
+            }
+            else if (usagePercent >= 40.0f) {
+                barColor = ImVec4(0.9f, 0.9f, 0.2f, 1.0f); // Yellow
+            }
+            else {
+                barColor = ImVec4(0.2f, 0.8f, 0.2f, 1.0f); // Green
+            }
+
+            ImGui::TableNextRow();
+
+            // Column 0: System Name
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("%s", name.c_str());
+
+            // Column 1: Usage % with color bar
+            ImGui::TableSetColumnIndex(1);
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
+            ImGui::ProgressBar(usagePercent / 100.0f, ImVec2(-1.0f, 0.0f), "");
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+            ImGui::Text("%.1f%%", usagePercent);
+
+            // Column 2: Average time
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.2f", data.AverageTimeMs);
+
+            // Column 3: Max time
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.2f", data.MaxTimeMs);
+        }
+
+        // Show unattributed/render time
+        if (unaccountedMs > 0.001) {
+            double unaccountedPercent = (unaccountedMs / totalTime) * 100.0;
+            if (unaccountedPercent < 0.0) unaccountedPercent = 0.0;
+            if (unaccountedPercent > 100.0) unaccountedPercent = 100.0;
+
+            ImGui::TableNextRow();
+
+            // Column 0: System Name
+            ImGui::TableSetColumnIndex(0);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+            ImGui::Text("Render");
+            ImGui::PopStyleColor();
+
+            // Column 1: Usage % with gray bar
+            ImGui::TableSetColumnIndex(1);
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+            ImGui::ProgressBar(static_cast<float>(unaccountedPercent / 100.0), ImVec2(-1.0f, 0.0f), "");
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+            ImGui::Text("%.1f%%", static_cast<float>(unaccountedPercent));
+
+            // Column 2: Average time
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.2f", unaccountedMs);
+
+            // Column 3: Max time (not tracked for render)
+            ImGui::TableSetColumnIndex(3);
+            ImGui::TextDisabled("-");
+        }
+
+        ImGui::EndTable();
+    }
+}
+
+// -------------------------------------------------------------------------
+// Private Data Management
+// -------------------------------------------------------------------------
+
+void PerformancePanel::_updateCachedData(bool isPlaying) {
     if (isPlaying) {
         m_hasCollectedData = true;
-        
+
         // Cache live data while playing
         try {
             m_cachedFps = TimeSystem::Instance().GetFPS();
             m_cachedFrameMs = TimeSystem::Instance().GetFrameTimeMs();
             m_cachedTotalTime = TimeSystem::Instance().GetTotalScopeTimes();
-            
+
             // Cache scope data
             const auto liveScopes = TimeSystem::Instance().GetAllScopeData();
             m_cachedScopes.clear();
@@ -76,130 +229,4 @@ void PerformancePanel::Render(bool isPlaying) {
             // Keep existing cached values on error
         }
     }
-
-    // Use cached values (frozen when stopped, live when playing)
-    float fps = m_cachedFps;
-    float frameMs = m_cachedFrameMs;
-
-    ImGui::Text("FPS: %.1f", fps);
-    ImGui::SameLine(150);
-    ImGui::Text("Frame: %.2f ms", frameMs);
-
-    ImGui::Separator();
-    ImGui::PushFont(m_boldFont);
-    ImGui::Text("System Usage");
-    ImGui::PopFont();
-    ImGui::Spacing();
-
-    // Use cached total time. Ensure it's not smaller than the frame time
-    // (some profilers report scope totals that are smaller due to sampling
-    // or nested/overlapping scopes). Using at least the frame time prevents
-    // usage percentages from exceeding 100% unexpectedly.
-    double totalTime = m_cachedTotalTime;
-    if (totalTime < 0.001)
-        totalTime = frameMs; // Fallback to frame time if no scopes
-    else
-        totalTime = std::max(totalTime, static_cast<double>(frameMs));
-
-    // List each system with cached formatting
-    // Compute sum of scoped averages so we can show any "unattributed" time
-    double sumScopeAvgMs = 0.0;
-    for (const auto &kv : m_cachedScopes) {
-        sumScopeAvgMs += static_cast<double>(kv.second.AverageTimeMs);
-    }
-
-    double unaccountedMs = totalTime - sumScopeAvgMs;
-    if (unaccountedMs < 0.0)
-        unaccountedMs = 0.0; // avoid negative due to rounding
-
-    // Show a short summary of attributed vs unattributed time
-    {
-        double attributedPercent = 0.0;
-        double unaccountedPercent = 0.0;
-        if (totalTime > 0.001) {
-            attributedPercent = (sumScopeAvgMs / totalTime) * 100.0;
-            unaccountedPercent = (unaccountedMs / totalTime) * 100.0;
-            if (attributedPercent < 0.0) attributedPercent = 0.0;
-            if (attributedPercent > 100.0) attributedPercent = 100.0;
-            if (unaccountedPercent < 0.0) unaccountedPercent = 0.0;
-            if (unaccountedPercent > 100.0) unaccountedPercent = 100.0;
-        }
-
-        ImGui::PushFont(m_boldFont);
-        ImGui::Text("Breakdown: Attributed %.2f ms (%.1f%%)  Unattributed %.2f ms (%.1f%%)",
-                    sumScopeAvgMs, attributedPercent, unaccountedMs, unaccountedPercent);
-        ImGui::PopFont();
-        ImGui::Spacing();
-    }
-
-    for (const auto &kv : m_cachedScopes) {
-        const std::string &name = kv.first;
-        // TODO: Fix Render system to follow usual pattern, then remove this line
-        if (name == "Render") continue; // Skip, because it's not following the usual system pattern for now
-        const auto &data = kv.second;
-        
-        // Calculate usage percentage and clamp to [0, 100].
-        float usagePercent = 0.0f;
-        if (totalTime > 0.001) {
-            double percent = (static_cast<double>(data.AverageTimeMs) / totalTime) * 100.0;
-            if (percent < 0.0) percent = 0.0;
-            if (percent > 100.0) percent = 100.0;
-            usagePercent = static_cast<float>(percent);
-        }
-        
-        // System name header
-        ImGui::PushFont(m_boldFont);
-        ImGui::Text("%s", name.c_str());
-        ImGui::PopFont();
-        
-        // Determine bar color based on usage percentage
-        ImVec4 barColor;
-        if (usagePercent >= 80.0f) {
-            // Red for very high usage (>= 80%)
-            barColor = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
-        }
-        else if (usagePercent >= 60.0f) {
-            // Orange for high usage (60-79%)
-            barColor = ImVec4(0.9f, 0.6f, 0.2f, 1.0f);
-        }
-        else if (usagePercent >= 40.0f) {
-            // Yellow for moderate usage (40-59%)
-            barColor = ImVec4(0.9f, 0.9f, 0.2f, 1.0f);
-        }
-        else {
-            // Green for low usage (< 40%)
-            barColor = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
-        }
-        
-        // Bar graph showing usage
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
-        ImGui::ProgressBar(usagePercent / 100.0f, ImVec2(-1.0f, 0.0f));
-        ImGui::PopStyleColor();
-        
-        // Detailed stats on one line
-        ImGui::Text("  %.1f%% | Avg: %.2f ms | Max: %.2f ms", usagePercent, data.AverageTimeMs, data.MaxTimeMs);
-        
-        ImGui::Spacing();
-    }
-
-    // If there's unaccounted time, show it as "Other / Unattributed"
-    // Usually, this is renderer
-    if (unaccountedMs > 0.001) {
-        double unaccountedPercent = (unaccountedMs / totalTime) * 100.0;
-        if (unaccountedPercent < 0.0) unaccountedPercent = 0.0;
-        if (unaccountedPercent > 100.0) unaccountedPercent = 100.0;
-
-        ImGui::PushFont(m_boldFont);
-        //ImGui::Text("Others / Unattributed (e.g., underlying system calls)");
-        ImGui::Text("Render");
-        ImGui::PopFont();
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-        ImGui::ProgressBar(static_cast<float>(unaccountedPercent / 100.0), ImVec2(-1.0f, 0.0f));
-        ImGui::PopStyleColor();
-        ImGui::Text("  %.1f%% | %.2f ms", static_cast<float>(unaccountedPercent), unaccountedMs);
-        ImGui::Spacing();
-    }
-
-    ImGui::End();
-    ImGui::PopFont();
 }
