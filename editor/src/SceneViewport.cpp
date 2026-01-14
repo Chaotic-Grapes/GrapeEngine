@@ -65,7 +65,8 @@ void SceneViewport::HandleInWorldInteraction() {
     
     // Handle editor-specific entity manipulation (drag-to-move)
     // This only works when viewport is hovered
-    if (m_isViewportHovered) {
+    // IMPORTANT: Don't interfere if ImGuizmo is being used
+    if (m_isViewportHovered && !ImGuizmo::IsUsing()) {
         _handleEntityDragToMove();
     }
 }
@@ -174,7 +175,8 @@ void SceneViewport::_renderViewport() {
 
             // Handle mouse click picking on the Scene viewport image
             // Use IsMousePressed to detect a single click event (edge-triggered)
-            if (ImGui::IsItemHovered() && Input::IsMousePressed(MOUSE_LEFT)) {
+            // BUT: Don't pick while gizmo is being used - let gizmo have priority for drag operations
+            if (ImGui::IsItemHovered() && Input::IsMousePressed(MOUSE_LEFT) && !ImGuizmo::IsUsing()) {
                 double mx = 0, my = 0;
                 Input::GetMousePosition(mx, my);
 
@@ -197,12 +199,21 @@ void SceneViewport::_renderViewport() {
             // Poll for async pick result (non-blocking). If a result is ready
             // resolve selection and notify callbacks.
             if (m_pendingPickRequestId != 0) {
-                uint32_t pickedEntity = 0;
+                uint32_t pickedEntity = ECS::Entity::NPOS32;
                 if (Editor::ViewportPicking::TryGetAsyncPickResult(m_pendingPickRequestId, pickedEntity, rendererSystem)) {
                     m_pendingPickRequestId = 0; // consumed
-                    if (pickedEntity != 0 && pickedEntity != ECS::Entity::NPOS32) {
+                    // Allow selection of any entity including 0
+                    // If no entity was picked (NPOS32), deselect only if NOT hovering over gizmo
+                    if (pickedEntity != ECS::Entity::NPOS32) {
                         SetSelectedEntity(pickedEntity);
+                        // Publish selection change to allow hierarchy and other systems to sync
+                        Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(pickedEntity));
+                    } else if (!ImGuizmo::IsOver()) {
+                        // Only deselect if clicking on empty space AND not hovering over gizmo
+                        SetSelectedEntity(ECS::Entity::NPOS32);
+                        Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(ECS::Entity::NPOS32));
                     }
+                    // If hovering over gizmo and no entity picked, keep current selection
                 }
             }
 
@@ -212,7 +223,7 @@ void SceneViewport::_renderViewport() {
             }
 
             // Draw selection outline and gizmo for selected entity
-            if (m_selectedEntityId != 0 && m_editorCamera) {
+            if (!m_selectedEntity.IsNull() && m_editorCamera) {
                 auto* camera = m_editorCamera->GetCamera();
                 if (camera) {
                     // Compute camera matrices for overlays
@@ -222,7 +233,7 @@ void SceneViewport::_renderViewport() {
                     // Draw wireframe outline around selected entity (updated signature)
                     Editor::SelectionOutlineRenderer::RenderOutline(
                         *m_world,
-                        m_selectedEntityId,
+                        m_selectedEntity.Index,
                         rendererSystem->GetRenderer(),
                         rendererSystem->GetShader(),
                         proj * view,
@@ -234,7 +245,7 @@ void SceneViewport::_renderViewport() {
                     // Draw gizmo for transform manipulation
                     Editor::EditorGizmo::DrawGizmo(
                         *m_world,
-                        m_selectedEntityId,
+                        m_selectedEntity.Index,
                         glm::value_ptr(view),
                         glm::value_ptr(proj),
                         gizmoPos.x, gizmoPos.y,

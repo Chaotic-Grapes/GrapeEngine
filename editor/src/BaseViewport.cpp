@@ -129,7 +129,7 @@ void BaseViewport::SetFileMenu(EditorFileMenu* fileMenu) {
 // Accessors
 // -------------------------------------------------------------------------
 EntityId BaseViewport::GetSelectedEntityId() const {
-    return m_selectedEntityId;
+    return m_selectedEntity.Index;
 }
 
 bool BaseViewport::IsViewportHovered() const {
@@ -137,8 +137,15 @@ bool BaseViewport::IsViewportHovered() const {
 }
 
 void BaseViewport::SetSelectedEntity(const EntityId id) {
-    // Keep local state in sync
-    m_selectedEntityId = id;
+    // Convert EntityId to full Entity by looking it up in the world
+    // This ensures we have the correct generation for IsAlive() validation
+    if (m_world && id != ECS::Entity::NPOS32) {
+        m_selectedEntity = m_world->Resolve(id);
+    }
+    else {
+        m_selectedEntity = ECS::NULL_ENTITY;
+    }
+    
     // Notify any registered callbacks so the rest of the editor can react
     if (m_onSelectionChanged) {
         m_onSelectionChanged(id);
@@ -320,7 +327,7 @@ void BaseViewport::_handleEntityDragToMove() {
         m_wasMouseDownLastFrame = false;
         return;
     }
-    if (!m_world || m_selectedEntityId == ECS::Entity::NPOS32) {
+    if (!m_world || m_selectedEntity.IsNull()) {
         m_isDragging = false;
         m_wasMouseDownLastFrame = false;
         return;
@@ -365,21 +372,21 @@ void BaseViewport::_handleEntityDragToMove() {
     glm::vec2 mouseWorld = screenToWorld(mousePos);
 
     // Check if selection changed (from hierarchy or inspector)
-    if (m_selectedEntityId != m_lastSelectedEntityID) {
+    if (m_selectedEntity.Index != m_lastSelectedEntityID) {
         m_isDragging = false;
-        m_lastSelectedEntityID = m_selectedEntityId;
+        m_lastSelectedEntityID = m_selectedEntity.Index;
     }
 
     // Start drag on mouse press
-    if (mouseJustPressed && !m_isDragging) {
-        m_world->Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, const ECS::Components::LocalTransform& lt) {
-            if (e.Index == m_selectedEntityId) {
-                m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
-                m_dragStartEntityRot = lt.Rotation;
-                m_dragStartEntityScale = lt.Scale;
-            }
-        });
-        m_dragStartMouseWorld = mouseWorld;
+    if (mouseJustPressed && !m_isDragging && m_world->IsAlive(m_selectedEntity)) {
+        if (m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
+            const auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
+            m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
+            m_dragStartEntityRot = lt.Rotation;
+            m_dragStartEntityScale = lt.Scale;
+            m_dragStartMouseWorld = mouseWorld;
+            m_isDragging = true;
+        }
     }
 
     // Check for drag threshold (5 pixels in world space)
@@ -398,37 +405,39 @@ void BaseViewport::_handleEntityDragToMove() {
     if (m_isDragging && isMouseDownThisFrame) {
         const glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
 
-        m_world->Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, ECS::Components::LocalTransform& lt) {
-            if (e.Index == m_selectedEntityId) {
-                lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
-                lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
-
-                // Mark scene as dirty
-                if (m_fileMenu) {
-                    m_fileMenu->MarkSceneDirty();
-                }
-            }
-        });
+        // Direct component access instead of Each() to avoid O(n) iteration
+        // Get the selected entity directly by its stored Entity with correct generation
+        if (m_world->IsAlive(m_selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
+            auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
+            lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
+            lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
+            // Don't mark scene dirty every frame during drag
+            // It will be marked when drag completes below
+        }
     }
 
     // End drag and create undo command
     if (m_isDragging && !isMouseDownThisFrame) {
-        m_world->Each<ECS::Components::LocalTransform>([&](const ECS::Entity e, const ECS::Components::LocalTransform& lt) {
-            if (e.Index == m_selectedEntityId) {
-                const Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
-                const Vector3D newPos = lt.Position;
+        if (m_world->IsAlive(m_selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
+            const auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
+            const Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
+            const Vector3D newPos = lt.Position;
 
-                // Only notify if position actually changed
-                if (oldPos != newPos) {
-                    Messaging::MessageSystem::Notify(
-                        Messaging::EntityTransformChanged(
-                            e.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale,
-                            newPos, lt.Rotation, lt.Scale
-                        )
-                    );
+            // Only notify if position actually changed
+            if (oldPos != newPos) {
+                // Mark scene as dirty once when drag completes (not every frame during drag)
+                if (m_fileMenu) {
+                    m_fileMenu->MarkSceneDirty();
                 }
+                
+                Messaging::MessageSystem::Notify(
+                    Messaging::EntityTransformChanged(
+                        m_selectedEntity.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale,
+                        newPos, lt.Rotation, lt.Scale
+                    )
+                );
             }
-        });
+        }
         m_isDragging = false;
     }
 

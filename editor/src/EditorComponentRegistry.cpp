@@ -608,14 +608,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
     
     // Get all registered component IDs from the native registry
     auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
-    LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry: Found " << allIds.size() << " total component IDs in native registry");
-    // Dump details for debugging
-    for (ECS::ComponentTypeId aid : allIds) {
-        const auto& ameta = ECS::ComponentRegistry::Meta(aid);
-        std::string aname = ECS::ComponentRegistry::GetComponentNameFromHash(ameta.TypeHash);
-        if (aname.empty()) aname = "<no-name>";
-        LOG_INFO("[EditorComponentRegistry]   NativeID " << aid << " hash=0x" << std::hex << ameta.TypeHash << std::dec << " size=" << ameta.Size << " name=" << aname);
-    }
+    LOG_DEBUG("[EditorComponentRegistry] RebuildFromNativeRegistry: Found " << allIds.size() << " total component IDs in native registry");
     
     // Add C++ components that aren't hardcoded
     int newComponentsFound = 0;
@@ -641,7 +634,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         }
         
         // This is a new C# component - add it with generic operations
-        LOG_INFO("[EditorComponentRegistry] Found new C# component: ID " << id << ", hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ", size " << nativeMeta.Size);
+        LOG_DEBUG("[EditorComponentRegistry] Found new C# component: ID " << id << ", hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ", size " << nativeMeta.Size);
         newComponentsFound++;
         
         std::string displayName;
@@ -755,7 +748,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             static_cast<std::function<void(ECS::World*, ECS::Entity, const nlohmann::json&)>>(applyComponentFunc)
         );
         
-        LOG_INFO("[EditorComponentRegistry] Added C# component to editor registry: " << displayName << " (hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
+        LOG_DEBUG("[EditorComponentRegistry] Added C# component to editor registry: " << displayName);
     }
     
     LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry complete: Found " << newComponentsFound << " new C# components. Total in editor registry = " << s_registry.size());

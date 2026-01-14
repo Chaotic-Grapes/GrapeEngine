@@ -25,6 +25,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/ISystem.h"
 #include "ecs/ISystemMetadataProvider.h"
 #include "ecs/SystemDependencyGraph.h"
+#include "services/TimeSystem.h"
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -330,32 +331,27 @@ namespace ECS {
          * @brief Update systems based on run mode (for editor play/edit state).
          * @param mode Run mode filter (Always, PlayOnly, or EditOnly)
          * @param world Active scene's World
-         * @param deltaTime Time since last frame
          * 
          * Only updates systems whose GetRunMode() matches the specified mode.
          * Used by editor to control which systems run in edit vs play mode.
          * 
+         * OPTIMIZATION: Iterates only through system groups that have registered
+         * systems, avoiding unnecessary lookups on empty groups. This prevents
+         * the O(9*n) lookup pattern that was causing frame stalls in the editor.
+         * 
          * Example:
          * @code
          * if (editorInPlayMode) {
-         *     systemManager.UpdateSystemsForMode(SystemRunMode::Always, world, dt);
-         *     systemManager.UpdateSystemsForMode(SystemRunMode::PlayOnly, world, dt);
+         *     systemManager.UpdateSystemsForMode(SystemRunMode::Always, world);
+         *     systemManager.UpdateSystemsForMode(SystemRunMode::PlayOnly, world);
          * } else {
-         *     systemManager.UpdateSystemsForMode(SystemRunMode::Always, world, dt);
-         *     systemManager.UpdateSystemsForMode(SystemRunMode::EditOnly, world, dt);
+         *     systemManager.UpdateSystemsForMode(SystemRunMode::Always, world);
+         *     systemManager.UpdateSystemsForMode(SystemRunMode::EditOnly, world);
          * }
          * @endcode
          */
         void UpdateSystemsForMode(SystemRunMode mode, World& world) {
-            _updateGroupForMode(SystemGroup::PreUpdate, mode, world);
-            _updateGroupForMode(SystemGroup::Update, mode, world);
-            _updateGroupForMode(SystemGroup::PostUpdate, mode, world);
-            _updateGroupForMode(SystemGroup::PrePhysics, mode, world);
-            _updateGroupForMode(SystemGroup::Physics, mode, world);
-            _updateGroupForMode(SystemGroup::PostPhysics, mode, world);
-            _updateGroupForMode(SystemGroup::PreRender, mode, world);
-            _updateGroupForMode(SystemGroup::Render, mode, world);
-            _updateGroupForMode(SystemGroup::PostRender, mode, world);
+            _updateAllGroupsForMode(mode, world);
         }
 
         /**
@@ -683,7 +679,10 @@ namespace ECS {
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
                     if (system->IsEnabled()) {
+                        // Profile this system's execution
+                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
                         system->OnUpdate(world);
+                        TimeSystem::Instance().ProfileEnd();
                     }
                 }
             }
@@ -693,32 +692,42 @@ namespace ECS {
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
                     if (system->IsEnabled()) {
+                        // Profile this system's execution
+                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
                         system->OnUpdate(world);
+                        TimeSystem::Instance().ProfileEnd();
                     }
                 }
             }
         }
 
         /**
-         * @brief Update systems in a group filtered by run mode.
+         * @brief Update all systems filtered by run mode.
+         * 
+         * Iterates only through system groups that have registered systems,
+         * avoiding unnecessary lookups on empty groups.
          */
-        void _updateGroupForMode(SystemGroup group, SystemRunMode mode, World& world) {
-            // Update owned systems
-            auto itOwned = m_systemGroups.find(group);
-            if (itOwned != m_systemGroups.end()) {
-                for (auto& system : itOwned->second) {
+        void _updateAllGroupsForMode(SystemRunMode mode, World& world) {
+            // Update owned systems - iterate only through groups that exist
+            for (auto& [group, systems] : m_systemGroups) {
+                for (auto& system : systems) {
                     if (system->IsEnabled() && system->GetRunMode() == mode) {
+                        // Profile this system's execution
+                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
                         system->OnUpdate(world);
+                        TimeSystem::Instance().ProfileEnd();
                     }
                 }
             }
 
-            // Update scripted systems
-            auto itScripted = m_scriptedSystemGroups.find(group);
-            if (itScripted != m_scriptedSystemGroups.end()) {
-                for (auto* system : itScripted->second) {
+            // Update scripted systems - iterate only through groups that exist
+            for (auto& [group, systems] : m_scriptedSystemGroups) {
+                for (auto* system : systems) {
                     if (system->IsEnabled() && system->GetRunMode() == mode) {
+                        // Profile this system's execution
+                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
                         system->OnUpdate(world);
+                        TimeSystem::Instance().ProfileEnd();
                     }
                 }
             }
@@ -762,7 +771,9 @@ namespace ECS {
 
             // Execute sequential systems first (maintain backward compatibility)
             for (auto* system : sequentialSystems) {
+                TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
                 system->OnUpdate(world);
+                TimeSystem::Instance().ProfileEnd();
             }
 
             // Execute job-based systems in parallel (if any)
@@ -819,7 +830,9 @@ namespace ECS {
 
                 // Execute sequential systems first (maintain order)
                 for (auto* system : sequentialSystems) {
+                    TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
                     system->OnUpdate(world);
+                    TimeSystem::Instance().ProfileEnd();
                 }
 
                 // Execute job-based systems in parallel

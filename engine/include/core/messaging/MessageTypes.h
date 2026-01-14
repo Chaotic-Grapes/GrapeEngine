@@ -465,6 +465,16 @@ namespace Messaging {
               HitSomething(false), HitPosition(0.0f) {
         }
     };
+
+    // Editor: Entity selection changed (sent by viewport/hierarchy when entity is selected)
+    // Uses NPOS32 as sentinel for "nothing selected" to allow entity 0 to be a valid selection
+    struct EditorEntitySelected {
+        uint32_t EntityId;  // The entity that was selected (NPOS32 for "nothing selected")
+        
+        EditorEntitySelected(uint32_t id = std::numeric_limits<uint32_t>::max())
+            : EntityId(id) {
+        }
+    };
 }
 
 #endif // MESSAGETYPES_H

@@ -27,6 +27,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "math/Matrix4x4.h"
 #include "math/Quaternion.h"
 #include "math/Vector3D.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 
 using namespace ECS;
 
@@ -35,6 +37,13 @@ namespace Editor {
     // Static member initialization
     EditorGizmo::Operation EditorGizmo::s_currentOperation = EditorGizmo::Operation::Translate;
     EditorGizmo::Mode EditorGizmo::s_currentMode = EditorGizmo::Mode::Local;
+    
+    // Track gizmo usage state to detect start/end of manipulation
+    static bool s_wasUsing = false;
+    static uint32_t s_activeEntityID = Entity::NPOS32;
+    static Vector3D s_startPosition;
+    static Quaternion s_startRotation;
+    static Vector3D s_startScale;
 
     bool EditorGizmo::DrawGizmo(
         ECS::World& world,
@@ -47,23 +56,41 @@ namespace Editor {
         float drawSizeY,
         bool isPerspective)
     {
+        auto ResetManipulationState = []() {
+            s_wasUsing = false;
+            s_activeEntityID = Entity::NPOS32;
+        };
+
         // ------------------------------------------------------------------------
         // A. VALIDATION
         // ------------------------------------------------------------------------
 
         // Pre-check: Stop if the current selected entity is invalid
-        if (selectedEntityID == Entity::NPOS32)
+        if (selectedEntityID == Entity::NPOS32) {
+            ResetManipulationState();
             return false;
+        }
 
         ECS::Entity entity = world.Resolve(selectedEntityID);
 
         // Skip if entity doesn't exist or was destroyed
-        if (entity.IsNull() || !world.IsAlive(entity))
+        if (entity.IsNull() || !world.IsAlive(entity)) {
+            ResetManipulationState();
             return false;
+        }
 
         // Check if entity has transform
-        if (!world.Has<ECS::Components::LocalTransform>(entity))
+        if (!world.Has<ECS::Components::LocalTransform>(entity)) {
+            ResetManipulationState();
             return false;
+        }
+
+        // If selection changed mid-drag, drop the previous drag state to avoid
+        // firing end-of-manipulation events on the wrong entity.
+        if (s_activeEntityID != Entity::NPOS32 && s_activeEntityID != selectedEntityID) {
+            s_wasUsing = false;
+        }
+        s_activeEntityID = selectedEntityID;
 
         // ------------------------------------------------------------------------
         // B. SETUP IMGUIZMO CONTEXT
@@ -100,11 +127,9 @@ namespace Editor {
         // Build model matrix as engine Matrix4x4
         Matrix4x4 modelMatrix = Matrix4x4::Identity();
 
-        bool usedWorld = false;
         if (world.Has<ECS::Components::WorldTransform>(entity)) {
             const auto& wt = world.Get<ECS::Components::WorldTransform>(entity);
             modelMatrix = wt.Matrix;
-            usedWorld = true;
         }
         else {
             // Fallback to LocalTransform if WorldTransform not present
@@ -129,7 +154,7 @@ namespace Editor {
 
         MatToColMajor(modelMatrix, modelArr);
 
-        ImGuizmo::Manipulate(
+        bool manipulated = ImGuizmo::Manipulate(
             viewMatrix,
             projMatrix,
             static_cast<ImGuizmo::OPERATION>(s_currentOperation),
@@ -141,13 +166,20 @@ namespace Editor {
         // F. APPLY MODIFIED TRANSFORM BACK TO ECS COMPONENT
         // ------------------------------------------------------------------------
 
-        bool wasManipulated = false;
+        bool isCurrentlyUsing = ImGuizmo::IsUsing();
 
-        if (ImGuizmo::IsUsing())
+        // Detect start of manipulation
+        if (isCurrentlyUsing && !s_wasUsing) {
+            // Capture initial transform for undo system
+            const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+            s_startPosition = lt.Position;
+            s_startRotation = lt.Rotation;
+            s_startScale = lt.Scale;
+            LOG_DEBUG("Gizmo started - captured initial transform");
+        }
+
+        if (isCurrentlyUsing)
         {
-            wasManipulated = true;
-            LOG_DEBUG("GIZMO IS USING: Applying changes!");
-
             // modelArr now contains the modified world matrix in column-major order
             Matrix4x4 newWorldMat;
             // Convert column-major array back into engine Matrix4x4 (row-major storage)
@@ -169,7 +201,11 @@ namespace Editor {
                 parentWorld = world.Get<ECS::Components::WorldTransform>(parent).Matrix;
             }
 
-            Matrix4x4 invParent = parentWorld.Inverse();
+            float parentDet = 0.0f;
+            Matrix4x4 invParent = parentWorld.Inverse(&parentDet);
+            if (parentDet == 0.0f) {
+                invParent = Matrix4x4::Identity();
+            }
             Matrix4x4 localMatrix = invParent * newWorldMat;
 
             // Decompose localMatrix into T/R/S using engine TransformUtils
@@ -177,11 +213,17 @@ namespace Editor {
             Quaternion outRot;
             TransformUtils::DecomposeTRS(localMatrix, outPos, outRot, outScale);
 
+            // Engine translation convention uses last column (see Matrix4x4::Translation).
+            // Force position extraction to match that convention so gizmo translation
+            // always updates correctly.
+            outPos = Vector3D(localMatrix.m03, localMatrix.m13, localMatrix.m23);
+
             // Update LocalTransform component
-            auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+            auto lt = world.Get<ECS::Components::LocalTransform>(entity);
             lt.Position = outPos;
             lt.Scale = outScale;
             lt.Rotation = outRot;
+            world.Set<ECS::Components::LocalTransform>(entity, lt);
 
             // Update WorldTransform immediately so subsequent frames use the
             // freshly edited world matrix (avoids snapping when hierarchy update
@@ -198,7 +240,37 @@ namespace Editor {
             }
         }
 
-        return wasManipulated;
+        // Detect end of manipulation
+        if (!isCurrentlyUsing && s_wasUsing) {
+            // Get final transform and send message for undo system
+            const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+            
+            // Only send message if transform actually changed
+            if (s_startPosition != lt.Position || 
+                s_startRotation != lt.Rotation || 
+                s_startScale != lt.Scale) {
+                
+                world.Set<ECS::Components::LocalTransform>(entity, lt);
+                
+                Messaging::MessageSystem::Notify(
+                    Messaging::EntityTransformChanged(
+                        selectedEntityID,
+                        s_startPosition, s_startRotation, s_startScale,
+                        lt.Position, lt.Rotation, lt.Scale
+                    )
+                );
+                
+                // Mark scene as modified
+                Messaging::MessageSystem::Broadcast(Messaging::SceneModified("Gizmo manipulation"));
+            }
+        }
+
+        s_wasUsing = isCurrentlyUsing;
+
+        // "manipulated" is true when the matrix actually changed this frame.
+        // Also treat the active drag as manipulation so callers can optionally
+        // suppress other input while the gizmo is held.
+        return manipulated || isCurrentlyUsing;
     }
 
 } // namespace Editor

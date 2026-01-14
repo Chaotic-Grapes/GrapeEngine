@@ -28,6 +28,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CompilePanel.h"
+#include <cmath>
 
 #ifdef ERROR
 #undef ERROR
@@ -188,7 +189,9 @@ void LevelEditor::_renderDockSpace() {
     if (vp->Size.x <= 0 || vp->Size.y <= 0) return; // Guard against hidden or zero viewport
 
     // Track viewport size changes and trigger layout rebuild when it changes
-    if (m_lastViewportSize.x != vp->Size.x || m_lastViewportSize.y != vp->Size.y) {
+    // Use a tolerance to avoid rebuilding every frame due to tiny float jitter.
+    constexpr float sizeEpsilon = 0.5f;
+    if (std::fabs(m_lastViewportSize.x - vp->Size.x) > sizeEpsilon || std::fabs(m_lastViewportSize.y - vp->Size.y) > sizeEpsilon) {
         m_lastViewportSize = vp->Size;
         m_dockLayoutBuilt = false; // Force a rebuild on size change
     }

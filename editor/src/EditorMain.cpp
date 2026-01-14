@@ -22,11 +22,18 @@ Launches the application in editor mode with the level editor interface.
 #include "EditorState.h"
 #include "services/TimeSystem.h"
 #include "platform/IPlatformContext.h"
+#include "platform/IWindow.h"
 #include "scripting/ScriptManager.h"
 #include "core/Logger.h"
 
-// Forward declare the component deserialize callback registration function
-extern "C" void RegisterComponentDeserializeCallback(void(*callback)(uint32_t, void*, int, const char*));
+extern "C" {
+    // Forward declare the component deserialize callback registration function
+    void RegisterComponentDeserializeCallback(void(*callback)(uint32_t, void*, int, const char*));
+
+    // Request high-performance GPU
+    __declspec(dllexport) unsigned long NvOptimusEnablement         = 1;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance  = 1;
+}
 
 /**
  * @brief Main entry point for the Grape Engine Level Editor
@@ -58,11 +65,14 @@ int main() {
     engine.GetSystemManager().CreateAll(emptyWorld);
 
     // Initialize C# script compilation and hot reload watcher
-    auto* scriptManager = engine.GetScriptManager();
+    ECS::ScriptManager* scriptManager = engine.GetScriptManager();
+    
+    // Flag to defer registry rebuild to avoid frame spikes during hot reload
+    std::atomic<bool> registryRebuildPending{false};
     
     // Register hot reload callback so systems get reinitialized when scripts are reloaded
     if (scriptManager && scriptManager->IsInitialized()) {
-        scriptManager->SetHotReloadCallback([&engine, &emptyWorld](const std::string& assemblyPath) {
+        scriptManager->SetHotReloadCallback([&engine, &emptyWorld, &registryRebuildPending](const std::string& assemblyPath) {
             LOG_INFO("[EditorMain] Hot reload callback triggered for: " << assemblyPath);
             
             // IMPORTANT: Clear all entities to ensure component schema changes are applied
@@ -84,10 +94,10 @@ int main() {
                 LOG_INFO("[EditorMain] Hot reload: re-discovered and initialized " << systemCount << " C# systems");
             }
 
-            // Rebuild the editor's component registry to reflect any changes to C# component structures
-            // This ensures the inspector shows the correct properties for updated components
-            ComponentRegistryUI::RebuildFromNativeRegistry();
-            LOG_INFO("[EditorMain] Rebuilt editor component registry after hot reload");
+            // DEFER the registry rebuild to avoid spiking frame time during hot reload callback
+            // The rebuild will be applied at the start of the next frame, before rendering
+            registryRebuildPending.store(true);
+            LOG_INFO("[EditorMain] Deferred editor component registry rebuild to next frame (avoids render spike)");
         });
         LOG_INFO("[EditorMain] Hot reload callback registered with ScriptManager");
 
@@ -133,7 +143,7 @@ int main() {
             LOG_INFO("[EditorMain] Scheduling background C# script compilation...");
 
             std::atomic<bool> compileDone{false};
-            std::thread progressThread([&]() {
+            std::thread progressThread([&compileDone, scriptManager]() {
                 int status = 0;
                 int progress = -1;
                 std::string message;
@@ -150,7 +160,7 @@ int main() {
             });
 
             // Launch compilation on a worker thread so main loop can run immediately
-            std::thread compileThread([scriptManager, scriptsOutput, projectRoot, &engine, &emptyWorld, &compileDone]() mutable {
+            std::thread compileThread([scriptManager, scriptsOutput, projectRoot, &engine, &emptyWorld, &registryRebuildPending, &compileDone]() mutable {
                 std::string diagnostics;
                 try {
                     scriptManager->SetCompileStatus(1, 0, "Starting compilation");
@@ -171,9 +181,10 @@ int main() {
                             int systemCount = scriptManager->RegisterScriptedSystems(engine.GetSystemManager(), &emptyWorld);
                             LOG_INFO("[EditorMain] Registered " << systemCount << " C# systems with SystemManager");
                             
-                            // Rebuild the editor's component registry now that C# components are registered
-                            ComponentRegistryUI::RebuildFromNativeRegistry();
-                            LOG_INFO("[EditorMain] Rebuilt editor component registry with C# components");
+                            // DEFER the registry rebuild to avoid blocking frame time during initial compilation
+                            // The rebuild will be applied at the start of the next frame, before rendering
+                            registryRebuildPending.store(true);
+                            LOG_INFO("[EditorMain] Deferred editor component registry rebuild to next frame (avoids startup stutter)");
                         }
                         else {
                             LOG_ERROR("[EditorMain] Failed to load compiled script assembly");
@@ -212,8 +223,26 @@ int main() {
     // Track previous state to detect transitions
     EditorState previousState = EditorState::Edit;
 
+    LOG_CRITICAL("Using GPU: " << glGetString(GL_RENDERER));
+
     // Editor main loop
     while (engine.IsRunning()) {
+        // Apply deferred registry rebuild at the start of frame (before rendering)
+        // This avoids spiking editor.Render() when hot reload happens
+        if (registryRebuildPending.exchange(false)) {
+            ComponentRegistryUI::RebuildFromNativeRegistry();
+            LOG_INFO("[EditorMain] Deferred registry rebuild completed");
+        }
+
+        // If the editor window is minimized or unfocused, avoid burning CPU in a tight loop.
+        // This does not affect FPS cap behavior when focused.
+        if (platformContext) {
+            auto* mainWindow = platformContext->GetMainWindow();
+            if (mainWindow && (mainWindow->IsMinimized() || !mainWindow->IsFocused() || !mainWindow->IsVisible())) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+
         // Update editor state and input
         editor.Update();
         
@@ -291,6 +320,8 @@ int main() {
 
         // Swap buffers using platform abstraction
         for (auto* win : platformContext->GetAllWindows()) {
+            if (!win) continue;
+            if (!win->IsVisible() || win->IsMinimized()) continue;
             win->SwapBuffers();
         }
     }

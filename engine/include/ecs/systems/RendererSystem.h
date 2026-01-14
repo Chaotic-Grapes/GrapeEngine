@@ -40,6 +40,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <functional>
 #include <optional>
 #include <unordered_map>
+#include <queue>
 
 namespace ECS {
     /**
@@ -383,7 +384,8 @@ namespace ECS {
             glm::vec2 ViewportSize{0.0f, 0.0f};
         };
 
-        std::optional<PendingPickRequest> m_pendingPickRequest; // single-slot request processed by picking pass
+        std::queue<PendingPickRequest> m_pendingPickRequests; // queue of requests to process
+        std::optional<PendingPickRequest> m_currentPickRequest; // currently processing request
         std::unordered_map<uint32_t, uint32_t> m_completedPickResults; // requestId -> picked entity id
         uint32_t m_nextPickRequestId = 1;
         struct InFlightPick {
