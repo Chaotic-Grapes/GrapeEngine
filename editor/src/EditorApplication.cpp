@@ -90,16 +90,17 @@ void EditorApplication::Shutdown() {
 
     LOG_INFO("Shutting down Editor Application...");
 
-    // Save editor settings
-    _saveEditorSettings();
-
-    // Clean up editor service
+    // Clean up editor service first while GL context is still active
+    // This ensures ImGui and all editor resources are properly destroyed
     if (m_editorService) {
         m_editorService->Terminate();
         delete m_editorService;
         m_editorService = nullptr;
         LOG_INFO("EditorService terminated");
     }
+
+    // Save editor settings after editor is cleaned up
+    _saveEditorSettings();
 
     m_initialized = false;
     LOG_INFO("Editor Application shutdown complete");
