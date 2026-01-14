@@ -32,6 +32,43 @@ public static class ScriptFileWatcher
     private static string? _watchedDirectory;
     private static string? _outputAssemblyPath;  // Output path for compiled scripts
 
+    // Ignore paths that commonly change during builds/compilation and can cause feedback loops.
+    // NOTE: FileSystemWatcher doesn't support excludes, so we filter in handlers.
+    private static readonly string[] _ignoredPathSegments =
+    [
+        "\\\\.git\\\\",
+        "\\\\.vs\\\\",
+        "\\\\.idea\\\\",
+        "\\\\bin\\\\",
+        "\\\\obj\\\\",
+        "\\\\build\\\\",
+        "\\\\x64\\\\",
+        "\\\\Debug\\\\",
+        "\\\\Release\\\\",
+        "\\\\.vscode\\\\",
+    ];
+
+    private static bool ShouldIgnorePath(string fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+            return true;
+
+        var p = fullPath.Replace('/', '\\');
+        p = p.ToLowerInvariant();
+
+        for (int i = 0; i < _ignoredPathSegments.Length; i++)
+        {
+            if (p.Contains(_ignoredPathSegments[i].ToLowerInvariant()))
+                return true;
+        }
+
+        // Ignore common generated C# sources even if they somehow appear outside ignored dirs.
+        if (p.EndsWith(".g.cs", StringComparison.Ordinal) || p.EndsWith(".generated.cs", StringComparison.Ordinal))
+            return true;
+
+        return false;
+    }
+
     // Native compile status callback (function pointer set by native ScriptManager)
     // Signature: void callback(int status, int progress, sbyte* messageUtf8)
     private static unsafe delegate* unmanaged[Cdecl]<int, int, sbyte*, void> _compileCallback = null;
@@ -153,6 +190,9 @@ public static class ScriptFileWatcher
 
     private static void OnFileChanged(object sender, FileSystemEventArgs e)
     {
+        if (ShouldIgnorePath(e.FullPath))
+            return;
+
         lock (_lock)
         {
             // Add to changed files set
@@ -161,22 +201,26 @@ public static class ScriptFileWatcher
             // Reset debounce timer
             _debounceTimer?.Stop();
             _debounceTimer?.Start();
-            
-            Logging.LogInternal($"[ScriptFileWatcher] Detected change: {e.ChangeType} - {e.Name}", LogLevel.Info);
         }
+
+        // Per-file event logging is extremely noisy and can impact editor responsiveness.
+        Logging.LogInternal($"[ScriptFileWatcher] Detected change: {e.ChangeType} - {e.Name}", LogLevel.Debug);
     }
 
     private static void OnFileRenamed(object sender, RenamedEventArgs e)
     {
+        if (ShouldIgnorePath(e.FullPath))
+            return;
+
         lock (_lock)
         {
             _changedFiles.Add(e.FullPath);
             
             _debounceTimer?.Stop();
             _debounceTimer?.Start();
-            
-            Logging.LogInternal($"[ScriptFileWatcher] Detected rename: {e.OldName} -> {e.Name}", LogLevel.Info);
         }
+
+        Logging.LogInternal($"[ScriptFileWatcher] Detected rename: {e.OldName} -> {e.Name}", LogLevel.Debug);
     }
 
     private static unsafe void OnDebounceTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
