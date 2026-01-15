@@ -59,6 +59,14 @@ struct PrefabData {
     bool IsValid = false;       // Flag indicating if the prefab was loaded successfully
 };
 
+// Raw data structure for generic file loading
+// THIS IS FOR IMGUI FONT LOADING BECAUSE IT WANTS RAW BYTES
+struct RawData {
+    std::vector<uint8_t> Data;  // Raw file data
+    std::string Path;           // File path
+    bool IsValid = false;       // Success flag
+};
+
 // Centralized resource management system for game assets
 // Supports textures, audio, fonts, shaders and prefabs
 class GRAPEENGINE_API ResourceManager {
@@ -75,6 +83,9 @@ public:
     // Template function to retrieve assets with automatic caching
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
+
+	// Load shader from vertex and fragment paths that don't have the same base name
+    std::shared_ptr<Shader> GetShader(const std::string& vertexPath, const std::string& fragmentPath);
 
     // Load font with specified size (allows same font at different sizes)
     std::shared_ptr<Font> GetFont(const std::string& name, int pixelSize = 48);
@@ -109,6 +120,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<Font>> m_fonts;
     std::unordered_map<std::string, std::shared_ptr<Shader>> m_shaders;
     std::unordered_map<std::string, std::shared_ptr<PrefabData>> m_prefabs;
+    std::unordered_map<std::string, std::shared_ptr<RawData>> m_rawData;
 };
 
 // Global ResourceManager instance

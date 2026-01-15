@@ -162,35 +162,21 @@ namespace ECS {
         const int width = mainWindow->GetWidth();
         const int height = mainWindow->GetHeight();
 
-        // Shaders
-        m_shader = std::make_unique<Shader>(
-            "assets/shaders/batch.vert",
-            "assets/shaders/batch.frag");
+        // Use RM instead!
+        m_shader = RM.Get<Shader>("assets/shaders/batch");
+        m_textShader = RM.Get<Shader>("assets/shaders/sdf_text");
+        m_sdfCircleShader = RM.Get<Shader>("assets/shaders/sdf_circle");
+        m_bloomExtractShader = RM.Get<Shader>("assets/shaders/bloom_extract");
 
-        m_textShader = std::make_unique<Shader>(
-            "assets/shaders/sdf_text.vert",
-            "assets/shaders/sdf_text.frag");
-
-        m_sdfCircleShader = std::make_unique<Shader>(
-            "assets/shaders/sdf_circle.vert",
-            "assets/shaders/sdf_circle.frag"
-        );
-
-        m_bloomExtractShader = std::make_unique<Shader>(
-            "assets/shaders/bloom_extract.vert",
-            "assets/shaders/bloom_extract.frag");
-
-        m_bloomBlurShader = std::make_unique<Shader>(
+        m_bloomBlurShader = RM.GetShader(
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_blur.frag");
 
-        m_bloomCombineShader = std::make_unique<Shader>(
+        m_bloomCombineShader = RM.GetShader(
             "assets/shaders/bloom_extract.vert",
             "assets/shaders/bloom_combine.frag");
 
-        m_blitShader = std::make_unique<Shader>(
-            "assets/shaders/blit.vert",
-            "assets/shaders/blit.frag");
+        m_blitShader = RM.Get<Shader>("assets/shaders/blit");
 
         // Object Picking
         m_pickingFBO.Create(width, height, false, false, 1);
@@ -1337,23 +1323,14 @@ namespace ECS {
     void RendererSystem::ProcessGUIText(const GUISubmission& submission) {
         if (!m_textShader || !m_renderer) return;
 
-        // Font cache (static to persist across frames)
-        static std::unordered_map<std::string, std::shared_ptr<Font>> fontCache;
-
-        // Load/cache font
         std::string fontPath = submission.fontPath;
-        auto it = fontCache.find(fontPath);
-        if (it == fontCache.end()) {
-            try {
-                auto font = std::make_shared<Font>(fontPath, 96);
-                fontCache[fontPath] = font;
-                it = fontCache.find(fontPath);
-                LOG_DEBUG("Loaded font for GUI: " << fontPath);
-            }
-            catch (const std::exception& e) {
-                LOG_ERROR("Failed to load GUI font " << fontPath << ": " << e.what());
-                return;
-            }
+        
+        // Use ResourceManager to get the font (using 96px for high quality SDF)
+        auto font = RM.GetFont(fontPath, 96);
+
+        if (!font) {
+            // Error already logged by RM
+            return;
         }
 
         // Use text shader for SDF rendering
@@ -1373,7 +1350,7 @@ namespace ECS {
         // Submit text to renderer for SDF rendering
         // The renderer's submitText handles font geometry generation and batching
         m_renderer->submitText(
-            *it->second,
+            *font,
             submission.text,
             screenPos,
             glmColor,

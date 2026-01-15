@@ -204,14 +204,57 @@ template<>std::shared_ptr<Font> ResourceManager::Load<Font>(const std::string& f
     }
 }
 
-// Loading function for shaders
-template<>std::shared_ptr<Shader> ResourceManager::Load<Shader>(const std::string& basePath) {
-    // Shader files are expected to have .vert and .frag extensions
-    // Example: "assets/shaders/sprite" -> "sprite.vert" and "sprite.frag"
-    std::string vertPath = basePath + ".vert";
-    std::string fragPath = basePath + ".frag";
+// Loading function for raw data
+template<>std::shared_ptr<RawData> ResourceManager::Load<RawData>(const std::string& filePath) {
+    if (!std::filesystem::exists(filePath)) {
+        LOG_ERROR("File not found: " << filePath);
+        return nullptr;
+    }
 
-    // Check if both shader files exist
+    try {
+        std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+        if (!file) {
+            LOG_ERROR("Failed to open file: " << filePath);
+            return nullptr;
+        }
+
+        size_t fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        auto raw = std::make_shared<RawData>();
+        raw->Path = filePath;
+        raw->Data.resize(fileSize);
+        file.read(reinterpret_cast<char*>(raw->Data.data()), fileSize);
+
+        if (!file) {
+            LOG_ERROR("Failed to read file: " << filePath);
+            return nullptr;
+        }
+
+        raw->IsValid = true;
+        return raw;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Exception loading raw file " << filePath << ": " << e.what());
+        return nullptr;
+    }
+}
+
+// Loading function for shaders
+template<>std::shared_ptr<Shader> ResourceManager::Load<Shader>(const std::string& key) {
+    std::string vertPath;
+    std::string fragPath;
+
+    size_t separator = key.find('|');
+    if (separator != std::string::npos) {
+        vertPath = key.substr(0, separator);
+        fragPath = key.substr(separator + 1);
+    }
+    else {
+        vertPath = key + ".vert";
+        fragPath = key + ".frag";
+    }
+
     if (!std::filesystem::exists(vertPath)) {
         LOG_ERROR("Vertex shader not found: " << vertPath);
         return nullptr;
@@ -223,15 +266,12 @@ template<>std::shared_ptr<Shader> ResourceManager::Load<Shader>(const std::strin
     }
 
     try {
-        // Use the existing Shader constructor to load and compile
         auto shader = std::make_shared<Shader>(vertPath, fragPath);
-
-        // Shader constructor throws on failure, so if we get here it succeeded
-        LOG_INFO("Loaded shader: " << basePath);
+        LOG_INFO("Loaded shader: " << key);
         return shader;
     }
     catch (const std::exception& e) {
-        LOG_ERROR("Exception loading shader " << basePath << ": " << e.what());
+        LOG_ERROR("Exception loading shader " << key << ": " << e.what());
         return nullptr;
     }
 }
@@ -322,6 +362,11 @@ std::shared_ptr<Font> ResourceManager::GetFont(const std::string& name, int pixe
     }
 }
 
+std::shared_ptr<Shader> ResourceManager::GetShader(const std::string& vertexPath, const std::string& fragmentPath) {
+    std::string key = vertexPath + "|" + fragmentPath;
+    return Get<Shader>(key);
+}
+
 // Clear all cached assets
 void ResourceManager::ClearCache() {
     m_textures.clear();
@@ -343,7 +388,20 @@ void ResourceManager::UnloadAsset(const std::string& name) {
 
     // Try to remove from all caches
     removed |= m_audioFiles.erase(name) > 0;
+    
+    // Fonts use composite key (name:size), so we must iterate
+    for (auto it = m_fonts.begin(); it != m_fonts.end(); ) {
+        // Check if key starts with "name:"
+        if (it->first.find(name + ":") == 0) {
+            it = m_fonts.erase(it);
+            removed = true;
+        } else {
+            ++it;
+        }
+    }
+    // Also try direct match (just in case)
     removed |= m_fonts.erase(name) > 0;
+
     removed |= m_shaders.erase(name) > 0;
     removed |= m_prefabs.erase(name) > 0;
 
