@@ -461,30 +461,55 @@ void LevelEditor::_loadFonts() {
     auto& io = ImGui::GetIO();
     float textFontSize = m_config.TextFontSize;
 
+    // Helper to load font via RM
+    auto loadFont = [&](const std::string& path, float size, ImFontConfig* config = nullptr, const ImWchar* ranges = nullptr) -> ImFont* {
+        // WE'RE USING RAWDATA BECAUSE ENGINE VS IMGUI FONTS ARE DIFFERENT
+        // IMGUI FONTS NEED RAW TTF BYTES
+        auto raw = RM.Get<RawData>(path);
+        
+        // Load from memory if valid
+        if (raw && raw->IsValid) {
+            ImFontConfig cfg = config ? *config : ImFontConfig();
+            cfg.FontDataOwnedByAtlas = false; // Data is owned by RM (shared_ptr)
+
+            // Make a name for debug    
+            strncpy_s(cfg.Name, path.c_str(), sizeof(cfg.Name) - 1);
+            return io.Fonts->AddFontFromMemoryTTF(raw->Data.data(), (int)raw->Data.size(), size, &cfg, ranges);
+        }
+        else {
+            LOG_ERROR("Failed to load font via RM: " << path);
+            return nullptr;
+        }
+    };
+
+	// Load main text font (caching handled by RM)
     if (!m_mainFont && io.Fonts->Fonts.empty()) {
-        m_mainFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Inter/static/Inter_24pt-Medium.ttf",
-            textFontSize
-        );
+        m_mainFont = loadFont("assets/fonts/Inter/static/Inter_24pt-Medium.ttf", textFontSize);
+
+		// Safety check (fallback to default font)
         if (!m_mainFont) {
             LOG_ERROR("Failed to load Inter Medium font");
             m_mainFont = io.Fonts->AddFontDefault();
         }
     }
+
+	// Use first font if already loaded
     else if (!m_mainFont) {
         m_mainFont = io.Fonts->Fonts[0];
     }
 
+	// Load bold font
     if (!m_boldFont && io.Fonts->Fonts.size() < 2) {
-        m_boldFont = io.Fonts->AddFontFromFileTTF(
-            "assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf",
-            textFontSize
-        );
+        m_boldFont = loadFont("assets/fonts/Inter/static/Inter_24pt-ExtraBold.ttf", textFontSize);
+
+		// Safety check (fallback to default font)
         if (!m_boldFont) {
             LOG_ERROR("Failed to load Inter ExtraBold font");
             m_boldFont = io.Fonts->AddFontDefault();
         }
     }
+
+	// Use second font if already loaded
     else if (!m_boldFont) {
         m_boldFont = io.Fonts->Fonts[1];
     }
@@ -497,8 +522,9 @@ void LevelEditor::_loadFonts() {
     iconsConfig.OversampleH = 3;
     iconsConfig.OversampleV = 3;
 
+	// Load icon font (Material Symbols); AGAIN, caching via RM
     if (!m_symbolsFont && io.Fonts->Fonts.size() < 3) {
-        m_symbolsFont = io.Fonts->AddFontFromFileTTF(
+        m_symbolsFont = loadFont(
             "assets/fonts/Material_Symbols_Rounded/static/MaterialSymbolsRounded-Regular.ttf",
             iconFontSize,
             &iconsConfig,

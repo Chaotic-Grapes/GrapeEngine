@@ -89,21 +89,6 @@ namespace ECS {
                 const std::string& name = "");
 
             /**
-             * @brief Create an image element
-             * @param world The ECS world
-             * @param position Image position
-             * @param size Image size
-             * @param texturePath Path to texture
-             * @return Created image entity
-             */
-            static Entity CreateImage(
-                World& world,
-                Vector2D position,
-                Vector2D size,
-                const std::string& texturePath,
-                const std::string& name = "");
-
-            /**
              * @brief Create an input field
              * @param world The ECS world
              * @param position Input field position

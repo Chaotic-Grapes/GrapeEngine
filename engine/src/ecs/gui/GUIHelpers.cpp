@@ -25,6 +25,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "core/Logger.h"
+#include "services/ResourceManager.h"
 #include <cmath>
 
 namespace ECS {
@@ -130,7 +131,14 @@ namespace ECS {
 
             auto& element = world.Add<GUIElement>(label);
             element.Position = position;
-            element.Size = {200.0f, 30.0f};  // Default size
+            
+            // Calculate size based on text content
+            if (!text.empty()) {
+                element.Size = GUITextUtils::MeasureText(text, "assets/fonts/arial.ttf", fontSize);
+            } else {
+                element.Size = {200.0f, 30.0f};  // Default size
+            }
+            
             element.ElementType = GUIElementType::Text;
 
             auto& textComp = world.Add<GUIText>(label);
@@ -483,10 +491,27 @@ namespace ECS {
             const std::string& fontPath,
             float fontSize) {
             
-            // TODO: Implement actual text measurement using font system
-            // For now, return estimated size
-            float width = text.length() * fontSize * 0.6f;
-            float height = fontSize;
+            // Use 96px as the standard SDF size, matching RendererSystem
+            const int StandardSDFSize = 96;
+            std::string actualPath = fontPath.empty() ? "assets/fonts/arial.ttf" : fontPath;
+            
+            auto font = RM.GetFont(actualPath, StandardSDFSize);
+            if (!font) {
+                // Fallback estimation if font fails to load
+                float width = text.length() * fontSize * 0.6f;
+                float height = fontSize;
+                return {width, height};
+            }
+
+            float scale = fontSize / static_cast<float>(StandardSDFSize);
+            float width = 0.0f;
+            float height = font->getLineHeight() * scale;
+
+            for (char c : text) {
+                const auto& glyph = font->getGlyph(c);
+                width += glyph.advance * scale;
+            }
+
             return {width, height};
         }
 
