@@ -57,13 +57,6 @@ public:
     void Render();
 
 private:
-    struct CachedDirEntry {
-        std::string Path;
-        std::string Name;
-        std::string Extension;
-        bool IsDirectory = false;
-    };
-
     // -------------------------------------------------------------------------
     // UI Sections
     // -------------------------------------------------------------------------
@@ -94,9 +87,6 @@ private:
 
     // Render status message bar
     void _renderStatusBar();
-
-    // Refresh directory listing cache (avoids per-frame filesystem iteration)
-    void _refreshDirectoryCacheIfNeeded();
 
     // -------------------------------------------------------------------------
     // Prefab Operations and Selection
@@ -182,8 +172,8 @@ private:
     AssetLibrary m_assetLibrary;
     std::string m_currentPath;
     std::string m_selectedAsset;
-    std::unordered_set<std::string> m_selectedAssets;  // Multi-selection support
-    std::string m_anchorAsset;  // For shift-selection
+    std::unordered_set<std::string> m_selectedAssets; // Multi-selection support
+    std::string m_anchorAsset;                        // For shift-selection
 
     // Clipboard state
     std::vector<std::string> m_clipboardAssets;
@@ -205,12 +195,6 @@ private:
     std::string m_renamingAsset;
     char m_renameBuffer[256] = "";
     bool m_focusRenameInput = false;
-
-    // Directory listing cache (reduces filesystem overhead)
-    std::vector<CachedDirEntry> m_cachedEntries;
-    std::string m_cachedPath;
-    double m_lastCacheRefreshTime = 0.0;
-    bool m_forceCacheRefresh = true;
 };
 
 #endif

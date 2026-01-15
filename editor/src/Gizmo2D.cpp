@@ -44,6 +44,7 @@ namespace Editor {
     static Vector3D s_startPosition;
     static Quaternion s_startRotation;
     static Vector3D s_startScale;
+    static bool s_hadMouseDown = false;  // Track mouse button state
 
     bool EditorGizmo::DrawGizmo(
         ECS::World& world,
@@ -107,6 +108,9 @@ namespace Editor {
         // Set the screen area (the viewport image bounds).
         ImGuizmo::SetRect(drawPosX, drawPosY, drawSizeX, drawSizeY);
 
+        // Enable gizmo to receive input - critical for reliable mouse interaction
+        ImGuizmo::Enable(true);
+
         // ------------------------------------------------------------------------
         // C. HANDLE TOOL SWITCH INPUT (T = Move, E = Rotate, R = Scale)
         // ------------------------------------------------------------------------
@@ -154,6 +158,9 @@ namespace Editor {
 
         MatToColMajor(modelMatrix, modelArr);
 
+        // Check if mouse is over gizmo BEFORE calling Manipulate to ensure proper detection
+        bool isMouseOverGizmo = ImGuizmo::IsOver();
+        
         bool manipulated = ImGuizmo::Manipulate(
             viewMatrix,
             projMatrix,
@@ -167,6 +174,12 @@ namespace Editor {
         // ------------------------------------------------------------------------
 
         bool isCurrentlyUsing = ImGuizmo::IsUsing();
+        
+        // If we were using the gizmo but suddenly IsUsing() returns false,
+        // check if we're still hovering - sometimes ImGuizmo needs a frame to settle
+        if (s_wasUsing && !isCurrentlyUsing && isMouseOverGizmo) {
+            isCurrentlyUsing = true;  // Treat as still using if hovering over gizmo
+        }
 
         // Detect start of manipulation
         if (isCurrentlyUsing && !s_wasUsing) {
@@ -229,8 +242,10 @@ namespace Editor {
             // freshly edited world matrix (avoids snapping when hierarchy update
             // runs later).
             if (world.Has<ECS::Components::WorldTransform>(entity)) {
-                world.Get<ECS::Components::WorldTransform>(entity).Matrix = newWorldMat;
-                world.Get<ECS::Components::WorldTransform>(entity).Dirty = false;
+                auto wt = world.Get<ECS::Components::WorldTransform>(entity);
+                wt.Matrix = newWorldMat;
+                wt.Dirty = false;
+                world.Set<ECS::Components::WorldTransform>(entity, wt);
             }
             else {
                 ECS::Components::WorldTransform wt{};

@@ -89,6 +89,24 @@ namespace Editor {
          */
         static Mode GetMode() { return s_currentMode; }
 
+        /**
+         * @brief Check if gizmo is currently being interacted with (dragged)
+         * @return true if user is actively manipulating the gizmo
+         */
+        static bool IsBeingUsed() { return ImGuizmo::IsUsing(); }
+
+        /**
+         * @brief Check if mouse is hovering over gizmo handles
+         * @return true if mouse is over any gizmo element
+         */
+        static bool IsMouseOverGizmo() { return ImGuizmo::IsOver(); }
+
+        /**
+         * @brief Check if gizmo should block input (either being used or hovered)
+         * @return true if gizmo is active and should prevent other input
+         */
+        static bool ShouldBlockInput() { return ImGuizmo::IsUsing() || ImGuizmo::IsOver(); }
+
     private:
         static Operation s_currentOperation;
         static Mode s_currentMode;

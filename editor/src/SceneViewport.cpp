@@ -173,10 +173,45 @@ void SceneViewport::_renderViewport() {
             // Get the drawing position of the rendered image
             ImVec2 gizmoPos = ImGui::GetItemRectMin();
 
+            // Draw selection outline and gizmo BEFORE picking check so ImGuizmo state is valid
+            if (!m_selectedEntity.IsNull() && m_editorCamera) {
+                auto* camera = m_editorCamera->GetCamera();
+                if (camera) {
+                    // Compute camera matrices for overlays
+                    glm::mat4 view = camera->GetViewMatrix();
+                    glm::mat4 proj = camera->GetProjectionMatrix();
+
+                    // Draw wireframe outline around selected entity (updated signature)
+                    Editor::SelectionOutlineRenderer::RenderOutline(
+                        *m_world,
+                        m_selectedEntity.Index,
+                        rendererSystem->GetRenderer(),
+                        rendererSystem->GetShader(),
+                        proj * view,
+                        camera->OrthoSize,
+                        size.x,
+                        size.y
+                    );
+
+                    // Draw gizmo for transform manipulation
+                    // CRITICAL: Must be drawn BEFORE picking check so ImGuizmo state is available
+                    Editor::EditorGizmo::DrawGizmo(
+                        *m_world,
+                        m_selectedEntity.Index,
+                        glm::value_ptr(view),
+                        glm::value_ptr(proj),
+                        gizmoPos.x, gizmoPos.y,
+                        size.x, size.y,
+                        false  // isPerspective
+                    );
+                }
+            }
+
             // Handle mouse click picking on the Scene viewport image
             // Use IsMousePressed to detect a single click event (edge-triggered)
-            // BUT: Don't pick while gizmo is being used - let gizmo have priority for drag operations
-            if (ImGui::IsItemHovered() && Input::IsMousePressed(MOUSE_LEFT) && !ImGuizmo::IsUsing()) {
+            // BUT: Don't pick while gizmo is being used or hovered - let gizmo have priority
+            // for drag operations and handle clicks on extended gizmo geometry
+            if (ImGui::IsItemHovered() && Input::IsMousePressed(MOUSE_LEFT) && !Editor::EditorGizmo::ShouldBlockInput()) {
                 double mx = 0, my = 0;
                 Input::GetMousePosition(mx, my);
 
@@ -217,42 +252,9 @@ void SceneViewport::_renderViewport() {
                 }
             }
 
-            // Draw FPS overlay if enabled (before gizmo so it appears behind)
+            // Draw FPS overlay if enabled
             if (m_showSceneFpsOverlay) {
                 _drawFpsOverlay(gizmoPos, size);
-            }
-
-            // Draw selection outline and gizmo for selected entity
-            if (!m_selectedEntity.IsNull() && m_editorCamera) {
-                auto* camera = m_editorCamera->GetCamera();
-                if (camera) {
-                    // Compute camera matrices for overlays
-                    glm::mat4 view = camera->GetViewMatrix();
-                    glm::mat4 proj = camera->GetProjectionMatrix();
-
-                    // Draw wireframe outline around selected entity (updated signature)
-                    Editor::SelectionOutlineRenderer::RenderOutline(
-                        *m_world,
-                        m_selectedEntity.Index,
-                        rendererSystem->GetRenderer(),
-                        rendererSystem->GetShader(),
-                        proj * view,
-                        camera->OrthoSize,
-                        size.x,
-                        size.y
-                    );
-
-                    // Draw gizmo for transform manipulation
-                    Editor::EditorGizmo::DrawGizmo(
-                        *m_world,
-                        m_selectedEntity.Index,
-                        glm::value_ptr(view),
-                        glm::value_ptr(proj),
-                        gizmoPos.x, gizmoPos.y,
-                        size.x, size.y,
-                        false  // isPerspective
-                    );
-                }
             }
         }
     }

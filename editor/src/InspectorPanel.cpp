@@ -128,9 +128,6 @@ void InspectorPanel::InspectEntity(EntityId id) {
     }
 
     m_entityId = id;
-    // Mark JSON cache as dirty so it gets rebuilt on next render
-    m_entityJsonDirty = (m_cachedEntityId != id);  // Dirty if different entity, clean if same entity
-    m_cachedEntityId = id;
 
     // If we do not have a world there is nothing to inspect
     if (!m_world) {
@@ -240,9 +237,6 @@ void InspectorPanel::ClearSelection() {
     m_prefabPath.clear();
     m_prefabData = {};
     m_componentsToDelete.clear();
-    m_cachedEntityId = 0;
-    m_cachedEntityJson = {};
-    m_entityJsonDirty = true;
 }
 
 // -------------------------------------------------------------------------
@@ -424,17 +418,11 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 8));
     ImGui::BeginChild("EntityComponents", ImVec2(0, childHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
 
-    // OPTIMIZATION: Only serialize entity to JSON when the entity changes (not every frame)
-    // This is a huge performance win - SerializeEntity is expensive for complex entities
-    if (m_entityJsonDirty || m_cachedEntityId != entity.Index) {
-        m_cachedEntityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
-        m_cachedEntityId = entity.Index;
-        m_entityJsonDirty = false;
-    }
-
     // Convert the entity into JSON so we can use the same UI path as prefabs
     // UI edits this JSON, then we sync the edits back into the ECS
-    nlohmann::json& entityJson = m_cachedEntityJson;
+    nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+
+    // LOG_DEBUG("[InspectorPanel] Serialized entity " << entity.Index << ": " << entityJson.dump(2));
 
     // Make sure the JSON has a component list we can iterate
     if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
@@ -577,12 +565,14 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         // MARK SCENE AS DIRTY if anything was edited
         if (wasEdited) {
-            // Also mark the entity JSON cache as dirty so it rebuilds next frame if needed
-            m_entityJsonDirty = true;
             MarkSceneDirtyIfNeeded(m_fileMenu);
         }
     }
-
+    // else {
+    //     // Debug: show why components aren't rendering
+    //     ImGui::TextDisabled("No Components array in serialized entity");
+    //     LOG_ERROR("[InspectorPanel] Entity " << entity.Index << " has no Components array. JSON: " << entityJson.dump(2));
+    // }
 
     ImGui::EndChild();
     ImGui::PopStyleVar();

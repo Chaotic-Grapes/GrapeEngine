@@ -31,46 +31,7 @@ Provides:
 #include "ScriptTemplates.h"
 #include <fstream>
 #include <cstring>
-#include <filesystem>
 #include "EditorStyle.h"
-
-void AssetBrowserPanel::_refreshDirectoryCacheIfNeeded() {
-    // Throttle filesystem work: refresh on path change, explicit invalidate, or periodic poll.
-    // Using ImGui time keeps this tied to the UI update cadence.
-    const double now = ImGui::GetTime();
-    const bool pathChanged = (m_cachedPath != m_currentPath);
-    const bool pollExpired = (now - m_lastCacheRefreshTime) > 1.0; // catch external changes without hammering FS
-
-    if (!m_forceCacheRefresh && !pathChanged && !pollExpired) {
-        return;
-    }
-
-    m_cachedEntries.clear();
-    m_cachedPath = m_currentPath;
-    m_lastCacheRefreshTime = now;
-    m_forceCacheRefresh = false;
-
-    std::error_code ec;
-    if (!std::filesystem::exists(m_currentPath, ec) || !std::filesystem::is_directory(m_currentPath, ec) || ec) {
-        return;
-    }
-
-    std::filesystem::directory_iterator it(std::filesystem::path(m_currentPath), ec);
-    const std::filesystem::directory_iterator end;
-    for (; it != end; it.increment(ec)) {
-        if (ec) break;
-
-        const auto& entry = *it;
-        CachedDirEntry cached;
-        cached.Path = entry.path().string();
-        cached.Name = entry.path().filename().string();
-        cached.IsDirectory = entry.is_directory(ec);
-        if (!cached.IsDirectory) {
-            cached.Extension = entry.path().extension().string();
-        }
-        m_cachedEntries.emplace_back(std::move(cached));
-    }
-}
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -229,7 +190,6 @@ void AssetBrowserPanel::_renderNavigationBar() {
                 m_currentPath = accumulatedPath;
                 m_selectedAssets.clear();
                 m_selectedAsset.clear();
-                m_forceCacheRefresh = true;
             }
 
             ImGui::PopStyleColor(4);
@@ -498,92 +458,77 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
     // Custom folder display with multi-selection support
     ImGui::PushFont(m_mainFont);
 
-    _refreshDirectoryCacheIfNeeded();
-
     if (!std::filesystem::exists(m_currentPath) || !std::filesystem::is_directory(m_currentPath)) {
         ImGui::TextColored(EditorStyle::DangerText, "Folder not found");
     }
     else {
-        // Iterate through cached directory entries (avoid per-frame filesystem iteration)
-        static std::string s_hoveredFolder;
-        static float s_hoverStartTime = 0.0f;
+        // Iterate through directory entries
+        for (const auto& entry : std::filesystem::directory_iterator(m_currentPath)) {
+            std::string entryPath = entry.path().string();
+            std::string entryName = entry.path().filename().string();
+            const bool isSelected = m_selectedAssets.contains(entryPath);
 
-        // Large folders can be very expensive to render in full. Clip to visible rows.
-        ImGuiListClipper clipper;
-        clipper.Begin(static_cast<int>(m_cachedEntries.size()));
-        while (clipper.Step()) {
-            for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
-                const auto& entry = m_cachedEntries[static_cast<size_t>(row)];
-                const std::string& entryPath = entry.Path;
-                const std::string& entryName = entry.Name;
-                const bool isSelected = m_selectedAssets.contains(entryPath);
+            // Render icon
+            ImGui::PushFont(m_symbolsFont);
+            if (entry.is_directory()) {
+                ImGui::Text("\xEE\x8B\x87"); // Folder icon
+            }
+            else {
+                ImGui::Text("\xEE\xA1\xB3"); // File icon
+            }
+            ImGui::PopFont();
 
-                ImGui::PushID(entryPath.c_str());
+            ImGui::SameLine();
 
-                // Render icon
-                ImGui::PushFont(m_symbolsFont);
-                if (entry.IsDirectory) {
-                    ImGui::Text("\xEE\x8B\x87"); // Folder icon
+            // Handle rename mode
+            if (m_renamingAsset == entryPath) {
+                ImGui::PushItemWidth(-1);
+                if (m_focusRenameInput) {
+                    ImGui::SetKeyboardFocusHere();
+                    m_focusRenameInput = false;
                 }
-                else {
-                    ImGui::Text("\xEE\xA1\xB3"); // File icon
+
+                if (ImGui::InputText("##Rename", m_renameBuffer, sizeof(m_renameBuffer),
+                    ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    // Apply rename
+                    try {
+                        std::filesystem::path newPath = entry.path().parent_path() / m_renameBuffer;
+                        std::filesystem::rename(entry.path(), newPath);
+                        m_selectedAssets.erase(entryPath);
+                        m_selectedAssets.insert(newPath.string());
+                        m_selectedAsset = newPath.string();
+                        m_statusMessage = "Renamed to: " + std::string(m_renameBuffer);
+                        m_statusTimer = 2.0f;
+                    }
+                    catch (const std::exception& e) {
+                        m_statusMessage = "Rename failed: " + std::string(e.what());
+                        m_statusTimer = 3.0f;
+                    }
+                    m_renamingAsset.clear();
                 }
-                ImGui::PopFont();
 
-                ImGui::SameLine();
-
-                // Handle rename mode
-                if (m_renamingAsset == entryPath) {
-                    ImGui::PushItemWidth(-1);
-                    if (m_focusRenameInput) {
-                        ImGui::SetKeyboardFocusHere();
-                        m_focusRenameInput = false;
-                    }
-
-                    if (ImGui::InputText("##Rename", m_renameBuffer, sizeof(m_renameBuffer),
-                        ImGuiInputTextFlags_EnterReturnsTrue)) {
-                        // Apply rename
-                        try {
-                            std::filesystem::path oldPath(entryPath);
-                            std::filesystem::path newPath = oldPath.parent_path() / m_renameBuffer;
-                            std::filesystem::rename(oldPath, newPath);
-                            m_selectedAssets.erase(entryPath);
-                            m_selectedAssets.insert(newPath.string());
-                            m_selectedAsset = newPath.string();
-                            m_statusMessage = "Renamed to: " + std::string(m_renameBuffer);
-                            m_statusTimer = 2.0f;
-                            m_forceCacheRefresh = true;
-                        }
-                        catch (const std::exception& e) {
-                            m_statusMessage = "Rename failed: " + std::string(e.what());
-                            m_statusTimer = 3.0f;
-                        }
-                        m_renamingAsset.clear();
-                    }
-
-                    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-                        m_renamingAsset.clear();
-                    }
-
-                    ImGui::PopItemWidth();
+                if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+                    m_renamingAsset.clear();
                 }
-                else {
-                    // Normal selectable
-                    if (ImGui::Selectable(entryName.c_str(), isSelected,
-                        ImGuiSelectableFlags_AllowDoubleClick)) {
+
+                ImGui::PopItemWidth();
+            }
+            else {
+                // Normal selectable
+                if (ImGui::Selectable(entryName.c_str(), isSelected,
+                    ImGuiSelectableFlags_AllowDoubleClick)) {
 
                     const bool ctrlPressed = ImGui::GetIO().KeyCtrl;
                     const bool shiftPressed = ImGui::GetIO().KeyShift;
 
-                    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && entry.IsDirectory) {
+                    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && entry.is_directory()) {
                         // Double-click folder: navigate
                         m_currentPath = entryPath;
                         m_selectedAssets.clear();
                         m_selectedAsset.clear();
-                        m_forceCacheRefresh = true;
                     }
                     else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
-                        entry.Extension == ".prefab" && m_inspector) {
+                        entry.path().extension() == ".prefab" && m_inspector) {
                         // Double-click prefab: open in inspector
                         m_inspector->InspectPrefab(entryPath);
                     }
@@ -602,8 +547,8 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                         // Shift+click: range selection (simplified - select all between anchor and current)
                         m_selectedAssets.clear();
                         bool inRange = false;
-                        for (const auto& e : m_cachedEntries) {
-                            const std::string& path = e.Path;
+                        for (const auto& e : std::filesystem::directory_iterator(m_currentPath)) {
+                            std::string path = e.path().string();
                             if (path == m_anchorAsset || path == entryPath) {
                                 m_selectedAssets.insert(path);
                                 inRange = !inRange;
@@ -624,49 +569,49 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                     }
                 }
 
-                    // Handle right-click on item
-                    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        // Select this item if not already selected
-                        if (!m_selectedAssets.contains(entryPath)) {
-                            m_selectedAssets.clear();
-                            m_selectedAssets.insert(entryPath);
-                            m_selectedAsset = entryPath;
-                            m_anchorAsset = entryPath;
-                        }
-                        ImGui::OpenPopup("ItemContextMenu");
+                // Handle right-click on item
+                if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                    // Select this item if not already selected
+                    if (!m_selectedAssets.contains(entryPath)) {
+                        m_selectedAssets.clear();
+                        m_selectedAssets.insert(entryPath);
+                        m_selectedAsset = entryPath;
+                        m_anchorAsset = entryPath;
                     }
-
-                    // Handle drag-drop
-                    _handleAssetDragDrop(entryPath);
-
-                    // Handle drop target for folders and auto-navigation
-                    if (entry.IsDirectory) {
-                        // Check if dragging over this folder for auto-navigation (only during drag)
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
-                            ImGui::GetDragDropPayload() != nullptr) {
-                            if (s_hoveredFolder != entryPath) {
-                                s_hoveredFolder = entryPath;
-                                s_hoverStartTime = static_cast<float>(ImGui::GetTime());
-                            }
-                            else if (ImGui::GetTime() - s_hoverStartTime > 0.75f) {
-                                // Auto-navigate after hovering for 0.75 seconds
-                                m_currentPath = entryPath;
-                                m_selectedAssets.clear();
-                                m_selectedAsset.clear();
-                                s_hoveredFolder.clear();
-                                m_forceCacheRefresh = true;
-                            }
-                        }
-                        else {
-                            // Not hovering or not dragging - reset state
-                            s_hoveredFolder.clear();
-                        }
-
-                        _handleFolderDropTarget(entryPath);
-                    }
+                    ImGui::OpenPopup("ItemContextMenu");
                 }
 
-                ImGui::PopID();
+                // Handle drag-drop
+                _handleAssetDragDrop(entryPath);
+
+                // Handle drop target for folders and auto-navigation
+                if (entry.is_directory()) {
+                    // Check if dragging over this folder for auto-navigation (only during drag)
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) &&
+                        ImGui::GetDragDropPayload() != nullptr) {
+                        static std::string s_hoveredFolder;
+                        static float s_hoverStartTime = 0.0f;
+
+                        if (s_hoveredFolder != entryPath) {
+                            s_hoveredFolder = entryPath;
+                            s_hoverStartTime = static_cast<float>(ImGui::GetTime());
+                        }
+                        else if (ImGui::GetTime() - s_hoverStartTime > 0.75f) {
+                            // Auto-navigate after hovering for 0.75 seconds
+                            m_currentPath = entryPath;
+                            m_selectedAssets.clear();
+                            m_selectedAsset.clear();
+                            s_hoveredFolder.clear();
+                        }
+                    }
+                    else {
+                        // Not hovering or not dragging - reset state
+                        static std::string s_hoveredFolder;
+                        s_hoveredFolder.clear();
+                    }
+
+                    _handleFolderDropTarget(entryPath);
+                }
             }
         }
     }
@@ -1064,6 +1009,8 @@ void AssetBrowserPanel::_renderItemContextMenu() {
 void AssetBrowserPanel::_createScript() {
     // Create in current directory
     std::filesystem::path targetDir = m_currentPath;
+    std::cout << "Creating script in directory: " << targetDir.string() << std::endl;
+
     // Ensure the directory exists
     if (!exists(targetDir)) {
         create_directories(targetDir);
@@ -1145,7 +1092,6 @@ void AssetBrowserPanel::_createScript() {
 
         // Select the newly created file
         m_selectedAsset = filePath.string();
-        m_forceCacheRefresh = true;
 
     }
     catch (const std::exception& e) {
@@ -1198,7 +1144,6 @@ void AssetBrowserPanel::_createScene() {
 
         // Select the newly created file
         m_selectedAsset = filePath.string();
-        m_forceCacheRefresh = true;
 
     }
     catch (const std::exception& e) {
@@ -1230,7 +1175,6 @@ void AssetBrowserPanel::_createFolder() {
 
             // Select the newly created folder
             m_selectedAsset = folderPath.string();
-            m_forceCacheRefresh = true;
         }
         else {
             m_statusMessage = "Failed to create folder: " + folderName;
@@ -1310,7 +1254,6 @@ void AssetBrowserPanel::_deleteSelectedAssets() {
     m_selectedAsset.clear();
     m_statusMessage = "Deleted " + std::to_string(deleteCount) + " item(s)";
     m_statusTimer = 2.0f;
-    m_forceCacheRefresh = true;
 }
 
 void AssetBrowserPanel::_startRename() {
@@ -1441,7 +1384,6 @@ void AssetBrowserPanel::_moveAssetsToDirectory(const std::vector<std::string>& a
 
     m_statusMessage = "Moved " + std::to_string(moveCount) + " item(s)";
     m_statusTimer = 2.0f;
-    m_forceCacheRefresh = true;
 }
 
 void AssetBrowserPanel::_copyAssetsToDirectory(const std::vector<std::string>& assets,
@@ -1487,5 +1429,4 @@ void AssetBrowserPanel::_copyAssetsToDirectory(const std::vector<std::string>& a
 
     m_statusMessage = "Copied " + std::to_string(copyCount) + " item(s)";
     m_statusTimer = 2.0f;
-    m_forceCacheRefresh = true;
 }

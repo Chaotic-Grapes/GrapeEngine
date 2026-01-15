@@ -775,6 +775,6 @@ const ComponentUIMetadata* ComponentRegistryUI::Find(const std::string& typeName
             return &meta;
         }
     }
-    // LOG_WARNING("[EditorComponentRegistry] Find: No metadata for component type '" << typeName << "'");
+    // LOG_WARNING("[EditorComponentRegistry] Find: No metadata for component type '" << typeName << "'. Registry has " << s_registry.size() << " components.");
     return nullptr;
 }

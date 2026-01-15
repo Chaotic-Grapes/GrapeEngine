@@ -64,6 +64,11 @@ int main() {
     ECS::World emptyWorld;
     engine.GetSystemManager().CreateAll(emptyWorld);
 
+    // Build the initial component registry immediately so the editor UI has metadata
+    // This ensures components are available for rendering in the inspector on startup
+    ComponentRegistryUI::RebuildFromNativeRegistry();
+    LOG_INFO("[EditorMain] Initial component registry built");
+
     // Initialize C# script compilation and hot reload watcher
     ECS::ScriptManager* scriptManager = engine.GetScriptManager();
     

@@ -243,11 +243,6 @@ private:
         bool isEditing = false;
     };
     EditState m_editState;
-
-    // Entity JSON caching to avoid expensive serialization every frame
-    EntityId m_cachedEntityId = 0;           // ID of entity whose JSON is cached
-    nlohmann::json m_cachedEntityJson;       // Cached serialized entity (avoids SerializeEntity() every frame)
-    bool m_entityJsonDirty = true;           // Flag: rebuild cache on next render
 };
 
 // -------------------------------------------------------------------------
