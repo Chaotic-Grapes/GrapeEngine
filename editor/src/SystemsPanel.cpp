@@ -159,12 +159,24 @@ void SystemsPanel::_renderSystemsTable() {
 
                 // Column 3: Enabled Toggle
                 ImGui::TableSetColumnIndex(3);
-                bool wasEnabled = system.isEnabled;
-                ImGui::Checkbox(("##enabled_" + system.name).c_str(), &system.isEnabled);
                 
-                // Apply state change to SystemManager if toggled
-                if (wasEnabled != system.isEnabled && m_systemManager != nullptr) {
-                    m_systemManager->SetSystemEnabled(system.name, system.isEnabled);
+                // Read the actual enabled state directly from SystemManager
+                bool isEnabled = system.isEnabled;
+                if (m_systemManager) {
+                    ECS::ISystem* sys = m_systemManager->GetSystem(system.name);
+                    if (sys) {
+                        isEnabled = sys->IsEnabled();
+                    }
+                }
+                
+                // Display checkbox and handle toggle
+                if (ImGui::Checkbox(("##enabled_" + system.name).c_str(), &isEnabled)) {
+                    // User toggled the checkbox, apply state change to SystemManager
+                    if (m_systemManager != nullptr) {
+                        m_systemManager->SetSystemEnabled(system.name, isEnabled);
+                    }
+                    // Update cache for display consistency
+                    system.isEnabled = isEnabled;
                 }
 
                 // Column 4: Edit Mode Execution

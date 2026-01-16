@@ -423,8 +423,16 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() {
             m_performancePanel.Initialize(m_mainFont, m_boldFont);
         },
-        [this]() { m_performancePanel.Render(m_playback.IsPlaying()); },
-        nullptr//[this](ECS::World* w) { void(*w); } // No world needed
+        [this]() { 
+            // Get SystemManager from engine
+            ECS::SystemManager* systemManager = nullptr;
+            if (Engine::CORE) {
+                systemManager = &Engine::CORE->GetSystemManager();
+            }
+            m_performancePanel.SetSystemManager(systemManager);
+            m_performancePanel.Render(m_playback.IsPlaying()); 
+        },
+        [this](ECS::World* w) { m_performancePanel.SetWorld(w); }
     );
 
     // Register Systems panel (shows registered C# and C++ systems)

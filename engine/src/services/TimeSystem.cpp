@@ -244,6 +244,11 @@ void TimeSystem::_collectThreadSamples() {
     {
         std::lock_guard<std::mutex> lk(m_scopeMutex);
 
+        // Reset call counts for this frame
+        for (auto& sd : m_scopeDataById) {
+            sd.CallCount = 0;
+        }
+
         for (const auto &s : all) {
             uint32_t id = s.ScopeId;
             float ms = static_cast<float>(s.DurationSeconds * 1000.0);
@@ -259,6 +264,9 @@ void TimeSystem::_collectThreadSamples() {
                 sd.FrameTimes.erase(sd.FrameTimes.begin());
 
             sd.LastTimeMs = ms;
+            
+            // Increment call count for this scope
+            sd.CallCount++;
 
             // compute average and max
             float sum = 0.0f;

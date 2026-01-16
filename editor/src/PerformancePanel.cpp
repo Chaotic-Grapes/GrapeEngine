@@ -19,9 +19,12 @@ polling system counters while the game is not running.
 
 #include "PerformancePanel.h"
 #include "services/TimeSystem.h"
+#include "ecs/SystemManager.h"
+#include "ecs/World.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include <algorithm>
+#include <deque>
 
 void PerformancePanel::Initialize(ImFont* mainFont, ImFont* boldFont) {
     m_mainFont = mainFont;
@@ -38,6 +41,14 @@ void PerformancePanel::ResetForNewScene() {
     m_hasCollectedData = false;
 }
 
+void PerformancePanel::SetSystemManager(ECS::SystemManager* systemManager) {
+    m_systemManager = systemManager;
+}
+
+void PerformancePanel::SetWorld(ECS::World* world) {
+    m_world = world;
+}
+
 void PerformancePanel::Render(bool isPlaying) {
     if (!m_initialized) return;
 
@@ -46,18 +57,16 @@ void PerformancePanel::Render(bool isPlaying) {
         return;
     }
 
-    // Update cached data each frame
-    _updateCachedData(isPlaying);
-
-    // Show paused message only if we haven't collected any TimeSystem scope data yet
-    if (!isPlaying && !m_hasCollectedData) {
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Scope monitoring paused — enter Play (Run) to collect per-system scope data");
-        ImGui::End();
-        return;
-    }
+    // Update cached data each frame (continuous monitoring)
+    _updateCachedData();
 
     // Render header with FPS and frame time
     _renderHeader();
+
+    ImGui::Separator();
+
+    // Render overview statistics
+    _renderOverviewStats();
 
     ImGui::Separator();
 
@@ -72,11 +81,52 @@ void PerformancePanel::Render(bool isPlaying) {
 // -------------------------------------------------------------------------
 
 void PerformancePanel::_renderHeader() {
-    ImGui::PushFont(m_mainFont);
-    ImGui::Text("FPS: %.1f", m_cachedFps);
-    ImGui::SameLine(150);
-    ImGui::Text("Frame: %.2f ms", m_cachedFrameMs);
+    ImGui::PushFont(m_boldFont);
+    ImGui::Text("Performance");
     ImGui::PopFont();
+}
+
+void PerformancePanel::_renderOverviewStats() {
+    ImGui::PushFont(m_boldFont);
+    ImGui::Text("Overview");
+    ImGui::PopFont();
+
+    // Display overview stats in columns
+    ImGui::Columns(8, "OverviewColumns", false);
+    
+    ImGui::Text("FPS:");
+    ImGui::NextColumn();
+    ImGui::Text("%.1f", m_cachedFps);
+    ImGui::NextColumn();
+    
+    ImGui::Text("Frame:");
+    ImGui::NextColumn();
+    ImGui::Text("%.2f ms", m_cachedFrameMs);
+    ImGui::NextColumn();
+
+    ImGui::Text("Min:");
+    ImGui::NextColumn();
+    ImGui::Text("%.2f ms", m_cachedMinFrameMs);
+    ImGui::NextColumn();
+
+    ImGui::Text("Max:");
+    ImGui::NextColumn();
+    ImGui::Text("%.2f ms", m_cachedMaxFrameMs);
+    ImGui::NextColumn();
+
+    ImGui::Separator();
+
+    ImGui::Text("Entities:");
+    ImGui::NextColumn();
+    ImGui::Text("%u", m_cachedEntityCount);
+    ImGui::NextColumn();
+    
+    ImGui::Text("Components:");
+    ImGui::NextColumn();
+    ImGui::Text("%u", m_cachedComponentCount);
+    ImGui::NextColumn();
+
+    ImGui::Columns(1);
 }
 
 void PerformancePanel::_renderSystemsTable() {
@@ -108,16 +158,24 @@ void PerformancePanel::_renderSystemsTable() {
     if (ImGui::BeginTable("PerformanceTable", 4,
         ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit)) {
 
-        ImGui::TableSetupColumn("System", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Usage", ImGuiTableColumnFlags_WidthFixed, 70);
-        ImGui::TableSetupColumn("Avg (ms)", ImGuiTableColumnFlags_WidthFixed, 100);
-        ImGui::TableSetupColumn("Max (ms)", ImGuiTableColumnFlags_WidthFixed, 100);
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Usage", ImGuiTableColumnFlags_WidthFixed, 150);
+        ImGui::TableSetupColumn("Avg (ms)", ImGuiTableColumnFlags_WidthFixed, 150);
+        ImGui::TableSetupColumn("Max (ms)", ImGuiTableColumnFlags_WidthFixed, 150);
         ImGui::TableHeadersRow();
 
         // Render each system
         for (const auto &kv : m_cachedScopes) {
             const std::string &name = kv.first;
             const auto &data = kv.second;
+
+            // Skip disabled systems from display
+            // Even though we have [Disabled] tags, hiding them declutters the view
+            if (m_systemManager) {
+                if (!m_systemManager->IsSystemEnabled(name)) {
+                    continue;
+                }
+            }
 
             // Calculate usage percentage and clamp to [0, 100].
             float usagePercent = 0.0f;
@@ -145,9 +203,39 @@ void PerformancePanel::_renderSystemsTable() {
 
             ImGui::TableNextRow();
 
-            // Column 0: System Name
+            // Column 0: System Name with type and status indicators
             ImGui::TableSetColumnIndex(0);
-            ImGui::Text("%s", name.c_str());
+            
+            // Get system info from cached data
+            bool isScripted = data.isScripted;
+            bool isEnabled = data.isEnabled;
+            
+            // Display system type indicator
+            if (isScripted) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.8f, 0.2f, 1.0f)); // Green for C#
+                ImGui::Text("[C#]");
+                ImGui::PopStyleColor();
+            }
+            else {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.6f, 0.8f, 1.0f)); // Blue for Native
+                ImGui::Text("[Native]");
+                ImGui::PopStyleColor();
+            }
+            ImGui::SameLine();
+            
+            // Display status indicator (based on cached data, not current check)
+            if (isEnabled) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.9f, 0.2f, 1.0f)); // Green for Enabled
+                ImGui::Text("[Enabled]");
+                ImGui::PopStyleColor();
+            }
+            else {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f)); // Gray for Disabled
+                ImGui::Text("[Disabled]");
+                ImGui::PopStyleColor();
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", name.c_str());
 
             // Column 1: Usage % with color bar
             ImGui::TableSetColumnIndex(1);
@@ -164,6 +252,9 @@ void PerformancePanel::_renderSystemsTable() {
             // Column 3: Max time
             ImGui::TableSetColumnIndex(3);
             ImGui::Text("%.2f", data.MaxTimeMs);
+
+            // Add padding after each system row
+            ImGui::TableNextRow(ImGuiTableRowFlags_None);
         }
 
         // Show unattributed/render time
@@ -177,7 +268,7 @@ void PerformancePanel::_renderSystemsTable() {
             // Column 0: System Name
             ImGui::TableSetColumnIndex(0);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-            ImGui::Text("Render");
+            ImGui::Text("Engine");
             ImGui::PopStyleColor();
 
             // Column 1: Usage % with gray bar
@@ -195,6 +286,9 @@ void PerformancePanel::_renderSystemsTable() {
             // Column 3: Max time (not tracked for render)
             ImGui::TableSetColumnIndex(3);
             ImGui::TextDisabled("-");
+
+            // Add padding after unattributed row
+            ImGui::TableNextRow(ImGuiTableRowFlags_None);
         }
 
         ImGui::EndTable();
@@ -205,28 +299,81 @@ void PerformancePanel::_renderSystemsTable() {
 // Private Data Management
 // -------------------------------------------------------------------------
 
-void PerformancePanel::_updateCachedData(bool isPlaying) {
-    if (isPlaying) {
-        m_hasCollectedData = true;
+void PerformancePanel::_updateCachedData() {
+    m_hasCollectedData = true;
 
-        // Cache live data while playing
-        try {
-            m_cachedFps = TimeSystem::Instance().GetFPS();
-            m_cachedFrameMs = TimeSystem::Instance().GetFrameTimeMs();
-            m_cachedTotalTime = TimeSystem::Instance().GetTotalScopeTimes();
+    // Cache live data continuously
+    try {
+        m_cachedFps = TimeSystem::Instance().GetFPS();
+        m_cachedFrameMs = TimeSystem::Instance().GetFrameTimeMs();
+        m_cachedTotalTime = TimeSystem::Instance().GetTotalScopeTimes();
 
-            // Cache scope data
-            const auto liveScopes = TimeSystem::Instance().GetAllScopeData();
-            m_cachedScopes.clear();
-            for (const auto &kv : liveScopes) {
-                CachedScopeData cached;
-                cached.AverageTimeMs = kv.second.AverageTimeMs;
-                cached.MaxTimeMs = kv.second.MaxTimeMs;
-                m_cachedScopes[kv.first] = cached;
+        // Cache scope data and track min/max frame times
+        const auto liveScopes = TimeSystem::Instance().GetAllScopeData();
+        m_cachedScopes.clear();
+        
+        // Track frame time variation
+        static std::deque<float> frameTimeHistory;
+        frameTimeHistory.push_back(m_cachedFrameMs);
+        if (frameTimeHistory.size() > 60) {  // Keep last 60 frames
+            frameTimeHistory.pop_front();
+        }
+        
+        if (!frameTimeHistory.empty()) {
+            m_cachedMinFrameMs = *std::min_element(frameTimeHistory.begin(), frameTimeHistory.end());
+            m_cachedMaxFrameMs = *std::max_element(frameTimeHistory.begin(), frameTimeHistory.end());
+        }
+        
+        for (const auto &kv : liveScopes) {
+            CachedScopeData cached;
+            cached.AverageTimeMs = kv.second.AverageTimeMs;
+            cached.MaxTimeMs = kv.second.MaxTimeMs;
+            
+            // Cache system info from SystemManager
+            if (m_systemManager) {
+                cached.isScripted = m_systemManager->IsScriptedSystem(kv.first);
+                cached.isEnabled = m_systemManager->IsSystemEnabled(kv.first);
             }
+            
+            m_cachedScopes[kv.first] = cached;
         }
-        catch (...) {
-            // Keep existing cached values on error
+
+        // Get entity and component count from World if available
+        if (m_world) {
+            // Count entities by iterating through archetypes
+            uint32_t totalEntities = 0;
+            uint32_t totalComponents = 0;
+            
+            const auto archetypes = m_world->GetAllArchetypes();
+            for (const auto* archetype : archetypes) {
+                if (archetype) {
+                    // Each archetype contains entities with a specific set of components
+                    const uint32_t chunkCount = archetype->GetChunkCount();
+
+                    for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                        const auto* chunk = archetype->GetChunk(ci);
+
+                        if (chunk) {
+                            uint32_t entityCount = chunk->Count();
+                            totalEntities += entityCount;
+
+                            // Each entity in this archetype has the same number of components
+                            uint32_t componentsPerEntity = static_cast<uint32_t>(archetype->GetComponents().size());
+                            totalComponents += entityCount * componentsPerEntity;
+                        }
+                    }
+                }
+            }
+            
+            m_cachedEntityCount = totalEntities;
+            m_cachedComponentCount = totalComponents;
         }
+        else {
+            m_cachedEntityCount = 0;
+            m_cachedComponentCount = 0;
+        }
+    }
+    catch (...) {
+        // Keep existing cached values on error
     }
 }
