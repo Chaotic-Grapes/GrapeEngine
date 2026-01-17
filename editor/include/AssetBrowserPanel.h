@@ -123,6 +123,9 @@ private:
     // Right-click context menu for asset creation
     bool _renderCreateMenuItems();
 
+    // Open the generated C# project file with default code editor
+    void _openProjectFile();
+
     // -------------------------------------------------------------------------
     // Copy/Paste Operations
     // -------------------------------------------------------------------------

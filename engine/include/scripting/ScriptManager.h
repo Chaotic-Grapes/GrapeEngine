@@ -270,6 +270,7 @@ namespace ECS {
         inline auto GetGetSystemComponentAccesses() const { return m_getSystemComponentAccesses; }
         inline auto GetDeserializeComponentFromJson() const { return m_deserializeComponentFromJson; }
         inline auto GetSetOutputAssemblyPath() const { return m_setOutputAssemblyPath; }
+        inline auto GetGenerateCsProj() const { return m_generateCsProj; }
 
         // --------------------------------------------------------------------
         // Convenience native wrappers used by engine code
@@ -308,7 +309,7 @@ namespace ECS {
         using GetManagedExceptionForHResultFn   = void*(*)(int hr);
         using ReloadAssemblyFn                  = int(*)(const char* assemblyPath);
         using CompileAndReloadFn                = int(*)(const char* scriptsDir, const char* outputAssemblyPath);
-        using GenerateCsProjFn                  = int(*)(const char* scriptsDir, const char* projectName);
+        using GenerateCsProjFn                  = int(*)(const char* outputDir, const char* scriptsDir, const char* projectName);
         using HashComponentTypeNameFn           = uint32_t(*)(const char* typeName);
         using ResolveSystemGroupFn              = int(*)(int attributeGroup);
         using CallSystemOnCreateFn              = void(*)(uint64_t handle, void* worldPtr);

@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "core/Application.h"
 #include "core/CrashDumping.h"
+#include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
@@ -90,6 +91,9 @@ namespace Engine {
         m_initialized = true;
 
         LOG_INFO("Engine initialized in " << (mode == EngineMode::Editor ? "Editor" : "Game") << " mode");
+
+        // Broadcast application start event
+        Messaging::MessageSystem::Notify(Messaging::ApplicationStart{});
     }
 
     void Application::Update() {
@@ -185,6 +189,9 @@ namespace Engine {
         }
 
         LOG_INFO("Shutting down engine...");
+
+        // Broadcast application exit event
+        Messaging::MessageSystem::Notify(Messaging::ApplicationExit{});
 
         // Stop device change detection
         DeviceManager::StopAudioDeviceChangeDetection();

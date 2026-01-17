@@ -415,11 +415,12 @@ public static class ScriptHost
     /// (VS / Rider) open the script folder. Writes to <dir>/<projectName>.csproj.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static int GenerateCsProj(IntPtr scriptsDirPtr, IntPtr projectNamePtr)
+    public static int GenerateCsProj(IntPtr outputDirPtr, IntPtr scriptsDirPtr, IntPtr projectNamePtr)
     {
         try
         {
-            var dir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
+            var outputDir = Marshal.PtrToStringUTF8(outputDirPtr) ?? string.Empty;
+            var scriptsDir = Marshal.PtrToStringUTF8(scriptsDirPtr) ?? string.Empty;
             var projectName = Marshal.PtrToStringUTF8(projectNamePtr) ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(projectName))
@@ -428,25 +429,49 @@ public static class ScriptHost
                 return -1;
             }
 
-            if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+            if (string.IsNullOrWhiteSpace(outputDir) || !Directory.Exists(outputDir))
             {
-                Logging.LogInternal($"[ScriptHost] GenerateCsProj: invalid dir {dir}", LogLevel.Warning);
+                Logging.LogInternal($"[ScriptHost] GenerateCsProj: invalid output dir {outputDir}", LogLevel.Warning);
                 return -1;
             }
 
-            string outPath = Path.Combine(dir, projectName + ".csproj");
+            if (string.IsNullOrWhiteSpace(scriptsDir) || !Directory.Exists(scriptsDir))
+            {
+                Logging.LogInternal($"[ScriptHost] GenerateCsProj: invalid scripts dir {scriptsDir}", LogLevel.Warning);
+                return -1;
+            }
 
-            string template = @"<Project Sdk=""Microsoft.NET.Sdk""> 
-                                    <PropertyGroup>
-                                        <TargetFramework>net9.0</TargetFramework>
-                                        <ImplicitUsings>enable</ImplicitUsings>
-                                        <Nullable>enable</Nullable>
-                                    </PropertyGroup>
-                                    <ItemGroup>
-                                        <Compile Include=""**\*.cs"" />
-                                    </ItemGroup>
-                                </Project>
-                             ";
+            string outPath = Path.Combine(outputDir, projectName + ".csproj");
+            // Normalize the scripts directory path for the Include element
+            string normalizedScriptsDir = Path.GetFullPath(scriptsDir);
+
+            // .csproj template
+            // Needs to:
+            // - Target net9.0
+            // - Include all .cs files in the scripts directory
+            // - Reference GrapeEngine.Scripting for intellisense
+            // - Reference GameScripts.dll for compiled types intellisense
+            // - Exclude obj/ subdirectories
+            string template = 
+            $@"<Project Sdk=""Microsoft.NET.Sdk""> 
+                <PropertyGroup>
+                    <TargetFramework>net9.0</TargetFramework>
+                    <ImplicitUsings>enable</ImplicitUsings>
+                    <Nullable>enable</Nullable>
+                </PropertyGroup>
+                <ItemGroup>
+                    <Compile Include=""{normalizedScriptsDir}\**\*.cs"" />
+                </ItemGroup>
+                <ItemGroup>
+                    <Reference Include=""GrapeEngine.Scripting"">
+                        <HintPath>..\GrapeEngine.Scripting.dll</HintPath>
+                    </Reference>
+                </ItemGroup>
+                <ItemGroup>
+                    <Compile Remove=""{normalizedScriptsDir}\obj\**"" />
+                </ItemGroup>
+            </Project>
+                ";
 
             File.WriteAllText(outPath, template);
             Logging.LogInternal($"[ScriptHost] Generated csproj: {outPath}", LogLevel.Info);

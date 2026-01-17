@@ -119,20 +119,29 @@ int main() {
     std::thread bgProgressThread;
     // Temp output root for compiled scripts (if created) and cleanup flag
     std::filesystem::path tempRoot;
-    bool shouldCleanTemp = false;
     if (scriptManager && scriptManager->IsInitialized()) {
         // Use ProjectPaths to get the current project root and watch all directories
         if (Engine::ProjectPaths::IsInitialized()) {
             std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
 
-            // Write compiled script assemblies to an OS temp area so they're
-            // kept out of the user's project source tree and are easy to clean.
-            // Use a per-project subfolder under the system temp directory.
-            std::string projName = projectRoot.filename().string();
-            tempRoot = std::filesystem::temp_directory_path() / "GrapeEngine" / projName;
-            std::filesystem::create_directories(tempRoot);
-            shouldCleanTemp = true;
-            std::filesystem::path scriptsOutput = tempRoot / "GameScripts.dll";
+            // Use temp path from ProjectPaths
+            tempRoot = Engine::ProjectPaths::GetTempScriptsPath();
+            std::filesystem::path scriptsOutput = Engine::ProjectPaths::GetCompiledScriptAssemblyPath();
+            
+            // Generate the C# project file in the temp directory
+            auto generateCsProj = scriptManager->GetGenerateCsProj();
+            if (generateCsProj) {
+                std::string csprojDir = Engine::ProjectPaths::GetCsProjPath();
+                std::string scriptsRootStr = projectRoot.string();
+                std::string projectName = std::filesystem::path(projectRoot).filename().string();
+                int result = generateCsProj(csprojDir.c_str(), scriptsRootStr.c_str(), projectName.c_str());
+                if (result == 0) {
+                    LOG_INFO("[EditorMain] Generated C# project file at: " << csprojDir << "/" << projectName << ".csproj");
+                }
+                else {
+                    LOG_WARNING("[EditorMain] Failed to generate C# project file, result: " << result);
+                }
+            }
             
             // Set the standardized output path for hot reload watcher so compilations use consistent location
             auto setOutputPath = scriptManager->GetSetOutputAssemblyPath();
@@ -228,7 +237,7 @@ int main() {
     // Track previous state to detect transitions
     EditorState previousState = EditorState::Edit;
 
-    LOG_CRITICAL("Using GPU: " << glGetString(GL_RENDERER));
+    LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
 
     // Editor main loop
     while (engine.IsRunning()) {
@@ -335,22 +344,9 @@ int main() {
     editor.Shutdown();
     engine.Shutdown();
 
-    // Ensure background compile/poller threads are finished before exiting
+    // Make sure background compile/poller threads are finished before exiting
     try { if (bgCompileThread.joinable()) bgCompileThread.join(); } catch (...) {}
     try { if (bgProgressThread.joinable()) bgProgressThread.join(); } catch (...) {}
-
-    // Clean up temp compiled scripts folder if we created one
-    if (shouldCleanTemp) {
-        try {
-            if (!tempRoot.empty() && std::filesystem::exists(tempRoot)) {
-                std::filesystem::remove_all(tempRoot);
-                LOG_INFO("[EditorMain] Removed temp script output: " << tempRoot.string());
-            }
-        }
-        catch (const std::exception& e) {
-            LOG_WARNING("[EditorMain] Failed to remove temp script output: " << e.what());
-        }
-    }
 
     return 0;
 }
