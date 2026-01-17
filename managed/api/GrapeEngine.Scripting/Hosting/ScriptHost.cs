@@ -108,7 +108,28 @@ public static class ScriptHost
     private static IntPtr _nativeHotReloadCallback = IntPtr.Zero;
 
     /// <summary>
-    /// Register a callback to be invoked when hot reload completes.
+    /// Cache of World wrapper objects to avoid allocating new World objects every frame.
+    /// Maps native world pointer to managed World wrapper.
+    /// </summary>
+    private static readonly Dictionary<IntPtr, World> _worldCache = [];
+
+    /// <summary>
+    /// Get or create a cached World wrapper for a native world pointer.
+    /// Reuses the same managed World object across frames to minimize allocations.
+    /// </summary>
+    private static World GetOrCreateWorldWrapper(IntPtr worldPtr)
+    {
+        if (_worldCache.TryGetValue(worldPtr, out var cachedWorld))
+        {
+            return cachedWorld;
+        }
+        
+        var newWorld = new World(worldPtr);
+        _worldCache[worldPtr] = newWorld;
+        return newWorld;
+    }
+
+    /// <summary>
     /// Called from C++ to provide the native callback function pointer.
     /// </summary>
     [UnmanagedCallersOnly]
@@ -918,9 +939,8 @@ public static class ScriptHost
             
             if (instance is ISystem system)
             {
-                // Wrap native World pointer in managed World wrapper
-                World managedWorld = new(worldPtr);
-                Logging.LogInternal($"[ScriptHost] CallSystemOnCreate for {instance.GetType().Name}", LogLevel.Info);
+                // Use cached World wrapper to avoid unnecessary allocations
+                World managedWorld = GetOrCreateWorldWrapper(worldPtr);
                 system.OnCreate(managedWorld);
             }
         }
@@ -939,7 +959,6 @@ public static class ScriptHost
     {
         try
         {
-            Logging.LogInternal($"[ScriptHost] CallSystemOnUpdate invoked for handle=0x{handle:X}", LogLevel.Debug);
             object? instance = SystemDiscovery.GetSystemInstance(handle);
             if (instance == null)
             {
@@ -949,9 +968,8 @@ public static class ScriptHost
             
             if (instance is ISystem system)
             {
-                Logging.LogInternal($"[ScriptHost] CallSystemOnUpdate for {instance.GetType().Name}", LogLevel.Info);
-                // Wrap native World pointer in managed World wrapper
-                World managedWorld = new(worldPtr);
+                // Use cached World wrapper to avoid allocating a new object every frame
+                World managedWorld = GetOrCreateWorldWrapper(worldPtr);
                 system.OnUpdate(managedWorld);
             }
         }
@@ -971,7 +989,6 @@ public static class ScriptHost
     {
         try
         {
-            Logging.LogInternal($"[ScriptHost] CallSystemOnUpdateJob invoked for handle=0x{handle:X}, dependsOn=0x{dependsOnNativeHandle.ToInt64():X}", LogLevel.Debug);
             object? instance = SystemDiscovery.GetSystemInstance(handle);
             if (instance == null)
             {
@@ -980,7 +997,8 @@ public static class ScriptHost
 
             if (instance is ISystemJob jobSystem)
             {
-                World managedWorld = new(worldPtr);
+                // Use cached World wrapper to avoid allocating a new object every frame
+                World managedWorld = GetOrCreateWorldWrapper(worldPtr);
                 JobHandle? depends = dependsOnNativeHandle == IntPtr.Zero ? null : new JobHandle(dependsOnNativeHandle);
                 var result = jobSystem.OnUpdateWithJob(managedWorld, depends);
                 return result != null ? new IntPtr(result.NativeHandle) : IntPtr.Zero;
@@ -1013,19 +1031,37 @@ public static class ScriptHost
             object? instance = SystemDiscovery.GetSystemInstance(handle);
             if (instance == null)
             {
+                Logging.LogInternal($"[ScriptHost] System instance not found: {handle}", LogLevel.Warning);
                 return;
             }
             
             if (instance is ISystem system)
             {
-                // Wrap native World pointer in managed World wrapper
-                World managedWorld = new(worldPtr);
+                // Use cached World wrapper to avoid unnecessary allocations
+                World managedWorld = GetOrCreateWorldWrapper(worldPtr);
                 system.OnDestroy(managedWorld);
             }
         }
         catch (Exception ex)
         {
             Logging.LogInternal($"[ScriptHost] Error in OnDestroy: {ex.Message}", LogLevel.Error);
+        }
+    }
+
+    /// <summary>
+    /// Flush all buffered logs to the native side.
+    /// Call this at the end of each frame to ensure all logs are delivered.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static void FlushLogs()
+    {
+        try
+        {
+            Logging.Flush();
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ScriptHost] Error in FlushLogs: {ex.Message}", LogLevel.Error);
         }
     }
 

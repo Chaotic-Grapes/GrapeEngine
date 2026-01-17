@@ -266,6 +266,7 @@ namespace ECS {
         inline auto GetCallSystemOnCreate() const { return m_callSystemOnCreate; }
         inline auto GetCallSystemOnUpdate() const { return m_callSystemOnUpdate; }
         inline auto GetCallSystemOnDestroy() const { return m_callSystemOnDestroy; }
+        inline auto GetFlushLogs() const { return m_flushLogs; }
         inline auto GetGetSystemMetadata() const { return m_getSystemMetadata; }
         inline auto GetGetSystemComponentAccesses() const { return m_getSystemComponentAccesses; }
         inline auto GetDeserializeComponentFromJson() const { return m_deserializeComponentFromJson; }
@@ -316,6 +317,7 @@ namespace ECS {
         using CallSystemOnUpdateFn              = void(*)(uint64_t handle, void* worldPtr);
         using CallSystemOnUpdateJobFn           = intptr_t(*)(uint64_t handle, void* worldPtr, intptr_t dependsOn);
         using CallSystemOnDestroyFn             = void(*)(uint64_t handle, void* worldPtr);
+        using FlushLogsFn                       = void(*)();  // Flush buffered logs to native side
         using CompileDirectoryFn                = int(*)(const char* directoryPath, const char* outputAssemblyPath);
         using CompileDirectoryWithDiagFn        = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
         using GetLastDiagnosticsCountFn         = int(*)();
@@ -339,6 +341,7 @@ namespace ECS {
         CallSystemOnUpdateFn                m_callSystemOnUpdate = nullptr;
         CallSystemOnUpdateJobFn             m_callSystemOnUpdateJob = nullptr;
         CallSystemOnDestroyFn               m_callSystemOnDestroy = nullptr;
+        FlushLogsFn                         m_flushLogs = nullptr;
         CompileDirectoryFn                  m_compileDirectory = nullptr;
         CompileDirectoryWithDiagFn          m_compileDirectoryWithDiag = nullptr;
         GetLastDiagnosticsCountFn           m_getLastDiagnosticsCount = nullptr;

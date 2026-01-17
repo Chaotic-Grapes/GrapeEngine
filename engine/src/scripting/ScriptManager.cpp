@@ -891,6 +891,7 @@ namespace ECS {
         success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
         success &= loadMethod("CallSystemOnUpdateJob",            scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdateJob));
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
+        success &= loadMethod("FlushLogs",                         scriptHostTypeName, reinterpret_cast<void**>(&m_flushLogs));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
         success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));
@@ -1013,11 +1014,9 @@ namespace ECS {
     void ScriptSystemWrapper::OnUpdate(World& world) {
         if (!m_scriptManager) return;
 
-        LOG_INFO("[ScriptSystemWrapper] OnUpdate invoked (handle=0x" << std::hex << m_managedHandle << ")");
         auto callOnUpdate = m_scriptManager->GetCallSystemOnUpdate();
         if (callOnUpdate) {
             callOnUpdate(m_managedHandle, &world);
-            LOG_INFO("[ScriptSystemWrapper] OnUpdate forwarded to managed (handle=0x" << std::hex << m_managedHandle << ")");
         }
     }
 

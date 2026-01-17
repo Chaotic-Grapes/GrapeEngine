@@ -128,6 +128,12 @@ namespace Messaging {
     // System Events
     // -------------------------------
 
+    // Sent when the application has finished initializing.
+    struct ApplicationStart {};
+
+    // Sent when the application is shutting down.
+    struct ApplicationExit {};
+
     // Sent when the active scene changes.
     struct SceneChanged {
         std::string OldScene; // Previous scene name

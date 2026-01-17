@@ -7,6 +7,7 @@ using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Services;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using GrapeEngine.Scripting.Profiling;
 
 namespace EchoesBelow.Scripts;
 
@@ -44,25 +45,15 @@ public class LifetimeSystem : SystemBase
         var deltaTime = Time.DeltaTime;
         var entitiesToDestroy = new List<Entity>();
 
-        Log($"[LifetimeSystem] Updating lifetimes with deltaTime={deltaTime}", LogLevel.Debug);
-
-        // Query all entities with Lifetime components (use ref-local for in-place updates)
-        foreach (var result in World!.Query<LifetimeComponent>())
+        // Query all entities with Lifetime and Active components
+        foreach (var result in World!.Query<LifetimeComponent, Active>())
         {
             var entity = result.Entity;
             ref var lifetime = ref result.Component1;
-
-            // Check if entity is enabled. If ActiveComponent doesn't exist,
-            // treat the entity as enabled by default.
-            bool isEnabled = true;
-            if (entity.HasComponent<Active>())
-            {
-                var active = entity.GetComponent<Active>();
-                isEnabled = active.Enabled;
-            }
+            ref var active = ref result.Component2;
 
             // Skip processing if entity is disabled
-            if (!isEnabled)
+            if (!active.Enabled)
                 continue;
 
             // Decrease lifetime in-place via ref
@@ -75,10 +66,30 @@ public class LifetimeSystem : SystemBase
             }
         }
 
-        // Destroy all expired entities
-        foreach (var entity in entitiesToDestroy)
+        // Process entities with Lifetime but NO Active component (treat as enabled)
+        foreach (var result in World!.Query<LifetimeComponent>().Without<Active>())
         {
-            World!.DestroyEntity(entity);
+            var entity = result.Entity;
+            ref var lifetime = ref result.Component1;
+
+            // Decrease lifetime in-place via ref
+            lifetime.Time -= deltaTime;
+
+            // Mark for destruction if lifetime expired
+            if (lifetime.Time <= 0.0f)
+            {
+                entitiesToDestroy.Add(entity);
+            }
+        }
+
+        // Batch destroy all expired entities instead of destroying individually
+        // This reduces entity removal overhead by batching structural changes
+        if (entitiesToDestroy.Count > 0)
+        {
+            foreach (var entity in entitiesToDestroy)
+            {
+                World!.DestroyEntity(entity);
+            }
         }
     }
 

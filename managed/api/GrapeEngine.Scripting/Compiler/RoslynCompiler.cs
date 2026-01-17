@@ -30,6 +30,11 @@ internal static class RoslynCompiler
     
     // Store the last compiled PDB bytes for retrieval
     private static byte[]? _lastCompiledPdbBytes = null;
+    
+    // Track compilation count: 0 = initial/boot compilation, 1+ = hot reload
+    // First compilation writes to GameScripts.dll directly
+    // Subsequent compilations write to GameScripts_hotreload_N.dll for hot reload safety
+    private static int _compilationCount = 0;
 
     public static int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath, IEnumerable<string>? references = null)
     {
@@ -171,25 +176,72 @@ internal static class RoslynCompiler
                     // Store PDB bytes for retrieval
                     _lastCompiledPdbBytes = pdbBytes.Length > 0 ? pdbBytes : null;
                     
-                    // Use versioned assembly loading to avoid file-locking issues
-                    // Instead of overwriting GameScripts.dll, we create GameScripts_hotreload_1.dll, 
-                    // GameScripts_hotreload_2.dll, etc. This eliminates file locks when unloading old versions.
-                    string versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes, pdbBytes);
+                    string finalAssemblyPath;
                     
-                    if (versionedPath == null)
+                    // First compilation (count=0): write directly to GameScripts.dll
+                    // Subsequent compilations (count>0): use versioned names for hot reload safety
+                    if (_compilationCount == 0)
                     {
-                        _lastDiagnosticsList.Clear();
-                        string errMsg = $"Failed to write versioned assembly {outputAssemblyPath}.\nCheck AssemblyManager logs for details.";
-                        _lastDiagnosticsList.Add(errMsg);
-                        try 
+                        // Initial boot compilation - write directly to the original path
+                        Logging.LogInternal($"[RoslynCompiler] First compilation (boot) - writing directly to: {outputAssemblyPath}", LogLevel.Info);
+                        
+                        // Ensure the output directory exists
+                        var dir = Path.GetDirectoryName(outputAssemblyPath) ?? "";
+                        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                         {
-                            Logging.Log(errMsg, LogLevel.Error);
+                            Directory.CreateDirectory(dir);
                         }
-                        catch { }
-                        return -1;
+                        
+                        // Write DLL directly to the original path
+                        File.WriteAllBytes(outputAssemblyPath, bytes);
+                        Logging.LogInternal($"[RoslynCompiler] Wrote initial assembly: {outputAssemblyPath}", LogLevel.Info);
+                        
+                        // Write PDB if provided
+                        if (pdbBytes != null && pdbBytes.Length > 0)
+                        {
+                            string pdbPath = Path.ChangeExtension(outputAssemblyPath, ".pdb");
+                            try
+                            {
+                                File.WriteAllBytes(pdbPath, pdbBytes);
+                                Logging.LogInternal($"[RoslynCompiler] Wrote PDB: {pdbPath}", LogLevel.Debug);
+                            }
+                            catch (Exception pdbEx)
+                            {
+                                Logging.LogInternal($"[RoslynCompiler] Warning: Failed to write PDB: {pdbEx.Message}", LogLevel.Warning);
+                            }
+                        }
+                        
+                        finalAssemblyPath = outputAssemblyPath;
+                    }
+                    else
+                    {
+                        // Hot reload compilation (count>0): use versioned assembly loading
+                        // Create GameScripts_hotreload_1.dll, GameScripts_hotreload_2.dll, etc.
+                        // This avoids file-locking issues when unloading old versions.
+                        Logging.LogInternal($"[RoslynCompiler] Hot reload compilation (count={_compilationCount}) - using versioned path", LogLevel.Info);
+                        
+                        string versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes, pdbBytes);
+                        
+                        if (versionedPath == null)
+                        {
+                            _lastDiagnosticsList.Clear();
+                            string errMsg = $"Failed to write versioned assembly {outputAssemblyPath}.\nCheck AssemblyManager logs for details.";
+                            _lastDiagnosticsList.Add(errMsg);
+                            try 
+                            {
+                                Logging.Log(errMsg, LogLevel.Error);
+                            }
+                            catch { }
+                            return -1;
+                        }
+                        
+                        finalAssemblyPath = versionedPath;
                     }
                     
-                    // Update the output path to point to the versioned assembly
+                    // Increment compilation counter after successful write
+                    _compilationCount++;
+                    
+                    // Update the output path to point to the actual assembly
                     // The caller (TriggerCompileAndReloadManaged) will use this path to load the new version
                     string outputDir = Path.GetDirectoryName(outputAssemblyPath) ?? "";
                     
@@ -213,9 +265,8 @@ internal static class RoslynCompiler
                         }
                     }
                     
-                    // Store the versioned path for retrieval by the caller
-                    // This is a bit of a hack but avoids changing the public API
-                    _lastCompiledAssemblyPath = versionedPath;
+                    // Store the actual path (either original or versioned) for retrieval by the caller
+                    _lastCompiledAssemblyPath = finalAssemblyPath;
                 }
                 catch (Exception ex)
                 {

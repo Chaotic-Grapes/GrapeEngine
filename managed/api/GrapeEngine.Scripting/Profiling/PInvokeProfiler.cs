@@ -43,18 +43,23 @@ public static class PInvokeProfiler
     private static bool _enabled = false;
 
     /// <summary>
-    /// Enable or disable profiling.
+    /// Runtime flag to enable/disable P/Invoke profiling.
+    /// When disabled, profiling adds zero overhead (just a flag check).
     /// </summary>
-    public static void SetEnabled(bool enabled)
+    public static bool Enabled
     {
-        _enabled = enabled;
-        if (enabled)
+        get => _enabled;
+        set
         {
-            Logging.LogInternal("[PInvokeProfiler] Profiling enabled", LogLevel.Info);
-        }
-        else
-        {
-            Logging.LogInternal("[PInvokeProfiler] Profiling disabled", LogLevel.Info);
+            _enabled = value;
+            if (value)
+            {
+                Logging.LogInternal("[PInvokeProfiler] Profiling enabled", LogLevel.Info);
+            }
+            else
+            {
+                Logging.LogInternal("[PInvokeProfiler] Profiling disabled", LogLevel.Info);
+            }
         }
     }
 
@@ -182,29 +187,38 @@ public static class PInvokeProfiler
 
 /// <summary>
 /// Convenience class for timing a P/Invoke call using a using statement.
+/// Profiling overhead is minimal when disabled (just a flag check).
 /// Usage: using (var timer = PInvokeTimer.Start("FunctionName")) { /* call P/Invoke */ }
 /// </summary>
 public class PInvokeTimer : IDisposable
 {
     private readonly string _functionName;
-    private readonly Stopwatch _stopwatch;
+    private readonly Stopwatch? _stopwatch;
+    private readonly bool _profilingEnabled;
 
-    private PInvokeTimer(string functionName)
+    private PInvokeTimer(string functionName, bool profilingEnabled)
     {
         _functionName = functionName;
-        _stopwatch = Stopwatch.StartNew();
+        _profilingEnabled = profilingEnabled;
+        // Only create and start stopwatch if profiling is enabled
+        _stopwatch = profilingEnabled ? Stopwatch.StartNew() : null;
     }
 
     /// <summary>
     /// Start timing a P/Invoke call.
+    /// When profiling is disabled, returns a no-op scope with minimal overhead.
     /// </summary>
     public static PInvokeTimer Start(string functionName)
     {
-        return new PInvokeTimer(functionName);
+        return new PInvokeTimer(functionName, PInvokeProfiler.Enabled);
     }
 
     public void Dispose()
     {
+        // Only record if profiling was enabled when we started
+        if (!_profilingEnabled || _stopwatch == null)
+            return;
+
         _stopwatch.Stop();
         var microseconds = _stopwatch.Elapsed.Ticks / 10;
         PInvokeProfiler.RecordCall(_functionName, microseconds);

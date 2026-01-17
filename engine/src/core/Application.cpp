@@ -276,6 +276,11 @@ namespace Engine {
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::EditOnly))) {
             m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::EditOnly, world);
         }
+
+        // Flush any buffered logs from C# systems to the native side
+        if (m_scriptManager && m_scriptManager->GetFlushLogs()) {
+            m_scriptManager->GetFlushLogs()();
+        }
     }
 
     void Application::_initializeServices() {

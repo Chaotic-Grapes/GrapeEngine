@@ -33,6 +33,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace ECS {
 
+    // Forward declaration to avoid circular dependency
+    class ScriptManager;
+
     /**
      * @brief Global manager for all ECS systems.
      * 
@@ -150,9 +153,13 @@ namespace ECS {
 
             const auto& metadata = system->GetMetadata();
             SystemGroup group = GetSystemMetadataGroup(system);
+            std::string systemName = metadata.GetName();
 
             m_scriptedSystemGroups[group].push_back(system);
-            m_systemsByName[metadata.GetName()] = system;
+            m_systemsByName[systemName] = system;
+            
+            // Cache system name to avoid expensive P/Invoke calls during updates
+            m_systemNameCache[system] = systemName;
 
             _sortSystemGroup(group);
             
@@ -253,6 +260,9 @@ namespace ECS {
                         // Remove from name map
                         const auto& metadata = system->GetMetadata();
                         m_systemsByName.erase(metadata.GetName());
+
+                        // Remove from name cache
+                        m_systemNameCache.erase(system);
                     }
                 }
             }
@@ -639,16 +649,20 @@ namespace ECS {
         }
 
     private:
-        /// Native C++ systems (owned)
+        // Native C++ systems (owned)
         std::unordered_map<SystemGroup, std::vector<std::unique_ptr<ISystem>>> m_systemGroups;
 
-        /// Scripted C# systems (not owned, managed by scripting layer)
+        // Scripted C# systems (not owned, managed by scripting layer)
         std::unordered_map<SystemGroup, std::vector<ISystem*>> m_scriptedSystemGroups;
 
-        /// Name -> System lookup
+        // Name -> System lookup
         std::unordered_map<std::string, ISystem*> m_systemsByName;
 
-        /// Dependency graphs for each system group (for parallel execution analysis)
+        // Cached system names to avoid expensive P/Invoke metadata calls during updates
+        // Maps from ISystem* to its cached name string
+        std::unordered_map<ISystem*, std::string> m_systemNameCache;
+
+        // Dependency graphs for each system group (for parallel execution analysis)
         std::unordered_map<SystemGroup, SystemDependencyGraph> m_dependencyGraphs;
 
         /**
@@ -668,6 +682,16 @@ namespace ECS {
                 [](const ISystem* a, const ISystem* b) {
                     return a->GetMetadata().GetExecutionOrder() < b->GetMetadata().GetExecutionOrder();
                 });
+        }
+
+        /**
+         * @brief Flush buffered logs from C# systems.
+         * This ensures all logs accumulated during system execution are delivered
+         * to the native side before the next frame.
+         * Called from Application after system updates.
+         */
+        void FlushScriptedLogs() {
+            // Implementation is in Application.cpp after UpdateSystemsForMode calls
         }
 
         /**
@@ -693,7 +717,11 @@ namespace ECS {
                 for (auto* system : itScripted->second) {
                     if (system->IsEnabled()) {
                         // Profile this system's execution
-                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
+                        // Use cached name to avoid expensive P/Invoke metadata lookups
+                        auto it = m_systemNameCache.find(system);
+                        const char* systemName = (it != m_systemNameCache.end()) ? 
+                            it->second.c_str() : "Unknown";
+                        TimeSystem::Instance().ProfileBegin(systemName);
                         system->OnUpdate(world);
                         TimeSystem::Instance().ProfileEnd();
                     }
@@ -725,7 +753,11 @@ namespace ECS {
                 for (auto* system : systems) {
                     if (system->IsEnabled() && system->GetRunMode() == mode) {
                         // Profile this system's execution
-                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
+                        // Use cached name to avoid expensive P/Invoke metadata lookups
+                        auto it = m_systemNameCache.find(system);
+                        const char* systemName = (it != m_systemNameCache.end()) ? 
+                            it->second.c_str() : "Unknown";
+                        TimeSystem::Instance().ProfileBegin(systemName);
                         system->OnUpdate(world);
                         TimeSystem::Instance().ProfileEnd();
                     }
@@ -771,7 +803,11 @@ namespace ECS {
 
             // Execute sequential systems first (maintain backward compatibility)
             for (auto* system : sequentialSystems) {
-                TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
+                // Use cached name to avoid expensive P/Invoke metadata lookups
+                auto it = m_systemNameCache.find(system);
+                const char* systemName = (it != m_systemNameCache.end()) ? 
+                    it->second.c_str() : system->GetMetadata().GetName().c_str();
+                TimeSystem::Instance().ProfileBegin(systemName);
                 system->OnUpdate(world);
                 TimeSystem::Instance().ProfileEnd();
             }
@@ -830,7 +866,11 @@ namespace ECS {
 
                 // Execute sequential systems first (maintain order)
                 for (auto* system : sequentialSystems) {
-                    TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
+                    // Use cached name to avoid expensive P/Invoke metadata lookups
+                    auto it = m_systemNameCache.find(system);
+                    const char* systemName = (it != m_systemNameCache.end()) ? 
+                        it->second.c_str() : system->GetMetadata().GetName().c_str();
+                    TimeSystem::Instance().ProfileBegin(systemName);
                     system->OnUpdate(world);
                     TimeSystem::Instance().ProfileEnd();
                 }
