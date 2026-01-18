@@ -142,6 +142,25 @@ int main() {
                     LOG_WARNING("[EditorMain] Failed to generate C# project file, result: " << result);
                 }
             }
+
+            // Copy GrapeEngine.Scripting dependency to the output directory so it can be found at runtime
+            try {
+                std::filesystem::path outputDir = scriptsOutput.parent_path();
+                if (!outputDir.empty() && std::filesystem::exists(outputDir)) {
+                    // GrapeEngine.Scripting.dll is typically in the current working directory (build output)
+                    std::filesystem::path scriptingSource = std::filesystem::current_path() / "GrapeEngine.Scripting.dll";
+                    
+                    if (std::filesystem::exists(scriptingSource)) {
+                        std::filesystem::path scriptingDest = outputDir / "GrapeEngine.Scripting.dll";
+                        std::filesystem::copy_file(scriptingSource, scriptingDest, std::filesystem::copy_options::overwrite_existing);
+                        LOG_INFO("[EditorMain] Copied GrapeEngine.Scripting.dll to output directory: " << scriptingDest.string());
+                    } else {
+                        LOG_WARNING("[EditorMain] Could not find GrapeEngine.Scripting.dll at: " << scriptingSource.string());
+                    }
+                }
+            } catch (const std::exception& e) {
+                LOG_WARNING("[EditorMain] Warning: Failed to copy GrapeEngine.Scripting.dll dependency: " << e.what());
+            }
             
             // Set the standardized output path for hot reload watcher so compilations use consistent location
             auto setOutputPath = scriptManager->GetSetOutputAssemblyPath();
@@ -185,7 +204,7 @@ int main() {
                     if (compileSuccess) {
                         scriptManager->SetCompileStatus(3, 100, "Compilation successful");
                         LOG_INFO("[EditorMain] Initial script compilation succeeded");
-                        
+        
                         // Load the compiled assembly into the managed runtime so components are discovered
                         if (scriptManager->LoadAssembly(scriptsOutput.string())) {
                             LOG_INFO("[EditorMain] Loaded compiled script assembly");

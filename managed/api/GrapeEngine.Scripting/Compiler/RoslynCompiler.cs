@@ -243,28 +243,7 @@ internal static class RoslynCompiler
                     
                     // Update the output path to point to the actual assembly
                     // The caller (TriggerCompileAndReloadManaged) will use this path to load the new version
-                    string outputDir = Path.GetDirectoryName(outputAssemblyPath) ?? "";
-                    
-                    // Copy GrapeEngine.Scripting dependency to the same directory so it can be found at runtime
-                    if (!string.IsNullOrEmpty(outputDir))
-                    {
-                        try
-                        {
-                            var scriptingAsm = Assembly.Load("GrapeEngine.Scripting");
-                            if (scriptingAsm != null && !string.IsNullOrEmpty(scriptingAsm.Location))
-                            {
-                                var scriptingDllName = Path.GetFileName(scriptingAsm.Location);
-                                var scriptingDstPath = Path.Combine(outputDir, scriptingDllName);
-                                File.Copy(scriptingAsm.Location, scriptingDstPath, overwrite: true);
-                                Logging.LogInternal($"Copied GrapeEngine.Scripting to output directory: {scriptingDstPath}", LogLevel.Info);
-                            }
-                        }
-                        catch (Exception depEx)
-                        {
-                            Logging.Log($"Warning: Failed to copy GrapeEngine.Scripting dependency: {depEx.Message}", LogLevel.Warning);
-                        }
-                    }
-                    
+                    // Note: GrapeEngine.Scripting copy is now handled in native code (EditorMain.cpp) on startup
                     // Store the actual path (either original or versioned) for retrieval by the caller
                     _lastCompiledAssemblyPath = finalAssemblyPath;
                 }
