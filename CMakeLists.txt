@@ -32,7 +32,7 @@ find_program(DOTNET_EXECUTABLE dotnet REQUIRED)
 
 # ================ CoreCLR / .NET Hosting Configuration =================
 # Set the path to the CoreCLR library directory (primary default)
-set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/CoreCLR")
+set(CORECLR_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/externals/lib/CoreCLR")
 
 # Also consider common fallback locations and an environment override
 set(CORECLR_FALLBACK_DIR "${CMAKE_CURRENT_LIST_DIR}/externals/lib/CoreCLR")
