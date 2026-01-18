@@ -117,10 +117,20 @@ internal static partial class WorldAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void RegisterSerializeCallback(nint callbackPtr);
 
+    // Managed deserializer callback registration (native will call into managed callback)
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_RegisterDeserializeCallback")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial void RegisterDeserializeCallback(nint callbackPtr);
+
     // Serialize a component (engine-owned entrypoint) — returns CoTaskMem UTF8 pointer (must be freed)
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_SerializeComponentToJson")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial nint SerializeComponentToJson(void* worldPtr, ulong entityId, uint componentTypeHash);
+
+    // Deserialize a component from JSON (called during play state restoration)
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_DeserializeComponentFromJson", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial void DeserializeComponentFromJson(void* worldPtr, ulong entityId, uint componentTypeHash, string jsonStr);
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_FreeSerializedString")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
