@@ -2,7 +2,8 @@
 /*!
 \file   UndoSystem.cpp
 \author Daniel Kay Neo Zuo Feng
-\date   14th November 2025
+\author Samantha Leong Sher Yen
+\date   14th January 2026
 \brief
 Implementation of the UndoSystem and command types used to support
 undo/redo operations within the editor. This system records user actions,
@@ -212,13 +213,38 @@ namespace Editor {
 
     void CreateEntityCommand::Undo() {
         // Undo, deletes entity
-        if (!m_world || !m_world->IsAlive(m_entity)) {
+       // if (!m_world || !m_world->IsAlive(m_entity)) {
+       // Undo creation = delete/deactivate entity 
+       if (!m_world) {
+
+            LOG_WARNING("[UndoSystem] Cannot undo entity creation - world is null");
+
+            return;
+
+        }
+
+
+
+        if (!m_world->IsAlive(m_entity)) {
             LOG_WARNING("[UndoSystem] Cannot undo entity creation - entity already deleted");
             return;
         }
 
         // Actually destroy the entity
-        m_world->Destroy(m_entity);
+        //m_world->Destroy(m_entity);
+
+        // NEW: Soft Delete - deactivate instead of destroying
+   // if (m_world && m_world->IsAlive(m_entity)) {
+        if (m_world->Has<ECS::Components::Active>(m_entity)) {
+            m_world->Get<ECS::Components::Active>(m_entity).Enabled = false;
+        } else {
+            // If it doesn't have the component, add it as disabled
+            m_world->Add<ECS::Components::Active>(m_entity, ECS::Components::Active{ false });
+        }
+
+        LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " deactivated (undo creation)");
+
+   // }
 
         if (m_onEntityDeleted) {
             m_onEntityDeleted();
@@ -245,6 +271,30 @@ namespace Editor {
             if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
                 m_hasTransform = true;
                 m_savedTransform = m_world->Get<ECS::Components::LocalTransform>(entity);
+            }
+
+              if (m_world->Has<ECS::Components::Layer>(entity)) {
+
+                m_hasLayer = true;
+
+                m_savedLayer = m_world->Get<ECS::Components::Layer>(entity);
+
+            }
+
+            if (m_world->Has<ECS::Components::Name>(entity)) {
+
+                m_hasName = true;
+
+                m_savedName = m_world->Get<ECS::Components::Name>(entity);
+
+            }
+
+            if (m_world->Has<ECS::Components::Active>(entity)) {
+
+                m_hasActive = true;
+
+                m_savedActive = m_world->Get<ECS::Components::Active>(entity);
+
             }
 
             if (m_world->Has<ECS::Components::SpriteRenderer2D>(entity)) {
@@ -282,9 +332,24 @@ namespace Editor {
     }
 
     void DeleteEntityCommand::Undo() {
-        if (!m_world || !m_world->IsAlive(m_entity)) {
-            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - entity invalid");
+        // if (!m_world || !m_world->IsAlive(m_entity)) {
+        //     LOG_WARNING("[UndoSystem] Cannot undo entity deletion - entity invalid");
+          // Undo deletion = restore entity
+
+        if (!m_world) {
+
+            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - world is null");
+
             return;
+
+        }
+
+        // For soft delete system: entity should still be alive, just deactivated
+
+        if (!m_world->IsAlive(m_entity)) {
+
+            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - entity no longer exists in ECS");   
+        return;
         }
 
         // Restore entity state
@@ -295,6 +360,38 @@ namespace Editor {
             else {
                 m_world->Add<ECS::Components::LocalTransform>(m_entity, m_savedTransform);
             }
+        }
+
+         if (m_hasLayer) {
+
+            if (m_world->Has<ECS::Components::Layer>(m_entity)) {
+
+                m_world->Get<ECS::Components::Layer>(m_entity) = m_savedLayer;
+
+            }
+
+            else {
+
+                m_world->Add<ECS::Components::Layer>(m_entity, m_savedLayer);
+
+            }
+
+        }
+
+        if (m_hasName) {
+
+            if (m_world->Has<ECS::Components::Name>(m_entity)) {
+
+                m_world->Get<ECS::Components::Name>(m_entity) = m_savedName;
+
+            }
+
+            else {
+
+                m_world->Add<ECS::Components::Name>(m_entity, m_savedName);
+
+            }
+
         }
 
         if (m_hasSprite) {
@@ -325,8 +422,23 @@ namespace Editor {
         }
 
         // Reactivate entity
-        if (m_world->Has<ECS::Components::Active>(m_entity)) {
-            m_world->Get<ECS::Components::Active>(m_entity).Enabled = true;
+        // if (m_world->Has<ECS::Components::Active>(m_entity)) {
+        //     m_world->Get<ECS::Components::Active>(m_entity).Enabled = true;
+          // Restore Active component last (this will re-enable the entity)
+
+        if (m_hasActive) {
+
+            if (m_world->Has<ECS::Components::Active>(m_entity)) {
+
+                m_world->Get<ECS::Components::Active>(m_entity) = m_savedActive;
+
+            }
+
+            else {
+
+                m_world->Add<ECS::Components::Active>(m_entity, m_savedActive);
+
+            }
         }
 
         if (m_onEntityRestored) {

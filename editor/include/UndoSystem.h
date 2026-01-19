@@ -2,7 +2,8 @@
 /*!
 \file   UndoSystem.h
 \author Daniel Kay Neo Zuo Feng
-\date   14th November 2025
+\author Samantha Leong Sher Yen
+\date   14th January 2026
 \brief
 Declaration of the undo/redo command system used by the editor.
 
@@ -11,7 +12,7 @@ Command Pattern. It supports reversible editor actions such as transform
 modifications, entity creation, and entity deletion by encapsulating each
 operation into a command object that can be executed, undone, and redone.
 
-The UndoSystem serves as the editor’s central history manager, ensuring that
+The UndoSystem serves as the editor's central history manager, ensuring that
 entity edits and scene interactions remain fully reversible and consistent
 with ECS state.
 
@@ -113,6 +114,15 @@ namespace Editor {
 
         bool m_hasName = false;
         ECS::Components::Name m_savedName;
+        
+        bool m_hasActive = false;
+        ECS::Components::Active m_savedActive;
+
+        bool m_hasLayer = false;
+        ECS::Components::Layer m_savedLayer;
+
+        bool m_hasName = false;
+        ECS::Components::Name m_savedName;
 
         bool m_hasActive = false;
         ECS::Components::Active m_savedActive;
@@ -156,6 +166,15 @@ namespace Editor {
         bool m_hasTransform = false;
         ECS::Components::LocalTransform m_savedTransform;
 
+        bool m_hasLayer = false;
+        ECS::Components::Layer m_savedLayer;
+
+        bool m_hasName = false;
+        ECS::Components::Name m_savedName;
+
+        bool m_hasActive = false;
+        ECS::Components::Active m_savedActive;
+        
         bool m_hasSprite = false;
         ECS::Components::SpriteRenderer2D m_savedSprite;
 
