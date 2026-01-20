@@ -250,7 +250,7 @@ public class CommandBuffer(World world) : IDisposable
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error executing command {command.Type}: {ex.Message}");
+                Logging.LogInternal($"Error executing command {command.Type}: {ex.Message}", LogLevel.Error);
             }
         }
 
@@ -304,7 +304,7 @@ public class CommandBuffer(World world) : IDisposable
     {
         if (command.ComponentType == null || command.ComponentData == null)
         {
-            Console.WriteLine("[CommandBuffer] AddComponent failed: Missing component type or data");
+            Logging.LogInternal("[CommandBuffer] AddComponent failed: Missing component type or data", LogLevel.Warning);
             return;
         }
 
@@ -323,13 +323,12 @@ public class CommandBuffer(World world) : IDisposable
             }
             else
             {
-                Console.WriteLine(
-                    $"[CommandBuffer] AddComponent failed: Could not find method for {command.ComponentType.Name}");
+                Logging.LogInternal($"[CommandBuffer] AddComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CommandBuffer] AddComponent error: {ex.Message}");
+            Logging.LogInternal($"[CommandBuffer] AddComponent error: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -340,7 +339,7 @@ public class CommandBuffer(World world) : IDisposable
     {
         if (command.ComponentType == null)
         {
-            Console.WriteLine("[CommandBuffer] RemoveComponent failed: Missing component type");
+            Logging.LogInternal("[CommandBuffer] RemoveComponent failed: Missing component type", LogLevel.Warning);
             return;
         }
 
@@ -355,12 +354,12 @@ public class CommandBuffer(World world) : IDisposable
             }
             else
             {
-                Console.WriteLine($"[CommandBuffer] RemoveComponent failed: Could not find method for {command.ComponentType.Name}");
+                Logging.LogInternal($"[CommandBuffer] RemoveComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CommandBuffer] RemoveComponent error: {ex.Message}");
+            Logging.LogInternal($"[CommandBuffer] RemoveComponent error: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -371,7 +370,7 @@ public class CommandBuffer(World world) : IDisposable
     {
         if (command.ComponentType == null || command.ComponentData == null)
         {
-            Console.WriteLine($"[CommandBuffer] SetComponent failed: Missing component type or data");
+            Logging.LogInternal($"[CommandBuffer] SetComponent failed: Missing component type or data", LogLevel.Warning);
             return;
         }
 
@@ -385,12 +384,12 @@ public class CommandBuffer(World world) : IDisposable
             }
             else
             {
-                Console.WriteLine($"[CommandBuffer] SetComponent failed: Could not find method for {command.ComponentType.Name}");
+                Logging.LogInternal($"[CommandBuffer] SetComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CommandBuffer] SetComponent error: {ex.Message}");
+            Logging.LogInternal($"[CommandBuffer] SetComponent error: {ex.Message}", LogLevel.Error);
         }
     }
 

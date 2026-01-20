@@ -33,11 +33,20 @@ namespace GrapeEngine.Scripting.Hosting;
 internal static class ComponentDiscovery
 {
     /// <summary>
+    /// Maps component type hashes to their Type objects.
+    /// Used by the editor when deserializing component values from JSON at runtime.
+    /// </summary>
+    public static Dictionary<uint, Type> TypeHashToType { get; } = new();
+    /// <summary>
     /// Discover all unmanaged component types in loaded assemblies and register them.
     /// Called from ScriptHost initialization.
     /// </summary>
     public static void DiscoverAndRegisterAll()
     {
+        // Clear the registration cache to allow re-registration of modified component types
+        // This is REQUIRED for hot reload to work otherwise modified components won't be re-registered
+        ComponentRegistry.ClearRegistrationCache();
+
         var components = DiscoverComponents();
         Logging.LogInternal($"[ComponentDiscovery] Found {components.Count} component types", LogLevel.Info);
 
@@ -233,6 +242,10 @@ internal static class ComponentDiscovery
             if (getHashMethod != null)
             {
                 var hash = (uint)getHashMethod.Invoke(null, [])!;
+                
+                // Add to the type hash mapping for editor deserialization
+                TypeHashToType[hash] = componentType;
+                
                 Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name} (hash: 0x{hash:X8})", LogLevel.Info);
             }
             else

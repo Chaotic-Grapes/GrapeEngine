@@ -82,16 +82,18 @@ void ConsolePanel::_renderToolbar() {
     ImGui::Text(" Filter:");
     ImGui::SameLine();
 
-    if (ImGui::Checkbox("WRN", &m_showWarning)) {}
+    if (ImGui::Checkbox("WRN", &m_showWarning)) { m_filterDirty = true; }
     ImGui::SameLine();
-    if (ImGui::Checkbox("ERR", &m_showError)) {}
+    if (ImGui::Checkbox("ERR", &m_showError)) { m_filterDirty = true; }
     ImGui::SameLine();
-    if (ImGui::Checkbox("CRT", &m_showCritical)) {}
+    if (ImGui::Checkbox("CRT", &m_showCritical)) { m_filterDirty = true; }
 
     // Search bar
     ImGui::Separator();
     ImGui::SetNextItemWidth(-1);
-    ImGui::InputTextWithHint("##search", "Search messages...", m_searchBuffer, sizeof(m_searchBuffer));
+    if (ImGui::InputTextWithHint("##search", "Search messages...", m_searchBuffer, sizeof(m_searchBuffer))) {
+        m_filterDirty = true;
+    }
 }
 
 void ConsolePanel::_renderMessages() {
@@ -100,16 +102,53 @@ void ConsolePanel::_renderMessages() {
 
     // Display messages with thread safety
     std::lock_guard<std::mutex> lock(m_messagesMutex);
-    int displayedCount = 0;
-    for (size_t i = 0; i < m_messages.size(); ++i) {
-        const auto& msg = m_messages[i];
 
-        if (_shouldDisplayMessage(msg)) {
-            _renderMessage(msg, static_cast<int>(i));
-            displayedCount++;
-        }
+    // Detect changes that require rebuilding the filtered view
+    if (m_lastMessageCount != m_messages.size()) {
+        m_filterDirty = true;
+        m_lastMessageCount = m_messages.size();
     }
 
+    if (m_lastShowWarning != m_showWarning || m_lastShowError != m_showError || m_lastShowCritical != m_showCritical) {
+        m_filterDirty = true;
+        m_lastShowWarning = m_showWarning;
+        m_lastShowError = m_showError;
+        m_lastShowCritical = m_showCritical;
+    }
+
+    // Cheap rolling hash for search buffer
+    uint32_t searchHash = 2166136261u;
+    for (const char* p = m_searchBuffer; *p; ++p) {
+        searchHash ^= static_cast<uint8_t>(*p);
+        searchHash *= 16777619u;
+    }
+    if (m_lastSearchHash != searchHash) {
+        m_filterDirty = true;
+        m_lastSearchHash = searchHash;
+    }
+
+    if (m_filterDirty) {
+        m_filteredIndices.clear();
+        m_filteredIndices.reserve(m_messages.size());
+        for (size_t i = 0; i < m_messages.size(); ++i) {
+            const auto& msg = m_messages[i];
+            if (_shouldDisplayMessage(msg)) {
+                m_filteredIndices.push_back(static_cast<int>(i));
+            }
+        }
+        m_filterDirty = false;
+    }
+
+    // Render only visible messages
+    ImGuiListClipper clipper;
+    clipper.Begin(static_cast<int>(m_filteredIndices.size()));
+    while (clipper.Step()) {
+        for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+            const int msgIndex = m_filteredIndices[static_cast<size_t>(row)];
+            const auto& msg = m_messages[static_cast<size_t>(msgIndex)];
+            _renderMessage(msg, msgIndex);
+        }
+    }
     // Auto-scroll to bottom
     if (m_autoScroll && m_scrollToBottom) {
         ImGui::SetScrollHereY(1.0f);
@@ -230,12 +269,18 @@ void ConsolePanel::AddMessage(LogLevel level, LogSource source, const std::strin
     }
 
     m_messages.push_back({ timestamp, level, message });
+    m_filterDirty = true;
     m_scrollToBottom = true;
 }
 
 void ConsolePanel::Clear() {
     std::lock_guard<std::mutex> lock(m_messagesMutex);
     m_messages.clear();
+    m_filteredIndices.clear();
+    m_filterDirty = true;
+    m_lastMessageCount = 0;
+    m_selectedMessageIndex = -1;
+    m_hoveredMessageIndex = -1;
 }
 
 // -------------------------------------------------------------------------

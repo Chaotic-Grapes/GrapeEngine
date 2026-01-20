@@ -16,12 +16,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "core/Application.h"
 #include "core/CrashDumping.h"
+#include "core/messaging/MessageSystem.h"
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "scripting/ScriptManager.h"
 #include "scripting/ComponentTypeRegistry.h"
-#include "ecs/systems/LifetimeSystem.h"
 #include "ecs/systems/TransformSystem.h"
 #include "ecs/systems/AudioSystem.h"
 #include "scene/Scene.h"
@@ -91,6 +91,9 @@ namespace Engine {
         m_initialized = true;
 
         LOG_INFO("Engine initialized in " << (mode == EngineMode::Editor ? "Editor" : "Game") << " mode");
+
+        // Broadcast application start event
+        Messaging::MessageSystem::Notify(Messaging::ApplicationStart{});
     }
 
     void Application::Update() {
@@ -167,8 +170,7 @@ namespace Engine {
                 _updatePhysics(world);
                 
                 // Update systems - always run for game mode
-                const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
-                m_systemManager.UpdateWithDependencies(world, dt);
+                m_systemManager.UpdateWithDependencies(world);
             }
         }
 
@@ -187,6 +189,9 @@ namespace Engine {
         }
 
         LOG_INFO("Shutting down engine...");
+
+        // Broadcast application exit event
+        Messaging::MessageSystem::Notify(Messaging::ApplicationExit{});
 
         // Stop device change detection
         DeviceManager::StopAudioDeviceChangeDetection();
@@ -258,18 +263,23 @@ namespace Engine {
         }
     }
 
-    void Application::UpdateSystemsByMode(uint32_t modes, ECS::World& world, float deltaTime) {
+    void Application::UpdateSystemsByMode(uint32_t modes, ECS::World& world) {
         // Public API for editor to directly control which modes execute
         // This allows editor to implement play/pause/step/edit state transitions
-        
+
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::Always))) {
-            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world, deltaTime);
+            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::Always, world);
         }
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::PlayOnly))) {
-            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::PlayOnly, world, deltaTime);
+            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::PlayOnly, world);
         }
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::EditOnly))) {
-            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::EditOnly, world, deltaTime);
+            m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::EditOnly, world);
+        }
+
+        // Flush any buffered logs from C# systems to the native side
+        if (m_scriptManager && m_scriptManager->GetFlushLogs()) {
+            m_scriptManager->GetFlushLogs()();
         }
     }
 
@@ -317,7 +327,6 @@ namespace Engine {
         // Systems will execute based on their SystemGroup and executionOrder
         
         // Update Phase Systems
-        m_systemManager.RegisterSystem<ECS::LifetimeSystem>();
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
         m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         

@@ -128,6 +128,12 @@ namespace Messaging {
     // System Events
     // -------------------------------
 
+    // Sent when the application has finished initializing.
+    struct ApplicationStart {};
+
+    // Sent when the application is shutting down.
+    struct ApplicationExit {};
+
     // Sent when the active scene changes.
     struct SceneChanged {
         std::string OldScene; // Previous scene name
@@ -463,6 +469,16 @@ namespace Messaging {
         PickResultRequested(float x, float y)
             : ScreenX(x), ScreenY(y), ResultEntityId(0), 
               HitSomething(false), HitPosition(0.0f) {
+        }
+    };
+
+    // Editor: Entity selection changed (sent by viewport/hierarchy when entity is selected)
+    // Uses NPOS32 as sentinel for "nothing selected" to allow entity 0 to be a valid selection
+    struct EditorEntitySelected {
+        uint32_t EntityId;  // The entity that was selected (NPOS32 for "nothing selected")
+        
+        EditorEntitySelected(uint32_t id = std::numeric_limits<uint32_t>::max())
+            : EntityId(id) {
         }
     };
 }

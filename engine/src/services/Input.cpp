@@ -29,13 +29,14 @@ Features:
 
 // Initialize static members
 GLFWwindow* Input::m_window = nullptr;
-std::unordered_map<int, bool> Input::m_keyDown{ 0 };
-std::unordered_map<int, bool> Input::m_keyPressed{ 0 };
-std::unordered_map<int, bool> Input::m_keyUp{ 0 };
 
-std::unordered_map<int, bool> Input::m_mouseDown{ 0 };
-std::unordered_map<int, bool> Input::m_mousePressed{ 0 };
-std::unordered_map<int, bool> Input::m_mouseUp{ 0 };
+// ************** Keyboard state ************** //
+bool Input::s_keyCurrent[MAX_KEYS] = { false };
+bool Input::s_keyPrevious[MAX_KEYS] = { false };
+
+// ************** Mouse state ************** //
+bool Input::s_mouseCurrent[MAX_MOUSE] = { false };
+bool Input::s_mousePrevious[MAX_MOUSE] = { false };
 
 double Input::m_scrollX{ 0 };
 double Input::m_scrollY{ 0 };
@@ -47,32 +48,32 @@ void Input::Initialize(GLFWwindow* pWin) {
 
 // Check if a specific key is currently pressed
 bool Input::IsKeyPressed(const int key) {
-    return m_keyPressed[key];
+    return s_keyCurrent[key] && !s_keyPrevious[key];
 }
 
 // Check if a specific key was just pressed this frame
 bool Input::IsKeyDown(const int key) {
-    return glfwGetKey(m_window, key) == PRESS;
+    return s_keyCurrent[key];
 }
 
 // Check if a specific key was just released this frame
 bool Input::IsKeyUp(const int key) {
-    return m_keyUp[key];
+    return !s_keyCurrent[key] && s_keyPrevious[key];
 }
 
 // Check if a specific mouse button is currently pressed
 bool Input::IsMousePressed(const int button) {
-    return glfwGetMouseButton(m_window, button) == PRESS;
+    return s_mouseCurrent[button] && !s_mousePrevious[button];
 }
 
 // Check if a mouse button was just pressed this frame
 bool Input::IsMouseDown(const int button) {
-    return glfwGetMouseButton(m_window, button) == GLFW_PRESS;
+    return s_mouseCurrent[button];
 }
 
 // Check if a mouse button was just released this frame
 bool Input::IsMouseUp(const int button) {
-    return m_mouseUp[button];
+    return !s_mouseCurrent[button] && s_mousePrevious[button];
 }
 
 // Get current mouse position
@@ -112,52 +113,45 @@ void Input::ErrorCallback(const int error, char const* description) {
 
 // Clear frame-specific input state and poll GLFW events (called once per frame)
 void Input::_processInput() {
-    m_keyDown.clear();
-    m_mouseDown.clear();
-    m_mousePressed.clear();
-    m_mouseUp.clear();
-    m_keyUp.clear();
-    m_keyPressed.clear();
-    m_mouseDown.clear();
-    m_mouseUp.clear();
+    // Update previous state arrays
+    std::memcpy(s_keyPrevious,   s_keyCurrent,   sizeof(s_keyCurrent));
+    std::memcpy(s_mousePrevious, s_mouseCurrent, sizeof(s_mouseCurrent));
 
     // Reset scroll deltas so scroll input only lasts one frame
     m_scrollX = 0.0;
     m_scrollY = 0.0;
 
+    m_charInput.clear();
+
     glfwPollEvents();
 }
 
 // Called on keyboard key press/release
-void Input::_keyCallback(GLFWwindow* pWin, int key, int scancode, int action, int mod) {
-    (void)pWin;
-    (void)mod;
-    (void)scancode;
+void Input::_keyCallback(GLFWwindow*, int key, int, int action, int mod) {
+    if (key < 0 || key >= MAX_KEYS)
+        return;
 
     if (action == GLFW_PRESS) {
-        m_keyDown[key] = true;
-        m_keyPressed[key] = true;
+        s_keyCurrent[key] = true;
         Messaging::MessageSystem::Broadcast(Messaging::KeyPressed{ key, false, mod });
     }
     else if (action == GLFW_RELEASE) {
-        m_keyDown[key] = false;
-        m_keyUp[key] = true;
+        s_keyCurrent[key] = false;
         Messaging::MessageSystem::Broadcast(Messaging::KeyReleased{ key, mod });
     }
 }
 
 // Called on mouse button press/release
-void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int mod) {
-    (void)pWin;
-    (void)mod;
+void Input::_mouseButtonCallback(GLFWwindow*, int button, int action, int) {
+    if (button < 0 || button >= MAX_MOUSE)
+        return;
 
     if (action == GLFW_PRESS) {
         double xPos = 0.0, yPos = 0.0;
         if (Input::m_window) {
             glfwGetCursorPos(Input::m_window, &xPos, &yPos);
         }
-        m_mouseDown[button] = true;
-        m_mousePressed[button] = true;
+        s_mouseCurrent[button] = true;
         Messaging::MessageSystem::Broadcast(Messaging::MouseButtonPressed{ button,
             static_cast<float>(xPos), static_cast<float>(yPos) });
     }
@@ -166,8 +160,7 @@ void Input::_mouseButtonCallback(GLFWwindow* pWin, int button, int action, int m
         if (Input::m_window) {
             glfwGetCursorPos(Input::m_window, &xPos, &yPos);
         }
-        m_mouseDown[button] = false;
-        m_mouseUp[button] = true;
+        s_mouseCurrent[button] = false;
         Messaging::MessageSystem::Broadcast(Messaging::MouseButtonReleased{ button,
             static_cast<float>(xPos), static_cast<float>(yPos) });
     }

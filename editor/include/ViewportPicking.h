@@ -18,6 +18,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include <glm/glm.hpp>
 #include <cstdint>
+#include "ecs/Entity.h"
 
 // Forward declarations
 namespace ECS { class RendererSystem; }
@@ -30,6 +31,9 @@ namespace Editor {
      * 
      * This utility handles viewport-space to FBO-space coordinate conversion
      * and reads from the engine's picking framebuffer.
+     * 
+     * Note: Uses ECS::Entity::NPOS32 as the "no entity picked" sentinel value
+     * to allow picking entity 0.
      */
     class ViewportPicking {
     public:
@@ -40,7 +44,7 @@ namespace Editor {
          * @param viewportPos Viewport position in screen space
          * @param viewportSize Viewport size in pixels
          * @param rendererSystem Renderer system to query picking FBO from
-         * @return Entity ID at that position, or 0 if none
+         * @return Request ID (non-zero for valid requests), or 0 if request failed
          */
         // NOTE: synchronous readback helper removed. Use async API below.
 
@@ -55,7 +59,8 @@ namespace Editor {
         static bool TryGetAsyncPickResult(uint32_t requestId, uint32_t& outEntityId, ECS::RendererSystem* rendererSystem);
 
     private:
-        static constexpr uint32_t INVALID_ENTITY_ID = 0;
+        // Use NPOS32 as sentinel for "no entity picked" to allow picking entity 0
+        static constexpr uint32_t INVALID_ENTITY_ID = ECS::Entity::NPOS32;
     };
 
 }

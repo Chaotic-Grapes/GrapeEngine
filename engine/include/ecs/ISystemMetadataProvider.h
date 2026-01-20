@@ -62,9 +62,9 @@ namespace ECS {
      *         return SystemGroup::Physics;
      *     }
      *     
-     *     void OnUpdate(World& world, float deltaTime) override {
-     *         // Physics logic here
-     *     }
+    *     void OnUpdate(World& world) override {
+    *         // Physics logic here
+    *     }
      *     
      * private:
      *     SystemGroup m_systemGroup;

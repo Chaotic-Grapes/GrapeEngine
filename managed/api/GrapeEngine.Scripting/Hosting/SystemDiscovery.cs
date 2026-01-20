@@ -8,9 +8,6 @@ Discovers and manages ISystem implementations via reflection.
 */
 /* End Header *******************************************************************/
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using GrapeEngine.Scripting.Systems;
 
@@ -32,19 +29,19 @@ internal static class SystemDiscovery
     /// Key: Handle (opaque identifier for C++)
     /// Value: Type that implements ISystem
     /// </summary>
-    private static readonly Dictionary<ulong, Type> s_systemTypes = [];
+    private static readonly Dictionary<ulong, Type> _systemTypes = [];
 
     /// <summary>
     /// Instantiated system objects.
     /// Key: Handle
     /// Value: System instance
     /// </summary>
-    private static readonly Dictionary<ulong, object> s_systemInstances = [];
+    private static readonly Dictionary<ulong, object> _systemInstances = [];
 
     /// <summary>
     /// Next available system handle.
     /// </summary>
-    private static ulong s_nextSystemHandle = 1;
+    private static ulong _nextSystemHandle = 1;
 
     /// <summary>
     /// Discover all ISystem implementations in the given assembly.
@@ -68,18 +65,18 @@ internal static class SystemDiscovery
             foreach (var systemType in systemTypes)
             {
                 // Assign handle and register
-                ulong handle = s_nextSystemHandle++;
-                s_systemTypes[handle] = systemType;
+                ulong handle = _nextSystemHandle++;
+                _systemTypes[handle] = systemType;
 
                 result.Add($"{handle}:{systemType.FullName}");
-                Console.WriteLine($"[SystemDiscovery] Discovered system: {systemType.FullName} (handle={handle})");
+                Logging.LogInternal($"[SystemDiscovery] Discovered system: {systemType.FullName} (handle={handle})", LogLevel.Info);
             }
 
-            return result.ToArray();
+            return [.. result];
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SystemDiscovery] Error discovering systems: {ex.Message}");
+            Logging.LogInternal($"[SystemDiscovery] Error discovering systems: {ex.Message}", LogLevel.Error);
             return [];
         }
     }
@@ -96,22 +93,22 @@ internal static class SystemDiscovery
     {
         try
         {
-            if (!s_systemTypes.TryGetValue(handle, out var systemType))
+            if (!_systemTypes.TryGetValue(handle, out var systemType))
             {
-                Console.WriteLine($"[SystemDiscovery] System not found: handle={handle}");
+                Logging.LogInternal($"[SystemDiscovery] System not found: handle={handle}", LogLevel.Warning);
                 return null;
             }
 
             // Create instance using parameterless constructor
             var instance = Activator.CreateInstance(systemType);
-            s_systemInstances[handle] = instance!;
+            _systemInstances[handle] = instance!;
 
-            Console.WriteLine($"[SystemDiscovery] Created system instance: {systemType.Name} (handle={handle})");
+            Logging.LogInternal($"[SystemDiscovery] Created system instance: {systemType.Name} (handle={handle})", LogLevel.Info);
             return instance;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SystemDiscovery] Error creating system instance: {ex.Message}");
+            Logging.LogInternal($"[SystemDiscovery] Error creating system instance: {ex.Message}", LogLevel.Error);
             return null;
         }
     }
@@ -126,30 +123,30 @@ internal static class SystemDiscovery
         {
             if (!typeof(ISystem).IsAssignableFrom(systemType))
             {
-                Console.WriteLine($"[SystemDiscovery] Type does not implement ISystem: {systemType.Name}");
+                Logging.LogInternal($"[SystemDiscovery] Type does not implement ISystem: {systemType.Name}", LogLevel.Warning);
                 return 0;
             }
 
             // Allocate a handle
-            ulong handle = s_nextSystemHandle++;
-            s_systemTypes[handle] = systemType;
+            ulong handle = _nextSystemHandle++;
+            _systemTypes[handle] = systemType;
 
             // Create instance
             var instance = Activator.CreateInstance(systemType);
             if (instance == null)
             {
-                s_systemTypes.Remove(handle);
-                Console.WriteLine($"[SystemDiscovery] Failed to instantiate: {systemType.Name}");
+                _systemTypes.Remove(handle);
+                Logging.LogInternal($"[SystemDiscovery] Failed to instantiate: {systemType.Name}", LogLevel.Warning);
                 return 0;
             }
 
-            s_systemInstances[handle] = instance;
-            Console.WriteLine($"[SystemDiscovery] Created system instance: {systemType.Name} (handle={handle})");
+            _systemInstances[handle] = instance;
+            Logging.LogInternal($"[SystemDiscovery] Created system instance: {systemType.Name} (handle={handle})", LogLevel.Info);
             return handle;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SystemDiscovery] Error creating system from type: {ex.Message}");
+            Logging.LogInternal($"[SystemDiscovery] Error creating system from type: {ex.Message}", LogLevel.Error);
             return 0;
         }
     }
@@ -159,7 +156,7 @@ internal static class SystemDiscovery
     /// </summary>
     public static object? GetSystemInstance(ulong handle)
     {
-        return s_systemInstances.TryGetValue(handle, out var instance) ? instance : null;
+        return _systemInstances.TryGetValue(handle, out var instance) ? instance : null;
     }
 
     /// <summary>
@@ -167,18 +164,36 @@ internal static class SystemDiscovery
     /// </summary>
     public static Type? GetSystemType(ulong handle)
     {
-        return s_systemTypes.TryGetValue(handle, out var type) ? type : null;
+        return _systemTypes.TryGetValue(handle, out var type) ? type : null;
     }
 
     /// <summary>
     /// Clear all discovered systems and instances.
-    /// Used during assembly reload.
+    /// Used during assembly reload. Disposes IDisposable instances first.
     /// </summary>
     public static void ClearDiscoveredSystems()
     {
-        s_systemTypes.Clear();
-        s_systemInstances.Clear();
-        s_nextSystemHandle = 1;
+        // Try to dispose instances that implement IDisposable
+        foreach (var instance in _systemInstances.Values)
+        {
+            try
+            {
+                if (instance is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.LogInternal($"[SystemDiscovery] Error disposing system instance: {ex.Message}", LogLevel.Warning);
+            }
+        }
+
+        _systemTypes.Clear();
+        _systemInstances.Clear();
+        _nextSystemHandle = 1;
+        
+        Logging.LogInternal($"[SystemDiscovery] Cleared all discovered systems and instances", LogLevel.Info);
     }
 
     /// <summary>
@@ -186,6 +201,37 @@ internal static class SystemDiscovery
     /// </summary>
     public static IEnumerable<(ulong Handle, object Instance)> GetAllSystemInstances()
     {
-        return s_systemInstances.Select(x => (x.Key, x.Value));
+        return _systemInstances.Select(x => (x.Key, x.Value));
+    }
+
+    /// <summary>
+    /// Register an existing ISystem instance and return its assigned handle.
+    /// This is useful for systems created by code (not via Activator) or for
+    /// registering `SystemBase` instances directly.
+    /// </summary>
+    public static ulong RegisterInstance(object instance)
+    {
+        try
+        {
+            if (instance == null)
+                return 0;
+
+            if (instance is not ISystem)
+            {
+                Logging.LogInternal($"[SystemDiscovery] Instance does not implement ISystem: {instance.GetType().Name}", LogLevel.Warning);
+                return 0;
+            }
+
+            ulong handle = _nextSystemHandle++;
+            _systemTypes[handle] = instance.GetType();
+            _systemInstances[handle] = instance;
+            Logging.LogInternal($"[SystemDiscovery] Registered system instance: {instance.GetType().Name} (handle={handle})", LogLevel.Info);
+            return handle;
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[SystemDiscovery] Error registering instance: {ex.Message}", LogLevel.Error);
+            return 0;
+        }
     }
 }

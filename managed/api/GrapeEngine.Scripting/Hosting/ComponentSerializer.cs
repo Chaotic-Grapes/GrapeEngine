@@ -29,19 +29,27 @@ internal static class ComponentSerializer
 {
     private static readonly ConcurrentDictionary<uint, Type> _types = new();
 
-    // Delegate used for reverse-P/Invoke from native
+    // Delegate used for reverse-P/Invoke from native (serialization)
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr NativeSerializeDelegate(uint typeHash, IntPtr data, int size);
 
-    private static readonly NativeSerializeDelegate _nativeDelegate = ManagedSerializeCallback;
-    private static readonly IntPtr _nativeFunctionPtr;
+    // Delegate used for reverse-P/Invoke from native (deserialization)
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void NativeDeserializeDelegate(uint typeHash, IntPtr data, int size, IntPtr jsonStr);
+
+    private static readonly NativeSerializeDelegate _nativeSerializeDelegate = ManagedSerializeCallback;
+    private static readonly NativeDeserializeDelegate _nativeDeserializeDelegate = ManagedDeserializeCallback;
+    private static readonly IntPtr _nativeSerializeFunctionPtr;
+    private static readonly IntPtr _nativeDeserializeFunctionPtr;
 
     static ComponentSerializer()
     {
-        _nativeFunctionPtr = Marshal.GetFunctionPointerForDelegate(_nativeDelegate);
+        _nativeSerializeFunctionPtr = Marshal.GetFunctionPointerForDelegate(_nativeSerializeDelegate);
+        _nativeDeserializeFunctionPtr = Marshal.GetFunctionPointerForDelegate(_nativeDeserializeDelegate);
 
-        // Register with native runtime so engine can call back into managed serializer
-        WorldAPI.RegisterSerializeCallback(_nativeFunctionPtr);
+        // Register with native runtime so engine can call back into managed serializer/deserializer
+        WorldAPI.RegisterSerializeCallback(_nativeSerializeFunctionPtr);
+        WorldAPI.RegisterDeserializeCallback(_nativeDeserializeFunctionPtr);
     }
 
     public static void RegisterManagedType(uint hash, Type t)
@@ -67,8 +75,44 @@ internal static class ComponentSerializer
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ComponentSerializer] Serialize error: {ex.Message}");
+            Logging.LogInternal($"[ComponentSerializer] Serialize error: {ex.Message}", LogLevel.Error);
             return IntPtr.Zero;
+        }
+    }
+
+    private static void ManagedDeserializeCallback(uint typeHash, IntPtr data, int size, IntPtr jsonStr)
+    {
+        try
+        {
+            if (!_types.TryGetValue(typeHash, out var t))
+            {
+                Logging.LogInternal($"[ComponentSerializer] Deserialize: Unknown type hash 0x{typeHash:X8}", LogLevel.Warning);
+                return;
+            }
+
+            // Marshal JSON string from native
+            string jsonString = Marshal.PtrToStringUTF8(jsonStr) ?? "{}";
+
+            // Deserialize from JSON
+            var options = new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                IncludeFields = true
+            };
+            var obj = JsonSerializer.Deserialize(jsonString, t, options);
+
+            if (obj == null)
+            {
+                Logging.LogInternal($"[ComponentSerializer] Failed to deserialize type {t.Name}", LogLevel.Warning);
+                return;
+            }
+
+            // Copy deserialized object back to native memory
+            Marshal.StructureToPtr(obj, data, false);
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentSerializer] Deserialize error: {ex.Message}", LogLevel.Error);
         }
     }
 

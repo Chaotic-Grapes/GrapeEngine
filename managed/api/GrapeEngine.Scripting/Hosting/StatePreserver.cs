@@ -8,10 +8,6 @@ Manages system state serialization for hot reload.
 */
 /* End Header *******************************************************************/
 
-using System;
-using System.Collections.Generic;
-using GrapeEngine.Scripting.Hosting;
-
 namespace GrapeEngine.Scripting.Hosting;
 
 /// <summary>
@@ -35,53 +31,84 @@ internal static class StatePreserver
     /// Key: Assembly path
     /// Value: Dictionary mapping type full name to serialized blob (null if serialization failed)
     /// </summary>
-    private static readonly Dictionary<string, Dictionary<string, byte[]?>> s_savedSystemStateByAssemblyPath = new();
+    private static readonly Dictionary<string, Dictionary<string, byte[]?>> _savedSystemStateByAssemblyPath = [];
 
-/// <summary>
-/// Save state from all IHotReloadable systems before unload.
-/// 
-/// Iterates through all instantiated systems and calls OnBeforeUnload()
-/// on those implementing IHotReloadable.
-/// </summary>
-/// <param name="assemblyPath">Path of assembly being unloaded (for tracking purposes)</param>
-public static void SaveAllSystemStates(string assemblyPath)
-{
-    try
+    private static string NormalizeAssemblyKey(string assemblyPath)
     {
-        var stateDict = new Dictionary<string, byte[]?>();
+        if (string.IsNullOrWhiteSpace(assemblyPath))
+            return assemblyPath;
 
-        foreach (var (handle, instance) in SystemDiscovery.GetAllSystemInstances())
+        try
         {
-            if (instance is IHotReloadable hotReloadable)
+            assemblyPath = Path.GetFullPath(assemblyPath);
+        }
+        catch
+        {
+            // Best-effort normalization; keep original string.
+        }
+
+        string dir = Path.GetDirectoryName(assemblyPath) ?? "";
+        string filename = Path.GetFileNameWithoutExtension(assemblyPath);
+        string ext = Path.GetExtension(assemblyPath);
+
+        int hotreloadIndex = filename.LastIndexOf("_hotreload_", StringComparison.OrdinalIgnoreCase);
+        if (hotreloadIndex > 0)
+        {
+            filename = filename.Substring(0, hotreloadIndex);
+        }
+
+        return Path.Combine(dir, filename + ext);
+    }
+
+    /// <summary>
+    /// Save state from all IHotReloadable systems before unload.
+    /// 
+    /// Iterates through all instantiated systems and calls OnBeforeUnload()
+    /// on those implementing IHotReloadable.
+    /// </summary>
+    /// <param name="assemblyPath">Path of assembly being unloaded (for tracking purposes)</param>
+    public static void SaveAllSystemStates(string assemblyPath)
+    {
+        try
+        {
+            assemblyPath = NormalizeAssemblyKey(assemblyPath);
+            var stateDict = new Dictionary<string, byte[]?>();
+
+            foreach (var (handle, instance) in SystemDiscovery.GetAllSystemInstances())
             {
-                string typeName = instance.GetType().FullName ?? "Unknown";
+                if (instance is IHotReloadable hotReloadable)
+                {
+                    string typeName = instance.GetType().FullName ?? "Unknown";
                 
-                try
-                {
-                    byte[]? state = hotReloadable.OnBeforeUnload();
-                    stateDict[typeName] = state;
+                    try
+                    {
+                        byte[]? state = hotReloadable.OnBeforeUnload();
+                        stateDict[typeName] = state;
                     
-                    Console.WriteLine($"[StatePreserver] Saved state for {typeName} ({state?.Length ?? 0} bytes)");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[StatePreserver] Error saving state for {typeName}: {ex.Message}");
-                    stateDict[typeName] = null;
+                        Logging.LogInternal($"[StatePreserver] Saved state for {typeName} ({state?.Length ?? 0} bytes)", LogLevel.Info);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.LogInternal($"[StatePreserver] Error saving state for {typeName}: {ex.Message}", LogLevel.Error);
+                        stateDict[typeName] = null;
+                    }
                 }
             }
+
+            if (stateDict.Count > 0)
+            {
+                _savedSystemStateByAssemblyPath[assemblyPath] = stateDict;
+                Logging.LogInternal($"[StatePreserver] Saved state for {stateDict.Count} systems from {assemblyPath}", LogLevel.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[StatePreserver] Error in SaveAllSystemStates: {ex.Message}", LogLevel.Error);
         }
 
-        if (stateDict.Count > 0)
-        {
-            s_savedSystemStateByAssemblyPath[assemblyPath] = stateDict;
-            Console.WriteLine($"[StatePreserver] Saved state for {stateDict.Count} systems from {assemblyPath}");
-        }
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[StatePreserver] Error in SaveAllSystemStates: {ex.Message}");
-    }
-}    /// <summary>
+    
+    /// <summary>
     /// Restore state to a system instance after reload.
     /// 
     /// Looks up previously saved state and calls OnAfterHotReload()
@@ -93,14 +120,15 @@ public static void SaveAllSystemStates(string assemblyPath)
     {
         try
         {
+            assemblyPath = NormalizeAssemblyKey(assemblyPath);
             if (instance is not IHotReloadable hotReloadable)
             {
                 return; // Not a hot-reloadable system
             }
 
-            if (!s_savedSystemStateByAssemblyPath.TryGetValue(assemblyPath, out var stateDict))
+            if (!_savedSystemStateByAssemblyPath.TryGetValue(assemblyPath, out var stateDict))
             {
-                Console.WriteLine($"[StatePreserver] No saved state found for assembly: {assemblyPath}");
+                Logging.LogInternal($"[StatePreserver] No saved state found for assembly: {assemblyPath}", LogLevel.Warning);
                 return;
             }
 
@@ -108,29 +136,29 @@ public static void SaveAllSystemStates(string assemblyPath)
             
             if (!stateDict.TryGetValue(typeName, out var savedState))
             {
-                Console.WriteLine($"[StatePreserver] No saved state found for type: {typeName}");
+                Logging.LogInternal($"[StatePreserver] No saved state found for type: {typeName}", LogLevel.Warning);
                 return;
             }
 
             if (savedState == null)
             {
-                Console.WriteLine($"[StatePreserver] Saved state was null for {typeName}");
+                Logging.LogInternal($"[StatePreserver] Saved state was null for {typeName}", LogLevel.Warning);
                 return;
             }
 
             try
             {
                 hotReloadable.OnAfterReload(savedState);
-                Console.WriteLine($"[StatePreserver] Restored state for {typeName} ({savedState.Length} bytes)");
+                Logging.LogInternal($"[StatePreserver] Restored state for {typeName} ({savedState.Length} bytes)", LogLevel.Info);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[StatePreserver] Error restoring state for {typeName}: {ex.Message}");
+                Logging.LogInternal($"[StatePreserver] Error restoring state for {typeName}: {ex.Message}", LogLevel.Error);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[StatePreserver] Error in RestoreSystemState: {ex.Message}");
+            Logging.LogInternal($"[StatePreserver] Error in RestoreSystemState: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -142,11 +170,21 @@ public static void SaveAllSystemStates(string assemblyPath)
     {
         if (assemblyPath != null)
         {
-            s_savedSystemStateByAssemblyPath.Remove(assemblyPath);
+            _savedSystemStateByAssemblyPath.Remove(NormalizeAssemblyKey(assemblyPath));
         }
         else
         {
-            s_savedSystemStateByAssemblyPath.Clear();
+            _savedSystemStateByAssemblyPath.Clear();
         }
+    }
+
+    /// <summary>
+    /// Clear all saved state from all assemblies.
+    /// Used before unload to break any remaining references.
+    /// </summary>
+    public static void ClearAllSavedState()
+    {
+        _savedSystemStateByAssemblyPath.Clear();
+        Logging.LogInternal($"[StatePreserver] Cleared all saved state", LogLevel.Info);
     }
 }

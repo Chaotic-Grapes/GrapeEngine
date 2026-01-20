@@ -58,7 +58,8 @@ namespace ECS {
         // Initialize any per-world resources here if needed
     }
 
-    void GUISystem::OnUpdate(World& world, float deltaTime) {
+    void GUISystem::OnUpdate(World& world) {
+        const float deltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
         // Phase 0: Build spatial grid for hit-testing acceleration
         if (m_spatialGridDirty) {
             BuildSpatialGrid(world);

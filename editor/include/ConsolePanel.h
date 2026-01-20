@@ -19,6 +19,7 @@ clearing. Integrates with Logger to capture all log output in real-time.
 #include <string>
 #include <mutex>
 #include <atomic>
+#include <cstdint>
 #include "core/Logger.h"
 
 struct ConsoleMessage {
@@ -93,6 +94,15 @@ private:
     bool m_scrollToBottom = false;
     int m_selectedMessageIndex = -1;
     int m_hoveredMessageIndex = -1;
+
+    // Cached filtered view to avoid rendering every message every frame
+    std::vector<int> m_filteredIndices;
+    bool m_filterDirty = true;
+    size_t m_lastMessageCount = 0;
+    bool m_lastShowWarning = true;
+    bool m_lastShowError = true;
+    bool m_lastShowCritical = true;
+    uint32_t m_lastSearchHash = 0;
 
     // Message limits
     static constexpr size_t MAX_MESSAGES = 1000;

@@ -140,7 +140,6 @@ namespace Engine {
          * @brief Update systems for specific run modes (editor use)
          * @param modes Bitmask of SystemRunMode values to execute
          * @param world Active scene's World
-         * @param deltaTime Time since last frame
          * 
          * **EDITOR MODE ONLY**: Editor uses this to control which systems execute
          * based on editor state (play/pause/edit/step).
@@ -151,16 +150,16 @@ namespace Engine {
          * Example (edit mode):
          * @code
          * uint32_t editModeMask = (1 << SystemRunMode::Always) | (1 << SystemRunMode::EditOnly);
-         * app->UpdateSystemsByMode(editModeMask, world, deltaTime);
+         * app->UpdateSystemsByMode(editModeMask, world);
          * @endcode
          * 
          * Example (play mode):
          * @code
          * uint32_t playModeMask = (1 << SystemRunMode::Always) | (1 << SystemRunMode::PlayOnly);
-         * app->UpdateSystemsByMode(playModeMask, world, deltaTime);
+         * app->UpdateSystemsByMode(playModeMask, world);
          * @endcode
          */
-        void UpdateSystemsByMode(uint32_t modes, ECS::World& world, float deltaTime);
+        void UpdateSystemsByMode(uint32_t modes, ECS::World& world);
 
         // ==================== Device Management (Phase 3) ====================
         

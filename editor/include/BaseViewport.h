@@ -110,7 +110,7 @@ protected:
     std::unique_ptr<Editor::EditorCamera> m_editorCamera;
 
     // State
-    EntityId m_selectedEntityId = ECS::Entity::NPOS32;
+    ECS::Entity m_selectedEntity = ECS::NULL_ENTITY;  // Store full entity with generation to validate IsAlive()
     bool m_isViewportHovered = false;
 
     // Stores the exact screen position and size of the drawn scene texture

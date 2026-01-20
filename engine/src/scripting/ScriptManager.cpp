@@ -40,6 +40,7 @@ using get_hostfxr_path_fn = int(*)(char_t* path, size_t* path_size, void* reserv
 // Forward-declare native callback so managed watcher registration can pass
 // its address before the function definition appears later in this file.
 extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, const char* message);
+extern "C" void __cdecl Native_HotReloadCallback(const char* assemblyPath);
 
 namespace ECS {
 
@@ -228,6 +229,35 @@ namespace ECS {
     }
 
     /**
+     * @brief Handle hot reload completion callback from C#.
+     * @param assemblyPath Path to the reloaded assembly
+     * 
+     * Called when C# finishes hot reload. Calls registered callback to allow
+     * editor to re-discover and re-register systems.
+     */
+    void ScriptManager::HandleHotReloadCompletion(const std::string& assemblyPath) {
+        LOG_INFO("[ScriptManager] Hot reload completed for: " << assemblyPath);
+
+        if (!m_initialized) {
+            LOG_ERROR("[ScriptManager] Cannot handle hot reload - CLR not initialized");
+            return;
+        }
+
+        // Invoke registered callback if any
+        if (m_hotReloadCallback) {
+            try {
+                m_hotReloadCallback(assemblyPath);
+            }
+            catch (const std::exception& ex) {
+                LOG_ERROR("[ScriptManager] Error in hot reload callback: " << ex.what());
+            }
+        }
+        else {
+            LOG_WARNING("[ScriptManager] No hot reload callback registered - systems may not be properly reinitialized");
+        }
+    }
+
+    /**
      * @brief Discover ISystem implementations in all loaded assemblies.
      * @return Vector of ScriptSystemWrapper instances
      * 
@@ -243,6 +273,15 @@ namespace ECS {
         }
 
         LOG_INFO("[ScriptManager] Discovering scripted systems...");
+        // Log native-tracked loaded assemblies for diagnostics
+        if (!m_loadedAssemblies.empty()) {
+            std::stringstream ss;
+            ss << "[ScriptManager] Native loaded assemblies (" << m_loadedAssemblies.size() << "):\n";
+            for (const auto& a : m_loadedAssemblies) ss << "  - " << a << "\n";
+            LOG_INFO(ss.str());
+        } else {
+            LOG_INFO("[ScriptManager] No native-loaded assemblies recorded");
+        }
         // Call managed function to discover all ISystem implementations
         // DiscoverSystems now creates instances and returns INSTANCE handles
         int systemCount = 0;
@@ -269,16 +308,69 @@ namespace ECS {
         return systems;
     }
 
+    // ------------------------------------------------------------------------
+    // Native wrapper implementations
+    // ------------------------------------------------------------------------
+
+    uint64_t ScriptManager::CreateSystemInstanceFromTypeName(const char* typeName)
+    {
+        if (!m_initialized || !m_createSystemWrapper || typeName == nullptr) return 0;
+        try {
+            return m_createSystemWrapper(typeName);
+        } catch (...) {
+            return 0;
+        }
+    }
+
+    void ScriptManager::CallSystemOnCreate(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemOnCreate) return;
+        try {
+            m_callSystemOnCreate(handle, worldPtr);
+        } catch (...) {
+            // swallow exceptions at native boundary
+        }
+    }
+
+    intptr_t ScriptManager::CallSystemOnUpdateJob(uint64_t handle, void* worldPtr, intptr_t dependsOn)
+    {
+        if (!m_initialized) return 0;
+        // Prefer job-capable delegate if available
+        if (m_callSystemOnUpdateJob) {
+            try {
+                return m_callSystemOnUpdateJob(handle, worldPtr, dependsOn);
+            } catch (...) {
+                return 0;
+            }
+        }
+        // Fallback to non-job update
+        if (m_callSystemOnUpdate) {
+            try {
+                m_callSystemOnUpdate(handle, worldPtr);
+            } catch (...) {}
+        }
+        return 0;
+    }
+
+    void ScriptManager::CallSystemOnDestroy(uint64_t handle, void* worldPtr)
+    {
+        if (!m_initialized || !m_callSystemOnDestroy) return;
+        try {
+            m_callSystemOnDestroy(handle, worldPtr);
+        } catch (...) {}
+    }
+
     /**
      * @brief Register discovered scripted systems with the SystemManager.
      * @param systemManager Reference to the SystemManager
+     * @param world Optional World to pass for immediate OnCreate initialization
      * @return Number of systems registered
      */
-    int ScriptManager::RegisterScriptedSystems(SystemManager& systemManager) {
+    int ScriptManager::RegisterScriptedSystems(SystemManager& systemManager, ECS::World* world) {
         auto systems = DiscoverScriptedSystems();
 
         for (auto* system : systems) {
-            systemManager.RegisterScriptedSystem(system);
+            systemManager.RegisterScriptedSystem(system, world);
         }
 
         LOG_INFO("[ScriptManager] Registered " << static_cast<int>(systems.size()) << " scripted systems with SystemManager");
@@ -441,7 +533,34 @@ namespace ECS {
                     }
 
                     // Check if output assembly was created (success indicator)
-                    if (!std::filesystem::exists(outputAssembly)) {
+                    // Note: The compiler may write to a versioned path (GameScripts_hotreload_1.dll),
+                    // so we query the actual compiled path instead of checking the original output path.
+                    if (m_getLastCompiledAssemblyPath) {
+                        void* pathPtr = m_getLastCompiledAssemblyPath();
+                        if (pathPtr == nullptr) {
+                            std::string errMsg = "Compilation reported success, but no compiled assembly path was returned";
+                            LOG_ERROR(errMsg);
+                            {
+                                std::lock_guard<std::mutex> lock(m_compileMutex);
+                                m_compileMessage = errMsg;
+                            }
+                            return false;
+                        }
+                        const char* compiledPath = static_cast<const char*>(pathPtr);
+                        std::string compiledPathStr(compiledPath ? compiledPath : "");
+                        m_freeManagedString(pathPtr);
+
+                        if (compiledPathStr.empty() || !std::filesystem::exists(compiledPathStr)) {
+                            std::string summary = SummarizeDiagnostics(outDiagnostics);
+                            LOG_ERROR("Compilation failed (no output assembly at " << compiledPathStr << "): " << summary);
+                            {
+                                std::lock_guard<std::mutex> lock(m_compileMutex);
+                                m_compileMessage = outDiagnostics;
+                            }
+                            return false;
+                        }
+                    } else if (!std::filesystem::exists(outputAssembly)) {
+                        // Fallback if GetLastCompiledAssemblyPath is not available
                         std::string summary = SummarizeDiagnostics(outDiagnostics);
                         LOG_ERROR("Compilation failed (no output assembly): " << summary);
                         {
@@ -770,7 +889,9 @@ namespace ECS {
         success &= loadMethod("ResolveSystemGroup",               scriptHostTypeName, reinterpret_cast<void**>(&m_resolveSystemGroup));
         success &= loadMethod("CallSystemOnCreate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnCreate));
         success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
+        success &= loadMethod("CallSystemOnUpdateJob",            scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdateJob));
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
+        success &= loadMethod("FlushLogs",                         scriptHostTypeName, reinterpret_cast<void**>(&m_flushLogs));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
         success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));
@@ -778,11 +899,15 @@ namespace ECS {
         success &= loadMethod("GetLastDiagnosticsCount",          scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticsCount));
         success &= loadMethod("GetLastDiagnosticAt",              scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticAt));
         success &= loadMethod("FreeStringFromManaged",            scriptHostTypeName, reinterpret_cast<void**>(&m_freeManagedString));
+        success &= loadMethod("GetLastCompiledAssemblyPath",      scriptHostTypeName, reinterpret_cast<void**>(&m_getLastCompiledAssemblyPath));
+        success &= loadMethod("RegisterHotReloadCallback",        scriptHostTypeName, reinterpret_cast<void**>(&m_registerHotReloadCallback));
+        success &= loadMethod("DeserializeComponentFromJson",     scriptHostTypeName, reinterpret_cast<void**>(&m_deserializeComponentFromJson));
 
         // ScriptFileWatcher methods
         success &= loadMethod("StartWatching",                    watcherTypeName, reinterpret_cast<void**>(&m_startWatching), LoadLabel::Watcher);
         success &= loadMethod("StopWatching",                     watcherTypeName, reinterpret_cast<void**>(&m_stopWatching), LoadLabel::Watcher);
         success &= loadMethod("SetCompileCallback",               watcherTypeName, reinterpret_cast<void**>(&m_setCompileCallback), LoadLabel::Watcher);
+        success &= loadMethod("SetOutputAssemblyPath",            watcherTypeName, reinterpret_cast<void**>(&m_setOutputAssemblyPath), LoadLabel::Watcher);
         
         // Log results
         if (!sucstream.str().empty()) // Log any successes
@@ -790,6 +915,12 @@ namespace ECS {
         if (!success) { // Log any errors, then return failure
             LOG_CRITICAL(errstream.str());
             return false;
+        }
+
+        // Register the hot reload callback so C# can notify us when reload completes
+        if (m_registerHotReloadCallback) {
+            m_registerHotReloadCallback(reinterpret_cast<void*>(&Native_HotReloadCallback));
+            LOG_INFO("[ScriptManager] Registered hot reload callback");
         }
 
         // All delegates loaded successfully, so return true
@@ -864,9 +995,11 @@ namespace ECS {
             return;
         }
 
+        LOG_INFO("[ScriptSystemWrapper] OnCreate invoked (handle=0x" << std::hex << m_managedHandle << ")");
         auto callOnCreate = m_scriptManager->GetCallSystemOnCreate();
         if (callOnCreate) {
             callOnCreate(m_managedHandle, &world);
+            LOG_INFO("[ScriptSystemWrapper] OnCreate forwarded to managed (handle=0x" << std::hex << m_managedHandle << ")");
         }
         else {
             LOG_ERROR("[ScriptSystemWrapper] CallSystemOnCreate delegate not available");
@@ -878,12 +1011,12 @@ namespace ECS {
      * @param world Reference to the World instance
      * @param deltaTime Time elapsed since last update
      */
-    void ScriptSystemWrapper::OnUpdate(World& world, float deltaTime) {
+    void ScriptSystemWrapper::OnUpdate(World& world) {
         if (!m_scriptManager) return;
 
         auto callOnUpdate = m_scriptManager->GetCallSystemOnUpdate();
         if (callOnUpdate) {
-            callOnUpdate(m_managedHandle, &world, deltaTime);
+            callOnUpdate(m_managedHandle, &world);
         }
     }
 
@@ -1065,12 +1198,39 @@ extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, c
     mgr->SetCompileStatus(status, progress, message ? message : "");
 }
 
+/**
+ * @brief Native callback invoked when C# hot reload completes.
+ * Receives the assembly path that was reloaded.
+ */
+extern "C" void __cdecl Native_HotReloadCallback(const char* assemblyPath)
+{
+    if (Engine::CORE == nullptr) {
+        return;
+    }
+
+    if (assemblyPath == nullptr || assemblyPath[0] == '\0') {
+        LOG_WARNING("[Native_HotReloadCallback] Invalid assembly path");
+        return;
+    }
+
+    LOG_INFO("[Native_HotReloadCallback] Hot reload completed for: " << assemblyPath);
+
+    ECS::ScriptManager* scriptMgr = Engine::CORE->GetScriptManager();
+    if (!scriptMgr) {
+        LOG_ERROR("[Native_HotReloadCallback] ScriptManager not available");
+        return;
+    }
+
+    // Notify script manager of hot reload completion
+    scriptMgr->HandleHotReloadCompletion(assemblyPath);
+}
+
 void ECS::ScriptManager::SetCompileStatus(int status, int progress, const char* message)
 {
     std::lock_guard<std::mutex> lock(m_compileMutex);
     m_compileStatus = status;
     m_compileProgress = progress;
-    m_compileMessage = message ? std::string(message) : std::string();
+    m_compileMessage = message ? message : "";
 }
 
 void ECS::ScriptManager::GetCompileStatus(int& outStatus, int& outProgress, std::string& outMessage)

@@ -5,9 +5,20 @@ namespace GrapeEngine.Scripting.Profiling;
 /// <summary>
 /// Tracks optimization metrics and profiles hot paths for managed code optimization.
 /// Provides data for profile-guided optimization (PGO) decisions.
+/// 
+/// PERFORMANCE NOTE: Profiling is disabled by default via EnableProfiling flag.
+/// Users can enable profiling at runtime by setting OptimizationProfiler.EnableProfiling = true
+/// to analyze their script performance without recompiling.
+/// When disabled, profiling adds near-zero overhead (just a null check).
 /// </summary>
 public class OptimizationProfiler
 {
+    /// <summary>
+    /// Runtime flag to enable/disable profiling.
+    /// Users can set this to profile their scripts regardless of build configuration.
+    /// </summary>
+    public static bool EnableProfiling { get; set; } = false;
+
     private class MethodProfile
     {
         public string MethodName { get; set; } = string.Empty;
@@ -47,9 +58,14 @@ public class OptimizationProfiler
 
     /// <summary>
     /// Begin profiling a method call.
+    /// Profiling is controlled by the EnableProfiling static flag, allowing runtime control.
+    /// When disabled, returns a no-op scope with near-zero overhead.
     /// </summary>
     public OptimizationScope BeginProfile(string methodName, OptimizationSafety safetyLevel = OptimizationSafety.Normal)
     {
+        if (!EnableProfiling)
+            return default; // No-op when profiling is disabled
+
         return new OptimizationScope(this, methodName, safetyLevel);
     }
 
@@ -505,7 +521,7 @@ public class AOTCompiler(AOTConfig? config = null)
             _compiledMethods.Add(methodFullName);
 
             // Log compilation success
-            Console.WriteLine($"[AOT] Compiled {methodFullName} with args: {GetCompilerArgs()}");
+            Logging.LogInternal($"[AOT] Compiled {methodFullName} with args: {GetCompilerArgs()}", LogLevel.Info);
 
             return true;
         }

@@ -95,7 +95,6 @@ namespace ECS {
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TagMask, Mask)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Active, Enabled)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Lifetime, Time)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Layer, Id)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(LocalTransform, Position, Rotation, Scale)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WorldTransform, Matrix, Dirty)
@@ -584,7 +583,6 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(Name, ECS::Components::Name, "Name")
 	REGISTER_COMPONENT_SERIALIZER(TagMask, ECS::Components::TagMask, "TagMask")
 	REGISTER_COMPONENT_SERIALIZER(Active, ECS::Components::Active, "Active")
-	REGISTER_COMPONENT_SERIALIZER(Lifetime, ECS::Components::Lifetime, "Lifetime")
 	REGISTER_COMPONENT_SERIALIZER(Layer, ECS::Components::Layer, "Layer")
 	REGISTER_COMPONENT_SERIALIZER(LocalTransform, ECS::Components::LocalTransform, "LocalTransform")
 	REGISTER_COMPONENT_SERIALIZER(WorldTransform, ECS::Components::WorldTransform, "WorldTransform")

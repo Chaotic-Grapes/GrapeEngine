@@ -12,7 +12,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Math;
 using System.Reflection;
 
 namespace GrapeEngine.Scripting.Hosting;
@@ -82,7 +81,7 @@ public static class StateSerializer
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[StateSerializer] Failed to set field {fieldName}: {ex.Message}");
+                        Logging.LogInternal($"[StateSerializer] Failed to set field {fieldName}: {ex.Message}", LogLevel.Error);
                     }
                 }
                 else
@@ -94,7 +93,7 @@ public static class StateSerializer
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[StateSerializer] Error deserializing state: {ex.Message}");
+            Logging.LogInternal($"[StateSerializer] Error deserializing state: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -149,20 +148,20 @@ public static class StateSerializer
             writer.Write((string)value ?? "");
         else if (fieldType == typeof(Vector2))
         {
-            var v = (GrapeEngine.Math.Vector2)value;
+            var v = (Vector2)value;
             writer.Write(v.X);
             writer.Write(v.Y);
         }
         else if (fieldType == typeof(Vector3))
         {
-            var v = (GrapeEngine.Math.Vector3)value;
+            var v = (Vector3)value;
             writer.Write(v.X);
             writer.Write(v.Y);
             writer.Write(v.Z);
         }
         else if (fieldType == typeof(Quaternion))
         {
-            var q = (GrapeEngine.Math.Quaternion)value;
+            var q = (Quaternion)value;
             writer.Write(q.X);
             writer.Write(q.Y);
             writer.Write(q.Z);
@@ -178,7 +177,7 @@ public static class StateSerializer
             }
             catch
             {
-                Console.WriteLine($"[StateSerializer] Cannot serialize field {fieldName} of type {fieldType.Name}");
+                Logging.LogInternal($"[StateSerializer] Cannot serialize field {fieldName} of type {fieldType.Name}", LogLevel.Error);
                 writer.Write(""); // Write empty JSON
             }
         }
@@ -223,14 +222,14 @@ public static class StateSerializer
         {
             float x = reader.ReadSingle();
             float y = reader.ReadSingle();
-            return new GrapeEngine.Math.Vector2 { X = x, Y = y };
+            return new Vector2 { X = x, Y = y };
         }
         else if (fieldType == typeof(Vector3))
         {
             float x = reader.ReadSingle();
             float y = reader.ReadSingle();
             float z = reader.ReadSingle();
-            return new GrapeEngine.Math.Vector3 { X = x, Y = y, Z = z };
+            return new Vector3 { X = x, Y = y, Z = z };
         }
         else if (fieldType == typeof(Quaternion))
         {
@@ -238,7 +237,7 @@ public static class StateSerializer
             float y = reader.ReadSingle();
             float z = reader.ReadSingle();
             float w = reader.ReadSingle();
-            return new GrapeEngine.Math.Quaternion { X = x, Y = y, Z = z, W = w };
+            return new Quaternion { X = x, Y = y, Z = z, W = w };
         }
         else
         {
@@ -253,7 +252,7 @@ public static class StateSerializer
             }
             catch
             {
-                Console.WriteLine($"[StateSerializer] Cannot deserialize field of type {fieldType.Name}");
+                Logging.LogInternal($"[StateSerializer] Cannot deserialize field of type {fieldType.Name}", LogLevel.Error);
                 return Activator.CreateInstance(fieldType);
             }
         }

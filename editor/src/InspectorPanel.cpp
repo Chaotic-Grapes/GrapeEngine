@@ -422,6 +422,8 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     // UI edits this JSON, then we sync the edits back into the ECS
     nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
 
+    // LOG_DEBUG("[InspectorPanel] Serialized entity " << entity.Index << ": " << entityJson.dump(2));
+
     // Make sure the JSON has a component list we can iterate
     if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
         ImGui::Dummy(ImVec2(0, 4));
@@ -566,7 +568,11 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             MarkSceneDirtyIfNeeded(m_fileMenu);
         }
     }
-
+    // else {
+    //     // Debug: show why components aren't rendering
+    //     ImGui::TextDisabled("No Components array in serialized entity");
+    //     LOG_ERROR("[InspectorPanel] Entity " << entity.Index << " has no Components array. JSON: " << entityJson.dump(2));
+    // }
 
     ImGui::EndChild();
     ImGui::PopStyleVar();

@@ -22,8 +22,18 @@ Launches the application in editor mode with the level editor interface.
 #include "EditorState.h"
 #include "services/TimeSystem.h"
 #include "platform/IPlatformContext.h"
+#include "platform/IWindow.h"
 #include "scripting/ScriptManager.h"
 #include "core/Logger.h"
+
+extern "C" {
+    // Forward declare the component deserialize callback registration function
+    void RegisterComponentDeserializeCallback(void(*callback)(uint32_t, void*, int, const char*));
+
+    // Request high-performance GPU
+    __declspec(dllexport) unsigned long NvOptimusEnablement         = 1;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance  = 1;
+}
 
 /**
  * @brief Main entry point for the Grape Engine Level Editor
@@ -54,27 +64,110 @@ int main() {
     ECS::World emptyWorld;
     engine.GetSystemManager().CreateAll(emptyWorld);
 
+    // Build the initial component registry immediately so the editor UI has metadata
+    // This ensures components are available for rendering in the inspector on startup
+    ComponentRegistryUI::RebuildFromNativeRegistry();
+    LOG_INFO("[EditorMain] Initial component registry built");
+
     // Initialize C# script compilation and hot reload watcher
-    auto* scriptManager = engine.GetScriptManager();
+    ECS::ScriptManager* scriptManager = engine.GetScriptManager();
+    
+    // Flag to defer registry rebuild to avoid frame spikes during hot reload
+    std::atomic<bool> registryRebuildPending{false};
+    
+    // Register hot reload callback so systems get reinitialized when scripts are reloaded
+    if (scriptManager && scriptManager->IsInitialized()) {
+        scriptManager->SetHotReloadCallback([&engine, &emptyWorld, &registryRebuildPending](const std::string& assemblyPath) {
+            LOG_INFO("[EditorMain] Hot reload callback triggered for: " << assemblyPath);
+            
+            // IMPORTANT: Clear all entities to ensure component schema changes are applied
+            // When hot reload updates component types (added/removed/modified fields),
+            // existing entity instances still have the old binary layout.
+            // Clearing entities forces them to be recreated with the new schema.
+            emptyWorld.Clear();
+            LOG_INFO("[EditorMain] Cleared all entities to sync with updated component schema");
+            
+            // Unregister old C# systems (calls OnDestroy)
+            engine.GetSystemManager().UnregisterScriptedSystems(emptyWorld);
+            LOG_INFO("[EditorMain] Unregistered old scripted systems");
+            
+            // Re-discover and re-register C# systems
+            // Pass emptyWorld so OnCreate is called immediately during registration
+            int systemCount = engine.GetScriptManager()->RegisterScriptedSystems(engine.GetSystemManager(), &emptyWorld);
+            
+            if (systemCount > 0) {
+                LOG_INFO("[EditorMain] Hot reload: re-discovered and initialized " << systemCount << " C# systems");
+            }
+
+            // DEFER the registry rebuild to avoid spiking frame time during hot reload callback
+            // The rebuild will be applied at the start of the next frame, before rendering
+            registryRebuildPending.store(true);
+            LOG_INFO("[EditorMain] Deferred editor component registry rebuild to next frame (avoids render spike)");
+        });
+        LOG_INFO("[EditorMain] Hot reload callback registered with ScriptManager");
+
+        // Register the component deserialization callback so C# components can be edited in the editor
+        auto deserializeCallback = scriptManager->GetDeserializeComponentFromJson();
+        if (deserializeCallback) {
+            RegisterComponentDeserializeCallback(deserializeCallback);
+            LOG_INFO("[EditorMain] Registered component deserialize callback with editor");
+        }
+    }
+
     // Background threads for compilation/progress (declared outer so we can join on shutdown)
     std::thread bgCompileThread;
     std::thread bgProgressThread;
     // Temp output root for compiled scripts (if created) and cleanup flag
     std::filesystem::path tempRoot;
-    bool shouldCleanTemp = false;
     if (scriptManager && scriptManager->IsInitialized()) {
         // Use ProjectPaths to get the current project root and watch all directories
         if (Engine::ProjectPaths::IsInitialized()) {
             std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
 
-            // Write compiled script assemblies to an OS temp area so they're
-            // kept out of the user's project source tree and are easy to clean.
-            // Use a per-project subfolder under the system temp directory.
-            std::string projName = projectRoot.filename().string();
-            tempRoot = std::filesystem::temp_directory_path() / "GrapeEngine" / projName;
-            std::filesystem::create_directories(tempRoot);
-            shouldCleanTemp = true;
-            std::filesystem::path scriptsOutput = tempRoot / "GameScripts.dll";
+            // Use temp path from ProjectPaths
+            tempRoot = Engine::ProjectPaths::GetTempScriptsPath();
+            std::filesystem::path scriptsOutput = Engine::ProjectPaths::GetCompiledScriptAssemblyPath();
+            
+            // Generate the C# project file in the temp directory
+            auto generateCsProj = scriptManager->GetGenerateCsProj();
+            if (generateCsProj) {
+                std::string csprojDir = Engine::ProjectPaths::GetCsProjPath();
+                std::string scriptsRootStr = projectRoot.string();
+                std::string projectName = std::filesystem::path(projectRoot).filename().string();
+                int result = generateCsProj(csprojDir.c_str(), scriptsRootStr.c_str(), projectName.c_str());
+                if (result == 0) {
+                    LOG_INFO("[EditorMain] Generated C# project file at: " << csprojDir << "/" << projectName << ".csproj");
+                }
+                else {
+                    LOG_WARNING("[EditorMain] Failed to generate C# project file, result: " << result);
+                }
+            }
+
+            // Copy GrapeEngine.Scripting dependency to the output directory so it can be found at runtime
+            try {
+                std::filesystem::path outputDir = scriptsOutput.parent_path();
+                if (!outputDir.empty() && std::filesystem::exists(outputDir)) {
+                    // GrapeEngine.Scripting.dll is typically in the current working directory (build output)
+                    std::filesystem::path scriptingSource = std::filesystem::current_path() / "GrapeEngine.Scripting.dll";
+                    
+                    if (std::filesystem::exists(scriptingSource)) {
+                        std::filesystem::path scriptingDest = outputDir / "GrapeEngine.Scripting.dll";
+                        std::filesystem::copy_file(scriptingSource, scriptingDest, std::filesystem::copy_options::overwrite_existing);
+                        LOG_INFO("[EditorMain] Copied GrapeEngine.Scripting.dll to output directory: " << scriptingDest.string());
+                    } else {
+                        LOG_WARNING("[EditorMain] Could not find GrapeEngine.Scripting.dll at: " << scriptingSource.string());
+                    }
+                }
+            } catch (const std::exception& e) {
+                LOG_WARNING("[EditorMain] Warning: Failed to copy GrapeEngine.Scripting.dll dependency: " << e.what());
+            }
+            
+            // Set the standardized output path for hot reload watcher so compilations use consistent location
+            auto setOutputPath = scriptManager->GetSetOutputAssemblyPath();
+            if (setOutputPath) {
+                setOutputPath(scriptsOutput.string().c_str());
+                LOG_INFO("[EditorMain] Set output assembly path for hot reload: " << scriptsOutput.string());
+            }
             
             // Compile scripts after the editor has loaded, on a background thread,
             // so the UI becomes responsive immediately. A progress poller logs
@@ -83,7 +176,7 @@ int main() {
             LOG_INFO("[EditorMain] Scheduling background C# script compilation...");
 
             std::atomic<bool> compileDone{false};
-            std::thread progressThread([&]() {
+            std::thread progressThread([&compileDone, scriptManager]() {
                 int status = 0;
                 int progress = -1;
                 std::string message;
@@ -100,7 +193,7 @@ int main() {
             });
 
             // Launch compilation on a worker thread so main loop can run immediately
-            std::thread compileThread([=, &compileDone]() mutable {
+            std::thread compileThread([scriptManager, scriptsOutput, projectRoot, &engine, &emptyWorld, &registryRebuildPending, &compileDone]() mutable {
                 std::string diagnostics;
                 try {
                     scriptManager->SetCompileStatus(1, 0, "Starting compilation");
@@ -111,14 +204,20 @@ int main() {
                     if (compileSuccess) {
                         scriptManager->SetCompileStatus(3, 100, "Compilation successful");
                         LOG_INFO("[EditorMain] Initial script compilation succeeded");
-                        
+        
                         // Load the compiled assembly into the managed runtime so components are discovered
                         if (scriptManager->LoadAssembly(scriptsOutput.string())) {
                             LOG_INFO("[EditorMain] Loaded compiled script assembly");
                             
-                            // Rebuild the editor's component registry now that C# components are registered
-                            ComponentRegistryUI::RebuildFromNativeRegistry();
-                            LOG_INFO("[EditorMain] Rebuilt editor component registry with C# components");
+                            // Register discovered C# systems with the SystemManager
+                            // Pass emptyWorld so OnCreate is called immediately during registration
+                            int systemCount = scriptManager->RegisterScriptedSystems(engine.GetSystemManager(), &emptyWorld);
+                            LOG_INFO("[EditorMain] Registered " << systemCount << " C# systems with SystemManager");
+                            
+                            // DEFER the registry rebuild to avoid blocking frame time during initial compilation
+                            // The rebuild will be applied at the start of the next frame, before rendering
+                            registryRebuildPending.store(true);
+                            LOG_INFO("[EditorMain] Deferred editor component registry rebuild to next frame (avoids startup stutter)");
                         }
                         else {
                             LOG_ERROR("[EditorMain] Failed to load compiled script assembly");
@@ -157,8 +256,26 @@ int main() {
     // Track previous state to detect transitions
     EditorState previousState = EditorState::Edit;
 
+    LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
+
     // Editor main loop
     while (engine.IsRunning()) {
+        // Apply deferred registry rebuild at the start of frame (before rendering)
+        // This avoids spiking editor.Render() when hot reload happens
+        if (registryRebuildPending.exchange(false)) {
+            ComponentRegistryUI::RebuildFromNativeRegistry();
+            LOG_INFO("[EditorMain] Deferred registry rebuild completed");
+        }
+
+        // If the editor window is minimized or unfocused, avoid burning CPU in a tight loop.
+        // This does not affect FPS cap behavior when focused.
+        if (platformContext) {
+            auto* mainWindow = platformContext->GetMainWindow();
+            if (mainWindow && (mainWindow->IsMinimized() || !mainWindow->IsFocused() || !mainWindow->IsVisible())) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+
         // Update editor state and input
         editor.Update();
         
@@ -228,7 +345,7 @@ int main() {
             }
             
             // Execute the filtered systems
-            engine.UpdateSystemsByMode(systemModes, world, deltaTime);
+            engine.UpdateSystemsByMode(systemModes, world);
         }
         
         // Render editor UI
@@ -236,6 +353,8 @@ int main() {
 
         // Swap buffers using platform abstraction
         for (auto* win : platformContext->GetAllWindows()) {
+            if (!win) continue;
+            if (!win->IsVisible() || win->IsMinimized()) continue;
             win->SwapBuffers();
         }
     }
@@ -244,22 +363,9 @@ int main() {
     editor.Shutdown();
     engine.Shutdown();
 
-    // Ensure background compile/poller threads are finished before exiting
+    // Make sure background compile/poller threads are finished before exiting
     try { if (bgCompileThread.joinable()) bgCompileThread.join(); } catch (...) {}
     try { if (bgProgressThread.joinable()) bgProgressThread.join(); } catch (...) {}
-
-    // Clean up temp compiled scripts folder if we created one
-    if (shouldCleanTemp) {
-        try {
-            if (!tempRoot.empty() && std::filesystem::exists(tempRoot)) {
-                std::filesystem::remove_all(tempRoot);
-                LOG_INFO("[EditorMain] Removed temp script output: " << tempRoot.string());
-            }
-        }
-        catch (const std::exception& e) {
-            LOG_WARNING("[EditorMain] Failed to remove temp script output: " << e.what());
-        }
-    }
 
     return 0;
 }

@@ -492,10 +492,12 @@ namespace {
         return tracker;
     }
 
-    // --- Managed serialization callback support ---
+    // --- Managed serialization and deserialization callback support ---
     namespace {
         using SerializeCallback = const char*(__cdecl*)(uint32_t typeHash, const void* data, int size);
+        using DeserializeCallback = void(__cdecl*)(uint32_t typeHash, void* data, int size, const char* jsonStr);
         SerializeCallback g_serializeCallback = nullptr;
+        DeserializeCallback g_deserializeCallback = nullptr;
         std::mutex g_serializerMutex;
     }
 
@@ -503,6 +505,12 @@ namespace {
         std::lock_guard<std::mutex> lock(g_serializerMutex);
         g_serializeCallback = reinterpret_cast<SerializeCallback>(fnPtr);
         LOG_INFO("[WorldInterop] Registered managed serialize callback: " << fnPtr);
+    }
+
+    INTEROP_API void WorldInterop_RegisterDeserializeCallback(void* fnPtr) {
+        std::lock_guard<std::mutex> lock(g_serializerMutex);
+        g_deserializeCallback = reinterpret_cast<DeserializeCallback>(fnPtr);
+        LOG_INFO("[WorldInterop] Registered managed deserialize callback: " << fnPtr);
     }
 
     INTEROP_API const char* WorldInterop_SerializeComponentToJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash) {
@@ -535,6 +543,39 @@ namespace {
     INTEROP_API void WorldInterop_FreeSerializedString(const char* s) {
         if (!s) return;
         CoTaskMemFree(const_cast<char*>(s));
+    }
+
+    INTEROP_API void WorldInterop_DeserializeComponentFromJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash, const char* jsonStr) {
+        if (!worldPtr || !jsonStr) return;
+
+        ECS::World* world = GetWorld(worldPtr);
+        ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
+        if (!world->IsAlive(entity)) {
+            LOG_WARNING("[WorldInterop] DeserializeComponentFromJson: Entity is not alive");
+            return;
+        }
+
+        ECS::ComponentTypeId id = GetComponentIdFromHash(componentTypeHash);
+        if (id == ECS::NULL_COMPONENT_ID) {
+            LOG_WARNING("[WorldInterop] DeserializeComponentFromJson: Unknown component type hash: " << componentTypeHash);
+            return;
+        }
+
+        const auto& meta = ECS::ComponentRegistry::Meta(id);
+        void* ptr = world->GetRawComponentPtr(entity, id);
+        if (!ptr) {
+            LOG_WARNING("[WorldInterop] DeserializeComponentFromJson: Component not found on entity");
+            return;
+        }
+
+        std::lock_guard<std::mutex> lock(g_serializerMutex);
+        if (!g_deserializeCallback) {
+            LOG_WARNING("[WorldInterop] DeserializeComponentFromJson: No managed deserializer callback registered");
+            return;
+        }
+
+        // Call managed callback to deserialize JSON into component memory
+        g_deserializeCallback(meta.TypeHash, ptr, static_cast<int>(meta.Size), jsonStr);
     }
 }
 

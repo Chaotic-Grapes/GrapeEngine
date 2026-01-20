@@ -333,8 +333,7 @@ namespace ECS {
         return false;
     }
 
-    void RendererSystem::OnUpdate(World& world, const float deltaTime) {
-        (void)deltaTime;
+    void RendererSystem::OnUpdate(World& world) {
         if (!m_renderer)
             return;
 
@@ -655,14 +654,15 @@ namespace ECS {
                 // early-return when there's no interactive click and no
                 // pending request.
 
-                static bool prevMouseDown = false;
-                bool currMouseDown = Input::IsMouseDown(MOUSE_LEFT);
-                bool mouseJustReleased = (!currMouseDown && prevMouseDown);
-                prevMouseDown = currMouseDown;
-
                 (void)res;
-                // Allow the picking pass to run if there is a pending async request
-                if (!currMouseDown && !mouseJustReleased && !m_pendingPickRequest.has_value()) return;
+                // Allow the picking pass to run if there is a pending async request or mouse click
+                if (!Input::IsMousePressed(MOUSE_LEFT) && m_pendingPickRequests.empty() && !m_currentPickRequest.has_value() && !m_inFlightPick.has_value()) return;
+
+                // Dequeue the next pending request if current one is done
+                if (!m_currentPickRequest.has_value() && !m_pendingPickRequests.empty()) {
+                    m_currentPickRequest = m_pendingPickRequests.front();
+                    m_pendingPickRequests.pop();
+                }
 
                 // ============================================================
                 // GET VIEWPORT BOUNDS
@@ -677,13 +677,13 @@ namespace ECS {
                 glm::dvec2 mousePos;
                 Input::GetMousePosition(mousePos.x, mousePos.y);
 
-                // If there is a pending async pick request, prefer its viewport
-                // rectangle for coordinate mapping (it contains viewportPos/Size).
-                bool usingPendingRequestForViewport = false;
-                if (m_pendingPickRequest.has_value()) {
-                    viewportMin = m_pendingPickRequest->ViewportPos;
-                    viewportSize = m_pendingPickRequest->ViewportSize;
-                    usingPendingRequestForViewport = true;
+                // If there is a current async pick request being processed, 
+                // use its viewport rectangle for coordinate mapping
+                bool usingCurrentRequest = false;
+                if (m_currentPickRequest.has_value()) {
+                    viewportMin = m_currentPickRequest->ViewportPos;
+                    viewportSize = m_currentPickRequest->ViewportSize;
+                    usingCurrentRequest = true;
                 }
 
                 // ============================================================
@@ -857,14 +857,14 @@ namespace ECS {
                 // ============================================================
                 // READ PIXEL (now in FBO-local coordinates)
                 // ============================================================
-                // Determine which screen coordinates to sample. If an async
-                // pick request exists, use its provided coordinates. Otherwise
-                // use the current mouse position (interactive click).
+                // Determine which screen coordinates to sample. If a current
+                // pick request is being processed, use its coordinates.
+                // Otherwise use the current mouse position (interactive click).
                 glm::vec2 sampleScreenPos;
-                bool usingPendingRequest = false;
-                if (m_pendingPickRequest.has_value()) {
-                    sampleScreenPos = glm::vec2(m_pendingPickRequest->ScreenX, m_pendingPickRequest->ScreenY);
-                    usingPendingRequest = true;
+                bool usingCurrentPickRequest = false;
+                if (m_currentPickRequest.has_value()) {
+                    sampleScreenPos = glm::vec2(m_currentPickRequest->ScreenX, m_currentPickRequest->ScreenY);
+                    usingCurrentPickRequest = true;
                 }
                 else {
                     sampleScreenPos = glm::vec2(mousePos.x, mousePos.y);
@@ -897,8 +897,8 @@ namespace ECS {
 
                 LOG_DEBUG("[PICKING] FBO size: " << fboWidth << "x" << fboHeight);
                 LOG_DEBUG("[PICKING] Reading pixel: (" << readX << ", " << readY << ")");
-                if (usingPendingRequest && m_pendingPickRequest.has_value()) {
-                    LOG_DEBUG("[PICKING] Servicing async request " << m_pendingPickRequest->RequestId);
+                if (usingCurrentPickRequest && m_currentPickRequest.has_value()) {
+                    LOG_DEBUG("[PICKING] Servicing async request " << m_currentPickRequest->RequestId);
                 }
 
                 // Frame N: Write to current PBO (async transfer starts)
@@ -906,12 +906,12 @@ namespace ECS {
                 glReadPixels(readX, readY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, 0);
                 m_pbos[m_currentPBO].Unbind(GL_PIXEL_PACK_BUFFER);
 
-                // If this read corresponds to a pending async pick request,
+                // If this read corresponds to a current async pick request,
                 // mark it as in-flight and associate it with the current PBO
                 // so the result can be consumed on the next frame.
-                if (usingPendingRequest) {
-                    m_inFlightPick = InFlightPick{ m_pendingPickRequest->RequestId, m_currentPBO };
-                    m_pendingPickRequest.reset();
+                if (usingCurrentPickRequest) {
+                    m_inFlightPick = InFlightPick{ m_currentPickRequest->RequestId, m_currentPBO };
+                    m_currentPickRequest.reset();
                 }
 
                 // Swap PBOs for the next frame
@@ -1101,6 +1101,14 @@ namespace ECS {
     }
 
     uint32_t RendererSystem::RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
+        // Check if within viewport bounds
+        if (screenX < viewportPos.x || screenX >= (viewportPos.x + viewportSize.x) ||
+            screenY < viewportPos.y || screenY >= (viewportPos.y + viewportSize.y)) {
+            LOG_DEBUG("[Renderer] RequestPick ignored, screen coordinates out of viewport bounds.");
+            return ECS::Entity::NPOS32;
+        }
+
+        // Queue the request instead of rejecting it if one is pending
         uint32_t id = m_nextPickRequestId++;
         PendingPickRequest req;
         req.RequestId = id;
@@ -1108,8 +1116,9 @@ namespace ECS {
         req.ScreenY = screenY;
         req.ViewportPos = viewportPos;
         req.ViewportSize = viewportSize;
-        m_pendingPickRequest = req;
-        LOG_DEBUG("[Renderer] RequestPick id=" << id << " screen=(" << screenX << "," << screenY << ") viewport=(" << viewportPos.x << "," << viewportPos.y << "," << viewportSize.x << "," << viewportSize.y << ")");
+        m_pendingPickRequests.push(req);
+
+        LOG_DEBUG("[Renderer] RequestPick id=" << id << " screen=(" << screenX << "," << screenY << ") viewport=(" << viewportPos.x << "," << viewportPos.y << "," << viewportSize.x << "," << viewportSize.y << ") - queued");
         return id;
     }
 

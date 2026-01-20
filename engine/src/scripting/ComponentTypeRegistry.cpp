@@ -51,7 +51,6 @@ namespace ECS {
         ComponentRegistry::RegisterWithHash<Components::Active>(FNV1a_Hash("Active"));
         ComponentRegistry::RegisterWithHash<Components::PrefabLink>(FNV1a_Hash("PrefabLink"));
         ComponentRegistry::RegisterWithHash<Components::PrefabInstanceMetadata>(FNV1a_Hash("PrefabInstanceMetadata"));
-        ComponentRegistry::RegisterWithHash<Components::Lifetime>(FNV1a_Hash("Lifetime"));
         ComponentRegistry::RegisterWithHash<Components::Layer>(FNV1a_Hash("Layer"));
 
         // Transforms

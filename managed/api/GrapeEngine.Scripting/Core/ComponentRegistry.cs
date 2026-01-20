@@ -58,7 +58,7 @@ public static partial class ComponentRegistry
             {
                 _registeredHashes.Add(hash);
                 string displayName = customName ?? typeof(T).Name;
-                Console.WriteLine($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})");
+                Logging.LogInternal($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})", LogLevel.Info);
                 
                 // Let the managed serializer know about this managed type so it can
                 // marshal bytes into a typed object for JSON serialization.
@@ -100,6 +100,19 @@ public static partial class ComponentRegistry
     {
         if (!IsRegistered<T>())
             Register<T>();
+    }
+
+    /// <summary>
+    /// Clear the component registry cache.
+    /// Called during hot reload to allow re-registration of modified component types.
+    /// </summary>
+    internal static void ClearRegistrationCache()
+    {
+        lock (_lock)
+        {
+            _registeredHashes.Clear();
+            Logging.LogInternal("[ComponentRegistry] Cleared registration cache for hot reload", LogLevel.Info);
+        }
     }
 
     /// <summary>

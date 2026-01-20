@@ -25,12 +25,16 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/ISystem.h"
 #include "ecs/ISystemMetadataProvider.h"
 #include "ecs/SystemDependencyGraph.h"
+#include "services/TimeSystem.h"
 #include <memory>
 #include <vector>
 #include <unordered_map>
 #include <string>
 
 namespace ECS {
+
+    // Forward declaration to avoid circular dependency
+    class ScriptManager;
 
     /**
      * @brief Global manager for all ECS systems.
@@ -132,6 +136,7 @@ namespace ECS {
         /**
          * @brief Register a C# scripted system.
          * @param system Raw pointer to C# system wrapper (managed externally)
+         * @param world Optional World to call OnCreate immediately (nullptr = defer)
          * 
          * METADATA PRIORITY SYSTEM:
          * The system's execution group is resolved using the metadata priority system.
@@ -139,17 +144,29 @@ namespace ECS {
          * 
          * For C# systems, the lifetime is managed by the scripting layer.
          * The system is not owned by SystemManager.
+         * 
+         * If world is provided, OnCreate() is called immediately on registration.
+         * Otherwise, OnCreate() must be called separately via CreateAll().
          */
-        void RegisterScriptedSystem(ISystem* system) {
+        void RegisterScriptedSystem(ISystem* system, World* world = nullptr) {
             if (!system) return;
 
             const auto& metadata = system->GetMetadata();
             SystemGroup group = GetSystemMetadataGroup(system);
+            std::string systemName = metadata.GetName();
 
             m_scriptedSystemGroups[group].push_back(system);
-            m_systemsByName[metadata.GetName()] = system;
+            m_systemsByName[systemName] = system;
+            
+            // Cache system name to avoid expensive P/Invoke calls during updates
+            m_systemNameCache[system] = systemName;
 
             _sortSystemGroup(group);
+            
+            // If world is provided, initialize the system immediately
+            if (world) {
+                system->OnCreate(*world);
+            }
         }
 
         /**
@@ -179,20 +196,20 @@ namespace ECS {
          * @param deltaTime Time since last frame (seconds)
          * 
          * Executes systems in group order:
-         * PreUpdate → Update → PostUpdate → PrePhysics → Physics → PostPhysics → PreRender → Render → PostRender
+         * PreUpdate -> Update -> PostUpdate -> PrePhysics -> Physics -> PostPhysics -> PreRender -> Render -> PostRender
          * 
          * Within each group, systems are sorted by execution order (lower = earlier).
          */
-        void Update(World& world, float deltaTime) {
-            _updateGroup(SystemGroup::PreUpdate, world, deltaTime);
-            _updateGroup(SystemGroup::Update, world, deltaTime);
-            _updateGroup(SystemGroup::PostUpdate, world, deltaTime);
-            _updateGroup(SystemGroup::PrePhysics, world, deltaTime);
-            _updateGroup(SystemGroup::Physics, world, deltaTime);
-            _updateGroup(SystemGroup::PostPhysics, world, deltaTime);
-            _updateGroup(SystemGroup::PreRender, world, deltaTime);
-            _updateGroup(SystemGroup::Render, world, deltaTime);
-            _updateGroup(SystemGroup::PostRender, world, deltaTime);
+        void Update(World& world) {
+            _updateGroup(SystemGroup::PreUpdate, world);
+            _updateGroup(SystemGroup::Update, world);
+            _updateGroup(SystemGroup::PostUpdate, world);
+            _updateGroup(SystemGroup::PrePhysics, world);
+            _updateGroup(SystemGroup::Physics, world);
+            _updateGroup(SystemGroup::PostPhysics, world);
+            _updateGroup(SystemGroup::PreRender, world);
+            _updateGroup(SystemGroup::Render, world);
+            _updateGroup(SystemGroup::PostRender, world);
         }
 
         /**
@@ -201,8 +218,8 @@ namespace ECS {
          * @param world Active scene's World
          * @param deltaTime Time since last frame
          */
-        void UpdateGroup(SystemGroup group, World& world, float deltaTime) {
-            _updateGroup(group, world, deltaTime);
+        void UpdateGroup(SystemGroup group, World& world) {
+            _updateGroup(group, world);
         }
 
         /**
@@ -224,6 +241,34 @@ namespace ECS {
                     system->OnDestroy(world);
                 }
             }
+        }
+
+        /**
+         * @brief Unregister all scripted systems.
+         * @param world World to pass to OnDestroy
+         * 
+         * Calls OnDestroy() on all scripted systems and removes them from
+         * the SystemManager. Used during hot reload to clean up old systems
+         * before reloading new ones.
+         */
+        void UnregisterScriptedSystems(World& world) {
+            // Call OnDestroy on all scripted systems
+            for (auto& [group, systems] : m_scriptedSystemGroups) {
+                for (auto* system : systems) {
+                    if (system) {
+                        system->OnDestroy(world);
+                        // Remove from name map
+                        const auto& metadata = system->GetMetadata();
+                        m_systemsByName.erase(metadata.GetName());
+
+                        // Remove from name cache
+                        m_systemNameCache.erase(system);
+                    }
+                }
+            }
+
+            // Clear all scripted system groups
+            m_scriptedSystemGroups.clear();
         }
 
         /**
@@ -296,32 +341,27 @@ namespace ECS {
          * @brief Update systems based on run mode (for editor play/edit state).
          * @param mode Run mode filter (Always, PlayOnly, or EditOnly)
          * @param world Active scene's World
-         * @param deltaTime Time since last frame
          * 
          * Only updates systems whose GetRunMode() matches the specified mode.
          * Used by editor to control which systems run in edit vs play mode.
          * 
+         * OPTIMIZATION: Iterates only through system groups that have registered
+         * systems, avoiding unnecessary lookups on empty groups. This prevents
+         * the O(9*n) lookup pattern that was causing frame stalls in the editor.
+         * 
          * Example:
          * @code
          * if (editorInPlayMode) {
-         *     systemManager.UpdateSystemsForMode(SystemRunMode::Always, world, dt);
-         *     systemManager.UpdateSystemsForMode(SystemRunMode::PlayOnly, world, dt);
+         *     systemManager.UpdateSystemsForMode(SystemRunMode::Always, world);
+         *     systemManager.UpdateSystemsForMode(SystemRunMode::PlayOnly, world);
          * } else {
-         *     systemManager.UpdateSystemsForMode(SystemRunMode::Always, world, dt);
-         *     systemManager.UpdateSystemsForMode(SystemRunMode::EditOnly, world, dt);
+         *     systemManager.UpdateSystemsForMode(SystemRunMode::Always, world);
+         *     systemManager.UpdateSystemsForMode(SystemRunMode::EditOnly, world);
          * }
          * @endcode
          */
-        void UpdateSystemsForMode(SystemRunMode mode, World& world, float deltaTime) {
-            _updateGroupForMode(SystemGroup::PreUpdate, mode, world, deltaTime);
-            _updateGroupForMode(SystemGroup::Update, mode, world, deltaTime);
-            _updateGroupForMode(SystemGroup::PostUpdate, mode, world, deltaTime);
-            _updateGroupForMode(SystemGroup::PrePhysics, mode, world, deltaTime);
-            _updateGroupForMode(SystemGroup::Physics, mode, world, deltaTime);
-            _updateGroupForMode(SystemGroup::PostPhysics, mode, world, deltaTime);
-            _updateGroupForMode(SystemGroup::PreRender, mode, world, deltaTime);
-            _updateGroupForMode(SystemGroup::Render, mode, world, deltaTime);
-            _updateGroupForMode(SystemGroup::PostRender, mode, world, deltaTime);
+        void UpdateSystemsForMode(SystemRunMode mode, World& world) {
+            _updateAllGroupsForMode(mode, world);
         }
 
         /**
@@ -337,6 +377,48 @@ namespace ECS {
                 count += systems.size();
             }
             return count;
+        }
+
+        /**
+         * @brief Get all registered systems with their execution groups.
+         * @return Vector of (name, group) pairs for all systems
+         * 
+         * Used by editor panels to display system information.
+         * Returns systems from both native C++ and scripted C# layers.
+         */
+        std::vector<std::pair<std::string, SystemGroup>> GetAllSystems() const {
+            std::vector<std::pair<std::string, SystemGroup>> result;
+            
+            for (const auto& [group, systems] : m_systemGroups) {
+                for (const auto& system : systems) {
+                    result.emplace_back(system->GetMetadata().GetName(), group);
+                }
+            }
+            
+            for (const auto& [group, systems] : m_scriptedSystemGroups) {
+                for (const auto* system : systems) {
+                    result.emplace_back(system->GetMetadata().GetName(), group);
+                }
+            }
+            
+            return result;
+        }
+
+        /**
+         * @brief Check if a system is a scripted (C#) system.
+         * @param name System name
+         * @return True if the system is a C# scripted system, false if C++ native
+         */
+        bool IsScriptedSystem(const std::string& name) const {
+            // Search scripted systems only
+            for (const auto& [group, systems] : m_scriptedSystemGroups) {
+                for (const auto* system : systems) {
+                    if (system->GetMetadata().GetName() == name) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         /**
@@ -398,16 +480,16 @@ namespace ECS {
          * Note: This experimental feature enables parallel system execution when
          * systems declare their component access patterns correctly.
          */
-        void UpdateWithJobs(World& world, float deltaTime) {
-            _updateGroupWithJobs(SystemGroup::PreUpdate, world, deltaTime);
-            _updateGroupWithJobs(SystemGroup::Update, world, deltaTime);
-            _updateGroupWithJobs(SystemGroup::PostUpdate, world, deltaTime);
-            _updateGroupWithJobs(SystemGroup::PrePhysics, world, deltaTime);
-            _updateGroupWithJobs(SystemGroup::Physics, world, deltaTime);
-            _updateGroupWithJobs(SystemGroup::PostPhysics, world, deltaTime);
-            _updateGroupWithJobs(SystemGroup::PreRender, world, deltaTime);
-            _updateGroupWithJobs(SystemGroup::Render, world, deltaTime);
-            _updateGroupWithJobs(SystemGroup::PostRender, world, deltaTime);
+        void UpdateWithJobs(World& world) {
+            _updateGroupWithJobs(SystemGroup::PreUpdate, world);
+            _updateGroupWithJobs(SystemGroup::Update, world);
+            _updateGroupWithJobs(SystemGroup::PostUpdate, world);
+            _updateGroupWithJobs(SystemGroup::PrePhysics, world);
+            _updateGroupWithJobs(SystemGroup::Physics, world);
+            _updateGroupWithJobs(SystemGroup::PostPhysics, world);
+            _updateGroupWithJobs(SystemGroup::PreRender, world);
+            _updateGroupWithJobs(SystemGroup::Render, world);
+            _updateGroupWithJobs(SystemGroup::PostRender, world);
         }
 
         /**
@@ -416,8 +498,8 @@ namespace ECS {
          * @param world Active scene's World
          * @param deltaTime Time since last frame
          */
-        void UpdateGroupWithJobs(SystemGroup group, World& world, float deltaTime) {
-            _updateGroupWithJobs(group, world, deltaTime);
+        void UpdateGroupWithJobs(SystemGroup group, World& world) {
+            _updateGroupWithJobs(group, world);
         }
 
         /**
@@ -544,8 +626,8 @@ namespace ECS {
          * This is more sophisticated than UpdateWithJobs - it analyzes actual
          * component access patterns to maximize parallelism safely.
          */
-        void UpdateGroupWithDependencies(SystemGroup group, World& world, float deltaTime) {
-            _updateGroupWithDependencies(group, world, deltaTime);
+        void UpdateGroupWithDependencies(SystemGroup group, World& world) {
+            _updateGroupWithDependencies(group, world);
         }
 
         /**
@@ -554,29 +636,33 @@ namespace ECS {
          * @param world Active scene's World
          * @param deltaTime Time since last frame
          */
-        void UpdateWithDependencies(World& world, float deltaTime) {
-            _updateGroupWithDependencies(SystemGroup::PreUpdate, world, deltaTime);
-            _updateGroupWithDependencies(SystemGroup::Update, world, deltaTime);
-            _updateGroupWithDependencies(SystemGroup::PostUpdate, world, deltaTime);
-            _updateGroupWithDependencies(SystemGroup::PrePhysics, world, deltaTime);
-            _updateGroupWithDependencies(SystemGroup::Physics, world, deltaTime);
-            _updateGroupWithDependencies(SystemGroup::PostPhysics, world, deltaTime);
-            _updateGroupWithDependencies(SystemGroup::PreRender, world, deltaTime);
-            _updateGroupWithDependencies(SystemGroup::Render, world, deltaTime);
-            _updateGroupWithDependencies(SystemGroup::PostRender, world, deltaTime);
+        void UpdateWithDependencies(World& world) {
+            _updateGroupWithDependencies(SystemGroup::PreUpdate, world);
+            _updateGroupWithDependencies(SystemGroup::Update, world);
+            _updateGroupWithDependencies(SystemGroup::PostUpdate, world);
+            _updateGroupWithDependencies(SystemGroup::PrePhysics, world);
+            _updateGroupWithDependencies(SystemGroup::Physics, world);
+            _updateGroupWithDependencies(SystemGroup::PostPhysics, world);
+            _updateGroupWithDependencies(SystemGroup::PreRender, world);
+            _updateGroupWithDependencies(SystemGroup::Render, world);
+            _updateGroupWithDependencies(SystemGroup::PostRender, world);
         }
 
     private:
-        /// Native C++ systems (owned)
+        // Native C++ systems (owned)
         std::unordered_map<SystemGroup, std::vector<std::unique_ptr<ISystem>>> m_systemGroups;
 
-        /// Scripted C# systems (not owned, managed by scripting layer)
+        // Scripted C# systems (not owned, managed by scripting layer)
         std::unordered_map<SystemGroup, std::vector<ISystem*>> m_scriptedSystemGroups;
 
-        /// Name -> System lookup
+        // Name -> System lookup
         std::unordered_map<std::string, ISystem*> m_systemsByName;
 
-        /// Dependency graphs for each system group (for parallel execution analysis)
+        // Cached system names to avoid expensive P/Invoke metadata calls during updates
+        // Maps from ISystem* to its cached name string
+        std::unordered_map<ISystem*, std::string> m_systemNameCache;
+
+        // Dependency graphs for each system group (for parallel execution analysis)
         std::unordered_map<SystemGroup, SystemDependencyGraph> m_dependencyGraphs;
 
         /**
@@ -599,15 +685,28 @@ namespace ECS {
         }
 
         /**
+         * @brief Flush buffered logs from C# systems.
+         * This ensures all logs accumulated during system execution are delivered
+         * to the native side before the next frame.
+         * Called from Application after system updates.
+         */
+        void FlushScriptedLogs() {
+            // Implementation is in Application.cpp after UpdateSystemsForMode calls
+        }
+
+        /**
          * @brief Update all systems in a specific group.
          */
-        void _updateGroup(SystemGroup group, World& world, float deltaTime) {
+        void _updateGroup(SystemGroup group, World& world) {
             // Update owned systems
             auto itOwned = m_systemGroups.find(group);
             if (itOwned != m_systemGroups.end()) {
                 for (auto& system : itOwned->second) {
                     if (system->IsEnabled()) {
-                        system->OnUpdate(world, deltaTime);
+                        // Profile this system's execution
+                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
+                        system->OnUpdate(world);
+                        TimeSystem::Instance().ProfileEnd();
                     }
                 }
             }
@@ -617,32 +716,50 @@ namespace ECS {
             if (itScripted != m_scriptedSystemGroups.end()) {
                 for (auto* system : itScripted->second) {
                     if (system->IsEnabled()) {
-                        system->OnUpdate(world, deltaTime);
+                        // Profile this system's execution
+                        // Use cached name to avoid expensive P/Invoke metadata lookups
+                        auto it = m_systemNameCache.find(system);
+                        const char* systemName = (it != m_systemNameCache.end()) ? 
+                            it->second.c_str() : "Unknown";
+                        TimeSystem::Instance().ProfileBegin(systemName);
+                        system->OnUpdate(world);
+                        TimeSystem::Instance().ProfileEnd();
                     }
                 }
             }
         }
 
         /**
-         * @brief Update systems in a group filtered by run mode.
+         * @brief Update all systems filtered by run mode.
+         * 
+         * Iterates only through system groups that have registered systems,
+         * avoiding unnecessary lookups on empty groups.
          */
-        void _updateGroupForMode(SystemGroup group, SystemRunMode mode, World& world, float deltaTime) {
-            // Update owned systems
-            auto itOwned = m_systemGroups.find(group);
-            if (itOwned != m_systemGroups.end()) {
-                for (auto& system : itOwned->second) {
+        void _updateAllGroupsForMode(SystemRunMode mode, World& world) {
+            // Update owned systems - iterate only through groups that exist
+            for (auto& [group, systems] : m_systemGroups) {
+                for (auto& system : systems) {
                     if (system->IsEnabled() && system->GetRunMode() == mode) {
-                        system->OnUpdate(world, deltaTime);
+                        // Profile this system's execution
+                        TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
+                        system->OnUpdate(world);
+                        TimeSystem::Instance().ProfileEnd();
                     }
                 }
             }
 
-            // Update scripted systems
-            auto itScripted = m_scriptedSystemGroups.find(group);
-            if (itScripted != m_scriptedSystemGroups.end()) {
-                for (auto* system : itScripted->second) {
+            // Update scripted systems - iterate only through groups that exist
+            for (auto& [group, systems] : m_scriptedSystemGroups) {
+                for (auto* system : systems) {
                     if (system->IsEnabled() && system->GetRunMode() == mode) {
-                        system->OnUpdate(world, deltaTime);
+                        // Profile this system's execution
+                        // Use cached name to avoid expensive P/Invoke metadata lookups
+                        auto it = m_systemNameCache.find(system);
+                        const char* systemName = (it != m_systemNameCache.end()) ? 
+                            it->second.c_str() : "Unknown";
+                        TimeSystem::Instance().ProfileBegin(systemName);
+                        system->OnUpdate(world);
+                        TimeSystem::Instance().ProfileEnd();
                     }
                 }
             }
@@ -651,7 +768,7 @@ namespace ECS {
         /**
          * @brief Update systems in a group using job-based parallel execution.
          */
-        void _updateGroupWithJobs(SystemGroup group, World& world, float deltaTime) {
+        void _updateGroupWithJobs(SystemGroup group, World& world) {
             // Collect all enabled systems in this group that support jobs
             std::vector<ISystem*> jobSystems;
             std::vector<ISystem*> sequentialSystems;
@@ -686,24 +803,30 @@ namespace ECS {
 
             // Execute sequential systems first (maintain backward compatibility)
             for (auto* system : sequentialSystems) {
-                system->OnUpdate(world, deltaTime);
+                // Use cached name to avoid expensive P/Invoke metadata lookups
+                auto it = m_systemNameCache.find(system);
+                const char* systemName = (it != m_systemNameCache.end()) ? 
+                    it->second.c_str() : system->GetMetadata().GetName().c_str();
+                TimeSystem::Instance().ProfileBegin(systemName);
+                system->OnUpdate(world);
+                TimeSystem::Instance().ProfileEnd();
             }
 
             // Execute job-based systems in parallel (if any)
             if (!jobSystems.empty()) {
-                _executeJobSystems(jobSystems, world, deltaTime);
+                _executeJobSystems(jobSystems, world);
             }
         }
 
         /**
          * @brief Execute systems using job parallelization.
          */
-        void _executeJobSystems(const std::vector<ISystem*>& systems, World& world, float deltaTime) {
+        void _executeJobSystems(const std::vector<ISystem*>& systems, World& world) {
             /* auto& jobManager = */ world.GetJobManager();
 
             // Schedule all systems as jobs and wait for completion
             for (auto* system : systems) {
-                auto handle = system->OnUpdateAsJobs(world, deltaTime);
+                auto handle = system->OnUpdateAsJobs(world);
                 handle.Complete();
             }
         }
@@ -711,12 +834,12 @@ namespace ECS {
         /**
          * @brief Update a group using dependency-aware parallel scheduling.
          */
-        void _updateGroupWithDependencies(SystemGroup group, World& world, float deltaTime) {
+        void _updateGroupWithDependencies(SystemGroup group, World& world) {
             // Get dependency graph for this group
             auto it = m_dependencyGraphs.find(group);
             if (it == m_dependencyGraphs.end() || it->second.GetSystemCount() == 0) {
                 // No dependency info - fall back to sequential update
-                _updateGroup(group, world, deltaTime);
+                _updateGroup(group, world);
                 return;
             }
 
@@ -743,12 +866,18 @@ namespace ECS {
 
                 // Execute sequential systems first (maintain order)
                 for (auto* system : sequentialSystems) {
-                    system->OnUpdate(world, deltaTime);
+                    // Use cached name to avoid expensive P/Invoke metadata lookups
+                    auto it = m_systemNameCache.find(system);
+                    const char* systemName = (it != m_systemNameCache.end()) ? 
+                        it->second.c_str() : system->GetMetadata().GetName().c_str();
+                    TimeSystem::Instance().ProfileBegin(systemName);
+                    system->OnUpdate(world);
+                    TimeSystem::Instance().ProfileEnd();
                 }
 
                 // Execute job-based systems in parallel
                 if (!jobSystems.empty()) {
-                    _executeJobSystems(jobSystems, world, deltaTime);
+                    _executeJobSystems(jobSystems, world);
                 }
             }
         }
