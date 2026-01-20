@@ -558,7 +558,9 @@ namespace ECS {
                                 angleZ,
                                 1.0f,
                                 sr.EmissiveTextureId,
-                                sr.EmissiveStrength
+                                sr.EmissiveStrength,
+                                sr.Width,   // pass texture width
+                                sr.Height   // pass texture height
                                 });
                         }
                     }
