@@ -73,10 +73,30 @@ namespace ECS {
         /// Track if scene has started (for PlayOnStart logic)
         bool m_hasStarted = false;
 
+        // Fade state struct
+        struct FadeState {
+            float CurrentVolume = 0.0f,
+            float TargetVolume = 1.0f,
+            float Duration = 1.0f,
+            float elapsed = 0.0f,
+            bool IsFadingin = true;
+
+        }
+
+        // Map entity -> fade states stored
+        std::unordered_map<Entity, FadeState, EntityHash> m_activeFades;
+
+        
+
         // Helper methods
         void _stopSound(Entity entity);
         bool _isGamePlaying() const;
-    };
-}
+        // Fade helper methods 
+        void _startFadeIn(Entity entity, Audio::PlaybackHandle handle, float duration, float targetVolume);
+        void _startFadeOut(Entity entity, float duration);
+        void _updateFades(World& world, float deltaTime);
+
+    
+};
 
 #endif
