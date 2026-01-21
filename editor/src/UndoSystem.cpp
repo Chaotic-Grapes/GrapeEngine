@@ -1,16 +1,16 @@
 /* Start Header *****************************************************************/
 /*!
 \file   UndoSystem.cpp
-\author Daniel Kay Neo Zuo Feng
 \author Samantha Leong Sher Yen
-\date   14th January 2026
+\par    s.leong@digipen.edu
+\date   21th January 2026
 \brief
 Implementation of the UndoSystem and command types used to support
 undo/redo operations within the editor. This system records user actions,
 applies them via command objects, and restores previous states when
 undoing or redoing actions.
 
-Copyright (C) 2025 DigiPen Institute of Technology.
+Copyright (C) 2026 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */

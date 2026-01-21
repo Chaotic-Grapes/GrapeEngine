@@ -1,9 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
 \file   UndoSystem.h
-\author Daniel Kay Neo Zuo Feng
 \author Samantha Leong Sher Yen
-\date   14th January 2026
+\par    s.leong@digipen.edu
+\date   21th January 2026
 \brief
 Declaration of the undo/redo command system used by the editor.
 
@@ -16,7 +16,7 @@ The UndoSystem serves as the editor's central history manager, ensuring that
 entity edits and scene interactions remain fully reversible and consistent
 with ECS state.
 
-Copyright (C) 2025 DigiPen Institute of Technology.
+Copyright (C) 2026 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
@@ -115,15 +115,6 @@ namespace Editor {
         bool m_hasName = false;
         ECS::Components::Name m_savedName;
         
-        bool m_hasActive = false;
-        ECS::Components::Active m_savedActive;
-
-        bool m_hasLayer = false;
-        ECS::Components::Layer m_savedLayer;
-
-        bool m_hasName = false;
-        ECS::Components::Name m_savedName;
-
         bool m_hasActive = false;
         ECS::Components::Active m_savedActive;
 
