@@ -131,8 +131,7 @@ namespace ECS {
 
 			// CRITICAL: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
-			// Only reload if TextureId is not already set (0 means not loaded)
-			if (!texPath.empty() && sprite.TextureId == 0) {
+			if (!texPath.empty()) {
 				auto tex = RM.Get<Texture>(texPath);
 				if (tex) {
 					sprite.TextureId = static_cast<uint32_t>(tex->ID());
@@ -180,8 +179,7 @@ namespace ECS {
 
 			// CRITICAL: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
-			// Only reload if TextureId is not already set (0 means not loaded)
-			if (!texPath.empty() && anim.TextureId == 0) {
+			if (!texPath.empty()) {
 				auto tex = RM.Get<Texture>(texPath);
 				if (tex) {
 					anim.TextureId = static_cast<uint32_t>(tex->ID());
