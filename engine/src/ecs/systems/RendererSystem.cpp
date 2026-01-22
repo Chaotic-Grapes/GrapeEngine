@@ -474,6 +474,19 @@ namespace ECS {
                     m_shader->setUniform("uPicking", 0);
                     m_renderer->beginFrame();
 
+                    // ===============================
+                    // TILEMAP DRAW (WORLD BACKGROUND)
+                    // ===============================
+                    if (m_debugTileMap && m_debugTileset)
+                    {
+                        TileMapRenderer tileRenderer;
+                        tileRenderer.Submit(
+                            *m_debugTileMap,
+                            *m_debugTileset,
+                            *m_renderer
+                        );
+                    }
+
                     for (ECS::Entity entity : list) {
                         // Skip inactive
                         if (world.Has<Components::Active>(entity) &&
@@ -1481,5 +1494,17 @@ namespace ECS {
         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
         GLuint textureId = 0;
         m_renderer->submitQuad(center - size * 0.5f, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+    }
+
+    void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset)
+    {
+        m_debugTileMap = map;
+        m_debugTileset = tileset;
+    }
+
+    void RendererSystem::ClearDebugTileMap()
+    {
+        m_debugTileMap.reset();
+        m_debugTileset.reset();
     }
 }
