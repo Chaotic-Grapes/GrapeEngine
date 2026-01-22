@@ -34,6 +34,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
+#include "graphics/LightManager.hpp"
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -367,6 +368,7 @@ namespace ECS {
         };
         std::vector<GUISubmission> m_guiSubmissionQueue;
 
+        Graphics::LightManager m_lightManager;
 
         // ====================================================================
         // Member Variables - Shaders

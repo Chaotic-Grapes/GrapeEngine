@@ -47,6 +47,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/PixelBufferObject.hpp"
 #include "graphics/font.hpp"
+#include "graphics/LightManager.hpp"
 
 // ============================================================================
 // ECS Components
@@ -253,6 +254,9 @@ namespace ECS {
         // OpenGL state
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Light manager (SSBO creation etc.)
+        m_lightManager.Initialize();
     }
 
     void RendererSystem::BindWorld(World& world) {
@@ -368,8 +372,54 @@ namespace ECS {
         // baked into its vertex positions on the CPU during batching. By the time vertices
         // reach the GPU, they are in world space, so the shader only needs to transform them
         // into camera (view) space and then into clip space.
-        // I will remind myself to change this in the future
         const glm::mat4 viewProj = projection * view;
+
+        // ============================================================
+        // LIGHT COLLECTION (per-frame) - using Components::Light2D
+        // ============================================================
+        m_lightManager.BeginFrame();
+
+        // Policy: if multiple directional lights exist, keep the LAST one encountered.
+        // (If you want "first wins", just guard with if (!m_lightManager.HasDirectionalLight()) ...)
+        world.Each<Components::LocalTransform, Components::Light2D>(
+            [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l)
+            {
+                // Skip inactive
+                if (world.Has<Components::Active>(e) && !world.Get<Components::Active>(e).Enabled)
+                    return;
+
+                // Use render/world transform if you want lights to follow hierarchy.
+                // Otherwise, lt.Position is fine.
+                Vector3D position, scale;
+                Quaternion rotation;
+                GetRenderTransform(world, e, lt, position, rotation, scale);
+
+                // Color: use your existing conversion style.
+                // Our color use floating point representation [0,1], so DON'T divide by 255 here
+                // If Color is actually 0..255, then use /255.0f 
+                glm::vec3 color = glm::vec3(ToGlm(l.Color));
+
+                if (l.LightType == Components::Light2D::Type::Directional) {
+                    glm::vec3 dir(l.Direction.X, l.Direction.Y, l.Direction.Z);
+                    if (glm::dot(dir, dir) < 1e-8f) dir = glm::vec3(0.0f, -1.0f, 0.0f);
+                    dir = glm::normalize(dir);
+
+                    m_lightManager.SetDirectionalLight(dir, color, l.Intensity);
+                }
+
+                else { // Point
+                    // Decide how we want position:
+                    // Option A: entity transform is the light position
+                    glm::vec3 worldPos(position.X, position.Y, position.Z);
+
+                    // Option B: add l.Position as a local offset
+                    worldPos += glm::vec3(l.Position.X, l.Position.Y, l.Position.Z);
+
+                    m_lightManager.AddPointLight(worldPos, l.Range, color, l.Intensity);
+                }
+            });
+
+        m_lightManager.Upload();
 
         // Determine max layer id present this frame
         int maxLayerId = -1;
@@ -472,6 +522,13 @@ namespace ECS {
                     m_shader->use();
                     m_shader->setMat4("uViewProj", viewProj);
                     m_shader->setUniform("uPicking", 0);
+
+                    // enable lighting in batch.frag
+                    m_shader->setUniform("uLightingEnabled", 1);
+
+                    // bind SSBO + light uniforms (uPointLightCount/uHasDirectional/uDirLight)
+                    m_lightManager.Bind(*m_shader);
+
                     m_renderer->beginFrame();
 
                     // ===============================
@@ -754,6 +811,7 @@ namespace ECS {
                 m_sdfCircleShader->use();
                 m_sdfCircleShader->setMat4("uViewProj", viewProj);
                 m_sdfCircleShader->setUniform("uPicking", 1);
+                m_shader->setUniform("uLightingEnabled", 0);
                 m_renderer->beginFrame();
 
                 for (int layer = 0; layer <= static_cast<int>(buckets.size()) - 1; ++layer) {
@@ -802,6 +860,7 @@ namespace ECS {
                 m_shader->use();
                 m_shader->setMat4("uViewProj", viewProj);
                 m_shader->setUniform("uPicking", 1);
+                m_shader->setUniform("uLightingEnabled", 0);
 
                 m_renderer->beginFrame();
 
@@ -1043,6 +1102,7 @@ namespace ECS {
                     m_shader->use();
                     glm::mat4 screenOrtho = glm::ortho(0.0f, 1920.0f, 0.0f, 1080.0f, -1.0f, 1.0f);
                     m_shader->setMat4("uViewProj", screenOrtho);
+                    m_shader->setUniform("uLightingEnabled", 0);
                 }
 
                 m_renderer->beginFrame();
@@ -1113,6 +1173,7 @@ namespace ECS {
         m_bloomCombineShader.reset();
         m_pickingFBO.Destroy();
         g_rendererSystemInstance = nullptr;
+        m_lightManager.Shutdown();
     }
 
     uint32_t RendererSystem::RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
