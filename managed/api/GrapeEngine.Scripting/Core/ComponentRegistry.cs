@@ -96,10 +96,20 @@ public static partial class ComponentRegistry
     /// Auto-register a component type if not already registered.
     /// This is called internally before component operations.
     /// </summary>
+    /// <exception cref="InvalidOperationException">If component registration fails</exception>
     internal static void EnsureRegistered<T>() where T : unmanaged
     {
         if (!IsRegistered<T>())
-            Register<T>();
+        {
+            bool registered = Register<T>();
+            if (!registered)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to register component type {typeof(T).Name}. " +
+                    $"The native ECS may not have accepted this component type. " +
+                    $"Ensure the component size and alignment are compatible with the native world.");
+            }
+        }
     }
 
     /// <summary>

@@ -23,7 +23,7 @@ internal static class RoslynCompiler
 {
     // Store diagnostics as a list of individual messages so callers can
     // choose how to present them (UI can enumerate, logs can summarize).
-    private readonly static List<string> _lastDiagnosticsList = [];
+    private static readonly List<string> _lastDiagnosticsList = [];
     
     // Store the path to the last compiled assembly (may be versioned)
     private static string _lastCompiledAssemblyPath = "";
@@ -40,8 +40,8 @@ internal static class RoslynCompiler
     {
         _lastDiagnosticsList.Clear();
 
-        List<string> _errors = [];
-        List<string> _warnings = [];
+        List<string> errors = [];
+        List<string> warnings = [];
 
         try
         {
@@ -108,11 +108,11 @@ internal static class RoslynCompiler
             // Add user-provided references
             if (references != null)
             {
-                foreach (var r in references)
-                {
-                    if (File.Exists(r))
-                        refs.Add(MetadataReference.CreateFromFile(r));
-                }
+                refs.AddRange(
+                    from r 
+                        in references 
+                    where File.Exists(r) 
+                    select MetadataReference.CreateFromFile(r));
             }
 
             var compilation = CSharpCompilation.Create(
@@ -142,9 +142,9 @@ internal static class RoslynCompiler
                         var line = $"{filePath}({lineNumber},{columnNumber}): {diag.Id}: {diag.GetMessage()}";
 
                         if (diag.Severity == DiagnosticSeverity.Error)
-                            _errors.Add(line);
+                            errors.Add(line);
                         else if (diag.Severity == DiagnosticSeverity.Warning)
-                            _warnings.Add(line);
+                            warnings.Add(line);
 
                         _lastDiagnosticsList.Add(line);
                     }
@@ -153,11 +153,11 @@ internal static class RoslynCompiler
                     // native ConsolePanel receives them as independent messages.
                     try
                     {
-                        foreach (var line in _errors)
+                        foreach (var line in errors)
                         {
                             Logging.Log(line, LogLevel.Error);
                         }
-                        foreach (var line in _warnings)
+                        foreach (var line in warnings)
                         {
                             Logging.Log(line, LogLevel.Warning);
                         }
@@ -197,9 +197,9 @@ internal static class RoslynCompiler
                         Logging.LogInternal($"[RoslynCompiler] Wrote initial assembly: {outputAssemblyPath}", LogLevel.Info);
                         
                         // Write PDB if provided
-                        if (pdbBytes != null && pdbBytes.Length > 0)
+                        if (pdbBytes is { Length: > 0 })
                         {
-                            string pdbPath = Path.ChangeExtension(outputAssemblyPath, ".pdb");
+                            var pdbPath = Path.ChangeExtension(outputAssemblyPath, ".pdb");
                             try
                             {
                                 File.WriteAllBytes(pdbPath, pdbBytes);
@@ -220,12 +220,12 @@ internal static class RoslynCompiler
                         // This avoids file-locking issues when unloading old versions.
                         Logging.LogInternal($"[RoslynCompiler] Hot reload compilation (count={_compilationCount}) - using versioned path", LogLevel.Info);
                         
-                        string versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes, pdbBytes);
+                        var versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes, pdbBytes);
                         
                         if (versionedPath == null)
                         {
                             _lastDiagnosticsList.Clear();
-                            string errMsg = $"Failed to write versioned assembly {outputAssemblyPath}.\nCheck AssemblyManager logs for details.";
+                            var errMsg = $"Failed to write versioned assembly {outputAssemblyPath}.\nCheck AssemblyManager logs for details.";
                             _lastDiagnosticsList.Add(errMsg);
                             try 
                             {
@@ -251,7 +251,7 @@ internal static class RoslynCompiler
                 {
                     // If we fail to write the file, record an error with details
                     _lastDiagnosticsList.Clear();
-                    string errMsg = $"Failed to write assembly {outputAssemblyPath}:\n{ex}";
+                    var errMsg = $"Failed to write assembly {outputAssemblyPath}:\n{ex}";
                     _lastDiagnosticsList.Add(errMsg);
                     try 
                     {
@@ -270,7 +270,11 @@ internal static class RoslynCompiler
             Logging.Log($"Compilation error: {ex}", LogLevel.Error);
             _lastDiagnosticsList.Clear();
             _lastDiagnosticsList.Add(ex.ToString());
-            try { Logging.Log(ex.ToString(), LogLevel.Error); } catch { }
+            try
+            {
+                Logging.Log(ex.ToString(), LogLevel.Error);
+            }
+            catch { }
             return -1;
         }
     }
@@ -282,9 +286,9 @@ internal static class RoslynCompiler
 
     public static string GetLastDiagnostics()
     {
-        if (_lastDiagnosticsList == null || _lastDiagnosticsList.Count == 0)
-            return string.Empty;
-        return string.Join("\n", _lastDiagnosticsList);
+        return _lastDiagnosticsList.Count == 0 
+            ? string.Empty
+            : string.Join("\n", _lastDiagnosticsList);
     }
 
     // Expose diagnostics as indexed list accessors for native callers.
@@ -295,11 +299,11 @@ internal static class RoslynCompiler
 
     public static string? GetLastDiagnosticAt(int index)
     {
-        if (_lastDiagnosticsList == null) return null;
         if (index < 0 || index >= _lastDiagnosticsList.Count) return null;
         return _lastDiagnosticsList[index];
     }
 
+    
     public static byte[]? GetLastCompiledPdbBytes()
     {
         return _lastCompiledPdbBytes;

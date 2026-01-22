@@ -593,7 +593,7 @@ public static class ScriptHost
                 Logging.LogInternal($"[ScriptHost] Warning: Failed to unload existing assembly before compilation", LogLevel.Warning);
             }
 
-            // CRITICAL: Wait for CLR to fully release the file lock
+            // IMPORTANT: Wait for CLR to fully release the file lock
             // - GC.Collect() forces garbage collection (inside AssemblyManager.UnloadAssembly)
             // - GC.WaitForPendingFinalizers() waits for finalizers (inside AssemblyManager.UnloadAssembly)
             // - We do additional GC passes here to be extra sure

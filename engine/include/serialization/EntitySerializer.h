@@ -129,7 +129,7 @@ namespace ECS {
 			strncpy_s(sprite.TexturePath, texPath.c_str(), sizeof(sprite.TexturePath) - 1);
 			sprite.TexturePath[sizeof(sprite.TexturePath) - 1] = '\0';
 
-			// CRITICAL: Reload texture from path if available
+			// IMPORTANT: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
 			// Only reload if TextureId is not already set (0 means not loaded)
 			if (!texPath.empty() && sprite.TextureId == 0) {
@@ -178,7 +178,7 @@ namespace ECS {
 			strncpy_s(anim.TexturePath, texPath.c_str(), sizeof(anim.TexturePath) - 1);
 			anim.TexturePath[sizeof(anim.TexturePath) - 1] = '\0';
 
-			// CRITICAL: Reload texture from path if available
+			// IMPORTANT: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
 			// Only reload if TextureId is not already set (0 means not loaded)
 			if (!texPath.empty() && anim.TextureId == 0) {

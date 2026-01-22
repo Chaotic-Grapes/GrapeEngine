@@ -19,7 +19,7 @@ namespace GrapeEngine.Scripting.Components.Core;
 /// These hashes are used by the C++ engine to identify and match component types across
 /// the managed-native boundary.
 /// 
-/// CRITICAL: The hash algorithm MUST match the C++ ComponentType::Hash() implementation exactly.
+/// IMPORTANT: The hash algorithm MUST match the C++ ComponentType::Hash() implementation exactly.
 /// Any change to the hashing function will break component registration and queries.
 /// </summary>
 internal static class ComponentTypeRegistry

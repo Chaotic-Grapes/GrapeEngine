@@ -867,9 +867,9 @@ namespace ECS {
                 // Execute sequential systems first (maintain order)
                 for (auto* system : sequentialSystems) {
                     // Use cached name to avoid expensive P/Invoke metadata lookups
-                    auto it = m_systemNameCache.find(system);
-                    const char* systemName = (it != m_systemNameCache.end()) ? 
-                        it->second.c_str() : system->GetMetadata().GetName().c_str();
+                    auto sysIt = m_systemNameCache.find(system);
+                    const char* systemName = (sysIt != m_systemNameCache.end()) ? 
+                        sysIt->second.c_str() : system->GetMetadata().GetName().c_str();
                     TimeSystem::Instance().ProfileBegin(systemName);
                     system->OnUpdate(world);
                     TimeSystem::Instance().ProfileEnd();

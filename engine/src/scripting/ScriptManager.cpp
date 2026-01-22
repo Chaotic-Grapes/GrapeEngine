@@ -515,14 +515,8 @@ namespace ECS {
                     };
 
                     std::string diagLower = toLower(outDiagnostics);
-                    bool hasError = (diagLower.find("error") != std::string::npos) ||
-                                    (diagLower.find("exception") != std::string::npos) ||
-                                    (diagLower.find("failed") != std::string::npos) ||
-                                    (diagLower.find("could not load file or assembly") != std::string::npos) ||
-                                    (diagLower.find("filenotfoundexception") != std::string::npos) ||
-                                    (diagLower.find("microsoft.codeanalysis") != std::string::npos);
 
-                    if (hasError) {
+                    if (!diagLower.empty()) {
                         std::string summary = SummarizeDiagnostics(outDiagnostics);
                         LOG_ERROR("Compilation failed: " << summary);
                         {
