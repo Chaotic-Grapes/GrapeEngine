@@ -41,6 +41,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <optional>
 #include <unordered_map>
 
+#include "graphics/TileMapRenderer.hpp"
+
+class TileMap;
+class Tileset;
+class TileMapRenderer;
+
 namespace ECS {
     /**
      * @brief System for managing 2D rendering
@@ -252,6 +258,10 @@ namespace ECS {
         void SubmitGUILine(const Vector2D& startPos, const Vector2D& endPos,
                           const Color& color, float thickness = 1.0f);
 
+        // Call from editor when a tilemap should be rendered
+        void SetDebugTileMap(const TileMap& map, const Tileset& tileset);
+        void ClearDebugTileMap();
+
     private:
         // ====================================================================
         // Conversion Helpers
@@ -309,6 +319,11 @@ namespace ECS {
         std::unique_ptr<Renderer> m_renderer;                   ///< Low-level batch renderer
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         Engine::Camera* m_activeCamera = nullptr;               ///< Active camera (editor or game)
+
+        std::optional<std::reference_wrapper<const TileMap>> m_debugTileMap;
+        std::optional<std::reference_wrapper<const Tileset>> m_debugTileset;
+
+        TileMapRenderer m_tileMapRenderer; // value member, no pointer
 
         // ====================================================================
         // Member Variables - Wireframe Submissions
