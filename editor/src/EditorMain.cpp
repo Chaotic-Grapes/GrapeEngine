@@ -276,10 +276,19 @@ int main() {
             }
         }
 
-        // Update editor state and input
+        // ============================================================
+        // EDITOR BEGIN FRAME - Handle input and request picking
+        // ============================================================
+        editor.BeginFrame();
+        
+        // ============================================================
+        // EDITOR UPDATE - Update editor state and playback controls
+        // ============================================================
         editor.Update();
         
-        // Engine update (input, services, UI events - but NOT systems in editor mode)
+        // ============================================================
+        // ENGINE UPDATE - Process input, time, and services
+        // ============================================================
         engine.Update();
         
         // Editor controls which systems execute based on playback state
@@ -287,7 +296,7 @@ int main() {
         auto* currentScene = engine.GetSceneManager().GetActive();
         if (currentScene) {
             ECS::World& world = currentScene->GetWorld();
-            float deltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+            // float deltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
             
             // Determine which system modes to run based on editor playback state
             uint32_t systemModes = 0;
@@ -348,8 +357,15 @@ int main() {
             engine.UpdateSystemsByMode(systemModes, world);
         }
         
-        // Render editor UI
+        // ============================================================
+        // EDITOR RENDER - Render editor UI and viewports
+        // ============================================================
         editor.Render();
+
+        // ============================================================
+        // EDITOR END FRAME - Resolve picking and update selection
+        // ============================================================
+        editor.EndFrame();
 
         // Swap buffers using platform abstraction
         for (auto* win : platformContext->GetAllWindows()) {

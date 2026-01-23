@@ -124,7 +124,27 @@ void InspectorPanel::InspectEntity(EntityId id) {
     if (IsProtectedEntity(m_world, id)) {
         m_mode = InspectionMode::None;
         m_entityId = 0; // Clear selection
+        m_editState.isEditing = false; // Reset edit state
         return;
+    }
+
+    // CRITICAL: Clear edit state when entity selection changes
+    // This prevents the inspector from comparing the new entity's transform
+    // against the previous entity's captured transform
+    if (m_entityId != id) {
+        m_editState.isEditing = false;
+        m_editState.entityId = 0;
+        
+        // Debug logging: Check transform at selection time
+        if (m_world && id != 0 && id != ECS::Entity::NPOS32) {
+            ECS::Entity debugEntity = m_world->Resolve(id);
+            if (!debugEntity.IsNull() && m_world->IsAlive(debugEntity) && 
+                m_world->Has<ECS::Components::LocalTransform>(debugEntity)) {
+                const auto& lt = m_world->Get<ECS::Components::LocalTransform>(debugEntity);
+                LOG_DEBUG("[Inspector] InspectEntity(" << id << ") BEFORE any changes: pos=(" 
+                    << lt.Position.X << ", " << lt.Position.Y << ", " << lt.Position.Z << ")");
+            }
+        }
     }
 
     m_entityId = id;
@@ -234,6 +254,8 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
 void InspectorPanel::ClearSelection() {
     m_mode = InspectionMode::None;
     m_entityId = 0;
+    m_editState.isEditing = false;
+    m_editState.entityId = 0;
     m_prefabPath.clear();
     m_prefabData = {};
     m_componentsToDelete.clear();
@@ -411,6 +433,33 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 
 // Render all components on an entity using JSON as a temporary editable buffer
 void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
+    // Debug: Track LocalTransform changes frame-by-frame for ALL entities in the world
+    static std::unordered_map<uint32_t, Vector3D> lastKnownPositions;
+    static uint64_t lastFrameCheck = 0;
+    static uint64_t currentFrame = 0;
+    currentFrame++;
+    
+    // Only check once per frame across all entities
+    if (currentFrame != lastFrameCheck && m_world) {
+        lastFrameCheck = currentFrame;
+        
+        // Check all entities that have transforms
+        m_world->Each<ECS::Components::LocalTransform>([this](ECS::Entity e, ECS::Components::LocalTransform& lt) {
+            auto it = lastKnownPositions.find(e.Index);
+            if (it != lastKnownPositions.end()) {
+                constexpr float EPSILON = 0.0001f;
+                if (std::abs(it->second.X - lt.Position.X) > EPSILON ||
+                    std::abs(it->second.Y - lt.Position.Y) > EPSILON ||
+                    std::abs(it->second.Z - lt.Position.Z) > EPSILON) {
+                    LOG_WARNING("[Inspector] Entity " << e.Index << " transform changed from (" 
+                        << it->second.X << ", " << it->second.Y << ", " << it->second.Z << ") to (" 
+                        << lt.Position.X << ", " << lt.Position.Y << ", " << lt.Position.Z << ")");
+                }
+            }
+            lastKnownPositions[e.Index] = lt.Position;
+        });
+    }
+    
     // Footer needs 2 lines: one for button row, one for status message
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
@@ -432,6 +481,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         static nlohmann::json editStartState;
         static bool isEditing = false;
+        
+        // Track which components were actually modified this frame
+        std::unordered_set<std::string> modifiedComponents;
 
         // Capture initial state when starting to edit
         if (!m_editState.isEditing) {
@@ -482,6 +534,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                         isEditing = true;
                     }
                     wasEdited = true;
+                    modifiedComponents.insert(typeName); // Track which component changed
                 }
 
                 ImGui::Dummy(ImVec2(0, 4));
@@ -526,16 +579,32 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         m_componentsToDelete.clear();
 
         // Second pass: push any edited JSON values back into ECS components
+        // CRITICAL: Only apply components that were actually modified to prevent
+        // unnecessarily overwriting entity data every frame (which can cause teleporting)
         for (const auto& componentEntry : entityJson["Components"]) {
             // Validate again; same same
             if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
             if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
 
             std::string typeName = componentEntry["TypeName"];
+            
+            // Only apply if this component was modified this frame
+            if (modifiedComponents.find(typeName) == modifiedComponents.end()) {
+                continue; // Skip unmodified components
+            }
+            
             const auto* meta = ComponentRegistryUI::Find(typeName);
             // Apply edited JSON to the actual ECS component
             if (meta) {
+                LOG_DEBUG("[Inspector] Applying modified component: " << typeName << " to entity " << entity.Index);
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
+                
+                // Log transform after applying if it was LocalTransform
+                if (typeName == "LocalTransform" || typeName == "ECS::Components::LocalTransform") {
+                    const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
+                    LOG_DEBUG("[Inspector]   After apply: pos=(" << lt.Position.X << ", " 
+                        << lt.Position.Y << ", " << lt.Position.Z << ")");
+                }
             }
         }
 
@@ -545,10 +614,24 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (m_undoSystem && m_world->Has<ECS::Components::LocalTransform>(entity)) {
                 const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
 
-                // Only record if something actually changed
-                bool posChanged = (m_editState.startPosition != lt.Position);
-                bool rotChanged = (m_editState.startRotation != lt.Rotation);
-                bool scaleChanged = (m_editState.startScale != lt.Scale);
+                // Use epsilon comparison for floating point values to avoid spurious undo records
+                constexpr float EPSILON = 0.0001f;
+                auto vec3Changed = [EPSILON](const Vector3D& a, const Vector3D& b) {
+                    return (std::abs(a.X - b.X) > EPSILON || 
+                            std::abs(a.Y - b.Y) > EPSILON || 
+                            std::abs(a.Z - b.Z) > EPSILON);
+                };
+                auto quatChanged = [EPSILON](const Quaternion& a, const Quaternion& b) {
+                    return (std::abs(a.W - b.W) > EPSILON || 
+                            std::abs(a.X - b.X) > EPSILON || 
+                            std::abs(a.Y - b.Y) > EPSILON || 
+                            std::abs(a.Z - b.Z) > EPSILON);
+                };
+
+                // Only record if something actually changed beyond floating point precision
+                bool posChanged = vec3Changed(m_editState.startPosition, lt.Position);
+                bool rotChanged = quatChanged(m_editState.startRotation, lt.Rotation);
+                bool scaleChanged = vec3Changed(m_editState.startScale, lt.Scale);
 
                 if (posChanged || rotChanged || scaleChanged) {
                     m_undoSystem->RecordTransformChange(
@@ -557,6 +640,8 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                         lt.Position, lt.Rotation, lt.Scale
                     );
                     LOG_DEBUG("[Inspector] Recorded transform change for undo");
+                } else {
+                    LOG_DEBUG("[Inspector] Transform edit finished but no significant change detected (within epsilon)");
                 }
             }
 
@@ -632,7 +717,7 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
             });
 
         // Limit the popup height and make the list scrollable
-        float avail = ImGui::GetContentRegionAvail().y;
+        // float avail = ImGui::GetContentRegionAvail().y;
         float maxListHeight = 400.f;
         if (maxListHeight < 120.0f) maxListHeight = 120.0f;
 
@@ -852,7 +937,7 @@ void InspectorPanel::_renderPrefabActions() {
 
         // Limit popup height and make the list scrollable
 
-        float avail = ImGui::GetContentRegionAvail().y;
+        // float avail = ImGui::GetContentRegionAvail().y;
         float maxListHeight = 400.0f;
         if (maxListHeight < 120.0f) maxListHeight = 120.0f;
         ImGui::BeginChild("AddComponentListPrefab", ImVec2(0, maxListHeight), false, ImGuiWindowFlags_None);

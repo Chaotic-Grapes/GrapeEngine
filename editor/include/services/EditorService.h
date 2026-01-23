@@ -48,8 +48,10 @@ namespace Services {
 #endif
 
         void Initialize() override;
+        void BeginFrame();
         void Update() override;
         void Render() override;
+        void EndFrame();
         void Terminate() override;
 
         void EnableLevelEditorForScene(Scenes::Scene* scene);

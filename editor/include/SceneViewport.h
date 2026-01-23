@@ -16,16 +16,37 @@ gizmo manipulation, and drag-to-move functionality.
 #define SCENE_VIEWPORT_H
 
 #include "BaseViewport.h"
+#include "EditorGizmo.h"
+#include <unordered_map>
 
 class SceneViewport : public BaseViewport {
 public:
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
+                   ECS::World* world, Scenes::SceneManager* sceneManager) override;
+    ~SceneViewport() override;
+    
+    void BeginFrame() override;
     void HandleInWorldInteraction() override;
     void ShowEditorWindows() override;
+    void EndFrame() override;
 
 private:
     void _renderViewport();
-    // Async pick request id (0 = none)
-    uint32_t m_pendingPickRequestId = 0;
+    
+    // Static callback trampoline for C-style callback (DLL-safe)
+    static void _onPickResultStatic(uint32_t entityId, void* userData) {
+        if (userData) {
+            static_cast<SceneViewport*>(userData)->_onPickResult(entityId);
+        }
+    }
+    
+    // Instance method to handle pick result
+    void _onPickResult(uint32_t pickedEntity);
+    
+    // Gizmo instance for this viewport
+    Editor::EditorGizmo m_gizmo;
+    // Track which entity is currently being dragged (0 = none)
+    uint32_t m_currentlyDraggingEntityID = 0;
 };
 
 #endif // SCENE_VIEWPORT_H

@@ -19,6 +19,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 #include "EditorGizmo.h"
+#include "UndoSystem.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include <ImGuizmo.h>
@@ -37,14 +38,49 @@ namespace Editor {
     // Static member initialization
     EditorGizmo::Operation EditorGizmo::s_currentOperation = EditorGizmo::Operation::Translate;
     EditorGizmo::Mode EditorGizmo::s_currentMode = EditorGizmo::Mode::Local;
-    
-    // Track gizmo usage state to detect start/end of manipulation
-    static bool s_wasUsing = false;
-    static uint32_t s_activeEntityID = Entity::NPOS32;
-    static Vector3D s_startPosition;
-    static Quaternion s_startRotation;
-    static Vector3D s_startScale;
-    static bool s_hadMouseDown = false;  // Track mouse button state
+
+    void EditorGizmo::BeginFrame(ECS::World& world, uint32_t selectedEntityID) {        
+        // If entity selection changed, reset drag context completely
+        bool entitySelectionChanged = (this->m_dragContext.GetEntityID() != Entity::NPOS32 && 
+                                       this->m_dragContext.GetEntityID() != selectedEntityID);
+        if (entitySelectionChanged) {
+            this->m_dragContext.Reset();
+        }
+
+        // Validate selected entity
+        if (selectedEntityID == Entity::NPOS32) {
+            return;
+        }
+
+        ECS::Entity entity = world.Resolve(selectedEntityID);
+        if (entity.IsNull() || !world.IsAlive(entity)) {
+            this->m_dragContext.Reset();
+            return;
+        }
+
+        // Check if entity has transform
+        if (!world.Has<ECS::Components::LocalTransform>(entity)) {
+            this->m_dragContext.Reset();
+            return;
+        }
+
+        // Capture initial transform at the start of frame for undo command creation
+        if (!ImGuizmo::IsUsing() && this->m_dragContext.GetState() == GizmoDragContext::State::Idle) {
+            const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+            this->m_dragContext.CaptureInitialTransform(lt.Position, lt.Rotation, lt.Scale);
+        }
+    }
+
+    void EditorGizmo::EndFrame() {
+        // Handle drag end - create undo command if transform was modified
+        if (this->m_dragContext.JustEntered(GizmoDragContext::State::Ended) && m_undoSystem) {
+            // The final transform was already applied during DrawGizmo
+            // We just need to create the undo command with the captured initial state
+            
+            // Undo system will capture the final state internally
+            // This is a placeholder for future undo integration
+        }
+    }
 
     bool EditorGizmo::DrawGizmo(
         ECS::World& world,
@@ -57,18 +93,16 @@ namespace Editor {
         float drawSizeY,
         bool isPerspective)
     {
-        auto ResetManipulationState = []() {
-            s_wasUsing = false;
-            s_activeEntityID = Entity::NPOS32;
-        };
+        // If entity selection changed, reset drag context completely
+        // This prevents ImGuizmo state from previous entity affecting the new one
+        bool entitySelectionChanged = (this->m_dragContext.GetEntityID() != Entity::NPOS32 && 
+                                       this->m_dragContext.GetEntityID() != selectedEntityID);
+        if (entitySelectionChanged) {
+            this->m_dragContext.Reset();
+        }
 
-        // ------------------------------------------------------------------------
-        // A. VALIDATION
-        // ------------------------------------------------------------------------
-
-        // Pre-check: Stop if the current selected entity is invalid
+        // Validate selected entity
         if (selectedEntityID == Entity::NPOS32) {
-            ResetManipulationState();
             return false;
         }
 
@@ -76,28 +110,31 @@ namespace Editor {
 
         // Skip if entity doesn't exist or was destroyed
         if (entity.IsNull() || !world.IsAlive(entity)) {
-            ResetManipulationState();
+            this->m_dragContext.Reset();
             return false;
         }
 
         // Check if entity has transform
         if (!world.Has<ECS::Components::LocalTransform>(entity)) {
-            ResetManipulationState();
+            this->m_dragContext.Reset();
             return false;
         }
-
-        // If selection changed mid-drag, drop the previous drag state to avoid
-        // firing end-of-manipulation events on the wrong entity.
-        if (s_activeEntityID != Entity::NPOS32 && s_activeEntityID != selectedEntityID) {
-            s_wasUsing = false;
-        }
-        s_activeEntityID = selectedEntityID;
 
         // ------------------------------------------------------------------------
         // B. SETUP IMGUIZMO CONTEXT
         // ------------------------------------------------------------------------
 
         ImGuizmo::BeginFrame();
+        
+        // Force ImGuizmo to clear its internal state when entity selection changes
+        // ImGuizmo maintains global delta/matrix state that persists across frames
+        if (entitySelectionChanged) {
+            ImGuizmo::Enable(false);
+            ImGuizmo::Enable(true);
+        } else {
+            // Normal case: just ensure gizmo is enabled
+            ImGuizmo::Enable(true);
+        }
 
         // Set orthographic/perspective mode
         ImGuizmo::SetOrthographic(!isPerspective);
@@ -107,9 +144,6 @@ namespace Editor {
 
         // Set the screen area (the viewport image bounds).
         ImGuizmo::SetRect(drawPosX, drawPosY, drawSizeX, drawSizeY);
-
-        // Enable gizmo to receive input - critical for reliable mouse interaction
-        ImGuizmo::Enable(true);
 
         // ------------------------------------------------------------------------
         // C. HANDLE TOOL SWITCH INPUT (T = Move, E = Rotate, R = Scale)
@@ -157,43 +191,32 @@ namespace Editor {
         };
 
         MatToColMajor(modelMatrix, modelArr);
-
-        // Check if mouse is over gizmo BEFORE calling Manipulate to ensure proper detection
-        bool isMouseOverGizmo = ImGuizmo::IsOver();
         
-        bool manipulated = ImGuizmo::Manipulate(
-            viewMatrix,
-            projMatrix,
-            static_cast<ImGuizmo::OPERATION>(s_currentOperation),
-            static_cast<ImGuizmo::MODE>(s_currentMode),
-            modelArr
-        );
-
-        // ------------------------------------------------------------------------
-        // F. APPLY MODIFIED TRANSFORM BACK TO ECS COMPONENT
-        // ------------------------------------------------------------------------
-
-        bool isCurrentlyUsing = ImGuizmo::IsUsing();
+        // CRITICAL: Skip Manipulate if selection just changed
+        // If we just switched entities, calling Manipulate will cause ImGuizmo to
+        // calculate a delta based on its cached mouse position from the previous entity,
+        // resulting in a teleport. We'll just draw the gizmo without processing input.
+        bool manipulated = false;
+        bool isCurrentlyUsing = false;
         
-        // If we were using the gizmo but suddenly IsUsing() returns false,
-        // check if we're still hovering - sometimes ImGuizmo needs a frame to settle
-        if (s_wasUsing && !isCurrentlyUsing && isMouseOverGizmo) {
-            isCurrentlyUsing = true;  // Treat as still using if hovering over gizmo
+        if (!entitySelectionChanged) {
+            // Selection is stable - safe to call Manipulate
+            manipulated = ImGuizmo::Manipulate(
+                viewMatrix,
+                projMatrix,
+                static_cast<ImGuizmo::OPERATION>(s_currentOperation),
+                static_cast<ImGuizmo::MODE>(s_currentMode),
+                modelArr
+            );
+            isCurrentlyUsing = ImGuizmo::IsUsing();
         }
+        // else: entitySelectionChanged = true
+        //       Skip Manipulate entirely - gizmo will render but won't process input
+        //       This allows ImGuizmo's internal state to stabilize before the next frame
 
-        // Detect start of manipulation
-        if (isCurrentlyUsing && !s_wasUsing) {
-            // Capture initial transform for undo system
-            const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
-            s_startPosition = lt.Position;
-            s_startRotation = lt.Rotation;
-            s_startScale = lt.Scale;
-            LOG_DEBUG("Gizmo started - captured initial transform");
-        }
-
+        // Apply transform to entity while dragging
         if (isCurrentlyUsing)
         {
-            // modelArr now contains the modified world matrix in column-major order
             Matrix4x4 newWorldMat;
             // Convert column-major array back into engine Matrix4x4 (row-major storage)
             auto ColMajorToMat = [](const float in[16]) {
@@ -255,36 +278,76 @@ namespace Editor {
             }
         }
 
-        // Detect end of manipulation
-        if (!isCurrentlyUsing && s_wasUsing) {
-            // Get final transform and send message for undo system
+        // ------------------------------------------------------------------------
+        // F. DRAG STATE MACHINE & EVENT EMISSION
+        // ------------------------------------------------------------------------
+        
+        // Update drag state machine
+        // Only track dragging if we're not in the middle of switching entities
+        this->m_dragContext.Update(isCurrentlyUsing && !entitySelectionChanged, selectedEntityID);
+        
+        // Handle state transitions and emit appropriate events
+        if (this->m_dragContext.JustEntered(GizmoDragContext::State::Started)) {
+            // Capture initial transform snapshot
             const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+            this->m_dragContext.CaptureInitialTransform(lt.Position, lt.Rotation, lt.Scale);
+        }
+        
+        if (this->m_dragContext.JustEntered(GizmoDragContext::State::InProgress)) {
+            // Emit GizmoDragStarted event
+            Messaging::MessageSystem::Notify(
+                Messaging::GizmoDragStarted(
+                    selectedEntityID,
+                    this->m_dragContext.GetInitialPosition(),
+                    this->m_dragContext.GetInitialRotation(),
+                    this->m_dragContext.GetInitialScale()
+                )
+            );
+        }
+        
+        if (this->m_dragContext.GetState() == GizmoDragContext::State::InProgress && isCurrentlyUsing) {
+            // Emit GizmoDragging event while dragging
+            const auto& lt_current = world.Get<ECS::Components::LocalTransform>(entity);
+            Messaging::MessageSystem::Notify(
+                Messaging::GizmoDragging(
+                    selectedEntityID,
+                    lt_current.Position,
+                    lt_current.Rotation,
+                    lt_current.Scale
+                )
+            );
+        }
+        
+        if (this->m_dragContext.JustEntered(GizmoDragContext::State::Ended)) {
+            // Emit GizmoDragEnded event
+            const auto& lt_final = world.Get<ECS::Components::LocalTransform>(entity);
             
-            // Only send message if transform actually changed
-            if (s_startPosition != lt.Position || 
-                s_startRotation != lt.Rotation || 
-                s_startScale != lt.Scale) {
-                
-                world.Set<ECS::Components::LocalTransform>(entity, lt);
+            // Only emit if transform actually changed
+            if (this->m_dragContext.GetInitialPosition() != lt_final.Position ||
+                this->m_dragContext.GetInitialRotation() != lt_final.Rotation ||
+                this->m_dragContext.GetInitialScale() != lt_final.Scale) {
                 
                 Messaging::MessageSystem::Notify(
-                    Messaging::EntityTransformChanged(
+                    Messaging::GizmoDragEnded(
                         selectedEntityID,
-                        s_startPosition, s_startRotation, s_startScale,
-                        lt.Position, lt.Rotation, lt.Scale
+                        lt_final.Position,
+                        lt_final.Rotation,
+                        lt_final.Scale,
+                        this->m_dragContext.GetInitialPosition(),
+                        this->m_dragContext.GetInitialRotation(),
+                        this->m_dragContext.GetInitialScale()
                     )
                 );
                 
                 // Mark scene as modified
-                Messaging::MessageSystem::Broadcast(Messaging::SceneModified("Gizmo manipulation"));
+                Messaging::MessageSystem::Notify(Messaging::SceneModified("Gizmo manipulation"));
             }
         }
-
-        s_wasUsing = isCurrentlyUsing;
 
         // "manipulated" is true when the matrix actually changed this frame.
         // Also treat the active drag as manipulation so callers can optionally
         // suppress other input while the gizmo is held.
+        
         return manipulated || isCurrentlyUsing;
     }
 

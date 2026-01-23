@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define NO_ERROR
 #include <windows.h>
 #include "HierarchyPanel.h"
+#include "EditorGizmo.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
 #include "core/Logger.h"
@@ -680,6 +681,12 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
 
     // Skip interaction if currently renaming
     if (m_renamingEntityId != ECS::Entity::NPOS32) return;
+
+    // IMPORTANT: Block selection changes while gizmo is actively being manipulated
+    // This prevents entity teleporting when clicking on hierarchy during gizmo drag
+    if (Editor::EditorGizmo::ShouldBlockSelection()) {
+        return;
+    }
 
     // Get current time for click timing
     float currentTime = static_cast<float>(ImGui::GetTime());

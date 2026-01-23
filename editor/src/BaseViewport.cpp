@@ -373,11 +373,23 @@ void BaseViewport::_handleEntityDragToMove() {
 
     // Check if selection changed (from hierarchy or inspector)
     if (m_selectedEntity.Index != m_lastSelectedEntityID) {
+        // Reset ALL drag state when selection changes to prevent stale data
+        // from causing the new entity to teleport to the old entity's position
         m_isDragging = false;
+        m_dragStartMouseWorld = glm::vec2(0, 0);
+        m_dragStartEntityPos = glm::vec3(0, 0, 0);
+        m_draggingEntityID = ECS::Entity::NPOS32;
+        m_wasMouseDownLastFrame = false;
         m_lastSelectedEntityID = m_selectedEntity.Index;
     }
 
     // Start drag on mouse press
+    // Do not start a drag if a pick request is pending (selection in progress)
+    if (IsPickPending()) {
+        // Cancel any potential start to avoid moving the wrong entity
+        m_isDragging = false;
+    }
+
     if (mouseJustPressed && !m_isDragging && m_world->IsAlive(m_selectedEntity)) {
         if (m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
             const auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
@@ -385,12 +397,14 @@ void BaseViewport::_handleEntityDragToMove() {
             m_dragStartEntityRot = lt.Rotation;
             m_dragStartEntityScale = lt.Scale;
             m_dragStartMouseWorld = mouseWorld;
+            m_draggingEntityID = m_selectedEntity.Index;  // Lock in which entity we're dragging
             m_isDragging = true;
         }
     }
 
     // Check for drag threshold (5 pixels in world space)
-    if (isMouseDownThisFrame && !m_isDragging) {
+    // Only check threshold if mouse was already down (not on initial press)
+    if (isMouseDownThisFrame && !m_isDragging && m_wasMouseDownLastFrame) {
         const glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
         const float dragDistance = glm::length(dragDelta);
         const float dragThreshold = (camera->OrthoSize / m_sceneDrawSize.y) * 5.0f;
@@ -405,20 +419,29 @@ void BaseViewport::_handleEntityDragToMove() {
     if (m_isDragging && isMouseDownThisFrame) {
         const glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
 
-        // Direct component access instead of Each() to avoid O(n) iteration
-        // Get the selected entity directly by its stored Entity with correct generation
-        if (m_world->IsAlive(m_selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
-            auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
-            lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
-            lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
-            // Don't mark scene dirty every frame during drag
-            // It will be marked when drag completes below
+        // Safety check: only update if we're still dragging the same entity
+        // This prevents lag or rapid selection changes from causing entities to teleport
+        if (m_selectedEntity.Index == m_draggingEntityID) {
+            // Direct component access instead of Each() to avoid O(n) iteration
+            // Get the selected entity directly by its stored Entity with correct generation
+            if (m_world->IsAlive(m_selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
+                auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
+                lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
+                lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
+                // Don't mark scene dirty every frame during drag
+                // It will be marked when drag completes below
+            }
+        } else {
+            // Selection changed mid-drag, cancel the drag operation
+            m_isDragging = false;
+            m_draggingEntityID = ECS::Entity::NPOS32;
         }
     }
 
     // End drag and create undo command
     if (m_isDragging && !isMouseDownThisFrame) {
-        if (m_world->IsAlive(m_selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
+        // Only finalize drag if we're still on the same entity
+        if (m_selectedEntity.Index == m_draggingEntityID && m_world->IsAlive(m_selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
             const auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
             const Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
             const Vector3D newPos = lt.Position;
@@ -439,6 +462,7 @@ void BaseViewport::_handleEntityDragToMove() {
             }
         }
         m_isDragging = false;
+        m_draggingEntityID = ECS::Entity::NPOS32;
     }
 
     m_wasMouseDownLastFrame = isMouseDownThisFrame;

@@ -49,7 +49,7 @@ void PerformancePanel::SetWorld(ECS::World* world) {
     m_world = world;
 }
 
-void PerformancePanel::Render(bool isPlaying) {
+void PerformancePanel::Render(bool /*isPlaying*/) {
     if (!m_initialized) return;
 
     if (!ImGui::Begin("Performance", nullptr, ImGuiWindowFlags_NoCollapse)) {

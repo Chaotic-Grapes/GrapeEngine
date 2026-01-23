@@ -60,8 +60,10 @@ public:
         ECS::World* world, Scenes::SceneManager* sceneManager);
 
     virtual void SetWorld(ECS::World* world);
+    virtual void BeginFrame() {}
     virtual void HandleInWorldInteraction() = 0;
     virtual void ShowEditorWindows() = 0;
+    virtual void EndFrame() {}
 
     // Event registration
     virtual void OnSelectionChanged(std::function<void(EntityId)> callback);
@@ -130,6 +132,7 @@ protected:
     Quaternion m_dragStartEntityRot;
     Vector3D m_dragStartEntityScale;
     uint32_t m_lastSelectedEntityID = ECS::Entity::NPOS32;
+    uint32_t m_draggingEntityID = ECS::Entity::NPOS32;  // Track which entity we're currently dragging
     bool m_wasMouseDownLastFrame = false;
 
     // Event callback
@@ -144,6 +147,10 @@ protected:
 
     // Viewport type (Scene vs Game)
     ViewportType m_viewportType = ViewportType::Scene;
+    
+    // Override point to allow derived viewports to indicate a pending pick
+    // Default: no pick pending
+    virtual bool IsPickPending() const { return false; }
 };
 
 #endif // BASE_VIEWPORT_H

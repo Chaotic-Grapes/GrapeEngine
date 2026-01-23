@@ -67,6 +67,15 @@ void EditorApplication::Initialize() {
     LOG_INFO("Editor Application initialized successfully");
 }
 
+void EditorApplication::BeginFrame() {
+    if (!m_initialized) return;
+
+    // Begin frame processing in editor service
+    if (m_editorService) {
+        m_editorService->BeginFrame();
+    }
+}
+
 void EditorApplication::Update() {
     if (!m_initialized) return;
 
@@ -82,6 +91,15 @@ void EditorApplication::Render() {
     // Render editor UI
     if (m_editorService) {
         m_editorService->Render();
+    }
+}
+
+void EditorApplication::EndFrame() {
+    if (!m_initialized) return;
+
+    // End frame processing in editor service
+    if (m_editorService) {
+        m_editorService->EndFrame();
     }
 }
 

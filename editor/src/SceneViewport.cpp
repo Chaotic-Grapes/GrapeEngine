@@ -45,10 +45,52 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageTypes.h"
 
 // -------------------------------------------------------------------------
+// Lifecycle
+// -------------------------------------------------------------------------
+void SceneViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
+                                ECS::World* world, Scenes::SceneManager* sceneManager) {
+    BaseViewport::Initialize(mainFont, boldFont, symbolsFont, world, sceneManager);
+    
+    // Set viewport type to Scene
+    SetViewportType(ViewportType::Scene);
+    
+    // Initialize gizmo with undo system if available
+    if (m_undoSystem) {
+        m_gizmo.SetUndoSystem(m_undoSystem);
+    }
+}
+
+SceneViewport::~SceneViewport() {
+    // Cleanup handled by base class and RAII members
+}
+
+void SceneViewport::BeginFrame() {
+    BaseViewport::BeginFrame();
+    
+    // Update gizmo state at start of frame
+    if (HasValidWorld() && m_selectedEntity.Index != ECS::Entity::NPOS32) {
+        m_gizmo.BeginFrame(*m_world, m_selectedEntity.Index);
+    }
+}
+
+void SceneViewport::EndFrame() {
+    // Finalize gizmo state at end of frame
+    m_gizmo.EndFrame();
+    
+    BaseViewport::EndFrame();
+}
+
+// -------------------------------------------------------------------------
 // Update
 // -------------------------------------------------------------------------
 void SceneViewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
+
+    // Update picking system to check for completed pick requests
+    auto* rendererSystem = _getRendererSystem();
+    if (rendererSystem) {
+        Editor::ViewportPicking::Update(rendererSystem);
+    }
 
     if (m_undoSystem) {
         m_undoSystem->Update();
@@ -76,6 +118,25 @@ void SceneViewport::HandleInWorldInteraction() {
 // -------------------------------------------------------------------------
 void SceneViewport::ShowEditorWindows() {
     _renderViewport();
+}
+
+// -------------------------------------------------------------------------
+// Private Methods
+// -------------------------------------------------------------------------
+void SceneViewport::_onPickResult(uint32_t pickedEntity) {
+    // Callback invoked when pick result is ready
+    // Allow selection of any entity including 0
+    // If no entity was picked (NPOS32), deselect only if NOT hovering over gizmo
+    if (pickedEntity != ECS::Entity::NPOS32) {
+        SetSelectedEntity(pickedEntity);
+        // Publish selection change to allow hierarchy and other systems to sync
+        Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(pickedEntity));
+    } else if (!ImGuizmo::IsOver()) {
+        // Only deselect if clicking on empty space AND not hovering over gizmo
+        SetSelectedEntity(ECS::Entity::NPOS32);
+        Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(ECS::Entity::NPOS32));
+    }
+    // If hovering over gizmo and no entity picked, keep current selection
 }
 
 // -------------------------------------------------------------------------
@@ -194,8 +255,8 @@ void SceneViewport::_renderViewport() {
                     );
 
                     // Draw gizmo for transform manipulation
-                    // CRITICAL: Must be drawn BEFORE picking check so ImGuizmo state is available
-                    Editor::EditorGizmo::DrawGizmo(
+                    // IMPORTANT: Must be drawn BEFORE picking check so ImGuizmo state is available
+                    m_gizmo.DrawGizmo(
                         *m_world,
                         m_selectedEntity.Index,
                         glm::value_ptr(view),
@@ -215,41 +276,15 @@ void SceneViewport::_renderViewport() {
                 double mx = 0, my = 0;
                 Input::GetMousePosition(mx, my);
 
-                // Enqueue async pick via renderer and store returned request id
-                // Only enqueue if no existing pending request to avoid spamming
-                if (m_pendingPickRequestId == 0) {
-                    uint32_t req = Editor::ViewportPicking::RequestAsyncPick(
+                // Enqueue async pick with C-style callback (DLL-safe)
+                // Pass 'this' as userData so callback can access viewport instance
+                Editor::ViewportPicking::RequestAsyncPick(
                     static_cast<float>(mx), static_cast<float>(my),
                     glm::vec2(gizmoPos.x, gizmoPos.y), glm::vec2(size.x, size.y),
-                    rendererSystem
-                    );
-
-                    if (req != 0) {
-                        m_pendingPickRequestId = req;
-                        LOG_DEBUG("[SceneViewport] Enqueued pick request: " << req << " at (" << mx << ", " << my << ") viewport=(" << gizmoPos.x << "," << gizmoPos.y << "," << size.x << "," << size.y << ")");
-                    }
-                }
-            }
-
-            // Poll for async pick result (non-blocking). If a result is ready
-            // resolve selection and notify callbacks.
-            if (m_pendingPickRequestId != 0) {
-                uint32_t pickedEntity = ECS::Entity::NPOS32;
-                if (Editor::ViewportPicking::TryGetAsyncPickResult(m_pendingPickRequestId, pickedEntity, rendererSystem)) {
-                    m_pendingPickRequestId = 0; // consumed
-                    // Allow selection of any entity including 0
-                    // If no entity was picked (NPOS32), deselect only if NOT hovering over gizmo
-                    if (pickedEntity != ECS::Entity::NPOS32) {
-                        SetSelectedEntity(pickedEntity);
-                        // Publish selection change to allow hierarchy and other systems to sync
-                        Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(pickedEntity));
-                    } else if (!ImGuizmo::IsOver()) {
-                        // Only deselect if clicking on empty space AND not hovering over gizmo
-                        SetSelectedEntity(ECS::Entity::NPOS32);
-                        Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(ECS::Entity::NPOS32));
-                    }
-                    // If hovering over gizmo and no entity picked, keep current selection
-                }
+                    rendererSystem,
+                    &SceneViewport::_onPickResultStatic,
+                    this
+                );
             }
 
             // Draw FPS overlay if enabled
