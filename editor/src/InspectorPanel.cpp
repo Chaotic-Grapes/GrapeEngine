@@ -37,6 +37,8 @@ through a unified system shared by both entities and prefab templates.
 #include <fstream>
 #include <algorithm>
 #include "EditorStyle.h"
+#include "core/Application.h"
+#include "scene/SceneManager.h"
 
 namespace {
     // Helper template function to safely add components during deserialization
@@ -85,6 +87,123 @@ namespace {
     void MarkSceneDirtyIfNeeded(EditorFileMenu* fileMenu) {
         if (fileMenu) {
             fileMenu->MarkSceneDirty();
+        }
+    }
+
+    // Helper to update prefab instances in a scene file on disk
+    void UpdatePrefabInSceneFile(const std::filesystem::path& scenePath,
+        const nlohmann::json& prefabData,
+        uint32_t targetHash)
+    {
+        // 1. Load Scene JSON
+        std::ifstream inFile(scenePath);
+        if (!inFile.is_open()) {
+            LOG_ERROR("Failed to open scene file for prefab update: " << scenePath);
+            return;
+        }
+
+        nlohmann::json sceneJson;
+        try {
+            inFile >> sceneJson;
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to parse scene JSON: " << scenePath << " Error: " << e.what());
+            return;
+        }
+        inFile.close();
+
+        // Validate scene format
+        if (!sceneJson.contains("Entities") || !sceneJson["Entities"].is_array()) {
+            return;
+        }
+
+        bool sceneModified = false;
+        int updatedCount = 0;
+
+        // Get components to apply
+        const nlohmann::json* componentsToApply = nullptr;
+        if (prefabData.contains("Components")) {
+            componentsToApply = &prefabData["Components"];
+        }
+        else if (prefabData.contains("Entity") && prefabData["Entity"].contains("Components")) {
+            componentsToApply = &prefabData["Entity"]["Components"];
+        }
+
+        if (!componentsToApply || !componentsToApply->is_array()) {
+            return;
+        }
+
+        // 2. Iterate entities
+        for (auto& entity : sceneJson["Entities"]) {
+            if (!entity.contains("Components") || !entity["Components"].is_array()) continue;
+
+            bool isInstance = false;
+
+            // Check components for PrefabInstanceMetadata or PrefabLink
+            for (const auto& comp : entity["Components"]) {
+                if (!comp.contains("TypeName") || !comp.contains("Data")) continue;
+
+                std::string typeName = comp["TypeName"];
+
+                if (typeName == "PrefabInstanceMetadata" || typeName == "ECS::Components::PrefabInstanceMetadata") {
+                    if (comp["Data"].contains("PrefabHash")) {
+                        if (comp["Data"]["PrefabHash"].get<uint32_t>() == targetHash) {
+                            isInstance = true;
+                            break;
+                        }
+                    }
+                }
+                else if (typeName == "PrefabLink" || typeName == "ECS::Components::PrefabLink") {
+                    if (comp["Data"].contains("prefabPath")) {
+                        std::string path = comp["Data"]["prefabPath"];
+                        uint32_t hash = ECS::PrefabManager::ComputeHash(ECS::PrefabManager::NormalizePath(path));
+                        if (hash == targetHash) {
+                            isInstance = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (isInstance) {
+                // 3. Update components
+                // Iterate through prefab components and apply them to the entity JSON
+                for (const auto& prefabComp : *componentsToApply) {
+                    if (!prefabComp.contains("TypeName") || !prefabComp.contains("Data")) continue;
+
+                    std::string prefabTypeName = prefabComp["TypeName"];
+
+                    // Find matching component in entity
+                    bool found = false;
+                    for (auto& entityComp : entity["Components"]) {
+                        if (entityComp["TypeName"] == prefabTypeName) {
+                            // Overwrite Data
+                            entityComp["Data"] = prefabComp["Data"];
+                            found = true;
+                            sceneModified = true;
+                            break;
+                        }
+                    }
+
+                    // If not found, add it
+                    if (!found) {
+                        entity["Components"].push_back(prefabComp);
+                        sceneModified = true;
+                    }
+                }
+                updatedCount++;
+            }
+        }
+
+        // 4. Save Scene JSON if modified
+        if (sceneModified) {
+            std::ofstream outFile(scenePath);
+            if (!outFile.is_open()) {
+                LOG_ERROR("Failed to write scene file: " << scenePath);
+                return;
+            }
+            outFile << sceneJson.dump(4);
+            LOG_INFO("Updated " << updatedCount << " instances in " << scenePath);
         }
     }
 }
@@ -1213,7 +1332,42 @@ void InspectorPanel::_applyPrefabToInstances() {
         }
     });
 
-    m_statusMessage = "Applied to " + std::to_string(count) + " instance(s)";
+    // NEW LOGIC: Apply to ALL OTHER SCENES (Files on disk)
+    // Get active scene path to avoid double processing
+    std::string activeScenePath = "";
+    if (Engine::CORE && Engine::CORE->GetSceneManager().GetActive()) {
+        activeScenePath = Engine::CORE->GetSceneManager().GetActive()->GetPath();
+        // Normalize path for comparison
+        activeScenePath = ECS::PrefabManager::NormalizePath(activeScenePath);
+    }
+
+    try {
+        // Iterate recursively over assets folder
+        std::string assetsDir = Engine::ProjectPaths::GetAssetsPath();
+        if (std::filesystem::exists(assetsDir)) {
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(assetsDir)) {
+                if (entry.is_regular_file()) {
+                    std::string ext = entry.path().extension().string();
+                    // Case insensitive check for extension? usually lower case on windows or strict
+                    // Let's assume .scn or .scene
+                    if (ext == ".scn" || ext == ".scene") {
+                        std::string entryPath = entry.path().string();
+                        std::string normalizedEntryPath = ECS::PrefabManager::NormalizePath(entryPath);
+
+                        // Skip active scene
+                        if (normalizedEntryPath != activeScenePath) {
+                            UpdatePrefabInSceneFile(entry.path(), m_prefabData, targetHash);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Error iterating scenes for prefab update: " << e.what());
+    }
+
+    m_statusMessage = "Applied to " + std::to_string(count) + " instance(s) in active scene + others on disk";
     m_statusTimer = 2.0f;
 }
 
