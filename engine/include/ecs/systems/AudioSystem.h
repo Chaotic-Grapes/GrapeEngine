@@ -75,23 +75,26 @@ namespace ECS {
 
         // Fade state struct
         struct FadeState {
-            float CurrentVolume = 0.0f,
-            float TargetVolume = 1.0f,
-            float Duration = 1.0f,
-            float elapsed = 0.0f,
-            bool IsFadingin = true;
-
-        }
+            float CurrentVolume = 0.0f;
+            float TargetVolume = 1.0f;
+            float Duration = 1.0f;
+            float Elapsed = 0.0f;
+            bool IsFadingIn = true;
+        };
 
         // Map entity -> fade states stored
         std::unordered_map<Entity, FadeState, EntityHash> m_activeFades;
 
+        // check if any sounds are currently fading out
+        bool HasActiveFadeOuts() const;
         
+        // get maximum remaining fade-out time
+        float GetMaxFadeOutRemaining() const;
 
-        // Helper methods
-        void _stopSound(Entity entity);
+        // Helper funcs
+        void _stopSound(Entity entity, World& world, bool allowFade = true);
         bool _isGamePlaying() const;
-        // Fade helper methods 
+        // Fade helper funcs 
         void _startFadeIn(Entity entity, Audio::PlaybackHandle handle, float duration, float targetVolume);
         void _startFadeOut(Entity entity, float duration);
         void _updateFades(World& world, float deltaTime);
