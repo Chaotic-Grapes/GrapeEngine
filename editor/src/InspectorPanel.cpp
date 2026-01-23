@@ -93,7 +93,7 @@ namespace {
     // Helper to update prefab instances in a scene file on disk
     void UpdatePrefabInSceneFile(const std::filesystem::path& scenePath,
         const nlohmann::json& prefabData,
-        uint32_t targetHash)
+        const std::vector<uint32_t>& targetHashes)
     {
         // 1. Load Scene JSON
         std::ifstream inFile(scenePath);
@@ -147,9 +147,12 @@ namespace {
 
                 if (typeName == "PrefabInstanceMetadata" || typeName == "ECS::Components::PrefabInstanceMetadata") {
                     if (comp["Data"].contains("PrefabHash")) {
-                        if (comp["Data"]["PrefabHash"].get<uint32_t>() == targetHash) {
-                            isInstance = true;
-                            break;
+                        uint32_t instanceHash = comp["Data"]["PrefabHash"].get<uint32_t>();
+                        for (uint32_t h : targetHashes) {
+                            if (instanceHash == h) {
+                                isInstance = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -157,12 +160,15 @@ namespace {
                     if (comp["Data"].contains("prefabPath")) {
                         std::string path = comp["Data"]["prefabPath"];
                         uint32_t hash = ECS::PrefabManager::ComputeHash(ECS::PrefabManager::NormalizePath(path));
-                        if (hash == targetHash) {
-                            isInstance = true;
-                            break;
+                        for (uint32_t h : targetHashes) {
+                            if (hash == h) {
+                                isInstance = true;
+                                break;
+                            }
                         }
                     }
                 }
+                if (isInstance) break;
             }
 
             if (isInstance) {
@@ -1319,14 +1325,37 @@ void InspectorPanel::_applyPrefabToInstances() {
     // Iterate over every entity that has a PrefabInstanceMetadata component
     int count = 0;
 
-    // Handle new format: PrefabInstanceMetadata
-    uint32_t targetHash = ECS::PrefabManager::ComputeHash(
-        ECS::PrefabManager::NormalizePath(m_prefabPath)
-    );
+    // Compute valid hashes for this prefab (Absolute AND Relative)
+    // This handles cases where instances were saved with different path formats
+    std::vector<uint32_t> targetHashes;
 
+    // 1. Hash from absolute path (normalized)
+    std::string normalizedAbsPath = ECS::PrefabManager::NormalizePath(m_prefabPath);
+    targetHashes.push_back(ECS::PrefabManager::ComputeHash(normalizedAbsPath));
+
+    // 2. Hash from relative path (normalized)
+    std::string relativePath = Engine::ProjectPaths::ToRelativePath(m_prefabPath);
+    if (!relativePath.empty()) {
+        std::string normalizedRelPath = ECS::PrefabManager::NormalizePath(relativePath);
+        uint32_t relHash = ECS::PrefabManager::ComputeHash(normalizedRelPath);
+        // Avoid duplicate
+        if (relHash != targetHashes[0]) {
+            targetHashes.push_back(relHash);
+        }
+    }
+
+    // Apply to active scene (in-memory)
     m_world->Each<ECS::Components::PrefabInstanceMetadata>([&](ECS::Entity entity, ECS::Components::PrefabInstanceMetadata& meta) {
         // Apply only to instances that match the prefab we are editing
-        if (meta.PrefabHash == targetHash) {
+        bool match = false;
+        for (uint32_t h : targetHashes) {
+            if (meta.PrefabHash == h) {
+                match = true;
+                break;
+            }
+        }
+
+        if (match) {
             _applyPrefabDataToEntity(entity);
             count++;
         }
@@ -1356,7 +1385,7 @@ void InspectorPanel::_applyPrefabToInstances() {
 
                         // Skip active scene
                         if (normalizedEntryPath != activeScenePath) {
-                            UpdatePrefabInSceneFile(entry.path(), m_prefabData, targetHash);
+                            UpdatePrefabInSceneFile(entry.path(), m_prefabData, targetHashes);
                         }
                     }
                 }
