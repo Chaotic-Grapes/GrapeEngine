@@ -202,8 +202,11 @@ namespace Engine {
             delete m_scriptManager;
             m_scriptManager = nullptr;
         }
-        delete m_audio;
-        m_audio = nullptr;
+        if (m_audio) {
+            m_audio->Terminate();
+            delete m_audio;
+            m_audio = nullptr;
+        }
 
         // Shutdown platform context (handles window cleanup)
         if (m_platformContext) {
@@ -211,9 +214,6 @@ namespace Engine {
             delete m_platformContext;
             m_platformContext = nullptr;
         }
-
-        delete m_audio;
-        m_audio = nullptr;
 
         m_initialized = false;
         CORE = nullptr;

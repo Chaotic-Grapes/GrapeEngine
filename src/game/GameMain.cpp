@@ -109,6 +109,8 @@ int main() {
         return 1;
     }
 
+    sceneManager.SetActive(sceneIndex);
+
     // Game main loop
     while (engine.IsRunning()) {
         // Update engine (all game systems run)
