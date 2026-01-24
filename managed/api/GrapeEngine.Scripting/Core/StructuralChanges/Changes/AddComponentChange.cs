@@ -69,3 +69,4 @@ public class AddComponentChange : IChangeHandler
 
     public string GetDescription() => $"AddComponent<{ComponentTypeName ?? ComponentType?.Name ?? "Unknown"}>({TargetEntity.Id})";
 }
+

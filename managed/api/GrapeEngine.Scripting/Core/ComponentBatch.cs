@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using System.Runtime.InteropServices;
 using UnsafePtr = System.Runtime.CompilerServices.Unsafe;
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -487,3 +487,4 @@ public static class BatchConfiguration
     /// </summary>
     public static bool AutoBatchingEnabled { get; set; } = true;
 }
+

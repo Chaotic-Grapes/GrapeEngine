@@ -1,5 +1,5 @@
-using GrapeEngine.Scripting.Unsafe;
-using GrapeEngine.Scripting.Components.Core;
+using GrapeEngine.Scripting.Internal.Unsafe;
+using GrapeEngine.Scripting.Components;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Core;
@@ -322,3 +322,4 @@ public static class HierarchyUtils
         return null;
     }
 }
+

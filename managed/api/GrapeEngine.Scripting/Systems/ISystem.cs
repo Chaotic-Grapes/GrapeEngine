@@ -12,9 +12,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Services;
-
 namespace GrapeEngine.Scripting.Systems;
 
 /// <summary>
@@ -43,3 +40,4 @@ public interface ISystem
     /// <param name="world">The ECS World instance</param>
     void OnDestroy(World world) { }
 }
+

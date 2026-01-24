@@ -13,8 +13,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Query;
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Query;
+using GrapeEngine.Scripting.Internal.Unsafe;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -24,9 +24,8 @@ namespace GrapeEngine.Scripting.Core;
 /// 
 /// THREAD SAFETY:
 /// - All entity/component operations must be called from the main thread
-/// - The job system (IJob) provides safe parallelism with proper synchronization
 /// - Query iterators are not reentrant-safe and must not be stored across thread boundaries
-/// - Do NOT access the World from multiple threads without IJob
+/// - Access the World only from the main game thread
 /// </summary>
 public class World : IDisposable
 {
@@ -478,4 +477,5 @@ public class World : IDisposable
         Dispose();
     }
 }
+
 

@@ -193,3 +193,4 @@ public struct Quaternion(float x, float y, float z, float w)
         return HashCode.Combine(X, Y, Z, W);
     }
 }
+

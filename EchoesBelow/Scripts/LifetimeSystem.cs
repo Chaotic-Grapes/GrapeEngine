@@ -1,13 +1,9 @@
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
-using GrapeEngine.Scripting.Hosting;
-using GrapeEngine.Scripting.Components.Core;
 using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Services;
-using System.Runtime.InteropServices;
-using System.Collections.Generic;
-using GrapeEngine.Scripting.Profiling;
+using GrapeEngine.Scripting.Hosting;
 
 namespace EchoesBelow.Scripts;
 
@@ -29,7 +25,7 @@ public record struct LifetimeComponent(float Time);
 /// If an entity has an Active component, it is only updated when enabled.
 /// Entities without the Active component are treated as enabled by default.
 /// </summary>
-[SystemGroup(SystemGroup.Update)]
+[SystemGroup(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class LifetimeSystem : SystemBase
 {
     // One-time initialization
@@ -100,3 +96,4 @@ public class LifetimeSystem : SystemBase
         Log("[LifetimeSystem] Destroyed", LogLevel.Debug);
     }
 }
+

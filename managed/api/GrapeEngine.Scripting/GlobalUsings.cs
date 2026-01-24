@@ -3,26 +3,25 @@
 // These namespaces are automatically available to all files in the project and
 // any projects that reference this assembly.
 
-// Core ECS API
+// Core ECS API - Public
 global using GrapeEngine.Scripting.Core;
 global using GrapeEngine.Scripting.Core.StructuralChanges;
 global using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 global using GrapeEngine.Scripting.Core.StructuralChanges.Changes;
 global using GrapeEngine.Scripting.Core.Dependencies;
-global using GrapeEngine.Scripting.Components.Types;
+global using GrapeEngine.Scripting.Components;
 global using GrapeEngine.Scripting.Services;
 global using GrapeEngine.Scripting.Systems;
 global using GrapeEngine.Scripting.Events;
 global using GrapeEngine.Scripting.Helpers;
 
-// Math & Numerics
+// Math & Numerics - Public
 global using GrapeEngine.Math;
 
-// Profiling & Optimization
-global using GrapeEngine.Scripting.Profiling;
-global using GrapeEngine.Scripting.Profiling.Optimization;
-global using GrapeEngine.Scripting.Profiling.Optimization.SIMD;
+// Internal APIs
+global using GrapeEngine.Scripting.Internal.Profiling;
+global using GrapeEngine.Scripting.Internal.Profiling.Optimization;
+global using GrapeEngine.Scripting.Internal.Profiling.Optimization.SIMD;
+global using GrapeEngine.Scripting.Internal.Compiler;
 
-// Compiler
-global using GrapeEngine.Scripting.Compiler;
 

@@ -42,3 +42,4 @@ public static class CommandBufferExtensions
             : new ThreadSafeCommandBuffer(buffer.World);
     }
 }
+

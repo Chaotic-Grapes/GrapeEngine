@@ -21,7 +21,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
 using System.Text;
 
 namespace GrapeEngine.Scripting.Services;
@@ -140,3 +140,4 @@ internal static class Logging
         Console.ResetColor();
     }
 }
+

@@ -14,7 +14,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Hosting;
+using GrapeEngine.Scripting.Systems.Attributes;
 
 namespace GrapeEngine.Scripting.Systems;
 
@@ -28,4 +28,10 @@ public interface ISystemMetadata
     /// The execution group (phase) this system runs in.
     /// </summary>
     SystemGroup Group { get; }
+
+    /// <summary>
+    /// Gets the current run mode of the system.
+    /// </summary>
+    SystemRunMode RunMode { get; }
 }
+

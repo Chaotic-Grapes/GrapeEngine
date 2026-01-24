@@ -13,7 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -436,7 +436,7 @@ internal static class ComponentTypeHelper
         // FNV-1a hash algorithm - must match C++ implementation
         // IMPORTANT: Hash only the type NAME, not the full namespace.
         // C++ side registers with just the class name (e.g., "LocalTransform")
-        // not the full qualified name (e.g., "GrapeEngine.Scripting.Components.Types.LocalTransform")
+        // not the full qualified name (e.g., "GrapeEngine.Scripting.Components.LocalTransform")
         string typeName = type.Name;
         hash = FNV1aHash(typeName);
         
@@ -455,3 +455,4 @@ internal static class ComponentTypeHelper
         return hash;
     }
 }
+

@@ -16,8 +16,8 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using GrapeEngine.Scripting.Components;
-using GrapeEngine.Scripting.Unsafe;
-using GrapeEngine.Scripting.Hosting;
+using GrapeEngine.Scripting.Internal.Unsafe;
+using GrapeEngine.Scripting.Internal.Hosting;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -169,3 +169,4 @@ public static partial class ComponentRegistry
     private static partial Regex ComponentNameRegex();
 
 }
+

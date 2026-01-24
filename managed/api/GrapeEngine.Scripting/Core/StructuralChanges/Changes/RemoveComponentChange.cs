@@ -66,3 +66,4 @@ public class RemoveComponentChange : IChangeHandler
 
     public string GetDescription() => $"RemoveComponent<{ComponentTypeName ?? ComponentType?.Name ?? "Unknown"}>({TargetEntity.Id})";
 }
+

@@ -6,15 +6,15 @@
 \brief
 Records structural changes and plays them back safely.
 
-Deferred command buffer for safe entity/component modifications from jobs.
+Deferred command buffer for safe entity/component modifications.
 Records structural changes (add/remove entities, add/remove components)
-and applies them at safe synchronization points to prevent data races
-during parallel job execution.
+and applies them at safe synchronization points to prevent data races.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
+/* End Header *******************************************************************/
 /* End Header *******************************************************************/
 
 using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
@@ -24,24 +24,20 @@ namespace GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 /// <summary>
 /// Records structural changes and plays them back safely.
 /// 
-/// Allows parallel jobs to queue structural modifications (create/destroy entities,
+/// Allows queuing of structural modifications (create/destroy entities,
 /// add/remove components) without causing data races. Changes are applied at a
-/// safe synchronization point after all jobs complete.
+/// safe synchronization point after all system updates complete.
 /// 
 /// Example:
 /// <code>
-/// public JobHandle OnUpdateAsJobs(World world, float deltaTime)
+/// var buffer = new CommandBuffer(world);
+/// 
+/// deadQuery.ForEachEntity((in Dead d) =>
 /// {
-///     var buffer = new CommandBuffer(world);
-///     
-///     var handle = deadQuery.ForEachEntity((in Dead d) =>
-///     {
-///         buffer.DestroyEntity(entity);  // Recorded, not executed yet
-///     });
-///     
-///     handle.Complete();
-///     buffer.Playback();  // Now execute all recorded commands
-/// }
+///     buffer.DestroyEntity(entity);  // Recorded, not executed yet
+/// });
+/// 
+/// buffer.Playback();  // Now execute all recorded commands
 /// </code>
 /// </summary>
 /// <remarks>
@@ -228,7 +224,7 @@ public class CommandBuffer(World world) : IDisposable
     /// <summary>
     /// Execute all recorded commands on the world.
     /// 
-    /// This should be called after all jobs complete and before the next
+    /// This should be called after all queries complete and before the next
     /// frame or system execution to ensure all structural changes are applied safely.
     /// </summary>
     /// <returns>Number of commands executed</returns>
@@ -456,3 +452,4 @@ public class CommandBuffer(World world) : IDisposable
         GC.SuppressFinalize(this);
     }
 }
+
