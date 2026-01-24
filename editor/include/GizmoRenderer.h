@@ -104,13 +104,15 @@ namespace Editor {
          * @param projMatrix Camera projection matrix (row-major)
          * @param inputTransform Input entity transform (will be read/modified by ImGuizmo)
          * @param outTransform [OUT] Computed transform from ImGuizmo manipulation
+         * @param outDeltaTransform [OUT] Delta transform from last frame (optional, set nullptr to skip)
          * @return true if gizmo is currently being manipulated; false otherwise
          */
         bool Render(
             const glm::mat4& viewMatrix,
             const glm::mat4& projMatrix,
             const glm::mat4& inputTransform,
-            glm::mat4& outTransform);
+            glm::mat4& outTransform,
+            glm::mat4* outDeltaTransform = nullptr);
 
         // ====================================================================
         // State Queries

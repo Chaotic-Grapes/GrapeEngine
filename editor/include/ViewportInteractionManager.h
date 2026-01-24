@@ -243,6 +243,41 @@ namespace Editor {
          * @brief Set entity's LocalTransform from CachedTransformState
          */
         void _setEntityTransform(ECS::World& world, uint32_t entityId, const CachedTransformState& state);
+
+        // ====================================================================
+        // Helper functions for matrix decomposition and coordinate conversion
+        // ====================================================================
+
+        /**
+         * @brief Extract position (translation) from a 4x4 matrix
+         */
+        glm::vec3 _extractPositionFromMatrix(const glm::mat4& matrix) const;
+
+        /**
+         * @brief Extract scale from a 4x4 matrix (column magnitudes)
+         */
+        glm::vec3 _extractScaleFromMatrix(const glm::mat4& matrix) const;
+
+        /**
+         * @brief Extract rotation quaternion from a 4x4 matrix
+         */
+        glm::quat _extractRotationFromMatrix(const glm::mat4& matrix) const;
+
+        /**
+         * @brief Convert world-space position to local-space for child entities
+         * Takes into account parent's position, rotation, and scale
+         */
+        glm::vec3 _convertWorldToLocalPosition(ECS::World& world, ECS::Entity entity, const glm::vec3& worldPosition) const;
+
+        /**
+         * @brief Extract parent entity's scale from its WorldTransform matrix
+         */
+        glm::vec3 _extractParentScale(const Matrix4x4& parentMatrix) const;
+
+        /**
+         * @brief Extract parent entity's rotation from its WorldTransform matrix
+         */
+        glm::quat _extractParentRotation(const Matrix4x4& parentMatrix, const glm::vec3& parentScale) const;
     };
 
 }  // namespace Editor

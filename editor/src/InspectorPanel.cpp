@@ -563,6 +563,13 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             }
         }
 
+        // Re-serialize after applying changes so the displayed values stay fresh
+        // This ensures if the component was modified by transform system or other systems,
+        // the inspector shows the current values rather than stale cached values
+        if (wasEdited) {
+            entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
+        }
+
         // Record undo when editing finishes
         if (m_editState.isEditing && !ImGui::IsAnyItemActive()) {
             // Editing just finished - record the change

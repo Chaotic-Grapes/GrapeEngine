@@ -25,7 +25,7 @@ namespace Editor {
 
     GizmoRenderer::GizmoRenderer()
         : m_operation(Operation::Translate)
-        , m_mode(Mode::World)
+        , m_mode(Mode::Local)
         , m_isPerspective(false)
         , m_viewportX(0.0f)
         , m_viewportY(0.0f)
@@ -59,7 +59,8 @@ namespace Editor {
         const glm::mat4& viewMatrix,
         const glm::mat4& projMatrix,
         const glm::mat4& inputTransform,
-        glm::mat4& outTransform) {
+        glm::mat4& outTransform,
+        glm::mat4* outDeltaTransform) {
 
         // Validate viewport size FIRST
         if (m_viewportW <= 0 || m_viewportH <= 0) {
@@ -123,6 +124,12 @@ namespace Editor {
         if (isManipulating) {
             float* dst = glm::value_ptr(outTransform);
             for (int i = 0; i < 16; ++i) dst[i] = matrixArr[i];
+        }
+
+        // If delta transform requested, initialize to identity
+        // ImGuizmo doesn't directly expose delta matrices, but we can compute them in the caller
+        if (outDeltaTransform && isManipulating) {
+            *outDeltaTransform = glm::mat4(1.0f);
         }
 
         return isManipulating;
