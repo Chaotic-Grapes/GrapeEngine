@@ -128,23 +128,12 @@ void InspectorPanel::InspectEntity(EntityId id) {
         return;
     }
 
-    // CRITICAL: Clear edit state when entity selection changes
+    // IMPORTANT: Clear edit state when entity selection changes
     // This prevents the inspector from comparing the new entity's transform
     // against the previous entity's captured transform
     if (m_entityId != id) {
         m_editState.isEditing = false;
         m_editState.entityId = 0;
-        
-        // Debug logging: Check transform at selection time
-        if (m_world && id != 0 && id != ECS::Entity::NPOS32) {
-            ECS::Entity debugEntity = m_world->Resolve(id);
-            if (!debugEntity.IsNull() && m_world->IsAlive(debugEntity) && 
-                m_world->Has<ECS::Components::LocalTransform>(debugEntity)) {
-                const auto& lt = m_world->Get<ECS::Components::LocalTransform>(debugEntity);
-                LOG_DEBUG("[Inspector] InspectEntity(" << id << ") BEFORE any changes: pos=(" 
-                    << lt.Position.X << ", " << lt.Position.Y << ", " << lt.Position.Z << ")");
-            }
-        }
     }
 
     m_entityId = id;
@@ -433,33 +422,6 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
 
 // Render all components on an entity using JSON as a temporary editable buffer
 void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
-    // Debug: Track LocalTransform changes frame-by-frame for ALL entities in the world
-    static std::unordered_map<uint32_t, Vector3D> lastKnownPositions;
-    static uint64_t lastFrameCheck = 0;
-    static uint64_t currentFrame = 0;
-    currentFrame++;
-    
-    // Only check once per frame across all entities
-    if (currentFrame != lastFrameCheck && m_world) {
-        lastFrameCheck = currentFrame;
-        
-        // Check all entities that have transforms
-        m_world->Each<ECS::Components::LocalTransform>([this](ECS::Entity e, ECS::Components::LocalTransform& lt) {
-            auto it = lastKnownPositions.find(e.Index);
-            if (it != lastKnownPositions.end()) {
-                constexpr float EPSILON = 0.0001f;
-                if (std::abs(it->second.X - lt.Position.X) > EPSILON ||
-                    std::abs(it->second.Y - lt.Position.Y) > EPSILON ||
-                    std::abs(it->second.Z - lt.Position.Z) > EPSILON) {
-                    LOG_WARNING("[Inspector] Entity " << e.Index << " transform changed from (" 
-                        << it->second.X << ", " << it->second.Y << ", " << it->second.Z << ") to (" 
-                        << lt.Position.X << ", " << lt.Position.Y << ", " << lt.Position.Z << ")");
-                }
-            }
-            lastKnownPositions[e.Index] = lt.Position;
-        });
-    }
-    
     // Footer needs 2 lines: one for button row, one for status message
     float childHeight = ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2;
 
@@ -579,7 +541,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         m_componentsToDelete.clear();
 
         // Second pass: push any edited JSON values back into ECS components
-        // CRITICAL: Only apply components that were actually modified to prevent
+        // IMPORTANT: Only apply components that were actually modified to prevent
         // unnecessarily overwriting entity data every frame (which can cause teleporting)
         for (const auto& componentEntry : entityJson["Components"]) {
             // Validate again; same same
@@ -598,13 +560,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (meta) {
                 LOG_DEBUG("[Inspector] Applying modified component: " << typeName << " to entity " << entity.Index);
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
-                
-                // Log transform after applying if it was LocalTransform
-                if (typeName == "LocalTransform" || typeName == "ECS::Components::LocalTransform") {
-                    const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
-                    LOG_DEBUG("[Inspector]   After apply: pos=(" << lt.Position.X << ", " 
-                        << lt.Position.Y << ", " << lt.Position.Z << ")");
-                }
             }
         }
 
@@ -640,8 +595,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                         lt.Position, lt.Rotation, lt.Scale
                     );
                     LOG_DEBUG("[Inspector] Recorded transform change for undo");
-                } else {
-                    LOG_DEBUG("[Inspector] Transform edit finished but no significant change detected (within epsilon)");
                 }
             }
 

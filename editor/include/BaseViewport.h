@@ -24,12 +24,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "EditorFileMenu.h"
 #include "EditorCamera.hpp"
 #include "UndoSystem.h"
+#include "ViewportInteractionManager.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "Math/Quaternion.h"
 #include "Math/Vector3D.h"
 #include <imgui.h>
-#include "ImGuizmo.h"
 #include <glm/glm.hpp>
 #include <memory>
 #include <functional>
@@ -98,7 +98,6 @@ protected:
     void _renderCameraFrustum();
     void _drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& viewportSize);
     ECS::RendererSystem* _getRendererSystem();
-    void _handleEntityDragToMove();
 
     ECS::World* m_world = nullptr;
     EditorFileMenu* m_fileMenu = nullptr;
@@ -110,6 +109,9 @@ protected:
 
     // Editor camera (owned by viewport)
     std::unique_ptr<Editor::EditorCamera> m_editorCamera;
+
+    // Interaction manager (owned by viewport)
+    Editor::ViewportInteractionManager m_interactionMgr;
 
     // State
     ECS::Entity m_selectedEntity = ECS::NULL_ENTITY;  // Store full entity with generation to validate IsAlive()
@@ -124,16 +126,6 @@ protected:
     
     // Toggleable camera frustum visualization
     bool m_showCameraFrustum = true;  // Default: enabled
-    
-    // Editor-specific entity manipulation
-    bool m_isDragging = false;
-    glm::vec2 m_dragStartMouseWorld = {0, 0};
-    glm::vec3 m_dragStartEntityPos = {0, 0, 0};
-    Quaternion m_dragStartEntityRot;
-    Vector3D m_dragStartEntityScale;
-    uint32_t m_lastSelectedEntityID = ECS::Entity::NPOS32;
-    uint32_t m_draggingEntityID = ECS::Entity::NPOS32;  // Track which entity we're currently dragging
-    bool m_wasMouseDownLastFrame = false;
 
     // Event callback
     std::function<void(EntityId)> m_onSelectionChanged;
@@ -147,10 +139,6 @@ protected:
 
     // Viewport type (Scene vs Game)
     ViewportType m_viewportType = ViewportType::Scene;
-    
-    // Override point to allow derived viewports to indicate a pending pick
-    // Default: no pick pending
-    virtual bool IsPickPending() const { return false; }
 };
 
 #endif // BASE_VIEWPORT_H

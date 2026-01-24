@@ -35,4 +35,4 @@ public:
     bool operator!=(const Quaternion& other) const;
 };
 
-Quaternion operator*(const Quaternion& a, const Quaternion& b);
+GRAPEENGINE_API Quaternion operator*(const Quaternion& a, const Quaternion& b);
