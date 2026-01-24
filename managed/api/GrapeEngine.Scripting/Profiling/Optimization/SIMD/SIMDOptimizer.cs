@@ -273,63 +273,6 @@ public static class SIMDOptimizer
         }
 
         /// <summary>
-        /// Transform components in parallel using the job system for maximum performance.
-        /// </summary>
-        /// <typeparam name="T">Component struct type</typeparam>
-        /// <param name="components">Array of components to transform</param>
-        /// <param name="transform">Transformation function</param>
-        /// <param name="count">Number of elements to transform</param>
-        /// <remarks>
-        /// This method should be used for bulk transforms of large component arrays.
-        /// The job system will automatically distribute work across available CPU cores.
-        /// Requires the transform function to be thread-safe (no shared state).
-        /// </remarks>
-        public static void TransformComponentsParallel<T>(T[] components, Func<T, T> transform, int count) where T : struct
-        {
-            ArgumentNullException.ThrowIfNull(components);
-            ArgumentNullException.ThrowIfNull(transform);
-            if (count < 0 || count > components.Length)
-                throw new ArgumentOutOfRangeException(nameof(count));
-
-            // For very large arrays, parallel processing is beneficial
-            // Break into jobs of ~1000 elements for optimal load distribution
-            const int jobSize = 1000;
-            
-            if (count <= jobSize)
-            {
-                // Too small for parallelization overhead; use scalar version
-                TransformComponents(components, transform, count);
-                return;
-            }
-
-            var jobCount = (count + jobSize - 1) / jobSize;
-            
-            // In a real implementation, this would use the ECS job system
-            // For now, use Task Parallel Library as fallback
-            List<Task> jobs = new(jobCount);
-
-            for (var jobIdx = 0; jobIdx < jobCount; jobIdx++)
-            {
-                var startIdx = jobIdx * jobSize;
-                var endIdx = System.Math.Min(startIdx + jobSize, count);
-
-                var job = Task.Run(() =>
-                {
-                    for (var i = startIdx; i < endIdx; i++)
-                    {
-                        components[i] = transform(components[i]);
-                    }
-                });
-
-                jobs.Add(job);
-            }
-
-            // Wait for all jobs to complete
-            Task.WaitAll([.. jobs]);
-        }
-
-
-        /// <summary>
         /// Broadcast a component value to multiple positions using SIMD idioms.
         /// </summary>
         public static void BroadcastComponent<T>(T[] target, T value, int start, int count) where T : struct
@@ -497,10 +440,12 @@ public static class SIMDOptimizer
 /// </summary>
 public static class OptimizedQueryExtensions
 {
+    public delegate void EntityAction<TEntity, T>(TEntity entity, ref T component);
+    
     /// <summary>
     /// Execute query with optimization metrics collection.
     /// </summary>
-    public static void ForEachOptimized<T>(this Query<T> query, EntityAction<T> action, 
+    public static void ForEachOptimized<T>(this Query<T> query, EntityAction<Entity, T> action, 
         OptimizationProfiler? profiler = null) where T : unmanaged
     {
         using var scope = profiler?.BeginProfile($"Query<{typeof(T).Name}>", OptimizationSafety.Normal);
@@ -511,20 +456,10 @@ public static class OptimizedQueryExtensions
             while (enumerator.MoveNext())
             {
                 var (entity, component) = enumerator.Current;
-                action?.Invoke(ref component);
+                action?.Invoke(entity, ref component);
                 count++;
             }
         }
         scope?.RecordEntitiesProcessed(count);
-    }
-
-    /// <summary>
-    /// Execute query as job with optimization tracking.
-    /// </summary>
-    public static JobHandle? ForEachOptimizedAsJob<T>(this Query<T> query, EntityAction<T> action,
-        OptimizationProfiler? profiler = null) where T : unmanaged
-    {
-        using var scope = profiler?.BeginProfile($"ForEachOptimizedAsJob<{typeof(T).Name}>", OptimizationSafety.Normal);
-        return query.ForEachEntity(action);
     }
 }

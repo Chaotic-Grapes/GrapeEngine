@@ -646,10 +646,3 @@ INTEROP_API bool WorldInterop_GetComponentMetaFromHash(uint32_t typeNameHash, in
     if (outAlignment) *outAlignment = it->second.Alignment;
     return true;
 }
-
-INTEROP_API void* WorldInterop_GetJobManager(void* worldPtr) {
-    if (!worldPtr) return nullptr;
-    
-    auto* world = static_cast<ECS::World*>(worldPtr);
-    return &world->GetJobManager();
-}

@@ -101,14 +101,6 @@ internal static partial class WorldAPI
     public static unsafe partial int GetChildCount(void* worldPtr, ulong parentId);
 
     // ============================================================================
-    // Job System Access
-    // ============================================================================
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_GetJobManager")]
-    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    public static unsafe partial nint GetJobManager(void* worldPtr);
-
-    // ============================================================================
     // Component Serialization Callback Registration
     // ============================================================================
     

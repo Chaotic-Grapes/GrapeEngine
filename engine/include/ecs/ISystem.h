@@ -26,7 +26,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "Export.h"
 #include "ecs/World.h"
-#include "ecs/jobs/JobHandle.h"
 #include "ecs/SystemEnums.h"
 #include "ecs/ComponentAccessAttribute.h"
 #include <string>
@@ -367,46 +366,6 @@ namespace ECS {
             return accesses;
         }
 
-        /**
-         * @brief Execute system as parallel jobs instead of sequential update.
-         * 
-         * Override to implement job-based system execution. The default
-         * implementation calls OnUpdate() sequentially.
-         * 
-         * @param world Active world
-         * @param deltaTime Time since last frame
-         * @return JobHandle for tracking execution (default: invalid handle)
-         * 
-         * Example:
-         * @code
-         * Jobs::JobHandle OnUpdateAsJobs(World& world, float deltaTime) override {
-         *     auto query = world.CreateParallelQuery<Transform, Velocity>();
-         *     auto chunks = query.GetChunks();
-         *     
-         *     std::vector<std::unique_ptr<IJob>> jobs;
-         *     for (auto* chunk : chunks) {
-         *         auto job = std::make_unique<UpdateChunkJob>();
-         *         job->DeltaTime = deltaTime;
-         *         jobs.push_back(std::move(job));
-         *     }
-         *     
-         *     return world.GetJobManager().ScheduleParallel(std::move(jobs));
-         * }
-         * @endcode
-         */
-        virtual Jobs::JobHandle OnUpdateAsJobs(World& world) {
-            // Default: run sequentially
-            OnUpdate(world);
-            return Jobs::JobHandle{};
-        }
-
-        /**
-         * @brief Check if this system supports job-based execution.
-         * @return true if OnUpdateAsJobs() is overridden, false if using sequential execution
-         */
-        virtual bool SupportsJobBasedExecution() const {
-            return false;  // Override and return true if implementing OnUpdateAsJobs()
-        }
 
     private:
         bool m_enabled = true;

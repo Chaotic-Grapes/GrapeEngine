@@ -332,26 +332,6 @@ namespace ECS {
         }
     }
 
-    intptr_t ScriptManager::CallSystemOnUpdateJob(uint64_t handle, void* worldPtr, intptr_t dependsOn)
-    {
-        if (!m_initialized) return 0;
-        // Prefer job-capable delegate if available
-        if (m_callSystemOnUpdateJob) {
-            try {
-                return m_callSystemOnUpdateJob(handle, worldPtr, dependsOn);
-            } catch (...) {
-                return 0;
-            }
-        }
-        // Fallback to non-job update
-        if (m_callSystemOnUpdate) {
-            try {
-                m_callSystemOnUpdate(handle, worldPtr);
-            } catch (...) {}
-        }
-        return 0;
-    }
-
     void ScriptManager::CallSystemOnDestroy(uint64_t handle, void* worldPtr)
     {
         if (!m_initialized || !m_callSystemOnDestroy) return;
@@ -883,7 +863,6 @@ namespace ECS {
         success &= loadMethod("ResolveSystemGroup",               scriptHostTypeName, reinterpret_cast<void**>(&m_resolveSystemGroup));
         success &= loadMethod("CallSystemOnCreate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnCreate));
         success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
-        success &= loadMethod("CallSystemOnUpdateJob",            scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdateJob));
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
         success &= loadMethod("FlushLogs",                         scriptHostTypeName, reinterpret_cast<void**>(&m_flushLogs));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));

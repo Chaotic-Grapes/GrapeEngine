@@ -20,7 +20,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Linq;
-using GrapeEngine.Scripting.Job;
 
 namespace GrapeEngine.Scripting.Hosting;
 
@@ -979,47 +978,7 @@ public static class ScriptHost
         }
     }
 
-    /// <summary>
-    /// Call OnUpdate on a scripted system that may schedule jobs.
-    /// Returns a native job handle (IntPtr) when the system implements ISystemJob
-    /// and schedules work. Returns IntPtr.Zero otherwise.
-    /// </summary>
-    [UnmanagedCallersOnly]
-    public static IntPtr CallSystemOnUpdateJob(ulong handle, IntPtr worldPtr, IntPtr dependsOnNativeHandle)
-    {
-        try
-        {
-            object? instance = SystemDiscovery.GetSystemInstance(handle);
-            if (instance == null)
-            {
-                return IntPtr.Zero;
-            }
 
-            if (instance is ISystemJob jobSystem)
-            {
-                // Use cached World wrapper to avoid allocating a new object every frame
-                World managedWorld = GetOrCreateWorldWrapper(worldPtr);
-                JobHandle? depends = dependsOnNativeHandle == IntPtr.Zero ? null : new JobHandle(dependsOnNativeHandle);
-                var result = jobSystem.OnUpdateWithJob(managedWorld, depends);
-                return result != null ? new IntPtr(result.NativeHandle) : IntPtr.Zero;
-            }
-            else
-            {
-                // Fallback: call legacy OnUpdate
-                if (instance is ISystem system)
-                {
-                    World managedWorld = new(worldPtr);
-                    system.OnUpdate(managedWorld);
-                }
-                return IntPtr.Zero;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logging.LogInternal($"[ScriptHost] Error in CallSystemOnUpdateJob: {ex.Message}", LogLevel.Error);
-            return IntPtr.Zero;
-        }
-    }
     /// <summary>
     /// Call OnDestroy on a scripted system.
     /// </summary>

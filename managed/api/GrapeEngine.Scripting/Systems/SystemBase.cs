@@ -9,7 +9,6 @@
 using System.Collections.Generic;
 using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Query;
-using GrapeEngine.Scripting.Job;
 
 namespace GrapeEngine.Scripting.Systems;
 
@@ -54,7 +53,7 @@ public abstract class SystemBase : ISystem
         // Ensure the protected World property is up-to-date for derived systems
         if (World != world)
             World = world;
-        // Keep compatibility: call derived OnUpdate which may schedule jobs
+        // Call derived OnUpdate for sequential execution
         OnUpdate();
     }
 
@@ -151,25 +150,5 @@ public abstract class SystemBase : ISystem
         var q = World.Query<T1, T2, T3, T4>();
         _queryCache[key] = q;
         return q;
-    }
-
-    // ------------------------ Job helpers ------------------------
-
-    /// <summary>
-    /// Schedule an <see cref="IJob"/> through the world's JobManager.
-    /// Returns the created JobHandle.
-    /// </summary>
-    protected JobHandle Schedule(IJob job, JobHandle? dependsOn = null, int priority = 0)
-    {
-        if (World == null) throw new InvalidOperationException("World is not set");
-        return World.JobManager.Schedule(job, dependsOn, priority);
-    }
-
-    /// <summary>
-    /// Helper to complete a job handle synchronously.
-    /// </summary>
-    protected void Complete(JobHandle handle)
-    {
-        handle?.Complete();
     }
 }

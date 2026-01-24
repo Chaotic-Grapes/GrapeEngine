@@ -59,7 +59,6 @@ namespace GrapeEngine.Scripting.Systems
     /// - JIT compilation optimization
     /// - Profile-guided optimization (PGO)
     /// - SIMD vectorization
-    /// - Parallel job scheduling
     /// </summary>
     public static class SystemExecutionHelper
     {
@@ -79,8 +78,6 @@ namespace GrapeEngine.Scripting.Systems
                 throw new ArgumentNullException(nameof(system));
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
-
-            profiler ??= world.OptimizationProfiler;
 
             var systemName = system.GetType().Name;
             var profileName = $"System.{systemName}.OnUpdate";
@@ -137,7 +134,8 @@ namespace GrapeEngine.Scripting.Systems
 
             ExecuteWithProfiling(system, world);
 
-            return world.OptimizationProfiler.TryGetStats(profileName, out stats);
+            stats = default;
+            return false;
         }
 
         /// <summary>
@@ -155,27 +153,7 @@ namespace GrapeEngine.Scripting.Systems
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
 
-            var hotPaths = world.OptimizationProfiler.GetHotPaths(thresholdMs);
-            var systemPaths = hotPaths
-                .Where(p => p.MethodName.StartsWith("System.") && p.MethodName.EndsWith(".OnUpdate"))
-                .ToList();
-
-            if (systemPaths.Count == 0)
-                return Array.Empty<SystemPerformanceSummary>();
-
-            return systemPaths
-                .Select(stats => new SystemPerformanceSummary
-                {
-                    SystemName = ExtractSystemName(stats.MethodName),
-                    CallCount = stats.CallCount,
-                    AverageMs = stats.AverageMs,
-                    PeakMs = stats.PeakMs,
-                    TotalMs = stats.TotalMs,
-                    IsHotPath = stats.IsHotPath,
-                    OptimizationSuggestions = GenerateSuggestions(stats)
-                })
-                .OrderByDescending(s => s.TotalMs)
-                .ToArray();
+            return Array.Empty<SystemPerformanceSummary>();
         }
 
         /// <summary>

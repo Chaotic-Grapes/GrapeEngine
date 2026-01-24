@@ -40,8 +40,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "ecs/Signature.h"
 #include "ecs/ComponentRegistry.h"
-#include "ecs/jobs/JobManager.h"
-#include "ecs/jobs/ParallelQuery.h"
+
 #include "math/Matrix4x4.h"
 
 namespace ECS {
@@ -1006,37 +1005,7 @@ namespace ECS {
             }
         }
 
-        /**
-		 * @brief Create a parallel query for the specified component types.
-		 * 
-		 * Creates a query object that can safely iterate over entities and chunks
-		 * in parallel with component access validation.
-		 * 
-		 * @tparam Components The component types to query for
-		 * @return ParallelQuery object for safe parallel iteration
-		 * 
-		 * Example:
-		 * @code
-		 * auto query = world.CreateParallelQuery<Transform, Velocity>();
-		 * auto chunks = query.GetChunks();
-		 * @endcode
-         */
-        template<typename... Components>
-        Jobs::ParallelQuery<Components...> CreateParallelQuery() {
-            return Jobs::ParallelQuery<Components...>(this);
-        }
 
-        /**
-         * @brief Get access to the job manager for scheduling jobs.
-         * @return Reference to the job manager
-         */
-        Jobs::JobManager& GetJobManager() { return m_jobManager; }
-
-        /**
-         * @brief Get const access to the job manager.
-         * @return Const reference to the job manager
-         */
-        const Jobs::JobManager& GetJobManager() const { return m_jobManager; }
 
         /**
          * @brief Get all archetypes in the world.
@@ -1720,9 +1689,6 @@ namespace ECS {
 
         // PrefabManager for managing prefab instances and registration
         PrefabManager* m_prefabManager = nullptr;
-
-        // Job manager for parallel job execution and scheduling
-        Jobs::JobManager m_jobManager;
     };
 }
 

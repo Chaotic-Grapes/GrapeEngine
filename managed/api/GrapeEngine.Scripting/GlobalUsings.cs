@@ -14,8 +14,6 @@ global using GrapeEngine.Scripting.Services;
 global using GrapeEngine.Scripting.Systems;
 global using GrapeEngine.Scripting.Events;
 global using GrapeEngine.Scripting.Helpers;
-global using GrapeEngine.Scripting.Job;
-global using GrapeEngine.Scripting.Job.Batching;
 
 // Math & Numerics
 global using GrapeEngine.Math;

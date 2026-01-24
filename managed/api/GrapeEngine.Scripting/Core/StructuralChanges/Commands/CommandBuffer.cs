@@ -17,7 +17,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Job;
 using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 
 namespace GrapeEngine.Scripting.Core.StructuralChanges.Commands;

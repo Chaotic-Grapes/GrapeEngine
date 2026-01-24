@@ -89,9 +89,6 @@ public class World : IDisposable
     /// <returns>A new Entity instance</returns>
     public Entity CreateEntity()
     {
-        using var scope = JobManager.OptimizationProfiler.BeginProfile(
-            "World.CreateEntity",
-            OptimizationSafety.Normal);
         unsafe
         {
             ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
@@ -136,9 +133,6 @@ public class World : IDisposable
     /// <returns>A new Entity instance</returns>
     public Entity InstantiateEntity(uint archetypeId)
     {
-        using var scope = JobManager.OptimizationProfiler.BeginProfile(
-            "World.InstantiateEntity",
-            OptimizationSafety.Normal);
         unsafe
         {
             ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
@@ -454,49 +448,6 @@ public class World : IDisposable
             _eventSystem ??= new EventSystem(this);
             return _eventSystem;
         }
-    }
-
-    // ============================================================================
-    // Job System Access
-    // ============================================================================
-
-    private Job.JobManager? _jobManager;
-
-    /// <summary>
-    /// Access the job manager for this world.
-    /// Use this to schedule jobs and manage parallelized work.
-    /// </summary>
-    public Job.JobManager JobManager
-    {
-        get
-        {
-            if (_jobManager == null)
-            {
-                unsafe
-                {
-                    nint jobManagerPtr = WorldAPI.GetJobManager((void*)_nativeWorldPtr);
-                    _jobManager = new Job.JobManager(jobManagerPtr, this);
-                }
-            }
-            return _jobManager;
-        }
-    }
-
-    /// <summary>
-    /// Access the optimization profiler for this world.
-    /// Use this to profile hot paths and get optimization recommendations.
-    /// </summary>
-    public OptimizationProfiler OptimizationProfiler => JobManager.OptimizationProfiler;
-
-    /// <summary>
-    /// Get optimization recommendations for hot paths in this world.
-    /// Returns methods that exceed performance thresholds and could benefit from optimization.
-    /// </summary>
-    /// <returns>Array of optimization recommendations sorted by priority</returns>
-    public OptimizationRecommendation[] GetOptimizationRecommendations()
-    {
-        ThrowIfDisposed();
-        return [.. JobManager.OptimizationProfiler.GetRecommendations().OrderBy(r => r.Priority)];
     }
 
     // ============================================================================

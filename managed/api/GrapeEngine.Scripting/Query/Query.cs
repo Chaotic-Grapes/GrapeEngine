@@ -29,7 +29,6 @@ namespace GrapeEngine.Scripting.Query;
 /// - All query operations must be called from the main thread
 /// - Query iterators are NOT reentrant-safe - do not store iterators across iterations
 /// - Do NOT call query methods from multiple threads simultaneously
-/// - For parallelized iteration, use the Job system (IJob) with WorldAPI directly
 /// 
 /// MAXIMUM COMPONENTS SUPPORTED:
 /// This implementation supports up to 8 components per single query (Query<T1> through Query<T1..T8>).
@@ -113,7 +112,6 @@ public class Query<T1>
         OptimizationProfiler? profiler = null,
         string? queryName = null)
     {
-        profiler ??= _world.OptimizationProfiler;
         queryName ??= $"Query<{typeof(T1).Name}>";
         
         return new ProfiledQueryIterator<T1>(_world, _componentHashes, profiler, queryName);
@@ -132,7 +130,7 @@ public class Query<T1>
     /// </summary>
     public int CountWithProfiling(OptimizationProfiler? profiler = null)
     {
-        profiler ??= _world.OptimizationProfiler;
+        if (profiler == null) return Count();
         using (var scope = profiler.BeginProfile(
             $"Query<{typeof(T1).Name}>.Count",
             OptimizationSafety.Normal))
@@ -260,7 +258,6 @@ public class Query<T1, T2>
         OptimizationProfiler? profiler = null,
         string? queryName = null)
     {
-        profiler ??= _world.OptimizationProfiler;
         queryName ??= $"Query<{typeof(T1).Name},{typeof(T2).Name}>";
         
         return new ProfiledQueryIterator<T1, T2>(_world, _componentHashes, profiler, queryName);
@@ -279,7 +276,7 @@ public class Query<T1, T2>
     /// </summary>
     public int CountWithProfiling(OptimizationProfiler? profiler = null)
     {
-        profiler ??= _world.OptimizationProfiler;
+        if (profiler == null) return Count();
         using (var scope = profiler.BeginProfile(
             $"Query<{typeof(T1).Name},{typeof(T2).Name}>.Count",
             OptimizationSafety.Normal))
