@@ -47,6 +47,11 @@ MemoryManager::MemoryManager(int totalBytes)
 
 	// Create the first page node
 	MemoryPage* firstPage = (MemoryPage*)malloc(sizeof(MemoryPage));
+	if (!firstPage) {
+		std::cerr << "ERROR: Failed to allocate page metadata!" << std::endl;
+		free(memoryPool);
+		return;
+	}
 	firstPage->pageStart = memoryPool;
 	firstPage->pageSize = totalBytes;
 	firstPage->next = nullptr;
@@ -55,6 +60,12 @@ MemoryManager::MemoryManager(int totalBytes)
 	// Create the first memory block (entire pool is free initially)
 	// We need space for the MemoryBlock metadata, so allocate it using malloc
 	MemoryBlock* initialBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
+	if (!initialBlock) {
+		std::cerr << "ERROR: Failed to allocate block metadata!" << std::endl;
+		free(firstPage);
+		free(memoryPool);
+		return;
+	}
 	initialBlock->data = memoryPool;
 	initialBlock->size = totalBytes;
 	initialBlock->allocated = false;
@@ -112,6 +123,12 @@ void* MemoryManager::Allocate(int size) {
 			// Create new block representing leftover free memory
 			// Remaining block = Original size - Requested size
 			MemoryBlock* remainingBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
+			if (!remainingBlock) {
+				// Can't allocate metadata, but we can still use the whole block
+				current->allocated = true;
+				m_totalAllocated += current->size;
+				return current->data;
+			}
 			remainingBlock->data = static_cast<char*>(current->data) + size;
 			remainingBlock->size = current->size - size;
 
@@ -198,6 +215,11 @@ void MemoryManager::_extendMemoryPool() {
 
 	// Create new page metadata
 	MemoryPage* newPage = (MemoryPage*)malloc(sizeof(MemoryPage));
+	if (!newPage) {
+		std::cerr << "CRITICAL ERROR: Failed to allocate page metadata!" << std::endl;
+		free(newPageMemory);
+		return;
+	}
 	newPage->pageStart = newPageMemory;
 	newPage->pageSize = m_defaultPageSize;
 	newPage->next = nullptr;
@@ -211,6 +233,11 @@ void MemoryManager::_extendMemoryPool() {
 
 	// Create a new free block for this page
 	MemoryBlock* newBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
+	if (!newBlock) {
+		std::cerr << "CRITICAL ERROR: Failed to allocate block metadata!" << std::endl;
+		// Page is added but no block - this will leak, but prevents crash
+		return;
+	}
 	newBlock->data = newPageMemory;
 	newBlock->size = m_defaultPageSize;
 	newBlock->allocated = false;
@@ -340,6 +367,10 @@ MemoryManager& MemoryManager::GetInstance() {
 // GLOBAL NEW/DELETE OPERATOR IMPLEMENTATIONS
 // ============================================================================
 
+#ifdef _MSC_VER
+_Ret_notnull_ _Post_writable_byte_size_(size)
+#endif
+
 // Global new operator: routes all allocations through our memory manager
 void* operator new(size_t size) {
 	void* ptr = MemoryManager::GetInstance().Allocate(static_cast<int>(size));
@@ -358,6 +389,10 @@ void operator delete(void* ptr) noexcept {
 		MemoryManager::GetInstance().Deallocate(ptr);
 	}
 }
+
+#ifdef _MSC_VER
+_Ret_notnull_ _Post_writable_byte_size_(size)
+#endif
 
 // Global new[] operator for arrays
 void* operator new[](size_t size) {

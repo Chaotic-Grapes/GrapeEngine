@@ -114,11 +114,25 @@ public:
 // GLOBAL NEW/DELETE OPERATOR IMPLEMENTATIONS
 // ============================================================================
 
+/* 
+_Ret_notnull_ indicates the function never returns null (throws instead)
+_Post_writable_byte_size_ indicates  the returned memory is writable for 'size' bytes
+Wrapped in #ifdef to avoid issues on non-MSVC compilers
+*/
+#ifdef _MSC_VER
+_Ret_notnull_ _Post_writable_byte_size_(size)
+#endif
+
 // Global new operator override
 void* operator new(size_t size);
 
 // Global delete operator override
 void operator delete(void* ptr) noexcept;
+
+// Same thing for array new/delete
+#ifdef _MSC_VER
+_Ret_notnull_ _Post_writable_byte_size_(size)
+#endif
 
 // Global new[] operator override for arrays
 void* operator new[](size_t size);
