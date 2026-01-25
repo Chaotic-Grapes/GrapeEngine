@@ -3,7 +3,7 @@
 \file   AssetLibrary.h
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   3rd November 2025
+\date   11th January 2026
 
 \brief
 Declares the AssetLibrary which powers all asset browser file operations.
@@ -29,7 +29,7 @@ Provides:
 namespace ECS { class World; }
 
 // Forward declarations
-struct ImFont;  
+struct ImFont;
 class AssetBrowserPanel;            // Forward declare to use as friend
 class InspectorPanel;               // Forward declare to wire double-click open
 
@@ -54,7 +54,7 @@ private:
     // -------------------------------------------------------------------------
     // Navigation and Display
     // -------------------------------------------------------------------------
-    
+
     // This shows the breadcrumb path bar
     // It lets you click to navigate and updates selection
     void _displayBreadcrumbs(const std::string& currentPath, std::string& selectedAsset, std::string& outNewPath);
@@ -74,7 +74,7 @@ private:
     // -------------------------------------------------------------------------
     // Import Replace Delete
     // -------------------------------------------------------------------------
-    
+
     // This brings a new file into the current folder
     // It sets status text and updates selection
     void _importAsset(const std::string& currentPath, std::string& selectedAsset,
@@ -94,22 +94,9 @@ private:
     void _deleteSelectedAsset(std::string& selectedAsset, std::string& statusMessage, float& statusTimer);
 
     // -------------------------------------------------------------------------
-    // Helper Methods
-    // -------------------------------------------------------------------------
-
-    // This copies a file to both build and source asset locations
-    // Returns true on success, false on failure
-    bool _copyFileToBothLocations(const std::filesystem::path& sourcePath,
-        const std::filesystem::path& destBuildPath, bool createDirs = false);
-
-    // This deletes a file or folder from both build and source asset locations
-    // Returns true on success, false on failure
-    bool _deleteFromBothLocations(const std::filesystem::path& pathToDelete, bool isFolder);
-
-    // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
-    
+
     // Fonts used for all UI text and icons
     ImFont* m_mainFont = nullptr;
     ImFont* m_boldFont = nullptr;

@@ -76,7 +76,7 @@ public:
 
     // Default destructor
     ~ResourceManager() = default;
-    
+
     // Storage vector for cached string paths
     std::vector<std::string> ListCachedAudioPaths() const;
 
@@ -84,7 +84,7 @@ public:
     template <typename T>
     std::shared_ptr<T> Get(const std::string& name);
 
-	// Load shader from vertex and fragment paths that don't have the same base name
+    // Load shader from vertex and fragment paths that don't have the same base name
     std::shared_ptr<Shader> GetShader(const std::string& vertexPath, const std::string& fragmentPath);
 
     // Load font with specified size (allows same font at different sizes)
@@ -104,6 +104,19 @@ public:
 
     // Check if a specific asset is already cached
     bool IsAssetCached(const std::string& name) const;
+
+    // File System Operations (Editor Support)
+    // Import/add an asset file to the project (copies to assets directory)
+    bool AddAsset(const std::string& sourcePath, const std::string& destPath);
+
+    // Delete an asset file from the project (removes from disk and cache)
+    bool DeleteAsset(const std::string& assetPath);
+
+    // Replace an existing asset with a new file (keeps same path)
+    bool ReplaceAsset(const std::string& assetPath, const std::string& newSourcePath);
+
+    // Create a new empty directory
+    bool CreateDirectory(const std::string& path);
 
 private:
     // Returns reference to the appropriate cache map for type T

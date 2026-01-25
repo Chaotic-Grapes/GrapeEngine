@@ -3,7 +3,7 @@
 \file   AssetLibrary.cpp
 \author Foo Rui Qin (100%)
 \par    ruiqin.foo@digipen.edu
-\date   3rd November 2025
+\date   11th January 2026
 
 \brief
 Handles all asset browser operations.
@@ -38,7 +38,7 @@ Provides:
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
-    
+
 // Initialize the asset library with the fonts used across the editor
 // Stores font pointers so entries can mix icon and text styling
 void AssetLibrary::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
@@ -107,7 +107,7 @@ void AssetLibrary::_displayBreadcrumbs(const std::string& currentPath, std::stri
             // Restore the four color overrides (Text, Button, ButtonHovered, ButtonActive)
             ImGui::PopStyleColor(4);
             // Pop the unique ID for this button
-            ImGui::PopID();           
+            ImGui::PopID();
         }
     }
 }
@@ -276,11 +276,11 @@ void AssetLibrary::_displaySelectedFileInfo(const std::string& selectedAsset) {
 // -------------------------------------------------------------------------
 // Import Replace Delete
 // -------------------------------------------------------------------------
-    
+
 // Import a new asset into the current folder via a file dialog
 // Copies to both build/assets and ../assets for runtime and source sync
-void AssetLibrary::_importAsset(const std::string& currentPath, std::string& selectedAsset, 
-    std::string& statusMessage, float& statusTimer) 
+void AssetLibrary::_importAsset(const std::string& currentPath, std::string& selectedAsset,
+    std::string& statusMessage, float& statusTimer)
 {
 #ifdef _WIN32  // Only compile this code on Windows
     char filename[512] = "";
@@ -315,9 +315,9 @@ void AssetLibrary::_importAsset(const std::string& currentPath, std::string& sel
         auto absCur = std::filesystem::absolute(currentPath).string();
         auto absAssets = std::filesystem::absolute(assetsRoot).string();
         if (absCur.find(absAssets) != std::string::npos) {
-            // Use helper function to copy to both locations
-            if (_copyFileToBothLocations(sourcePath, destPathBuild, true)) {
-                LOG_INFO("Successfully imported to both locations: " << sourcePath.filename().string());
+            // Use ResourceManager to add the asset
+            if (RM.AddAsset(sourcePath.string(), destPathBuild.string())) {
+                LOG_INFO("Successfully imported: " << sourcePath.filename().string());
                 statusMessage = "File imported: " + sourcePath.filename().string();
                 statusTimer = 3.0f;
 
@@ -372,7 +372,7 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
     // If no extension exists, fall back to "All Files"
     // E.g. ext = ".png" -> "PNG files"
     std::string filterDesc = upperExt.empty() ? std::string("All Files") : (upperExt.substr(1) + " Files");
-    
+
     // Build the actual wildcard pattern the dialog will filter by
     // E.g. ext = ".png" -> "*.png" and ext = "" -> "*.*"
     std::string filterPattern = ext.empty() ? std::string("*.*") : ("*" + ext);
@@ -400,19 +400,14 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
             return;
         }
 
-    // Only operate when inside the project's Assets folder
-    std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();
-    auto absSel = std::filesystem::absolute(selectedAsset).string();
-    auto absAssets = std::filesystem::absolute(assetsRoot).string();
-    if (absSel.find(absAssets) != std::string::npos) {
-        // Use helper function to copy to both locations
-        if (_copyFileToBothLocations(sourcePath, destPathBuild, false)) {
-            // Hot reload: force ResourceManager to reload the texture
-            // Basically update assets while the program is running without restarting it
-            RM.UnloadAsset(selectedAsset);   // Remove old cached version
-            RM.Get<Texture>(selectedAsset);  // Load new version into cache
-
-                LOG_INFO("Successfully replaced asset in both locations: " << destPathBuild.filename().string());
+        // Only operate when inside the project's Assets folder
+        std::string assetsRoot = Engine::ProjectPaths::GetAssetsPath();
+        auto absSel = std::filesystem::absolute(selectedAsset).string();
+        auto absAssets = std::filesystem::absolute(assetsRoot).string();
+        if (absSel.find(absAssets) != std::string::npos) {
+            // Use ResourceManager to replace the asset (handles unload + reload automatically)
+            if (RM.ReplaceAsset(selectedAsset, sourcePath.string())) {
+                LOG_INFO("Successfully replaced asset: " << destPathBuild.filename().string());
                 statusMessage = "File replaced: " + destPathBuild.filename().string();
                 statusTimer = 3.0f;
             }
@@ -421,20 +416,19 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
                 statusTimer = 3.0f;
             }
         }
-    }
-    else {
-        LOG_INFO("Replace cancelled by user");
-    }
+        else {
+            LOG_INFO("Replace cancelled by user");
+        }
 
 #else
     LOG_WARNING("File dialog not implemented for this platform");
 #endif
-}
+    }
 
 // Handle a file dropped from the OS into the asset browser
 // Mirrors the import flow and selects the newly copied file
-void AssetLibrary::_handleFileDrop(const std::string& sourcePathStr, const std::string& currentPath, 
-    std::string& selectedAsset, std::string& statusMessage, float& statusTimer) 
+void AssetLibrary::_handleFileDrop(const std::string & sourcePathStr, const std::string & currentPath,
+    std::string & selectedAsset, std::string & statusMessage, float& statusTimer)
 {
     std::filesystem::path sourcePath(sourcePathStr);
 
@@ -446,8 +440,8 @@ void AssetLibrary::_handleFileDrop(const std::string& sourcePathStr, const std::
     auto absCur = std::filesystem::absolute(currentPath).string();
     auto absAssets = std::filesystem::absolute(assetsRoot).string();
     if (absCur.find(absAssets) != std::string::npos) {
-        // Use helper function to copy to both locations
-        if (_copyFileToBothLocations(sourcePath, destPathBuild, true)) {
+        // Use ResourceManager to add the asset
+        if (RM.AddAsset(sourcePath.string(), destPathBuild.string())) {
             LOG_INFO("Successfully imported dropped file to: " << currentPath);
             statusMessage = "File imported: " + sourcePath.filename().string();
             statusTimer = 3.0f;
@@ -464,8 +458,8 @@ void AssetLibrary::_handleFileDrop(const std::string& sourcePathStr, const std::
 
 // Delete the currently selected file or folder safely in both locations
 // Removes from build/assets and mirrors the deletion in ../assets
-void AssetLibrary::_deleteSelectedAsset(std::string& selectedAsset, std::string& statusMessage, 
-    float& statusTimer) 
+void AssetLibrary::_deleteSelectedAsset(std::string & selectedAsset, std::string & statusMessage,
+    float& statusTimer)
 {
     if (selectedAsset.empty()) {
         LOG_WARNING("No file or folder selected to delete");
@@ -489,8 +483,8 @@ void AssetLibrary::_deleteSelectedAsset(std::string& selectedAsset, std::string&
     auto absSel = std::filesystem::absolute(selectedAsset).string();
     auto absAssets = std::filesystem::absolute(assetsRoot).string();
     if (absSel.find(absAssets) != std::string::npos) {
-        // Use helper function to delete from both locations
-        if (_deleteFromBothLocations(selectedPath, isFolder)) {
+        // Use ResourceManager to delete the asset (handles cache cleanup automatically)
+        if (RM.DeleteAsset(selectedAsset)) {
             LOG_INFO("Deleted: " << selectedPath.filename().string());
             statusMessage = "Deleted: " + selectedPath.filename().string();
             statusTimer = 3.0f;
@@ -502,90 +496,5 @@ void AssetLibrary::_deleteSelectedAsset(std::string& selectedAsset, std::string&
             statusMessage = "Failed to delete item";
             statusTimer = 3.0f;
         }
-    }
-}
-
-// -------------------------------------------------------------------------
-// Helper Methods
-// -------------------------------------------------------------------------
-    
-// Copy a file to both build and source asset locations
-// Handles directory creation if needed and returns success status
-bool AssetLibrary::_copyFileToBothLocations(const std::filesystem::path& sourcePath,
-    const std::filesystem::path& destBuildPath, bool createDirs) 
-{
-    try {
-        // If requested, ensure the destination folder for the build asset exists
-        if (createDirs) {
-            std::filesystem::create_directories(destBuildPath.parent_path());
-        }
-
-        // First copy: write file into the build/assets (runtime)
-        std::filesystem::copy_file(sourcePath, destBuildPath,
-            std::filesystem::copy_options::overwrite_existing);
-
-        // Construct project assets path using ProjectPaths
-        std::filesystem::path assetsRoot = std::filesystem::absolute(Engine::ProjectPaths::GetAssetsPath());
-        std::filesystem::path absoluteDest = std::filesystem::absolute(destBuildPath);
-        std::filesystem::path relativePath = std::filesystem::relative(absoluteDest, assetsRoot);
-        std::filesystem::path destSourcePath = assetsRoot / relativePath;
-
-        // Ensure parent directories for the source assets exist if needed
-        if (createDirs) {
-            std::filesystem::create_directories(destSourcePath.parent_path());
-        }
-
-        // Second copy: write the file into ../assets (source): only if parent exists or we're creating dirs
-        if (!std::filesystem::equivalent(destSourcePath, destBuildPath) &&
-            (createDirs || std::filesystem::exists(destSourcePath.parent_path()))) {
-            // Allow replacing a file with the same name
-            std::filesystem::copy_file(sourcePath, destSourcePath,
-            std::filesystem::copy_options::overwrite_existing);
-        }
-
-        return true;
-    }
-    catch (const std::exception& e) {
-        LOG_ERROR("Failed to copy file to both locations: " << e.what());
-        return false;
-    }
-}
-
-// Delete a file or folder from both build and source asset locations
-// Handles both single files and recursive folder deletion
-bool AssetLibrary::_deleteFromBothLocations(const std::filesystem::path& pathToDelete, bool isFolder) {
-    try {
-        // Delete from build/assets
-        if (isFolder) {
-            // remove_all so both folder + files
-            std::filesystem::remove_all(pathToDelete);
-        }
-        else {
-            // Else, just the file itself
-            std::filesystem::remove(pathToDelete);
-        }
-
-        // Construct project assets path using ProjectPaths
-        std::filesystem::path assetsRoot = std::filesystem::absolute(Engine::ProjectPaths::GetAssetsPath());
-        std::filesystem::path absolutePath = std::filesystem::absolute(pathToDelete);
-        std::filesystem::path relativePath = std::filesystem::relative(absolutePath, assetsRoot);
-        std::filesystem::path sourcePathToDelete = assetsRoot / relativePath;
-
-        // Delete from ../assets (source) if it exists
-        if (!std::filesystem::equivalent(sourcePathToDelete, pathToDelete) && std::filesystem::exists(sourcePathToDelete)) {
-            // Same logic
-            if (isFolder) {
-                std::filesystem::remove_all(sourcePathToDelete);
-            }
-            else {
-                std::filesystem::remove(sourcePathToDelete);
-            }
-        }
-
-        return true;
-    }
-    catch (const std::exception& e) {
-        LOG_ERROR("Failed to delete from both locations: " << e.what());
-        return false;
     }
 }

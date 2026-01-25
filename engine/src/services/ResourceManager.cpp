@@ -50,6 +50,11 @@ template<>
 std::unordered_map<std::string, std::shared_ptr<PrefabData>>&
 ResourceManager::GetCacheMap<PrefabData>() { return m_prefabs; }
 
+// When T = RawData, return raw data cache
+template<>
+std::unordered_map<std::string, std::shared_ptr<RawData>>&
+ResourceManager::GetCacheMap<RawData>() { return m_rawData; }
+
 // Generic Get function: handles caching logic for all asset types
 template<typename T>std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
     // Get reference to appropriate cache (m_textures or m_audioFiles)
@@ -85,6 +90,7 @@ template GRAPEENGINE_API std::shared_ptr<AudioData> ResourceManager::Get<AudioDa
 template GRAPEENGINE_API std::shared_ptr<Font> ResourceManager::Get<Font>(const std::string&);
 template GRAPEENGINE_API std::shared_ptr<Shader> ResourceManager::Get<Shader>(const std::string&);
 template GRAPEENGINE_API std::shared_ptr<PrefabData> ResourceManager::Get<PrefabData>(const std::string&);
+template GRAPEENGINE_API std::shared_ptr<RawData> ResourceManager::Get<RawData>(const std::string&);
 
 // Loading function for textures
 template<>std::shared_ptr<Texture> ResourceManager::Load<Texture>(const std::string& filePath) {
@@ -106,7 +112,7 @@ template<>std::shared_ptr<Texture> ResourceManager::Load<Texture>(const std::str
         }
 
         // Successful: send success message
-        Messaging::MessageSystem::Notify(Messaging::ResourceLoaded{filePath, "Texture", true});
+        Messaging::MessageSystem::Notify(Messaging::ResourceLoaded{ filePath, "Texture", true });
         return texture;
     }
     catch (const std::exception& e) {
@@ -374,6 +380,7 @@ void ResourceManager::ClearCache() {
     m_fonts.clear();
     m_shaders.clear();
     m_prefabs.clear();
+    m_rawData.clear();
     LOG_INFO("Cleared all cached assets");
 }
 
@@ -388,22 +395,23 @@ void ResourceManager::UnloadAsset(const std::string& name) {
 
     // Try to remove from all caches
     removed |= m_audioFiles.erase(name) > 0;
-    
+
     // Fonts use composite key (name:size), so we must iterate
     for (auto it = m_fonts.begin(); it != m_fonts.end(); ) {
         // Check if key starts with "name:"
         if (it->first.find(name + ":") == 0) {
             it = m_fonts.erase(it);
             removed = true;
-        } else {
+        }
+        else {
             ++it;
         }
     }
     // Also try direct match (just in case)
     removed |= m_fonts.erase(name) > 0;
-
     removed |= m_shaders.erase(name) > 0;
     removed |= m_prefabs.erase(name) > 0;
+    removed |= m_rawData.erase(name) > 0;
 
     if (removed) {
         LOG_INFO("Unloaded asset: " << name);
@@ -415,7 +423,7 @@ void ResourceManager::UnloadAsset(const std::string& name) {
 
 // Get total number of cached assets
 size_t ResourceManager::GetCacheSize() const {
-    return m_textures.size() + m_audioFiles.size() + m_fonts.size() + m_shaders.size() + m_prefabs.size();
+    return m_textures.size() + m_audioFiles.size() + m_fonts.size() + m_shaders.size() + m_prefabs.size() + m_rawData.size();
 }
 
 // Get cache info broken down by type
@@ -426,6 +434,7 @@ void ResourceManager::PrintCacheInfo() const {
     LOG_INFO("Fonts: " << m_fonts.size());
     LOG_INFO("Shaders: " << m_shaders.size());
     LOG_INFO("Prefabs: " << m_prefabs.size());
+    LOG_INFO("Raw data: " << m_rawData.size());
     LOG_INFO("Total assets: " << GetCacheSize());
 }
 
@@ -447,7 +456,134 @@ bool ResourceManager::IsAssetCached(const std::string& name) const {
         (m_audioFiles.find(name) != m_audioFiles.end()) ||
         (m_fonts.find(name) != m_fonts.end()) ||
         (m_shaders.find(name) != m_shaders.end()) ||
-        (m_prefabs.find(name) != m_prefabs.end());
+        (m_prefabs.find(name) != m_prefabs.end()) ||
+        (m_rawData.find(name) != m_rawData.end());
+}
+
+// Import/add an asset file to the project
+bool ResourceManager::AddAsset(const std::string& sourcePath, const std::string& destPath) {
+    try {
+        // Validate source file/directory exists
+        if (!std::filesystem::exists(sourcePath)) {
+            LOG_ERROR("Source file not found: " << sourcePath);
+            return false;
+        }
+
+        // Create destination directories if needed
+        std::filesystem::path destPathObj(destPath);
+        if (destPathObj.has_parent_path()) {
+            std::filesystem::create_directories(destPathObj.parent_path());
+        }
+
+        // Handle directories vs files
+        if (std::filesystem::is_directory(sourcePath)) {
+            // Copy entire directory recursively
+            std::filesystem::copy(sourcePath, destPath,
+                std::filesystem::copy_options::overwrite_existing |
+                std::filesystem::copy_options::recursive);
+        }
+        else {
+            // Copy single file
+            std::filesystem::copy_file(sourcePath, destPath,
+                std::filesystem::copy_options::overwrite_existing);
+        }
+
+        LOG_INFO("Added asset: " << destPath);
+        return true;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Failed to add asset " << destPath << ": " << e.what());
+        return false;
+    }
+}
+
+// Delete an asset file from the project
+bool ResourceManager::DeleteAsset(const std::string& assetPath) {
+    try {
+        // Remove from cache first
+        UnloadAsset(assetPath);
+
+        // Check if file/folder exists
+        if (!std::filesystem::exists(assetPath)) {
+            LOG_WARNING("Asset not found: " << assetPath);
+            return false;
+        }
+
+        // Delete from filesystem
+        if (std::filesystem::is_directory(assetPath)) {
+            std::filesystem::remove_all(assetPath);
+        }
+        else {
+            std::filesystem::remove(assetPath);
+        }
+
+        LOG_INFO("Deleted asset: " << assetPath);
+        return true;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Failed to delete asset " << assetPath << ": " << e.what());
+        return false;
+    }
+}
+
+// Replace an existing asset with a new file
+bool ResourceManager::ReplaceAsset(const std::string& assetPath, const std::string& newSourcePath) {
+    try {
+        // Validate source file exists
+        if (!std::filesystem::exists(newSourcePath)) {
+            LOG_ERROR("Source file not found: " << newSourcePath);
+            return false;
+        }
+
+        // Unload from cache before replacing
+        UnloadAsset(assetPath);
+
+        // Replace file
+        std::filesystem::copy_file(newSourcePath, assetPath,
+            std::filesystem::copy_options::overwrite_existing);
+
+        // Reload into cache (determine type by extension)
+        std::string ext = std::filesystem::path(assetPath).extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tga") {
+            Get<Texture>(assetPath);
+        }
+        else if (ext == ".wav" || ext == ".mp3" || ext == ".ogg" || ext == ".flac" || ext == ".m4a" || ext == ".aac") {
+            Get<AudioData>(assetPath);
+        }
+        else if (ext == ".ttf" || ext == ".otf") {
+            Get<Font>(assetPath);
+        }
+        else if (ext == ".prefab") {
+            Get<PrefabData>(assetPath);
+        }
+
+        LOG_INFO("Replaced asset: " << assetPath);
+        return true;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Failed to replace asset " << assetPath << ": " << e.what());
+        return false;
+    }
+}
+
+// Create a new empty directory
+bool ResourceManager::CreateDirectory(const std::string& path) {
+    try {
+        if (std::filesystem::exists(path)) {
+            LOG_WARNING("Directory already exists: " << path);
+            return true; // Not an error if it already exists
+        }
+
+        std::filesystem::create_directories(path);
+        LOG_INFO("Created directory: " << path);
+        return true;
+    }
+    catch (const std::exception& e) {
+        LOG_ERROR("Failed to create directory " << path << ": " << e.what());
+        return false;
+    }
 }
 
 // Define the global ResourceManager instance
