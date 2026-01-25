@@ -17,6 +17,7 @@ Implements the custom MemoryManager class for efficient memory allocation.
 /* End Header *******************************************************************/
 
 #include "services/MemoryManager.h"
+#include "core/Logger.h"
 #include <cstdlib> 
 
 // ============================================================================
@@ -41,14 +42,14 @@ MemoryManager::MemoryManager(int totalBytes)
 	void* memoryPool = malloc(totalBytes);
 
 	if (!memoryPool) {
-		std::cerr << "ERROR: Failed to allocate initial memory pool!" << std::endl;
+		LOG_CRITICAL("MemoryManager: Failed to allocate initial memory pool of " << totalBytes << " bytes.");
 		return;
 	}
 
 	// Create the first page node
 	MemoryPage* firstPage = (MemoryPage*)malloc(sizeof(MemoryPage));
 	if (!firstPage) {
-		std::cerr << "ERROR: Failed to allocate page metadata!" << std::endl;
+		LOG_CRITICAL("MemoryManager: Failed to allocate page metadata.");
 		free(memoryPool);
 		return;
 	}
@@ -61,7 +62,7 @@ MemoryManager::MemoryManager(int totalBytes)
 	// We need space for the MemoryBlock metadata, so allocate it using malloc
 	MemoryBlock* initialBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
 	if (!initialBlock) {
-		std::cerr << "ERROR: Failed to allocate block metadata!" << std::endl;
+		LOG_CRITICAL("MemoryManager: Failed to allocate block metadata.");
 		free(firstPage);
 		free(memoryPool);
 		return;
@@ -107,7 +108,7 @@ void* MemoryManager::Allocate(int size) {
 	while (current != nullptr) {
 		// Check if this block is free and large enough
 		if (!current->allocated && current->size >= size) {
-			// Found a suitable block!
+			// Found a suitable block
 
 			// If the block is the right size, allocate it directly
 			if (current->size == size) {
@@ -158,9 +159,9 @@ void* MemoryManager::Allocate(int size) {
 		current = current->next;
 	}
 
-	// On failure (no suitable block found) - need to extend memory pool
-	std::cout << "WARNING: Out of memory! Extending memory pool by "
-		<< m_defaultPageSize << " bytes..." << std::endl;
+	// On failure (no suitable block found): need to extend memory pool
+	LOG_WARNING("MemoryManager: Out of memory! Extending pool by " << m_defaultPageSize 
+		<< " bytes (" << (m_defaultPageSize / 1024) << " KB)");
 
 	_extendMemoryPool();
 
@@ -197,7 +198,7 @@ void MemoryManager::Deallocate(void* ptr) {
 	}
 
 	// If block not found, do nothing (or warn)
-	std::cerr << "WARNING: Attempted to deallocate invalid pointer!" << std::endl;
+	LOG_WARNING("MemoryManager: Attempted to deallocate invalid pointer.");
 }
 
 // ============================================================================
@@ -209,14 +210,14 @@ void MemoryManager::_extendMemoryPool() {
 	void* newPageMemory = malloc(m_defaultPageSize);
 
 	if (!newPageMemory) {
-		std::cerr << "CRITICAL ERROR: Failed to extend memory pool!" << std::endl;
+		LOG_CRITICAL("MemoryManager: Failed to extend memory pool.");
 		return;
 	}
 
 	// Create new page metadata
 	MemoryPage* newPage = (MemoryPage*)malloc(sizeof(MemoryPage));
 	if (!newPage) {
-		std::cerr << "CRITICAL ERROR: Failed to allocate page metadata!" << std::endl;
+		LOG_CRITICAL("MemoryManager: Failed to allocate page metadata.");
 		free(newPageMemory);
 		return;
 	}
@@ -234,8 +235,8 @@ void MemoryManager::_extendMemoryPool() {
 	// Create a new free block for this page
 	MemoryBlock* newBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
 	if (!newBlock) {
-		std::cerr << "CRITICAL ERROR: Failed to allocate block metadata!" << std::endl;
-		// Page is added but no block - this will leak, but prevents crash
+		LOG_CRITICAL("MemoryManager: Failed to allocate block metadata.");
+		// Page is added but no block: this will leak, but prevents crash
 		return;
 	}
 	newBlock->data = newPageMemory;
@@ -252,8 +253,8 @@ void MemoryManager::_extendMemoryPool() {
 	currentBlock->next = newBlock;
 	newBlock->prev = currentBlock;
 
-	std::cout << "Memory pool extended successfully! New page added: "
-		<< m_defaultPageSize << " bytes" << std::endl;
+	LOG_INFO("MemoryManager: Pool extended! New page added: " << m_defaultPageSize 
+		<< " bytes (" << (m_defaultPageSize / 1024) << " KB)");
 }
 
 // ============================================================================
@@ -269,7 +270,7 @@ void MemoryManager::_mergeAdjacentFreeBlocks(MemoryBlock* block) {
 		void* expectedNextStart = static_cast<char*>(block->data) + block->size;
 
 		if (expectedNextStart == block->next->data) {
-			// Blocks are adjacent - merge them!
+			// Blocks are adjacent: merge them
 			MemoryBlock* nextBlock = block->next;
 
 			// Merge sizes
@@ -291,7 +292,7 @@ void MemoryManager::_mergeAdjacentFreeBlocks(MemoryBlock* block) {
 		void* expectedCurrentStart = static_cast<char*>(block->prev->data) + block->prev->size;
 
 		if (expectedCurrentStart == block->data) {
-			// Blocks are adjacent - merge them!
+			// Blocks are adjacent: merge them
 			MemoryBlock* prevBlock = block->prev;
 
 			// Merge sizes
@@ -376,7 +377,7 @@ void* operator new(size_t size) {
 	void* ptr = MemoryManager::GetInstance().Allocate(static_cast<int>(size));
 
 	if (!ptr) {
-		std::cerr << "ERROR: Global new failed to allocate " << size << " bytes!" << std::endl;
+		LOG_CRITICAL("MemoryManager: Global new failed to allocate " << size << " bytes.");
 		throw std::bad_alloc();
 	}
 
@@ -399,7 +400,7 @@ void* operator new[](size_t size) {
 	void* ptr = MemoryManager::GetInstance().Allocate(static_cast<int>(size));
 
 	if (!ptr) {
-		std::cerr << "ERROR: Global new[] failed to allocate " << size << " bytes!" << std::endl;
+		LOG_CRITICAL("MemoryManager: Global new[] failed to allocate " << size << " bytes.");
 		throw std::bad_alloc();
 	}
 
