@@ -14,7 +14,7 @@ Provides:
 - Dynamic memory page extension when running out of memory
 - Global new/delete operator overloading for automatic memory management
 - Fragmentation reduction through adjacent block merging
-- Debugging support via dump() function
+- Debugging support via Dump() function
 */
 /* End Header *******************************************************************/
 
@@ -52,11 +52,11 @@ private:
 		MemoryPage(void* start, int size);
 	};
 
-	MemoryBlock* blockListHead;   // Head of the memory block linked list
-	MemoryPage* pageListHead;     // Head of the memory page linked list
-	int defaultPageSize;          // Size of each memory page
-	int totalAllocated;           // Total bytes allocated
-	int totalFreed;               // Total bytes freed
+	MemoryBlock* m_blockListHead;   // Head of the memory block linked list
+	MemoryPage* m_pageListHead;     // Head of the memory page linked list
+	int m_defaultPageSize;          // Size of each memory page
+	int m_totalAllocated;           // Total bytes allocated
+	int m_totalFreed;               // Total bytes freed
 
 	// ============================================================================
 	// MEMORY POOL EXTENSION
@@ -64,14 +64,14 @@ private:
 
 	// Creates a new memory page and adds it to the page list
 	// Called when running out of pre-allocated memory
-	void extendMemoryPool();
+	void _extendMemoryPool();
 
 	// ============================================================================
 	// FRAGMENTATION MANAGEMENT
 	// ============================================================================
 
 	// Merges adjacent free blocks to reduce fragmentation
-	void mergeAdjacentFreeBlocks(MemoryBlock* block);
+	void _mergeAdjacentFreeBlocks(MemoryBlock* block);
 
 public:
 	// ============================================================================
@@ -89,25 +89,25 @@ public:
 	// ============================================================================
 
 	// Allocates a block of memory from the pool using first-fit strategy
-	void* allocate(int size);
+	void* Allocate(int size);
 
 	// Deallocates a previously allocated block
 	// Merges with adjacent free blocks to reduce fragmentation
-	void deallocate(void* ptr);
+	void Deallocate(void* ptr);
 
 	// ============================================================================
 	// DEBUGGING AND UTILITY
 	// ============================================================================
 
 	// Dumps the current state of the memory manager
-	void dump(std::ostream& os);
+	void Dump(std::ostream& os);
 
 	// ============================================================================
 	// SINGLETON PATTERN
 	// ============================================================================
-	
+
 	// Returns singleton instance of the memory manager
-	static MemoryManager& getInstance();
+	static MemoryManager& GetInstance();
 };
 
 // ============================================================================
