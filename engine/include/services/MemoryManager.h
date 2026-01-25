@@ -1,3 +1,23 @@
+/* Start Header *****************************************************************/
+/*!
+\file   MemoryManager.h
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   25th January 2026
+\brief
+Declares the custom MemoryManager class for efficient game object memory allocation.
+Provides:
+- Pre-allocated memory pool using memory pages
+- Free linked list for efficient memory block management
+- No STL containers (manual doubly-linked list implementation)
+- Placement new support for object construction in pre-allocated memory
+- Dynamic memory page extension when running out of memory
+- Global new/delete operator overloading for automatic memory management
+- Fragmentation reduction through adjacent block merging
+- Debugging support via dump() function
+*/
+/* End Header *******************************************************************/
+
 #ifndef MEMORY_MANAGER_H
 #define MEMORY_MANAGER_H
 
@@ -6,6 +26,10 @@
 
 class MemoryManager {
 private:
+	// ============================================================================
+	// CONSTRUCTORS
+	// ============================================================================
+
 	// Memory block node: represents a single block in the free linked list
 	// Used to track both allocated and free memory regions
 	struct MemoryBlock {
@@ -34,19 +58,35 @@ private:
 	int totalAllocated;           // Total bytes allocated
 	int totalFreed;               // Total bytes freed
 
+	// ============================================================================
+	// MEMORY POOL EXTENSION
+	// ============================================================================
+
 	// Creates a new memory page and adds it to the page list
 	// Called when running out of pre-allocated memory
 	void extendMemoryPool();
+
+	// ============================================================================
+	// FRAGMENTATION MANAGEMENT
+	// ============================================================================
 
 	// Merges adjacent free blocks to reduce fragmentation
 	void mergeAdjacentFreeBlocks(MemoryBlock* block);
 
 public:
+	// ============================================================================
+	// MEMORY MANAGER IMPLEMENTATION
+	// ============================================================================
+
 	// Initializes memory manager with initial pool size
 	MemoryManager(int totalBytes);
 
 	// Destructor: frees all memory pages
 	~MemoryManager();
+
+	// ============================================================================
+	// ALLOCATION AND DEALLOCATION
+	// ============================================================================
 
 	// Allocates a block of memory from the pool using first-fit strategy
 	void* allocate(int size);
@@ -55,15 +95,23 @@ public:
 	// Merges with adjacent free blocks to reduce fragmentation
 	void deallocate(void* ptr);
 
+	// ============================================================================
+	// DEBUGGING AND UTILITY
+	// ============================================================================
+
 	// Dumps the current state of the memory manager
 	void dump(std::ostream& os);
 
+	// ============================================================================
+	// SINGLETON PATTERN
+	// ============================================================================
+	
 	// Returns singleton instance of the memory manager
 	static MemoryManager& getInstance();
 };
 
 // ============================================================================
-// GLOBAL NEW/DELETE OPERATOR OVERLOADING
+// GLOBAL NEW/DELETE OPERATOR IMPLEMENTATIONS
 // ============================================================================
 
 // Global new operator override

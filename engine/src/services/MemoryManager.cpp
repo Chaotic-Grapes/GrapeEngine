@@ -1,3 +1,21 @@
+/* Start Header *****************************************************************/
+/*!
+\file   MemoryManager.cpp
+\author Foo Rui Qin (100%)
+\par    ruiqin.foo@digipen.edu
+\date   25th January 2026
+\brief
+Implements the custom MemoryManager class for efficient memory allocation.
+- Uses manual doubly-linked list (no STL containers)
+- Metadata (MemoryBlock, MemoryPage structs) allocated with malloc
+- Actual memory pools allocated with malloc at load/runtime
+- First-fit strategy: Finds first free block large enough
+- Block splitting: Divides blocks when larger than requested
+- Adjacent merging: Combines neighboring free blocks
+- Singleton pattern: Single global instance for entire game
+*/
+/* End Header *******************************************************************/
+
 #include "services/MemoryManager.h"
 #include <cstdlib> 
 
