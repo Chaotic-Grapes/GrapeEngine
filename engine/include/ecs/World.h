@@ -1045,6 +1045,54 @@ namespace ECS {
         }
 
         /**
+         * @brief Remove a specific component type from all entities that have it.
+         * @param componentId The component type ID to remove
+         * 
+         * This is a bulk operation that iterates through all entities in the world
+         * and removes the specified component from any entity that has it.
+         * 
+         * Useful for hot reload scenarios where a component type is no longer valid
+         * and must be removed from all entities before new definitions are registered.
+         * 
+         * @note This operation calls _onComponentRemoving hooks for each entity.
+         * @note The operation is relatively expensive as it iterates all entities.
+         */
+        void RemoveComponentFromAllEntities(ComponentTypeId componentId) {
+            // Collect all entities that have this component
+            // We collect first to avoid invalidating iterators during removal
+            std::vector<Entity> entitiesToUpdate;
+            
+            // Iterate all archetypes to find those that contain this component
+            for (const auto& kv : m_archetypes) {
+                const auto& archPtr = kv.second;
+                if (!archPtr) continue;
+                
+                Archetype* arch = archPtr.get();
+                if (!arch->Has(componentId)) {
+                    continue; // Skip archetypes that don't have this component
+                }
+                
+                // Collect all entities from this archetype
+                const uint32_t chunkCount = arch->GetChunkCount();
+                for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                    Chunk* ch = arch->GetChunk(ci);
+                    const uint32_t count = ch->Count();
+                    for (uint32_t i = 0; i < count; ++i) {
+                        const Entity ent = ch->GetEntity(i);
+                        if (!ent.IsNull()) {
+                            entitiesToUpdate.push_back(ent);
+                        }
+                    }
+                }
+            }
+            
+            // Now remove the component from all collected entities
+            for (const Entity& ent : entitiesToUpdate) {
+                RemoveById(ent, componentId);
+            }
+        }
+
+        /**
 		 * @brief Attach a child entity to a parent entity in the hierarchy.
 		 * @param child The child entity to attach
 		 * @param parent The parent entity to which the child will be attached

@@ -25,16 +25,11 @@ internal static class RoslynCompiler
     // choose how to present them (UI can enumerate, logs can summarize).
     private static readonly List<string> _lastDiagnosticsList = [];
     
-    // Store the path to the last compiled assembly (may be versioned)
-    private static string _lastCompiledAssemblyPath = "";
+    // Store the temporary assembly path after compilation (C++ moves it after unload)
+    private static string _lastCompiledTempAssemblyPath = "";
     
     // Store the last compiled PDB bytes for retrieval
     private static byte[]? _lastCompiledPdbBytes = null;
-    
-    // Track compilation count: 0 = initial/boot compilation, 1+ = hot reload
-    // First compilation writes to GameScripts.dll directly
-    // Subsequent compilations write to GameScripts_hotreload_N.dll for hot reload safety
-    private static int _compilationCount = 0;
 
     public static int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath, IEnumerable<string>? references = null)
     {
@@ -79,18 +74,18 @@ internal static class RoslynCompiler
             // Default references: mscorlib, System, System.Core, netstandard and current ScriptHost assembly
             var refs = new List<MetadataReference>();
 
-            // Add commonly available references
+            // Add all trusted platform assemblies to ensure all system types are available
+            // (List<>, Dictionary<>, etc. from System.Collections.Generic are critical)
             var trustedAssemblies = (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string)?.Split(Path.PathSeparator) ?? [];
             foreach (var asmPath in trustedAssemblies)
             {
-                var name = Path.GetFileName(asmPath);
-                if (name.StartsWith("System") || name.StartsWith("mscorlib") || name.StartsWith("netstandard") || name.StartsWith("Microsoft.CSharp") || name.StartsWith("System.Private.CoreLib"))
+                try
                 {
-                    try
-                    {
-                        refs.Add(MetadataReference.CreateFromFile(asmPath));
-                    }
-                    catch { }
+                    refs.Add(MetadataReference.CreateFromFile(asmPath));
+                }
+                catch 
+                { 
+                    // Skip any assemblies that can't be loaded
                 }
             }
 
@@ -176,76 +171,30 @@ internal static class RoslynCompiler
                     // Store PDB bytes for retrieval
                     _lastCompiledPdbBytes = pdbBytes.Length > 0 ? pdbBytes : null;
                     
-                    string finalAssemblyPath;
+                    // Write to output assembly path directly
+                    // (C++ handles temp→final moves during hot reload if needed)
+                    Logging.LogInternal($"[RoslynCompiler] Writing assembly to: {outputAssemblyPath}", LogLevel.Info);
                     
-                    // First compilation (count=0): write directly to GameScripts.dll
-                    // Subsequent compilations (count>0): use versioned names for hot reload safety
-                    if (_compilationCount == 0)
+                    File.WriteAllBytes(outputAssemblyPath, bytes);
+                    Logging.LogInternal($"[RoslynCompiler] Wrote assembly: {outputAssemblyPath}", LogLevel.Info);
+                    
+                    // Write PDB alongside the assembly
+                    if (pdbBytes is { Length: > 0 })
                     {
-                        // Initial boot compilation - write directly to the original path
-                        Logging.LogInternal($"[RoslynCompiler] First compilation (boot) - writing directly to: {outputAssemblyPath}", LogLevel.Info);
-                        
-                        // Ensure the output directory exists
-                        var dir = Path.GetDirectoryName(outputAssemblyPath) ?? "";
-                        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                        var pdbPath = Path.ChangeExtension(outputAssemblyPath, ".pdb");
+                        try
                         {
-                            Directory.CreateDirectory(dir);
+                            File.WriteAllBytes(pdbPath, pdbBytes);
+                            Logging.LogInternal($"[RoslynCompiler] Wrote PDB: {pdbPath}", LogLevel.Debug);
                         }
-                        
-                        // Write DLL directly to the original path
-                        File.WriteAllBytes(outputAssemblyPath, bytes);
-                        Logging.LogInternal($"[RoslynCompiler] Wrote initial assembly: {outputAssemblyPath}", LogLevel.Info);
-                        
-                        // Write PDB if provided
-                        if (pdbBytes is { Length: > 0 })
+                        catch (Exception pdbEx)
                         {
-                            var pdbPath = Path.ChangeExtension(outputAssemblyPath, ".pdb");
-                            try
-                            {
-                                File.WriteAllBytes(pdbPath, pdbBytes);
-                                Logging.LogInternal($"[RoslynCompiler] Wrote PDB: {pdbPath}", LogLevel.Debug);
-                            }
-                            catch (Exception pdbEx)
-                            {
-                                Logging.LogInternal($"[RoslynCompiler] Warning: Failed to write PDB: {pdbEx.Message}", LogLevel.Warning);
-                            }
+                            Logging.LogInternal($"[RoslynCompiler] Warning: Failed to write PDB: {pdbEx.Message}", LogLevel.Warning);
                         }
-                        
-                        finalAssemblyPath = outputAssemblyPath;
-                    }
-                    else
-                    {
-                        // Hot reload compilation (count>0): use versioned assembly loading
-                        // Create GameScripts_hotreload_1.dll, GameScripts_hotreload_2.dll, etc.
-                        // This avoids file-locking issues when unloading old versions.
-                        Logging.LogInternal($"[RoslynCompiler] Hot reload compilation (count={_compilationCount}) - using versioned path", LogLevel.Info);
-                        
-                        var versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes, pdbBytes);
-                        
-                        if (versionedPath == null)
-                        {
-                            _lastDiagnosticsList.Clear();
-                            var errMsg = $"Failed to write versioned assembly {outputAssemblyPath}.\nCheck AssemblyManager logs for details.";
-                            _lastDiagnosticsList.Add(errMsg);
-                            try 
-                            {
-                                Logging.Log(errMsg, LogLevel.Error);
-                            }
-                            catch { }
-                            return -1;
-                        }
-                        
-                        finalAssemblyPath = versionedPath;
                     }
                     
-                    // Increment compilation counter after successful write
-                    _compilationCount++;
-                    
-                    // Update the output path to point to the actual assembly
-                    // The caller (TriggerCompileAndReloadManaged) will use this path to load the new version
-                    // Note: GrapeEngine.Scripting copy is now handled in native code (EditorMain.cpp) on startup
-                    // Store the actual path (either original or versioned) for retrieval by the caller
-                    _lastCompiledAssemblyPath = finalAssemblyPath;
+                    // Store the actual path for retrieval (same as output path)
+                    _lastCompiledTempAssemblyPath = outputAssemblyPath;
                 }
                 catch (Exception ex)
                 {
@@ -279,9 +228,9 @@ internal static class RoslynCompiler
         }
     }
 
-    public static string GetLastCompiledAssemblyPath()
+    public static string GetLastCompiledTempAssemblyPath()
     {
-        return _lastCompiledAssemblyPath;
+        return _lastCompiledTempAssemblyPath;
     }
 
     public static string GetLastDiagnostics()
@@ -303,7 +252,6 @@ internal static class RoslynCompiler
         return _lastDiagnosticsList[index];
     }
 
-    
     public static byte[]? GetLastCompiledPdbBytes()
     {
         return _lastCompiledPdbBytes;

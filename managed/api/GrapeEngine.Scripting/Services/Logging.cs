@@ -81,6 +81,24 @@ internal static class Logging
         }
     }
 
+    /// <summary>
+    /// Clear the log buffer and reset state.
+    /// Called during assembly unload to break references that might prevent GC.
+    /// </summary>
+    internal static void ClearBuffer()
+    {
+        try
+        {
+            _logBuffer.Clear();
+            _lastLogLevel = LogLevel.Info;
+            LogInternal("[Logging] Cleared log buffer before assembly unload", LogLevel.Info);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error clearing log buffer: {ex.Message}");
+        }
+    }
+
     private static void FlushBuffer(LogLevel level)
     {
         if (_logBuffer.Length == 0)

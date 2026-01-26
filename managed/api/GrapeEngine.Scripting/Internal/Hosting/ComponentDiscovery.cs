@@ -43,9 +43,10 @@ internal static class ComponentDiscovery
     /// </summary>
     public static void DiscoverAndRegisterAll()
     {
-        // Clear the registration cache to allow re-registration of modified component types
-        // This is REQUIRED for hot reload to work otherwise modified components won't be re-registered
-        ComponentRegistry.ClearRegistrationCache();
+        // NOTE: Do NOT clear the registration cache here!
+        // It must be cleared AFTER ClearAllManagedComponentsFromEntities() completes,
+        // so that component removal can still find the old component hashes/IDs.
+        // The cache will be cleared by the caller after component cleanup.
 
         var components = DiscoverComponents();
         Logging.LogInternal($"[ComponentDiscovery] Found {components.Count} component types", LogLevel.Info);
@@ -282,6 +283,27 @@ internal static class ComponentDiscovery
 
         // Include everything else (user scripts)
         return true;
+    }
+
+    /// <summary>
+    /// Clear all cached component type mappings.
+    /// Called during assembly unload to break references to types from the loaded assembly.
+    /// </summary>
+    public static void ClearTypeCache()
+    {
+        try
+        {
+            int count = TypeHashToType.Count;
+            TypeHashToType.Clear();
+            if (count > 0)
+            {
+                Logging.LogInternal($"[ComponentDiscovery] Cleared {count} component type cache entries", LogLevel.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentDiscovery] Error clearing type cache: {ex.Message}", LogLevel.Error);
+        }
     }
 
 }

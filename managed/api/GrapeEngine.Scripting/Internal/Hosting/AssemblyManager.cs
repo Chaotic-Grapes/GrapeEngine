@@ -190,32 +190,60 @@ internal static class AssemblyManager
 
             Logging.LogInternal($"[AssemblyManager] Unloading assembly: {trackingKey}", LogLevel.Info);
 
-            // Remove strong references first; otherwise the collectible ALC cannot be collected.
-            s_loadedAssemblies.Remove(trackingKey);
+            // Remove strong references COMPLETELY from the dictionary.
+            // Dictionary.Remove() doesn't deallocate the Entry[] backing array - it just marks as deleted.
+            // We need to clear the ENTIRE dictionary to force deallocation of the Entry[] array,
+            // which was holding a strong reference to the Assembly and LoadContext.
+            // This is CRITICAL for the AssemblyLoadContext to be garbage collected.
+            int countBefore = s_loadedAssemblies.Count;
+            s_loadedAssemblies.Clear();
+            Logging.LogInternal($"[AssemblyManager] Cleared {countBefore} entries from loaded assemblies dictionary", LogLevel.Debug);
 
             WeakReference? weakRef = null;
             if (loadContext != null)
             {
                 weakRef = new WeakReference(loadContext);
-                loadContext.Unload();
+                
+                // Unload the load context to release the AssemblyDependencyResolver
+                try
+                {
+                    loadContext.Unload();
+                    // Give the unload request a moment to propagate
+                    System.Threading.Thread.Sleep(100);
+                }
+                catch (Exception ex)
+                {
+                    Logging.LogInternal($"[AssemblyManager] Error during Unload/Dispose: {ex.Message}", LogLevel.Debug);
+                }
             }
 
             // Force GC to complete finalization and allow the ALC to unload.
-            for (int i = 0; i < 8; i++)
+            // Increased iterations and sleep time to handle cached references from World wrappers
+            // and other assembly types. CoreCLR finalizers are asynchronous.
+            for (int i = 0; i < 10; i++)
             {
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
 
                 if (weakRef == null || !weakRef.IsAlive)
+                {
+                    Logging.LogInternal($"[AssemblyManager] Assembly unloaded successfully on iteration {i}: {trackingKey}", LogLevel.Info);
                     break;
+                }
 
-                System.Threading.Thread.Sleep(10);
+                // Increased from 10ms to 50ms per iteration for more time for async finalizers
+                // Total max time: 500ms (10 iterations × 50ms)
+                System.Threading.Thread.Sleep(50);
             }
 
             if (weakRef != null && weakRef.IsAlive)
             {
-                Logging.LogInternal($"[AssemblyManager] Warning: Load context still alive after unload attempts for {trackingKey}", LogLevel.Warning);
+                Logging.LogInternal($"[AssemblyManager] ERROR: Load context still alive after all unload attempts for {trackingKey}", LogLevel.Error);
+            }
+            else
+            {
+                Logging.LogInternal($"[AssemblyManager] Confirmed: Assembly AssemblyLoadContext collected and unloaded: {trackingKey}", LogLevel.Info);
             }
 
             Logging.LogInternal($"[AssemblyManager] Unloaded: {assembly.FullName}", LogLevel.Info);

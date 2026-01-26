@@ -128,23 +128,22 @@ namespace ECS {
         bool LoadAssembly(const std::string& assemblyPath);
 
         /**
-         * @brief Unload a previously loaded assembly.
-         * @param assemblyPath Path to the assembly to unload
+         * @brief Unload the currently loaded script assembly.
          * @return true if unloaded successfully
          * 
          * Note: This will destroy all systems from that assembly.
-         * For hot reload, use ReloadAssembly() instead.
+         * Single-assembly model enforcement: only one gameplay assembly can be loaded at a time.
          */
-        bool UnloadAssembly(const std::string& assemblyPath);
+        bool UnloadScriptAssembly();
 
         /**
-         * @brief Reload an assembly for hot reload support.
-         * @param assemblyPath Path to the assembly to reload
-         * @return true if reloaded successfully
+         * @brief Set the current world for hot reload operations.
+         * @param world Pointer to the ECS World
          * 
-         * Preserves system state where possible during reload.
+         * Must be called before UnloadScriptAssembly() during hot reload.
+         * This allows the C# side to clear managed components from entities before unloading.
          */
-        bool ReloadAssembly(const std::string& assemblyPath);
+        void SetCurrentWorldForHotReload(World* world);
 
         /**
          * @brief Handle hot reload completion (called by C# when reload finishes).
@@ -164,6 +163,16 @@ namespace ECS {
          */
         void SetHotReloadCallback(std::function<void(const std::string&)> callback) {
             m_hotReloadCallback = callback;
+        }
+
+        /**
+         * @brief Register a callback to be invoked when script files change.
+         * 
+         * The callback receives the scripts directory path where changes were detected.
+         * The callback should decide whether to trigger compilation/reload.
+         */
+        void SetScriptChangedCallback(std::function<void(const std::string&)> callback) {
+            m_scriptChangedCallback = callback;
         }
 
         // ====================================================================
@@ -191,29 +200,34 @@ namespace ECS {
          */
         int RegisterScriptedSystems(SystemManager& systemManager, ECS::World* world = nullptr);
 
+        /**
+         * @brief Copy GrapeEngine.Scripting.dll to a target directory.
+         * @param targetDir Target directory to copy to
+         * @return true if copied successfully, false otherwise
+         * 
+         * Locates GrapeEngine.Scripting.dll in the current working directory
+         * and copies it to the specified target directory. This is necessary
+         * because the managed script assembly needs access to the scripting API.
+         */
+        bool CopyScriptingAssemblyToDirectory(const std::string& targetDir);
+
         // ====================================================================
-        // Compilation Support (Roslyn integration)
+        // Compilation Support (Roslyn)
         // ====================================================================
 
         /**
          * @brief Compile C# scripts in a directory to an assembly using Roslyn.
          * @param scriptDirectory Path to directory containing .cs files
          * @param outputAssembly Path for output assembly (e.g., "GameScripts.dll")
-         * @return true if compilation succeeded, false otherwise
-         * 
-         * Compiles all .cs files in the specified directory using Roslyn.
-         * Errors are logged but do not crash the editor.
-         * Used by editor on startup and when file watcher detects changes.
-         */
-        bool CompileScriptsInDirectory(const std::string& scriptDirectory,
-                                      const std::string& outputAssembly);
-
-        /**
-         * @brief Compile scripts and return diagnostics as a string.
-         * @param scriptDirectory Path to directory containing .cs files
-         * @param outputAssembly Path for output assembly
          * @param outDiagnostics Reference to store compilation error/warning messages
-         * @return true if compilation succeeded
+         * @return true if temp assembly was created (success = file existence, not diagnostics)
+         * 
+         * This is the only public compilation API. Always returns diagnostics.
+         * Success is determined by temp assembly file existence, not diagnostic content.
+         * Warnings and errors are informational only and do not prevent hot reload.
+         * 
+         * Compiled assembly is written to a temporary location.
+         * C++ orchestrates: unload → move → load (use HotReloadAssembly for full flow).
          */
         bool CompileScriptsWithDiagnostics(const std::string& scriptDirectory,
                                           const std::string& outputAssembly,
@@ -223,19 +237,38 @@ namespace ECS {
         bool StartScriptWatching(const std::string& directory);
         void StopScriptWatching();
 
+        /**
+         * @brief Callback invoked by C# file watcher when scripts change.
+         * Forwards to registered script changed callback if one is set.
+         * @param scriptsDir Directory where changes were detected
+         */
+        void OnScriptsChanged(const std::string& scriptsDir);
         // Expose compile status (updated by native callback from managed watcher)
         void SetCompileStatus(int status, int progress, const char* message);
         void GetCompileStatus(int& outStatus, int& outProgress, std::string& outMessage);
+
+        /**
+         * @brief Remove a component type from all entities in the world.
+         * @param world The world to process
+         * @param componentTypeHash The hash of the component type to remove
+         * 
+         * This is used during hot reload to remove all instances of a component type
+         * before reloading the assembly with updated component definitions.
+         */
+        void RemoveComponentFromAllEntitiesByHash(ECS::World& world, uint32_t componentTypeHash);
 
         // ====================================================================
         // Debugging and Diagnostics
         // ====================================================================
 
         /**
-         * @brief Get list of loaded assembly paths.
+         * @brief Get the currently loaded script assembly path.
+         * @return Path to the loaded assembly, or empty string if none loaded
+         * 
+         * Single-assembly model: only one gameplay assembly can be active.
          */
-        const std::vector<std::string>& GetLoadedAssemblies() const {
-            return m_loadedAssemblies;
+        const std::string& GetLoadedScriptAssembly() const {
+            return m_loadedAssemblyPath;
         }
 
         /**
@@ -251,6 +284,15 @@ namespace ECS {
          * @return string with managed exception type and message, empty if helper not available
          */
         std::string GetManagedExceptionString(int hr);
+
+        /**
+         * @brief Force a garbage collection in the managed runtime.
+         * @internal Should only be called during hot reload, immediately after unload.
+         * 
+         * Invokes System.GC.Collect and WaitForPendingFinalizers from native code
+         * to ensure CoreCLR releases all file handles after assembly unload.
+         */
+        void ForceGarbageCollection();
 
         // Retrieve the last compilation diagnostics as an array of lines.
         void GetLastDiagnosticsLines(std::vector<std::string>& outLines);
@@ -270,8 +312,10 @@ namespace ECS {
         inline auto GetGetSystemMetadata() const { return m_getSystemMetadata; }
         inline auto GetGetSystemComponentAccesses() const { return m_getSystemComponentAccesses; }
         inline auto GetDeserializeComponentFromJson() const { return m_deserializeComponentFromJson; }
-        inline auto GetSetOutputAssemblyPath() const { return m_setOutputAssemblyPath; }
+        inline auto GetLastCompiledAssemblyPath() const { return m_getLastCompiledTempAssemblyPath; }
         inline auto GetGenerateCsProj() const { return m_generateCsProj; }
+        inline auto GetClearAllManagedComponentsFunc() const { return m_clearAllManagedComponents; }
+        inline auto GetRegisterRemoveComponentCallback() const { return m_registerRemoveComponentCallback; }
 
         // --------------------------------------------------------------------
         // Convenience native wrappers used by engine code
@@ -301,6 +345,7 @@ namespace ECS {
 
         // Function pointer types for calling into C#
         using LoadAssemblyFn                    = int(*)(const char* assemblyPath);
+        using SetCurrentWorldForHotReloadFn     = void(*)(void* worldPtr);  // Set the current world for hot reload operations
         using UnloadAssemblyFn                  = int(*)(const char* assemblyPath);
         using DiscoverSystemsFn                 = void*(*)(int* outCount);  // Returns array of system handles
         using CreateSystemWrapperFn             = uint64_t(*)(const char* typeName);
@@ -322,14 +367,18 @@ namespace ECS {
         using CompileDirectoryWithDiagFn        = void*(*)(const char* directoryPath, const char* outputAssemblyPath);
         using GetLastDiagnosticsCountFn         = int(*)();
         using GetLastDiagnosticAtFn             = void*(*)(int index);
+        using GetLastCompiledAssemblyPathFn     = void*(*)();  // Returns path to last compiled assembly
         using FreeManagedStringFn               = void(*)(void* ptr);
-        using GetLastCompiledAssemblyPathFn     = void*(*)();  // Returns UTF8 path to last compiled assembly (may be versioned), must free with FreeManagedStringFn
         using RegisterHotReloadCallbackFn       = void(*)(void* callbackPtr);  // Register C++ callback for reload notifications
+        using HotReloadRequestFn                = void(*)(const char* scriptDir, const char* outputPath);  // Hot reload orchestrator (C++ side)
         using DeserializeComponentFromJsonFn    = void(*)(uint32_t typeHash, void* componentPtr, int size, const char* jsonStr);  // Deserialize component from JSON
-        using SetOutputAssemblyPathFn           = void(*)(const char* outputPath);  // Set the standardized output path for compiled scripts
+        using ClearAllManagedComponentsFn       = void(*)(void* worldPtr);  // Clear all C# components from entities (worldPtr can be null)
+        using RegisterRemoveComponentCallbackFn = void(*)(void* callbackPtr);  // Register callback to remove component from all entities
+        using ForceGarbageCollectionFn         = void(*)();
 
         // Managed function delegates
         LoadAssemblyFn                      m_loadAssembly = nullptr;
+        SetCurrentWorldForHotReloadFn       m_setCurrentWorldForHotReload = nullptr;
         UnloadAssemblyFn                    m_unloadAssembly = nullptr;
         DiscoverSystemsFn                   m_discoverSystems = nullptr;
         CreateSystemWrapperFn               m_createSystemWrapper = nullptr;
@@ -346,31 +395,34 @@ namespace ECS {
         CompileDirectoryWithDiagFn          m_compileDirectoryWithDiag = nullptr;
         GetLastDiagnosticsCountFn           m_getLastDiagnosticsCount = nullptr;
         GetLastDiagnosticAtFn               m_getLastDiagnosticAt = nullptr;
+        GetLastCompiledAssemblyPathFn       m_getLastCompiledTempAssemblyPath = nullptr;
         FreeManagedStringFn                 m_freeManagedString = nullptr;
-        GetLastCompiledAssemblyPathFn       m_getLastCompiledAssemblyPath = nullptr;
+        RegisterHotReloadCallbackFn         m_registerHotReloadCallback = nullptr;
+        HotReloadRequestFn                  m_onHotReloadRequested = nullptr;
         ReloadAssemblyFn                    m_reloadAssembly = nullptr;
         CompileAndReloadFn                  m_compileAndReload = nullptr;
         GenerateCsProjFn                    m_generateCsProj = nullptr;
         HashComponentTypeNameFn             m_hashComponentTypeName = nullptr;
         ResolveSystemGroupFn                m_resolveSystemGroup = nullptr;
-        RegisterHotReloadCallbackFn         m_registerHotReloadCallback = nullptr;
         DeserializeComponentFromJsonFn      m_deserializeComponentFromJson = nullptr;
-        SetOutputAssemblyPathFn             m_setOutputAssemblyPath = nullptr;
+        ClearAllManagedComponentsFn         m_clearAllManagedComponents = nullptr;
+        RegisterRemoveComponentCallbackFn   m_registerRemoveComponentCallback = nullptr;
+        ForceGarbageCollectionFn            m_forceGarbageCollection = nullptr;
         
         // File-watcher managed delegates (Start/Stop) and setter for native compile callback
         using StartWatchingFn                   = int(*)(const char* directoryPath, void* userData);
         using StopWatchingFn                    = void(*)();
-        using SetCompileCallbackFn              = void(*)(void* callbackPtr);
+        using RegisterScriptChangedCallbackFn   = void(*)(void* callbackPtr);
 
         StartWatchingFn                     m_startWatching = nullptr;
         StopWatchingFn                      m_stopWatching = nullptr;
-        SetCompileCallbackFn                m_setCompileCallback = nullptr;
+        RegisterScriptChangedCallbackFn     m_registerScriptChangedCallback = nullptr;
 
         // ====================================================================
         // Internal State
         // ====================================================================
 
-        std::vector<std::string> m_loadedAssemblies;
+        std::string m_loadedAssemblyPath;  // Single-assembly model: only one active gameplay assembly
         std::vector<std::unique_ptr<ScriptSystemWrapper>> m_scriptedSystems;
         std::unordered_map<std::string, std::vector<ScriptSystemWrapper*>> m_systemsByAssembly;
 
@@ -382,6 +434,7 @@ namespace ECS {
 
         // Hot reload callback registered by editor
         std::function<void(const std::string&)> m_hotReloadCallback = nullptr;
+        std::function<void(const std::string&)> m_scriptChangedCallback = nullptr;
 
         // ====================================================================
         // Helper Methods

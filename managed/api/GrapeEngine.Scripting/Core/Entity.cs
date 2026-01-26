@@ -444,6 +444,28 @@ internal static class ComponentTypeHelper
         return hash;
     }
 
+    /// <summary>
+    /// Clear the type hash cache during assembly unload.
+    /// This is critical for hot reload: the cache holds Type references that prevent
+    /// the AssemblyLoadContext from being garbage collected.
+    /// </summary>
+    internal static void ClearTypeHashCache()
+    {
+        try
+        {
+            int count = _typeHashCache.Count;
+            _typeHashCache.Clear();
+            if (count > 0)
+            {
+                Logging.LogInternal($"[ComponentTypeHelper] Cleared {count} type hash cache entries", LogLevel.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentTypeHelper] Error clearing type hash cache: {ex.Message}", LogLevel.Error);
+        }
+    }
+
     private static uint FNV1aHash(string str)
     {
         uint hash = 2166136261u;
