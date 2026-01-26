@@ -2,8 +2,6 @@
 #define LOGGER_H
 
 #include "Export.h"
-// Include MemoryManager to ensure global new/delete overrides are visible to all users of Logger
-#include "services/MemoryManager.h"
 
 #ifdef ERROR
 #undef ERROR

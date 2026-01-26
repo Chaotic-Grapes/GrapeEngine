@@ -7,6 +7,7 @@
 \brief
 Implements the custom MemoryManager class for efficient memory allocation.
 - Uses manual doubly-linked list (no STL containers)
+- Address-ordered free list for reduced fragmentation
 - Metadata (MemoryBlock, MemoryPage structs) allocated with malloc
 - Actual memory pools allocated with malloc at load/runtime
 - First-fit strategy: Finds first free block large enough
@@ -104,13 +105,14 @@ void* MemoryManager::Allocate(int size) {
 	// PROOF: Log usage to verify integration
 	static int allocCount = 0;
 	allocCount++;
+
 	// Log first 5 allocations and then every 1000th to avoid spam but prove usage
 	if (allocCount <= 5 || allocCount % 1000 == 0) {
 		LOG_INFO("MemoryManager: Allocating " << size << " bytes (Total Allocs: " << allocCount << ")");
 	}
 
 	// Get a block of memory of a specified size from the pool
-	// Traverse the free linked list to find a suitable block (first-fit strategy)
+	// Traverse the address-ordered free linked list to find a suitable block (first-fit strategy)
 	MemoryBlock* current = m_blockListHead;
 
 	while (current != nullptr) {
@@ -168,7 +170,7 @@ void* MemoryManager::Allocate(int size) {
 	}
 
 	// On failure (no suitable block found): need to extend memory pool
-	LOG_WARNING("MemoryManager: Out of memory! Extending pool by " << m_defaultPageSize 
+	LOG_WARNING("MemoryManager: Out of memory! Extending pool by " << m_defaultPageSize
 		<< " bytes (" << (m_defaultPageSize / 1024) << " KB)");
 
 	_extendMemoryPool();
@@ -253,16 +255,49 @@ void MemoryManager::_extendMemoryPool() {
 	newBlock->next = nullptr;
 	newBlock->prev = nullptr;
 
-	// Add to the end of the block list
-	MemoryBlock* currentBlock = m_blockListHead;
-	while (currentBlock->next != nullptr) {
-		currentBlock = currentBlock->next;
-	}
-	currentBlock->next = newBlock;
-	newBlock->prev = currentBlock;
+	// Insert this new block in address-ordered position
+	_insertBlockAddressOrdered(newBlock);
 
-	LOG_INFO("MemoryManager: Pool extended! New page added: " << m_defaultPageSize 
+	LOG_INFO("MemoryManager: Pool extended! New page added: " << m_defaultPageSize
 		<< " bytes (" << (m_defaultPageSize / 1024) << " KB)");
+}
+
+// ============================================================================
+// ADDRESS-ORDERED INSERTION
+// ============================================================================
+
+void MemoryManager::_insertBlockAddressOrdered(MemoryBlock* block) {
+	// Insert block into the free list in address order
+	// This reduces fragmentation significantly
+	if (block == nullptr) return;
+
+	// Empty list case
+	if (m_blockListHead == nullptr) {
+		m_blockListHead = block;
+		block->next = nullptr;
+		block->prev = nullptr;
+		return;
+	}
+
+	// Insert at beginning if this block has the lowest address
+	if (block->data < m_blockListHead->data) {
+		block->next = m_blockListHead;
+		block->prev = nullptr;
+		m_blockListHead->prev = block;
+		m_blockListHead = block;
+		return;
+	}
+
+	// Find the correct position in the address-ordered list
+	MemoryBlock* current = m_blockListHead;
+	while (current->next != nullptr && current->next->data < block->data) current = current->next;
+
+	// Insert after current
+	block->next = current->next;
+	block->prev = current;
+
+	if (current->next != nullptr) current->next->prev = block;
+	current->next = block;
 }
 
 // ============================================================================
@@ -341,24 +376,36 @@ void MemoryManager::Dump(std::ostream& os) {
 	os << "Total Memory Pages: " << pageCount << std::endl;
 	os << std::endl;
 
-	// Display all blocks
-	os << "Memory Block List:" << std::endl;
+	// Display all blocks (in address order)
+	os << "Memory Block List (Address-Ordered):" << std::endl;
 	os << "----------------------------------------" << std::endl;
 
 	MemoryBlock* current = m_blockListHead;
 	int blockNum = 0;
+	int totalFreeBlocks = 0;
+	int totalFreeBytes = 0;
 
 	while (current != nullptr) {
 		os << "Block #" << blockNum << ": ";
 		os << "[Addr: " << current->data << "] ";
 		os << "[Size: " << current->size << " bytes] ";
 		os << "[Status: " << (current->allocated ? "ALLOCATED" : "FREE") << "]";
+
+		if (!current->allocated) {
+			totalFreeBlocks++;
+			totalFreeBytes += current->size;
+		}
+
 		os << std::endl;
 
 		current = current->next;
 		blockNum++;
 	}
 
+	os << "----------------------------------------" << std::endl;
+	os << "Total Blocks: " << blockNum << std::endl;
+	os << "Free Blocks: " << totalFreeBlocks << std::endl;
+	os << "Free Memory: " << totalFreeBytes << " bytes" << std::endl;
 	os << "========================================" << std::endl;
 }
 
@@ -372,52 +419,3 @@ MemoryManager& MemoryManager::GetInstance() {
 	return instance;
 }
 
-// ============================================================================
-// GLOBAL NEW/DELETE OPERATOR IMPLEMENTATIONS
-// ============================================================================
-
-#ifdef _MSC_VER
-_Ret_notnull_ _Post_writable_byte_size_(size)
-#endif
-
-// Global new operator: routes all allocations through our memory manager
-void* operator new(size_t size) {
-	void* ptr = MemoryManager::GetInstance().Allocate(static_cast<int>(size));
-
-	if (!ptr) {
-		LOG_CRITICAL("MemoryManager: Global new failed to allocate " << size << " bytes.");
-		throw std::bad_alloc();
-	}
-
-	return ptr;
-}
-
-// Global delete operator: routes all deallocations through our memory manager
-void operator delete(void* ptr) noexcept {
-	if (ptr != nullptr) {
-		MemoryManager::GetInstance().Deallocate(ptr);
-	}
-}
-
-#ifdef _MSC_VER
-_Ret_notnull_ _Post_writable_byte_size_(size)
-#endif
-
-// Global new[] operator for arrays
-void* operator new[](size_t size) {
-	void* ptr = MemoryManager::GetInstance().Allocate(static_cast<int>(size));
-
-	if (!ptr) {
-		LOG_CRITICAL("MemoryManager: Global new[] failed to allocate " << size << " bytes.");
-		throw std::bad_alloc();
-	}
-
-	return ptr;
-}
-
-// Global delete[] operator for arrays
-void operator delete[](void* ptr) noexcept {
-	if (ptr != nullptr) {
-		MemoryManager::GetInstance().Deallocate(ptr);
-	}
-}

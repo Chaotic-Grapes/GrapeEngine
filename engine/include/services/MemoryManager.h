@@ -8,7 +8,7 @@
 Declares the custom MemoryManager class for efficient game object memory allocation.
 Provides:
 - Pre-allocated memory pool using memory pages
-- Free linked list for efficient memory block management
+- Address-ordered free linked list for optimal fragmentation reduction
 - No STL containers (manual doubly-linked list implementation)
 - Placement new support for object construction in pre-allocated memory
 - Dynamic memory page extension when running out of memory
@@ -53,7 +53,7 @@ private:
 		MemoryPage(void* start, int size);
 	};
 
-	MemoryBlock* m_blockListHead;   // Head of the memory block linked list
+	MemoryBlock* m_blockListHead;   // Head of the memory block linked list (address-ordered)
 	MemoryPage* m_pageListHead;     // Head of the memory page linked list
 	int m_defaultPageSize;          // Size of each memory page
 	int m_totalAllocated;           // Total bytes allocated
@@ -74,6 +74,14 @@ private:
 	// Merges adjacent free blocks to reduce fragmentation
 	void _mergeAdjacentFreeBlocks(MemoryBlock* block);
 
+	// ============================================================================
+	// ADDRESS-ORDERED INSERTION
+	// ============================================================================
+
+	// Inserts a free block into the address-ordered free list
+	// This significantly reduces fragmentation compared to insertion-order
+	void _insertBlockAddressOrdered(MemoryBlock* block);
+
 public:
 	// ============================================================================
 	// MEMORY MANAGER IMPLEMENTATION
@@ -89,7 +97,7 @@ public:
 	// ALLOCATION AND DEALLOCATION
 	// ============================================================================
 
-	// Allocates a block of memory from the pool using first-fit strategy
+	// Allocates a block of memory from the pool using address-ordered first-fit strategy
 	void* Allocate(int size);
 
 	// Deallocates a previously allocated block
@@ -110,35 +118,5 @@ public:
 	// Returns singleton instance of the memory manager
 	static MemoryManager& GetInstance();
 };
-
-// ============================================================================
-// GLOBAL NEW/DELETE OPERATOR IMPLEMENTATIONS
-// ============================================================================
-
-/* 
-_Ret_notnull_ indicates the function never returns null (throws instead)
-_Post_writable_byte_size_ indicates  the returned memory is writable for 'size' bytes
-Wrapped in #ifdef to avoid issues on non-MSVC compilers
-*/
-#ifdef _MSC_VER
-_Ret_notnull_ _Post_writable_byte_size_(size)
-#endif
-
-// Global new operator override
-GRAPEENGINE_API void* operator new(size_t size);
-
-// Global delete operator override
-GRAPEENGINE_API void operator delete(void* ptr) noexcept;
-
-// Same thing for array new/delete
-#ifdef _MSC_VER
-_Ret_notnull_ _Post_writable_byte_size_(size)
-#endif
-
-// Global new[] operator override for arrays
-GRAPEENGINE_API void* operator new[](size_t size);
-
-// Global delete[] operator override for arrays
-GRAPEENGINE_API void operator delete[](void* ptr) noexcept;
 
 #endif

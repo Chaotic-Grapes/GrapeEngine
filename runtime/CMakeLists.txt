@@ -19,6 +19,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ======================= Game Entry Point =========================
 set(RUNTIME_SOURCES 
     ${CMAKE_CURRENT_LIST_DIR}/../src/game/GameMain.cpp
+    # Force global new/delete override to be compiled into the Runtime EXE
+    ${CMAKE_CURRENT_LIST_DIR}/../engine/src/services/GlobalMemoryOverride.cpp
 )
 
 # ======================= Create Runtime Executable =========================
