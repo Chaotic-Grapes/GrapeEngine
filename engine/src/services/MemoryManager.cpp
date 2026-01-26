@@ -101,6 +101,14 @@ MemoryManager::~MemoryManager() {
 // ============================================================================
 
 void* MemoryManager::Allocate(int size) {
+	// PROOF: Log usage to verify integration
+	static int allocCount = 0;
+	allocCount++;
+	// Log first 5 allocations and then every 1000th to avoid spam but prove usage
+	if (allocCount <= 5 || allocCount % 1000 == 0) {
+		LOG_INFO("MemoryManager: Allocating " << size << " bytes (Total Allocs: " << allocCount << ")");
+	}
+
 	// Get a block of memory of a specified size from the pool
 	// Traverse the free linked list to find a suitable block (first-fit strategy)
 	MemoryBlock* current = m_blockListHead;

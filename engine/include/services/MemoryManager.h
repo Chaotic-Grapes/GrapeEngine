@@ -23,6 +23,7 @@ Provides:
 
 #include <iostream>
 #include <cstddef> 
+#include "Export.h"
 
 class MemoryManager {
 private:
@@ -124,10 +125,10 @@ _Ret_notnull_ _Post_writable_byte_size_(size)
 #endif
 
 // Global new operator override
-void* operator new(size_t size);
+GRAPEENGINE_API void* operator new(size_t size);
 
 // Global delete operator override
-void operator delete(void* ptr) noexcept;
+GRAPEENGINE_API void operator delete(void* ptr) noexcept;
 
 // Same thing for array new/delete
 #ifdef _MSC_VER
@@ -135,9 +136,9 @@ _Ret_notnull_ _Post_writable_byte_size_(size)
 #endif
 
 // Global new[] operator override for arrays
-void* operator new[](size_t size);
+GRAPEENGINE_API void* operator new[](size_t size);
 
 // Global delete[] operator override for arrays
-void operator delete[](void* ptr) noexcept;
+GRAPEENGINE_API void operator delete[](void* ptr) noexcept;
 
 #endif
