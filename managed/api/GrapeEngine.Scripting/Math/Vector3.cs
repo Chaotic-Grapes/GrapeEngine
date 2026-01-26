@@ -90,3 +90,4 @@ public struct Vector3(float x, float y, float z)
 
     public readonly override string ToString() => $"({X}, {Y}, {Z})";
 }
+

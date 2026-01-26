@@ -110,7 +110,9 @@ namespace Messaging {
         }
 
         void OnNotify(const T& message) override {
-            handler_(message);
+            if (handler_) {
+                handler_(message);
+            }
         }
 
         int GetPriority() const override { return priority_; }

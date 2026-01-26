@@ -48,9 +48,6 @@ public:
     // Renders tag mask bitfield for entity tagging and filtering systems
     void RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
-    // Renders lifetime timer component for auto-destroying entities
-    void RenderLifetime(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
-
     // Renders transform properties including position, rotation and scale values
     void RenderLocalTransform(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 

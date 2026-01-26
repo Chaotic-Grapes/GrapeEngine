@@ -43,8 +43,8 @@ public class SetComponentChange : IChangeHandler
     {
         if (ComponentType == null || ComponentData == null)
         {
-            Console.WriteLine(
-                "[DeferredChanges] SetComponent failed: Missing component type or data");
+
+            Logging.LogInternal("[DeferredChanges] SetComponent failed: Missing component type or data", LogLevel.Warning);
             return;
         }
 
@@ -59,16 +59,15 @@ public class SetComponentChange : IChangeHandler
             }
             else
             {
-                Console.WriteLine(
-                    $"[DeferredChanges] SetComponent failed: Could not find method for {ComponentType.Name}");
+                Logging.LogInternal($"[DeferredChanges] SetComponent failed: Could not find method for {ComponentType.Name}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                $"[DeferredChanges] SetComponent error: {ex.Message}");
+            Logging.LogInternal($"[DeferredChanges] SetComponent error: {ex.Message}", LogLevel.Error);
         }
     }
 
     public string GetDescription() => $"SetComponent<{ComponentTypeName ?? ComponentType?.Name ?? "Unknown"}>({TargetEntity.Id})";
 }
+

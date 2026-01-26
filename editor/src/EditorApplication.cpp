@@ -67,6 +67,15 @@ void EditorApplication::Initialize() {
     LOG_INFO("Editor Application initialized successfully");
 }
 
+void EditorApplication::BeginFrame() {
+    if (!m_initialized) return;
+
+    // Begin frame processing in editor service
+    if (m_editorService) {
+        m_editorService->BeginFrame();
+    }
+}
+
 void EditorApplication::Update() {
     if (!m_initialized) return;
 
@@ -85,21 +94,31 @@ void EditorApplication::Render() {
     }
 }
 
+void EditorApplication::EndFrame() {
+    if (!m_initialized) return;
+
+    // End frame processing in editor service
+    if (m_editorService) {
+        m_editorService->EndFrame();
+    }
+}
+
 void EditorApplication::Shutdown() {
     if (!m_initialized) return;
 
     LOG_INFO("Shutting down Editor Application...");
 
-    // Save editor settings
-    _saveEditorSettings();
-
-    // Clean up editor service
+    // Clean up editor service first while GL context is still active
+    // This ensures ImGui and all editor resources are properly destroyed
     if (m_editorService) {
         m_editorService->Terminate();
         delete m_editorService;
         m_editorService = nullptr;
         LOG_INFO("EditorService terminated");
     }
+
+    // Save editor settings after editor is cleaned up
+    _saveEditorSettings();
 
     m_initialized = false;
     LOG_INFO("Editor Application shutdown complete");

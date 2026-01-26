@@ -65,3 +65,4 @@ public class StructuralChangeValidator(World world)
     /// </summary>
     public int GetErrorCount() => _errors.Count;
 }
+

@@ -106,6 +106,12 @@ set_target_properties(GrapeRuntime PROPERTIES
     WIN32_EXECUTABLE "$<$<CONFIG:Release>:TRUE>"
 )
 
+# Set Visual Studio debugger working directory to build output
+# This ensures assets and config files are found when debugging via .sln
+set_target_properties(GrapeRuntime PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:GrapeRuntime>"
+)
+
 # ======================= Embed Icon (Windows) =========================
 set(GAME_ICON "${CMAKE_CURRENT_LIST_DIR}/../assets/game_icon.ico" CACHE FILEPATH "Icon file for the game executable")
 
@@ -145,6 +151,19 @@ endif()
 
 # ======================= Compiler Definitions =========================
 # NO USE_IMGUI - runtime has no editor UI
+
+# ======================= IDE Organization - Visual Studio Filters =========================
+# Organize runtime source files by folder structure
+foreach(source IN LISTS RUNTIME_SOURCES)
+    get_filename_component(source_path "${source}" PATH)
+    file(RELATIVE_PATH source_path_rel "${CMAKE_CURRENT_LIST_DIR}/../src" "${source_path}")
+    if(NOT source_path_rel STREQUAL "")
+        string(REPLACE "/" "\\" group_path "Runtime Source\\${source_path_rel}")
+    else()
+        set(group_path "Runtime Source")
+    endif()
+    source_group("${group_path}" FILES "${source}")
+endforeach()
 
 # ======================= Link Dependencies =========================
 target_link_libraries(GrapeRuntime

@@ -24,7 +24,7 @@ namespace ECS {
         return builder.Build();
     }
 
-    void TransformSystem::OnUpdate(World& world, float /*dt*/) {
+    void TransformSystem::OnUpdate(World& world) {
         std::vector<Entity> roots;
         std::vector<Entity> needsWorldTransform;
 

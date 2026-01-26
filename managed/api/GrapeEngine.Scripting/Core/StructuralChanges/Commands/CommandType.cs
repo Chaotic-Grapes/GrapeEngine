@@ -54,3 +54,4 @@ public enum CommandType
     /// </summary>
     CloneEntity
 }
+

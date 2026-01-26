@@ -84,3 +84,4 @@ public class BatchDestroyOperation(CommandBuffer buffer)
         _entitiesToDestroy.Clear();
     }
 }
+

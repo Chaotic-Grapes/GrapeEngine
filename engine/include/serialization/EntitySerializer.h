@@ -95,7 +95,6 @@ namespace ECS {
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TagMask, Mask)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Active, Enabled)
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Lifetime, Time)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Layer, Id)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(LocalTransform, Position, Rotation, Scale)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WorldTransform, Matrix, Dirty)
@@ -130,10 +129,9 @@ namespace ECS {
 			strncpy_s(sprite.TexturePath, texPath.c_str(), sizeof(sprite.TexturePath) - 1);
 			sprite.TexturePath[sizeof(sprite.TexturePath) - 1] = '\0';
 
-			// CRITICAL: Reload texture from path if available
+			// IMPORTANT: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
-			// Only reload if TextureId is not already set (0 means not loaded)
-			if (!texPath.empty() && sprite.TextureId == 0) {
+			if (!texPath.empty()) {
 				auto tex = RM.Get<Texture>(texPath);
 				if (tex) {
 					sprite.TextureId = static_cast<uint32_t>(tex->ID());
@@ -179,10 +177,9 @@ namespace ECS {
 			strncpy_s(anim.TexturePath, texPath.c_str(), sizeof(anim.TexturePath) - 1);
 			anim.TexturePath[sizeof(anim.TexturePath) - 1] = '\0';
 
-			// CRITICAL: Reload texture from path if available
+			// IMPORTANT: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
-			// Only reload if TextureId is not already set (0 means not loaded)
-			if (!texPath.empty() && anim.TextureId == 0) {
+			if (!texPath.empty()) {
 				auto tex = RM.Get<Texture>(texPath);
 				if (tex) {
 					anim.TextureId = static_cast<uint32_t>(tex->ID());
@@ -584,7 +581,6 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(Name, ECS::Components::Name, "Name")
 	REGISTER_COMPONENT_SERIALIZER(TagMask, ECS::Components::TagMask, "TagMask")
 	REGISTER_COMPONENT_SERIALIZER(Active, ECS::Components::Active, "Active")
-	REGISTER_COMPONENT_SERIALIZER(Lifetime, ECS::Components::Lifetime, "Lifetime")
 	REGISTER_COMPONENT_SERIALIZER(Layer, ECS::Components::Layer, "Layer")
 	REGISTER_COMPONENT_SERIALIZER(LocalTransform, ECS::Components::LocalTransform, "LocalTransform")
 	REGISTER_COMPONENT_SERIALIZER(WorldTransform, ECS::Components::WorldTransform, "WorldTransform")

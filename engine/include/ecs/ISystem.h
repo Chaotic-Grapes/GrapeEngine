@@ -26,7 +26,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "Export.h"
 #include "ecs/World.h"
-#include "ecs/jobs/JobHandle.h"
 #include "ecs/SystemEnums.h"
 #include "ecs/ComponentAccessAttribute.h"
 #include <string>
@@ -164,12 +163,13 @@ namespace ECS {
      *         m_query = world.CreateQuery<Transform, Velocity>();
      *     }
      *     
-     *     void OnUpdate(World& world, float deltaTime) override {
-     *         // Process entities
-     *         m_query.Each([deltaTime](Transform& t, Velocity& v) {
-     *             t.Position += v.Value * deltaTime;
-     *         });
-     *     }
+    *     void OnUpdate(World& world) override {
+    *         // Process entities (use TimeSystem singleton for delta time)
+    *         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+    *         m_query.Each([dt](Transform& t, Velocity& v) {
+    *             t.Position += v.Value * dt;
+    *         });
+    *     }
      *     
      *     void OnDestroy(World& world) override {
      *         // Cleanup resources
@@ -212,22 +212,22 @@ namespace ECS {
         /**
          * @brief Called every frame to update the system.
          * @param world The active scene's World
-         * @param deltaTime Time elapsed since last frame (in seconds)
-         * 
-         * This is where all per-frame logic goes. The world parameter
-         * represents the currently active scene and may change between calls
-         * if scenes are switched.
-         * 
+         *
+         * Per-frame timing is available via the engine `Time` service/singleton.
+         * This avoids passing a delta time parameter to every system. The
+         * world parameter represents the currently active scene and may change
+         * between calls if scenes are switched.
+         *
          * Systems should:
          * - Query components from the provided world
          * - Update entity state
          * - Emit events/messages as needed
-         * 
+         *
          * Systems should NOT:
          * - Cache the world reference
          * - Assume world is the same between calls
          */
-        virtual void OnUpdate(World& world, float deltaTime) = 0;
+        virtual void OnUpdate(World& world) = 0;
 
         /**
          * @brief Called once during engine shutdown.
@@ -366,46 +366,6 @@ namespace ECS {
             return accesses;
         }
 
-        /**
-         * @brief Execute system as parallel jobs instead of sequential update.
-         * 
-         * Override to implement job-based system execution. The default
-         * implementation calls OnUpdate() sequentially.
-         * 
-         * @param world Active world
-         * @param deltaTime Time since last frame
-         * @return JobHandle for tracking execution (default: invalid handle)
-         * 
-         * Example:
-         * @code
-         * Jobs::JobHandle OnUpdateAsJobs(World& world, float deltaTime) override {
-         *     auto query = world.CreateParallelQuery<Transform, Velocity>();
-         *     auto chunks = query.GetChunks();
-         *     
-         *     std::vector<std::unique_ptr<IJob>> jobs;
-         *     for (auto* chunk : chunks) {
-         *         auto job = std::make_unique<UpdateChunkJob>();
-         *         job->DeltaTime = deltaTime;
-         *         jobs.push_back(std::move(job));
-         *     }
-         *     
-         *     return world.GetJobManager().ScheduleParallel(std::move(jobs));
-         * }
-         * @endcode
-         */
-        virtual Jobs::JobHandle OnUpdateAsJobs(World& world, float deltaTime) {
-            // Default: run sequentially
-            OnUpdate(world, deltaTime);
-            return Jobs::JobHandle{};
-        }
-
-        /**
-         * @brief Check if this system supports job-based execution.
-         * @return true if OnUpdateAsJobs() is overridden, false if using sequential execution
-         */
-        virtual bool SupportsJobBasedExecution() const {
-            return false;  // Override and return true if implementing OnUpdateAsJobs()
-        }
 
     private:
         bool m_enabled = true;

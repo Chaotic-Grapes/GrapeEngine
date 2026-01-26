@@ -79,3 +79,4 @@ public struct Vector2(float x, float y)
 
     public readonly override string ToString() => $"({X}, {Y})";
 }
+

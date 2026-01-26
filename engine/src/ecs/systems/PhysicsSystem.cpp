@@ -343,7 +343,9 @@ namespace ECS {
     /**
     * @brief Integrate dynamics, build broad phase, test narrow phase, resolve.
     */
-    void PhysicsSystem::OnUpdate(World& world, const float dt) {
+    void PhysicsSystem::OnUpdate(World& world) {
+        const double dtd = TimeSystem::Instance().GetDeltaTime();
+        const float dt = static_cast<float>(dtd);
         if (!Engine::Physics::IsEnabled()) return;
         if (dt <= 0.0f) return;
 

@@ -6,18 +6,17 @@
 \brief
 Records structural changes and plays them back safely.
 
-Deferred command buffer for safe entity/component modifications from jobs.
+Deferred command buffer for safe entity/component modifications.
 Records structural changes (add/remove entities, add/remove components)
-and applies them at safe synchronization points to prevent data races
-during parallel job execution.
+and applies them at safe synchronization points to prevent data races.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
+/* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Job;
 using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 
 namespace GrapeEngine.Scripting.Core.StructuralChanges.Commands;
@@ -25,24 +24,20 @@ namespace GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 /// <summary>
 /// Records structural changes and plays them back safely.
 /// 
-/// Allows parallel jobs to queue structural modifications (create/destroy entities,
+/// Allows queuing of structural modifications (create/destroy entities,
 /// add/remove components) without causing data races. Changes are applied at a
-/// safe synchronization point after all jobs complete.
+/// safe synchronization point after all system updates complete.
 /// 
 /// Example:
 /// <code>
-/// public JobHandle OnUpdateAsJobs(World world, float deltaTime)
+/// var buffer = new CommandBuffer(world);
+/// 
+/// deadQuery.ForEachEntity((in Dead d) =>
 /// {
-///     var buffer = new CommandBuffer(world);
-///     
-///     var handle = deadQuery.ForEachEntity((in Dead d) =>
-///     {
-///         buffer.DestroyEntity(entity);  // Recorded, not executed yet
-///     });
-///     
-///     handle.Complete();
-///     buffer.Playback();  // Now execute all recorded commands
-/// }
+///     buffer.DestroyEntity(entity);  // Recorded, not executed yet
+/// });
+/// 
+/// buffer.Playback();  // Now execute all recorded commands
 /// </code>
 /// </summary>
 /// <remarks>
@@ -229,7 +224,7 @@ public class CommandBuffer(World world) : IDisposable
     /// <summary>
     /// Execute all recorded commands on the world.
     /// 
-    /// This should be called after all jobs complete and before the next
+    /// This should be called after all queries complete and before the next
     /// frame or system execution to ensure all structural changes are applied safely.
     /// </summary>
     /// <returns>Number of commands executed</returns>
@@ -250,7 +245,7 @@ public class CommandBuffer(World world) : IDisposable
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error executing command {command.Type}: {ex.Message}");
+                Logging.LogInternal($"Error executing command {command.Type}: {ex.Message}", LogLevel.Error);
             }
         }
 
@@ -304,7 +299,7 @@ public class CommandBuffer(World world) : IDisposable
     {
         if (command.ComponentType == null || command.ComponentData == null)
         {
-            Console.WriteLine("[CommandBuffer] AddComponent failed: Missing component type or data");
+            Logging.LogInternal("[CommandBuffer] AddComponent failed: Missing component type or data", LogLevel.Warning);
             return;
         }
 
@@ -323,13 +318,12 @@ public class CommandBuffer(World world) : IDisposable
             }
             else
             {
-                Console.WriteLine(
-                    $"[CommandBuffer] AddComponent failed: Could not find method for {command.ComponentType.Name}");
+                Logging.LogInternal($"[CommandBuffer] AddComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CommandBuffer] AddComponent error: {ex.Message}");
+            Logging.LogInternal($"[CommandBuffer] AddComponent error: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -340,7 +334,7 @@ public class CommandBuffer(World world) : IDisposable
     {
         if (command.ComponentType == null)
         {
-            Console.WriteLine("[CommandBuffer] RemoveComponent failed: Missing component type");
+            Logging.LogInternal("[CommandBuffer] RemoveComponent failed: Missing component type", LogLevel.Warning);
             return;
         }
 
@@ -355,12 +349,12 @@ public class CommandBuffer(World world) : IDisposable
             }
             else
             {
-                Console.WriteLine($"[CommandBuffer] RemoveComponent failed: Could not find method for {command.ComponentType.Name}");
+                Logging.LogInternal($"[CommandBuffer] RemoveComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CommandBuffer] RemoveComponent error: {ex.Message}");
+            Logging.LogInternal($"[CommandBuffer] RemoveComponent error: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -371,7 +365,7 @@ public class CommandBuffer(World world) : IDisposable
     {
         if (command.ComponentType == null || command.ComponentData == null)
         {
-            Console.WriteLine($"[CommandBuffer] SetComponent failed: Missing component type or data");
+            Logging.LogInternal($"[CommandBuffer] SetComponent failed: Missing component type or data", LogLevel.Warning);
             return;
         }
 
@@ -385,12 +379,12 @@ public class CommandBuffer(World world) : IDisposable
             }
             else
             {
-                Console.WriteLine($"[CommandBuffer] SetComponent failed: Could not find method for {command.ComponentType.Name}");
+                Logging.LogInternal($"[CommandBuffer] SetComponent failed: Could not find method for {command.ComponentType.Name}", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CommandBuffer] SetComponent error: {ex.Message}");
+            Logging.LogInternal($"[CommandBuffer] SetComponent error: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -458,3 +452,4 @@ public class CommandBuffer(World world) : IDisposable
         GC.SuppressFinalize(this);
     }
 }
+

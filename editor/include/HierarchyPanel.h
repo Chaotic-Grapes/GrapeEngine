@@ -32,6 +32,7 @@ which entity the user is working with.
 #include <functional>
 #include "EditorEntityActions.h"
 #include "ecs/gui/GUIHelpers.h"
+#include "core/messaging/MessageSystem.h"
 
 // Forward declaration
 class BaseViewport;
@@ -222,6 +223,9 @@ private:
 
     // DON'T REMOVE: IMPORTANT
     std::vector<EntityId> m_deferredDeletions;
+
+    // Message subscription for viewport entity selection
+    Messaging::SubscriptionHandle m_entitySelectedSubscription;
 };
 
 #endif

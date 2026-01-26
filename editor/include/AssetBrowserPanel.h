@@ -123,6 +123,9 @@ private:
     // Right-click context menu for asset creation
     bool _renderCreateMenuItems();
 
+    // Open the generated C# project file with default code editor
+    void _openProjectFile();
+
     // -------------------------------------------------------------------------
     // Copy/Paste Operations
     // -------------------------------------------------------------------------
@@ -172,8 +175,8 @@ private:
     AssetLibrary m_assetLibrary;
     std::string m_currentPath;
     std::string m_selectedAsset;
-    std::unordered_set<std::string> m_selectedAssets;  // Multi-selection support
-    std::string m_anchorAsset;  // For shift-selection
+    std::unordered_set<std::string> m_selectedAssets; // Multi-selection support
+    std::string m_anchorAsset;                        // For shift-selection
 
     // Clipboard state
     std::vector<std::string> m_clipboardAssets;

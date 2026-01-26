@@ -28,6 +28,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CompilePanel.h"
+#include <cmath>
+
+#ifdef ERROR
+#undef ERROR
+#endif
+
+#ifdef max
+#undef max
+#endif
 
 // Create the editor and initialize panel members and config
 LevelEditor::LevelEditor(ECS::World* world, const LevelEditorConfig& config, Scenes::Scene* scene)
@@ -157,6 +166,7 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
+    ImGui::DockBuilderDockWindow("Systems", assetBrowserNode);
 
     ImGui::DockBuilderFinish(m_dockspaceId); // Finalize docking layout
     
@@ -179,7 +189,9 @@ void LevelEditor::_renderDockSpace() {
     if (vp->Size.x <= 0 || vp->Size.y <= 0) return; // Guard against hidden or zero viewport
 
     // Track viewport size changes and trigger layout rebuild when it changes
-    if (m_lastViewportSize.x != vp->Size.x || m_lastViewportSize.y != vp->Size.y) {
+    // Use a tolerance to avoid rebuilding every frame due to tiny float jitter.
+    constexpr float sizeEpsilon = 0.5f;
+    if (std::fabs(m_lastViewportSize.x - vp->Size.x) > sizeEpsilon || std::fabs(m_lastViewportSize.y - vp->Size.y) > sizeEpsilon) {
         m_lastViewportSize = vp->Size;
         m_dockLayoutBuilt = false; // Force a rebuild on size change
     }
@@ -411,8 +423,32 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() {
             m_performancePanel.Initialize(m_mainFont, m_boldFont);
         },
-        [this]() { m_performancePanel.Render(m_playback.IsPlaying()); },
-        nullptr//[this](ECS::World* w) { void(*w); } // No world needed
+        [this]() { 
+            // Get SystemManager from engine
+            ECS::SystemManager* systemManager = nullptr;
+            if (Engine::CORE) {
+                systemManager = &Engine::CORE->GetSystemManager();
+            }
+            m_performancePanel.SetSystemManager(systemManager);
+            m_performancePanel.Render(m_playback.IsPlaying()); 
+        },
+        [this](ECS::World* w) { m_performancePanel.SetWorld(w); }
+    );
+
+    // Register Systems panel (shows registered C# and C++ systems)
+    _registerPanel("Systems",
+        [this]() {
+            m_systemsPanel.Initialize(m_mainFont, m_boldFont);
+        },
+        [this]() { 
+            // Get SystemManager from engine
+            ECS::SystemManager* systemManager = nullptr;
+            if (Engine::CORE) {
+                systemManager = &Engine::CORE->GetSystemManager();
+            }
+            m_systemsPanel.Render(systemManager);
+        },
+        [this](ECS::World* w) { m_systemsPanel.SetWorld(w); }
     );
 
     // Initialize all registered panels
@@ -542,6 +578,16 @@ void LevelEditor::_loadFonts() {
     if (!io.Fonts->Fonts.empty() && !io.Fonts->IsBuilt()) {
         io.Fonts->Build();
     }
+}
+
+// -------------------------------------------------------------------------
+// Frame Processing
+// -------------------------------------------------------------------------
+// Begin frame - handle input and request picking before systems update
+void LevelEditor::BeginFrame() {
+    // Begin frame for all viewports - handle input and request picking
+    m_sceneViewport.BeginFrame();
+    m_gameViewport.BeginFrame();
 }
 
 // -------------------------------------------------------------------------
@@ -675,6 +721,16 @@ void LevelEditor::Render() {
         ImGui::PopFont();
         ImGui::End();
     }
+}
+
+// -------------------------------------------------------------------------
+// End Frame
+// -------------------------------------------------------------------------
+// End frame - resolve picking and update selection after rendering
+void LevelEditor::EndFrame() {
+    // End frame for all viewports - resolve picking and update selection
+    m_sceneViewport.EndFrame();
+    m_gameViewport.EndFrame();
 }
 
 // -------------------------------------------------------------------------

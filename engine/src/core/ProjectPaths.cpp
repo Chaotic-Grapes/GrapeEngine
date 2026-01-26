@@ -55,6 +55,47 @@ namespace Engine {
         return GetProjectRoot() + "/ProjectSettings.json";
     }
     
+    std::string ProjectPaths::GetTempScriptsPath() {
+        try {
+            // Create a stable temp directory per project
+            std::filesystem::path projRoot = GetProjectRoot();
+            std::string projName = projRoot.filename().string();
+            std::filesystem::path tempDir = std::filesystem::temp_directory_path() / "GrapeEngine" / projName;
+            
+            // Ensure the directory exists
+            if (!std::filesystem::exists(tempDir)) {
+                std::filesystem::create_directories(tempDir);
+            }
+            
+            return tempDir.string();
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to get temp scripts path: " << e.what());
+            return "";
+        }
+    }
+    
+    std::string ProjectPaths::GetCompiledScriptAssemblyPath() {
+        return GetTempScriptsPath() + "/GameScripts.dll";
+    }
+    
+    std::string ProjectPaths::GetCsProjPath() {
+        try {
+            std::filesystem::path csprojDir = GetTempScriptsPath() + "/csproj";
+            
+            // Ensure the directory exists
+            if (!std::filesystem::exists(csprojDir)) {
+                std::filesystem::create_directories(csprojDir);
+            }
+            
+            return csprojDir.string();
+        }
+        catch (const std::exception& e) {
+            LOG_ERROR("Failed to get csproj path: " << e.what());
+            return "";
+        }
+    }
+    
     std::string ProjectPaths::ToAbsolutePath(const std::string& relativePath) {
         std::filesystem::path absolute = std::filesystem::absolute(GetProjectRoot() + "/" + relativePath);
         return absolute.string();

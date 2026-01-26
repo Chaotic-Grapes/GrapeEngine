@@ -40,8 +40,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "ecs/Signature.h"
 #include "ecs/ComponentRegistry.h"
-#include "ecs/jobs/JobManager.h"
-#include "ecs/jobs/ParallelQuery.h"
+
 #include "math/Matrix4x4.h"
 
 namespace ECS {
@@ -62,6 +61,12 @@ namespace ECS {
         bool KeepLayer = true;
         // Keep Name component (if present)
         bool KeepName = true;
+    };
+
+    // Serialized component data for snapshot-based undo/redo
+    struct SerializedComponent {
+        ComponentTypeId Id;                 // Component type identifier
+        std::vector<uint8_t> Data;          // Raw component data
     };
 
     // World holds all archetypes and entity allocation, moves entities across archetypes on structural changes.
@@ -441,6 +446,131 @@ namespace ECS {
             // Otherwise, add new component
             // Again using move semantics
             return Add<T>(e, std::move(value));
+        }
+
+        // ************** Batch Operations ************** //
+
+        /**
+         * @brief Begin a batch operation to defer archetype version increments.
+         * 
+         * Useful when performing multiple structural changes (add/remove components)
+         * on many entities. Defers query cache invalidation until EndBatch() is called.
+         * 
+         * @note Batch operations can be nested (ref-counted)
+         */
+        void BeginBatch() {
+            if (m_batchDepth == 0) {
+                m_batchStartVersion = m_archetypeVersion;
+            }
+            ++m_batchDepth;
+        }
+
+        /**
+         * @brief End a batch operation.
+         * 
+         * When the outermost batch ends (depth reaches 0), invalidates query caches
+         * if any archetypes were created during the batch.
+         */
+        void EndBatch() {
+            if (m_batchDepth > 0) {
+                --m_batchDepth;
+                // If depth reached 0, query caches will be invalidated on next Each() call
+                // since cacheVersion won't match m_archetypeVersion
+            }
+        }
+
+        /**
+         * @brief Check if currently inside a batch operation.
+         * @return True if BeginBatch() was called more times than EndBatch()
+         */
+        bool IsInBatch() const { return m_batchDepth > 0; }
+
+        // ************** Entity State Capture/Restore ************** //
+
+        /**
+         * @brief Capture all components of an entity as serialized data.
+         * 
+         * Useful for snapshot-based undo/redo. Captures component data in the order
+         * they appear in the entity's archetype.
+         * 
+         * @param e The entity to capture
+         * @return Vector of serialized components; empty if entity is not alive
+         * @note Assumes the entity is alive
+         */
+        std::vector<SerializedComponent> CaptureEntityComponents(Entity e) const {
+            std::vector<SerializedComponent> result;
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr) return result;
+
+            for (const auto& info : loc.ArchetypePtr->GetComponents()) {
+                const void* ptr = loc.ArchetypePtr->GetRaw(info.Id, loc.ChunkIndex, loc.SlotIndex);
+                SerializedComponent sc;
+                sc.Id = info.Id;
+                sc.Data.resize(info.Size);
+                std::memcpy(sc.Data.data(), ptr, info.Size);
+                result.push_back(std::move(sc));
+            }
+            return result;
+        }
+
+        /**
+         * @brief Restore an entity's components from a serialized snapshot.
+         * 
+         * Removes components not in the snapshot and adds/updates components from the snapshot.
+         * 
+         * @param e The entity to restore
+         * @param comps The serialized component snapshot
+         * @note Does nothing if entity is not alive
+         */
+        void RestoreEntityComponents(Entity e, const std::vector<SerializedComponent>& comps) {
+            if (!IsAlive(e)) return;
+
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr) return;
+
+            // Collect IDs to restore
+            std::unordered_set<ComponentTypeId> restoreIds;
+            for (const auto& sc : comps) {
+                restoreIds.insert(sc.Id);
+            }
+
+            // Remove components not in snapshot
+            std::vector<ComponentTypeId> toRemove;
+            for (const auto& info : loc.ArchetypePtr->GetComponents()) {
+                if (restoreIds.find(info.Id) == restoreIds.end()) {
+                    toRemove.push_back(info.Id);
+                }
+            }
+            for (auto id : toRemove) {
+                RemoveById(e, id);
+            }
+
+            // Add/update components from snapshot
+            for (const auto& sc : comps) {
+                AddComponentById(e, sc.Id, (void*)sc.Data.data(), sc.Data.size());
+            }
+        }
+
+        // ************** Entity Introspection ************** //
+
+        /**
+         * @brief Get all component IDs currently on an entity.
+         * 
+         * Useful for editor inspection or generic entity operations.
+         * 
+         * @param e The entity to inspect
+         * @return Vector of component type IDs; empty if entity is not alive
+         * @note Assumes the entity is alive
+         */
+        std::vector<ComponentTypeId> GetEntityComponents(Entity e) const {
+            std::vector<ComponentTypeId> result;
+            auto& loc = m_locations[e.Index];
+            if (!loc.ArchetypePtr) return result;
+
+            for (const auto& info : loc.ArchetypePtr->GetComponents()) {
+                result.push_back(info.Id);
+            }
+            return result;
         }
 
         // ************** Non-Templated Component API (for C# interop) ************** //
@@ -875,37 +1005,7 @@ namespace ECS {
             }
         }
 
-        /**
-		 * @brief Create a parallel query for the specified component types.
-		 * 
-		 * Creates a query object that can safely iterate over entities and chunks
-		 * in parallel with component access validation.
-		 * 
-		 * @tparam Components The component types to query for
-		 * @return ParallelQuery object for safe parallel iteration
-		 * 
-		 * Example:
-		 * @code
-		 * auto query = world.CreateParallelQuery<Transform, Velocity>();
-		 * auto chunks = query.GetChunks();
-		 * @endcode
-         */
-        template<typename... Components>
-        Jobs::ParallelQuery<Components...> CreateParallelQuery() {
-            return Jobs::ParallelQuery<Components...>(this);
-        }
 
-        /**
-         * @brief Get access to the job manager for scheduling jobs.
-         * @return Reference to the job manager
-         */
-        Jobs::JobManager& GetJobManager() { return m_jobManager; }
-
-        /**
-         * @brief Get const access to the job manager.
-         * @return Const reference to the job manager
-         */
-        const Jobs::JobManager& GetJobManager() const { return m_jobManager; }
 
         /**
          * @brief Get all archetypes in the world.
@@ -1571,6 +1671,10 @@ namespace ECS {
         std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash> m_archetypes;
         std::unordered_map<TypeId, std::pair<size_t,size_t>> m_componentSizes;
 
+        // Batch operation depth for deferred archetype version increments
+        uint32_t m_batchDepth = 0;
+        uint64_t m_batchStartVersion = 0;
+
         HierarchyIndex m_hierarchy;
 
         // Query cache: maps a required signature to matching archetypes.
@@ -1585,9 +1689,6 @@ namespace ECS {
 
         // PrefabManager for managing prefab instances and registration
         PrefabManager* m_prefabManager = nullptr;
-
-        // Job manager for parallel job execution and scheduling
-        Jobs::JobManager m_jobManager;
     };
 }
 

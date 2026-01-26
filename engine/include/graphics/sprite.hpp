@@ -41,6 +41,10 @@ struct Sprite {
     GLuint emissiveTextureId = 0;   // 0 = no emissive map
     float emissiveStrength = 0.0f;  // HDR multiplier
 
+    // Texture dimensions for aspect ratio correction
+    int textureWidth = 0;
+    int textureHeight = 0;
+
     void handleInput(GLFWwindow* window, float deltaTime);
 };
 

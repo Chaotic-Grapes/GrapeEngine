@@ -1,0 +1,150 @@
+/* Start Header *****************************************************************/
+/*!
+\file   GizmoRenderer.cpp
+\author Samanta Leong (50%)
+        Muhammad Nur Fadzly Bin Zulkifli (50%)
+\par    s.leong@digipen.edu
+        muhammadnurfadzly.b@digipen.edu
+\brief
+Implementation of GizmoRenderer ImGuizmo wrapper.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#include "GizmoRenderer.h"
+#include <imgui.h>
+#include <ImGuizmo.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include "core/Logger.h"
+
+namespace Editor {
+
+    GizmoRenderer::GizmoRenderer()
+        : m_operation(Operation::Translate)
+        , m_mode(Mode::Local)
+        , m_isPerspective(false)
+        , m_viewportX(0.0f)
+        , m_viewportY(0.0f)
+        , m_viewportW(1.0f)
+        , m_viewportH(1.0f) {
+    }
+
+    GizmoRenderer::~GizmoRenderer() {
+    }
+
+    void GizmoRenderer::SetViewport(float x, float y, float w, float h) {
+        m_viewportX = x;
+        m_viewportY = y;
+        m_viewportW = w;
+        m_viewportH = h;
+    }
+
+    void GizmoRenderer::SetOperation(Operation op) {
+        m_operation = op;
+    }
+
+    void GizmoRenderer::SetMode(Mode mode) {
+        m_mode = mode;
+    }
+
+    void GizmoRenderer::SetPerspective(bool isPerspective) {
+        m_isPerspective = isPerspective;
+    }
+
+    bool GizmoRenderer::Render(
+        const glm::mat4& viewMatrix,
+        const glm::mat4& projMatrix,
+        const glm::mat4& inputTransform,
+        glm::mat4& outTransform,
+        glm::mat4* outDeltaTransform) {
+
+        // Validate viewport size FIRST
+        if (m_viewportW <= 0 || m_viewportH <= 0) {
+            LOG_WARNING("GizmoRenderer::Render - Invalid viewport: " << m_viewportW << "x" << m_viewportH);
+            return false;  // Can't render with invalid viewport
+        }
+
+        // Check if we're in a valid ImGui context
+        if (!ImGui::GetCurrentContext()) {
+            LOG_ERROR("GizmoRenderer::Render - No ImGui context!");
+            return false;
+        }
+
+        // Initialize ImGuizmo state
+        ImGuizmo::BeginFrame();
+
+        // Enable the gizmo explicitly
+        ImGuizmo::Enable(true);
+
+        // Configure orthographic/perspective mode
+        ImGuizmo::SetOrthographic(!m_isPerspective);
+
+        // Set the draw list for ImGui integration (use current window drawlist)
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        if (!drawList) {
+            LOG_WARNING("GizmoRenderer::Render - No ImGui draw list available!");
+            return false;
+        }
+
+        ImGuizmo::SetDrawlist(drawList);
+
+        // SetRect must use the actual viewport coordinates (image rendering area)
+        // NOT the full window coordinates (which include toolbar)
+        ImGuizmo::SetRect(m_viewportX, m_viewportY, m_viewportW, m_viewportH);
+
+        // Convert operation and mode to ImGuizmo types
+        ImGuizmo::OPERATION imguizmoOp = static_cast<ImGuizmo::OPERATION>(static_cast<int>(m_operation));
+        ImGuizmo::MODE imguizmoMode = static_cast<ImGuizmo::MODE>(static_cast<int>(m_mode));
+
+        // Copy input transform to output (ImGuizmo modifies in-place)
+        outTransform = inputTransform;
+
+        // Call ImGuizmo::Manipulate and get whether it's being used
+        // Note: ImGuizmo accepts both column-major (glm) and row-major matrices
+        // Passing glm matrices directly (column-major)
+        
+        // Use explicit column-major float array for ImGuizmo input/output
+        float matrixArr[16];
+        const float* src = glm::value_ptr(outTransform);
+        for (int i = 0; i < 16; ++i) matrixArr[i] = src[i];
+
+        bool isManipulating = ImGuizmo::Manipulate(
+            glm::value_ptr(viewMatrix),
+            glm::value_ptr(projMatrix),
+            imguizmoOp,
+            imguizmoMode,
+            matrixArr
+        );
+        
+        // Copy back modified matrix into outTransform
+        if (isManipulating) {
+            float* dst = glm::value_ptr(outTransform);
+            for (int i = 0; i < 16; ++i) dst[i] = matrixArr[i];
+        }
+
+        // If delta transform requested, initialize to identity
+        // ImGuizmo doesn't directly expose delta matrices, but we can compute them in the caller
+        if (outDeltaTransform && isManipulating) {
+            *outDeltaTransform = glm::mat4(1.0f);
+        }
+
+        return isManipulating;
+    }
+
+    bool GizmoRenderer::IsBeingUsed() const {
+        return ImGuizmo::IsUsing();
+    }
+
+    bool GizmoRenderer::IsMouseOver() const {
+        return ImGuizmo::IsOver();
+    }
+
+    bool GizmoRenderer::ShouldBlockInput() const {
+        return ImGuizmo::IsUsing() || ImGuizmo::IsOver();
+    }
+
+}  // namespace Editor

@@ -16,8 +16,8 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using GrapeEngine.Scripting.Components;
-using GrapeEngine.Scripting.Unsafe;
-using GrapeEngine.Scripting.Hosting;
+using GrapeEngine.Scripting.Internal.Unsafe;
+using GrapeEngine.Scripting.Internal.Hosting;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -58,7 +58,7 @@ public static partial class ComponentRegistry
             {
                 _registeredHashes.Add(hash);
                 string displayName = customName ?? typeof(T).Name;
-                Console.WriteLine($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})");
+                Logging.LogInternal($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})", LogLevel.Info);
                 
                 // Let the managed serializer know about this managed type so it can
                 // marshal bytes into a typed object for JSON serialization.
@@ -96,10 +96,33 @@ public static partial class ComponentRegistry
     /// Auto-register a component type if not already registered.
     /// This is called internally before component operations.
     /// </summary>
+    /// <exception cref="InvalidOperationException">If component registration fails</exception>
     internal static void EnsureRegistered<T>() where T : unmanaged
     {
         if (!IsRegistered<T>())
-            Register<T>();
+        {
+            bool registered = Register<T>();
+            if (!registered)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to register component type {typeof(T).Name}. " +
+                    $"The native ECS may not have accepted this component type. " +
+                    $"Ensure the component size and alignment are compatible with the native world.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Clear the component registry cache.
+    /// Called during hot reload to allow re-registration of modified component types.
+    /// </summary>
+    internal static void ClearRegistrationCache()
+    {
+        lock (_lock)
+        {
+            _registeredHashes.Clear();
+            Logging.LogInternal("[ComponentRegistry] Cleared registration cache for hot reload", LogLevel.Info);
+        }
     }
 
     /// <summary>
@@ -146,3 +169,4 @@ public static partial class ComponentRegistry
     private static partial Regex ComponentNameRegex();
 
 }
+

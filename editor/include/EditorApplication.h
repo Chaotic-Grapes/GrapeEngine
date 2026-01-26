@@ -43,7 +43,12 @@ public:
     void Initialize();
 
     /**
-     * @brief Update editor UI and tools
+     * @brief Begin frame processing - handle input and request picking
+     */
+    void BeginFrame();
+
+    /**
+     * @brief Update editor UI and tools (called after engine systems)
      */
     void Update();
 
@@ -51,6 +56,11 @@ public:
      * @brief Render editor UI
      */
     void Render();
+
+    /**
+     * @brief End frame processing - resolve picking and update selection
+     */
+    void EndFrame();
 
     /**
      * @brief Shutdown editor and save state

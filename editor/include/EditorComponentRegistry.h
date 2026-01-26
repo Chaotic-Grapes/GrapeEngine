@@ -45,8 +45,10 @@ struct ComponentUIMetadata {
     std::string DisplayName;    // "Sprite Renderer"
     std::string TypeName;       // "SpriteRenderer2D" 
     std::string FullTypeName;   // "ECS::Components::SpriteRenderer2D"
+    ECS::ComponentTypeId ComponentId; // Unique ID from native registry (for deduplication)
     uint32_t TypeHash;          // FNV-1a hash from native registry
     bool CanDelete;             // Whether component can be removed from entities
+    bool IsBuiltin;             // Whether this is a hardcoded C++ component (vs dynamically discovered C# component)
 
     // Render function for editing component properties
     // For C++ components: calls specialized RenderXXX function

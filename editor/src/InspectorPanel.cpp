@@ -124,7 +124,16 @@ void InspectorPanel::InspectEntity(EntityId id) {
     if (IsProtectedEntity(m_world, id)) {
         m_mode = InspectionMode::None;
         m_entityId = 0; // Clear selection
+        m_editState.isEditing = false; // Reset edit state
         return;
+    }
+
+    // IMPORTANT: Clear edit state when entity selection changes
+    // This prevents the inspector from comparing the new entity's transform
+    // against the previous entity's captured transform
+    if (m_entityId != id) {
+        m_editState.isEditing = false;
+        m_editState.entityId = 0;
     }
 
     m_entityId = id;
@@ -234,6 +243,8 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
 void InspectorPanel::ClearSelection() {
     m_mode = InspectionMode::None;
     m_entityId = 0;
+    m_editState.isEditing = false;
+    m_editState.entityId = 0;
     m_prefabPath.clear();
     m_prefabData = {};
     m_componentsToDelete.clear();
@@ -422,6 +433,8 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
     // UI edits this JSON, then we sync the edits back into the ECS
     nlohmann::json entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
 
+    // LOG_DEBUG("[InspectorPanel] Serialized entity " << entity.Index << ": " << entityJson.dump(2));
+
     // Make sure the JSON has a component list we can iterate
     if (entityJson.contains("Components") && entityJson["Components"].is_array()) {
         ImGui::Dummy(ImVec2(0, 4));
@@ -430,6 +443,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         static nlohmann::json editStartState;
         static bool isEditing = false;
+        
+        // Track which components were actually modified this frame
+        std::unordered_set<std::string> modifiedComponents;
 
         // Capture initial state when starting to edit
         if (!m_editState.isEditing) {
@@ -480,6 +496,7 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                         isEditing = true;
                     }
                     wasEdited = true;
+                    modifiedComponents.insert(typeName); // Track which component changed
                 }
 
                 ImGui::Dummy(ImVec2(0, 4));
@@ -524,17 +541,33 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         m_componentsToDelete.clear();
 
         // Second pass: push any edited JSON values back into ECS components
+        // IMPORTANT: Only apply components that were actually modified to prevent
+        // unnecessarily overwriting entity data every frame (which can cause teleporting)
         for (const auto& componentEntry : entityJson["Components"]) {
             // Validate again; same same
             if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
             if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
 
             std::string typeName = componentEntry["TypeName"];
+            
+            // Only apply if this component was modified this frame
+            if (modifiedComponents.find(typeName) == modifiedComponents.end()) {
+                continue; // Skip unmodified components
+            }
+            
             const auto* meta = ComponentRegistryUI::Find(typeName);
             // Apply edited JSON to the actual ECS component
             if (meta) {
+                LOG_DEBUG("[Inspector] Applying modified component: " << typeName << " to entity " << entity.Index);
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
             }
+        }
+
+        // Re-serialize after applying changes so the displayed values stay fresh
+        // This ensures if the component was modified by transform system or other systems,
+        // the inspector shows the current values rather than stale cached values
+        if (wasEdited) {
+            entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
         }
 
         // Record undo when editing finishes
@@ -543,10 +576,24 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (m_undoSystem && m_world->Has<ECS::Components::LocalTransform>(entity)) {
                 const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
 
-                // Only record if something actually changed
-                bool posChanged = (m_editState.startPosition != lt.Position);
-                bool rotChanged = (m_editState.startRotation != lt.Rotation);
-                bool scaleChanged = (m_editState.startScale != lt.Scale);
+                // Use epsilon comparison for floating point values to avoid spurious undo records
+                constexpr float EPSILON = 0.0001f;
+                auto vec3Changed = [EPSILON](const Vector3D& a, const Vector3D& b) {
+                    return (std::abs(a.X - b.X) > EPSILON || 
+                            std::abs(a.Y - b.Y) > EPSILON || 
+                            std::abs(a.Z - b.Z) > EPSILON);
+                };
+                auto quatChanged = [EPSILON](const Quaternion& a, const Quaternion& b) {
+                    return (std::abs(a.W - b.W) > EPSILON || 
+                            std::abs(a.X - b.X) > EPSILON || 
+                            std::abs(a.Y - b.Y) > EPSILON || 
+                            std::abs(a.Z - b.Z) > EPSILON);
+                };
+
+                // Only record if something actually changed beyond floating point precision
+                bool posChanged = vec3Changed(m_editState.startPosition, lt.Position);
+                bool rotChanged = quatChanged(m_editState.startRotation, lt.Rotation);
+                bool scaleChanged = vec3Changed(m_editState.startScale, lt.Scale);
 
                 if (posChanged || rotChanged || scaleChanged) {
                     m_undoSystem->RecordTransformChange(
@@ -566,7 +613,11 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             MarkSceneDirtyIfNeeded(m_fileMenu);
         }
     }
-
+    // else {
+    //     // Debug: show why components aren't rendering
+    //     ImGui::TextDisabled("No Components array in serialized entity");
+    //     LOG_ERROR("[InspectorPanel] Entity " << entity.Index << " has no Components array. JSON: " << entityJson.dump(2));
+    // }
 
     ImGui::EndChild();
     ImGui::PopStyleVar();
@@ -626,7 +677,7 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
             });
 
         // Limit the popup height and make the list scrollable
-        float avail = ImGui::GetContentRegionAvail().y;
+        // float avail = ImGui::GetContentRegionAvail().y;
         float maxListHeight = 400.f;
         if (maxListHeight < 120.0f) maxListHeight = 120.0f;
 
@@ -846,7 +897,7 @@ void InspectorPanel::_renderPrefabActions() {
 
         // Limit popup height and make the list scrollable
 
-        float avail = ImGui::GetContentRegionAvail().y;
+        // float avail = ImGui::GetContentRegionAvail().y;
         float maxListHeight = 400.0f;
         if (maxListHeight < 120.0f) maxListHeight = 120.0f;
         ImGui::BeginChild("AddComponentListPrefab", ImVec2(0, maxListHeight), false, ImGuiWindowFlags_None);
