@@ -19,7 +19,8 @@ Implements the custom MemoryManager class for efficient memory allocation.
 
 #include "services/MemoryManager.h"
 #include "core/Logger.h"
-#include <cstdlib> 
+#include <cstdlib>
+#include <cstring>
 
 // ============================================================================
 // CONSTRUCTORS
@@ -35,9 +36,9 @@ MemoryManager::MemoryPage::MemoryPage(void* start, int size)
 // MEMORY MANAGER IMPLEMENTATION
 // ============================================================================
 
-MemoryManager::MemoryManager(int totalBytes)
+MemoryManager::MemoryManager(int totalBytes, bool debugMode)
 	: m_blockListHead(nullptr), m_pageListHead(nullptr), m_defaultPageSize(totalBytes),
-	m_totalAllocated(0), m_totalFreed(0) {
+	m_totalAllocated(0), m_totalFreed(0), m_debugMode(debugMode) {
 
 	// Allocate the first memory page using raw malloc (this is the only OS allocation at load time)
 	void* memoryPool = malloc(totalBytes);
@@ -46,6 +47,9 @@ MemoryManager::MemoryManager(int totalBytes)
 		LOG_CRITICAL("MemoryManager: Failed to allocate initial memory pool of " << totalBytes << " bytes.");
 		return;
 	}
+
+	// Fill with unallocated pattern if debug mode is enabled
+	if (m_debugMode) memset(memoryPool, UNALLOCATED_PATTERN, totalBytes);
 
 	// Create the first page node
 	MemoryPage* firstPage = (MemoryPage*)malloc(sizeof(MemoryPage));
@@ -76,6 +80,8 @@ MemoryManager::MemoryManager(int totalBytes)
 
 	// Set as head of the block list
 	m_blockListHead = initialBlock;
+
+	if (m_debugMode) LOG_INFO("MemoryManager: Debug mode ENABLED, memory patterns active");
 }
 
 MemoryManager::~MemoryManager() {
@@ -124,6 +130,9 @@ void* MemoryManager::Allocate(int size) {
 			if (current->size == size) {
 				current->allocated = true;
 				m_totalAllocated += size;
+
+				// Fill with allocated pattern if debug mode enabled
+				if (m_debugMode) memset(current->data, ALLOCATED_PATTERN, size);
 				return current->data;
 			}
 
@@ -138,6 +147,9 @@ void* MemoryManager::Allocate(int size) {
 				// Can't allocate metadata, but we can still use the whole block
 				current->allocated = true;
 				m_totalAllocated += current->size;
+
+				// Fill with allocated pattern if debug mode enabled
+				if (m_debugMode) memset(current->data, ALLOCATED_PATTERN, current->size);
 				return current->data;
 			}
 			remainingBlock->data = static_cast<char*>(current->data) + size;
@@ -162,6 +174,10 @@ void* MemoryManager::Allocate(int size) {
 			current->next = remainingBlock;
 
 			m_totalAllocated += size;
+
+			// Fill with allocated pattern if debug mode enabled
+			if (m_debugMode) memset(allocatedPtr, ALLOCATED_PATTERN, size);
+
 			// Return pointer to allocated memory
 			return allocatedPtr;
 		}
@@ -195,6 +211,9 @@ void MemoryManager::Deallocate(void* ptr) {
 
 	while (current != nullptr) {
 		if (current->allocated && current->data == ptr) {
+			// Fill with freed pattern if debug mode enabled
+			if (m_debugMode) memset(current->data, FREED_PATTERN, current->size);
+
 			// If block is found, mark the block as free
 			current->allocated = false;
 			m_totalFreed += current->size;
@@ -223,6 +242,9 @@ void MemoryManager::_extendMemoryPool() {
 		LOG_CRITICAL("MemoryManager: Failed to extend memory pool.");
 		return;
 	}
+
+	// Fill with unallocated pattern if debug mode enabled
+	if (m_debugMode) memset(newPageMemory, UNALLOCATED_PATTERN, m_defaultPageSize);
 
 	// Create new page metadata
 	MemoryPage* newPage = (MemoryPage*)malloc(sizeof(MemoryPage));
@@ -320,9 +342,7 @@ void MemoryManager::_mergeAdjacentFreeBlocks(MemoryBlock* block) {
 			block->size += nextBlock->size;
 			block->next = nextBlock->next;
 
-			if (nextBlock->next != nullptr) {
-				nextBlock->next->prev = block;
-			}
+			if (nextBlock->next != nullptr) nextBlock->next->prev = block;
 
 			// Remove next block
 			free(nextBlock);  // Free the metadata of the merged block
@@ -356,11 +376,18 @@ void MemoryManager::_mergeAdjacentFreeBlocks(MemoryBlock* block) {
 // DEBUGGING AND UTILITY
 // ============================================================================
 
+void MemoryManager::SetDebugMode(bool enabled) {
+	m_debugMode = enabled;
+	if (m_debugMode) LOG_INFO("MemoryManager: Debug mode ENABLED");
+	else LOG_INFO("MemoryManager: Debug mode DISABLED");
+}
+
 void MemoryManager::Dump(std::ostream& os) {
 	// Print information about the block structure
 	os << "========================================" << std::endl;
 	os << "MEMORY MANAGER STATE" << std::endl;
 	os << "========================================" << std::endl;
+	os << "Debug Mode: " << (m_debugMode ? "ENABLED" : "DISABLED") << std::endl;
 	os << "Total Allocated: " << m_totalAllocated << " bytes" << std::endl;
 	os << "Total Freed: " << m_totalFreed << " bytes" << std::endl;
 	os << "Currently In Use: " << (m_totalAllocated - m_totalFreed) << " bytes" << std::endl;
@@ -414,8 +441,12 @@ void MemoryManager::Dump(std::ostream& os) {
 // ============================================================================
 
 MemoryManager& MemoryManager::GetInstance() {
-	// Static instance with 1MB default pool size
-	static MemoryManager instance(1024 * 1024);  // 1 MB default
+// Static instance with 1MB default pool size
+// Debug mode enabled in debug builds
+#ifdef _DEBUG
+	static MemoryManager instance(1024 * 1024, true);  // 1 MB default, debug ON
+#else
+	static MemoryManager instance(1024 * 1024, false); // 1 MB default, debug OFF
+#endif
 	return instance;
 }
-

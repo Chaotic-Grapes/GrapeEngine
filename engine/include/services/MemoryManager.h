@@ -28,6 +28,15 @@ Provides:
 class MemoryManager {
 private:
 	// ============================================================================
+	// DEBUG PATTERNS
+	// ============================================================================
+
+	// Memory signature patterns for debugging (similar to ObjectAllocator)
+	static const unsigned char UNALLOCATED_PATTERN = 0xAA;  // New memory
+	static const unsigned char ALLOCATED_PATTERN = 0xBB;    // In use
+	static const unsigned char FREED_PATTERN = 0xCC;        // Just freed
+
+	// ============================================================================
 	// CONSTRUCTORS
 	// ============================================================================
 
@@ -58,6 +67,7 @@ private:
 	int m_defaultPageSize;          // Size of each memory page
 	int m_totalAllocated;           // Total bytes allocated
 	int m_totalFreed;               // Total bytes freed
+	bool m_debugMode;               // Enable/disable debug pattern filling
 
 	// ============================================================================
 	// MEMORY POOL EXTENSION
@@ -88,7 +98,7 @@ public:
 	// ============================================================================
 
 	// Initializes memory manager with initial pool size
-	MemoryManager(int totalBytes);
+	MemoryManager(int totalBytes, bool debugMode = false);
 
 	// Destructor: frees all memory pages
 	~MemoryManager();
@@ -110,6 +120,12 @@ public:
 
 	// Dumps the current state of the memory manager
 	void Dump(std::ostream& os);
+
+	// Enable or disable debug mode at runtime
+	void SetDebugMode(bool enabled);
+
+	// Get current debug mode state
+	bool GetDebugMode() const { return m_debugMode; }
 
 	// ============================================================================
 	// SINGLETON PATTERN
