@@ -1,6 +1,6 @@
 #ifndef STATE_MACHINE
 #define STATE_MACHINE
-#include "../services/StateMachine.h"
+#include "StateMachine.h"
 
 
 /**

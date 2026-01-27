@@ -30,7 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <thread>
 #include <filesystem>
 #include "ecs/gui/GUISystem.h"
-//#include "services/UIEvents.h"
+#include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 
 // Undefine potential Windows macros that conflict with enum names
@@ -106,8 +106,8 @@ namespace Engine {
         const double rawDelta = frameStart - m_lastFrameTime;
         m_lastFrameTime = frameStart;
 
-        //// Clear UI event queue
-        //ECS::UIEventQueue::Clear();
+        // Clear UI event queue
+        ECS::UIEventQueue::Clear();
         
         // Update time using platform timestamp and computed delta
         TimeSystem::Instance().Advance(rawDelta, frameStart);
