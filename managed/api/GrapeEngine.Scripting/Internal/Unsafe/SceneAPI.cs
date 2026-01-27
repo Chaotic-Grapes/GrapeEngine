@@ -63,6 +63,10 @@ internal static partial class SceneAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void SetActiveImmediate(void* sceneManagerPtr, ulong sceneIndex);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_SetActiveWithTransition")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial void SetActiveWithTransition(void* sceneManagerPtr, ulong sceneIndex, int transitionMode, float fadeDuration);
+
     [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_GetActive")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial void* GetActive(void* sceneManagerPtr);

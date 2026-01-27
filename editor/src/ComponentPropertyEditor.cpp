@@ -964,16 +964,13 @@ static std::string s_unsupportedPath;
 void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;
     (void)world;
-    // Ensure keys exist with defaults
-    if (!data.contains("CueId"))       data["CueId"] = 0;
-    if (!data.contains("Volume"))      data["Volume"] = 1.0f;
-    if (!data.contains("Pitch"))       data["Pitch"] = 1.0f;
-    if (!data.contains("Loop"))        data["Loop"] = false;
-    if (!data.contains("PlayOnStart")) data["PlayOnStart"] = false;
-    if (!data.contains("Spatial3D"))   data["Spatial3D"] = false;
+    // Note: Defaults are now handled by EditorComponentRegistry, not here
+    // This prevents JSON modification every frame which would mark component as dirty
 
     // SINGLE BeginPropertySection call with ALL field names for proper alignment
-    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D" });
+    // Note: Fade duration fields are conditionally shown, so we include all possible fields
+    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D",
+                                     "Enable Fade In", "Fade In Duration", "Enable Fade Out", "Fade Out Duration" });
 
     uint32_t cueId = data.value("CueId", 0u);
     auto& lib = AudioAssetLibrary::Get();
@@ -1071,6 +1068,23 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
     EditorUI::RenderCheckboxProperty("Play On Start", data, "PlayOnStart");
     EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
+
+    // Fade settings
+    EditorUI::RenderCheckboxProperty("Enable Fade In", data, "EnableFadeIn");
+
+    // Only show fade duration if fade is enabled
+    bool fadeInEnabled = data.value("EnableFadeIn", false);
+    if (fadeInEnabled) {
+        EditorUI::RenderFloatRow("Fade In Duration", "s", data, "FadeInDuration", 0.1f);
+    }
+
+    EditorUI::RenderCheckboxProperty("Enable Fade Out", data, "EnableFadeOut");
+
+    // Only show fade duration if fade is enabled
+    bool fadeOutEnabled = data.value("EnableFadeOut", false);
+    if (fadeOutEnabled) {
+        EditorUI::RenderFloatRow("Fade Out Duration", "s", data, "FadeOutDuration", 0.1f);
+    }
 
     // SINGLE EndPropertySection call
     EditorUI::EndPropertySection();

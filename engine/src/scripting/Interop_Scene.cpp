@@ -132,6 +132,31 @@ INTEROP_API void SceneManagerInterop_SetActiveImmediate(void* sceneManagerPtr, u
 }
 
 /**
+ * @brief Set the active scene with audio fade transition support
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index of the scene to activate
+ * @param transitionMode 0=Immediate, 1=FadeOut, 2=CrossFade
+ * @param fadeDuration Duration of fade in seconds (used for FadeOut and CrossFade modes)
+ */
+INTEROP_API void SceneManagerInterop_SetActiveWithTransition(void* sceneManagerPtr, uint64_t sceneIndex, int transitionMode, float fadeDuration) {
+    if (!sceneManagerPtr)
+        return;
+
+    Scenes::SceneManager* manager = static_cast<Scenes::SceneManager*>(sceneManagerPtr);
+    Scenes::SceneTransitionMode mode = Scenes::SceneTransitionMode::Immediate;
+
+    switch (transitionMode) {
+        case 0: mode = Scenes::SceneTransitionMode::Immediate; break;
+        case 1: mode = Scenes::SceneTransitionMode::FadeOut; break;
+        case 2: mode = Scenes::SceneTransitionMode::CrossFade; break;
+        default: mode = Scenes::SceneTransitionMode::Immediate; break;
+    }
+
+    manager->SetActiveWithTransition(static_cast<size_t>(sceneIndex), mode, fadeDuration);
+}
+
+/**
  * @brief Get the currently active scene
  *
  * @param sceneManagerPtr Pointer to the SceneManager

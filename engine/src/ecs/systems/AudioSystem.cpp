@@ -242,7 +242,13 @@ namespace ECS {
                 // ----------------------------------------------------------------
                 if (hasInstance) {
                     Audio::PlaybackHandle handle = it->second;
-                    device->SetInstanceVolume(handle, src.Volume);
+
+                    // Only set volume directly if NOT currently fading
+                    // Fading entities have their volume managed by _updateFades()
+                    if (!IsEntityFading(e)) {
+                        device->SetInstanceVolume(handle, src.Volume);
+                    }
+
                     device->SetInstancePitch(handle, src.Pitch);
 
                     // Update 3D position if spatial audio is enabled
@@ -485,5 +491,59 @@ namespace ECS {
         }
 
         return maxRemaining;
+    }
+
+    void AudioSystem::OnSceneWillUnload(float fadeDuration) {
+        if (fadeDuration > 0.0f) {
+            FadeOutAllAudio(fadeDuration);
+            LOG_DEBUG("AudioSystem: Scene will unload - fading out all audio (duration="
+                     << fadeDuration << "s)");
+        }
+        else {
+            // Immediate stop without fade
+            OnSceneStop();
+        }
+    }
+
+    void AudioSystem::FadeOutAllAudio(float duration) {
+        if (duration <= 0.0f) {
+            LOG_WARNING("AudioSystem::FadeOutAllAudio called with duration <= 0, using immediate stop");
+            OnSceneStop();
+            return;
+        }
+
+        // Start fade-out for all currently playing sounds
+        for (auto& [entity, handle] : m_activeSounds) {
+            // Check if already fading
+            auto fadeIt = m_activeFades.find(entity);
+            if (fadeIt != m_activeFades.end()) {
+                // Already fading - update to fade-out if it was fading in
+                if (fadeIt->second.IsFadingIn) {
+                    fadeIt->second.IsFadingIn = false;
+                    fadeIt->second.TargetVolume = 0.0f;
+                    fadeIt->second.FadeDuration = duration;
+                    fadeIt->second.ElapsedTime = 0.0f;
+                }
+            }
+            else {
+                // Not fading - start new fade-out
+                _startFadeOut(entity, duration);
+            }
+        }
+
+        LOG_DEBUG("AudioSystem: Fading out " << m_activeSounds.size()
+                 << " sounds (duration=" << duration << "s)");
+    }
+
+    bool AudioSystem::HasActiveFadeOuts() const {
+        return _hasActiveFadeOuts();
+    }
+
+    float AudioSystem::GetMaxFadeOutRemaining() const {
+        return _getMaxFadeOutRemaining();
+    }
+
+    bool AudioSystem::IsEntityFading(Entity entity) const {
+        return m_activeFades.find(entity) != m_activeFades.end();
     }
 } // namespace ECS

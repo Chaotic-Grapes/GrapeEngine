@@ -15,11 +15,20 @@ namespace GrapeEngine.Scripting.Components;
 [StructLayout(LayoutKind.Sequential)]
 public record struct AudioSource(uint CueId)
 {
+    // Basics
     public uint CueId = CueId;
     public float Volume = 1.0f;
     public float Pitch = 1.0f;
     public bool Loop = false;
     public bool PlayOnStart = false;
     public bool Spatial3D = true;
+
+    // Fade flags
+    public bool EnableFadeIn = false;
+    public bool EnableFadeOut = false;
+
+    // Fade durations (seconds)
+    public float FadeInDuration = 1.0f;
+    public float FadeOutDuration = 1.0f;
 }
 

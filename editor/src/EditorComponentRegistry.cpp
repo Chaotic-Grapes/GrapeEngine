@@ -307,15 +307,19 @@ static auto& _getCppComponentDefaults() {
             }; 
         };
         
-        defaults[ECS::ComponentRegistry::Type<AudioSource>()] = []() { 
+        defaults[ECS::ComponentRegistry::Type<AudioSource>()] = []() {
             return nlohmann::json{
                 {"CueId", 0 },
                 {"Volume", 1.0f },
                 {"Pitch", 1.0f },
                 {"Loop", false },
                 {"PlayOnStart", false },
-                {"Spatial3D", false }
-            }; 
+                {"Spatial3D", false },
+                {"EnableFadeIn", false },
+                {"EnableFadeOut", false },
+                {"FadeInDuration", 1.0f },
+                {"FadeOutDuration", 1.0f }
+            };
         };
         
         defaults[ECS::ComponentRegistry::Type<Layer>()] = []() { 
@@ -570,7 +574,11 @@ static void _initializeDefaultRegistry() {
                 { "Pitch", 1.0f },
                 { "Loop", false },
                 { "PlayOnStart", false },
-                { "Spatial3D", false }
+                { "Spatial3D", false },
+                { "EnableFadeIn", false },
+                { "EnableFadeOut", false },
+                { "FadeInDuration", 1.0f },
+                { "FadeOutDuration", 1.0f }
             }; }),
             COMPONENT_OPS(AudioSource)
         },

@@ -257,7 +257,7 @@ namespace ECS {
 		}
 
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D, EnableFadeIn, EnableFadeOut, FadeInDuration, FadeOutDuration)
 	}
 }
 

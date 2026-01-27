@@ -32,10 +32,20 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/systems/AudioSystem.h"
 
 using json = nlohmann::json;
 
 namespace Scenes {
+    /**
+     * @brief Defines how audio should behave during scene transitions
+     */
+    enum class SceneTransitionMode {
+        Immediate,      // Instant switch, stop all audio immediately
+        FadeOut,        // Fade out current scene audio, then switch
+        CrossFade       // Overlap: fade out old scene while fading in new scene
+    };
+
     class SceneManager {
     public:
         // Default constructor
@@ -131,8 +141,32 @@ namespace Scenes {
         void SetActiveImmediate(const size_t index) {
             if (index >= m_scenes.size())
                 return;
-            
+
             _performTransition(index);
+        }
+
+        /**
+         * @brief Sets active scene with audio fade support
+         * @param index The index of the scene to activate
+         * @param mode Transition mode (Immediate, FadeOut, or CrossFade)
+         * @param fadeDuration Duration of fade in seconds (used for FadeOut and CrossFade modes)
+         * @note This queues the transition for the next Update boundary
+         */
+        void SetActiveWithTransition(const size_t index, SceneTransitionMode mode = SceneTransitionMode::Immediate, float fadeDuration = 1.0f) {
+            if (index >= m_scenes.size())
+                return;
+
+            m_pendingActive = index;
+            m_transitionMode = mode;
+            m_transitionFadeDuration = fadeDuration;
+        }
+
+        /**
+         * @brief Sets the AudioSystem reference for scene transition coordination
+         * @param audioSystem Pointer to the AudioSystem (can be nullptr)
+         */
+        void SetAudioSystem(ECS::AudioSystem* audioSystem) {
+            m_audioSystem = audioSystem;
         }
 
         /**
@@ -406,13 +440,54 @@ namespace Scenes {
             if (m_pendingActive == NPOS)
                 return;
 
+            // Handle fade-aware transitions
+            if (m_transitionMode != SceneTransitionMode::Immediate && m_audioSystem) {
+                if (!m_waitingForFadeOut) {
+                    // Start fade-out on first call
+                    if (m_transitionMode == SceneTransitionMode::FadeOut ||
+                        m_transitionMode == SceneTransitionMode::CrossFade) {
+                        m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration);
+                        m_waitingForFadeOut = true;
+                        m_transitionFadeTimer = 0.0f;
+                        return; // Don't transition yet, wait for fade
+                    }
+                }
+                else {
+                    // Update fade timer
+                    m_transitionFadeTimer += static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+
+                    // Check if fade is complete
+                    bool fadeComplete = !m_audioSystem->HasActiveFadeOuts();
+                    bool timeoutReached = m_transitionFadeTimer >= (m_transitionFadeDuration + 0.1f); // Small buffer
+
+                    if (!fadeComplete && !timeoutReached) {
+                        return; // Still fading, wait
+                    }
+
+                    // Fade complete or timeout - proceed with transition
+                    m_waitingForFadeOut = false;
+                }
+            }
+
+            // Perform the actual transition
             _performTransition(m_pendingActive);
             m_pendingActive = NPOS;
+
+            // Reset transition settings
+            m_transitionMode = SceneTransitionMode::Immediate;
+            m_transitionFadeDuration = 1.0f;
         }
 
         void _performTransition(const size_t toIndex) {
             if (toIndex >= m_scenes.size() || m_active == toIndex)
                 return;
+
+            // Stop audio from old scene when transitioning
+            // Note: For fade modes, audio is already stopped/fading via OnSceneWillUnload
+            // For Immediate mode, we need to stop it here
+            if (m_audioSystem && m_transitionMode == SceneTransitionMode::Immediate) {
+                m_audioSystem->OnSceneStop();
+            }
 
             m_active = toIndex;
         }
@@ -469,6 +544,13 @@ namespace Scenes {
         static constexpr size_t NPOS = static_cast<size_t>(-1);
         size_t m_active = NPOS;
         size_t m_pendingActive = NPOS;
+
+        // Audio fade transition support
+        ECS::AudioSystem* m_audioSystem = nullptr;
+        SceneTransitionMode m_transitionMode = SceneTransitionMode::Immediate;
+        float m_transitionFadeDuration = 1.0f;
+        float m_transitionFadeTimer = 0.0f;
+        bool m_waitingForFadeOut = false;
     };
 }
 

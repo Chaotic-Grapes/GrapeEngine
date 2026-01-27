@@ -18,6 +18,19 @@ using GrapeEngine.Scripting.Internal.Unsafe;
 namespace GrapeEngine.Scripting.Core;
 
 /// <summary>
+/// Defines how audio should behave during scene transitions.
+/// </summary>
+public enum SceneTransitionMode
+{
+    /// <summary>Instant switch, stop all audio immediately</summary>
+    Immediate = 0,
+    /// <summary>Fade out current scene audio, then switch</summary>
+    FadeOut = 1,
+    /// <summary>Overlap: fade out old scene while fading in new scene</summary>
+    CrossFade = 2
+}
+
+/// <summary>
 /// Manages scenes in the application. Handles scene loading, unloading, and activation.
 /// </summary>
 public class SceneManager
@@ -143,6 +156,21 @@ public class SceneManager
         unsafe
         {
             SceneAPI.SetActiveImmediate(_sceneManagerPtr, sceneIndex);
+        }
+    }
+
+    /// <summary>
+    /// Sets the active scene with audio fade transition support.
+    /// This queues the transition for the next update boundary.
+    /// </summary>
+    /// <param name="sceneIndex">The index of the scene to activate.</param>
+    /// <param name="mode">Transition mode (Immediate, FadeOut, or CrossFade).</param>
+    /// <param name="fadeDuration">Duration of fade in seconds (used for FadeOut and CrossFade modes).</param>
+    public void SetActiveWithTransition(ulong sceneIndex, SceneTransitionMode mode = SceneTransitionMode.Immediate, float fadeDuration = 1.0f)
+    {
+        unsafe
+        {
+            SceneAPI.SetActiveWithTransition(_sceneManagerPtr, sceneIndex, (int)mode, fadeDuration);
         }
     }
 
