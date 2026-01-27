@@ -67,6 +67,8 @@ namespace ECS {
     private:
         Services::AudioService& m_audioService;
 
+        void _startFadeOutByHandle(Audio::PlaybackHandle handle, float duration);
+
         /// Map entity -> playing audio handle
         std::unordered_map<Entity, Audio::PlaybackHandle, EntityHash> m_activeSounds;
 

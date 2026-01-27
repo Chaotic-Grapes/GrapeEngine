@@ -197,7 +197,7 @@ int main() {
                     // Transitioning from Edit to any active state: start PlayOnly systems
                     auto& systemManager = engine.GetSystemManager();
                     systemManager.OnSceneStart(world);
-                }
+                } 
                 
                 // Update previous state after processing transition
                 previousState = state;

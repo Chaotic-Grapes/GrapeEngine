@@ -483,7 +483,7 @@ namespace ECS {
 
             // Presets for fade capability
             float FadeInDuration =1.0f;
-            Float FadeOutDuration =1.0f;
+            float FadeOutDuration =1.0f;
 
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
