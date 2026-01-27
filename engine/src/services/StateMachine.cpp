@@ -105,14 +105,14 @@ namespace Engine {
 			// Clear currentState if state exists
             if (m_currentState)
             {
-                m_currentState->ExitAction();
+                m_currentState->OnExit();
             }
 
 			// Then switch to newState
             m_currentState = newState;
 
 			// Set current to initialize funct
-            m_currentState->EntryAction();
+            m_currentState->OnEnter();
 
         }
 
@@ -148,7 +148,7 @@ namespace Engine {
             if (!m_currentState)
                 return;
 
-            m_currentState->UpdateAction(deltaTime);
+            m_currentState->OnUpdate(deltaTime);
 
         }
 
