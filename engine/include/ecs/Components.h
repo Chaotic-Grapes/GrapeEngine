@@ -453,16 +453,28 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<Light2D>, "Light2D must be trivially copyable");
 
-        // ---------- Audio (kept minimal) ----------
+        // ---------- Audio ----------
 
         struct AudioSource {
         public:
+
+            // Basics
             uint32_t CueId = 0;
             float Volume = 1.0f;
             float Pitch = 1.0f;
             bool Loop = false;
             bool PlayOnStart = false;
+
+            // TODO
             bool Spatial3D = true;
+
+            // Fade flags
+			bool EnableFadeIn = false;
+			bool EnableFadeOut = false;
+
+			// Fade durations (seconds)
+			float FadeInDuration = 1.0f;
+			float FadeOutDuration = 1.0f;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
     }

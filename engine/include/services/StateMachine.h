@@ -5,48 +5,45 @@
 #include <memory>
 
 
-namespace Engine {
-	namespace Gameplay {
+namespace Engine::Gameplay {
 
-		// // forward declarations for other classess
-		// class Brain;
-		// class FiniteStateMachine;
-		// class State;
+	// forward declarations for other classess
+	class State;
+	// class Brain;
+	// class FiniteStateMachine;
 		
-		// Transition class to help with the engagement of C# and C++ 
-		// Communication and container state transitions
-		class Transition {
-			
-			// Destructor 
-			virtual ~Transition() = default;
+	// Transition class to help with the engagement of C# and C++ 
+	// Communication and container state transitions
+	class Transition {
+	public:
+		// Destructor 
+		virtual ~Transition() = default;
 
-			// Get target state to transition to 
-			virtual State* getTargetState() =0;
+		// Get target state to transition to 
+		virtual State* GetTargetState() = 0;
 
-			// Evaluate if condition is met and ret true if transition should 
-			// Happen, false otherwise.
-			virtual bool Condition() = 0;
-		};
+		// Evaluate if condition is met and ret true if transition should 
+		// Happen, false otherwise.
+		virtual bool Condition() = 0;
+	};
 
-		// State class to represent states in FSM
-		class State
-        {
-        public:
+	// State class to represent states in FSM
+	class State {
+    public:
 
-			// Dtor
-            virtual ~State() = default;
+		// Dtor
+        virtual ~State() = default;
 
-			// On enter/exit/update functionalities
-            virtual void OnEnter() {}
-            virtual void OnUpdate(float deltaTime) {}
-            virtual void OnExit() {}
-        };
+		// On enter/exit/update functionalities
+        virtual void OnEnter() {}
+        virtual void OnUpdate(float deltaTime) {}
+        virtual void OnExit() {}
+    };
 
-		// Class for FSM 
-		// List states, active state, update in a loop
-		class FiniteStateMachine {
-		public:
-
+	// Class for FSM 
+	// List states, active state, update in a loop
+	class FiniteStateMachine {
+	public:
 		// Default ctr
 		FiniteStateMachine();
 		// Dtor
@@ -58,53 +55,49 @@ namespace Engine {
 		void TransitionTo(/*States new state*/);
 
 		// Get Specific states 
-		State* getCurrentState() const;
-		State* getIdleState() const;
-		State* getChaseState() const;
-		State* getAttackState() const;
+		State* GetCurrentState() const;
+		State* GetIdleState() const;
+		State* GetChaseState() const;
+		State* GetAttackState() const;
 
-		private:
+	private:
 		
 		// predefined states we can use to cordinate with
 		State* m_idleState();
-		state* m_attackState();
-		state* m_chaseState();
-		state* m_currentState();
+		State* m_attackState();
+		State* m_chaseState();
+		State* m_currentState();
 		
 		// Transition to a new state
-		void TransitionTo(state* newState);
+		void TransitionTo(State* newState);
+	};
 
-		};
+	// Image this as a top layer wrapper that will function as the 
+	// main brain that controls each state change for each AI-entity
+	class Brain {
+    public:
+        Brain();
+        ~Brain();
 
-		// Image this as a top layer wrapper that will function as the 
-		// main brain that controls each state change for each AI-entity
-		  class Brain
-        {
-        public:
-            Brain();
-            ~Brain();
+        // C# calls this to make transitions
+        void TransitionTo(State* newState);
 
-            // C# calls this to make transitions
-            void TransitionTo(State* newState);
+        // C# queries this to check current state
+        State* GetCurrentState() const;
 
-            // C# queries this to check current state
-            State* GetCurrentState() const;
+        // Get specific states
+        State* GetPatrolState() const;
+        State* GetChaseState() const;
+        State* GetAttackState() const;
 
-            // Get specific states
-            State* GetPatrolState() const;
-            State* GetChaseState() const;
-            State* GetAttackState() const;
+        // update for cycle for states
+        void Update(float deltaTime);
 
-            // update for cycle for states
-            void Update(float deltaTime);
-
-        private:
-			// Running States
-            State* m_patrolState;
-            State* m_chaseState;
-            State* m_attackState;
-            State* m_currentState;
-        };
-
-	}
-}
+    private:
+		// Running States
+        State* m_patrolState;
+        State* m_chaseState;
+        State* m_attackState;
+        State* m_currentState;
+    };
+} // namespace Engine::Gameplay

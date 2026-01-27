@@ -67,15 +67,34 @@ namespace ECS {
     private:
         Services::AudioService& m_audioService;
 
-        /// Map entity -> playing audio handle
-        std::unordered_map<Entity, Audio::PlaybackHandle, EntityHash> m_activeSounds;
+        // Fade State
+        struct FadeState {
+            float CurrentVolume = 0.0f;
+            float TargetVolume = 1.0f;
+            float FadeDuration = 1.0f;
+            float ElapsedTime = 0.0f;
+            bool IsFadingIn = true;
+        };
 
-        /// Track if scene has started (for PlayOnStart logic)
+        // Map entity -> playing audio handle
+        std::unordered_map<Entity, Audio::PlaybackHandle, EntityHash> m_activeSounds;
+        // Map entity -> fade states stored
+        std::unordered_map<Entity, FadeState, EntityHash> m_activeFades;
+
+        // Track if scene has started (for PlayOnStart logic)
         bool m_hasStarted = false;
 
         // Helper methods
-        void _stopSound(Entity entity);
+        void _stopSound(Entity entity, World& world, bool allowFade = true);
         bool _isGamePlaying() const;
+
+        // Fade helper methods
+		void _startFadeIn(Entity entity, Audio::PlaybackHandle handle, float duration, float targetVolume);
+		void _startFadeOut(Entity entity, float duration);
+        void _startFadeOutByHandle(Audio::PlaybackHandle handle, float duration);
+		void _updateFades(World& world, float deltaTime);
+        bool _hasActiveFadeOuts() const;
+        float _getMaxFadeOutRemaining() const;
     };
 }
 

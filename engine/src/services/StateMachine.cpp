@@ -1,6 +1,4 @@
-#ifndef STATE_MACHINE
-#define STATE_MACHINE
-#include "StateMachine.h"
+#include "services/StateMachine.h"
 
 
 /**
@@ -155,6 +153,4 @@ namespace Engine {
         }
 
     } 
-} 
-
-#endif STATE_MACHINE
+}
