@@ -12,7 +12,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Query;
+using GrapeEngine.Scripting.Internal.Query;
 using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 
 namespace GrapeEngine.Scripting.Core.StructuralChanges;
@@ -25,7 +25,7 @@ public static class StructuralChangePatterns
     /// <summary>
     /// Pattern: Destroy all entities matching a condition.
     /// 
-    /// Safe pattern for removing entities from a parallel job.
+    /// Safe pattern for removing entities using a command buffer.
     /// </summary>
     public static int DestroyAllMatching<T>(
         Query<T> query,
@@ -70,7 +70,7 @@ public static class StructuralChangePatterns
     /// <summary>
     /// Pattern: Spawn entities in bulk.
     /// 
-    /// Safe pattern for creating many entities from a job.
+    /// Safe pattern for creating many entities using a command buffer.
     /// </summary>
     public static List<Entity> SpawnBulk(
         CommandBuffer buffer,
@@ -91,7 +91,7 @@ public static class StructuralChangePatterns
     /// <summary>
     /// Pattern: Clone entities matching a condition.
     /// 
-    /// Safe pattern for duplicating entities from a parallel job.
+    /// Safe pattern for duplicating entities using a command buffer.
     /// </summary>
     public static int CloneMatching<T>(
         Query<T> query,
@@ -163,3 +163,4 @@ public static class StructuralChangePatterns
         return swappedCount;
     }
 }
+

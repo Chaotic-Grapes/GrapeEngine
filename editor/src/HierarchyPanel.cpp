@@ -42,6 +42,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <fstream>
 #include <filesystem>
 #include "BaseViewport.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 
 namespace {
     // Helper template function to safely add components during deserialization
@@ -70,15 +72,9 @@ namespace {
     // Helper function to check if entity should be hidden from hierarchy
     // Returns true if entity should be filtered out (hidden)
     bool ShouldHideFromHierarchy(ECS::World* world, ECS::Entity entity) {
-        if (!world || entity.IsNull() || !world->IsAlive(entity)) return true;
-
-        // Hide entities named "EditorCamera" (editor system entity)
-        if (world->Has<ECS::Components::Name>(entity)) {
-            const auto& name = world->Get<ECS::Components::Name>(entity);
-            if (std::string(name.Value) == "EditorCamera") {
-                return true;
-            }
-        }
+        // Also hide entities that are not alive or null, or the camera editor entity
+        if (!world || entity.IsNull() || !world->IsAlive(entity) || world->Has<ECS::Components::CameraEditor3D>(entity))
+            return true;
 
         return false;
     }
@@ -120,6 +116,30 @@ void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
     // Cache pointers to world and entity actions so we operate on correct scene
     m_world = world;
     m_entityActions = entityActions;
+
+    // Subscribe to viewport entity selection messages to sync hierarchy with viewport
+    m_entitySelectedSubscription = Messaging::MessageSystem::Subscribe<Messaging::EditorEntitySelected>(
+        [this](const Messaging::EditorEntitySelected& event) {
+            // When viewport selects an entity, update hierarchy selection and expand parent nodes
+            if (event.EntityId != ECS::Entity::NPOS32) {
+                SetSelectedEntity(event.EntityId);
+                
+                // Expand all ancestor nodes to reveal the selected entity
+                ECS::Entity entity = m_world->Resolve(event.EntityId);
+                while (!entity.IsNull() && m_world->IsAlive(entity)) {
+                    m_expandedNodes.insert(entity.Index);
+                    
+                    // Move to parent if it exists
+                    ECS::Entity parentEntity = m_world->ParentOf(entity);
+                    if (!parentEntity.IsNull()) {
+                        entity = parentEntity;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    );
 }
 
 // Update the world reference when scene changes
@@ -675,6 +695,8 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
             m_selectedEntityIds.clear();
             m_selectedEntityIds.insert(entityId);
             m_anchorEntityId = entityId;
+            // Publish selection change to sync with viewport
+            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(entityId));
         }
         // Trigger callback with first selected entity
         if (m_selectionCallback) m_selectionCallback(entityId);
@@ -737,6 +759,8 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
                 }
             }
 
+            // Publish selection change to sync with viewport (send primary selected)
+            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(entityId));
             if (m_selectionCallback) m_selectionCallback(entityId);
         }
         else if (ctrlPressed) {
@@ -752,6 +776,9 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
                 m_selectedEntityIds.insert(entityId);
                 m_anchorEntityId = entityId;
             }
+            // Publish selection change to sync with viewport
+            EntityId selectedId = m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin();
+            Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(selectedId));
             if (m_selectionCallback) m_selectionCallback(entityId);
         }
         else {
@@ -767,6 +794,8 @@ void HierarchyPanel::_handleNodeInteraction(EntityId entityId) {
                 m_selectedEntityIds.clear();
                 m_selectedEntityIds.insert(entityId);
                 m_anchorEntityId = entityId;
+                // Publish selection change to sync with viewport
+                Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(entityId));
                 if (m_selectionCallback) m_selectionCallback(entityId);
             }
         }

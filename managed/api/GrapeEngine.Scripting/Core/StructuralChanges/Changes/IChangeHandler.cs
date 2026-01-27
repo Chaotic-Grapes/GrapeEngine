@@ -29,3 +29,4 @@ public interface IChangeHandler
     /// </summary>
     string GetDescription();
 }
+

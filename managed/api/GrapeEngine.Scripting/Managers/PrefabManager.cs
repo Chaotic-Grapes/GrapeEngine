@@ -12,10 +12,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using System.Runtime.InteropServices;
-using System.Reflection;
-using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
 
 namespace GrapeEngine.Scripting.Managers;
 
@@ -34,7 +31,7 @@ public class PrefabManager
     {
         unsafe
         {
-            var nativePtr = Unsafe.PrefabAPI.GetPrefabManagerInstance();
+            var nativePtr = PrefabAPI.GetPrefabManagerInstance();
             if (nativePtr == null)
                 throw new InvalidOperationException("PrefabManager instance is not available.");
             return new PrefabManager(nativePtr);
@@ -46,9 +43,8 @@ public class PrefabManager
     /// </summary>
     public static PrefabManager GetFromScene(Scene scene)
     {
-        if (scene == null)
-            throw new ArgumentNullException(nameof(scene));
-        
+        ArgumentNullException.ThrowIfNull(scene);
+
         // Get the PrefabManager via the scene's internal pointer
         // Using reflection approach since we can't directly access _scenePtr
         var type = scene.GetType();
@@ -64,7 +60,7 @@ public class PrefabManager
         unsafe
         {
             var scenePtr = (void*)(IntPtr)scenePtrValue;
-            var nativePtr = Unsafe.SceneAPI.GetPrefabManager(scenePtr);
+            var nativePtr = SceneAPI.GetPrefabManager(scenePtr);
             
             if (nativePtr == null)
                 throw new InvalidOperationException("Could not get PrefabManager from scene.");
@@ -93,7 +89,7 @@ public class PrefabManager
 
         unsafe
         {
-            return Unsafe.PrefabAPI.RegisterPrefab(_nativePtr, path);
+            return PrefabAPI.RegisterPrefab(_nativePtr, path);
         }
     }
 
@@ -104,7 +100,7 @@ public class PrefabManager
     {
         unsafe
         {
-            var path = Unsafe.PrefabAPI.GetPrefabPath(_nativePtr, hash);
+            var path = PrefabAPI.GetPrefabPath(_nativePtr, hash);
             return path ?? string.Empty;
         }
     }
@@ -116,7 +112,7 @@ public class PrefabManager
     {
         unsafe
         {
-            return Unsafe.PrefabAPI.IsRegistered(_nativePtr, hash);
+            return PrefabAPI.IsRegistered(_nativePtr, hash);
         }
     }
 
@@ -131,7 +127,7 @@ public class PrefabManager
         
         unsafe
         {
-            return Unsafe.PrefabAPI.Instantiate(_nativePtr, path);
+            return PrefabAPI.Instantiate(_nativePtr, path);
         }
     }
 
@@ -146,7 +142,7 @@ public class PrefabManager
         
         unsafe
         {
-            return Unsafe.PrefabAPI.InstantiateAsChild(_nativePtr, path, parentEntityId);
+            return PrefabAPI.InstantiateAsChild(_nativePtr, path, parentEntityId);
         }
     }
 
@@ -158,7 +154,7 @@ public class PrefabManager
     {
         unsafe
         {
-            Unsafe.PrefabAPI.TrackInstance(_nativePtr, entityId, prefabHash);
+            PrefabAPI.TrackInstance(_nativePtr, entityId, prefabHash);
         }
     }
 
@@ -170,7 +166,7 @@ public class PrefabManager
     {
         unsafe
         {
-            Unsafe.PrefabAPI.UntrackInstance(_nativePtr, entityId);
+            PrefabAPI.UntrackInstance(_nativePtr, entityId);
         }
     }
 
@@ -181,7 +177,7 @@ public class PrefabManager
     {
         unsafe
         {
-            return Unsafe.PrefabAPI.GetInstanceCount(_nativePtr, prefabHash);
+            return PrefabAPI.GetInstanceCount(_nativePtr, prefabHash);
         }
     }
 
@@ -196,7 +192,7 @@ public class PrefabManager
 
         unsafe
         {            
-            return Unsafe.PrefabAPI.SynchronizeInstance(_nativePtr, entityId, prefabPath);
+            return PrefabAPI.SynchronizeInstance(_nativePtr, entityId, prefabPath);
         }
     }
 
@@ -208,7 +204,7 @@ public class PrefabManager
     {
         unsafe
         {
-            return Unsafe.PrefabAPI.DetachInstance(_nativePtr, entityId);
+            return PrefabAPI.DetachInstance(_nativePtr, entityId);
         }
     }
 

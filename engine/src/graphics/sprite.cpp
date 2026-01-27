@@ -95,18 +95,19 @@ void SpriteAnimation::setRow(int rowIndex, int count, int startCol) {
 
 // Build a Sprite for the current frame
 Sprite SpriteAnimation::currentFrame(const glm::vec2& pos, const glm::vec2& size) const {
-    Sprite s;
-    s.pos = pos;
-    s.size = size;
-    s.textureId = m_textureId;
-    s.uv = currentUV();
-    s.color = { 1, 1, 1, 1 };
-
-    // Pass through emissive data
-    s.emissiveTextureId = m_emissiveTextureId;
-    s.emissiveStrength = m_emissiveStrength;
-
-    return s;
+    return Sprite{
+        pos,
+        size,
+        currentUV(),
+        glm::vec4(1.0f),
+        m_textureId,
+        0.0f,
+        1.0f,
+        m_emissiveTextureId,
+        m_emissiveStrength,
+        m_texWidth,      // pass full texture width
+        m_texHeight      // pass full texture height
+    };
 }
 
 Sprite SpriteAnimation::play(glm::vec2 pos, glm::vec2 size, float dt) {

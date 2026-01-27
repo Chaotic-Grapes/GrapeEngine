@@ -51,15 +51,34 @@ namespace Engine {
         
         /**
          * @brief Get the Assets directory path
-         * @return Full path to EchoesBelow/Assets/
+         * @return Full path to project/Assets/
          */
         static std::string GetAssetsPath();
         
         /**
          * @brief Get the ProjectSettings.json file path
-         * @return Full path to EchoesBelow/ProjectSettings.json
+         * @return Full path to project/ProjectSettings.json
          */
         static std::string GetSettingsPath();
+        
+        /**
+         * @brief Get temporary directory for build outputs (e.g., compiled scripts)
+         * Uses system temp directory: <system-temp>/GrapeEngine/<project-name>/
+         * @return Full path to temporary build output directory
+         */
+        static std::string GetTempScriptsPath();
+        
+        /**
+         * @brief Get the build output directory for compiled scripts
+         * @return Full path where compiled GameScripts.dll should be placed
+         */
+        static std::string GetCompiledScriptAssemblyPath();
+        
+        /**
+         * @brief Get the directory for C# project files (.csproj)
+         * @return Full path to <temp-scripts>/csproj/
+         */
+        static std::string GetCsProjPath();
         
         /**
          * @brief Convert a relative project path to absolute path

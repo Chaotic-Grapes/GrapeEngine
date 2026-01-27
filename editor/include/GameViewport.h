@@ -19,8 +19,10 @@ selection. Separate from the editor camera and scene editing controls.
 
 class GameViewport : public BaseViewport {
 public:
+    void BeginFrame() override {}
     void HandleInWorldInteraction() override;
     void ShowEditorWindows() override;
+    void EndFrame() override {}
 
 private:
     void _renderViewport();

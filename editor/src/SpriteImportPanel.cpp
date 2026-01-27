@@ -100,9 +100,10 @@ bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pi
 
     // Sprite
     auto& sprite = m_world->Get<SpriteRenderer2D>(entity);
+    std::shared_ptr<Texture> tex = RM.Get<Texture>(imagePath.c_str());
     sprite.TextureId = RM.Get<Texture>(imagePath.c_str())->ID();
-    sprite.Width = pixelWidth;
-    sprite.Height = pixelHeight;
+    sprite.Width = tex->Width();
+    sprite.Height = tex->Height();
     sprite.Color = Color{ 1.0f, 1.0f, 1.0f, 1.0f };
 
     // Auto BoxCollider2D - pixel-perfect, centered

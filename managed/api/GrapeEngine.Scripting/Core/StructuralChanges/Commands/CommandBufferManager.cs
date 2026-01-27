@@ -101,3 +101,4 @@ public class CommandBufferManager(World world)
     /// </summary>
     public int GetBufferCount() => _buffers.Count;
 }
+

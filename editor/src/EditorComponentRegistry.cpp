@@ -29,6 +29,18 @@ This registry is only responsible for UI presentation.
 #include <nlohmann/json.hpp>
 #include <imgui.h> 
 
+// Callback function pointer for deserializing C# components from JSON
+// Called when editor applies component property changes to entities at runtime
+using DeserializeComponentCallback = void(*)(ECS::ComponentTypeId id, void* componentPtr, int size, const char* jsonStr);
+static DeserializeComponentCallback s_deserializeComponentCallback = nullptr;
+
+// Function to register the deserialize callback from managed code
+extern "C" void RegisterComponentDeserializeCallback(DeserializeComponentCallback callback)
+{
+    s_deserializeComponentCallback = callback;
+    LOG_INFO("[EditorComponentRegistry] Component deserialize callback registered");
+}
+
 /* 
 Helper macro to reduce repetition when registering components
 
@@ -92,9 +104,6 @@ static auto& _getCppComponentRenderers() {
         
         renderers[ECS::ComponentRegistry::Type<TagMask>()] = 
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTagMask(d, e, w); };
-        
-        renderers[ECS::ComponentRegistry::Type<Lifetime>()] = 
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLifetime(d, e, w); };
         
         renderers[ECS::ComponentRegistry::Type<Camera3D>()] = 
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCamera3D(d, e, w); };
@@ -179,10 +188,6 @@ static auto& _getCppComponentDefaults() {
         
         defaults[ECS::ComponentRegistry::Type<TagMask>()] = []() { 
             return nlohmann::json{{"Mask", 0}}; 
-        };
-        
-        defaults[ECS::ComponentRegistry::Type<Lifetime>()] = []() { 
-            return nlohmann::json{{"Time", 0.0f}}; 
         };
         
         defaults[ECS::ComponentRegistry::Type<Camera3D>()] = []() { 
@@ -330,7 +335,6 @@ static auto& _getCppComponentDefaults() {
 static std::vector<ComponentUIMetadata> s_registry;
 static std::mutex s_registryLock;
 
-// Initialize registry with hardcoded C++ components
 static void _initializeDefaultRegistry() {
     if (!s_registry.empty()) return;  // Already initialized
     
@@ -341,249 +345,241 @@ static void _initializeDefaultRegistry() {
         // Transform: cannot be deleted (every entity has one)
         {
             "Transform", "LocalTransform", "ECS::Components::LocalTransform",
-            ECS::ComponentRegistry::Type<LocalTransform>(), false,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLocalTransform(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<LocalTransform>(), 0, false, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLocalTransform(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
                 {"Rotation", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}, {"W", 1.0f}}},
                 {"Scale", {{"X", 1.0f}, {"Y", 1.0f}, {"Z", 1.0f}}}
-            }; },
+            }; }),
             COMPONENT_OPS(LocalTransform)
         },
         // Name
         {
             "Name", "Name", "ECS::Components::Name",
-            ECS::ComponentRegistry::Type<Name>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderName(d, e, w); },
-            []() { return nlohmann::json{{"Value", "Entity"}}; },
+            ECS::ComponentRegistry::Type<Name>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderName(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Value", "Entity"}}; }),
             COMPONENT_OPS(Name)
         },
         // Active
         {
             "Active", "Active", "ECS::Components::Active",
-            ECS::ComponentRegistry::Type<Active>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderActive(d, e, w); },
-            []() { return nlohmann::json{{"Enabled", true}}; },
+            ECS::ComponentRegistry::Type<Active>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderActive(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Enabled", true}}; }),
             COMPONENT_OPS(Active)
         },
         // Tag Mask
         {
             "Tag Mask", "TagMask", "ECS::Components::TagMask",
-            ECS::ComponentRegistry::Type<TagMask>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTagMask(d, e, w); },
-            []() { return nlohmann::json{{"Mask", 0}}; },
+            ECS::ComponentRegistry::Type<TagMask>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderTagMask(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Mask", 0}}; }),
             COMPONENT_OPS(TagMask)
-        },
-        // Lifetime
-        {
-            "Lifetime", "Lifetime", "ECS::Components::Lifetime",
-            ECS::ComponentRegistry::Type<Lifetime>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLifetime(d, e, w); },
-            []() { return nlohmann::json{{"Time", 0.0f}}; },
-            COMPONENT_OPS(Lifetime)
         },
         // Camera 3D
         {
             "Camera 3D", "Camera3D", "ECS::Components::Camera3D",
-            ECS::ComponentRegistry::Type<Camera3D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCamera3D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<Camera3D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCamera3D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"UsePerspective", false}, {"FOV", 45.0f}, {"NearPlane", 0.1f},
                 {"FarPlane", 100.0f}, {"OrthoSize", 10.0f},
                 {"AspectRatio", 16.0f / 9.0f}, {"Active", false}
-            }; },
+            }; }),
             COMPONENT_OPS(Camera3D)
         },
         // Sprite Renderer 2D
         {
             "Sprite Renderer 2D", "SpriteRenderer2D", "ECS::Components::SpriteRenderer2D",
-            ECS::ComponentRegistry::Type<SpriteRenderer2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteRenderer2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<SpriteRenderer2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteRenderer2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"TextureId", 0},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Tiling", {{"X", 1.0f}, {"Y", 1.0f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
                 {"Width", 0}, {"Height", 0}
-            }; },
+            }; }),
             COMPONENT_OPS(SpriteRenderer2D)
         },
         // Sprite Sheet Animation 2D
         {
             "Sprite Sheet Animation 2D", "SpriteSheetAnimation2D", "ECS::Components::SpriteSheetAnimation2D",
-            ECS::ComponentRegistry::Type<SpriteSheetAnimation2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteSheetAnimation2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<SpriteSheetAnimation2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteSheetAnimation2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"TextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
                 {"Loop", true}, {"Playing", false}
-            }; },
+            }; }),
             COMPONENT_OPS(SpriteSheetAnimation2D)
         },
         // Z-Index 2D
         {
             "Z-Index 2D", "ZIndex2D", "ECS::Components::ZIndex2D",
-            ECS::ComponentRegistry::Type<ZIndex2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderZIndex2D(d, e, w); },
-            []() { return nlohmann::json{{"ZOrder", 0}}; },
+            ECS::ComponentRegistry::Type<ZIndex2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderZIndex2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"ZOrder", 0}}; }),
             COMPONENT_OPS(ZIndex2D)
         },
         // Rigidbody 2D
         {
             "Rigidbody 2D", "Rigidbody2D", "ECS::Components::Rigidbody2D",
-            ECS::ComponentRegistry::Type<Rigidbody2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderRigidbody2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<Rigidbody2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderRigidbody2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Mass", 1.0f}, {"InverseMass", 1.0f},
                 {"LinearDamping", 0.0f}, {"AngularDamping", 0.0f},
                 {"GravityScale", 1.0f}, {"Flags", 0}
-            }; },
+            }; }),
             COMPONENT_OPS(Rigidbody2D)
         },
         // Linear Velocity 2D
         {
             "Linear Velocity 2D", "LinearVelocity2D", "ECS::Components::LinearVelocity2D",
-            ECS::ComponentRegistry::Type<LinearVelocity2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLinearVelocity2D(d, e, w); },
-            []() { return nlohmann::json{{"Value", {{"X", 0.0f}, {"Y", 0.0f}}}}; },
+            ECS::ComponentRegistry::Type<LinearVelocity2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLinearVelocity2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Value", {{"X", 0.0f}, {"Y", 0.0f}}}}; }),
             COMPONENT_OPS(LinearVelocity2D)
         },
         // Angular Velocity 2D
         {
             "Angular Velocity 2D", "AngularVelocity2D", "ECS::Components::AngularVelocity2D",
-            ECS::ComponentRegistry::Type<AngularVelocity2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAngularVelocity2D(d, e, w); },
-            []() { return nlohmann::json{{"Value", 0.0f}}; },
+            ECS::ComponentRegistry::Type<AngularVelocity2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAngularVelocity2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Value", 0.0f}}; }),
             COMPONENT_OPS(AngularVelocity2D)
         },
         // Acceleration 2D
         {
             "Acceleration 2D", "Acceleration2D", "ECS::Components::Acceleration2D",
-            ECS::ComponentRegistry::Type<Acceleration2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAcceleration2D(d, e, w); },
-            []() { return nlohmann::json{{"Value", {{"X", 0.0f}, {"Y", 0.0f}}}}; },
+            ECS::ComponentRegistry::Type<Acceleration2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAcceleration2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Value", {{"X", 0.0f}, {"Y", 0.0f}}}}; }),
             COMPONENT_OPS(Acceleration2D)
         },
         // Physics Material 2D
         {
             "Physics Material 2D", "PhysicsMaterial2D", "ECS::Components::PhysicsMaterial2D",
-            ECS::ComponentRegistry::Type<PhysicsMaterial2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderPhysicsMaterial2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<PhysicsMaterial2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderPhysicsMaterial2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Friction", 0.5f}, {"Restitution", 0.0f}, {"PositionCorrectPercent", 0.2f}
-            }; },
+            }; }),
             COMPONENT_OPS(PhysicsMaterial2D)
         },
         // Circle Collider 2D
         {
             "Circle Collider 2D", "CircleCollider2D", "ECS::Components::CircleCollider2D",
-            ECS::ComponentRegistry::Type<CircleCollider2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCircleCollider2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<CircleCollider2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderCircleCollider2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Radius", 0.5f},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
                 {"LayerMask", 0xFFFFFFFFu}, {"Flags", 0}
-            }; },
+            }; }),
             COMPONENT_OPS(CircleCollider2D)
         },
         // Box Collider 2D
         {
             "Box Collider 2D", "BoxCollider2D", "ECS::Components::BoxCollider2D",
-            ECS::ComponentRegistry::Type<BoxCollider2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderBoxCollider2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<BoxCollider2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderBoxCollider2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
                 {"Rotation", 0.0f},
                 {"LayerMask", 0xFFFFFFFFu}, {"Flags", 0}
-            }; },
+            }; }),
             COMPONENT_OPS(BoxCollider2D)
         },
         // Shape Circle 2D
         {
             "Shape Circle", "ShapeCircle2D", "ECS::Components::ShapeCircle2D",
-            ECS::ComponentRegistry::Type<ShapeCircle2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeCircle2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<ShapeCircle2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeCircle2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"Radius", 0.5f},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Thickness", 1.0f}, {"Filled", false}
-            }; },
+            }; }),
             COMPONENT_OPS(ShapeCircle2D)
         },
         // Shape Box 2D
         {
             "Shape Box", "ShapeBox2D", "ECS::Components::ShapeBox2D",
-            ECS::ComponentRegistry::Type<ShapeBox2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeBox2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<ShapeBox2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeBox2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"HalfExtents", {{"X", 0.5f}, {"Y", 0.5f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Thickness", 0.1f}, {"Filled", false}
-            }; },
+            }; }),
             COMPONENT_OPS(ShapeBox2D)
         },
         // Shape Line 2D
         {
             "Shape Line", "ShapeLine2D", "ECS::Components::ShapeLine2D",
-            ECS::ComponentRegistry::Type<ShapeLine2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeLine2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<ShapeLine2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderShapeLine2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"A", {{"X", 0.0f}, {"Y", 0.0f}}},
                 {"B", {{"X", 1.0f}, {"Y", 0.0f}}},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Thickness", 1.0f}
-            }; },
+            }; }),
             COMPONENT_OPS(ShapeLine2D)
         },
         // Light 2D
         {
             "Light 2D", "Light2D", "ECS::Components::Light2D",
-            ECS::ComponentRegistry::Type<Light2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLight2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<Light2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLight2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"LightType", 0},
                 {"Position", {{"X", 0.0f}, {"Y", 0.0f}, {"Z", 0.0f}}},
                 {"Direction", {{"X", 0.0f}, {"Y", -1.0f}, {"Z", 0.0f}}},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Intensity", 1.0f}, {"Range", 10.0f}, {"CastsShadows", false}
-            }; },
+            }; }),
             COMPONENT_OPS(Light2D)
         },
         // Animation State 2D
         {
             "Animation State 2D", "AnimationState2D", "ECS::Components::AnimationState2D",
-            ECS::ComponentRegistry::Type<AnimationState2D>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationState2D(d, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<AnimationState2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderAnimationState2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"CurrentFrame", 0}, {"TimeAccumulator", 0.0f}, {"Finished", false}
-            }; },
+            }; }),
             COMPONENT_OPS(AnimationState2D)
         },
         // Audio Source
         {
             "Audio Source", "AudioSource", "ECS::Components::AudioSource",
-            ECS::ComponentRegistry::Type<AudioSource>(), true,
-            [](ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w) { ui.RenderAudioSource(data, e, w); },
-            []() { return nlohmann::json{
+            ECS::ComponentRegistry::Type<AudioSource>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w) { ui.RenderAudioSource(data, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "CueId", 0 },
                 { "Volume", 1.0f },
                 { "Pitch", 1.0f },
                 { "Loop", false },
                 { "PlayOnStart", false },
                 { "Spatial3D", false }
-            }; },
+            }; }),
             COMPONENT_OPS(AudioSource)
         },
         // Layer
         {
             "Layer 2D", "Layer", "ECS::Components::Layer",
-            ECS::ComponentRegistry::Type<Layer>(), true,
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); },
-            []() { return nlohmann::json{{"Id", 0}}; },
+            ECS::ComponentRegistry::Type<Layer>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Id", 0}}; }),
             COMPONENT_OPS(Layer)
         }
     };
@@ -594,22 +590,25 @@ static void _initializeDefaultRegistry() {
 void ComponentRegistryUI::RebuildFromNativeRegistry() {
     std::lock_guard<std::mutex> lock(s_registryLock);
     
-    // Initialize with hardcoded C++ components first
-    _initializeDefaultRegistry();
+    // First, remove all C# components (those with IsBuiltin = false)
+    // Keep only hardcoded C++ components (IsBuiltin = true)
+    auto newEnd = std::remove_if(s_registry.begin(), s_registry.end(),
+        [](const ComponentUIMetadata& meta) {
+            return !meta.IsBuiltin;  // Remove non-builtin (C#) components
+        }
+    );
+    s_registry.erase(newEnd, s_registry.end());
+    
+    LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry: Cleared old C# components, keeping " << s_registry.size() << " hardcoded C++ components");
+    
+    // Initialize with hardcoded C++ components on first call
+    if (s_registry.empty()) {
+        _initializeDefaultRegistry();
+    }
     
     // Get all registered component IDs from the native registry
     auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
-    LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry: Found " << allIds.size() << " total component IDs in native registry");
-    // Dump details for debugging
-    for (ECS::ComponentTypeId aid : allIds) {
-        const auto& ameta = ECS::ComponentRegistry::Meta(aid);
-        std::string aname = ECS::ComponentRegistry::GetComponentNameFromHash(ameta.TypeHash);
-        if (aname.empty()) aname = "<no-name>";
-        LOG_INFO("[EditorComponentRegistry]   NativeID " << aid << " hash=0x" << std::hex << ameta.TypeHash << std::dec << " size=" << ameta.Size << " name=" << aname);
-    }
-    
-    // Debug: log the hardcoded registry count
-    LOG_INFO("[EditorComponentRegistry] Hardcoded C++ components in s_registry: " << s_registry.size());
+    LOG_DEBUG("[EditorComponentRegistry] RebuildFromNativeRegistry: Found " << allIds.size() << " total component IDs in native registry");
     
     // Add C++ components that aren't hardcoded
     int newComponentsFound = 0;
@@ -621,21 +620,22 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             continue;
         }
         
-        // Check if this component is already in our registry
+        // Check if this component is already in our registry by comparing ComponentTypeId
+        // This prevents duplicates when the same C++ component is registered multiple times
         bool alreadyExists = false;
         for (const auto& meta : s_registry) {
-            if (meta.TypeHash == ECS::ComponentRegistry::Meta(id).TypeHash) {
+            if (meta.ComponentId == id) {
                 alreadyExists = true;
                 break;
             }
         }
         
         if (alreadyExists) {
-            continue;  // Skip C++ components, they're already added
+            continue;  // Skip components that are already in the registry
         }
         
         // This is a new C# component - add it with generic operations
-        LOG_INFO("[EditorComponentRegistry] Found new C# component: ID " << id << ", hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ", size " << nativeMeta.Size);
+        LOG_DEBUG("[EditorComponentRegistry] Found new C# component: ID " << id << ", hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ", size " << nativeMeta.Size);
         newComponentsFound++;
         
         std::string displayName;
@@ -703,14 +703,34 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         
         auto applyComponentFunc = [id](ECS::World* w, ECS::Entity e, const nlohmann::json& data) {
             if (!w) return;
+            
             const auto& meta = ECS::ComponentRegistry::Meta(id);
             void* componentPtr = w->GetRawComponentPtr(e, id);
+            
+            // If component doesn't exist, add it first
             if (!componentPtr) {
-                // Allocate zero-initialized buffer
                 std::vector<uint8_t> buffer(meta.Size, 0);
                 w->AddComponentById(e, id, buffer.data(), meta.Size);
+                componentPtr = w->GetRawComponentPtr(e, id);
+                
+                if (!componentPtr) {
+                    LOG_ERROR("[EditorComponentRegistry] Failed to add component for deserialization (ID " << id << ")");
+                    return;
+                }
             }
-            // TODO: Parse JSON data and copy into component buffer
+            
+            // Serialize the JSON to a string for the managed deserializer
+            std::string jsonStr = data.dump();
+            
+            // Call the managed deserializer to populate component fields from JSON
+            // Pass the type hash (not the component ID) so C# can look up the type
+            if (s_deserializeComponentCallback) {
+                s_deserializeComponentCallback(meta.TypeHash, componentPtr, meta.Size, jsonStr.c_str());
+                // LOG_INFO("[EditorComponentRegistry] Applied C# component (ID " << id << ", hash 0x" << std::hex << meta.TypeHash << std::dec << ") from JSON data");
+            }
+            else {
+                LOG_WARNING("[EditorComponentRegistry] No deserialize callback available for C# component (ID " << id << ")");
+            }
         };
         
         // Add to registry with generic renderer
@@ -719,16 +739,18 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             typeName,
             typeName,
             id,
+            0,  // TypeHash
             true,  // C# components can be deleted
-            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); },
-            []() { return nlohmann::json::object(); },
-            hasComponentFunc,
-            addComponentFunc,
-            removeComponentFunc,
-            applyComponentFunc
+            false,  // IsBuiltin - false because this is a dynamically discovered C# component
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json::object(); }),
+            static_cast<std::function<bool(ECS::World*, ECS::Entity)>>(hasComponentFunc),
+            static_cast<std::function<void(ECS::World*, ECS::Entity, const nlohmann::json&)>>(addComponentFunc),
+            static_cast<std::function<void(ECS::World*, ECS::Entity)>>(removeComponentFunc),
+            static_cast<std::function<void(ECS::World*, ECS::Entity, const nlohmann::json&)>>(applyComponentFunc)
         );
         
-        LOG_INFO("[EditorComponentRegistry] Added C# component to editor registry: " << displayName << " (hash 0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
+        LOG_DEBUG("[EditorComponentRegistry] Added C# component to editor registry: " << displayName);
     }
     
     LOG_INFO("[EditorComponentRegistry] RebuildFromNativeRegistry complete: Found " << newComponentsFound << " new C# components. Total in editor registry = " << s_registry.size());
@@ -755,6 +777,6 @@ const ComponentUIMetadata* ComponentRegistryUI::Find(const std::string& typeName
             return &meta;
         }
     }
-    // LOG_WARNING("[EditorComponentRegistry] Find: No metadata for component type '" << typeName << "'");
+    // LOG_WARNING("[EditorComponentRegistry] Find: No metadata for component type '" << typeName << "'. Registry has " << s_registry.size() << " components.");
     return nullptr;
 }

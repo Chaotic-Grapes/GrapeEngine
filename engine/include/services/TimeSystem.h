@@ -51,6 +51,7 @@ public:
         float LastTimeMs = 0.0f;
         float AverageTimeMs = 0.0f;
         float MaxTimeMs = 0.0f;
+        uint32_t CallCount = 0;
     };
 
     using ScopeDataMap = std::map<std::string, ScopeData>;

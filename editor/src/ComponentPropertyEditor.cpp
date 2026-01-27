@@ -100,15 +100,6 @@ void ComponentUI::RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::W
     EditorUI::EndPropertySection();
 }
 
-// Renders the Lifetime component properties
-void ComponentUI::RenderLifetime(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
-    (void)entity;
-    (void)world;
-    EditorUI::BeginPropertySection({ "Lifetime" });
-    EditorUI::RenderFloatRow("Time##Lifetime", "s", data, "Time", 0.1f);
-    EditorUI::EndPropertySection();
-}
-
 // Renders the LocalTransform component properties
 void ComponentUI::RenderLocalTransform(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
     (void)entity;

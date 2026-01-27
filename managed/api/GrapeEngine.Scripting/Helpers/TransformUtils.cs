@@ -37,7 +37,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Math;
-using GrapeEngine.Math;
 using GrapeEngine.Scripting.Core;
 
 namespace GrapeEngine.Scripting.Helpers;
@@ -281,3 +280,4 @@ public static class TransformUtils
         );
     }
 }
+

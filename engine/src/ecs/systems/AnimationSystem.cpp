@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include <algorithm>
 #include <vector>
+#include "services/TimeSystem.h"
 
 namespace ECS {
     SystemMetadata AnimationSystem::GetMetadata() const {
@@ -43,7 +44,8 @@ namespace ECS {
         return builder.Build();
     }
 
-    void AnimationSystem::OnUpdate(World& world, float dt) {
+    void AnimationSystem::OnUpdate(World& world) {
+        const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
         // Process all entities with animation components
         world.Each<Components::SpriteSheetAnimation2D, Components::AnimationState2D>(
             [&](Entity entity, Components::SpriteSheetAnimation2D& anim, Components::AnimationState2D& state) {

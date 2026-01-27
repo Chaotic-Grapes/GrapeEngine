@@ -19,13 +19,17 @@ gizmo manipulation, and drag-to-move functionality.
 
 class SceneViewport : public BaseViewport {
 public:
+    void Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
+                   ECS::World* world, Scenes::SceneManager* sceneManager) override;
+    ~SceneViewport() override;
+    
+    void BeginFrame() override;
     void HandleInWorldInteraction() override;
     void ShowEditorWindows() override;
+    void EndFrame() override;
 
 private:
     void _renderViewport();
-    // Async pick request id (0 = none)
-    uint32_t m_pendingPickRequestId = 0;
 };
 
 #endif // SCENE_VIEWPORT_H

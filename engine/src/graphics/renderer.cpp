@@ -336,7 +336,17 @@ void Renderer::submitTriangles(const Vertex* verts, size_t vCount,
 }
 
 void Renderer::submitSprite(const Sprite& sprite) {
-    submitQuad(sprite.pos, sprite.size, sprite.textureId,
+    glm::vec2 adjustedSize = sprite.size;
+
+    // Adjust size to maintain texture aspect ratio
+    if (sprite.textureWidth > 0 && sprite.textureHeight > 0) {
+        float aspectRatio = (float)sprite.textureWidth / (float)sprite.textureHeight;
+        // Apply aspect ratio while preserving both scale.X and scale.Y
+        adjustedSize.x = sprite.size.x * aspectRatio;
+        adjustedSize.y = sprite.size.y;
+    }
+
+    submitQuad(sprite.pos, adjustedSize, sprite.textureId,
         sprite.uv, sprite.color,
         sprite.rotation, sprite.uniformScale,
         0,  // layer (default)

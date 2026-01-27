@@ -13,8 +13,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Query;
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Query;
+using GrapeEngine.Scripting.Internal.Unsafe;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -24,9 +24,8 @@ namespace GrapeEngine.Scripting.Core;
 /// 
 /// THREAD SAFETY:
 /// - All entity/component operations must be called from the main thread
-/// - The job system (IJob) provides safe parallelism with proper synchronization
 /// - Query iterators are not reentrant-safe and must not be stored across thread boundaries
-/// - Do NOT access the World from multiple threads without IJob
+/// - Access the World only from the main game thread
 /// </summary>
 public class World : IDisposable
 {
@@ -89,9 +88,6 @@ public class World : IDisposable
     /// <returns>A new Entity instance</returns>
     public Entity CreateEntity()
     {
-        using var scope = JobManager.OptimizationProfiler.BeginProfile(
-            "World.CreateEntity",
-            OptimizationSafety.Normal);
         unsafe
         {
             ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
@@ -136,9 +132,6 @@ public class World : IDisposable
     /// <returns>A new Entity instance</returns>
     public Entity InstantiateEntity(uint archetypeId)
     {
-        using var scope = JobManager.OptimizationProfiler.BeginProfile(
-            "World.InstantiateEntity",
-            OptimizationSafety.Normal);
         unsafe
         {
             ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
@@ -457,49 +450,6 @@ public class World : IDisposable
     }
 
     // ============================================================================
-    // Job System Access
-    // ============================================================================
-
-    private Job.JobManager? _jobManager;
-
-    /// <summary>
-    /// Access the job manager for this world.
-    /// Use this to schedule jobs and manage parallelized work.
-    /// </summary>
-    public Job.JobManager JobManager
-    {
-        get
-        {
-            if (_jobManager == null)
-            {
-                unsafe
-                {
-                    nint jobManagerPtr = WorldAPI.GetJobManager((void*)_nativeWorldPtr);
-                    _jobManager = new Job.JobManager(jobManagerPtr, this);
-                }
-            }
-            return _jobManager;
-        }
-    }
-
-    /// <summary>
-    /// Access the optimization profiler for this world.
-    /// Use this to profile hot paths and get optimization recommendations.
-    /// </summary>
-    public OptimizationProfiler OptimizationProfiler => JobManager.OptimizationProfiler;
-
-    /// <summary>
-    /// Get optimization recommendations for hot paths in this world.
-    /// Returns methods that exceed performance thresholds and could benefit from optimization.
-    /// </summary>
-    /// <returns>Array of optimization recommendations sorted by priority</returns>
-    public OptimizationRecommendation[] GetOptimizationRecommendations()
-    {
-        ThrowIfDisposed();
-        return [.. JobManager.OptimizationProfiler.GetRecommendations().OrderBy(r => r.Priority)];
-    }
-
-    // ============================================================================
     // Lifetime Management (IDisposable)
     // ============================================================================
 
@@ -527,4 +477,5 @@ public class World : IDisposable
         Dispose();
     }
 }
+
 

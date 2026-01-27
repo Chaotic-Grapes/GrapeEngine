@@ -38,7 +38,7 @@ public class RemoveComponentChange : IChangeHandler
     {
         if (ComponentType == null)
         {
-            Console.WriteLine("[DeferredChanges] RemoveComponent failed: Missing component type");
+            Logging.LogInternal("[DeferredChanges] RemoveComponent failed: Missing component type", LogLevel.Warning);
             return;
         }
 
@@ -53,16 +53,17 @@ public class RemoveComponentChange : IChangeHandler
             }
             else
             {
-                Console.WriteLine(
-                    $"[DeferredChanges] RemoveComponent failed: Could not find method for {ComponentType.Name}");
+                Logging.LogInternal(
+                    $"[DeferredChanges] RemoveComponent failed: Could not find RemoveComponent method for {ComponentType.Name}",
+                    LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                $"[DeferredChanges] RemoveComponent error: {ex.Message}");
+            Logging.LogInternal($"[DeferredChanges] RemoveComponent failed: {ex.Message}", LogLevel.Error);
         }
     }
 
     public string GetDescription() => $"RemoveComponent<{ComponentTypeName ?? ComponentType?.Name ?? "Unknown"}>({TargetEntity.Id})";
 }
+

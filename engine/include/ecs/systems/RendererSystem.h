@@ -34,12 +34,20 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
+#include "graphics/LightManager.hpp"
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <functional>
 #include <optional>
 #include <unordered_map>
+#include <queue>
+
+#include "graphics/TileMapRenderer.hpp"
+
+class TileMap;
+class Tileset;
+class TileMapRenderer;
 
 namespace ECS {
     /**
@@ -57,7 +65,7 @@ namespace ECS {
 
         // ISystem interface
         void OnCreate(World& world) override;
-        void OnUpdate(World& world, float deltaTime) override;
+        void OnUpdate(World& world) override;
         void OnDestroy(World& world) override;
         
         SystemMetadata GetMetadata() const override;
@@ -252,6 +260,10 @@ namespace ECS {
         void SubmitGUILine(const Vector2D& startPos, const Vector2D& endPos,
                           const Color& color, float thickness = 1.0f);
 
+        // Call from editor when a tilemap should be rendered
+        void SetDebugTileMap(const TileMap& map, const Tileset& tileset);
+        void ClearDebugTileMap();
+
     private:
         // ====================================================================
         // Conversion Helpers
@@ -310,6 +322,11 @@ namespace ECS {
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         Engine::Camera* m_activeCamera = nullptr;               ///< Active camera (editor or game)
 
+        std::optional<std::reference_wrapper<const TileMap>> m_debugTileMap;
+        std::optional<std::reference_wrapper<const Tileset>> m_debugTileset;
+
+        TileMapRenderer m_tileMapRenderer; // value member, no pointer
+
         // ====================================================================
         // Member Variables - Wireframe Submissions
         // ====================================================================
@@ -351,6 +368,7 @@ namespace ECS {
         };
         std::vector<GUISubmission> m_guiSubmissionQueue;
 
+        Graphics::LightManager m_lightManager;
 
         // ====================================================================
         // Member Variables - Shaders
@@ -383,7 +401,8 @@ namespace ECS {
             glm::vec2 ViewportSize{0.0f, 0.0f};
         };
 
-        std::optional<PendingPickRequest> m_pendingPickRequest; // single-slot request processed by picking pass
+        std::queue<PendingPickRequest> m_pendingPickRequests; // queue of requests to process
+        std::optional<PendingPickRequest> m_currentPickRequest; // currently processing request
         std::unordered_map<uint32_t, uint32_t> m_completedPickResults; // requestId -> picked entity id
         uint32_t m_nextPickRequestId = 1;
         struct InFlightPick {

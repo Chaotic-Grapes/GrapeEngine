@@ -4,7 +4,7 @@
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \brief
-Extension methods for safe structural changes in job contexts.
+Extension methods for safe structural changes using command buffers.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -12,18 +12,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Query;
+using GrapeEngine.Scripting.Internal.Query;
 using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 
 namespace GrapeEngine.Scripting.Core.StructuralChanges;
 
 /// <summary>
-/// Extension methods for safe structural changes in job contexts.
+/// Extension methods for safe structural changes using command buffers.
 /// </summary>
 public static class SafeStructuralChangeExtensions
 {
     /// <summary>
-    /// Safely destroy entities matching condition from a job.
+    /// Safely destroy entities matching condition using a command buffer.
     /// </summary>
     public static void DestroyAllIf<T>(
         this Query<T> query,
@@ -97,3 +97,4 @@ public static class SafeStructuralChangeExtensions
         return new StructuralChangeBuilder(buffer);
     }
 }
+

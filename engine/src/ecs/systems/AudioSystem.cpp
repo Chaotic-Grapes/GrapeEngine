@@ -99,7 +99,7 @@ void AudioSystem::OnCreate(World& world) {
     LOG_INFO("AudioSystem: Initialized");
 }
 
-void AudioSystem::OnUpdate(World& world, float /*dt*/)
+void AudioSystem::OnUpdate(World& world)
 {
     // Get device
     Audio::FmodAudioDevice* device = m_audioService.Device();

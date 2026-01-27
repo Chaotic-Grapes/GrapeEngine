@@ -72,85 +72,111 @@ EditorService::~EditorService() { m_editorInstance = nullptr; }
 
 void EditorService::Initialize() {
     LOG_INFO("EditorService::Initialize ENTRY - this=" << reinterpret_cast<void*>(this) << ", m_world=" << reinterpret_cast<void*>(m_world));
+    
+    // Prevent double initialization
+    if (m_initialized || m_backendInitialized) {
+        LOG_WARNING("EditorService::Initialize() - Already initialized, skipping");
+        return;
+    }
+
     try {
         if (m_world) {
             LOG_INFO("EditorService::Initialize - calling UICommon::InitializeDefaultLayouts");
             UICommon::InitializeDefaultLayouts();
         }
 
-    if (!Engine::CORE) {
-        LOG_ERROR("EditorService::Initialize() - Engine CORE not available");
-        return;
-    }
+        if (!Engine::CORE) {
+            LOG_ERROR("EditorService::Initialize() - Engine CORE not available");
+            return;
+        }
 
-    auto* platformContext = Engine::CORE->GetPlatformContext();
-    if (!platformContext) {
-        LOG_ERROR("EditorService::Initialize() - Platform context not available");
-        return;
-    }
+        auto* platformContext = Engine::CORE->GetPlatformContext();
+        if (!platformContext) {
+            LOG_ERROR("EditorService::Initialize() - Platform context not available");
+            return;
+        }
 
-    auto* mainWindow = platformContext->GetMainWindow();
-    if (!mainWindow) {
-        LOG_WARNING("EditorService::Initialize() - No main window available");
-        return;
-    }
+        auto* mainWindow = platformContext->GetMainWindow();
+        if (!mainWindow) {
+            LOG_WARNING("EditorService::Initialize() - No main window available");
+            return;
+        }
 
-    LOG_INFO("EditorService::Initialize - platformContext=" << reinterpret_cast<void*>(platformContext)
-             << ", mainWindow=" << reinterpret_cast<void*>(mainWindow)
-             << ", nativeHandle=" << reinterpret_cast<void*>(mainWindow->GetNativeHandle()));
+        LOG_INFO("EditorService::Initialize - platformContext=" << reinterpret_cast<void*>(platformContext)
+                 << ", mainWindow=" << reinterpret_cast<void*>(mainWindow)
+                 << ", nativeHandle=" << reinterpret_cast<void*>(mainWindow->GetNativeHandle()));
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
 
-    ImGuiIO& io = ImGui::GetIO();
-    // Enable docking, but disable multi-viewport to avoid the ImGui GLFW
-    // backend attempting to install Win32 WndProc hooks (engine already
-    // manages GLFW callbacks and that caused assertion failures).
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
-    io.FontGlobalScale = EditorStyle::FontScale;
+        ImGuiIO& io = ImGui::GetIO();
+        // Enable docking, but disable multi-viewport to avoid the ImGui GLFW
+        // backend attempting to install Win32 WndProc hooks (engine already
+        // manages GLFW callbacks and that caused assertion failures).
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
+        io.FontGlobalScale = EditorStyle::FontScale;
 
-    ImGui::StyleColorsDark();
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.TabBarBorderSize = 0.0f;
+        ImGui::StyleColorsDark();
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.TabBarBorderSize = 0.0f;
 
-    GLFWwindow* glfwHandle = static_cast<GLFWwindow*>(mainWindow->GetNativeHandle());
-    if (!glfwHandle) {
-        LOG_ERROR("EditorService::Initialize() - GLFW native handle is null; cannot initialize ImGui");
-        return;
-    }
+        GLFWwindow* glfwHandle = static_cast<GLFWwindow*>(mainWindow->GetNativeHandle());
+        if (!glfwHandle) {
+            LOG_ERROR("EditorService::Initialize() - GLFW native handle is null; cannot initialize ImGui");
+            ImGui::DestroyContext();
+            return;
+        }
 
-    // Make sure the window's context is current before initializing GL loader/backends
-    glfwMakeContextCurrent(glfwHandle);
+        // Make sure the window's context is current before initializing GL loader/backends
+        glfwMakeContextCurrent(glfwHandle);
 
-    // Ensure GL functions are available (GLAD). Window creation normally initializes GLAD,
-    // but re-check here to be safe in case of ordering differences during refactor.
-    if (!gladLoadGL()) {
-        LOG_ERROR("EditorService::Initialize() - gladLoadGL() failed; OpenGL functions unavailable");
-        return;
-    }
+        // Ensure GL functions are available (GLAD). Window creation normally initializes GLAD,
+        // but re-check here to be safe in case of ordering differences during refactor.
+        if (!gladLoadGL()) {
+            LOG_ERROR("EditorService::Initialize() - gladLoadGL() failed; OpenGL functions unavailable");
+            ImGui_ImplOpenGL3_Shutdown();
+            ImGui::DestroyContext();
+            return;
+        }
 
-    // We avoid using ImGui's GLFW platform backend (it installs Win32 hooks
-    // which conflict with our input system). Instead we initialize only the
-    // OpenGL renderer backend and provide minimal platform data ourselves.
-    ImGui_ImplOpenGL3_Init("#version 460");
-    ImGuiIO& io2 = ImGui::GetIO();
-    io2.BackendPlatformName = "GrapeEngine_Custom";
-    io2.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // we can honor cursors
-    m_backendInitialized = true;
+        // We avoid using ImGui's GLFW platform backend (it installs Win32 hooks
+        // which conflict with our input system). Instead we initialize only the
+        // OpenGL renderer backend and provide minimal platform data ourselves.
+        ImGui_ImplOpenGL3_Init("#version 460");
+        ImGuiIO& io2 = ImGui::GetIO();
+        io2.BackendPlatformName = "GrapeEngine_Custom";
+        io2.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // we can honor cursors
+        m_backendInitialized = true;
 
-    if (!m_initialized) {
-        Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
-            [this](const Messaging::WindowResized& msg) {
-                if (m_levelEditor) { m_levelEditor->OnWindowResized(msg.Width, msg.Height); }
-            }
-        );
-        m_initialized = true;
-    }
+        if (!m_initialized) {
+            Messaging::MessageSystem::Subscribe<Messaging::WindowResized>(
+                [this](const Messaging::WindowResized& msg) {
+                    if (m_levelEditor) { m_levelEditor->OnWindowResized(msg.Width, msg.Height); }
+                }
+            );
+            m_initialized = true;
+        }
     } catch (const std::exception& e) {
         LOG_ERROR("Exception in EditorService::Initialize(): " << e.what());
+        // Clean up partially initialized state
+        if (m_backendInitialized) {
+            ImGui_ImplOpenGL3_Shutdown();
+            m_backendInitialized = false;
+        }
+        if (ImGui::GetCurrentContext() != nullptr) {
+            ImGui::DestroyContext();
+        }
     } catch (...) {
         LOG_ERROR("Unknown exception in EditorService::Initialize()");
+        // Clean up partially initialized state
+        if (m_backendInitialized) {
+            ImGui_ImplOpenGL3_Shutdown();
+            m_backendInitialized = false;
+        }
+        if (ImGui::GetCurrentContext() != nullptr) {
+            ImGui::DestroyContext();
+        }
     }
 }
 
@@ -172,6 +198,17 @@ void EditorService::SetWorld(ECS::World* world) {
         // Also propagate the active Scenes::Scene so EntityActions is updated
         Scenes::Scene* activeScene = m_sceneManager.GetActive();
         m_levelEditor->SetScene(activeScene);
+    }
+}
+
+void EditorService::BeginFrame() {
+    if (!m_initialized) return;
+
+    auto* activeScene = m_sceneManager.GetActive();
+    bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
+
+    if (m_levelEditor && shouldShowLevelEditor) {
+        m_levelEditor->BeginFrame();
     }
 }
 
@@ -291,25 +328,57 @@ void EditorService::Render() {
         }
         Input::ClearCharInput();
 
+        // Start the ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui::NewFrame();
         
-        m_levelEditor->Update(); 
-        m_levelEditor->Render(); 
-        
-        ImGui::Render();
+        m_levelEditor->Update();
+        m_levelEditor->Render();
+
         ImGui::EndFrame();
+        ImGui::Render();
+        
         auto* drawData = ImGui::GetDrawData();
         if (drawData)
             ImGui_ImplOpenGL3_RenderDrawData(drawData);
     }
 }
 
-void EditorService::Terminate() {
-    if (m_levelEditor) m_levelEditor.reset();
+void EditorService::EndFrame() {
+    if (!m_initialized) return;
 
+    auto* activeScene = m_sceneManager.GetActive();
+    bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
+
+    if (m_levelEditor && shouldShowLevelEditor) {
+        m_levelEditor->EndFrame();
+    }
+}
+
+void EditorService::Terminate() {
+    // Destroy LevelEditor first while ImGui context is still active
+    if (m_levelEditor) {
+        m_levelEditor.reset();
+    }
+
+    // Clean up ImGui resources carefully
+    // Must happen AFTER LevelEditor is destroyed to avoid accessing ImGui from destructors
     if (ImGui::GetCurrentContext() != nullptr) {
         if (m_backendInitialized) {
+            // Ensure GL context is current before shutting down OpenGL backend
+            if (Engine::CORE) {
+                auto* platformContext = Engine::CORE->GetPlatformContext();
+                if (platformContext) {
+                    auto* mainWindow = platformContext->GetMainWindow();
+                    if (mainWindow) {
+                        GLFWwindow* glfwHandle = static_cast<GLFWwindow*>(mainWindow->GetNativeHandle());
+                        if (glfwHandle) {
+                            glfwMakeContextCurrent(glfwHandle);
+                        }
+                    }
+                }
+            }
+
             ImGui_ImplOpenGL3_Shutdown();
             // We only initialize the OpenGL renderer backend (see Initialize()).
             // Do not call ImGui_ImplGlfw_Shutdown() because we do not use
@@ -319,6 +388,8 @@ void EditorService::Terminate() {
         }
         ImGui::DestroyContext();
     }
+    
+    m_initialized = false;
 }
 
 void EditorService::EnableLevelEditorForScene(Scenes::Scene* scene) {

@@ -13,7 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -118,7 +118,12 @@ public class Entity
             
             void* componentPtr = WorldAPI.GetComponentPtr(nativePtr, _id, typeHash);
             if (componentPtr == null)
-                throw new InvalidOperationException($"Entity {_id} does not have component {typeof(T).Name}");
+            {
+                throw new InvalidOperationException(
+                    $"Entity {_id} does not have component {typeof(T).Name} " +
+                    $"(hash: 0x{typeHash:X8}). The component may not be registered on the native side, " +
+                    $"or the entity was destroyed. Check that ComponentRegistry.Register<{typeof(T).Name}>() was called.");
+            }
 
             return ref *(T*)componentPtr;
         }
@@ -429,11 +434,36 @@ internal static class ComponentTypeHelper
         }
 
         // FNV-1a hash algorithm - must match C++ implementation
-        string typeName = type.FullName ?? type.Name;
+        // IMPORTANT: Hash only the type NAME, not the full namespace.
+        // C++ side registers with just the class name (e.g., "LocalTransform")
+        // not the full qualified name (e.g., "GrapeEngine.Scripting.Components.LocalTransform")
+        string typeName = type.Name;
         hash = FNV1aHash(typeName);
         
         _typeHashCache[type] = hash;
         return hash;
+    }
+
+    /// <summary>
+    /// Clear the type hash cache during assembly unload.
+    /// This is critical for hot reload: the cache holds Type references that prevent
+    /// the AssemblyLoadContext from being garbage collected.
+    /// </summary>
+    internal static void ClearTypeHashCache()
+    {
+        try
+        {
+            int count = _typeHashCache.Count;
+            _typeHashCache.Clear();
+            if (count > 0)
+            {
+                Logging.LogInternal($"[ComponentTypeHelper] Cleared {count} type hash cache entries", LogLevel.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentTypeHelper] Error clearing type hash cache: {ex.Message}", LogLevel.Error);
+        }
     }
 
     private static uint FNV1aHash(string str)
@@ -447,3 +477,4 @@ internal static class ComponentTypeHelper
         return hash;
     }
 }
+

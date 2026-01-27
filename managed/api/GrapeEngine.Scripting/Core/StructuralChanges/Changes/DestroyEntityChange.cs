@@ -31,3 +31,4 @@ public class DestroyEntityChange : IChangeHandler
 
     public string GetDescription() => $"DestroyEntity({TargetEntity.Id})";
 }
+

@@ -67,3 +67,4 @@ public class WriteAccessAttribute<T> : Attribute
     /// </summary>
     public ComponentAccessMode AccessMode { get; }
 }
+

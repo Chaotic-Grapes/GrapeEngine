@@ -37,6 +37,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ConsolePanel.h"
 #include "PerformancePanel.h"
 #include "SpriteImportPanel.h"
+#include "SystemsPanel.h"
 
 struct LevelEditorConfig {
     float TextFontSize = 23.0f;
@@ -57,8 +58,10 @@ public:
     ~LevelEditor();
 
     void Initialize(const GLFWwindow* pWin);
+    void BeginFrame();
     void Update();
     void Render();
+    void EndFrame();
     void SetWorld(ECS::World* world);
     // Set active scene pointer so EntityActions can operate immediately
     void SetScene(Scenes::Scene* scene);
@@ -110,6 +113,7 @@ private:
     ConsolePanel m_console;
     PerformancePanel m_performancePanel;
     SpriteImportPanel m_spriteImportPanel;
+    SystemsPanel m_systemsPanel;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;

@@ -54,3 +54,4 @@ public sealed class ComponentAttribute : Attribute
     /// </summary>
     public string Name { get; set; } = string.Empty;
 }
+

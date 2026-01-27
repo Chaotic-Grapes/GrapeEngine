@@ -43,7 +43,12 @@ public:
     void Initialize();
 
     /**
-     * @brief Update editor UI and tools
+     * @brief Begin frame processing - handle input and request picking
+     */
+    void BeginFrame();
+
+    /**
+     * @brief Update editor UI and tools (called after engine systems)
      */
     void Update();
 
@@ -51,6 +56,11 @@ public:
      * @brief Render editor UI
      */
     void Render();
+
+    /**
+     * @brief End frame processing - resolve picking and update selection
+     */
+    void EndFrame();
 
     /**
      * @brief Shutdown editor and save state
@@ -68,11 +78,24 @@ public:
      */
     EditorState GetEditorState() const;
 
+    /**
+     * @brief Initialize script manager callbacks for C# interop
+     * @param scriptManager Pointer to the ScriptManager
+     * @param world The ECS world for callback access
+     * 
+     * Sets up callbacks that allow C# hot reload code to invoke native functionality.
+     */
+    void InitializeScriptCallbacks(ECS::ScriptManager* scriptManager, ECS::World* world);
+
 private:
     Engine::Application* m_engine;
     Services::EditorService* m_editorService;
     EditorSettings m_editorSettings;
     bool m_initialized = false;
+    
+    // Global pointers for script callbacks
+    static Engine::Application* s_editorApplication;
+    static ECS::World* s_editorWorld;
 
     void _loadEditorSettings();
     void _saveEditorSettings();

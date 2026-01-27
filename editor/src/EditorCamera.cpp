@@ -72,10 +72,25 @@ namespace Editor {
 
     EditorCamera::~EditorCamera() { } // RAII unsubscription assumed
 
+    void EditorCamera::BeginFrame() {
+        // Reset frame input flag at the start of frame
+        m_frameInputProcessed = false;
+        
+        // If viewport is not focused, reset mouse tracking
+        if (!m_isViewportFocused) {
+            m_firstMouse = true;
+        }
+    }
+
     void EditorCamera::Update(float dt) {
         if (!m_isViewportFocused) {
             // still keep mouse-first flag reset so mouse delta won't jump when focus returns
             m_firstMouse = true;
+            return;
+        }
+
+        // Prevent duplicate input processing in the same frame
+        if (m_frameInputProcessed) {
             return;
         }
 
@@ -88,6 +103,17 @@ namespace Editor {
 
         // Apply smoothing to camera transform
         _applySmoothing(dt);
+        
+        // Mark input as processed for this frame
+        m_frameInputProcessed = true;
+    }
+
+    void EditorCamera::EndFrame() {
+        // Finalize camera frustum for next frame's culling
+        // The camera matrices are already updated in Update(), but we can
+        // use this to perform any cleanup or state validation
+        
+        // Future: Could cache frustum planes here for next frame's culling
     }
 
     void EditorCamera::_handleMouseDelta(glm::vec2& outDelta) {

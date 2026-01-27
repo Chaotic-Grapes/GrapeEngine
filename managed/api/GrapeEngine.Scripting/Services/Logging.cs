@@ -21,7 +21,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
+using System.Text;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -35,14 +36,77 @@ public enum LogLevel
 
 /// <summary>
 /// Internal logging utility used by systems to log messages at different levels.
+/// Uses buffering to batch multiple log messages into fewer P/Invoke calls.
+/// This significantly reduces the overhead of logging from hot paths.
 /// </summary>
 internal static class Logging
 {
+    private static readonly StringBuilder _logBuffer = new();
+    private static LogLevel _lastLogLevel = LogLevel.Info;
+    private const int BufferSizeThreshold = 2048; // Flush when buffer exceeds 2KB
+
     /// <summary>
     /// Log a message at the specified level using the debug API.
+    /// Messages are buffered and sent in batches to reduce P/Invoke overhead.
     /// </summary>
     internal static void Log(string message, LogLevel level)
     {
+        // If log level changes, flush existing buffer with previous level
+        if (level != _lastLogLevel && _logBuffer.Length > 0)
+        {
+            FlushBuffer(_lastLogLevel);
+        }
+
+        _lastLogLevel = level;
+        
+        // Append to buffer with newline
+        _logBuffer.AppendLine(message);
+
+        // Flush if buffer gets too large to prevent excessive memory usage
+        if (_logBuffer.Length >= BufferSizeThreshold)
+        {
+            FlushBuffer(level);
+        }
+    }
+
+    /// <summary>
+    /// Immediately flush any buffered logs to the native side.
+    /// Call this at the end of each frame to ensure logs are delivered.
+    /// </summary>
+    internal static void Flush()
+    {
+        if (_logBuffer.Length > 0)
+        {
+            FlushBuffer(_lastLogLevel);
+        }
+    }
+
+    /// <summary>
+    /// Clear the log buffer and reset state.
+    /// Called during assembly unload to break references that might prevent GC.
+    /// </summary>
+    internal static void ClearBuffer()
+    {
+        try
+        {
+            _logBuffer.Clear();
+            _lastLogLevel = LogLevel.Info;
+            LogInternal("[Logging] Cleared log buffer before assembly unload", LogLevel.Info);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error clearing log buffer: {ex.Message}");
+        }
+    }
+
+    private static void FlushBuffer(LogLevel level)
+    {
+        if (_logBuffer.Length == 0)
+            return;
+
+        var message = _logBuffer.ToString();
+        _logBuffer.Clear();
+
         switch (level)
         {
             case LogLevel.Info:
@@ -94,3 +158,4 @@ internal static class Logging
         Console.ResetColor();
     }
 }
+

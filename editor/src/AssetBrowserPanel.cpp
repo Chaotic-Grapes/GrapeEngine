@@ -33,6 +33,7 @@ Provides:
 #include <cstring>
 #include "EditorStyle.h"
 
+
 // -------------------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------------------
@@ -900,6 +901,13 @@ void AssetBrowserPanel::_renderContextMenu() {
         // Use shared helper function
         openCreateDialog = _renderCreateMenuItems();
 
+        ImGui::Separator();
+
+        // Open Project menu item
+        if (ImGui::MenuItem("Open Project")) {
+            _openProjectFile();
+        }
+
         ImGui::PopFont();
         ImGui::EndPopup();
     }
@@ -1429,4 +1437,89 @@ void AssetBrowserPanel::_copyAssetsToDirectory(const std::vector<std::string>& a
 
     m_statusMessage = "Copied " + std::to_string(copyCount) + " item(s)";
     m_statusTimer = 2.0f;
+}
+
+void AssetBrowserPanel::_openProjectFile() {
+    // Get the project root directory
+    std::filesystem::path projectRoot = Engine::ProjectPaths::GetProjectRoot();
+    std::string csprojDir = Engine::ProjectPaths::GetCsProjPath();
+    std::string scriptsRootStr = projectRoot.string();
+    std::string projectName = std::filesystem::path(projectRoot).filename().string();
+    std::string csprojPath = csprojDir + "/" + projectName + ".csproj";
+    
+    // Check if the csproj file exists
+    if (!std::filesystem::exists(csprojPath)) {
+        m_statusMessage = "Project file not found: " + std::filesystem::path(csprojPath).filename().string();
+        m_statusTimer = 3.0f;
+        LOG_WARNING("Project file not found: " << csprojPath);
+        return;
+    }
+
+    try {
+        // Try to open Visual Studio with the project file
+#ifdef _WIN32
+        // List of common Visual Studio installation paths to try
+        std::vector<std::string> vsSearchPaths = {
+            "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\devenv.exe",
+            "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\Common7\\IDE\\devenv.exe",
+            "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\Common7\\IDE\\devenv.exe",
+            "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\Common7\\IDE\\devenv.exe",
+            "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Professional\\Common7\\IDE\\devenv.exe",
+            "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\Common7\\IDE\\devenv.exe",
+        };
+        
+        std::string devenvPath;
+        for (const auto& path : vsSearchPaths) {
+            if (std::filesystem::exists(path)) {
+                devenvPath = path;
+                break;
+            }
+        }
+        
+        if (devenvPath.empty()) {
+            // Try to find devenv in PATH
+            int result = system("where devenv.exe > nul 2>&1");
+            if (result == 0) {
+                devenvPath = "devenv.exe";
+            }
+        }
+        
+        if (!devenvPath.empty()) {
+            // Found Visual Studio, open the project
+            // Use ShellExecuteA via system() - properly formatted for Windows
+            std::string command = "start \"\" \"" + devenvPath + "\" \"" + csprojPath + "\"";
+            int result = system(command.c_str());
+            if (result == 0) {
+                m_statusMessage = "Opened project in Visual Studio";
+                m_statusTimer = 2.0f;
+                LOG_INFO("Opened project in Visual Studio: " << csprojPath);
+            }
+            else {
+                m_statusMessage = "Failed to open project in Visual Studio";
+                m_statusTimer = 3.0f;
+                LOG_ERROR("Failed to open project in Visual Studio, system() returned: " << result);
+            }
+        }
+        else {
+            // Visual Studio not found, try to open with default application
+            std::string command = "start \"\" \"" + csprojPath + "\"";
+            int result = system(command.c_str());
+            if (result == 0) {
+                m_statusMessage = "Opened project file";
+                m_statusTimer = 2.0f;
+                LOG_INFO("Opened project file: " << csprojPath);
+            }
+            else {
+                m_statusMessage = "Failed to open project file. Please ensure Visual Studio is installed.";
+                m_statusTimer = 3.0f;
+                LOG_WARNING("Could not find Visual Studio. Tried to open with default application.");
+            }
+        }
+#endif
+    }
+    catch (const std::exception& e) {
+        m_statusMessage = "Failed to open project";
+        m_statusTimer = 3.0f;
+        LOG_ERROR("Failed to open project: " << e.what());
+    }
 }

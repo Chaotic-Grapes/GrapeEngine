@@ -48,12 +48,12 @@ public class CreateEntityChange : IChangeHandler
                     }
                     else
                     {
-                        Console.WriteLine($"[DeferredChanges] CreateEntity failed: Could not find AddComponent method for {componentType.Name}");
+                        Logging.LogInternal($"[DeferredChanges] CreateEntity failed: Could not find AddComponent method for {componentType.Name}", LogLevel.Warning);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[DeferredChanges] CreateEntity error adding {componentType.Name}: {ex.Message}");
+                    Logging.LogInternal($"[DeferredChanges] CreateEntity error adding {componentType.Name}: {ex.Message}", LogLevel.Error);
                 }
             }
         }
@@ -61,3 +61,4 @@ public class CreateEntityChange : IChangeHandler
 
     public string GetDescription() => $"CreateEntity(archetype={ArchetypeId ?? 0}, components={InitialComponents?.Count ?? 0})";
 }
+

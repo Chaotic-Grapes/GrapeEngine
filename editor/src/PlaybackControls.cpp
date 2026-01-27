@@ -30,12 +30,16 @@ Reference:
 #include "core/ProjectPaths.h"
 #include "serialization/EntitySerializer.h"
 #include "scripting/ScriptManager.h"
+#include "helpers/EntityUtils.h"
 #include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
+
+// Forward declarations for C# component deserialization interop
+extern "C" void WorldInterop_DeserializeComponentFromJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash, const char* jsonStr);
 
 // Constructor: stores pointer to the world for playback operations.
 // Starts with default stopped state and no saved snapshot.
@@ -507,8 +511,8 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
         std::string typeName = componentJson["TypeName"];
         const auto& componentData = componentJson["Data"];
         
-        // Use the EntitySerializer's registry to deserialize components
-        // This leverages the existing REGISTER_COMPONENT_SERIALIZER infrastructure
+        // First, try to deserialize using the C++ EntitySerializer registry
+        bool foundInCppRegistry = false;
         for (const auto& [tid, info] : registry) {
             if (info.Name == typeName) {
                 try {
@@ -518,7 +522,45 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
                 catch (const std::exception& ex) {
                     LOG_ERROR("Failed to restore component " << typeName << ": " << ex.what());
                 }
+                foundInCppRegistry = true;
                 break;
+            }
+        }
+        
+        // If not found in C++ registry, it's a C# component, so deserialize via interop
+        if (!foundInCppRegistry) {
+            // Look up the component in the native ComponentRegistry
+            auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
+            for (ECS::ComponentTypeId id : allIds) {
+                const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
+                if (nativeMeta.TypeHash == 0) continue;
+                
+                std::string nativeName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
+                if (nativeName == typeName) {
+                    // Found the C# component by name
+                    // Check if the component exists on the entity
+                    if (!m_world->HasById(entity, id)) {
+                        // Component doesn't exist, add it with zero-initialized data
+                        std::vector<uint8_t> buffer(nativeMeta.Size, 0);
+                        m_world->AddComponentById(entity, id, buffer.data(), nativeMeta.Size);
+                    }
+                    
+                    // Deserialize the JSON into the component via interop
+                    std::string jsonStr = componentData.dump();
+                    try {
+                        WorldInterop_DeserializeComponentFromJson(
+                            m_world,
+                            ECS::EntityUtils::Pack(entity),
+                            nativeMeta.TypeHash,
+                            jsonStr.c_str()
+                        );
+                        LOG_DEBUG("Restored C# component " << typeName << " on entity " << entity.Index);
+                    }
+                    catch (const std::exception& ex) {
+                        LOG_ERROR("Failed to deserialize C# component " << typeName << ": " << ex.what());
+                    }
+                    break;
+                }
             }
         }
     }
@@ -540,15 +582,54 @@ ECS::Entity Playback::_recreateEntityWithId(uint32_t targetId, const nlohmann::j
             }
             
             std::string typeName = comp["TypeName"].get<std::string>();
+            const auto& componentData = comp["Data"];
+            
+            // First, try to deserialize using the C++ EntitySerializer registry
+            bool foundInCppRegistry = false;
             for (const auto& [tid, info] : registry) {
                 if (info.Name == typeName) {
                     try {
-                        info.Deserialize(*m_world, newEntity, comp["Data"]);
+                        info.Deserialize(*m_world, newEntity, componentData);
                     } 
                     catch (const std::exception& ex) {
                         LOG_ERROR("Failed to restore component " << typeName << ": " << ex.what());
                     }
+                    foundInCppRegistry = true;
                     break;
+                }
+            }
+            
+            // If not found in C++ registry, it's a C# component - deserialize via interop
+            if (!foundInCppRegistry) {
+                // Look up the component in the native ComponentRegistry
+                auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
+                for (ECS::ComponentTypeId id : allIds) {
+                    const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
+                    if (nativeMeta.TypeHash == 0) continue;
+                    
+                    std::string nativeName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
+                    if (nativeName == typeName) {
+                        // Found the C# component by name
+                        // Add component with zero-initialized data
+                        std::vector<uint8_t> buffer(nativeMeta.Size, 0);
+                        m_world->AddComponentById(newEntity, id, buffer.data(), nativeMeta.Size);
+                        
+                        // Deserialize the JSON into the component via interop
+                        std::string jsonStr = componentData.dump();
+                        try {
+                            WorldInterop_DeserializeComponentFromJson(
+                                m_world,
+                                ECS::EntityUtils::Pack(newEntity),
+                                nativeMeta.TypeHash,
+                                jsonStr.c_str()
+                            );
+                            LOG_DEBUG("Restored C# component " << typeName << " on recreated entity " << newEntity.Index);
+                        }
+                        catch (const std::exception& ex) {
+                            LOG_ERROR("Failed to deserialize C# component " << typeName << ": " << ex.what());
+                        }
+                        break;
+                    }
                 }
             }
         }

@@ -35,3 +35,4 @@ public enum ComponentAccessMode
     /// </summary>
     ReadWrite = 2
 }
+

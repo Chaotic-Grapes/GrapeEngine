@@ -1,0 +1,114 @@
+/* Start Header *****************************************************************/
+/*!
+\file   TransformState.cpp
+\author Muhammad Nur Fadzly Bin Zulkifli (100%)
+\par    muhammadnurfadzly.b@digipen.edu
+\brief
+Implementation of transform state snapshot and delta structures.
+
+Copyright (C) 2025 DigiPen Institute of Technology.
+Reproduction or disclosure of this file or its contents without the
+prior written consent of DigiPen Institute of Technology is prohibited.
+*/
+/* End Header *******************************************************************/
+
+#include "TransformState.h"
+#include <cmath>
+
+namespace Editor {
+
+    bool CachedTransformState::Equals(const CachedTransformState& other, float epsilon) const {
+        // Compare position component-wise
+        Vector3D posDiff = Position - other.Position;
+        float posDistance = std::sqrt(posDiff.X * posDiff.X + posDiff.Y * posDiff.Y + posDiff.Z * posDiff.Z);
+        if (posDistance > epsilon) return false;
+
+        // Compare rotation: check if quaternions are approximately equal or opposite
+        float dotProd = Rotation.X * other.Rotation.X +
+                       Rotation.Y * other.Rotation.Y +
+                       Rotation.Z * other.Rotation.Z +
+                       Rotation.W * other.Rotation.W;
+        if (std::fabs(std::fabs(dotProd) - 1.0f) > epsilon) return false;
+
+        // Compare scale component-wise
+        Vector3D scaleDiff = Scale - other.Scale;
+        float scaleDistance = std::sqrt(scaleDiff.X * scaleDiff.X + scaleDiff.Y * scaleDiff.Y + scaleDiff.Z * scaleDiff.Z);
+        if (scaleDistance > epsilon) return false;
+
+        return true;
+    }
+
+    TransformDelta CachedTransformState::ComputeDelta(const CachedTransformState& final) const {
+        // Compute position delta
+        Vector3D posDelta = final.Position - this->Position;
+
+        // Compute rotation delta as the relative rotation
+        Quaternion rotDelta = final.Rotation;
+
+        // Compute scale delta
+        Vector3D scaleDelta = final.Scale - this->Scale;
+
+        return TransformDelta(posDelta, rotDelta, scaleDelta);
+    }
+
+    CachedTransformState CachedTransformState::ApplyDelta(const TransformDelta& delta) const {
+        return delta.ApplyTo(*this);
+    }
+
+    bool TransformDelta::IsZero(float epsilon) const {
+        // Check position delta
+        float posDistance = std::sqrt(PositionDelta.X * PositionDelta.X +
+                                     PositionDelta.Y * PositionDelta.Y +
+                                     PositionDelta.Z * PositionDelta.Z);
+        if (posDistance > epsilon) return false;
+
+        // Check rotation delta (identity quaternion has w=1, x=y=z=0)
+        float angleError = std::fabs(1.0f - std::fabs(RotationDelta.W));
+        if (angleError > epsilon) return false;
+
+        // Check scale delta
+        float scaleDistance = std::sqrt(ScaleDelta.X * ScaleDelta.X +
+                                       ScaleDelta.Y * ScaleDelta.Y +
+                                       ScaleDelta.Z * ScaleDelta.Z);
+        if (scaleDistance > epsilon) return false;
+
+        return true;
+    }
+
+    TransformDelta TransformDelta::Inverted() const {
+        // Negate position and scale deltas
+        Vector3D invertedPosDelta(PositionDelta.X * -1.0f,
+                                 PositionDelta.Y * -1.0f,
+                                 PositionDelta.Z * -1.0f);
+        
+        Vector3D invertedScaleDelta(ScaleDelta.X * -1.0f,
+                                   ScaleDelta.Y * -1.0f,
+                                   ScaleDelta.Z * -1.0f);
+
+        // Invert rotation delta
+        Quaternion invertedRotDelta(RotationDelta.X * -1.0f,
+                                   RotationDelta.Y * -1.0f,
+                                   RotationDelta.Z * -1.0f,
+                                   RotationDelta.W);
+
+        return TransformDelta(invertedPosDelta, invertedRotDelta, invertedScaleDelta);
+    }
+
+    CachedTransformState TransformDelta::ApplyTo(const CachedTransformState& state) const {
+        // Apply position delta
+        Vector3D newPosition(state.Position.X + this->PositionDelta.X,
+                           state.Position.Y + this->PositionDelta.Y,
+                           state.Position.Z + this->PositionDelta.Z);
+
+        // Apply rotation delta
+        Quaternion newRotation = state.Rotation * this->RotationDelta;
+
+        // Apply scale delta
+        Vector3D newScale(state.Scale.X + this->ScaleDelta.X,
+                         state.Scale.Y + this->ScaleDelta.Y,
+                         state.Scale.Z + this->ScaleDelta.Z);
+
+        return CachedTransformState(newPosition, newRotation, newScale);
+    }
+
+}  // namespace Editor
