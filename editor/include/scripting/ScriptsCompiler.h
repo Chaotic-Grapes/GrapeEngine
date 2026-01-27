@@ -42,7 +42,7 @@ enum class HotReloadState {
  * Responsibilities:
  * - Initial compilation of project scripts on startup.
  * - Starting the file watcher for incremental compilation.
- * - Orchestrating hot-reload (compile → unload → move → load → register).
+ * - Orchestrating hot-reload (compile -> unload -> move -> load -> register).
  * - Owning the hot-reload state machine and CoreCLR-safe orchestration.
  */
 class ScriptsCompiler {

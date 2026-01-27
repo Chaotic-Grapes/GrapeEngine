@@ -22,21 +22,27 @@ namespace GrapeEngine.Scripting.Internal.Unsafe;
 /// </summary>
 internal partial class DebugAPI
 {
-    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Debug_LogInfo", StringMarshalling = StringMarshalling.Utf8)]
+    /// <summary>
+    /// Report a single compiler diagnostic with structured data.
+    /// One call per diagnostic for O(1) processing per diagnostic.
+    /// </summary>
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_ScriptDiagnostic", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial void LogInfo(string message);
+    internal static partial void ScriptDiagnostic(string id, byte severity, string file, int line, int column, string message);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Debug_LogDebug", StringMarshalling = StringMarshalling.Utf8)]
+    /// <summary>
+    /// Log a message from script code at runtime.
+    /// </summary>
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_ScriptLog", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial void LogDebug(string message);
+    internal static partial void ScriptLog(string message, byte level);
 
-    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Debug_LogWarning", StringMarshalling = StringMarshalling.Utf8)]
+    /// <summary>
+    /// Log a message from script code with source location information.
+    /// </summary>
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_ScriptLogWithLocation", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial void LogWarning(string message);
-
-    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Debug_LogError", StringMarshalling = StringMarshalling.Utf8)]
-    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial void LogError(string message);
+    internal static partial void ScriptLogWithLocation(string message, byte level, string file, int line);
 }
 
 

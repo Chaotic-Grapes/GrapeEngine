@@ -3,7 +3,7 @@ using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
 using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Services;
-using GrapeEngine.Scripting.Hosting;
+using System.Collections.Generic;
 
 namespace EchoesBelow.Scripts;
 
@@ -12,7 +12,7 @@ namespace EchoesBelow.Scripts;
 /// When Time <= 0, the entity can be destroyed by the LifetimeSystem.
 /// </summary>
 [Component]
-public record struct LifetimeComponent(float Time);
+public record struct LifetimeComponent(float Time, float MaxTime);
 
 /// <summary>
 /// System that decreases Lifetime and destroys expired entities.
@@ -25,14 +25,15 @@ public record struct LifetimeComponent(float Time);
 /// If an entity has an Active component, it is only updated when enabled.
 /// Entities without the Active component are treated as enabled by default.
 /// </summary>
-[SystemGroup(SystemGroup.Update, SystemRunMode.PlayOnly)]
+[System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class LifetimeSystem : SystemBase
 {
     // One-time initialization
     protected override void OnCreate()
     {
         // No initialization needed for LifetimeSystem
-        Log("[LifetimeSystem] Created", LogLevel.Debug);
+        Log("This is a test", LogLevel.Warning);
+        Log(() => "[LifetimeSystem] Created", LogLevel.Debug);
     }
 
     // Called every frame. Updates entity lifetimes and destroys expired entities.

@@ -254,7 +254,7 @@ namespace ECS {
      * 1. Compile scripts (C# writes to temp file)
      * 2. Completely unload the old assembly
      * 3. Force garbage collection to release file locks
-     * 4. Move temp DLL → final DLL
+     * 4. Move temp DLL -> final DLL
      * 5. Load the new assembly
      * 6. Trigger hot reload callback for system re-discovery
      */
@@ -801,7 +801,6 @@ namespace ECS {
         success &= loadMethod("CallSystemOnCreate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnCreate));
         success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
-        success &= loadMethod("FlushLogs",                        scriptHostTypeName, reinterpret_cast<void**>(&m_flushLogs));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
         success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));

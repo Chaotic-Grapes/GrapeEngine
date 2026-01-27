@@ -151,14 +151,14 @@ namespace Editor {
         // State
         // ====================================================================
 
-        // Pending pick requests: maps request ID → renderer system request ID
+        // Pending pick requests: maps request ID -> renderer system request ID
         struct PendingRequest {
             uint32_t rendererRequestId;
             // Could extend with callback, timestamp, etc.
         };
         std::unordered_map<uint32_t, PendingRequest> m_pendingRequests;
 
-        // Cached results: maps request ID → entity ID
+        // Cached results: maps request ID -> entity ID
         std::unordered_map<uint32_t, uint32_t> m_resultCache;
 
         // Next request ID (non-zero)
