@@ -256,6 +256,12 @@ void SceneViewport::_renderViewport() {
                         );
                     }
 
+                    // Submit collider debug visualization for selected entity
+                    if (!m_selectedEntity.IsNull() && m_world) {
+                        const glm::vec4 colliderColor{ 1.0f, 0.64f, 0.0f, 0.45f }; // Orange with some transparency
+                        rendererSystem->SubmitColliderDebugDraw(*m_world, m_selectedEntity.Index, colliderColor);
+                    }
+
                     // Render gizmo via interaction manager
                     if (m_world && m_selectedEntity.Index != ECS::Entity::NPOS32) {
                         m_interactionMgr.RenderGizmo(*m_world, m_selectedEntity.Index);

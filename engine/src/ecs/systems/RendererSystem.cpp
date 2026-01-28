@@ -73,6 +73,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <iostream>
 #include <unordered_map>
 #include <memory>
+#include <cmath>
 
 // ============================================================================
 // Third-Party Libraries
@@ -661,79 +662,6 @@ namespace ECS {
                     }
 
                     m_renderer->endFrame(); // flush non-SDF for this layer
-
-                    // Render queued wireframe submissions (debug/editor outlines)
-                    if (!m_wireframeQueue.empty()) {
-                        m_renderer->beginFrame();
-                        for (const auto& sub : m_wireframeQueue) {
-                            switch (sub.type) {
-                            case WireframeSubmission::Type::Quad: {
-                                if (sub.vertices.size() == 4) {
-                                    const auto& min = sub.vertices[0];
-                                    const auto& max = sub.vertices[2];
-                                    DebugDraw2D::RectStroke(*m_renderer, min, max, sub.thickness, sub.color, 0);
-                                }
-                                break;
-                            }
-                            case WireframeSubmission::Type::Circle: {
-                                if (sub.vertices.size() >= 2) {
-                                    for (size_t i = 0; i < sub.vertices.size(); ++i) {
-                                        size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
-                                        if (next < sub.vertices.size()) {
-                                            DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
-                                                sub.thickness, sub.color, 0);
-                                        }
-                                    }
-                                }
-                                break;
-                            }
-                            case WireframeSubmission::Type::Polygon: {
-                                if (sub.vertices.size() >= 2) {
-                                    for (size_t i = 0; i < sub.vertices.size(); ++i) {
-                                        size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
-                                        if (next < sub.vertices.size()) {
-                                            DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
-                                                sub.thickness, sub.color, 0);
-                                        }
-                                    }
-                                }
-                                break;
-                            }
-                            case WireframeSubmission::Type::Line: {
-                                if (sub.vertices.size() == 2) {
-                                    DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1],
-                                        sub.thickness, sub.color, 0);
-                                }
-                                break;
-                            }
-                            case WireframeSubmission::Type::Mesh: {
-                                if (!sub.indices.empty()) {
-                                    // Draw using indices
-                                    for (size_t i = 0; i < sub.indices.size(); i += 2) {
-                                        if (i + 1 < sub.indices.size()) {
-                                            uint32_t idx0 = sub.indices[i];
-                                            uint32_t idx1 = sub.indices[i + 1];
-                                            if (idx0 < sub.vertices.size() && idx1 < sub.vertices.size()) {
-                                                DebugDraw2D::Line(*m_renderer, sub.vertices[idx0], sub.vertices[idx1],
-                                                    sub.thickness, sub.color, 0);
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    // Draw as sequence of lines
-                                    for (size_t i = 0; i + 1 < sub.vertices.size(); i += 2) {
-                                        DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[i + 1],
-                                            sub.thickness, sub.color, 0);
-                                    }
-                                }
-                                break;
-                            }
-                            }
-                        }
-                        m_renderer->endFrame();
-                        m_wireframeQueue.clear(); // Clear queue for next frame
-                    }
-
                 }
                 Framebuffer::Unbind();
             });
@@ -1107,6 +1035,118 @@ namespace ECS {
                 Framebuffer::Unbind();
             });
 
+        // Wireframe Pass - Render debug/editor wireframes on top of tone-mapped scene
+        m_renderGraph->AddPass("Wireframe", { "LDR" }, { "LDR" },
+            [this, &viewProj](ResourceAccessor& res)
+            {
+                // Skip if no wireframes queued
+                if (m_wireframeQueue.empty()) return;
+
+                auto* ldr = res.GetFramebuffer("LDR");
+                if (!ldr) return;
+
+                // Bind LDR framebuffer for rendering on top of tone-mapped content
+                ldr->Bind();
+
+                // Enable blending for wireframes
+                GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+                // Process all queued wireframe submissions
+                for (const auto& sub : m_wireframeQueue) {
+                    switch (sub.type) {
+                    case WireframeSubmission::Type::Circle: {
+                        // Circles need SDF shader
+                        m_sdfCircleShader->use();
+                        m_sdfCircleShader->setMat4("uViewProj", viewProj);
+                        m_sdfCircleShader->setUniform("uPicking", 0);
+                        m_renderer->beginFrame();
+
+                        DebugDraw2D::Circle(*m_renderer,
+                            sub.center,
+                            sub.radius,
+                            sub.color,
+                            sub.thickness,
+                            0
+                        );
+
+                        m_renderer->endFrame();
+                        break;
+                    }
+                    case WireframeSubmission::Type::Quad: {
+                        // Switch to batch shader for non-circle shapes
+                        if (m_shader) {
+                            m_shader->use();
+                            m_shader->setMat4("uViewProj", viewProj);
+                            m_shader->setUniform("uPicking", 0);
+                            m_shader->setUniform("uLightingEnabled", 0);
+                        }
+                        m_renderer->beginFrame();
+
+                        if (sub.vertices.size() == 4) {
+                            const auto& min = sub.vertices[0];
+                            const auto& max = sub.vertices[2];
+                            DebugDraw2D::RectStroke(*m_renderer, min, max, sub.thickness, sub.color, 0);
+                        }
+                        m_renderer->endFrame();
+                        break;
+                    }
+                    case WireframeSubmission::Type::Polygon: {
+                        if (sub.vertices.size() >= 2) {
+                            for (size_t i = 0; i < sub.vertices.size(); ++i) {
+                                size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
+                                if (next < sub.vertices.size()) {
+                                    DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
+                                        sub.thickness, sub.color, 0);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    case WireframeSubmission::Type::Line: {
+                        if (sub.vertices.size() == 2) {
+                            DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1],
+                                sub.thickness, sub.color, 0);
+                        }
+                        break;
+                    }
+                    case WireframeSubmission::Type::Mesh: {
+                        if (!sub.indices.empty()) {
+                            // Draw using indices
+                            for (size_t i = 0; i < sub.indices.size(); i += 2) {
+                                if (i + 1 < sub.indices.size()) {
+                                    uint32_t idx0 = sub.indices[i];
+                                    uint32_t idx1 = sub.indices[i + 1];
+                                    if (idx0 < sub.vertices.size() && idx1 < sub.vertices.size()) {
+                                        DebugDraw2D::Line(*m_renderer, sub.vertices[idx0], sub.vertices[idx1],
+                                            sub.thickness, sub.color, 0);
+                                    }
+                                }
+                            }
+                        } else {
+                            // Draw as sequence of lines
+                            for (size_t i = 0; i + 1 < sub.vertices.size(); i += 2) {
+                                DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[i + 1],
+                                    sub.thickness, sub.color, 0);
+                            }
+                        }
+                        break;
+                    }
+                    }
+                }
+
+                m_renderer->endFrame();
+
+                // Clear wireframe queue for next frame
+                m_wireframeQueue.clear();
+
+                // Restore blend state
+                if (!blendWasEnabled) glDisable(GL_BLEND);
+
+                Framebuffer::Unbind();
+            });
+
         // GUI Rendering Pass - Render queued GUI elements on top of scene
         m_renderGraph->AddPass("GUI", { "LDR" }, { "LDR" },
             [this](ResourceAccessor& res)
@@ -1257,23 +1297,13 @@ namespace ECS {
                                                 const glm::vec4& color, float thickness) {
         if (!m_renderer) return;
 
-        // Tessellate circle into line segments
-        constexpr int segments = 64;
-        std::vector<glm::vec2> verts;
-        verts.reserve(segments);
-
-        for (int i = 0; i < segments; ++i) {
-            float angle = (2.0f * 3.14159265f * i) / segments;
-            glm::vec2 pt = center + glm::vec2(cosf(angle), sinf(angle)) * radius;
-            verts.push_back(pt);
-        }
-
         WireframeSubmission sub;
         sub.type = WireframeSubmission::Type::Circle;
-        sub.vertices = std::move(verts);
+        sub.center = center;
+        sub.radius = radius;
         sub.color = color;
         sub.thickness = thickness;
-        sub.closed = true;
+        sub.closed = false;
         m_wireframeQueue.push_back(sub);
     }
 
@@ -1318,6 +1348,50 @@ namespace ECS {
         sub.thickness = thickness;
         sub.closed = false;
         m_wireframeQueue.push_back(sub);
+    }
+
+    void RendererSystem::SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
+                                                  const glm::vec4& color) {
+        if (entityID == ECS::Entity::NPOS32) {
+            return;
+        }
+
+        ECS::Entity entity{ entityID };
+
+        // Get world position
+        Vector3D worldPos{0, 0, 0};
+        Vector3D scale{1.0f, 1.0f, 1.0f};
+        if (world.Has<ECS::Components::LocalTransform>(entity)) {
+            auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+            worldPos = lt.Position;
+            scale = lt.Scale;
+        }
+
+        glm::vec2 worldPos2D{ worldPos.X, worldPos.Y };
+
+        // Render 2D Box Collider
+        if (world.Has<ECS::Components::BoxCollider2D>(entity)) {
+            auto& collider = world.Get<ECS::Components::BoxCollider2D>(entity);
+            
+            glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
+            glm::vec2 halfExtents{ collider.HalfExtents.X, collider.HalfExtents.Y };
+            
+            glm::vec2 min = worldPos2D + offset - halfExtents;
+            glm::vec2 max = worldPos2D + offset + halfExtents;
+            
+            SubmitWireframeQuad(min, max, color, 1.f);
+        }
+
+        // Render 2D Circle Collider - render as polygon for accuracy
+        if (world.Has<ECS::Components::CircleCollider2D>(entity)) {
+            auto& collider = world.Get<ECS::Components::CircleCollider2D>(entity);
+            
+            glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
+            glm::vec2 center = worldPos2D + offset;
+            float radius = collider.Radius * ((scale.X + scale.Y) * 0.5f);
+            
+            SubmitWireframeCircle(center, radius, color, 0);
+        }
     }
 
     // ========================================================================
