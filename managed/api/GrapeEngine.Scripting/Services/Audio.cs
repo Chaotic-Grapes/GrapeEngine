@@ -14,9 +14,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 using GrapeEngine.Math;
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
 using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Profiling;
+using GrapeEngine.Scripting.Internal.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -212,3 +212,4 @@ public static class Audio
     public static void SetListener(Vector3 position, Vector3 velocity, Vector3 forward, Vector3 up)
         => AudioAPI.SetListener(position.X, position.Y, position.Z, velocity.X, velocity.Y, velocity.Z, forward.X, forward.Y, forward.Z, up.X, up.Y, up.Z);
 }
+

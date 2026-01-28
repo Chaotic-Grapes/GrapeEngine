@@ -34,7 +34,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
 using GrapeEngine.Scripting.Core;
 
 namespace GrapeEngine.Scripting.Services;
@@ -167,3 +167,4 @@ public static class UIEvents
         return hovered != null && hovered.Id == entity.Id;
     }
 }
+

@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Hosting;
+using GrapeEngine.Scripting.Internal.Hosting;
 
 namespace GrapeEngine.Scripting.Core.Dependencies;
 
@@ -223,3 +223,4 @@ public static class ComponentAccessBridge
         return true;
     }
 }
+

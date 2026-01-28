@@ -42,6 +42,12 @@ set_target_properties(GrapeEditor PROPERTIES
     WIN32_EXECUTABLE "$<$<CONFIG:Release>:TRUE>"
 )
 
+# Set Visual Studio debugger working directory to build output
+# This ensures assets and config files are found when debugging via .sln
+set_target_properties(GrapeEditor PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:GrapeEditor>"
+)
+
 # ======================= Embed Icon (Windows) =========================
 set(EDITOR_ICON "${CMAKE_CURRENT_LIST_DIR}/../assets/editor_icon.ico" CACHE FILEPATH "Icon file for the editor executable")
 
@@ -88,26 +94,27 @@ if(MSVC AND NOT BUILD_ENGINE_SHARED)
     set_target_properties(GrapeEditor PROPERTIES LINK_FLAGS "${SCRIPT_EXPORTS}")
 endif()
 
-# ======================= IDE Organization =========================
-# Preserve folder structure in Visual Studio
+# ======================= IDE Organization - Visual Studio Filters =========================
+# Organize editor source files by folder structure
 foreach(source IN LISTS EDITOR_SOURCES)
     get_filename_component(source_path "${source}" PATH)
     file(RELATIVE_PATH source_path_rel "${CMAKE_CURRENT_LIST_DIR}/src" "${source_path}")
     if(NOT source_path_rel STREQUAL "")
-        string(REPLACE "/" "\\" group_path "Source Files\\${source_path_rel}")
+        string(REPLACE "/" "\\" group_path "Editor Source\\${source_path_rel}")
     else()
-        set(group_path "Source Files")
+        set(group_path "Editor Source")
     endif()
     source_group("${group_path}" FILES "${source}")
 endforeach()
 
+# Organize editor header files by folder structure
 foreach(header IN LISTS EDITOR_HEADERS)
     get_filename_component(header_path "${header}" PATH)
     file(RELATIVE_PATH header_path_rel "${CMAKE_CURRENT_LIST_DIR}/include" "${header_path}")
     if(NOT header_path_rel STREQUAL "")
-        string(REPLACE "/" "\\" group_path "Header Files\\${header_path_rel}")
+        string(REPLACE "/" "\\" group_path "Editor Include\\${header_path_rel}")
     else()
-        set(group_path "Header Files")
+        set(group_path "Editor Include")
     endif()
     source_group("${group_path}" FILES "${header}")
 endforeach()

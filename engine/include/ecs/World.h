@@ -40,9 +40,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "ecs/Signature.h"
 #include "ecs/ComponentRegistry.h"
-#include "ecs/jobs/JobManager.h"
-#include "ecs/jobs/ParallelQuery.h"
+
 #include "math/Matrix4x4.h"
+
+namespace Scenes {
+    class LayerManager;  // Forward declaration for World::m_layerManager
+}
 
 namespace ECS {
     // Forward declarations
@@ -1006,37 +1009,7 @@ namespace ECS {
             }
         }
 
-        /**
-		 * @brief Create a parallel query for the specified component types.
-		 * 
-		 * Creates a query object that can safely iterate over entities and chunks
-		 * in parallel with component access validation.
-		 * 
-		 * @tparam Components The component types to query for
-		 * @return ParallelQuery object for safe parallel iteration
-		 * 
-		 * Example:
-		 * @code
-		 * auto query = world.CreateParallelQuery<Transform, Velocity>();
-		 * auto chunks = query.GetChunks();
-		 * @endcode
-         */
-        template<typename... Components>
-        Jobs::ParallelQuery<Components...> CreateParallelQuery() {
-            return Jobs::ParallelQuery<Components...>(this);
-        }
 
-        /**
-         * @brief Get access to the job manager for scheduling jobs.
-         * @return Reference to the job manager
-         */
-        Jobs::JobManager& GetJobManager() { return m_jobManager; }
-
-        /**
-         * @brief Get const access to the job manager.
-         * @return Const reference to the job manager
-         */
-        const Jobs::JobManager& GetJobManager() const { return m_jobManager; }
 
         /**
          * @brief Get all archetypes in the world.
@@ -1073,6 +1046,54 @@ namespace ECS {
             // Note: Intentionally keep m_componentSizes and chunk so subsequent usage
             // can reuse type size info and capacity heuristics.
 			/***** !!!!!! *****/
+        }
+
+        /**
+         * @brief Remove a specific component type from all entities that have it.
+         * @param componentId The component type ID to remove
+         * 
+         * This is a bulk operation that iterates through all entities in the world
+         * and removes the specified component from any entity that has it.
+         * 
+         * Useful for hot reload scenarios where a component type is no longer valid
+         * and must be removed from all entities before new definitions are registered.
+         * 
+         * @note This operation calls _onComponentRemoving hooks for each entity.
+         * @note The operation is relatively expensive as it iterates all entities.
+         */
+        void RemoveComponentFromAllEntities(ComponentTypeId componentId) {
+            // Collect all entities that have this component
+            // We collect first to avoid invalidating iterators during removal
+            std::vector<Entity> entitiesToUpdate;
+            
+            // Iterate all archetypes to find those that contain this component
+            for (const auto& kv : m_archetypes) {
+                const auto& archPtr = kv.second;
+                if (!archPtr) continue;
+                
+                Archetype* arch = archPtr.get();
+                if (!arch->Has(componentId)) {
+                    continue; // Skip archetypes that don't have this component
+                }
+                
+                // Collect all entities from this archetype
+                const uint32_t chunkCount = arch->GetChunkCount();
+                for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                    Chunk* ch = arch->GetChunk(ci);
+                    const uint32_t count = ch->Count();
+                    for (uint32_t i = 0; i < count; ++i) {
+                        const Entity ent = ch->GetEntity(i);
+                        if (!ent.IsNull()) {
+                            entitiesToUpdate.push_back(ent);
+                        }
+                    }
+                }
+            }
+            
+            // Now remove the component from all collected entities
+            for (const Entity& ent : entitiesToUpdate) {
+                RemoveById(ent, componentId);
+            }
         }
 
         /**
@@ -1214,6 +1235,23 @@ namespace ECS {
          * @param manager Pointer to the PrefabManager
          */
         void SetPrefabManager(PrefabManager* manager) { m_prefabManager = manager; }
+
+        // ************** Layer Management Access ************** //
+
+        /**
+         * @brief Get the LayerManager associated with this world.
+         * LayerManager is owned by the parent Scene and accessed through World
+         * for use by systems (PhysicsSystem, RendererSystem, etc.).
+         * @return LayerManager* Pointer to the LayerManager, or nullptr if not set
+         */
+        Scenes::LayerManager* GetLayerManager() const { return m_layerManager; }
+
+        /**
+         * @brief Set the LayerManager for this world.
+         * Called by Scene when creating its World.
+         * @param manager Pointer to the LayerManager
+         */
+        void SetLayerManager(Scenes::LayerManager* manager) { m_layerManager = manager; }
 
         // ************** Entity Location ************** //
 
@@ -1721,8 +1759,9 @@ namespace ECS {
         // PrefabManager for managing prefab instances and registration
         PrefabManager* m_prefabManager = nullptr;
 
-        // Job manager for parallel job execution and scheduling
-        Jobs::JobManager m_jobManager;
+        // LayerManager pointer for accessing layer state from systems
+        // Set by Scene::CreateWorld() to allow systems to query layer enable/disable flags
+        Scenes::LayerManager* m_layerManager = nullptr;
     };
 }
 

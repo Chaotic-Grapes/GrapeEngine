@@ -104,7 +104,7 @@ if(NOT EXISTS "${EDITOR_ICON}")
 endif()
 
 # ======================= BUILD SUBDIRECTORIES =========================
-# Build order: Engine (library) → Editor/Runtime (executables)
+# Build order: Engine (library) -> Editor/Runtime (executables)
 
 # Always build the engine library first
 add_subdirectory(engine)

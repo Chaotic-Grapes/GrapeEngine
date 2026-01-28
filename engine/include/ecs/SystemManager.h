@@ -468,17 +468,12 @@ namespace ECS {
         }
 
         /**
-         * @brief Update systems using job-based parallel execution.
+         * @brief Update all systems in a group (sequential execution).
          * 
-         * Systems that support job-based execution (SupportsJobBasedExecution() == true)
-         * are scheduled as jobs and can run in parallel based on component dependencies.
-         * Other systems fall back to sequential execution.
+         * All systems execute sequentially in order.
          * 
          * @param world Active scene's World
          * @param deltaTime Time since last frame
-         * 
-         * Note: This experimental feature enables parallel system execution when
-         * systems declare their component access patterns correctly.
          */
         void UpdateWithJobs(World& world) {
             _updateGroupWithJobs(SystemGroup::PreUpdate, world);
@@ -613,18 +608,14 @@ namespace ECS {
         }
 
         /**
-         * @brief Update systems in a group using dependency-aware parallel execution.
+         * @brief Update systems in a group (sequential execution with dependency awareness).
          * 
          * Systems are organized into execution levels based on their component
-         * dependencies. All systems in a level can run in parallel if they
-         * support job-based execution, otherwise they run sequentially.
+         * dependencies and execute sequentially within each level.
          * 
          * @param group System group to execute
          * @param world Active scene's World
          * @param deltaTime Time since last frame
-         * 
-         * This is more sophisticated than UpdateWithJobs - it analyzes actual
-         * component access patterns to maximize parallelism safely.
          */
         void UpdateGroupWithDependencies(SystemGroup group, World& world) {
             _updateGroupWithDependencies(group, world);
@@ -766,73 +757,15 @@ namespace ECS {
         }
 
         /**
-         * @brief Update systems in a group using job-based parallel execution.
+         * @brief Update systems in a group (sequential execution only).
          */
         void _updateGroupWithJobs(SystemGroup group, World& world) {
-            // Collect all enabled systems in this group that support jobs
-            std::vector<ISystem*> jobSystems;
-            std::vector<ISystem*> sequentialSystems;
-
-            auto itOwned = m_systemGroups.find(group);
-            if (itOwned != m_systemGroups.end()) {
-                for (auto& system : itOwned->second) {
-                    if (!system->IsEnabled()) continue;
-                    
-                    if (system->SupportsJobBasedExecution()) {
-                        jobSystems.push_back(system.get());
-                    }
-                    else {
-                        sequentialSystems.push_back(system.get());
-                    }
-                }
-            }
-
-            auto itScripted = m_scriptedSystemGroups.find(group);
-            if (itScripted != m_scriptedSystemGroups.end()) {
-                for (auto* system : itScripted->second) {
-                    if (!system->IsEnabled()) continue;
-                    
-                    if (system->SupportsJobBasedExecution()) {
-                        jobSystems.push_back(system);
-                    }
-                    else {
-                        sequentialSystems.push_back(system);
-                    }
-                }
-            }
-
-            // Execute sequential systems first (maintain backward compatibility)
-            for (auto* system : sequentialSystems) {
-                // Use cached name to avoid expensive P/Invoke metadata lookups
-                auto it = m_systemNameCache.find(system);
-                const char* systemName = (it != m_systemNameCache.end()) ? 
-                    it->second.c_str() : system->GetMetadata().GetName().c_str();
-                TimeSystem::Instance().ProfileBegin(systemName);
-                system->OnUpdate(world);
-                TimeSystem::Instance().ProfileEnd();
-            }
-
-            // Execute job-based systems in parallel (if any)
-            if (!jobSystems.empty()) {
-                _executeJobSystems(jobSystems, world);
-            }
+            // All systems execute sequentially (job system removed)
+            _updateGroup(group, world);
         }
 
         /**
-         * @brief Execute systems using job parallelization.
-         */
-        void _executeJobSystems(const std::vector<ISystem*>& systems, World& world) {
-            /* auto& jobManager = */ world.GetJobManager();
-
-            // Schedule all systems as jobs and wait for completion
-            for (auto* system : systems) {
-                auto handle = system->OnUpdateAsJobs(world);
-                handle.Complete();
-            }
-        }
-
-        /**
-         * @brief Update a group using dependency-aware parallel scheduling.
+         * @brief Update a group (dependency-aware sequential execution).
          */
         void _updateGroupWithDependencies(SystemGroup group, World& world) {
             // Get dependency graph for this group
@@ -849,35 +782,17 @@ namespace ECS {
             auto levels = graph.GetExecutionLevels();
 
             for (const auto& level : levels) {
-                // Within a level, separate job-based and sequential systems
-                std::vector<ISystem*> jobSystems;
-                std::vector<ISystem*> sequentialSystems;
-
+                // Execute all systems in this level sequentially
                 for (auto* system : level) {
                     if (!system->IsEnabled()) continue;
                     
-                    if (system->SupportsJobBasedExecution()) {
-                        jobSystems.push_back(system);
-                    }
-                    else {
-                        sequentialSystems.push_back(system);
-                    }
-                }
-
-                // Execute sequential systems first (maintain order)
-                for (auto* system : sequentialSystems) {
                     // Use cached name to avoid expensive P/Invoke metadata lookups
-                    auto it = m_systemNameCache.find(system);
-                    const char* systemName = (it != m_systemNameCache.end()) ? 
-                        it->second.c_str() : system->GetMetadata().GetName().c_str();
+                    auto sysIt = m_systemNameCache.find(system);
+                    const char* systemName = (sysIt != m_systemNameCache.end()) ? 
+                        sysIt->second.c_str() : system->GetMetadata().GetName().c_str();
                     TimeSystem::Instance().ProfileBegin(systemName);
                     system->OnUpdate(world);
                     TimeSystem::Instance().ProfileEnd();
-                }
-
-                // Execute job-based systems in parallel
-                if (!jobSystems.empty()) {
-                    _executeJobSystems(jobSystems, world);
                 }
             }
         }

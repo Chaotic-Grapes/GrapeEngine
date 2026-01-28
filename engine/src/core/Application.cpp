@@ -202,8 +202,11 @@ namespace Engine {
             delete m_scriptManager;
             m_scriptManager = nullptr;
         }
-        delete m_audio;
-        m_audio = nullptr;
+        if (m_audio) {
+            m_audio->Terminate();
+            delete m_audio;
+            m_audio = nullptr;
+        }
 
         // Shutdown platform context (handles window cleanup)
         if (m_platformContext) {
@@ -211,9 +214,6 @@ namespace Engine {
             delete m_platformContext;
             m_platformContext = nullptr;
         }
-
-        delete m_audio;
-        m_audio = nullptr;
 
         m_initialized = false;
         CORE = nullptr;
@@ -275,11 +275,6 @@ namespace Engine {
         }
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::EditOnly))) {
             m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::EditOnly, world);
-        }
-
-        // Flush any buffered logs from C# systems to the native side
-        if (m_scriptManager && m_scriptManager->GetFlushLogs()) {
-            m_scriptManager->GetFlushLogs()();
         }
     }
 

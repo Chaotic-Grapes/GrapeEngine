@@ -9,9 +9,9 @@ Logging utility for the GrapeEngine scripting API. Provides methods to log messa
 at different log levels.
 
 \code
-Logging.Log("This is an info message.", LogLevel.Info);
-Logging.Log("This is a warning message.", LogLevel.Warning);
-Logging.Log("This is an error message.", LogLevel.Error);
+Log.Info("Player spawned");
+Log.Warn("Low memory");
+Log.Error("Failed to load scene");
 \endcode
 
 Copyright (C) 2025 DigiPen Institute of Technology.
@@ -21,98 +21,107 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace GrapeEngine.Scripting.Services;
 
-public enum LogLevel
+/// <summary>
+/// Log level for script logging. Ordered by severity for filtering.
+/// </summary>
+public enum LogLevel : byte
 {
-    Info,
-    Debug,
-    Warning,
-    Error
+    Debug = 0,
+    Info = 1,
+    Warning = 2,
+    Error = 3,
+    Fatal = 4
+}
+
+/// <summary>
+/// Public logging API for scripts. Provides static methods to log messages
+/// at different severity levels with optional source location tracking.
+/// 
+/// Usage:
+/// <code>
+/// Log.Info("Player spawned");
+/// Log.Warn("Low memory");
+/// Log.Error("Failed to load scene");
+/// </code>
+/// </summary>
+public static class Log
+{
+    /// <summary>
+    /// Log a message at the specified level.
+    /// </summary>
+    /// <param name="message">Message text</param>
+    /// <param name="level">Log level</param>
+    public static void Write(
+        string message,
+        LogLevel level = LogLevel.Info)
+        => DebugAPI.ScriptLog(message, (byte)level);
+
+    /// <summary>
+    /// Log a message using a factory function.
+    /// </summary>
+    /// <param name="messageFactory">Function that produces the message text</param>
+    /// <param name="level">Log level</param>
+    public static void Write(
+        Func<string> messageFactory,
+        LogLevel level = LogLevel.Info)
+        => DebugAPI.ScriptLog(messageFactory(), (byte)level);
+
+    /// <summary>
+    /// Log a message at the specified level.
+    /// </summary>
+    /// <param name="message">Message text</param>
+    /// <param name="level">Log level</param>
+    /// <param name="file">Source file path</param>
+    /// <param name="line">Source line number</param>
+    public static void Write(
+        string message,
+        LogLevel level = LogLevel.Info,
+        string file = "",
+        int line = 0)
+    {
+        DebugAPI.ScriptLogWithLocation(message, (byte)level, file, line);
+    }
+
+    /// <summary>
+    /// Log a message using a factory function
+    /// </summary>
+    /// <param name="messageFactory">Function that produces the message text</param>
+    /// <param name="level">Log level</param>
+    /// <param name="file">Source file path</param>
+    /// <param name="line">Source line number</param>
+    public static void Write(
+        Func<string> messageFactory,
+        LogLevel level = LogLevel.Info,
+        string file = "",
+        int line = 0)
+    {
+        DebugAPI.ScriptLogWithLocation(messageFactory(), (byte)level, file, line);
+    }
 }
 
 /// <summary>
 /// Internal logging utility used by systems to log messages at different levels.
 /// Uses buffering to batch multiple log messages into fewer P/Invoke calls.
 /// This significantly reduces the overhead of logging from hot paths.
+/// 
+/// NOTE: This is internal-only. Scripts should use the public Log API instead.
 /// </summary>
 internal static class Logging
 {
-    private static readonly StringBuilder _logBuffer = new();
-    private static LogLevel _lastLogLevel = LogLevel.Info;
-    private const int BufferSizeThreshold = 2048; // Flush when buffer exceeds 2KB
-
-    /// <summary>
-    /// Log a message at the specified level using the debug API.
-    /// Messages are buffered and sent in batches to reduce P/Invoke overhead.
-    /// </summary>
-    internal static void Log(string message, LogLevel level)
-    {
-        // If log level changes, flush existing buffer with previous level
-        if (level != _lastLogLevel && _logBuffer.Length > 0)
-        {
-            FlushBuffer(_lastLogLevel);
-        }
-
-        _lastLogLevel = level;
-        
-        // Append to buffer with newline
-        _logBuffer.AppendLine(message);
-
-        // Flush if buffer gets too large to prevent excessive memory usage
-        if (_logBuffer.Length >= BufferSizeThreshold)
-        {
-            FlushBuffer(level);
-        }
-    }
-
-    /// <summary>
-    /// Immediately flush any buffered logs to the native side.
-    /// Call this at the end of each frame to ensure logs are delivered.
-    /// </summary>
-    internal static void Flush()
-    {
-        if (_logBuffer.Length > 0)
-        {
-            FlushBuffer(_lastLogLevel);
-        }
-    }
-
-    private static void FlushBuffer(LogLevel level)
-    {
-        if (_logBuffer.Length == 0)
-            return;
-
-        var message = _logBuffer.ToString();
-        _logBuffer.Clear();
-
-        switch (level)
-        {
-            case LogLevel.Info:
-                DebugAPI.LogInfo(message);
-                break;
-            case LogLevel.Debug:
-                DebugAPI.LogDebug(message);
-                break;
-            case LogLevel.Warning:
-                DebugAPI.LogWarning(message);
-                break;
-            case LogLevel.Error:
-                DebugAPI.LogError(message);
-                break;
-        }
-    }
-
     internal static void LogInternal(string message, LogLevel level)
     {
         // Log level colors:
-        // Info: White
         // Debug: Cyan
+        // Info: White
         // Warning: Yellow
         // Error: Red
+        // Fatal: Red
 
         // Timestamp in hh:mm format
         var time = TimeOnly.FromDateTime(DateTime.Now)
@@ -122,19 +131,23 @@ internal static class Logging
         {
             case LogLevel.Info:
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"[{time}][INF C#] {message}");
+                Console.WriteLine($"[{time}] [INF C#] {message}");
                 break;
             case LogLevel.Debug:
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[{time}][DBG C#] {message}");
+                Console.WriteLine($"[{time}] [DBG C#] {message}");
                 break;
             case LogLevel.Warning:
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[{time}][WRN C#] {message}");
+                Console.WriteLine($"[{time}] [WRN C#] {message}");
                 break;
             case LogLevel.Error:
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[{time}][ERR C#] {message}");
+                Console.WriteLine($"[{time}] [ERR C#] {message}");
+                break;
+            case LogLevel.Fatal:
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[{time}] [FTL C#] {message}");
                 break;
         }
         Console.ResetColor();

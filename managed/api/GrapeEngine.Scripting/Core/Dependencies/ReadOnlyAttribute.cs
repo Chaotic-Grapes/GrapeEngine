@@ -64,3 +64,4 @@ public class ReadOnlyAttribute<T> : Attribute
     /// </summary>
     public ComponentAccessMode AccessMode { get; }
 }
+

@@ -30,8 +30,8 @@ Interactive Menu (recommended):
    inspect output.
 
 Per-target scripts:
-- Editor: `script_build_editor.bat` → outputs to `build\<Config>` (e.g. `build\Debug\GrapeEngine.exe`)
-- Game: `script_build_game.bat` → outputs to `build_game\<Config>` (e.g. `build_game\Debug\<GameName>.exe`)
+- Editor: `script_build_editor.bat` -> outputs to `build\<Config>` (e.g. `build\Debug\GrapeEngine.exe`)
+- Game: `script_build_game.bat` -> outputs to `build_game\<Config>` (e.g. `build_game\Debug\<GameName>.exe`)
 - Build All: `script_build_all.bat` will build Editor into `build` and Game into `build_game`
 
 Notes:
@@ -107,7 +107,7 @@ The engine includes four test scenes:
 
 The GrapeEngine features a comprehensive FMOD-powered audio system:
 - FMOD Integration: Professional audio engine for 3D spatial audio
-- Audio Debug Interface: Accessible via DebugUI → Audio Monitor
+- Audio Debug Interface: Accessible via DebugUI -> Audio Monitor
 - Features: Sound loading and caching, real-time playback controls, volume and pitch adjustment, 3D positional audio support, audio resource management
 
 The audio system is integrated across all test scenes and can be monitored through the debug interface.

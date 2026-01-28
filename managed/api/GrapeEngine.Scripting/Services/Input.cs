@@ -15,8 +15,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 
-using GrapeEngine.Scripting.Unsafe;
-using GrapeEngine.Scripting.Profiling;
+using GrapeEngine.Scripting.Internal.Unsafe;
+using GrapeEngine.Scripting.Internal.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -248,3 +248,4 @@ public static class MouseButton
     public const int Right = 1;
     public const int Middle = 2;
 }
+

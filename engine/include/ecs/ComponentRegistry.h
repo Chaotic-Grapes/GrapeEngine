@@ -189,9 +189,28 @@ namespace ECS {
        * @return ComponentTypeId of the registered component
        */
       static ComponentTypeId RegisterCSharpComponent(uint32_t typeHash, size_t size, size_t alignment) {
-          ComponentTypeId id = _nextId();
           auto& metas = _metas();
           auto& hashMap = _hashToId();
+          
+          // Check if this component has already been registered (e.g., in a previous hot reload)
+          // If so, reuse the existing ID and update the metadata
+          auto existingIt = hashMap.find(typeHash);
+          if (existingIt != hashMap.end()) {
+              ComponentTypeId existingId = existingIt->second;
+              LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] Updating existing C# component with hash 0x" << std::hex << typeHash << std::dec << " (ID " << existingId << ")");
+              
+              // Update the existing metadata with new size/alignment (schema may have changed)
+              auto& meta = metas[existingId];
+              meta.Size = size;
+              meta.Align = alignment;
+              meta.TypeHash = typeHash;
+              // Keep the same ctor/dtor (zero-initialize)
+              
+              return existingId;
+          }
+          
+          // New component - create a new ID
+          ComponentTypeId id = _nextId();
           
           LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] BEFORE: _metas has " << metas.size() << " entries");
           

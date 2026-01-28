@@ -555,6 +555,16 @@ void LevelEditor::_loadFonts() {
 }
 
 // -------------------------------------------------------------------------
+// Frame Processing
+// -------------------------------------------------------------------------
+// Begin frame - handle input and request picking before systems update
+void LevelEditor::BeginFrame() {
+    // Begin frame for all viewports - handle input and request picking
+    m_sceneViewport.BeginFrame();
+    m_gameViewport.BeginFrame();
+}
+
+// -------------------------------------------------------------------------
 // Update Loop
 // -------------------------------------------------------------------------
 // Process input and in world interactions for editor panels
@@ -685,6 +695,16 @@ void LevelEditor::Render() {
         ImGui::PopFont();
         ImGui::End();
     }
+}
+
+// -------------------------------------------------------------------------
+// End Frame
+// -------------------------------------------------------------------------
+// End frame - resolve picking and update selection after rendering
+void LevelEditor::EndFrame() {
+    // End frame for all viewports - resolve picking and update selection
+    m_sceneViewport.EndFrame();
+    m_gameViewport.EndFrame();
 }
 
 // -------------------------------------------------------------------------

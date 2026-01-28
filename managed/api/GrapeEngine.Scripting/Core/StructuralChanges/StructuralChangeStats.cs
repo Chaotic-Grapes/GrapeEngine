@@ -68,3 +68,4 @@ public class StructuralChangeStats
                $"Updated: {ComponentsUpdated}, Time: {TotalTimeMs}ms";
     }
 }
+

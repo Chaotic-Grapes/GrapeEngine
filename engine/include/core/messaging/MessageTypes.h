@@ -481,6 +481,54 @@ namespace Messaging {
             : EntityId(id) {
         }
     };
+
+    // Gizmo Events
+    // -------------------------------
+
+    // Sent when user starts dragging the gizmo
+    struct GizmoDragStarted {
+        uint32_t EntityId;
+        Vector3D InitialPosition;
+        Quaternion InitialRotation;
+        Vector3D InitialScale;
+        
+        GizmoDragStarted(uint32_t id,
+                        const Vector3D& pos, const Quaternion& rot, const Vector3D& scale)
+            : EntityId(id), InitialPosition(pos), InitialRotation(rot), InitialScale(scale) {
+        }
+    };
+
+    // Sent continuously while user is dragging the gizmo
+    struct GizmoDragging {
+        uint32_t EntityId;
+        Vector3D CurrentPosition;
+        Quaternion CurrentRotation;
+        Vector3D CurrentScale;
+        
+        GizmoDragging(uint32_t id,
+                     const Vector3D& pos, const Quaternion& rot, const Vector3D& scale)
+            : EntityId(id), CurrentPosition(pos), CurrentRotation(rot), CurrentScale(scale) {
+        }
+    };
+
+    // Sent when user releases the gizmo after dragging
+    struct GizmoDragEnded {
+        uint32_t EntityId;
+        Vector3D FinalPosition;
+        Quaternion FinalRotation;
+        Vector3D FinalScale;
+        Vector3D InitialPosition;
+        Quaternion InitialRotation;
+        Vector3D InitialScale;
+        
+        GizmoDragEnded(uint32_t id,
+                      const Vector3D& finalPos, const Quaternion& finalRot, const Vector3D& finalScale,
+                      const Vector3D& initPos, const Quaternion& initRot, const Vector3D& initScale)
+            : EntityId(id),
+              FinalPosition(finalPos), FinalRotation(finalRot), FinalScale(finalScale),
+              InitialPosition(initPos), InitialRotation(initRot), InitialScale(initScale) {
+        }
+    };
 }
 
 #endif // MESSAGETYPES_H

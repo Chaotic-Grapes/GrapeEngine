@@ -47,6 +47,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/PixelBufferObject.hpp"
 #include "graphics/font.hpp"
+#include "graphics/LightManager.hpp"
 
 // ============================================================================
 // ECS Components
@@ -253,6 +254,9 @@ namespace ECS {
         // OpenGL state
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Light manager (SSBO creation etc.)
+        m_lightManager.Initialize();
     }
 
     void RendererSystem::BindWorld(World& world) {
@@ -368,16 +372,63 @@ namespace ECS {
         // baked into its vertex positions on the CPU during batching. By the time vertices
         // reach the GPU, they are in world space, so the shader only needs to transform them
         // into camera (view) space and then into clip space.
-        // I will remind myself to change this in the future
         const glm::mat4 viewProj = projection * view;
 
-        // Determine max layer id present this frame
+        // ============================================================
+        // LIGHT COLLECTION (per-frame) - using Components::Light2D
+        // ============================================================
+        m_lightManager.BeginFrame();
+
+        // Policy: if multiple directional lights exist, keep the LAST one encountered.
+        // (If you want "first wins", just guard with if (!m_lightManager.HasDirectionalLight()) ...)
+        world.Each<Components::LocalTransform, Components::Light2D>(
+            [&](ECS::Entity e, const Components::LocalTransform& lt, const Components::Light2D& l)
+            {
+                // Skip inactive
+                if (world.Has<Components::Active>(e) && !world.Get<Components::Active>(e).Enabled)
+                    return;
+
+                // Use render/world transform if you want lights to follow hierarchy.
+                // Otherwise, lt.Position is fine.
+                Vector3D position, scale;
+                Quaternion rotation;
+                GetRenderTransform(world, e, lt, position, rotation, scale);
+
+                // Color: use your existing conversion style.
+                // Our color use floating point representation [0,1], so DON'T divide by 255 here
+                // If Color is actually 0..255, then use /255.0f 
+                glm::vec3 color = glm::vec3(ToGlm(l.Color));
+
+                if (l.LightType == Components::Light2D::Type::Directional) {
+                    glm::vec3 dir(l.Direction.X, l.Direction.Y, l.Direction.Z);
+                    if (glm::dot(dir, dir) < 1e-8f) dir = glm::vec3(0.0f, -1.0f, 0.0f);
+                    dir = glm::normalize(dir);
+
+                    m_lightManager.SetDirectionalLight(dir, color, l.Intensity);
+                }
+
+                else { // Point
+                    // Decide how we want position:
+                    // Option A: entity transform is the light position
+                    glm::vec3 worldPos(position.X, position.Y, position.Z);
+
+                    // Option B: add l.Position as a local offset
+                    worldPos += glm::vec3(l.Position.X, l.Position.Y, l.Position.Z);
+
+                    m_lightManager.AddPointLight(worldPos, l.Range, color, l.Intensity);
+                }
+            });
+
+        m_lightManager.Upload();
+
+        // Collect entities that have LocalTransform + Layer for layered rendering
+        // Determine max layer id present this frame (for bucket sizing)
         int maxLayerId = -1;
         world.Each<Components::Layer>([&](ECS::Entity, const Components::Layer& ly) {
             maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
             });
 
-        // Render per-layer from back (0) to front (max)
+        // Render per-layer from LayerManager's DrawOrder()
         // Single-pass collection: bucket entities by layer then process each
         std::vector<std::vector<ECS::Entity>> buckets;
         buckets.resize(std::max(1, maxLayerId + 1));
@@ -415,10 +466,34 @@ namespace ECS {
                 // I chose a slightly brighter neutral gray for a nicer look
                 hdrFbo->BindAndClear(0.025f, 0.028f, 0.032f, 1.0f);
 
+                // Get LayerManager for layer visibility and render order
+                auto* layerManager = world.GetLayerManager();
+
+                // Determine render order using LayerManager if available, otherwise fall back to manual iteration
+                std::vector<uint16_t> renderOrder;
+                if (layerManager) {
+                    renderOrder = layerManager->DrawOrder();
+                } else {
+                    // Fallback: manually iterate from 0 to maxLayerId
+                    for (int layer = 0; layer <= maxLayerId; ++layer) {
+                        renderOrder.push_back(static_cast<uint16_t>(layer));
+                    }
+                }
+
                 // ---------------------------------------
                 // Layered rendering: SDF first, then batch
+                // Use LayerManager's render order
                 // ---------------------------------------
-                for (int layer = 0; layer <= maxLayerId; ++layer) {
+                for (uint16_t layerId : renderOrder) {
+                    // === Check layer visibility and render enabled ===
+                    if (layerManager) {
+                        const auto& layerData = layerManager->Get(layerId);
+                        // Skip layers that are disabled or hidden in editor
+                        if (!layerData.renderEnabled || !layerData.editorVisible)
+                            continue;
+                    }
+
+                    int layer = static_cast<int>(layerId);
                     if (layer >= static_cast<int>(buckets.size())) continue;
                     // Make a local copy of the bucket so we can sort by ZIndex2D
                     auto list = buckets[layer];
@@ -472,7 +547,27 @@ namespace ECS {
                     m_shader->use();
                     m_shader->setMat4("uViewProj", viewProj);
                     m_shader->setUniform("uPicking", 0);
+
+                    // enable lighting in batch.frag
+                    m_shader->setUniform("uLightingEnabled", 1);
+
+                    // bind SSBO + light uniforms (uPointLightCount/uHasDirectional/uDirLight)
+                    m_lightManager.Bind(*m_shader);
+
                     m_renderer->beginFrame();
+
+                    // ===============================
+                    // TILEMAP DRAW (WORLD BACKGROUND)
+                    // ===============================
+                    if (m_debugTileMap && m_debugTileset)
+                    {
+                        TileMapRenderer tileRenderer;
+                        tileRenderer.Submit(
+                            *m_debugTileMap,
+                            *m_debugTileset,
+                            *m_renderer
+                        );
+                    }
 
                     for (ECS::Entity entity : list) {
                         // Skip inactive
@@ -741,6 +836,7 @@ namespace ECS {
                 m_sdfCircleShader->use();
                 m_sdfCircleShader->setMat4("uViewProj", viewProj);
                 m_sdfCircleShader->setUniform("uPicking", 1);
+                m_shader->setUniform("uLightingEnabled", 0);
                 m_renderer->beginFrame();
 
                 for (int layer = 0; layer <= static_cast<int>(buckets.size()) - 1; ++layer) {
@@ -789,6 +885,7 @@ namespace ECS {
                 m_shader->use();
                 m_shader->setMat4("uViewProj", viewProj);
                 m_shader->setUniform("uPicking", 1);
+                m_shader->setUniform("uLightingEnabled", 0);
 
                 m_renderer->beginFrame();
 
@@ -1030,6 +1127,7 @@ namespace ECS {
                     m_shader->use();
                     glm::mat4 screenOrtho = glm::ortho(0.0f, 1920.0f, 0.0f, 1080.0f, -1.0f, 1.0f);
                     m_shader->setMat4("uViewProj", screenOrtho);
+                    m_shader->setUniform("uLightingEnabled", 0);
                 }
 
                 m_renderer->beginFrame();
@@ -1100,6 +1198,7 @@ namespace ECS {
         m_bloomCombineShader.reset();
         m_pickingFBO.Destroy();
         g_rendererSystemInstance = nullptr;
+        m_lightManager.Shutdown();
     }
 
     uint32_t RendererSystem::RequestPick(float screenX, float screenY, const glm::vec2& viewportPos, const glm::vec2& viewportSize) {
@@ -1481,5 +1580,17 @@ namespace ECS {
         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
         GLuint textureId = 0;
         m_renderer->submitQuad(center - size * 0.5f, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+    }
+
+    void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset)
+    {
+        m_debugTileMap = map;
+        m_debugTileset = tileset;
+    }
+
+    void RendererSystem::ClearDebugTileMap()
+    {
+        m_debugTileMap.reset();
+        m_debugTileset.reset();
     }
 }

@@ -6,18 +6,11 @@
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Core;
-
 namespace GrapeEngine.Scripting.Systems;
 
-internal sealed class SystemAdapter
+internal sealed class SystemAdapter(ISystem system)
 {
-    private readonly ISystem _system;
-
-    public SystemAdapter(ISystem system)
-    {
-        _system = system ?? throw new System.ArgumentNullException(nameof(system));
-    }
+    private readonly ISystem _system = system ?? throw new ArgumentNullException(nameof(system));
 
     public void InvokeOnCreate(World world)
     {
@@ -34,3 +27,4 @@ internal sealed class SystemAdapter
         _system.OnDestroy(world);
     }
 }
+

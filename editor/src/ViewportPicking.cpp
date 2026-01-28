@@ -21,21 +21,50 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 namespace Editor {
 
+    // Static storage for pending requests
+    std::unordered_map<uint32_t, ViewportPicking::PendingRequest> ViewportPicking::s_pendingRequests;
+
     uint32_t ViewportPicking::RequestAsyncPick(
         float screenX,
         float screenY,
         const glm::vec2& viewportPos,
         const glm::vec2& viewportSize,
-        ECS::RendererSystem* rendererSystem)
+        ECS::RendererSystem* rendererSystem,
+        PickResultCallback callback,
+        void* userData)
     {
-        if (!rendererSystem) return 0;
-        return rendererSystem->RequestPick(screenX, screenY, viewportPos, viewportSize);
+        if (!rendererSystem || !callback) return 0;
+        
+        // Request pick from renderer (uses existing 4-parameter API)
+        uint32_t requestId = rendererSystem->RequestPick(screenX, screenY, viewportPos, viewportSize);
+        
+        if (requestId != 0) {
+            // Store callback and user data for this request
+            s_pendingRequests[requestId] = PendingRequest{ requestId, callback, userData };
+        }
+        
+        return requestId;
     }
 
-    bool ViewportPicking::TryGetAsyncPickResult(uint32_t requestId, uint32_t& outEntityId, ECS::RendererSystem* rendererSystem)
-    {
-        if (!rendererSystem) return false;
-        return rendererSystem->TryGetPickResult(requestId, outEntityId);
+    void ViewportPicking::Update(ECS::RendererSystem* rendererSystem) {
+        if (!rendererSystem || s_pendingRequests.empty()) return;
+        
+        // Check all pending requests
+        auto it = s_pendingRequests.begin();
+        while (it != s_pendingRequests.end()) {
+            uint32_t entityId = INVALID_ENTITY_ID;
+            
+            // Poll for result
+            if (rendererSystem->TryGetPickResult(it->second.requestId, entityId)) {
+                // Result ready - invoke callback
+                it->second.callback(entityId, it->second.userData);
+                
+                // Remove from pending list
+                it = s_pendingRequests.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
 
 }

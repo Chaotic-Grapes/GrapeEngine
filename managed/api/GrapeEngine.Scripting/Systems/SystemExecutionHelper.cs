@@ -16,8 +16,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Core;
-
 namespace GrapeEngine.Scripting.Systems
 {
     /// <summary>
@@ -59,7 +57,6 @@ namespace GrapeEngine.Scripting.Systems
     /// - JIT compilation optimization
     /// - Profile-guided optimization (PGO)
     /// - SIMD vectorization
-    /// - Parallel job scheduling
     /// </summary>
     public static class SystemExecutionHelper
     {
@@ -75,20 +72,16 @@ namespace GrapeEngine.Scripting.Systems
         /// <param name="profiler">Optional profiler (uses world's default if not provided)</param>
         public static void ExecuteWithProfiling(ISystem system, World world, OptimizationProfiler? profiler = null)
         {
-            if (system == null)
-                throw new ArgumentNullException(nameof(system));
-            if (world == null)
-                throw new ArgumentNullException(nameof(world));
+            if (profiler == null) return;
 
-            profiler ??= world.OptimizationProfiler;
+            ArgumentNullException.ThrowIfNull(system);
+            ArgumentNullException.ThrowIfNull(world);
 
             var systemName = system.GetType().Name;
             var profileName = $"System.{systemName}.OnUpdate";
 
-            using (var scope = profiler.BeginProfile(profileName, OptimizationSafety.Normal))
-            {
-                system.OnUpdate(world);
-            }
+            using var scope = profiler.BeginProfile(profileName, OptimizationSafety.Normal);
+            system.OnUpdate(world);
         }
 
         /// <summary>
@@ -100,10 +93,8 @@ namespace GrapeEngine.Scripting.Systems
         /// <param name="world">The world instance</param>
         public static void ExecuteSystemsWithProfiling(IEnumerable<ISystem> systems, World world)
         {
-            if (systems == null)
-                throw new ArgumentNullException(nameof(systems));
-            if (world == null)
-                throw new ArgumentNullException(nameof(world));
+            ArgumentNullException.ThrowIfNull(systems);
+            ArgumentNullException.ThrowIfNull(world);
 
             foreach (var system in systems)
             {
@@ -127,17 +118,16 @@ namespace GrapeEngine.Scripting.Systems
         {
             stats = default;
 
-            if (system == null)
-                throw new ArgumentNullException(nameof(system));
-            if (world == null)
-                throw new ArgumentNullException(nameof(world));
+            ArgumentNullException.ThrowIfNull(system);
+            ArgumentNullException.ThrowIfNull(world);
 
             var systemName = system.GetType().Name;
             var profileName = $"System.{systemName}.OnUpdate";
 
             ExecuteWithProfiling(system, world);
 
-            return world.OptimizationProfiler.TryGetStats(profileName, out stats);
+            stats = default;
+            return false;
         }
 
         /// <summary>
@@ -152,30 +142,9 @@ namespace GrapeEngine.Scripting.Systems
             World world,
             double thresholdMs = 0.5)
         {
-            if (world == null)
-                throw new ArgumentNullException(nameof(world));
+            ArgumentNullException.ThrowIfNull(world);
 
-            var hotPaths = world.OptimizationProfiler.GetHotPaths(thresholdMs);
-            var systemPaths = hotPaths
-                .Where(p => p.MethodName.StartsWith("System.") && p.MethodName.EndsWith(".OnUpdate"))
-                .ToList();
-
-            if (systemPaths.Count == 0)
-                return Array.Empty<SystemPerformanceSummary>();
-
-            return systemPaths
-                .Select(stats => new SystemPerformanceSummary
-                {
-                    SystemName = ExtractSystemName(stats.MethodName),
-                    CallCount = stats.CallCount,
-                    AverageMs = stats.AverageMs,
-                    PeakMs = stats.PeakMs,
-                    TotalMs = stats.TotalMs,
-                    IsHotPath = stats.IsHotPath,
-                    OptimizationSuggestions = GenerateSuggestions(stats)
-                })
-                .OrderByDescending(s => s.TotalMs)
-                .ToArray();
+            return [];
         }
 
         /// <summary>
@@ -224,8 +193,9 @@ namespace GrapeEngine.Scripting.Systems
             }
 
             return suggestions.Count > 0
-                ? suggestions.ToArray()
-                : new[] { "System performance is acceptable. No immediate optimization needed." };
+                ? [.. suggestions]
+                : ["System performance is acceptable. No immediate optimization needed."];
         }
     }
 }
+

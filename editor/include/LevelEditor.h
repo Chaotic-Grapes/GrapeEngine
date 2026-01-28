@@ -58,8 +58,10 @@ public:
     ~LevelEditor();
 
     void Initialize(const GLFWwindow* pWin);
+    void BeginFrame();
     void Update();
     void Render();
+    void EndFrame();
     void SetWorld(ECS::World* world);
     // Set active scene pointer so EntityActions can operate immediately
     void SetScene(Scenes::Scene* scene);

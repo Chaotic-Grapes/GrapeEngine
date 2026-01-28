@@ -201,6 +201,17 @@ void EditorService::SetWorld(ECS::World* world) {
     }
 }
 
+void EditorService::BeginFrame() {
+    if (!m_initialized) return;
+
+    auto* activeScene = m_sceneManager.GetActive();
+    bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
+
+    if (m_levelEditor && shouldShowLevelEditor) {
+        m_levelEditor->BeginFrame();
+    }
+}
+
 void EditorService::Update() {
     if (!m_initialized) return;
 
@@ -330,6 +341,17 @@ void EditorService::Render() {
         auto* drawData = ImGui::GetDrawData();
         if (drawData)
             ImGui_ImplOpenGL3_RenderDrawData(drawData);
+    }
+}
+
+void EditorService::EndFrame() {
+    if (!m_initialized) return;
+
+    auto* activeScene = m_sceneManager.GetActive();
+    bool shouldShowLevelEditor = m_showLevelEditor && (m_levelEditorForScene == nullptr || (activeScene && activeScene == m_levelEditorForScene));
+
+    if (m_levelEditor && shouldShowLevelEditor) {
+        m_levelEditor->EndFrame();
     }
 }
 

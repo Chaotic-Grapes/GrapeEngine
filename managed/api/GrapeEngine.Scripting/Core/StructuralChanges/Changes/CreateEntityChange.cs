@@ -61,3 +61,4 @@ public class CreateEntityChange : IChangeHandler
 
     public string GetDescription() => $"CreateEntity(archetype={ArchetypeId ?? 0}, components={InitialComponents?.Count ?? 0})";
 }
+

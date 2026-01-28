@@ -1,16 +1,16 @@
 /* Start Header *****************************************************************/
 /*!
 \file   SceneViewport.cpp
-\author Samantha Leong (50%)
+\author Samantha Leong (45%)
         Foo Rui Qin    (45%)
-        Muhammad Nur Fadzly Bin Zulkifli (5%)
+        Muhammad Nur Fadzly Bin Zulkifli (10%)
 \par    s.leong@digipen.edu
         ruiqin.foo@digipen.edu
         muhammadnurfadzly.b@digipen.edu
 \date   3rd November 2025
 \brief
 Implementation of SceneViewport class for the editor scene view with editor camera,
-entity selection, gizmo manipulation, and drag-to-move functionality.
+entity selection, gizmo manipulation via ViewportInteractionManager.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -26,10 +26,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #endif
 
 #include "SceneViewport.h"
-#include "EditorGizmo.h"
 #include "SelectionOutlineRenderer.h"
 #include "EditorCamera.hpp"
-#include "ViewportPicking.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -37,7 +35,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <GLFW/glfw3native.h>
 #include "services/Input.h"
 #include <imgui.h>
-#include "core/Application.h"
+#include <ImGuizmo.h>
+#include <scene/SceneManager.h>
 #include "ecs/systems/RendererSystem.h"  
 #include "graphics/RenderGraph.hpp"
 #include "services/TimeSystem.h"
@@ -45,29 +44,50 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageTypes.h"
 
 // -------------------------------------------------------------------------
+// Lifecycle
+// -------------------------------------------------------------------------
+void SceneViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont,
+                                ECS::World* world, Scenes::SceneManager* sceneManager) {
+    BaseViewport::Initialize(mainFont, boldFont, symbolsFont, world, sceneManager);
+    
+    // Set viewport type to Scene
+    SetViewportType(ViewportType::Scene);
+}
+
+SceneViewport::~SceneViewport() {
+    // Cleanup handled by base class and RAII members
+}
+
+void SceneViewport::BeginFrame() {
+    // Only the scene viewport uses the editor camera input handling
+    if (m_editorCamera) {
+        m_editorCamera->BeginFrame();
+    }
+}
+
+void SceneViewport::EndFrame() {
+    BaseViewport::EndFrame();
+}
+
+// -------------------------------------------------------------------------
 // Update
 // -------------------------------------------------------------------------
 void SceneViewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
-
-    if (m_undoSystem) {
-        m_undoSystem->Update();
-    }
 
     // Toggle FPS overlay in the Scene viewport (editor-only)
     if (Input::IsKeyPressed(KEY_F)) {
         m_showSceneFpsOverlay = !m_showSceneFpsOverlay;
     }
 
-    // Editor camera input is controlled via SetViewportFocused() in Scene window
-    // Selection is handled by ViewportPicking utility in editor
-    // Viewport maintains its own m_selectedEntityId state
+    // Update viewport interaction manager (gizmo, picking, selection, transforms)
+    uint32_t newSelectedEntity = m_interactionMgr.Update(*m_world, m_selectedEntity.Index);
     
-    // Handle editor-specific entity manipulation (drag-to-move)
-    // This only works when viewport is hovered
-    // IMPORTANT: Don't interfere if ImGuizmo is being used
-    if (m_isViewportHovered && !ImGuizmo::IsUsing()) {
-        _handleEntityDragToMove();
+    // If selection changed due to picking, update our selected entity
+    if (newSelectedEntity != m_selectedEntity.Index) {
+        SetSelectedEntity(newSelectedEntity);
+        // Publish selection change message
+        Messaging::MessageSystem::Broadcast(Messaging::EntitySelectionRequested(newSelectedEntity, false));
     }
 }
 
@@ -92,40 +112,49 @@ void SceneViewport::_renderViewport() {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
 
     const float btnH = ImGui::GetFrameHeight();
-    // Operation buttons
-    auto curOp = Editor::EditorGizmo::GetOperation();
+    
+    // Get current gizmo operation and mode from interaction manager
+    auto curOp = m_interactionMgr.GetGizmoOperation();
+    auto curMode = m_interactionMgr.GetGizmoMode();
 
-    auto opButton = [&](const char* label, Editor::EditorGizmo::Operation op) {
+    // Operation buttons
+    auto opButton = [&](const char* label, Editor::GizmoRenderer::Operation op) {
         const bool active = (curOp == op);
         if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
         if (ImGui::Button(label, ImVec2(0, btnH))) {
-            Editor::EditorGizmo::SetOperation(op);
+            m_interactionMgr.SetGizmoOperation(op);
         }
         if (active) ImGui::PopStyleColor();
     };
 
     ImGui::PushID("GizmoOps");
-    opButton("Translate", Editor::EditorGizmo::Operation::Translate);
+    opButton("Translate", Editor::GizmoRenderer::Operation::Translate);
     ImGui::SameLine();
-    opButton("Rotate", Editor::EditorGizmo::Operation::Rotate);
+    opButton("Rotate", Editor::GizmoRenderer::Operation::Rotate);
     ImGui::SameLine();
-    opButton("Scale", Editor::EditorGizmo::Operation::Scale);
+    opButton("Scale", Editor::GizmoRenderer::Operation::Scale);
     ImGui::PopID();
 
     ImGui::SameLine(); ImGui::Separator(); ImGui::SameLine();
 
-    // Mode toggle (Local / World)
-    auto curMode = Editor::EditorGizmo::GetMode();
-    if (curMode == Editor::EditorGizmo::Mode::Local) {
-        if (ImGui::Button("Local", ImVec2(0, btnH))) Editor::EditorGizmo::SetMode(Editor::EditorGizmo::Mode::Local);
-        ImGui::SameLine();
-        if (ImGui::Button("World", ImVec2(0, btnH))) Editor::EditorGizmo::SetMode(Editor::EditorGizmo::Mode::World);
+    // Mode buttons (Local / World) with visual feedback
+    bool isLocal = (curMode == Editor::GizmoRenderer::Mode::Local);
+    
+    // Local button
+    if (isLocal) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+    if (ImGui::Button("Local", ImVec2(0, btnH))) {
+        m_interactionMgr.SetGizmoMode(Editor::GizmoRenderer::Mode::Local);
     }
-    else {
-        if (ImGui::Button("Local", ImVec2(0, btnH))) Editor::EditorGizmo::SetMode(Editor::EditorGizmo::Mode::Local);
-        ImGui::SameLine();
-        if (ImGui::Button("World", ImVec2(0, btnH))) Editor::EditorGizmo::SetMode(Editor::EditorGizmo::Mode::World);
+    if (isLocal) ImGui::PopStyleColor();
+    
+    ImGui::SameLine();
+    
+    // World button
+    if (!isLocal) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+    if (ImGui::Button("World", ImVec2(0, btnH))) {
+        m_interactionMgr.SetGizmoMode(Editor::GizmoRenderer::Mode::World);
     }
+    if (!isLocal) ImGui::PopStyleColor();
 
     ImGui::PopStyleVar();
     ImGui::EndGroup();
@@ -171,90 +200,72 @@ void SceneViewport::_renderViewport() {
             }
 
             // Get the drawing position of the rendered image
-            ImVec2 gizmoPos = ImGui::GetItemRectMin();
+            ImVec2 viewportScreenPos = ImGui::GetItemRectMin();
 
-            // Draw selection outline and gizmo BEFORE picking check so ImGuizmo state is valid
-            if (!m_selectedEntity.IsNull() && m_editorCamera) {
+            // Handle mouse click picking on the viewport image
+            // Don't pick if gizmo is being used or hovered
+            if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT)) {
+                // Check if gizmo should block input
+                bool gizmoBlocking = m_interactionMgr.ShouldBlockInput();
+                
+                if (!gizmoBlocking) {
+                    double mx = 0, my = 0;
+                    Input::GetMousePosition(mx, my);
+                    
+                    // Request a pick via the interaction manager's picking manager
+                    // We need access to renderer system to make the request
+                    auto* rs = _getRendererSystem();
+                    if (rs && m_world) {
+                        m_interactionMgr.RequestPick(
+                            static_cast<float>(mx),
+                            static_cast<float>(my),
+                            rs);
+                    }
+                }
+            }
+
+            // Prepare interaction manager with current viewport state
+            // IMPORTANT: Use viewportScreenPos which is the actual rendered image position
+            if (m_editorCamera) {
                 auto* camera = m_editorCamera->GetCamera();
                 if (camera) {
-                    // Compute camera matrices for overlays
                     glm::mat4 view = camera->GetViewMatrix();
                     glm::mat4 proj = camera->GetProjectionMatrix();
-
-                    // Draw wireframe outline around selected entity (updated signature)
-                    Editor::SelectionOutlineRenderer::RenderOutline(
-                        *m_world,
-                        m_selectedEntity.Index,
-                        rendererSystem->GetRenderer(),
-                        rendererSystem->GetShader(),
-                        proj * view,
-                        camera->OrthoSize,
-                        size.x,
-                        size.y
+                    
+                    // Prepare interaction manager frame (must be called before Update in HandleInWorldInteraction)
+                    // Note: This is called here after camera is updated
+                    m_interactionMgr.PrepareFrame(
+                        glm::vec2(viewportScreenPos.x, viewportScreenPos.y),
+                        glm::vec2(size.x, size.y),
+                        view,
+                        proj,
+                        false  // isPerspective (editor uses ortho)
                     );
 
-                    // Draw gizmo for transform manipulation
-                    // CRITICAL: Must be drawn BEFORE picking check so ImGuizmo state is available
-                    Editor::EditorGizmo::DrawGizmo(
-                        *m_world,
-                        m_selectedEntity.Index,
-                        glm::value_ptr(view),
-                        glm::value_ptr(proj),
-                        gizmoPos.x, gizmoPos.y,
-                        size.x, size.y,
-                        false  // isPerspective
-                    );
-                }
-            }
-
-            // Handle mouse click picking on the Scene viewport image
-            // Use IsMousePressed to detect a single click event (edge-triggered)
-            // BUT: Don't pick while gizmo is being used or hovered - let gizmo have priority
-            // for drag operations and handle clicks on extended gizmo geometry
-            if (ImGui::IsItemHovered() && Input::IsMousePressed(MOUSE_LEFT) && !Editor::EditorGizmo::ShouldBlockInput()) {
-                double mx = 0, my = 0;
-                Input::GetMousePosition(mx, my);
-
-                // Enqueue async pick via renderer and store returned request id
-                // Only enqueue if no existing pending request to avoid spamming
-                if (m_pendingPickRequestId == 0) {
-                    uint32_t req = Editor::ViewportPicking::RequestAsyncPick(
-                    static_cast<float>(mx), static_cast<float>(my),
-                    glm::vec2(gizmoPos.x, gizmoPos.y), glm::vec2(size.x, size.y),
-                    rendererSystem
-                    );
-
-                    if (req != 0) {
-                        m_pendingPickRequestId = req;
-                        LOG_DEBUG("[SceneViewport] Enqueued pick request: " << req << " at (" << mx << ", " << my << ") viewport=(" << gizmoPos.x << "," << gizmoPos.y << "," << size.x << "," << size.y << ")");
+                    // Draw selection outline around selected entity
+                    if (!m_selectedEntity.IsNull()) {
+                        Editor::SelectionOutlineRenderer::RenderOutline(
+                            *m_world,
+                            m_selectedEntity.Index,
+                            rendererSystem->GetRenderer(),
+                            rendererSystem->GetShader(),
+                            proj * view,
+                            camera->OrthoSize,
+                            size.x,
+                            size.y
+                        );
                     }
-                }
-            }
 
-            // Poll for async pick result (non-blocking). If a result is ready
-            // resolve selection and notify callbacks.
-            if (m_pendingPickRequestId != 0) {
-                uint32_t pickedEntity = ECS::Entity::NPOS32;
-                if (Editor::ViewportPicking::TryGetAsyncPickResult(m_pendingPickRequestId, pickedEntity, rendererSystem)) {
-                    m_pendingPickRequestId = 0; // consumed
-                    // Allow selection of any entity including 0
-                    // If no entity was picked (NPOS32), deselect only if NOT hovering over gizmo
-                    if (pickedEntity != ECS::Entity::NPOS32) {
-                        SetSelectedEntity(pickedEntity);
-                        // Publish selection change to allow hierarchy and other systems to sync
-                        Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(pickedEntity));
-                    } else if (!ImGuizmo::IsOver()) {
-                        // Only deselect if clicking on empty space AND not hovering over gizmo
-                        SetSelectedEntity(ECS::Entity::NPOS32);
-                        Messaging::MessageSystem::Notify(Messaging::EditorEntitySelected(ECS::Entity::NPOS32));
+                    // Render gizmo via interaction manager
+                    if (m_world && m_selectedEntity.Index != ECS::Entity::NPOS32) {
+                        m_interactionMgr.RenderGizmo(*m_world, m_selectedEntity.Index);
                     }
-                    // If hovering over gizmo and no entity picked, keep current selection
                 }
             }
 
             // Draw FPS overlay if enabled
             if (m_showSceneFpsOverlay) {
-                _drawFpsOverlay(gizmoPos, size);
+                _drawFpsOverlay(viewportScreenPos, size);
             }
         }
     }
@@ -269,7 +280,4 @@ void SceneViewport::_renderViewport() {
     }
 
     ImGui::End();
-
-    // Update mouse-down latch so clicks only trigger once per press
-    m_wasMouseDownLastFrame = Input::IsMouseDown(MOUSE_LEFT);
 }

@@ -1,5 +1,5 @@
-using GrapeEngine.Scripting.Unsafe;
-using GrapeEngine.Scripting.Components.Core;
+using GrapeEngine.Scripting.Internal.Unsafe;
+using GrapeEngine.Scripting.Components;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Core;
@@ -51,6 +51,56 @@ public static class Layers
         }
 
         return outArr;
+    }
+
+    /// <summary>
+    /// Check if a layer has rendering enabled.
+    /// </summary>
+    /// <param name="layerId">The layer ID</param>
+    /// <returns>True if rendering is enabled for this layer</returns>
+    public static bool IsRenderEnabled(ushort layerId)
+    {
+        return LayerAPI.IsRenderEnabled(layerId) != 0;
+    }
+
+    /// <summary>
+    /// Check if a layer has updates enabled.
+    /// </summary>
+    /// <param name="layerId">The layer ID</param>
+    /// <returns>True if updates are enabled for this layer</returns>
+    public static bool IsUpdateEnabled(ushort layerId)
+    {
+        return LayerAPI.IsUpdateEnabled(layerId) != 0;
+    }
+
+    /// <summary>
+    /// Check if a layer has physics enabled.
+    /// </summary>
+    /// <param name="layerId">The layer ID</param>
+    /// <returns>True if physics is enabled for this layer</returns>
+    public static bool IsPhysicsEnabled(ushort layerId)
+    {
+        return LayerAPI.IsPhysicsEnabled(layerId) != 0;
+    }
+
+    /// <summary>
+    /// Check if a layer is visible in the editor.
+    /// </summary>
+    /// <param name="layerId">The layer ID</param>
+    /// <returns>True if the layer is visible in the editor</returns>
+    public static bool IsVisible(ushort layerId)
+    {
+        return LayerAPI.IsVisible(layerId) != 0;
+    }
+
+    /// <summary>
+    /// Check if a layer is locked in the editor.
+    /// </summary>
+    /// <param name="layerId">The layer ID</param>
+    /// <returns>True if the layer is locked in the editor</returns>
+    public static bool IsLocked(ushort layerId)
+    {
+        return LayerAPI.IsLocked(layerId) != 0;
     }
 }
 
@@ -322,3 +372,4 @@ public static class HierarchyUtils
         return null;
     }
 }
+

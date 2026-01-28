@@ -24,10 +24,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "BaseViewport.h"
 #include "CameraFrustumRenderer.h"
-#include "EditorGizmo.h"
 #include "SelectionOutlineRenderer.h"
 #include "EditorCamera.hpp"
-#include "ViewportPicking.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -101,6 +99,7 @@ void BaseViewport::SetWorld(ECS::World* world) {
         m_editorCamera = std::make_unique<Editor::EditorCamera>();
     }
 }
+
 
 // -------------------------------------------------------------------------
 // Event Registration
@@ -318,128 +317,4 @@ ECS::RendererSystem* BaseViewport::_getRendererSystem() {
         return Engine::CORE->GetSystemManager().GetSystem<ECS::RendererSystem>();
     }
     return nullptr;
-}
-
-void BaseViewport::_handleEntityDragToMove() {
-    // Only Scene viewports support editor drag-to-move behavior
-    if (!IsSceneViewport()) {
-        m_isDragging = false;
-        m_wasMouseDownLastFrame = false;
-        return;
-    }
-    if (!m_world || m_selectedEntity.IsNull()) {
-        m_isDragging = false;
-        m_wasMouseDownLastFrame = false;
-        return;
-    }
-
-    auto* rendererSystem = _getRendererSystem();
-    if (!rendererSystem) return;
-
-    // Get camera matrices for screen-to-world conversion
-    const Engine::Camera* camera = m_editorCamera->GetCamera();
-    if (!camera) return;
-
-    const glm::mat4 view = camera->GetViewMatrix();
-    const glm::mat4 projection = camera->GetProjectionMatrix();
-
-    // Get mouse state
-    glm::dvec2 mousePos;
-    Input::GetMousePosition(mousePos.x, mousePos.y);
-    
-    const bool isMouseDownThisFrame = Input::IsMouseDown(MOUSE_LEFT);
-    const bool mouseJustPressed = isMouseDownThisFrame && !m_wasMouseDownLastFrame;
-
-    // Convert screen to world coordinates
-    const auto screenToWorld = [&](const glm::dvec2& screenPos) -> glm::vec2 {
-        // Convert to viewport-local coordinates
-        const auto localPos = glm::vec2(screenPos.x - m_sceneDrawPos.x, screenPos.y - m_sceneDrawPos.y);
-
-        // Normalize device coordinates (-1 to 1)
-        glm::vec4 ndc;
-        ndc.x = (2.0f * localPos.x) / m_sceneDrawSize.x - 1.0f;
-        ndc.y = 1.0f - (2.0f * localPos.y) / m_sceneDrawSize.y;
-        ndc.z = 0.0f;
-        ndc.w = 1.0f;
-
-        // Inverse projection and view
-        const glm::mat4 invViewProj = glm::inverse(projection * view);
-        glm::vec4 worldPos = invViewProj * ndc;
-
-        return {worldPos.x, worldPos.y};
-    };
-
-    glm::vec2 mouseWorld = screenToWorld(mousePos);
-
-    // Check if selection changed (from hierarchy or inspector)
-    if (m_selectedEntity.Index != m_lastSelectedEntityID) {
-        m_isDragging = false;
-        m_lastSelectedEntityID = m_selectedEntity.Index;
-    }
-
-    // Start drag on mouse press
-    if (mouseJustPressed && !m_isDragging && m_world->IsAlive(m_selectedEntity)) {
-        if (m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
-            const auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
-            m_dragStartEntityPos = glm::vec3(lt.Position.X, lt.Position.Y, lt.Position.Z);
-            m_dragStartEntityRot = lt.Rotation;
-            m_dragStartEntityScale = lt.Scale;
-            m_dragStartMouseWorld = mouseWorld;
-            m_isDragging = true;
-        }
-    }
-
-    // Check for drag threshold (5 pixels in world space)
-    if (isMouseDownThisFrame && !m_isDragging) {
-        const glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
-        const float dragDistance = glm::length(dragDelta);
-        const float dragThreshold = (camera->OrthoSize / m_sceneDrawSize.y) * 5.0f;
-
-        if (dragDistance > dragThreshold) {
-            m_isDragging = true;
-            m_dragStartMouseWorld = mouseWorld; // Reset to current position
-        }
-    }
-
-    // Update entity position while dragging
-    if (m_isDragging && isMouseDownThisFrame) {
-        const glm::vec2 dragDelta = mouseWorld - m_dragStartMouseWorld;
-
-        // Direct component access instead of Each() to avoid O(n) iteration
-        // Get the selected entity directly by its stored Entity with correct generation
-        if (m_world->IsAlive(m_selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
-            auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
-            lt.Position.X = m_dragStartEntityPos.x + dragDelta.x;
-            lt.Position.Y = m_dragStartEntityPos.y + dragDelta.y;
-            // Don't mark scene dirty every frame during drag
-            // It will be marked when drag completes below
-        }
-    }
-
-    // End drag and create undo command
-    if (m_isDragging && !isMouseDownThisFrame) {
-        if (m_world->IsAlive(m_selectedEntity) && m_world->Has<ECS::Components::LocalTransform>(m_selectedEntity)) {
-            const auto& lt = m_world->Get<ECS::Components::LocalTransform>(m_selectedEntity);
-            const Vector3D oldPos(m_dragStartEntityPos.x, m_dragStartEntityPos.y, m_dragStartEntityPos.z);
-            const Vector3D newPos = lt.Position;
-
-            // Only notify if position actually changed
-            if (oldPos != newPos) {
-                // Mark scene as dirty once when drag completes (not every frame during drag)
-                if (m_fileMenu) {
-                    m_fileMenu->MarkSceneDirty();
-                }
-                
-                Messaging::MessageSystem::Notify(
-                    Messaging::EntityTransformChanged(
-                        m_selectedEntity.Index, oldPos, m_dragStartEntityRot, m_dragStartEntityScale,
-                        newPos, lt.Rotation, lt.Scale
-                    )
-                );
-            }
-        }
-        m_isDragging = false;
-    }
-
-    m_wasMouseDownLastFrame = isMouseDownThisFrame;
 }

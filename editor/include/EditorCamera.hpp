@@ -63,6 +63,12 @@ namespace Editor {
         ~EditorCamera();
 
         /**
+         * @brief Begin frame processing - prepare input state
+         * Call this at the start of the frame before systems update
+         */
+        void BeginFrame();
+
+        /**
          * @brief Main update called once per frame by the editor viewport.
          *
          * Processes input (when viewport is focused), updates internal
@@ -72,6 +78,12 @@ namespace Editor {
          * @param deltaTime Elapsed time in seconds since last frame.
          */
         void Update(float deltaTime);
+
+        /**
+         * @brief End frame processing - finalize camera state for next frame
+         * Call this at the end of the frame after rendering
+         */
+        void EndFrame();
 
         /**
          * @brief Set whether the editor viewport has input focus.
@@ -166,6 +178,7 @@ namespace Editor {
         // ====================================================================
         glm::vec2 m_lastMousePos = glm::vec2(0.0f);
         bool m_firstMouse = true;
+        bool m_frameInputProcessed = false; // Track if input was processed this frame
 
         // ====================================================================
         // Movement & feel

@@ -34,6 +34,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "graphics/graphicsConfig.hpp"
 #include "graphics/PixelBufferObject.hpp"
+#include "graphics/LightManager.hpp"
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -41,6 +42,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <optional>
 #include <unordered_map>
 #include <queue>
+
+#include "graphics/TileMapRenderer.hpp"
+
+class TileMap;
+class Tileset;
+class TileMapRenderer;
 
 namespace ECS {
     /**
@@ -253,6 +260,10 @@ namespace ECS {
         void SubmitGUILine(const Vector2D& startPos, const Vector2D& endPos,
                           const Color& color, float thickness = 1.0f);
 
+        // Call from editor when a tilemap should be rendered
+        void SetDebugTileMap(const TileMap& map, const Tileset& tileset);
+        void ClearDebugTileMap();
+
     private:
         // ====================================================================
         // Conversion Helpers
@@ -311,6 +322,11 @@ namespace ECS {
         std::unique_ptr<RenderGraph> m_renderGraph;             ///< Render graph (owns framebuffers)
         Engine::Camera* m_activeCamera = nullptr;               ///< Active camera (editor or game)
 
+        std::optional<std::reference_wrapper<const TileMap>> m_debugTileMap;
+        std::optional<std::reference_wrapper<const Tileset>> m_debugTileset;
+
+        TileMapRenderer m_tileMapRenderer; // value member, no pointer
+
         // ====================================================================
         // Member Variables - Wireframe Submissions
         // ====================================================================
@@ -352,6 +368,7 @@ namespace ECS {
         };
         std::vector<GUISubmission> m_guiSubmissionQueue;
 
+        Graphics::LightManager m_lightManager;
 
         // ====================================================================
         // Member Variables - Shaders

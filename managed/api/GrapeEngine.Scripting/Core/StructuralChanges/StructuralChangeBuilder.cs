@@ -4,10 +4,10 @@
 \author Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par    muhammadnurfadzly.b@digipen.edu
 \brief
-Common patterns and utilities for safe structural changes in parallel jobs.
+Common patterns and utilities for safe structural changes using command buffers.
 
 Provides fluent APIs, batch operations, and safety-checked patterns
-for structural modifications in parallel execution contexts.
+for structural modifications through deferred command execution.
 
 Copyright (C) 2025 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-using GrapeEngine.Scripting.Query;
+using GrapeEngine.Scripting.Internal.Query;
 using GrapeEngine.Scripting.Core.StructuralChanges.Commands;
 
 namespace GrapeEngine.Scripting.Core.StructuralChanges;
@@ -102,3 +102,4 @@ public class StructuralChangeBuilder(CommandBuffer buffer)
     /// </summary>
     public int GetPendingChangeCount() => _changes.Count;
 }
+

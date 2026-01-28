@@ -15,7 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using System.Runtime.InteropServices;
 using UnsafePtr = System.Runtime.CompilerServices.Unsafe;
-using GrapeEngine.Scripting.Unsafe;
+using GrapeEngine.Scripting.Internal.Unsafe;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -47,7 +47,7 @@ public class ComponentBatch(World world)
     public void QueueRead<T>(Entity entity) where T : unmanaged
     {
         ComponentRegistry.EnsureRegistered<T>();
-        uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
+        var typeHash = ComponentTypeHelper.GetTypeHash<T>();
         var operation = new ReadOperation(entity, typeHash, typeof(T));
         _operations.Add((operation, null));
     }
@@ -58,11 +58,11 @@ public class ComponentBatch(World world)
     public void QueueWrite<T>(Entity entity, T value) where T : unmanaged
     {
         ComponentRegistry.EnsureRegistered<T>();
-        uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
+        var typeHash = ComponentTypeHelper.GetTypeHash<T>();
 
         // Marshal the unmanaged struct to bytes
-        int size = Marshal.SizeOf<T>();
-        byte[] data = new byte[size];
+        var size = Marshal.SizeOf<T>();
+        var data = new byte[size];
 
         unsafe
         {
@@ -250,7 +250,7 @@ public class EntityComponentBatchAccessor<T>(World world) where T : unmanaged
     {
         ComponentRegistry.EnsureRegistered<T>();
         var results = new (Entity, T)[_entities.Count];
-        int resultIndex = 0;
+        var resultIndex = 0;
 
         unsafe
         {
@@ -327,11 +327,11 @@ public class EntityComponentBatchAccessor<T>(World world) where T : unmanaged
         }
 
         ComponentRegistry.EnsureRegistered<T>();
-        int size = Marshal.SizeOf<T>();
+        var size = Marshal.SizeOf<T>();
 
         unsafe
         {
-            for (int i = 0; i < _entities.Count; i++)
+            for (var i = 0; i < _entities.Count; i++)
             {
                 var entity = _entities[i];
 
@@ -411,7 +411,7 @@ public class EntityComponentBatchAccessor<T>(World world) where T : unmanaged
     public int CountHaving()
     {
         ComponentRegistry.EnsureRegistered<T>();
-        int count = 0;
+        var count = 0;
 
         unsafe
         {
@@ -433,7 +433,7 @@ public class EntityComponentBatchAccessor<T>(World world) where T : unmanaged
     public int RemoveFromAll()
     {
         ComponentRegistry.EnsureRegistered<T>();
-        int removed = 0;
+        var removed = 0;
 
         unsafe
         {
@@ -487,3 +487,4 @@ public static class BatchConfiguration
     /// </summary>
     public static bool AutoBatchingEnabled { get; set; } = true;
 }
+

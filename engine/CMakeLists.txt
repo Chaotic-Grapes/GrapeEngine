@@ -120,6 +120,55 @@ endif()
 # Engine does NOT define USE_IMGUI - editor code is completely separate
 # Interop exports are handled via __declspec(dllexport) when BUILDING_INTEROP is defined
 
+# ======================= IDE Organization - Visual Studio Filters =========================
+# Organize engine source files by folder structure
+foreach(source IN LISTS ENGINE_SOURCES)
+    get_filename_component(source_path "${source}" PATH)
+    file(RELATIVE_PATH source_path_rel "${CMAKE_CURRENT_LIST_DIR}/src" "${source_path}")
+    if(NOT source_path_rel STREQUAL "")
+        string(REPLACE "/" "\\" group_path "Engine Source\\${source_path_rel}")
+    else()
+        set(group_path "Engine Source")
+    endif()
+    source_group("${group_path}" FILES "${source}")
+endforeach()
+
+# Organize engine header files by folder structure
+foreach(header IN LISTS ENGINE_HEADERS)
+    get_filename_component(header_path "${header}" PATH)
+    file(RELATIVE_PATH header_path_rel "${CMAKE_CURRENT_LIST_DIR}/include" "${header_path}")
+    if(NOT header_path_rel STREQUAL "")
+        string(REPLACE "/" "\\" group_path "Engine Include\\${header_path_rel}")
+    else()
+        set(group_path "Engine Include")
+    endif()
+    source_group("${group_path}" FILES "${header}")
+endforeach()
+
+# Organize external source files by folder structure
+foreach(source IN LISTS EXTERNAL_SOURCES)
+    get_filename_component(source_path "${source}" PATH)
+    file(RELATIVE_PATH source_path_rel "${CMAKE_CURRENT_LIST_DIR}/../externals/src" "${source_path}")
+    if(NOT source_path_rel STREQUAL "")
+        string(REPLACE "/" "\\" group_path "Externals\\${source_path_rel}")
+    else()
+        set(group_path "Externals")
+    endif()
+    source_group("${group_path}" FILES "${source}")
+endforeach()
+
+# Organize external header files by folder structure
+foreach(header IN LISTS EXTERNAL_HEADERS)
+    get_filename_component(header_path "${header}" PATH)
+    file(RELATIVE_PATH header_path_rel "${CMAKE_CURRENT_LIST_DIR}/../externals/include" "${header_path}")
+    if(NOT header_path_rel STREQUAL "")
+        string(REPLACE "/" "\\" group_path "Externals\\${header_path_rel}")
+    else()
+        set(group_path "Externals")
+    endif()
+    source_group("${group_path}" FILES "${header}")
+endforeach()
+
 # ======================= Installation (Optional) =========================
 # This allows engine to be installed as a reusable library
 install(TARGETS GrapeEngineLib
