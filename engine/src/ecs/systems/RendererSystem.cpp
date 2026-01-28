@@ -421,13 +421,14 @@ namespace ECS {
 
         m_lightManager.Upload();
 
-        // Determine max layer id present this frame
+        // Collect entities that have LocalTransform + Layer for layered rendering
+        // Determine max layer id present this frame (for bucket sizing)
         int maxLayerId = -1;
         world.Each<Components::Layer>([&](ECS::Entity, const Components::Layer& ly) {
             maxLayerId = std::max(static_cast<int>(ly.Id), maxLayerId);
             });
 
-        // Render per-layer from back (0) to front (max)
+        // Render per-layer from LayerManager's DrawOrder()
         // Single-pass collection: bucket entities by layer then process each
         std::vector<std::vector<ECS::Entity>> buckets;
         buckets.resize(std::max(1, maxLayerId + 1));
@@ -465,10 +466,34 @@ namespace ECS {
                 // I chose a slightly brighter neutral gray for a nicer look
                 hdrFbo->BindAndClear(0.025f, 0.028f, 0.032f, 1.0f);
 
+                // Get LayerManager for layer visibility and render order
+                auto* layerManager = world.GetLayerManager();
+
+                // Determine render order using LayerManager if available, otherwise fall back to manual iteration
+                std::vector<uint16_t> renderOrder;
+                if (layerManager) {
+                    renderOrder = layerManager->DrawOrder();
+                } else {
+                    // Fallback: manually iterate from 0 to maxLayerId
+                    for (int layer = 0; layer <= maxLayerId; ++layer) {
+                        renderOrder.push_back(static_cast<uint16_t>(layer));
+                    }
+                }
+
                 // ---------------------------------------
                 // Layered rendering: SDF first, then batch
+                // Use LayerManager's render order
                 // ---------------------------------------
-                for (int layer = 0; layer <= maxLayerId; ++layer) {
+                for (uint16_t layerId : renderOrder) {
+                    // === Check layer visibility and render enabled ===
+                    if (layerManager) {
+                        const auto& layerData = layerManager->Get(layerId);
+                        // Skip layers that are disabled or hidden in editor
+                        if (!layerData.renderEnabled || !layerData.editorVisible)
+                            continue;
+                    }
+
+                    int layer = static_cast<int>(layerId);
                     if (layer >= static_cast<int>(buckets.size())) continue;
                     // Make a local copy of the bucket so we can sort by ZIndex2D
                     auto list = buckets[layer];

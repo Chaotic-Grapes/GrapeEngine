@@ -24,6 +24,20 @@ internal static partial class LayerAPI
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Layers_IdOf")]
     internal static partial int IdOf([MarshalAs(UnmanagedType.LPStr)] string name);
-}
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Layers_IsRenderEnabled")]
+    internal static partial byte IsRenderEnabled(ushort layerId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Layers_IsUpdateEnabled")]
+    internal static partial byte IsUpdateEnabled(ushort layerId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Layers_IsPhysicsEnabled")]
+    internal static partial byte IsPhysicsEnabled(ushort layerId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Layers_IsVisible")]
+    internal static partial byte IsVisible(ushort layerId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Layers_IsLocked")]
+    internal static partial byte IsLocked(ushort layerId);
 
 

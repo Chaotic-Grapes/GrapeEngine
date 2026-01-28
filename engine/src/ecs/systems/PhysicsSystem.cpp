@@ -382,6 +382,8 @@ namespace ECS {
         static uint64_t s_frameCounter = 0;
         ++s_frameCounter;
 
+        // Get LayerManager for layer-wide physics gating
+        auto* layerManager = world.GetLayerManager();
 
         //  Collect entity sets once per frame (usually fine).
         //  If your scene can add/remove colliders mid-frame, you can also
@@ -399,6 +401,17 @@ namespace ECS {
                     Components::LocalTransform&) {
                         if (const auto* a = world.TryGet<Components::Active>(e)) if (!a->Enabled) return;
                         if (rb.Mass <= 0.0f) return; // only dynamics here
+                        
+                        // === Layer-wide physics gating ===
+                        // Check if the entity's layer has physics enabled
+                        if (layerManager) {
+                            const auto* layer = world.TryGet<Components::Layer>(e);
+                            const uint16_t layerId = layer ? layer->Id : 0;
+                            const auto& layerData = layerManager->Get(layerId);
+                            if (!layerData.physicsEnabled)
+                                return;  // Skip physics simulation for this layer
+                        }
+                        
                         // Must have some collider to participate in broad-phase
                         if (!world.Has<Components::CircleCollider2D>(e) && !world.Has<Components::BoxCollider2D>(e)) return;
                         dynamicEntities.push_back(e); //Push the entity into dynamicEntities for later broad-phase insertion
@@ -412,6 +425,16 @@ namespace ECS {
             [&](const Entity e, const Components::Rigidbody2D& rb, const Components::LocalTransform&) {
                 if (rb.Mass > 0.0f) return; // only statics here
                 if (const auto* a = world.TryGet<Components::Active>(e)) if (!a->Enabled) return;
+                
+                // === Layer-wide physics gating for static entities ===
+                if (layerManager) {
+                    const auto* layer = world.TryGet<Components::Layer>(e);
+                    const uint16_t layerId = layer ? layer->Id : 0;
+                    const auto& layerData = layerManager->Get(layerId);
+                    if (!layerData.physicsEnabled)
+                        return;  // Skip physics simulation for this layer
+                }
+                
                 if (!world.Has<Components::CircleCollider2D>(e) && !world.Has<Components::BoxCollider2D>(e)) return;
                 staticEntities.push_back(e); // Push to store and use static entities for checks later
             });
