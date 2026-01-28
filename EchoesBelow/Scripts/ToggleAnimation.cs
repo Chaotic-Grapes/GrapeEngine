@@ -1,6 +1,8 @@
 // Simple script to toggle between WALK and JUMP animations for the player entity.
 
 using GrapeEngine.Scripting;
+using GrapeEngine.Scripting.Services;
+using GrapeEngine.Scripting.Components;
 using System;
 
 namespace Scripts;

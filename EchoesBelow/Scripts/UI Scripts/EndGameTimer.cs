@@ -1,5 +1,6 @@
 using GrapeEngine.Numerics;
 using GrapeEngine.Scripting;
+using GrapeEngine.Scripting.Components;
 using Scripts.ButtonFolder;
 using Scripts.ObjectPool;
 using static System.Reflection.Metadata.BlobBuilder;
