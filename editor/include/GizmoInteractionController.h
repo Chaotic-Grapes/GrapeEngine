@@ -9,7 +9,7 @@
 Encapsulates gizmo drag interaction state machine and transform snapshots.
 
 This controller tracks the lifecycle of a gizmo interaction:
-    IDLE → HOVERING → DRAGGING → RELEASING → IDLE
+    IDLE -> HOVERING -> DRAGGING -> RELEASING -> IDLE
 
 It manages:
 - State transitions based on ImGuizmo feedback
@@ -54,7 +54,7 @@ namespace Editor {
      * Snapshots:
      *   - Initial: Captured when transitioning to DRAGGING
      *   - Final: Captured when transitioning to RELEASING
-     *   - Delta: Computed from initial → final for undo
+     *   - Delta: Computed from initial -> final for undo
      */
     class GizmoInteractionController {
     public:

@@ -241,18 +241,22 @@ namespace Scenes {
                 sceneJson["SceneName"] = sceneName;
                 sceneJson["EntityCount"] = 0;
 
-                // Serialize layer manager state (names, masks, visibility, locks)
+                // Serialize layer manager state (names, masks, visibility, locks, runtime flags)
                 json layersJson = json::array();
                 const auto layerList = scene.GetLayers().ListLayers();
                 for (const auto& p : layerList) {
                     uint16_t id = p.first;
                     const std::string& name = p.second;
+                    const auto& layerData = scene.GetLayers().Get(id);
                     json entry;
                     entry["id"] = id;
                     entry["name"] = name;
                     entry["mask"] = scene.GetLayers().GetLayerMask(id);
                     entry["visible"] = scene.GetLayers().IsVisible(id);
                     entry["locked"] = scene.GetLayers().IsLocked(id);
+                    entry["renderEnabled"] = layerData.renderEnabled;
+                    entry["updateEnabled"] = layerData.updateEnabled;
+                    entry["physicsEnabled"] = layerData.physicsEnabled;
                     layersJson.push_back(entry);
                 }
                 sceneJson["Layers"] = std::move(layersJson);
@@ -341,7 +345,7 @@ namespace Scenes {
                     return false;
                 }
 
-                // Restore layer definitions (names, masks, visibility) before entity deserialization
+                // Restore layer definitions (names, masks, visibility, locks, runtime flags) before entity deserialization
                 if (sceneJson.contains("Layers") && sceneJson["Layers"].is_array()) {
                     const auto& layersArr = sceneJson["Layers"];
                     for (const auto& ent : layersArr) {
@@ -358,6 +362,9 @@ namespace Scenes {
                         }
                         if (ent.contains("visible")) scene.GetLayers().SetVisibility(lid, ent["visible"].get<bool>());
                         if (ent.contains("locked")) scene.GetLayers().SetLocked(lid, ent["locked"].get<bool>());
+                        if (ent.contains("renderEnabled")) scene.GetLayers().SetRenderEnabled(lid, ent["renderEnabled"].get<bool>());
+                        if (ent.contains("updateEnabled")) scene.GetLayers().SetUpdateEnabled(lid, ent["updateEnabled"].get<bool>());
+                        if (ent.contains("physicsEnabled")) scene.GetLayers().SetPhysicsEnabled(lid, ent["physicsEnabled"].get<bool>());
                     }
                 }
 

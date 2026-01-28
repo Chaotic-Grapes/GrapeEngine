@@ -47,7 +47,10 @@ namespace Scenes {
      */
     class Scene {
     public:
-        Scene() = default;
+        Scene() {
+            // Set LayerManager pointer on World so systems can access it
+            m_world.SetLayerManager(&m_layers);
+        }
         ~Scene() = default;
 
         // ********************** Scene Metadata ********************** //

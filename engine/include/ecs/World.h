@@ -43,6 +43,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "math/Matrix4x4.h"
 
+namespace Scenes {
+    class LayerManager;  // Forward declaration for World::m_layerManager
+}
+
 namespace ECS {
     // Forward declarations
     class PrefabManager;
@@ -1232,6 +1236,23 @@ namespace ECS {
          */
         void SetPrefabManager(PrefabManager* manager) { m_prefabManager = manager; }
 
+        // ************** Layer Management Access ************** //
+
+        /**
+         * @brief Get the LayerManager associated with this world.
+         * LayerManager is owned by the parent Scene and accessed through World
+         * for use by systems (PhysicsSystem, RendererSystem, etc.).
+         * @return LayerManager* Pointer to the LayerManager, or nullptr if not set
+         */
+        Scenes::LayerManager* GetLayerManager() const { return m_layerManager; }
+
+        /**
+         * @brief Set the LayerManager for this world.
+         * Called by Scene when creating its World.
+         * @param manager Pointer to the LayerManager
+         */
+        void SetLayerManager(Scenes::LayerManager* manager) { m_layerManager = manager; }
+
         // ************** Entity Location ************** //
 
         // Location of an entity within the world
@@ -1737,6 +1758,10 @@ namespace ECS {
 
         // PrefabManager for managing prefab instances and registration
         PrefabManager* m_prefabManager = nullptr;
+
+        // LayerManager pointer for accessing layer state from systems
+        // Set by Scene::CreateWorld() to allow systems to query layer enable/disable flags
+        Scenes::LayerManager* m_layerManager = nullptr;
     };
 }
 

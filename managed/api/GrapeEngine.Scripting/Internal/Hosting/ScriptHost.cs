@@ -314,11 +314,8 @@ public static class ScriptHost
             // Clear the component registry's hash set (allows re-registration of modified types)
             ComponentRegistry.ClearRegistrationCache();
             
-            // Clear all component discovery cache (holds Type → Hash mappings)
+            // Clear all component discovery cache (holds Type -> Hash mappings)
             ComponentDiscovery.ClearTypeCache();
-
-            // Clear the log buffer (could transitively hold references)
-            Logging.ClearBuffer();
 
             // Clear all discovered systems (disposes IDisposable instances)
             // This breaks references from instances back to assembly types
@@ -384,7 +381,7 @@ public static class ScriptHost
     /// C++ orchestrates the timing:
     /// 1. C++ compiles (via CompileScriptsManaged)
     /// 2. C++ unloads old assembly (via UnloadAssembly)  
-    /// 3. C++ moves temp→final assembly location
+    /// 3. C++ moves temp->final assembly location
     /// 4. C++ calls ReloadAssembly to load new version
     /// 5. C++ calls C# post-reload hook (re-discovers systems, etc.)
     /// 6. C++ resynchronizes game state
@@ -560,7 +557,7 @@ public static class ScriptHost
                 return -1;
             }
 
-            // C++ will handle: unload → move → load → re-discover systems
+            // C++ will handle: unload -> move -> load -> re-discover systems
             // C# just reports success and provides temp path via GetLastCompiledTempAssemblyPath
             Logging.LogInternal($"[ScriptHost] Compilation succeeded - C++ will orchestrate assembly reload", LogLevel.Info);
             return 0;
@@ -1225,23 +1222,6 @@ public static class ScriptHost
         catch (Exception ex)
         {
             Logging.LogInternal($"[ScriptHost] Error in OnDestroy: {ex.Message}", LogLevel.Error);
-        }
-    }
-
-    /// <summary>
-    /// Flush all buffered logs to the native side.
-    /// Call this at the end of each frame to ensure all logs are delivered.
-    /// </summary>
-    [UnmanagedCallersOnly]
-    public static void FlushLogs()
-    {
-        try
-        {
-            Logging.Flush();
-        }
-        catch (Exception ex)
-        {
-            Logging.LogInternal($"[ScriptHost] Error in FlushLogs: {ex.Message}", LogLevel.Error);
         }
     }
 

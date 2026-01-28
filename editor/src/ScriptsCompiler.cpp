@@ -366,7 +366,7 @@ void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
         m_scriptManager->SetCompileStatus(2, 50, "Compiled successfully, unloading...");
         LOG_INFO("[ScriptsCompiler] Hot reload: compilation successful to temp: " << tempOutput);
         
-        // Step 2: Signal main thread to unload assembly and move temp→final
+        // Step 2: Signal main thread to unload assembly and move temp->final
         {
             std::lock_guard<std::mutex> lock(m_stateMutex);
             m_pendingScriptsOutput = finalOutput;      // Final path for loading

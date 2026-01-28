@@ -23,17 +23,21 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace Editor {
 
     ViewportInteractionManager::ViewportInteractionManager()
-        : m_pickingManager(std::make_unique<PickingQueryManager>())
-        , m_selectedEntityId(0)
-        , m_pendingPickRequestId(0) {
+        : m_pickingManager{std::make_unique<PickingQueryManager>()}
+        , m_selectedEntityId{0}
+        , m_pendingPickRequestId{0} {
         
         // Set up gizmo interaction callbacks
-        m_gizmoController.OnDragStart = [this](uint32_t entityId, const TransformDelta& delta) {
+        m_gizmoController.OnDragStart = [this](const uint32_t entityId, const TransformDelta& delta) {
             // Capture initial transform when drag starts
             // (will be set by RenderGizmo before this fires)
+
+            // nothing right now so
+			(void)entityId;
+            (void)delta;
         };
 
-        m_gizmoController.OnDragEnd = [this](uint32_t entityId, const TransformDelta& delta) {
+        m_gizmoController.OnDragEnd = [this](const uint32_t entityId, const TransformDelta& delta) {
             // Notify observers that transform changed
             if (OnTransformChanged) {
                 OnTransformChanged(entityId, m_dragInitialTransform, m_gizmoController.GetFinalTransform(), delta);
@@ -48,7 +52,7 @@ namespace Editor {
         const glm::vec2& viewportSize,
         const glm::mat4& viewMatrix,
         const glm::mat4& projMatrix,
-        bool isPerspective) {
+        const bool isPerspective) {
         
         m_viewportPos = viewportPos;
         m_viewportSize = viewportSize;
@@ -61,7 +65,7 @@ namespace Editor {
         m_gizmo.SetPerspective(isPerspective);
     }
 
-    uint32_t ViewportInteractionManager::Update(ECS::World& world, uint32_t selectedEntityId) {
+    uint32_t ViewportInteractionManager::Update(ECS::World& world, const uint32_t selectedEntityId) {
         m_selectedEntityId = selectedEntityId;
 
         // Step 1: Poll pending pick results from last frame
