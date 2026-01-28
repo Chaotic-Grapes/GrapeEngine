@@ -476,265 +476,165 @@ void LayersPanel::_renderLayersList() {
     auto& lm = m_scene->GetLayers();
     auto layers = lm.ListLayers();
 
-    for (auto& p : layers) {
-        const uint16_t id = p.first;
-        std::string name = p.second;
-        bool visible = lm.IsVisible(id);
-        bool locked = lm.IsLocked(id);
-        size_t count = lm.EntitiesIn(id).size();
+    // Simple list without columns - just render each layer on its own line
+    if (ImGui::BeginTable("LayersTable", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Vis", ImGuiTableColumnFlags_WidthFixed, 40.0f);
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_WidthFixed, 55.0f);
+        ImGui::TableSetupColumn("Render", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("Update", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("Physics", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("Lock", ImGuiTableColumnFlags_WidthFixed, 90.0f);
 
-        ImGui::PushID(static_cast<int>(id));
-        ImGui::Columns(4, nullptr, false);
-        ImGui::SetColumnWidth(0, 40);
-        ImGui::Checkbox("##vis", &visible);
-        if (visible != lm.IsVisible(id)) {
-            bool prev = lm.IsVisible(id);
-            lm.SetVisibility(id, visible);
+        ImGui::TableHeadersRow();
 
-            if (m_undoSystem) {
-                // Command
-                struct VisCmd : public Editor::ICommand {
-                    Scenes::Scene* scene; uint16_t id; bool prev; bool next;
-                    VisCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+        for (auto& p : layers) {
+            const uint16_t id = p.first;
+            std::string name = p.second;
+            bool visible = lm.IsVisible(id);
+            bool locked = lm.IsLocked(id);
+            bool renderEnabled = lm.IsRenderEnabled(id);
+            bool updateEnabled = lm.IsUpdateEnabled(id);
+            bool physicsEnabled = lm.IsPhysicsEnabled(id);
+            size_t count = lm.EntitiesIn(id).size();
 
-                    void Execute() override {
-                        if (!scene)
-                            return;
+            ImGui::TableNextRow();
+            ImGui::PushID(static_cast<int>(id));
 
-                        scene->GetLayers().SetVisibility(id, next); 
-                    }
-
-                    void Undo() override {
-                        if (!scene)
-                            return;
-
-                        scene->GetLayers().SetVisibility(id, prev); 
-                    }
-                };
-
-                auto cmd = std::make_unique<VisCmd>(m_scene, id, prev, visible);
-                m_undoSystem->ExecuteCommand(std::move(cmd));
-            }
-        }
-        ImGui::NextColumn();
-
-        ImGui::SetColumnWidth(1, 200);
-
-        // Initialize or retrieve the persistent rename buffer for this layer
-        if (m_renameBuffers.find(id) == m_renameBuffers.end()) {
-            m_renameBuffers[id] = {};
-            strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), name.c_str());
-        }
-
-        char* buf = m_renameBuffers[id].data();
-        if (ImGui::InputText("##name", buf, m_renameBuffers[id].size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            std::string newName(buf);
-            // Only proceed if the name actually changed
-            if (newName != name) {
-                std::string prevName = name;
-                lm.RenameLayer(id, newName);
-
-                // Update the buffer to reflect the new name from the layer system
-                strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), newName.c_str());
+            // Visibility column
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Checkbox("##vis", &visible);
+            if (visible != lm.IsVisible(id)) {
+                bool prev = lm.IsVisible(id);
+                lm.SetVisibility(id, visible);
 
                 if (m_undoSystem) {
-                    // Command
-                    struct RenameCmd : public Editor::ICommand {
-                        Scenes::Scene* scene; uint16_t id; std::string prev; std::string next;
-                        RenameCmd(Scenes::Scene* s, uint16_t i, std::string p, std::string n) : scene(s), id(i), prev(std::move(p)), next(std::move(n)) {}
-                        void Execute() override {
-                            if (!scene)
-                                return;
-                            scene->GetLayers().RenameLayer(id, next);
-                        }
-
-                        void Undo() override {
-                            if (!scene)
-                                return;
-                            scene->GetLayers().RenameLayer(id, prev);
-                        }
+                    struct VisCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        VisCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetVisibility(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetVisibility(id, prev); }
                     };
-
-                    auto cmd = std::make_unique<RenameCmd>(m_scene, id, prevName, newName);
+                    auto cmd = std::make_unique<VisCmd>(m_scene, id, prev, visible);
                     m_undoSystem->ExecuteCommand(std::move(cmd));
                 }
-
-                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
-        }
-        ImGui::NextColumn();
 
-        ImGui::SetColumnWidth(2, 60);
-        ImGui::Text("%zu", count);
-        ImGui::NextColumn();
-
-        ImGui::SetColumnWidth(3, 120);
-        ImGui::Checkbox("Lock", &locked);
-        if (locked != lm.IsLocked(id)) {
-            bool prev = lm.IsLocked(id);
-            lm.SetLocked(id, locked);
-
-            if (m_undoSystem) {
-                // Command
-                struct LockCmd : public Editor::ICommand {
-                    Scenes::Scene* scene; uint16_t id; bool prev; bool next;
-                    LockCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
-                    void Execute() override { if (!scene) return; scene->GetLayers().SetLocked(id, next); }
-                    void Undo() override { if (!scene) return; scene->GetLayers().SetLocked(id, prev); }
-                };
-                auto cmd = std::make_unique<LockCmd>(m_scene, id, prev, locked);
-                m_undoSystem->ExecuteCommand(std::move(cmd));
+            // Name column
+            ImGui::TableSetColumnIndex(1);
+            if (m_renameBuffers.find(id) == m_renameBuffers.end()) {
+                m_renameBuffers[id] = {};
+                strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), name.c_str());
             }
-        }
-        ImGui::Columns(1);
 
-        // Drag & Drop source/target for reordering
-        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-            ImGui::SetDragDropPayload("LAYER_PAYLOAD", &id, sizeof(id));
-            ImGui::Text("%s", name.c_str());
-            ImGui::EndDragDropSource();
-        }
-        if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("LAYER_PAYLOAD")) {
-                uint16_t fromId = *(const uint16_t*)payload->Data;
+            char* buf = m_renameBuffers[id].data();
+            if (ImGui::InputText("##name", buf, m_renameBuffers[id].size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                std::string newName(buf);
+                if (newName != name) {
+                    std::string prevName = name;
+                    lm.RenameLayer(id, newName);
+                    strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), newName.c_str());
 
-                if (fromId != id && m_scene) {
-                    // Determine source and destination indices within the current visible list
-                    auto layersListLocal = lm.ListLayers();
-                    int srcIdx = -1, dstIdx = -1;
-                    for (size_t i = 0; i < layersListLocal.size(); ++i) {
-                        if (layersListLocal[i].first == fromId) srcIdx = static_cast<int>(i);
-                        if (layersListLocal[i].first == id) dstIdx = static_cast<int>(i);
-                    }
-
-                    if (srcIdx != -1 && dstIdx != -1 && srcIdx != dstIdx && m_undoSystem) {
-                        struct MoveCmd : public Editor::ICommand {
-                            Scenes::Scene* scene; int fromIndex; int toIndex;
-                            MoveCmd(Scenes::Scene* s, int f, int t) : scene(s), fromIndex(f), toIndex(t) {}
-
-                            void Execute() override {
-                                if (!scene)
-                                    return;
-
-                                auto &lm = scene->GetLayers();
-                                auto layers = lm.ListLayers();
-
-                                if (fromIndex < 0 || toIndex < 0 ||
-                                    fromIndex >= (int)layers.size() || toIndex >= (int)layers.size())
-                                    return;
-
-                                // perform adjacent swaps to move element
-                                if (fromIndex < toIndex) {
-                                    for (int i = fromIndex; i < toIndex; ++i) {
-                                        auto cur = lm.ListLayers();
-                                        lm.SwapLayers(cur[i].first, cur[i+1].first);
-                                    }
-                                }
-                                else if (fromIndex > toIndex) {
-                                    for (int i = fromIndex; i > toIndex; --i) {
-                                        auto cur = lm.ListLayers();
-                                        lm.SwapLayers(cur[i].first, cur[i-1].first);
-                                    }
-                                }
-                            }
-
-                            void Undo() override {
-                                if (!scene)
-                                    return;
-                                auto &lm = scene->GetLayers();
-
-                                // reverse the same swaps using current ordering
-                                if (fromIndex < toIndex) {
-                                    for (int i = toIndex; i > fromIndex; --i) {
-                                        auto cur = lm.ListLayers();
-                                        lm.SwapLayers(cur[i].first, cur[i-1].first);
-                                    }
-                                }
-                                else if (fromIndex > toIndex) {
-                                    for (int i = toIndex; i < fromIndex; ++i) {
-                                        auto cur = lm.ListLayers();
-                                        lm.SwapLayers(cur[i].first, cur[i+1].first);
-                                    }
-                                }
-                            }
+                    if (m_undoSystem) {
+                        struct RenameCmd : public Editor::ICommand {
+                            Scenes::Scene* scene; uint16_t id; std::string prev; std::string next;
+                            RenameCmd(Scenes::Scene* s, uint16_t i, std::string p, std::string n) : scene(s), id(i), prev(std::move(p)), next(std::move(n)) {}
+                            void Execute() override { if (!scene) return; scene->GetLayers().RenameLayer(id, next); }
+                            void Undo() override { if (!scene) return; scene->GetLayers().RenameLayer(id, prev); }
                         };
-
-                        auto cmd = std::make_unique<MoveCmd>(m_scene, srcIdx, dstIdx);
+                        auto cmd = std::make_unique<RenameCmd>(m_scene, id, prevName, newName);
                         m_undoSystem->ExecuteCommand(std::move(cmd));
-                        if (m_fileMenu) m_fileMenu->MarkSceneDirty();
                     }
+                    if (m_fileMenu) m_fileMenu->MarkSceneDirty();
                 }
             }
-            ImGui::EndDragDropTarget();
+
+            // Count column
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%zu", count);
+
+            // Render column
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Checkbox("##render", &renderEnabled);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Render");
+            if (renderEnabled != lm.IsRenderEnabled(id)) {
+                bool prev = lm.IsRenderEnabled(id);
+                lm.SetRenderEnabled(id, renderEnabled);
+                if (m_undoSystem) {
+                    struct RenderCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        RenderCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetRenderEnabled(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetRenderEnabled(id, prev); }
+                    };
+                    auto cmd = std::make_unique<RenderCmd>(m_scene, id, prev, renderEnabled);
+                    m_undoSystem->ExecuteCommand(std::move(cmd));
+                }
+                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+            }
+
+            // Update column
+            ImGui::TableSetColumnIndex(4);
+            ImGui::Checkbox("##update", &updateEnabled);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Update");
+            if (updateEnabled != lm.IsUpdateEnabled(id)) {
+                bool prev = lm.IsUpdateEnabled(id);
+                lm.SetUpdateEnabled(id, updateEnabled);
+                if (m_undoSystem) {
+                    struct UpdateCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        UpdateCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetUpdateEnabled(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetUpdateEnabled(id, prev); }
+                    };
+                    auto cmd = std::make_unique<UpdateCmd>(m_scene, id, prev, updateEnabled);
+                    m_undoSystem->ExecuteCommand(std::move(cmd));
+                }
+                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+            }
+
+            // Physics column
+            ImGui::TableSetColumnIndex(5);
+            ImGui::Checkbox("##physics", &physicsEnabled);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Physics");
+            if (physicsEnabled != lm.IsPhysicsEnabled(id)) {
+                bool prev = lm.IsPhysicsEnabled(id);
+                lm.SetPhysicsEnabled(id, physicsEnabled);
+                if (m_undoSystem) {
+                    struct PhysicsCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        PhysicsCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetPhysicsEnabled(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetPhysicsEnabled(id, prev); }
+                    };
+                    auto cmd = std::make_unique<PhysicsCmd>(m_scene, id, prev, physicsEnabled);
+                    m_undoSystem->ExecuteCommand(std::move(cmd));
+                }
+                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+            }
+
+            // Lock column
+            ImGui::TableSetColumnIndex(6);
+            ImGui::Checkbox("##lock", &locked);
+            if (locked != lm.IsLocked(id)) {
+                bool prev = lm.IsLocked(id);
+                lm.SetLocked(id, locked);
+                if (m_undoSystem) {
+                    struct LockCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        LockCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetLocked(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetLocked(id, prev); }
+                    };
+                    auto cmd = std::make_unique<LockCmd>(m_scene, id, prev, locked);
+                    m_undoSystem->ExecuteCommand(std::move(cmd));
+                }
+            }
+
+            ImGui::PopID();
         }
 
-        // Row actions: Up/Down reorder, Select, Assign
-        ImGui::SameLine();
-        ImGui::SameLine();
-        if (ImGui::Button("▲")) {
-            // Move current entry one slot up using SwapLayers via an undoable command
-            int currentIdx = -1;
-            auto curList = lm.ListLayers();
-            for (size_t i = 0; i < curList.size(); ++i) if (curList[i].first == id) { currentIdx = static_cast<int>(i); break; }
-            if (currentIdx > 0 && m_undoSystem) {
-                struct MoveCmd : public Editor::ICommand {
-                    Scenes::Scene* scene; int fromIndex; int toIndex;
-                    MoveCmd(Scenes::Scene* s, int f, int t) : scene(s), fromIndex(f), toIndex(t) {}
-                    void Execute() override {
-                        if (!scene) return;
-                        auto &lm = scene->GetLayers();
-                        // perform adjacent swaps to move element
-                        for (int i = fromIndex; i > toIndex; --i) {
-                            auto cur = lm.ListLayers();
-                            lm.SwapLayers(cur[i].first, cur[i-1].first);
-                        }
-                    }
-                    void Undo() override {
-                        if (!scene) return;
-                        auto &lm = scene->GetLayers();
-                        for (int i = toIndex; i < fromIndex; ++i) {
-                            auto cur = lm.ListLayers();
-                            lm.SwapLayers(cur[i].first, cur[i+1].first);
-                        }
-                    }
-                };
-                auto cmd = std::make_unique<MoveCmd>(m_scene, currentIdx, currentIdx - 1);
-                m_undoSystem->ExecuteCommand(std::move(cmd));
-                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("▼")) {
-            int currentIdx = -1;
-            auto curList = lm.ListLayers();
-            for (size_t i = 0; i < curList.size(); ++i) if (curList[i].first == id) { currentIdx = static_cast<int>(i); break; }
-            if (currentIdx >= 0 && currentIdx < static_cast<int>(curList.size()) - 1 && m_undoSystem) {
-                struct MoveCmd : public Editor::ICommand {
-                    Scenes::Scene* scene; int fromIndex; int toIndex;
-                    MoveCmd(Scenes::Scene* s, int f, int t) : scene(s), fromIndex(f), toIndex(t) {}
-                    void Execute() override {
-                        if (!scene) return;
-                        auto &lm = scene->GetLayers();
-                        for (int i = fromIndex; i < toIndex; ++i) {
-                            auto cur = lm.ListLayers();
-                            lm.SwapLayers(cur[i].first, cur[i+1].first);
-                        }
-                    }
-                    void Undo() override {
-                        if (!scene) return;
-                        auto &lm = scene->GetLayers();
-                        for (int i = toIndex; i > fromIndex; --i) {
-                            auto cur = lm.ListLayers();
-                            lm.SwapLayers(cur[i].first, cur[i-1].first);
-                        }
-                    }
-                };
-                auto cmd = std::make_unique<MoveCmd>(m_scene, currentIdx, currentIdx + 1);
-                m_undoSystem->ExecuteCommand(std::move(cmd));
-                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
-            }
-        }
-        ImGui::PopID();
+        ImGui::EndTable();
     }
 }
 
