@@ -12,7 +12,7 @@ namespace EchoesBelow.Scripts;
 /// When Time <= 0, the entity can be destroyed by the LifetimeSystem.
 /// </summary>
 [Component]
-public record struct LifetimeComponent(float Time, float MaxTime);
+public record struct LifetimeComponent(float Time);
 
 /// <summary>
 /// System that decreases Lifetime and destroys expired entities.

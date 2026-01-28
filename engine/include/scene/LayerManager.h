@@ -382,17 +382,62 @@ namespace Scenes {
             return m_layers[id].physicsEnabled;
         }
 
-        // Get the collision mask for a layer (defaults to all ones)
+        /**
+         * @brief Get the collision mask for a layer.
+         * @param id The layer ID.
+         * @return The collision mask.
+         */
         uint32_t GetLayerMask(uint16_t id) const {
             if (id >= m_layers.size())
                 return 0xFFFFFFFFu;
             return m_layers[id].collisionMask;
         }
 
-        // Set the collision mask for a layer.
-        void SetLayerMask(uint16_t id, uint32_t mask) {
+        /**
+         * @brief Set the collision mask for a layer and sync all colliders in that layer.
+         * @param id The layer ID.
+         * @param mask The new collision mask.
+         * @param world Optional pointer to ECS World for syncing collider components.
+         *             If nullptr, only the layer mask is updated (no collider sync).
+         */
+        void SetLayerMask(uint16_t id, uint32_t mask, ECS::World* world = nullptr) {
             _ensureCapacity(id);
             m_layers[id].collisionMask = mask;
+            
+            // If a world is provided, sync all colliders in this layer with the new mask
+            if (world != nullptr) {
+                _syncCollidersForLayer(id, world);
+            }
+        }
+        
+        /**
+         * @brief Update all colliders in a layer to use the layer's current collision mask.
+         * Called automatically by SetLayerMask when a world is provided, but can be called
+         * manually if needed to force synchronization.
+         */
+        void _syncCollidersForLayer(uint16_t layerId, ECS::World* world) {
+            if (!world || layerId >= m_layers.size())
+                return;
+            
+            uint32_t layerMask = m_layers[layerId].collisionMask;
+            
+            // Update all entities in this layer
+            for (ECS::Entity entity : m_layers[layerId].entities) {
+                if (!world->IsAlive(entity))
+                    continue;
+                
+                // Update circle colliders
+                if (world->Has<ECS::Components::CircleCollider2D>(entity)) {
+                    auto& circle = world->Get<ECS::Components::CircleCollider2D>(entity);
+                    circle.LayerMask = layerMask;
+                }
+                
+                // Update box colliders
+                if (world->Has<ECS::Components::BoxCollider2D>(entity)) {
+                    auto& box = world->Get<ECS::Components::BoxCollider2D>(entity);
+                    box.LayerMask = layerMask;
+                }
+            }
         }
 
         /**

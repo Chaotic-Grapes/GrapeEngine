@@ -74,6 +74,50 @@ namespace Engine {
             const ECS::Components::PhysicsMaterial2D& physics
         );
 
+        // =========================================================================
+        // World-space shape helpers (Step 1 of refactor)
+        // =========================================================================
+        // These compute world-space shapes by applying transform position, collider
+        // offset, and scale - ensuring consistent shapes between broad and narrow phase.
+
+        /**
+         * @brief Compute world-space circle from components.
+         * Applies transform position, collider offset, and scale to radius.
+         */
+        static WorldCircle GetWorldCircle(
+            const ECS::Components::CircleCollider2D& circle,
+            const ECS::Components::LocalTransform& transform)
+        {
+            WorldCircle result;
+            result.Center.X = transform.Position.X + circle.Offset.X;
+            result.Center.Y = transform.Position.Y + circle.Offset.Y;
+            
+            // Apply scale (use average of X and Y scale)
+            float scale = (transform.Scale.X + transform.Scale.Y) * 0.5f;
+            result.Radius = circle.Radius * scale;
+            
+            return result;
+        }
+
+        /**
+         * @brief Compute world-space AABB from components.
+         * Applies transform position, collider offset, and scale to half-extents.
+         */
+        static WorldAABB GetWorldAABB(
+            const ECS::Components::BoxCollider2D& box,
+            const ECS::Components::LocalTransform& transform)
+        {
+            WorldAABB result;
+            result.Center.X = transform.Position.X + box.Offset.X;
+            result.Center.Y = transform.Position.Y + box.Offset.Y;
+            
+            // Apply scale to half-extents
+            result.HalfExtents.X = box.HalfExtents.X * transform.Scale.X;
+            result.HalfExtents.Y = box.HalfExtents.Y * transform.Scale.Y;
+            
+            return result;
+        }
+
     private:
         static Vector2D m_gravity;
         static bool m_enabled;

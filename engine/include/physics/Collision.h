@@ -15,6 +15,28 @@
 #include <utility>
 
 namespace Engine {
+    // =========================================================================
+    // World-space shape structs (single source of truth for broad+narrow phase)
+    // =========================================================================
+    
+    /**
+     * @brief World-space circle with center and radius already transformed.
+     * Used consistently in both broad-phase and narrow-phase collision detection.
+     */
+    struct WorldCircle {
+        Vector2D Center;
+        float Radius;
+    };
+
+    /**
+     * @brief World-space AABB (axis-aligned bounding box) with center and half-extents.
+     * Used consistently in both broad-phase and narrow-phase collision detection.
+     */
+    struct WorldAABB {
+        Vector2D Center;
+        Vector2D HalfExtents;
+    };
+
     class Collision {
     public:
         struct LineSegment {

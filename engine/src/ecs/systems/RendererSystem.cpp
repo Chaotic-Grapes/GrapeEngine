@@ -623,9 +623,17 @@ namespace ECS {
                         // Lines
                         if (world.Has<Components::ShapeLine2D>(entity)) {
                             const auto& sl = world.Get<Components::ShapeLine2D>(entity);
+                            
+                            // Build transformation matrix
+                            const Matrix4x4 m = TransformUtils::MakeTRS(position, rotation, scale);
+                            
+                            // Transform endpoints from local to world space
+                            const Vector4D worldA = m * Vector4D{sl.A.X, sl.A.Y, 0.0f, 1.0f};
+                            const Vector4D worldB = m * Vector4D{sl.B.X, sl.B.Y, 0.0f, 1.0f};
+                            
                             DebugDraw2D::Line(*m_renderer,
-                                ToGlm(Vector2D{ position.X, position.Y } + sl.A),
-                                ToGlm(Vector2D{ position.X, position.Y } + sl.B),
+                                ToGlm(Vector2D{worldA.X, worldA.Y}),
+                                ToGlm(Vector2D{worldB.X, worldB.Y}),
                                 sl.Thickness, ToGlm(sl.Color), 0);
                         }
 
@@ -1374,7 +1382,7 @@ namespace ECS {
             auto& collider = world.Get<ECS::Components::BoxCollider2D>(entity);
             
             glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
-            glm::vec2 halfExtents{ collider.HalfExtents.X, collider.HalfExtents.Y };
+            glm::vec2 halfExtents{ collider.HalfExtents.X * scale.X, collider.HalfExtents.Y * scale.Y };
             
             glm::vec2 min = worldPos2D + offset - halfExtents;
             glm::vec2 max = worldPos2D + offset + halfExtents;

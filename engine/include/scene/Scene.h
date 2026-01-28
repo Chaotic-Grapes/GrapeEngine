@@ -160,6 +160,26 @@ namespace Scenes {
 
             m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{id});
             m_layers.OnLayerSet(e, id);
+
+            // Synchronize the collider's LayerMask with the layer manager's collision mask.
+            // This ensures that physics collision checks will use the correct layer-based collision rules.
+            _syncCollidersToLayer(e, id);
+        }
+
+        /**
+         * @brief Internal helper: sync an entity's colliders to a layer's collision mask.
+         * Called by SetLayer and should be called whenever colliders are added to an entity with a layer.
+         */
+        void _syncCollidersToLayer(const ECS::Entity e, const uint16_t layerId) {
+            uint32_t layerMask = m_layers.GetLayerMask(layerId);
+            if (m_world.Has<ECS::Components::CircleCollider2D>(e)) {
+                auto& circle = m_world.Get<ECS::Components::CircleCollider2D>(e);
+                circle.LayerMask = layerMask;
+            }
+            if (m_world.Has<ECS::Components::BoxCollider2D>(e)) {
+                auto& box = m_world.Get<ECS::Components::BoxCollider2D>(e);
+                box.LayerMask = layerMask;
+            }
         }
 
         /**
