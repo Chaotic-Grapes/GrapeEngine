@@ -39,5 +39,4 @@ internal static partial class LayerAPI
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "EngineInterop_Layers_IsLocked")]
     internal static partial byte IsLocked(ushort layerId);
-
-
+}

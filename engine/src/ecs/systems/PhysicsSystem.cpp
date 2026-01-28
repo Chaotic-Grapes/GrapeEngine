@@ -38,6 +38,7 @@
 #include "physics/Collision.h"
 #include "physics/Physics.h"
 #include "physics/LayerMask.h"
+#include "scene/LayerManager.h"
 #include "ecs/Components.h"
 #include <unordered_map>
 #include <unordered_set>
