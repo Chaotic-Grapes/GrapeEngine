@@ -126,6 +126,7 @@ namespace ECS {
         LogComponentTypeIds<Components::Name>("Name", FNV1a_Hash("Name"));
         LogComponentTypeIds<Components::TagMask>("TagMask", FNV1a_Hash("TagMask"));
         LogComponentTypeIds<Components::Active>("Active", FNV1a_Hash("Active"));
+        LogComponentTypeIds<Components::Parent>("Parent", FNV1a_Hash("Parent"));
         LogComponentTypeIds<Components::PrefabLink>("PrefabLink", FNV1a_Hash("PrefabLink"));
         LogComponentTypeIds<Components::PrefabInstanceMetadata>("PrefabInstanceMetadata", FNV1a_Hash("PrefabInstanceMetadata"));
         LogComponentTypeIds<Components::Layer>("Layer", FNV1a_Hash("Layer"));
