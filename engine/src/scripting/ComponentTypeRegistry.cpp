@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/ComponentRegistry.h"
 #include "ecs/Components.h"
+#include "ecs/Entity.h"
 #include <cstdint>
 
 namespace {
@@ -32,6 +33,25 @@ namespace {
 }
 
 namespace ECS {
+#if defined(_DEBUG) || defined(DEBUG)
+    namespace {
+        template<typename T>
+        void LogComponentTypeIds(const char* name, uint32_t hash) {
+            const ComponentTypeId registryId = ComponentRegistry::GetComponentIdFromHash(hash);
+            const ComponentTypeId typeId = TypeIdOf<T>();
+
+            if (registryId == NULL_COMPONENT_ID) {
+                LOG_WARNING("[ComponentTypeRegistry] Missing registry ID for " << name << " (hash=0x" << std::hex << hash << std::dec << ")");
+            } else if (registryId != typeId) {
+                LOG_WARNING("[ComponentTypeRegistry] TypeId mismatch for " << name << " (hash=0x" << std::hex << hash << std::dec
+                    << ", registryId=" << registryId << ", typeIdOf=" << typeId << ")");
+            } else {
+                LOG_INFO("[ComponentTypeRegistry] TypeId match for " << name << " (hash=0x" << std::hex << hash << std::dec
+                    << ", id=" << registryId << ")");
+            }
+        }
+    }
+#endif
 
     /**
      * @brief Register all engine component types with their hash values.
@@ -99,5 +119,53 @@ namespace ECS {
 
         // Audio
         ComponentRegistry::RegisterWithHash<Components::AudioSource>(FNV1a_Hash("AudioSource"));
+
+#if defined(_DEBUG) || defined(DEBUG)
+        // Log the registered component types for debugging
+        LogComponentTypeIds<Components::Name>("Name", FNV1a_Hash("Name"));
+        LogComponentTypeIds<Components::TagMask>("TagMask", FNV1a_Hash("TagMask"));
+        LogComponentTypeIds<Components::Active>("Active", FNV1a_Hash("Active"));
+        LogComponentTypeIds<Components::PrefabLink>("PrefabLink", FNV1a_Hash("PrefabLink"));
+        LogComponentTypeIds<Components::PrefabInstanceMetadata>("PrefabInstanceMetadata", FNV1a_Hash("PrefabInstanceMetadata"));
+        LogComponentTypeIds<Components::Layer>("Layer", FNV1a_Hash("Layer"));
+
+        LogComponentTypeIds<Components::LocalTransform>("LocalTransform", FNV1a_Hash("LocalTransform"));
+        LogComponentTypeIds<Components::WorldTransform>("WorldTransform", FNV1a_Hash("WorldTransform"));
+
+        LogComponentTypeIds<Components::Velocity>("Velocity", FNV1a_Hash("Velocity"));
+        LogComponentTypeIds<Components::Acceleration>("Acceleration", FNV1a_Hash("Acceleration"));
+        LogComponentTypeIds<Components::AngularVelocity>("AngularVelocity", FNV1a_Hash("AngularVelocity"));
+        LogComponentTypeIds<Components::Rigidbody>("Rigidbody", FNV1a_Hash("Rigidbody"));
+        LogComponentTypeIds<Components::PhysicsMaterial2D>("PhysicsMaterial2D", FNV1a_Hash("PhysicsMaterial2D"));
+        LogComponentTypeIds<Components::BoxCollider>("BoxCollider", FNV1a_Hash("BoxCollider"));
+        LogComponentTypeIds<Components::SphereCollider>("SphereCollider", FNV1a_Hash("SphereCollider"));
+
+        LogComponentTypeIds<Components::LinearVelocity2D>("LinearVelocity2D", FNV1a_Hash("LinearVelocity2D"));
+        LogComponentTypeIds<Components::Acceleration2D>("Acceleration2D", FNV1a_Hash("Acceleration2D"));
+        LogComponentTypeIds<Components::AngularVelocity2D>("AngularVelocity2D", FNV1a_Hash("AngularVelocity2D"));
+        LogComponentTypeIds<Components::Rigidbody2D>("Rigidbody2D", FNV1a_Hash("Rigidbody2D"));
+        LogComponentTypeIds<Components::BoxCollider2D>("BoxCollider2D", FNV1a_Hash("BoxCollider2D"));
+        LogComponentTypeIds<Components::CircleCollider2D>("CircleCollider2D", FNV1a_Hash("CircleCollider2D"));
+
+        LogComponentTypeIds<Components::SpriteRenderer2D>("SpriteRenderer2D", FNV1a_Hash("SpriteRenderer2D"));
+        LogComponentTypeIds<Components::SpriteFlip2D>("SpriteFlip2D", FNV1a_Hash("SpriteFlip2D"));
+        LogComponentTypeIds<Components::SpriteShader2D>("SpriteShader2D", FNV1a_Hash("SpriteShader2D"));
+
+        LogComponentTypeIds<Components::SpriteSheetAnimation2D>("SpriteSheetAnimation2D", FNV1a_Hash("SpriteSheetAnimation2D"));
+        LogComponentTypeIds<Components::AnimationState2D>("AnimationState2D", FNV1a_Hash("AnimationState2D"));
+
+        LogComponentTypeIds<Components::ShapeCircle2D>("ShapeCircle2D", FNV1a_Hash("ShapeCircle2D"));
+        LogComponentTypeIds<Components::ShapeBox2D>("ShapeBox2D", FNV1a_Hash("ShapeBox2D"));
+        LogComponentTypeIds<Components::ShapeLine2D>("ShapeLine2D", FNV1a_Hash("ShapeLine2D"));
+        LogComponentTypeIds<Components::ZIndex2D>("ZIndex2D", FNV1a_Hash("ZIndex2D"));
+
+        LogComponentTypeIds<Components::Camera3D>("Camera3D", FNV1a_Hash("Camera3D"));
+        LogComponentTypeIds<Components::CameraEditor3D>("CameraEditor3D", FNV1a_Hash("CameraEditor3D"));
+        LogComponentTypeIds<Components::CameraMatrices>("CameraMatrices", FNV1a_Hash("CameraMatrices"));
+
+        LogComponentTypeIds<Components::Light2D>("Light2D", FNV1a_Hash("Light2D"));
+        
+        LogComponentTypeIds<Components::AudioSource>("AudioSource", FNV1a_Hash("AudioSource"));
+#endif
     }
 }
