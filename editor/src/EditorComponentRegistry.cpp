@@ -158,6 +158,9 @@ static auto& _getCppComponentRenderers() {
         
         renderers[ECS::ComponentRegistry::Type<Layer>()] = 
             [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); };
+
+        renderers[ECS::ComponentRegistry::Type<Material2D>()] =
+            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); };
     }
     
     return renderers;
@@ -320,6 +323,19 @@ static auto& _getCppComponentDefaults() {
         
         defaults[ECS::ComponentRegistry::Type<Layer>()] = []() { 
             return nlohmann::json{{"Id", 0}}; 
+        };
+
+        defaults[ECS::ComponentRegistry::Type<Material2D>()] = []() {
+            return nlohmann::json{
+                {"NormalTextureId", 0},
+                {"MRATextureId", 0},
+                {"Metallic", 0.0f},
+                {"Smoothness", 0.5f},
+                {"AOStrength", 1.0f},
+                {"NormalStrength", 1.0f},
+                {"AlphaCutoff", 0.5f},
+                {"Flags", 0}
+            };
         };
     }
     
@@ -581,6 +597,25 @@ static void _initializeDefaultRegistry() {
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); }),
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Id", 0}}; }),
             COMPONENT_OPS(Layer)
+        },
+        // Material2D
+        {
+			"Material 2D", "Material2D", "ECS::Components::Material2D",
+			ECS::ComponentRegistry::Type<Material2D>(), 0, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "NormalTextureId", 0 },
+                { "MRA_TextureId", 0 },
+                { "NormalTexturePath", "" },
+                { "MRA_TexturePath", "" },
+                { "Metallic", 0.0f },
+                { "Smoothness", 0.5f },
+                { "AOStrength", 1.0f },
+                { "NormalStrength", 1.0f },
+                { "AlphaCutoff", 0.5f },
+                { "Flags", 0 }
+            }; }),
+            COMPONENT_OPS(Material2D)
         }
     };
 }

@@ -82,7 +82,7 @@ namespace EditorUI {
     // The value is loaded from JSON and written back only if the user edits it
     // fieldLabel is an optional unit label like "kg" or "deg"
     void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
-        nlohmann::json& data, const std::string& key, float dragSpeed)
+        nlohmann::json& data, const std::string& key, float dragSpeed, float min, float max)
     {
         // Ensure we are editing a JSON object (key value pairs)
         _ensureObject(data);
@@ -95,7 +95,7 @@ namespace EditorUI {
 
         // Set the width for the drag widget so all floats look consistent
         ImGui::SetNextItemWidth(90.0f);
-        if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed, 0, 0, "%.2f"))
+        if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed, min, max, "%.2f"))
             data[key] = value;
 
         // If a unit label is provided, draw it next to the field

@@ -43,7 +43,7 @@ namespace EditorUI {
 
     // Renders a float property editor with drag control and label
     void RenderFloatRow(const std::string& label, const std::string& fieldLabel, 
-        nlohmann::json& data, const std::string& key, float dragSpeed);
+        nlohmann::json& data, const std::string& key, float dragSpeed, float min = 0.0f, float max = 0.0f);
 
     // -------------------------------------------------------------------------
     // Vector Editing

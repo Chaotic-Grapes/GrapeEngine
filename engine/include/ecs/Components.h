@@ -465,6 +465,33 @@ namespace ECS {
             bool Spatial3D = true;
         };
         static_assert(std::is_trivially_copyable_v<AudioSource>, "AudioSource must be trivially copyable");
+
+        // Material2D: material properties for 2D rendering
+        // Used in conjunction with SpriteRenderer2D for enhanced visual effects
+        struct Material2D {
+        public:
+            // --- Texture inputs (albedo comes from SpriteRenderer2D) ---
+            uint32_t NormalTextureId = 0;   // RGB normal map (tangent-space)
+            uint32_t MRA_TextureId = 0;     // R = Metallic, G = Roughness/Smoothness, B = AO
+
+            // --- Scalar fallbacks / modifiers ---
+            float Metallic = 0.0f;          // Used if no MRA texture or channel disabled
+            float Smoothness = 0.5f;        // (or Roughness, pick a convention)
+            float AOStrength = 1.0f;        // AO intensity multiplier
+
+            float NormalStrength = 1.0f;    // Normal map intensity
+            float AlphaCutoff = 0.5f;       // For alpha testing / cutout
+
+            // --- Shader flags (bitfield) ---
+            uint32_t Flags = 0;
+
+            // --- Persistent paths (do NOT serialize texture IDs) ---
+            char NormalTexturePath[256] = { 0 };
+            char MRA_TexturePath[256] = { 0 };
+
+            uint32_t _padding = 0;            // Alignment / if needed
+        };
+        static_assert(std::is_trivially_copyable_v<Material2D>, "Material2D must be trivially copyable");
     }
 }
 #endif
