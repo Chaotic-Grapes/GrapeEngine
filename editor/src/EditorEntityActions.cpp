@@ -112,7 +112,7 @@ void EntityActions::RemoveEntity(EntityId id) {
     std::function<void(EntityId)> deleteRecursive = [&](EntityId entityId) {
         // Collect children first to avoid iterator invalidation
         std::vector<EntityId> children;
-        world.Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
+        world.Each<ECS::Components::Parent>([&](ECS::Entity e, const ECS::Components::Parent& p) {
             if (p.ParentEntity.Index == entityId) {
                 children.push_back(e.Index);
             }
@@ -207,7 +207,7 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         }
         else {
             // Remove parent component if cloning as root
-            if (world.Has<ECS::Parent>(clone)) {
+            if (world.Has<ECS::Components::Parent>(clone)) {
                 world.Detach(clone);
             }
         }
@@ -217,7 +217,7 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
         // Find and clone all children
         std::vector<EntityId> children;
-        world.Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
+        world.Each<ECS::Components::Parent>([&](ECS::Entity e, const ECS::Components::Parent& p) {
             if (p.ParentEntity.Index == entityId) {
                 children.push_back(e.Index);
             }
@@ -233,7 +233,7 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
     // Get the parent of the original entity (if any)
     EntityId originalParentId = ECS::Entity::NPOS32;
-    if (world.Has<ECS::Parent>(entity)) {
+    if (world.Has<ECS::Components::Parent>(entity)) {
         const auto& parent = world.ParentOf(entity);
         originalParentId = parent.Index;
     }

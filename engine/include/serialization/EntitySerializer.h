@@ -494,7 +494,7 @@ namespace Serialization {
 
 			// Find all children
 			std::vector<EntityId> children;
-			world.Each<ECS::Parent>([&](ECS::Entity child, const ECS::Parent& p) {
+			world.Each<ECS::Components::Parent>([&](ECS::Entity child, const ECS::Components::Parent& p) {
 				// Entity's parent is entity we're serializing, it's a child basically
 				if (p.ParentEntity.Index == e.Index) {
 					children.push_back(child.Index);

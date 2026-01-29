@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define COMPONENTS_H
 
 #include "Color.h"
+#include "ecs/Entity.h"
 #include "math/Vector2D.h"
 #include "math/Vector3D.h"
 #include "math/Vector4D.h"
@@ -117,6 +118,13 @@ namespace ECS {
             bool Enabled = true;
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
+
+        // Parent relationship for hierarchy.
+        struct Parent {
+        public:
+            Entity ParentEntity{NULL_ENTITY};
+        };
+        static_assert(std::is_trivially_copyable_v<Parent>, "Parent must be trivially copyable");
 
         // [DEPRECATED] Legacy prefab link - kept for backward compatibility during migration
         // Use PrefabInstanceMetadata instead in new code
