@@ -93,6 +93,51 @@ public static partial class ComponentRegistry
     }
 
     /// <summary>
+    /// Get the FNV-1a hash for a component type.
+    /// </summary>
+    public static uint GetComponentHash<T>() where T : unmanaged
+    {
+        return ComponentTypeHelper.GetTypeHash<T>();
+    }
+
+    /// <summary>
+    /// Get all registered component hashes and names from the native registry.
+    /// </summary>
+    public static (uint hash, string name)[] ListAllComponents()
+    {
+        int total = ComponentRegistryAPI.GetAllComponentHashes(IntPtr.Zero, 0);
+        if (total <= 0)
+            return [];
+
+        int bytes = sizeof(uint) * total;
+        IntPtr buffer = Marshal.AllocHGlobal(bytes);
+        try
+        {
+            int written = ComponentRegistryAPI.GetAllComponentHashes(buffer, total);
+            int count = System.Math.Min(written, total);
+            if (count <= 0)
+                return [];
+
+            int[] tmp = new int[count];
+            Marshal.Copy(buffer, tmp, 0, count);
+
+            var result = new (uint, string)[count];
+            for (int i = 0; i < count; ++i)
+            {
+                uint hash = unchecked((uint)tmp[i]);
+                string name = GetComponentName(hash);
+                result[i] = (hash, name);
+            }
+
+            return result;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    /// <summary>
     /// Auto-register a component type if not already registered.
     /// This is called internally before component operations.
     /// </summary>
@@ -123,6 +168,11 @@ public static partial class ComponentRegistry
             _registeredHashes.Clear();
             Logging.LogInternal("[ComponentRegistry] Cleared registration cache for hot reload", LogLevel.Info);
         }
+    }
+
+    internal static void LogAllComponentHashesCritical()
+    {
+        ComponentRegistryAPI.LogAllComponentHashesCritical();
     }
 
     /// <summary>
@@ -163,6 +213,24 @@ public static partial class ComponentRegistry
             displayName = attribute.Name;
 
         return displayName;
+    }
+
+    private static string GetComponentName(uint hash)
+    {
+        const int bufferSize = 256;
+        IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+        try
+        {
+            int len = ComponentRegistryAPI.GetComponentNameFromHash(hash, buffer, bufferSize);
+            if (len <= 0)
+                return string.Empty;
+
+            return Marshal.PtrToStringUTF8(buffer) ?? string.Empty;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 
     [GeneratedRegex("(?<=[a-z])([A-Z])")]

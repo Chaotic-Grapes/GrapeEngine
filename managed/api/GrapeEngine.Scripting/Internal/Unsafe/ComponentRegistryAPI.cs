@@ -32,6 +32,18 @@ internal static partial class ComponentRegistryAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool IsComponentRegistered(uint typeNameHash);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_GetAllComponentHashes")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static partial int GetAllComponentHashes(System.IntPtr outHashes, int maxCount);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_GetComponentNameFromHash")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static partial int GetComponentNameFromHash(uint typeNameHash, System.IntPtr outNameBuffer, int maxLength);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_LogAllComponentHashesCritical")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static partial void LogAllComponentHashesCritical();
 }
 
 

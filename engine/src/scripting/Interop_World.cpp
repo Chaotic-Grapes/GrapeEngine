@@ -646,3 +646,38 @@ INTEROP_API bool WorldInterop_GetComponentMetaFromHash(uint32_t typeNameHash, in
     if (outAlignment) *outAlignment = it->second.Alignment;
     return true;
 }
+
+INTEROP_API int WorldInterop_GetAllComponentHashes(uint32_t* outHashes, int maxCount) {
+    const auto hashes = ECS::ComponentRegistry::GetAllComponentHashes();
+    const int total = static_cast<int>(hashes.size());
+
+    if (outHashes && maxCount > 0) {
+        const int copyCount = (total < maxCount) ? total : maxCount;
+        for (int i = 0; i < copyCount; ++i) {
+            outHashes[i] = hashes[i];
+        }
+    }
+
+    return total;
+}
+
+INTEROP_API int WorldInterop_GetComponentNameFromHash(uint32_t typeNameHash, char* outName, int maxLen) {
+    const std::string name = ECS::ComponentRegistry::GetComponentNameFromHash(typeNameHash);
+
+    if (outName && maxLen > 0) {
+        int copyLen = static_cast<int>(name.size());
+        if (copyLen >= maxLen) {
+            copyLen = maxLen - 1;
+        }
+        if (copyLen > 0) {
+            std::memcpy(outName, name.data(), static_cast<size_t>(copyLen));
+        }
+        outName[copyLen] = '\0';
+    }
+
+    return static_cast<int>(name.size());
+}
+
+INTEROP_API void WorldInterop_LogAllComponentHashesCritical() {
+    ECS::ComponentRegistry::LogAllComponentHashesCritical("managed registry build");
+}

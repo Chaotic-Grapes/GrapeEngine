@@ -55,6 +55,8 @@ internal static class ComponentDiscovery
         {
             RegisterComponent(componentType);
         }
+
+        ComponentRegistry.LogAllComponentHashesCritical();
     }
 
     /// <summary>

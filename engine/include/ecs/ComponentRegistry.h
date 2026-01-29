@@ -32,6 +32,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_map>
 #include <mutex>
 #include <atomic>  // For atomic operations in lock-free component registration
+#include <string>
+#include <vector>
 
 namespace ECS {
   using ComponentTypeId = uint32_t;
@@ -144,6 +146,15 @@ namespace ECS {
       }
 
       /**
+       * @brief Register a human-readable name for a component hash.
+       * @param typeHash FNV-1a hash of component type name
+       * @param typeName Component type name
+       */
+      static void RegisterName(uint32_t typeHash, const std::string& typeName) {
+          _hashToName()[typeHash] = typeName;
+      }
+
+      /**
        * @brief Get ComponentTypeId from type name hash
        * @param typeHash FNV-1a hash of component type name
        * @return ComponentTypeId or NULL_COMPONENT_ID if not found
@@ -253,6 +264,29 @@ namespace ECS {
               hashes.push_back(hash);
           }
           return hashes;
+      }
+
+      /**
+       * @brief Log all registered component hashes at CRITICAL level.
+       * @param context Optional context tag for the log output.
+       */
+      static void LogAllComponentHashesCritical(const char* context = nullptr) {
+          const auto& hashMap = _hashToId();
+
+          if (context && context[0] != '\0') {
+              LOG_CRITICAL("[ComponentRegistry] Dumping component hashes (" << context << ")");
+          } else {
+              LOG_CRITICAL("[ComponentRegistry] Dumping component hashes");
+          }
+
+          for (const auto& [hash, id] : hashMap) {
+              const std::string name = GetComponentNameFromHash(hash);
+              if (!name.empty()) {
+                  LOG_CRITICAL("[ComponentRegistry] 0x" << std::hex << hash << std::dec << " (" << name << ")");
+              } else {
+                  LOG_CRITICAL("[ComponentRegistry] 0x" << std::hex << hash << std::dec);
+              }
+          }
       }
   };
 
