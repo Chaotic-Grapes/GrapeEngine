@@ -14,6 +14,7 @@ using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Components;
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct LinearVelocity2D
 {
@@ -23,6 +24,7 @@ public record struct LinearVelocity2D
     public LinearVelocity2D(float x, float y) => Value = new Vector2(x, y);
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct Acceleration2D
 {
@@ -32,6 +34,7 @@ public record struct Acceleration2D
     public Acceleration2D(float x, float y) => Value = new Vector2(x, y);
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct AngularVelocity2D
 {
@@ -40,6 +43,7 @@ public record struct AngularVelocity2D
     public AngularVelocity2D(float value) => Value = value;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct Rigidbody2D
 {
@@ -100,6 +104,7 @@ public record struct Rigidbody2D
     }
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct PhysicsMaterial2D
 {
@@ -108,6 +113,7 @@ public record struct PhysicsMaterial2D
     public float PositionCorrectPercent;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct BoxCollider2D
 {
@@ -126,6 +132,7 @@ public record struct BoxCollider2D
     }
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct CircleCollider2D
 {
@@ -150,4 +157,3 @@ public record struct CircleCollider2D
         Flags = 0;
     }
 }
-

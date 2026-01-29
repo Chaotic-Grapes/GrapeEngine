@@ -14,6 +14,7 @@ using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Components;
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct LocalTransform(
     Vector3 Position = default,
@@ -23,6 +24,7 @@ public record struct LocalTransform(
     public static LocalTransform Default => new(Vector3.Zero, Quaternion.Identity, Vector3.One);
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct WorldTransform
 {

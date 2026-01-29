@@ -51,14 +51,34 @@ public static partial class ComponentRegistry
             if (_registeredHashes.Contains(hash))
                 return false;
 
-            // Register with native code, passing the custom name if available
+            // Check if component is already registered in C++ (e.g., engine components)
+            bool alreadyRegisteredInCpp = ComponentRegistryAPI.IsComponentRegistered(hash);
+            
+            if (alreadyRegisteredInCpp)
+            {
+                // Component exists in C++ already - just mark it as known in our cache
+                _registeredHashes.Add(hash);
+                string displayName = customName ?? typeof(T).Name;
+                Logging.LogInternal($"[ComponentRegistry] Component {displayName} already registered in C++ (hash: 0x{hash:X8})", LogLevel.Info);
+                
+                // Register with managed serializer
+                try
+                {
+                    ComponentSerializer.RegisterManagedType(hash, typeof(T));
+                }
+                catch { /* ignore if hosting not available */ }
+                
+                return true; // Successfully acknowledged existing registration
+            }
+
+            // Register as new C# component with native code
             bool success = ComponentRegistryAPI.RegisterComponent(hash, size, alignment, customName);
             
             if (success)
             {
                 _registeredHashes.Add(hash);
                 string displayName = customName ?? typeof(T).Name;
-                Logging.LogInternal($"[ComponentRegistry] Registered {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})", LogLevel.Info);
+                Logging.LogInternal($"[ComponentRegistry] Registered new C# component {displayName} (hash: 0x{hash:X8}, size: {size}, align: {alignment})", LogLevel.Info);
                 
                 // Let the managed serializer know about this managed type so it can
                 // marshal bytes into a typed object for JSON serialization.
@@ -67,6 +87,10 @@ public static partial class ComponentRegistry
                     ComponentSerializer.RegisterManagedType(hash, typeof(T));
                 }
                 catch { /* ignore if hosting not available */ }
+            }
+            else
+            {
+                Logging.LogInternal($"[ComponentRegistry] Failed to register C# component {typeof(T).Name} (hash: 0x{hash:X8}) - may conflict with existing registration", LogLevel.Warning);
             }
 
             return success;

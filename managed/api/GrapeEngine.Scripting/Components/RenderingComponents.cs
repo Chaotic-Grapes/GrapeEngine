@@ -14,6 +14,7 @@ using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Components;
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct SpriteRenderer2D
 {
@@ -27,6 +28,7 @@ public record struct SpriteRenderer2D
     public float EmissiveStrength;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct SpriteFlip2D
 {
@@ -34,12 +36,14 @@ public record struct SpriteFlip2D
     public bool FlipY;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct SpriteShader2D
 {
     public bool Bloom;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct SpriteSheetAnimation2D
 {
@@ -55,6 +59,7 @@ public record struct SpriteSheetAnimation2D
     public bool Playing;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct AnimationState2D
 {
@@ -63,6 +68,7 @@ public record struct AnimationState2D
     public bool Finished;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct ShapeCircle2D
 {
@@ -73,6 +79,7 @@ public record struct ShapeCircle2D
     public bool Filled;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct ShapeBox2D
 {
@@ -83,6 +90,7 @@ public record struct ShapeBox2D
     public bool Filled;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct ShapeLine2D
 {
@@ -92,12 +100,14 @@ public record struct ShapeLine2D
     public float Thickness;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct ZIndex2D
 {
     public short ZOrder;
 }
 
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct Light2D
 {

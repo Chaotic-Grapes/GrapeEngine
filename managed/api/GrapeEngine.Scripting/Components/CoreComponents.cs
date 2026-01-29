@@ -18,6 +18,7 @@ namespace GrapeEngine.Scripting.Components;
 /// Name component: String identifier for an entity.
 /// Uses fixed-size char array for unmanaged memory layout.
 /// </summary>
+[Component]
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
 public record struct Name
 {
@@ -37,12 +38,14 @@ public record struct Name
 /// <summary>
 /// Tag mask component: Bitmask for quick entity classification.
 /// </summary>
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct TagMask(uint Mask);
 
 /// <summary>
 /// Active component: Whether entity is active/enabled.
 /// </summary>
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct Active(bool Enabled);
 
@@ -50,6 +53,7 @@ public record struct Active(bool Enabled);
 /// Prefab instance metadata component: Runtime data for prefab instances.
 /// Contains the hash of the source prefab and instance flags.
 /// </summary>
+[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct PrefabInstanceMetadata
 {

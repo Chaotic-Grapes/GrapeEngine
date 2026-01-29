@@ -42,6 +42,17 @@ public class LifetimeSystem : SystemBase
         var deltaTime = Time.DeltaTime;
         var entitiesToDestroy = new List<Entity>();
 
+        foreach (var result in World!.Query<AngularVelocity2D>())
+        {
+            ref var angularVelocity = ref result.Component1;
+            angularVelocity.Value += 1.0f;
+            Log($"Angular Velocity: {angularVelocity.Value}", LogLevel.Debug);
+
+            ref var angularVelocity2D = ref result.Entity.GetComponent<AngularVelocity2D>();
+            angularVelocity2D.Value += 1.0f;
+            LogFrom($"Angular Velocity 2D: {angularVelocity2D.Value}", LogLevel.Debug);
+        }
+
         // Query all entities with Lifetime and Active components
         foreach (var result in World!.Query<LifetimeComponent, Active>())
         {
