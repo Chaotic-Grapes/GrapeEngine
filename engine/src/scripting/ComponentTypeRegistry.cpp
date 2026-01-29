@@ -69,6 +69,7 @@ namespace ECS {
         ComponentRegistry::RegisterWithHash<Components::Name>(FNV1a_Hash("Name"));
         ComponentRegistry::RegisterWithHash<Components::TagMask>(FNV1a_Hash("TagMask"));
         ComponentRegistry::RegisterWithHash<Components::Active>(FNV1a_Hash("Active"));
+        ComponentRegistry::RegisterWithHash<Components::Parent>(FNV1a_Hash("Parent"));
         ComponentRegistry::RegisterWithHash<Components::PrefabLink>(FNV1a_Hash("PrefabLink"));
         ComponentRegistry::RegisterWithHash<Components::PrefabInstanceMetadata>(FNV1a_Hash("PrefabInstanceMetadata"));
         ComponentRegistry::RegisterWithHash<Components::Layer>(FNV1a_Hash("Layer"));

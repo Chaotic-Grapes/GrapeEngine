@@ -333,6 +333,27 @@ void EditorFileMenu::CreateNewScene() {
     // If we have no SceneManager bound we cannot do anything
     if (!m_sceneManager) return;
 
+    const size_t activeIdx = m_sceneManager->GetActiveIndex();
+    if (activeIdx != static_cast<size_t>(-1)) {
+        Scenes::Scene* activeScene = m_sceneManager->GetActive();
+        if (activeScene) {
+            activeScene->GetWorld().DestroyAll();
+            activeScene->GetLayers().ResetToDefaults();
+            activeScene->SetName("New Scene");
+            activeScene->SetPath("");
+
+            if (m_hierarchyPanel) {
+                m_hierarchyPanel->ClearUIState();
+                m_hierarchyPanel->RebuildEntityOrder();
+            }
+
+            m_currentScenePath.clear();
+            m_hasUnsavedChanges = false;
+            LOG_INFO("Reset active scene to new scene");
+            return;
+        }
+    }
+
     // Allocate a new Scene on the heap using a unique_ptr for safety
     auto newScene = std::make_unique<Scenes::Scene>();
 

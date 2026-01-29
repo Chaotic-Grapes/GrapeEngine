@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <limits>
 #include <functional>
 #include <atomic>
+#include "ecs/ComponentRegistry.h"
 
 // Unique, stable ids per component type at runtime.
 using TypeId = uint32_t;
@@ -100,8 +101,7 @@ namespace ECS {
      */
     template<typename T>
     inline TypeId TypeIdOf() {
-        static const TypeId id = TypeIdNext();
-        return id;
+        return ComponentRegistry::Type<T>();
     }
 
     /**

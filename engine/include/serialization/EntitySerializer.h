@@ -33,6 +33,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Entity.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
+#include "ecs/StringTable.h"
 #include <helpers/EntityUtils.h>
 #include "Serializer.h"
 #include <string.h>
@@ -82,15 +83,28 @@ namespace ECS {
 		// Place component-specific NLOHMANN macros inside the component namespace so ADL
 		// can locate the generated to_json/from_json overloads for these types.
 
-		// Custom serialization for Name component (char array needs special handling)
+		// Custom serialization for Name component (StringId stored as uint32_t)
 		inline void to_json(nlohmann::json& j, const Name& n) {
-			j = nlohmann::json{ {"Value", std::string(n.Value)} }; // convert char array to std::string
+			std::string value = ECS::StringTable::Resolve(n.Value);
+			j = nlohmann::json{ {"Value", value} };
 		}
 
 		inline void from_json(const nlohmann::json& j, Name& n) {
-			std::string value = j.at("Value").get<std::string>(); // get as std::string
-			strncpy_s(n.Value, value.c_str(), sizeof(n.Value) - 1); // copy to char array
-			n.Value[sizeof(n.Value) - 1] = '\0'; // null terminator
+			if (j.contains("Value")) {
+				if (j["Value"].is_string()) {
+					std::string value = j["Value"].get<std::string>();
+					n.Value = ECS::StringTable::Intern(value);
+				}
+				else if (j["Value"].is_number_unsigned()) {
+					n.Value = j["Value"].get<uint32_t>();
+				}
+				else {
+					n.Value = 0;
+				}
+			}
+			else {
+				n.Value = 0;
+			}
 		}
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TagMask, Mask)
@@ -480,7 +494,7 @@ namespace Serialization {
 
 			// Find all children
 			std::vector<EntityId> children;
-			world.Each<ECS::Parent>([&](ECS::Entity child, const ECS::Parent& p) {
+			world.Each<ECS::Components::Parent>([&](ECS::Entity child, const ECS::Components::Parent& p) {
 				// Entity's parent is entity we're serializing, it's a child basically
 				if (p.ParentEntity.Index == e.Index) {
 					children.push_back(child.Index);

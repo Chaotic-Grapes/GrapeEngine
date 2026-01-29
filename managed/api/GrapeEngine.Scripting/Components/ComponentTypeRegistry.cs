@@ -49,7 +49,7 @@ internal static class ComponentTypeRegistry
         var hash = fnvOffset;
         foreach (var c in str)
         {
-            hash ^= c;
+            hash ^= (byte)c;  // Cast to byte to use only lower 8 bits (ASCII), matching C++ char behavior
             hash *= fnvPrime;
         }
 
@@ -67,6 +67,11 @@ internal static class ComponentTypeRegistry
     /// 
     /// The generic type parameter must be an unmanaged struct with sequential layout.
     /// Hash values are cached by the runtime and reused for all instances of the same type.
+    /// 
+    /// IMPORTANT: The hash is computed from typeof(T).Name only. This means:
+    /// - C# and C++ must use identical type names
+    /// - Namespace differences are ignored (may cause collisions)
+    /// - Any name mismatch will cause registration/query failures
     /// </summary>
     /// <typeparam name="T">The component type to hash (must be unmanaged struct)</typeparam>
     /// <returns>32-bit hash value for the component type</returns>
@@ -74,7 +79,20 @@ internal static class ComponentTypeRegistry
     {
         var name = typeof(T).Name;
         var hash = FNV1aHash(name);
+        
+        // Optional: Enable this for debugging type hash mismatches
+        // Logging.LogInternal($"[ComponentTypeRegistry] Hash for '{name}': 0x{hash:X8}", LogLevel.Debug);
+        
         return hash;
+    }
+
+    /// <summary>
+    /// Get the hash for a type name string (for debugging/verification).
+    /// Allows checking what hash a given name will produce.
+    /// </summary>
+    internal static uint GetTypeHash(string typeName)
+    {
+        return FNV1aHash(typeName);
     }
 }
 

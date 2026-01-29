@@ -7,6 +7,7 @@
 #include "core/Logger.h"
 #include "AudioAssetLibrary.h"
 #include "ecs/systems/AudioSystem.h"
+#include "ecs/StringTable.h"
 
 namespace AudioDiagnostics {
 
@@ -62,7 +63,11 @@ namespace AudioDiagnostics {
 
                 std::string entityName = "Unknown";
                 if (scene->GetWorld().Has<ECS::Components::Name>(e)) {
-                    entityName = scene->GetWorld().Get<ECS::Components::Name>(e).Value;
+                    const auto& nameComp = scene->GetWorld().Get<ECS::Components::Name>(e);
+                    std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+                    if (!resolved.empty()) {
+                        entityName = resolved;
+                    }
                 }
 
                 if (src.CueId == 0) {

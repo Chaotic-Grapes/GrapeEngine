@@ -31,6 +31,7 @@ through a unified system shared by both entities and prefab templates.
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/StringTable.h"
 #include "helpers/PrefabUtils.h"
 #include <imgui.h>
 #include <filesystem>
@@ -306,15 +307,19 @@ void InspectorPanel::_renderEntityInspector() {
 // Draw entity name, ID and prefab link information at the top of the inspector
 void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
     // Try to read the Name component for display
-    const char* entityName = "Unnamed";
+    std::string entityName = "Unnamed";
     if (m_world->Has<ECS::Components::Name>(entity)) {
-        entityName = m_world->Get<ECS::Components::Name>(entity).Value;
+        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
+        std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+        if (!resolved.empty()) {
+            entityName = resolved;
+        }
     }
 
     // Show the basic header line: Entity <Name> (ID)
     ImGui::Text("Entity ");
     ImGui::SameLine();
-    ImGui::TextDisabled("%s (ID: %u)", entityName, (unsigned)m_entityId);
+    ImGui::TextDisabled("%s (ID: %u)", entityName.c_str(), (unsigned)m_entityId);
 
     // If this entity came from a prefab show the link and an Open Prefab button
     if (m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
@@ -1182,7 +1187,11 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
     // Pick a base name for the prefab file
     std::string entityName = "Entity";
     if (m_world->Has<ECS::Components::Name>(entity)) {
-        entityName = m_world->Get<ECS::Components::Name>(entity).Value;
+        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
+        std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+        if (!resolved.empty()) {
+            entityName = resolved;
+        }
 
         // Replace characters that are illegal or unsafe in file paths
         std::replace_if(entityName.begin(), entityName.end(),
