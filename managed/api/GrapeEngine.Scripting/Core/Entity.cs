@@ -109,6 +109,7 @@ public class Entity
         
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
+        string typeName = typeof(T).Name;
 
         unsafe
         {
@@ -119,10 +120,29 @@ public class Entity
             void* componentPtr = WorldAPI.GetComponentPtr(nativePtr, _id, typeHash);
             if (componentPtr == null)
             {
+                // Enhanced error reporting for component access failures
+                // As per query_getcomponent_issues.pdf: component is either not registered on native side,
+                // not added to entity, or type hash mismatch between C# and C++
+                
+                bool hasComponent = WorldAPI.HasComponent(nativePtr, _id, typeHash);
+                bool isAlive = WorldAPI.IsEntityAlive(nativePtr, _id);
+                
+                string reason;
+                if (!isAlive)
+                    reason = "the entity is dead or invalid";
+                else if (!hasComponent)
+                    reason = "the component was never added to this entity";
+                else
+                    reason = "the component exists but GetComponentPtr returned null (possible native-side issue)";
+                
                 throw new InvalidOperationException(
-                    $"Entity {_id} does not have component {typeof(T).Name} " +
-                    $"(hash: 0x{typeHash:X8}). The component may not be registered on the native side, " +
-                    $"or the entity was destroyed. Check that ComponentRegistry.Register<{typeof(T).Name}>() was called.");
+                    $"Entity {_id} does not have component {typeName} (hash: 0x{typeHash:X8}). " +
+                    $"Reason: {reason}. " +
+                    $"This can happen if:\n" +
+                    $"  1. The component is not registered on the native (C++) side\n" +
+                    $"  2. The type hash mismatch between C# (using '{typeName}') and C++ (using different name)\n" +
+                    $"  3. AddComponent<{typeName}>() was never called for this entity\n" +
+                    $"Check that the native ECS has registered this component type with matching name and hash.");
             }
 
             return ref *(T*)componentPtr;

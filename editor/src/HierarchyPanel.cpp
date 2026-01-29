@@ -35,6 +35,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/EntitySerializer.h"
 #include "core/Application.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/StringTable.h"
 #include "helpers/PrefabUtils.h"
 #include <imgui.h>
 #include <sstream>
@@ -485,7 +486,13 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     std::stringstream oss;
     if (m_world->Has<ECS::Components::Name>(entity)) {
         const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        oss << nameComp.Value;
+        std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+        if (!resolved.empty()) {
+            oss << resolved;
+        }
+        else {
+            oss << "Entity";
+        }
     }
     else {
         oss << "Entity";
@@ -564,8 +571,7 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
             // Apply rename on Enter
             if (strlen(m_renameBuffer) > 0 && m_world->Has<ECS::Components::Name>(entity)) {
                 auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-                strncpy_s(nameComp.Value, m_renameBuffer, sizeof(nameComp.Value) - 1);
-                nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
+                nameComp.Value = ECS::StringTable::Intern(m_renameBuffer);
             }
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
@@ -833,7 +839,11 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
             ECS::Entity entity = m_world->Resolve(entityId);
             if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::Name>(entity)) {
                 const auto& name = m_world->Get<ECS::Components::Name>(entity);
-                ImGui::Text("%s", name.Value);
+                std::string resolved = ECS::StringTable::Resolve(name.Value);
+                if (resolved.empty()) {
+                    resolved = "Entity";
+                }
+                ImGui::Text("%s", resolved.c_str());
             }
         }
         ImGui::EndDragDropSource();
@@ -1102,7 +1112,11 @@ void HierarchyPanel::_startRename(EntityId entityId) {
     ECS::Entity entity = m_world->Resolve(entityId);
     if (m_world->Has<ECS::Components::Name>(entity)) {
         const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        strncpy_s(m_renameBuffer, nameComp.Value, sizeof(m_renameBuffer) - 1);
+        std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+        if (resolved.empty()) {
+            resolved = "Entity";
+        }
+        strncpy_s(m_renameBuffer, resolved.c_str(), sizeof(m_renameBuffer) - 1);
         m_renameBuffer[sizeof(m_renameBuffer) - 1] = '\0';
     }
     else {
@@ -1264,7 +1278,10 @@ bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
 
     if (m_world->Has<ECS::Components::Name>(entity)) {
         const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        std::string entityName = nameComp.Value;
+        std::string entityName = ECS::StringTable::Resolve(nameComp.Value);
+        if (entityName.empty()) {
+            entityName = "Entity";
+        }
 
         // Convert both to lowercase for case-insensitive search
         std::string lowerName = entityName;

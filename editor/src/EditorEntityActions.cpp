@@ -18,6 +18,7 @@ direct ECS manipulation.
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
 #include "ecs/Components.h" 
+#include "ecs/StringTable.h"
 #include "core/Logger.h"
 #include "UndoSystem.h"
 #include <functional>
@@ -56,10 +57,9 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     // Create empty entity
     ECS::Entity e = world.Create();
 
-    // Name (char buffer)
+    // Name (StringId)
     ECS::Components::Name nm{};
-    strncpy_s(nm.Value, name.c_str(), sizeof(nm.Value) - 1);
-    nm.Value[sizeof(nm.Value) - 1] = '\0';
+    nm.Value = ECS::StringTable::Intern(name);
     world.Set<ECS::Components::Name>(e, nm);
 
     // Mandatory LocalTransform
@@ -190,9 +190,12 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         // Update name to indicate it's a clone
         if (world.Has<ECS::Components::Name>(clone)) {
             auto& name = world.Get<ECS::Components::Name>(clone);
-            std::string newName = std::string(name.Value) + " (Clone)";
-            strncpy_s(name.Value, newName.c_str(), sizeof(name.Value) - 1);
-            name.Value[sizeof(name.Value) - 1] = '\0';
+            std::string baseName = ECS::StringTable::Resolve(name.Value);
+            if (baseName.empty()) {
+                baseName = "Entity";
+            }
+            std::string newName = baseName + " (Clone)";
+            name.Value = ECS::StringTable::Intern(newName);
         }
 
         // Set parent relationship

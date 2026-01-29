@@ -24,6 +24,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/gui/GUILayout.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
+#include "ecs/StringTable.h"
 #include "core/Logger.h"
 #include <cmath>
 
@@ -79,8 +80,7 @@ namespace ECS {
             // Assign name component
             ECS::Components::Name nm{};
             std::string finalName = !name.empty() ? name : label.empty() ? "Entity" : label;
-            strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-            nm.Value[sizeof(nm.Value) - 1] = '\0';
+            nm.Value = ECS::StringTable::Intern(finalName);
             world.Set<ECS::Components::Name>(button, nm);
 
             return button;
@@ -112,8 +112,7 @@ namespace ECS {
             // Assign name
             ECS::Components::Name nm{};
             std::string finalName = !name.empty() ? name : "Panel";
-            strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-            nm.Value[sizeof(nm.Value) - 1] = '\0';
+            nm.Value = ECS::StringTable::Intern(finalName);
             world.Set<ECS::Components::Name>(panel, nm);
 
             return panel;
@@ -147,8 +146,7 @@ namespace ECS {
             // Assign name (use provided name or text)
             ECS::Components::Name nm{};
             std::string finalName = !name.empty() ? name : text.empty() ? "Label" : text;
-            strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-            nm.Value[sizeof(nm.Value) - 1] = '\0';
+            nm.Value = ECS::StringTable::Intern(finalName);
             world.Set<ECS::Components::Name>(label, nm);
             return label;
         }
@@ -185,8 +183,7 @@ namespace ECS {
                             // Assign name
                             ECS::Components::Name nm{};
                             std::string finalName = !name.empty() ? name : "InputField";
-                            strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-                            nm.Value[sizeof(nm.Value) - 1] = '\0';
+                            nm.Value = ECS::StringTable::Intern(finalName);
                             world.Set<ECS::Components::Name>(inputField, nm);
                             return inputField;
         }
@@ -226,8 +223,7 @@ namespace ECS {
                             // Assign name
                             ECS::Components::Name nm{};
                             std::string finalName = !name.empty() ? name : "Slider";
-                            strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-                            nm.Value[sizeof(nm.Value) - 1] = '\0';
+                            nm.Value = ECS::StringTable::Intern(finalName);
                             world.Set<ECS::Components::Name>(slider, nm);
                             return slider;
         }
@@ -262,8 +258,7 @@ namespace ECS {
                 // Assign name
                 ECS::Components::Name nm{};
                 std::string finalName = !name.empty() ? name : label.empty() ? "Checkbox" : label;
-                strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-                nm.Value[sizeof(nm.Value) - 1] = '\0';
+                nm.Value = ECS::StringTable::Intern(finalName);
                 world.Set<ECS::Components::Name>(checkbox, nm);
                 return checkbox;
         }
@@ -308,8 +303,7 @@ namespace ECS {
                 // Assign name
                 ECS::Components::Name nm{};
                 std::string finalName = !name.empty() ? name : "Dropdown";
-                strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-                nm.Value[sizeof(nm.Value) - 1] = '\0';
+                nm.Value = ECS::StringTable::Intern(finalName);
                 world.Set<ECS::Components::Name>(dropdown, nm);
                 return dropdown;
         }
@@ -337,8 +331,7 @@ namespace ECS {
               // Assign name
               ECS::Components::Name nm{};
               std::string finalName = !name.empty() ? name : "Container";
-              strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-              nm.Value[sizeof(nm.Value) - 1] = '\0';
+              nm.Value = ECS::StringTable::Intern(finalName);
               world.Set<ECS::Components::Name>(container, nm);
               return container;
         }
@@ -369,8 +362,7 @@ namespace ECS {
               // Assign name
               ECS::Components::Name nm{};
               std::string finalName = !name.empty() ? name : "Separator";
-              strncpy_s(nm.Value, finalName.c_str(), std::min(finalName.length(), (size_t)sizeof(nm.Value) - 1));
-              nm.Value[sizeof(nm.Value) - 1] = '\0';
+              nm.Value = ECS::StringTable::Intern(finalName);
               world.Set<ECS::Components::Name>(separator, nm);
               return separator;
         }

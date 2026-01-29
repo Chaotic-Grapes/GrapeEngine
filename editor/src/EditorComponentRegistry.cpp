@@ -670,6 +670,8 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
         };
         
         auto addComponentFunc = [id](ECS::World* w, ECS::Entity e, const nlohmann::json& data) {
+            (void)data; // Unused parameter
+            
             if (!w) {
                 LOG_WARNING("[EditorComponentRegistry] addComponentFunc called with null world");
                 return;
@@ -725,7 +727,7 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             // Call the managed deserializer to populate component fields from JSON
             // Pass the type hash (not the component ID) so C# can look up the type
             if (s_deserializeComponentCallback) {
-                s_deserializeComponentCallback(meta.TypeHash, componentPtr, meta.Size, jsonStr.c_str());
+                s_deserializeComponentCallback(meta.TypeHash, componentPtr, static_cast<int>(meta.Size), jsonStr.c_str());
                 // LOG_INFO("[EditorComponentRegistry] Applied C# component (ID " << id << ", hash 0x" << std::hex << meta.TypeHash << std::dec << ") from JSON data");
             }
             else {
