@@ -96,14 +96,12 @@ public static class ComponentAccessBridge
     /// <summary>
     /// Get the FNV-1a hash for a component type.
     /// Must match the C++ hashing algorithm for proper dependency detection.
-    /// IMPORTANT: Uses simple type name (not full name) to match C++ registration.
     /// </summary>
     /// <param name="componentType">Component type to hash</param>
-    /// <returns>FNV-1a 32-bit hash of the component's simple name</returns>
+    /// <returns>FNV-1a 32-bit hash of the component's full name</returns>
     public static uint GetComponentTypeHash(Type componentType)
     {
-        // Use simple type name only - C++ registers with "LocalTransform", not "GrapeEngine.Scripting.Components.LocalTransform"
-        var name = componentType.Name;
+        var name = componentType.FullName ?? componentType.Name;
         return Fnv1aHash(name);
     }
 

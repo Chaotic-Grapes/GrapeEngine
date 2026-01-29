@@ -55,10 +55,6 @@ internal static class ComponentDiscovery
         {
             RegisterComponent(componentType);
         }
-        
-        // Also force register all GrapeEngine.Scripting components for backwards compatibility
-        // These might not have [Component] attribute but still need to be registered
-        RegisterGrapeEngineComponents();
     }
 
     /// <summary>
@@ -286,72 +282,6 @@ internal static class ComponentDiscovery
             return false;
 
         // Include everything else (user scripts)
-        return true;
-    }
-
-    /// <summary>
-    /// Force register all component types from GrapeEngine assemblies.
-    /// This ensures backwards compatibility for components that may not have [Component] attribute.
-    /// </summary>
-    private static void RegisterGrapeEngineComponents()
-    {
-        var grapeEngineAssemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => a.GetName().Name?.StartsWith("GrapeEngine") == true)
-            .ToList();
-            
-        foreach (var assembly in grapeEngineAssemblies)
-        {
-            try
-            {
-                var componentTypes = assembly.GetTypes()
-                    .Where(type => IsUnmanagedComponentType(type))
-                    .ToList();
-                    
-                Logging.LogInternal($"[ComponentDiscovery] Force registering {componentTypes.Count} component types from {assembly.GetName().Name}", LogLevel.Info);
-                
-                foreach (var componentType in componentTypes)
-                {
-                    // Force register this type
-                    RegisterComponent(componentType);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logging.LogInternal($"[ComponentDiscovery] Failed to force register from {assembly.GetName().Name}: {ex.Message}", LogLevel.Error);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Check if a type is a valid unmanaged component type regardless of [Component] attribute.
-    /// Used for force registration of GrapeEngine components.
-    /// </summary>
-    private static bool IsUnmanagedComponentType(Type type)
-    {
-        // Must be a value type (struct)
-        if (!type.IsValueType)
-            return false;
-
-        // Must not be a primitive or built-in type
-        if (type.IsPrimitive || type.IsEnum)
-            return false;
-
-        // Skip special types
-        if (type.Namespace?.StartsWith("System") == true)
-            return false;
-            
-        // Skip nested types (they're usually not components)
-        if (type.IsNested)
-            return false;
-
-        // Must be unmanaged (blittable)
-        if (!IsUnmanagedType(type))
-            return false;
-            
-        // Must be in a Components namespace or assembly
-        if (type.Namespace?.Contains("Components") != true)
-            return false;
-
         return true;
     }
 

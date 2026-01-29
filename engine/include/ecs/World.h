@@ -1310,33 +1310,8 @@ namespace ECS {
 
             // Then populate component infos based on signature
             for (auto t : sig.Types()) {
-                size_t size = 0;
-                size_t align = 1;
-                
-                // First, check if component size/alignment is in the world's map
-                auto sizeIt = m_componentSizes.find(t);
-                if (sizeIt != m_componentSizes.end()) {
-                    size = sizeIt->second.first;
-                    align = sizeIt->second.second;
-                }
-                else {
-                    // Fallback: Get metadata from ComponentRegistry (for C++ components registered but not yet used)
-                    const auto& meta = ComponentRegistry::Meta(t);
-                    if (meta.Size > 0) {
-                        size = meta.Size;
-                        align = meta.Align > 0 ? meta.Align : 1;
-                        // Cache this for future use
-                        m_componentSizes[t] = { size, align };
-                    }
-                    else {
-                        LOG_ERROR("[World::_getOrCreateArchetype] Component type ID " << t << " has no metadata in ComponentRegistry!");
-                        // Use a sensible default to avoid breaking the system
-                        size = 1;
-                        align = 1;
-                    }
-                }
-                
-                infos.push_back(ComponentInfo{ t, size, align });
+                const auto si = m_componentSizes[t];
+                infos.push_back(ComponentInfo{ t, si.first, si.second });
             }
 
             // Finally, create and store the new archetype in the map for signature-based lookup

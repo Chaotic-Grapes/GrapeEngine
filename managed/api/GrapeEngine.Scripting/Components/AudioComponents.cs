@@ -12,7 +12,6 @@ using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Components;
 
-[Component]
 [StructLayout(LayoutKind.Sequential)]
 public record struct AudioSource(uint CueId)
 {

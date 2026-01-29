@@ -3,7 +3,6 @@ using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Components;
 
-[Component]
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct LayerMask
 {
