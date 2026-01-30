@@ -15,12 +15,33 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ViewportInteractionManager.h"
 #include "ecs/Components.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include "math/Matrix4x4.h"
+#include "helpers/TransformUtils.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 namespace Editor {
+    namespace {
+        glm::mat4 ToGlmMat4(const Matrix4x4& m) {
+            glm::mat4 out(1.0f);
+            out[0][0] = m.m00; out[1][0] = m.m01; out[2][0] = m.m02; out[3][0] = m.m03;
+            out[0][1] = m.m10; out[1][1] = m.m11; out[2][1] = m.m12; out[3][1] = m.m13;
+            out[0][2] = m.m20; out[1][2] = m.m21; out[2][2] = m.m22; out[3][2] = m.m23;
+            out[0][3] = m.m30; out[1][3] = m.m31; out[2][3] = m.m32; out[3][3] = m.m33;
+            return out;
+        }
+
+        Matrix4x4 ToMatrix4x4(const glm::mat4& m) {
+            return Matrix4x4(
+                m[0][0], m[1][0], m[2][0], m[3][0],
+                m[0][1], m[1][1], m[2][1], m[3][1],
+                m[0][2], m[1][2], m[2][2], m[3][2],
+                m[0][3], m[1][3], m[2][3], m[3][3]
+            );
+        }
+    }
 
     ViewportInteractionManager::ViewportInteractionManager()
         : m_pickingManager{std::make_unique<PickingQueryManager>()}
@@ -40,7 +61,7 @@ namespace Editor {
         m_gizmoController.OnDragEnd = [this](const uint32_t entityId, const TransformDelta& delta) {
             // Notify observers that transform changed
             if (OnTransformChanged) {
-                OnTransformChanged(entityId, m_dragInitialTransform, m_gizmoController.GetFinalTransform(), delta);
+                OnTransformChanged(entityId, m_gizmoController.GetInitialTransform(), m_gizmoController.GetFinalTransform(), delta);
             }
         };
     }
@@ -79,31 +100,13 @@ namespace Editor {
             }
         }
 
-        // Step 2: Update gizmo interaction state (verify entity is valid first)
-        if (m_selectedEntityId != ECS::Entity::NPOS32) {
-            ECS::Entity entity(m_selectedEntityId);
-            if (world.IsAlive(entity)) {
-                m_gizmoController.Update(m_gizmo, m_selectedEntityId);
-            }
-        }
+        // Step 2: Gizmo interaction state is updated in RenderGizmo after ImGuizmo runs.
 
         // Step 3: Check for new picks (on mouse click)
         // Note: This is a simplified version. In reality, we'd check ImGui input.
         // For now, just maintain the pending request.
 
-        // Step 4: Apply gizmo transforms if entity is selected and being manipulated
-        if (m_selectedEntityId != ECS::Entity::NPOS32 && (m_gizmoController.IsDragging() || m_gizmoController.JustStartedDrag())) {
-            ECS::Entity entity(m_selectedEntityId);
-            if (world.IsAlive(entity)) {
-                // Capture initial transform on drag start
-                if (m_gizmoController.JustStartedDrag()) {
-                    m_dragInitialTransform = _getEntityTransform(world, m_selectedEntityId);
-                }
-
-                // Get gizmo output transform and apply to entity
-                // (This happens in RenderGizmo, not here)
-            }
-        }
+        // Step 4: Gizmo transform application happens in RenderGizmo.
 
         return m_selectedEntityId;
     }
@@ -114,7 +117,7 @@ namespace Editor {
         }
 
         // Verify entity exists in the world
-        ECS::Entity entity(selectedEntityId);
+        ECS::Entity entity = world.Resolve(selectedEntityId);
         if (!world.IsAlive(entity)) {
             return;  // Entity no longer exists
         }
@@ -122,49 +125,63 @@ namespace Editor {
         // Get entity's LOCAL transform (what we modify with gizmo)
         CachedTransformState localState = _getEntityTransform(world, selectedEntityId);
 
-        // Get entity's WORLD position for correct gizmo rendering
-        glm::vec3 worldPosition(0.0f);
-        auto* worldTransform = world.TryGet<ECS::Components::WorldTransform>(entity);
-        if (worldTransform) {
-            worldPosition = glm::vec3(worldTransform->Matrix.m03, worldTransform->Matrix.m13, worldTransform->Matrix.m23);
-        } else {
-            // No world transform, use local position (entity has no parent)
-            worldPosition = glm::vec3(localState.Position.X, localState.Position.Y, localState.Position.Z);
+        // Build world transform matrix for correct gizmo rendering
+        Matrix4x4 worldMatrix;
+        bool hasWorldMatrix = false;
+
+        auto* worldTransform = Editor::ECSUtils::GetComponentPtr<ECS::Components::WorldTransform>(
+            &world, entity, "WorldTransform");
+        if (worldTransform && !worldTransform->Dirty) {
+            worldMatrix = worldTransform->Matrix;
+            hasWorldMatrix = true;
         }
 
-        // Build matrix: world position + local rotation/scale
-        // This ensures gizmo renders at correct world location while manipulating in local space
-        glm::vec3 scale(localState.Scale.X, localState.Scale.Y, localState.Scale.Z);
-        glm::quat rotation(localState.Rotation.W, localState.Rotation.X, localState.Rotation.Y, localState.Rotation.Z);
+        if (!hasWorldMatrix) {
+            const Matrix4x4 localMatrix = TransformUtils::MakeTRS(localState.Position, localState.Rotation, localState.Scale);
+            ECS::Entity parentEntity = world.ParentOf(entity);
+            if (!parentEntity.IsNull()) {
+                auto* parentWorld = Editor::ECSUtils::GetComponentPtr<ECS::Components::WorldTransform>(
+                    &world, parentEntity, "WorldTransform");
+                if (parentWorld && !parentWorld->Dirty) {
+                    worldMatrix = parentWorld->Matrix * localMatrix;
+                    hasWorldMatrix = true;
+                }
+            }
 
-        glm::mat4 T = glm::translate(glm::mat4(1.0f), worldPosition);
-        glm::mat4 R = glm::mat4_cast(rotation);
-        glm::mat4 S = glm::scale(glm::mat4(1.0f), scale);
-        glm::mat4 entityTransform = T * R * S;
+            if (!hasWorldMatrix) {
+                worldMatrix = localMatrix;
+            }
+        }
+
+        Vector3D worldPosition;
+        Quaternion worldRotation;
+        Vector3D worldScale;
+        TransformUtils::DecomposeTRS(worldMatrix, worldPosition, worldRotation, worldScale);
+
+        glm::vec3 position(worldPosition.X, worldPosition.Y, worldPosition.Z);
+        glm::quat rotation(worldRotation.W, worldRotation.X, worldRotation.Y, worldRotation.Z);
+        glm::vec3 scale(worldScale.X, worldScale.Y, worldScale.Z);
+
+        glm::mat4 entityTransform = glm::translate(glm::mat4(1.0f), position) *
+                                    glm::mat4_cast(rotation) *
+                                    glm::scale(glm::mat4(1.0f), scale);
         
         // Render and compute output transform using the entity's transform
         glm::mat4 outputTransform;
         bool isManipulating = m_gizmo.Render(m_viewMatrix, m_projMatrix, entityTransform, outputTransform);
 
         // Update gizmo interaction state
-        m_gizmoController.Update(m_gizmo, selectedEntityId);
+        m_gizmoController.Update(m_gizmo, selectedEntityId, localState);
 
         // If gizmo is being used, apply the output transform to the entity
         if (isManipulating) {
             _applyGizmoTransform(world, selectedEntityId, outputTransform);
-
-            // Update final transform snapshot on drag end
-            if (m_gizmoController.JustEndedDrag()) {
-                CachedTransformState finalState = _getEntityTransform(world, selectedEntityId);
-                // (The manager internally stores this for the callback)
-            }
         }
     }
 
     void ViewportInteractionManager::ResetInteraction() {
         m_gizmoController.Reset();
         m_pendingPickRequestId = 0;
-        m_dragInitialTransform = CachedTransformState();
     }
 
     void ViewportInteractionManager::RequestPick(float screenX, float screenY, ECS::RendererSystem* rendererSystem) {
@@ -201,62 +218,25 @@ namespace Editor {
     }
 
     void ViewportInteractionManager::_applyGizmoTransform(ECS::World& world, uint32_t entityId, const glm::mat4& transformMatrix) {
-        // ImGuizmo in LOCAL mode outputs: world_position + local_rotation/scale matrix
-        // For child entities with parent transforms, extracting scale from this hybrid matrix
-        // can produce incorrect results due to numerical errors and parent transform interactions.
-        // Solution: Only extract scale when explicitly in Scale mode; otherwise preserve original.
-        // For rotation with non-uniform scale: use delta rotation to avoid extraction errors.
-        
-        ECS::Entity entity(entityId);
-        CachedTransformState originalState = _getEntityTransform(world, entityId);
-        
-        // Extract components from gizmo output matrix
-        glm::vec3 worldPosition = _extractPositionFromMatrix(transformMatrix);
-        glm::vec3 gizmoScale = _extractScaleFromMatrix(transformMatrix);
-        glm::quat newRotation = _extractRotationFromMatrix(transformMatrix);
-
-        // Convert world position to local position for child entities
-        glm::vec3 localPosition = _convertWorldToLocalPosition(world, entity, worldPosition);
-
-        // Determine which scale to use based on gizmo mode
-        glm::vec3 originalScale(originalState.Scale.X, originalState.Scale.Y, originalState.Scale.Z);
-        glm::vec3 finalScale = originalScale;
-        
-        // Only extract scale from gizmo matrix if in Scale mode
-        // In Rotate/Translate modes, preserve original scale to avoid corruption from parent transforms
-        if (m_gizmo.GetOperation() == GizmoRenderer::Operation::Scale) {
-            finalScale = gizmoScale;
-        }
-
-        // For rotation with non-uniform scale: use delta rotation to avoid extraction errors
-        glm::quat finalRotation = newRotation;
-        if (m_gizmo.GetOperation() == GizmoRenderer::Operation::Rotate) {
-            // Detect non-uniform scale by comparing scale components
-            float epsilon = 0.0001f;
-            bool isNonUniform = (glm::abs(finalScale.x - finalScale.y) > epsilon) ||
-                                (glm::abs(finalScale.y - finalScale.z) > epsilon) ||
-                                (glm::abs(finalScale.x - finalScale.z) > epsilon);
-            
-            if (isNonUniform) {
-                // Use delta rotation mode: apply delta rotation to original rotation
-                // This avoids extraction errors from the hybrid world/local matrix with non-uniform scale
-                glm::quat originalRotation(originalState.Rotation.W, originalState.Rotation.X, 
-                                          originalState.Rotation.Y, originalState.Rotation.Z);
-                
-                // Compute delta rotation: newRot = deltaRot * origRot
-                // Therefore: deltaRot = newRot * inv(origRot)
-                glm::quat deltaRotation = newRotation * glm::conjugate(originalRotation);
-                
-                // Apply delta to original for more robust result
-                finalRotation = deltaRotation * originalRotation;
+        ECS::Entity entity = world.Resolve(entityId);
+        glm::mat4 localMatrix = transformMatrix;
+        ECS::Entity parentEntity = world.ParentOf(entity);
+        if (parentEntity.Index != ECS::Entity::NPOS32) {
+            auto* parentWorldTransform = Editor::ECSUtils::GetComponentPtr<ECS::Components::WorldTransform>(
+                &world, parentEntity, "WorldTransform");
+            if (parentWorldTransform && !parentWorldTransform->Dirty) {
+                glm::mat4 parentWorld = ToGlmMat4(parentWorldTransform->Matrix);
+                localMatrix = glm::inverse(parentWorld) * transformMatrix;
             }
         }
-        
-        // Create transform state with local position, final rotation, and appropriate scale
-        CachedTransformState localState(Vector3D(localPosition.x, localPosition.y, localPosition.z), 
-                                        Quaternion(finalRotation.x, finalRotation.y, finalRotation.z, finalRotation.w),
-                                        Vector3D(finalScale.x, finalScale.y, finalScale.z));
-        
+
+        Vector3D localPosition;
+        Quaternion localRotation;
+        Vector3D localScale;
+        const Matrix4x4 localMatrix4x4 = ToMatrix4x4(localMatrix);
+        TransformUtils::DecomposeTRS(localMatrix4x4, localPosition, localRotation, localScale);
+
+        CachedTransformState localState(localPosition, localRotation, localScale);
         _setEntityTransform(world, entityId, localState);
     }
 
@@ -290,7 +270,8 @@ namespace Editor {
         ECS::Entity parentEntity = world.ParentOf(entity);
         
         if (parentEntity.Index != ECS::Entity::NPOS32) {
-            auto* parentWorldTransform = world.TryGet<ECS::Components::WorldTransform>(parentEntity);
+            auto* parentWorldTransform = Editor::ECSUtils::GetComponentPtr<ECS::Components::WorldTransform>(
+                &world, parentEntity, "WorldTransform");
             if (parentWorldTransform) {
                 glm::vec3 parentWorldPos(parentWorldTransform->Matrix.m03, parentWorldTransform->Matrix.m13, parentWorldTransform->Matrix.m23);
                 glm::vec3 parentScale = _extractParentScale(parentWorldTransform->Matrix);
@@ -334,14 +315,15 @@ namespace Editor {
     }
 
     CachedTransformState ViewportInteractionManager::_getEntityTransform(ECS::World& world, uint32_t entityId) const {
-        ECS::Entity entity(entityId);
+        ECS::Entity entity = world.Resolve(entityId);
         
         if (!world.IsAlive(entity)) {
             return CachedTransformState();
         }
 
         // Read from LocalTransform (what we actually modify in gizmo)
-        auto* localTransform = world.TryGet<ECS::Components::LocalTransform>(entity);
+        auto* localTransform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(
+            &world, entity, "LocalTransform");
         if (localTransform) {
             return CachedTransformState(localTransform->Position, localTransform->Rotation, localTransform->Scale);
         }
@@ -351,14 +333,15 @@ namespace Editor {
     }
 
     void ViewportInteractionManager::_setEntityTransform(ECS::World& world, uint32_t entityId, const CachedTransformState& state) {
-        ECS::Entity entity(entityId);
+        ECS::Entity entity = world.Resolve(entityId);
 
         if (!world.IsAlive(entity)) {
             return;
         }
 
         // Get or add LocalTransform component
-        auto* localTransform = world.TryGet<ECS::Components::LocalTransform>(entity);
+        auto* localTransform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(
+            &world, entity, "LocalTransform");
         if (localTransform) {
             localTransform->Position = state.Position;
             localTransform->Rotation = state.Rotation;
@@ -369,7 +352,7 @@ namespace Editor {
             newTransform.Position = state.Position;
             newTransform.Rotation = state.Rotation;
             newTransform.Scale = state.Scale;
-            world.Set(entity, newTransform);
+            Editor::ECSUtils::SetComponent(&world, entity, "LocalTransform", newTransform);
         }
     }
 

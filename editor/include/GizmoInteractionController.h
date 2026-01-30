@@ -81,7 +81,7 @@ namespace Editor {
          * @param gizmo The GizmoRenderer providing feedback
          * @param activeEntityId ID of the entity being manipulated (0 if none)
          */
-        void Update(const GizmoRenderer& gizmo, uint32_t activeEntityId);
+        void Update(const GizmoRenderer& gizmo, uint32_t activeEntityId, const CachedTransformState& currentTransform);
 
         /**
          * @brief Reset to idle state (e.g., when entity selection changes)

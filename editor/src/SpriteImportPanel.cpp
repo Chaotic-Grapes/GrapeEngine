@@ -90,6 +90,8 @@ bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pi
     ECS::Entity entity = m_world->Create();
 
     m_world->Add<LocalTransform>(entity);
+    m_world->Set<WorldTransform>(entity, WorldTransform{});
+    m_world->Set<Layer>(entity, Layer{ 0 });
     m_world->Add<SpriteRenderer2D>(entity);
     m_world->Add<BoxCollider2D>(entity);
     m_world->Add<Name>(entity);

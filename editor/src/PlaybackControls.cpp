@@ -236,7 +236,7 @@ void Playback::_saveWorldState() {
     // Save all entities (except editor camera) with their IDs as keys
     m_world->Each([&](ECS::Entity entity) {
         // Skip editor camera
-        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+        if (Editor::ECSUtils::HasComponent(m_world, entity, "CameraEditor3D")) {
             return;
         }
 
@@ -252,14 +252,14 @@ void Playback::_saveWorldState() {
     // Save hierarchy relationships separately
     nlohmann::json hierarchyArray = nlohmann::json::array();
     m_world->Each([&](ECS::Entity entity) {
-        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+        if (Editor::ECSUtils::HasComponent(m_world, entity, "CameraEditor3D")) {
             return;
         }
         
         ECS::Entity parent = m_world->ParentOf(entity);
         if (!parent.IsNull() && m_world->IsAlive(parent)) {
             // Skip if parent is editor camera
-            if (m_world->Has<ECS::Components::CameraEditor3D>(parent)) {
+            if (Editor::ECSUtils::HasComponent(m_world, parent, "CameraEditor3D")) {
                 return;
             }
             
@@ -308,7 +308,7 @@ void Playback::_restoreWorldState() {
     std::vector<ECS::Entity> entitiesToDestroy;
     m_world->Each([&](ECS::Entity entity) {
         // Skip editor camera
-        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+        if (Editor::ECSUtils::HasComponent(m_world, entity, "CameraEditor3D")) {
             return;
         }
         
@@ -324,7 +324,7 @@ void Playback::_restoreWorldState() {
 
     // Second pass: Detach all entities from hierarchy (will restore later)
     m_world->Each([&](ECS::Entity entity) {
-        if (m_world->Has<ECS::Components::CameraEditor3D>(entity)) {
+        if (Editor::ECSUtils::HasComponent(m_world, entity, "CameraEditor3D")) {
             return;
         }
         m_world->Detach(entity);

@@ -26,6 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "CameraFrustumRenderer.h"
 #include "SelectionOutlineRenderer.h"
 #include "EditorCamera.hpp"
+#include "EditorECSUtils.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -158,7 +159,9 @@ void BaseViewport::SetSelectedEntity(const EntityId id) {
     }
 
     // Broadcast a selection request message so other systems can observe
-    Messaging::MessageSystem::Broadcast(Messaging::EntitySelectionRequested(id, false));
+    if (m_world) {
+        Messaging::MessageSystem::Broadcast(Messaging::EntitySelectionRequested(id, false));
+    }
 }
 
 void BaseViewport::FocusOnEntity(const EntityId entityId) {
@@ -170,17 +173,23 @@ void BaseViewport::FocusOnEntity(const EntityId entityId) {
 
     // Get entity position (use WorldTransform if available, else LocalTransform)
     Vector3D position;
-    if (m_world->Has<ECS::Components::WorldTransform>(entity)) {
-        const auto& [Matrix, Dirty] = m_world->Get<ECS::Components::WorldTransform>(entity);
+    if (Editor::ECSUtils::HasComponent(m_world, entity, "WorldTransform")) {
+        const auto* wt = Editor::ECSUtils::GetComponentPtr<ECS::Components::WorldTransform>(m_world, entity, "WorldTransform");
+        if (!wt) {
+            return;
+        }
         // Extract position from the translation column of the matrix
         // In a standard 4x4 transformation matrix, translation is in the last column
-        position.X = Matrix.m03;
-        position.Y = Matrix.m13;
-        position.Z = Matrix.m23;
+        position.X = wt->Matrix.m03;
+        position.Y = wt->Matrix.m13;
+        position.Z = wt->Matrix.m23;
     }
-    else if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
-        const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
-        position = lt.Position;
+    else if (Editor::ECSUtils::HasComponent(m_world, entity, "LocalTransform")) {
+        const auto* lt = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
+        if (!lt) {
+            return;
+        }
+        position = lt->Position;
     }
     else {
         // No transform component, can't focus

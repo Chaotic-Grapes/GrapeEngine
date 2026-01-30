@@ -798,14 +798,15 @@ namespace ECS {
                 // Use compile-time query ID to cache archetype list pointer per unique component set
                 // Should be faster than unordered_map because template instantiation happens at compile-time
                 using QueryTag = std::tuple<std::decay_t<Ts>...>; // std::decay_t removes references and cv-qualifiers from types
-                static const std::vector<Archetype*>* cached = nullptr;
+                static std::vector<Archetype*> cached;
+                static const World* cachedWorld = nullptr;
                 static uint64_t cacheVersion = 0;  // Track which archetype version we last processed
                 static std::array<TypeId, numComponents> typeIds = { 0 };
                 
                 // Check only archetypes added since last version
-                if (cached == nullptr || cacheVersion != m_archetypeVersion) {
+                if (cachedWorld != this || cacheVersion != m_archetypeVersion) {
                     // First time initialization - get component type IDs at runtime
-                    if (cached == nullptr) {
+                    if (cachedWorld == nullptr) {
                         typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
                     }
 
@@ -813,12 +814,13 @@ namespace ECS {
                     const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
 
                     // Get matching archetypes and update cache
-                    cached = &_getMatchingArchetypes(req);
+                    cached = _getMatchingArchetypes(req);
                     
                     // Update version to current
                     cacheVersion = m_archetypeVersion;
+                    cachedWorld = this;
                 }
-                const auto& matched = *cached; // Get cached archetype list (shouldn't be null here either way)
+                const auto& matched = cached; // Cached by value to avoid pointer invalidation
                 
                 // Iterate through all matched archetypes
                 for (Archetype* arch : matched) {
@@ -909,21 +911,23 @@ namespace ECS {
             }
             else {
                 using QueryTag = std::tuple<std::decay_t<Ts>...>;
-                static const std::vector<Archetype*>* cached = nullptr;
+                static std::vector<Archetype*> cached;
+                static const World* cachedWorld = nullptr;
                 static uint64_t cacheVersion = 0;
                 static std::array<TypeId, numComponents> typeIds = { 0 };
                 
-                if (cached == nullptr || cacheVersion != m_archetypeVersion) {
+                if (cachedWorld != this || cacheVersion != m_archetypeVersion) {
 
-                    if (cached == nullptr) {
+                    if (cachedWorld == nullptr) {
                         typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
                     }
                     
                     const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
-                    cached = &_getMatchingArchetypes(req);
+                    cached = _getMatchingArchetypes(req);
                     cacheVersion = m_archetypeVersion;
+                    cachedWorld = this;
                 }
-                const auto& matched = *cached;
+                const auto& matched = cached;
                 
                 for (const Archetype* arch : matched) {
                     if (!arch) continue;

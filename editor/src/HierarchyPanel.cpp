@@ -75,7 +75,7 @@ namespace {
     // Returns true if entity should be filtered out (hidden)
     bool ShouldHideFromHierarchy(ECS::World* world, ECS::Entity entity) {
         // Also hide entities that are not alive or null, or the camera editor entity
-        if (!world || entity.IsNull() || !world->IsAlive(entity) || world->Has<ECS::Components::CameraEditor3D>(entity))
+        if (!world || entity.IsNull() || !world->IsAlive(entity) || Editor::ECSUtils::HasComponent(world, entity, "CameraEditor3D"))
             return true;
 
         return false;
@@ -95,7 +95,7 @@ namespace {
             return false;
 
         // Protect editor cameras from modification
-        if (world->Has<ECS::Components::CameraEditor3D>(entity))
+        if (Editor::ECSUtils::HasComponent(world, entity, "CameraEditor3D"))
             return true;
 
         return false;
@@ -120,11 +120,15 @@ void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
     m_entityActions = entityActions;
 
     // Subscribe to viewport entity selection messages to sync hierarchy with viewport
-    m_entitySelectedSubscription = Messaging::MessageSystem::Subscribe<Messaging::EditorEntitySelected>(
-        [this](const Messaging::EditorEntitySelected& event) {
-            // When viewport selects an entity, update hierarchy selection and expand parent nodes
-            if (event.EntityId != ECS::Entity::NPOS32) {
-                SetSelectedEntity(event.EntityId);
+        m_entitySelectedSubscription = Messaging::MessageSystem::Subscribe<Messaging::EditorEntitySelected>(
+            [this](const Messaging::EditorEntitySelected& event) {
+                if (!m_world) {
+                    return;
+                }
+
+                // When viewport selects an entity, update hierarchy selection and expand parent nodes
+                if (event.EntityId != ECS::Entity::NPOS32) {
+                    SetSelectedEntity(event.EntityId);
                 
                 // Expand all ancestor nodes to reveal the selected entity
                 ECS::Entity entity = m_world->Resolve(event.EntityId);
@@ -469,13 +473,13 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     bool hasChildren = !children.empty();
 
     // Check if this is a prefab instance FIRST (needed for color, both parent and child)
-    bool isPrefabInstance = m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
+    bool isPrefabInstance = Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata");
 
     if (!isPrefabInstance) {
         // Check if any parent has prefab component
         ECS::Entity parent = m_world->ParentOf(entity);
         while (!parent.IsNull()) {
-            if (m_world->Has<ECS::Components::PrefabInstanceMetadata>(parent)) {
+            if (Editor::ECSUtils::HasComponent(m_world, parent, "PrefabInstanceMetadata")) {
                 isPrefabInstance = true;
                 break;
             }
@@ -499,29 +503,32 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     }
 
     // Append prefab indicator if this is a prefab instance
-    if (isPrefabInstance && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
-        const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
+    if (isPrefabInstance && Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata")) {
+        const auto* meta = Editor::ECSUtils::GetComponentPtr<ECS::Components::PrefabInstanceMetadata>(m_world, entity, "PrefabInstanceMetadata");
+        if (!meta) {
+            return;
+        }
         oss << " [Prefab";
         
         // Try to show prefab name if manager is available, otherwise show hash
         if (m_prefabManager) {
-            std::string prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
+            std::string prefabPath = m_prefabManager->GetPrefabPath(meta->PrefabHash);
             if (!prefabPath.empty()) {
                 std::string prefabName = std::filesystem::path(prefabPath).stem().string();
                 oss << ":" << prefabName;
             }
             else {
-                oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
+                oss << ":0x" << std::hex << meta->PrefabHash << std::dec;
             }
         }
         else {
-            oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
+            oss << ":0x" << std::hex << meta->PrefabHash << std::dec;
         }
         
         oss << "]";
 
         // Show modification indicator
-        if (PrefabUtils::IsModified(meta)) {
+        if (PrefabUtils::IsModified(*meta)) {
             oss << " *";
         }
     }
@@ -1016,11 +1023,11 @@ void HierarchyPanel::_renderEntityContextMenu() {
 
             // Detach Prefab: removes prefab metadata from entity
             if (selectionCount == 1) {
-                bool hasMeta = m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
+                bool hasMeta = Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata");
 
                 if (hasMeta) {
                     if (ImGui::Selectable("Detach Prefab")) {
-                        m_world->Remove<ECS::Components::PrefabInstanceMetadata>(entity);
+                        Editor::ECSUtils::RemoveComponent(m_world, entity, "PrefabInstanceMetadata");
                         if (m_prefabManager) {
                             m_prefabManager->RemoveInstance(entity);
                         }
@@ -1200,7 +1207,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         ECS::Components::PrefabInstanceMetadata meta;
         meta.PrefabHash = hash;
         meta.Flags = 0;  // Not modified yet
-        m_world->Add<ECS::Components::PrefabInstanceMetadata>(rootEntity, meta);
+        Editor::ECSUtils::AddComponent(m_world, rootEntity, "PrefabInstanceMetadata", meta);
 
         // Mark scene as dirty
         if (m_fileMenu) {

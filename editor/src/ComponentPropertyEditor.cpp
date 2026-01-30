@@ -47,7 +47,7 @@ namespace {
     void UpdateSpriteAnimationPreview(nlohmann::json& animData, ECS::Entity entity, ECS::World* world) {
         if (!world || entity.IsNull() || !world->IsAlive(entity))
             return;
-        if (!world->Has<ECS::Components::SpriteRenderer2D>(entity))
+        if (!Editor::ECSUtils::HasComponent(world, entity, "SpriteRenderer2D"))
             return;
 
         const int frameWidth = animData.value("FrameWidth", 0);
@@ -88,8 +88,11 @@ namespace {
             return;
 
         int localFrame = 0;
-        if (world->Has<ECS::Components::AnimationState2D>(entity)) {
-            localFrame = world->Get<ECS::Components::AnimationState2D>(entity).CurrentFrame;
+        if (Editor::ECSUtils::HasComponent(world, entity, "AnimationState2D")) {
+            const auto* animState = Editor::ECSUtils::GetComponentPtr<ECS::Components::AnimationState2D>(world, entity, "AnimationState2D");
+            if (animState) {
+                localFrame = animState->CurrentFrame;
+            }
         }
         localFrame = std::clamp(localFrame, 0, windowCount - 1);
         const int absoluteFrame = windowStart + localFrame;
@@ -101,17 +104,20 @@ namespace {
         const float u1 = ((col + 1) * frameWidth) / static_cast<float>(sheetWidth);
         const float v1 = ((row + 1) * frameHeight) / static_cast<float>(sheetHeight);
 
-        auto& sprite = world->Get<ECS::Components::SpriteRenderer2D>(entity);
+        auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(world, entity, "SpriteRenderer2D");
+        if (!sprite) {
+            return;
+        }
         const uint32_t textureId = animData.value("TextureId", 0u);
         if (textureId != 0)
-            sprite.TextureId = textureId;
+            sprite->TextureId = textureId;
         const uint32_t normalId = animData.value("NormalTextureId", 0u);
         if (normalId != 0)
-            sprite.NormalTextureId = normalId;
-        sprite.Width = frameWidth;
-        sprite.Height = frameHeight;
-        sprite.Tiling = Vector2D{ u1 - u0, v1 - v0 };
-        sprite.Offset = Vector2D{ u0, v0 };
+            sprite->NormalTextureId = normalId;
+        sprite->Width = frameWidth;
+        sprite->Height = frameHeight;
+        sprite->Tiling = Vector2D{ u1 - u0, v1 - v0 };
+        sprite->Offset = Vector2D{ u0, v0 };
     }
 
     std::unordered_set<uint32_t> s_animPreviewedEntities;

@@ -626,6 +626,16 @@ namespace Serialization {
 				}
 			}
 
+			if (!world.Has<ECS::Components::LocalTransform>(e)) {
+				world.Set<ECS::Components::LocalTransform>(e, ECS::Components::LocalTransform{});
+			}
+
+			if (!world.Has<ECS::Components::WorldTransform>(e)) {
+				ECS::Components::WorldTransform wt{};
+				wt.Dirty = true;
+				world.Set<ECS::Components::WorldTransform>(e, wt);
+			}
+
 			// Ensure every entity has a Layer so editor picking and rendering remain functional.
 			if (!world.Has<ECS::Components::Layer>(e)) {
 				world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });

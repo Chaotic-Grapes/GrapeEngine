@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include "core/Logger.h"
 #include "ecs/Components.h"
+#include "EditorECSUtils.h"
 #include "EditorFileMenu.h"
 #include "HierarchyPanel.h"
 #include "EditorEntityActions.h"
@@ -228,7 +229,13 @@ void LayersPanel::_renderHeader() {
         std::vector<std::pair<uint32_t, uint16_t>> entityLayers;
         ECS::World& world = m_scene->GetWorld();
         world.Each([&](ECS::Entity e) {
-            if (world.Has<ECS::Components::Layer>(e)) entityLayers.emplace_back(e.Index, world.Get<ECS::Components::Layer>(e).Id);
+            if (!Editor::ECSUtils::HasComponent(&world, e, "Layer")) {
+                return;
+            }
+            const auto* layer = Editor::ECSUtils::GetComponentPtr<ECS::Components::Layer>(&world, e, "Layer");
+            if (layer) {
+                entityLayers.emplace_back(e.Index, layer->Id);
+            }
         });
 
         // Apply reset
