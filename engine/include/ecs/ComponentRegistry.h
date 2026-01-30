@@ -163,6 +163,28 @@ namespace ECS {
       }
 
       /**
+       * @brief Ensure the hash mapping points to the provided component id.
+       * Logs when an existing mapping disagrees and overwrites it.
+       * @param typeHash FNV-1a hash of the component type name
+       * @param id Component type id to enforce
+       * @param typeName Component type name (no namespace)
+       */
+      static void EnsureHashMapping(uint32_t typeHash, ComponentTypeId id, const char* typeName) {
+          auto& hashMap = _hashToId();
+          auto it = hashMap.find(typeHash);
+          if (it != hashMap.end() && it->second != id) {
+              LOG_WARNING("[ComponentRegistry] Hash mapping mismatch for '" << typeName
+                  << "' (hash=0x" << std::hex << typeHash << std::dec
+                  << ", existing id=" << it->second << ", enforced id=" << id << ")");
+          }
+          hashMap[typeHash] = id;
+          _idToHash()[id] = typeHash;
+          if (typeName && *typeName) {
+              _hashToName()[typeHash] = typeName;
+          }
+      }
+
+      /**
        * @brief Get ComponentTypeId from type name hash
        * @param typeHash FNV-1a hash of component type name
        * @return ComponentTypeId or NULL_COMPONENT_ID if not found

@@ -15,6 +15,7 @@
 #include "ecs/World.h"
 #include "ecs/Components.h"                
 #include "ecs/StringTable.h"
+#include "EditorECSUtils.h"
 #include "services/ResourceManager.h"           
 #include "core/Logger.h"
 #include "graphics/Texture.hpp" 
@@ -84,42 +85,41 @@ void SpriteImportPanel::Render()
 // -------------------------------------------------------------------------
 bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pixelWidth, int pixelHeight)
 {
-    using namespace ECS::Components;
-
     // Create Entity
     ECS::Entity entity = m_world->Create();
 
-    m_world->Add<LocalTransform>(entity);
-    m_world->Set<WorldTransform>(entity, WorldTransform{});
-    m_world->Set<Layer>(entity, Layer{ 0 });
-    m_world->Add<SpriteRenderer2D>(entity);
-    m_world->Add<BoxCollider2D>(entity);
-    m_world->Add<Name>(entity);
+    Editor::ECSUtils::SetComponent(m_world, entity, "LocalTransform", ECS::Components::LocalTransform{});
+    Editor::ECSUtils::SetComponent(m_world, entity, "WorldTransform", ECS::Components::WorldTransform{});
+    Editor::ECSUtils::SetComponent(m_world, entity, "Layer", ECS::Components::Layer{ 0 });
+    Editor::ECSUtils::AddComponent(m_world, entity, "SpriteRenderer2D", ECS::Components::SpriteRenderer2D{});
+    Editor::ECSUtils::AddComponent(m_world, entity, "BoxCollider2D", ECS::Components::BoxCollider2D{});
 
     // Transform - centered origin
-    auto& transform = m_world->Get<LocalTransform>(entity);
-    transform.Position = Vector3D{ 0.0f, 0.0f, 0.0f };
-    transform.Scale = Vector3D{ 1.0f, 1.0f, 1.0f };
+    if (auto* transform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform")) {
+        transform->Position = Vector3D{ 0.0f, 0.0f, 0.0f };
+        transform->Scale = Vector3D{ 1.0f, 1.0f, 1.0f };
+    }
 
     // Sprite
-    auto& sprite = m_world->Get<SpriteRenderer2D>(entity);
-    std::shared_ptr<Texture> tex = RM.Get<Texture>(imagePath.c_str());
-    sprite.TextureId = RM.Get<Texture>(imagePath.c_str())->ID();
-    sprite.Width = tex->Width();
-    sprite.Height = tex->Height();
-    sprite.Color = Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+    if (auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(m_world, entity, "SpriteRenderer2D")) {
+        std::shared_ptr<Texture> tex = RM.Get<Texture>(imagePath.c_str());
+        sprite->TextureId = RM.Get<Texture>(imagePath.c_str())->ID();
+        sprite->Width = tex->Width();
+        sprite->Height = tex->Height();
+        sprite->Color = Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+    }
 
     // Auto BoxCollider2D - pixel-perfect, centered
-    auto& col = m_world->Get<BoxCollider2D>(entity);
-    col.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
-    col.Offset = Vector2D{ 0.0f, 0.0f };
-    col.LayerMask = 0xFFFFFFFFu;
-    col.Flags = 0;  // Not a trigger
+    if (auto* col = Editor::ECSUtils::GetComponentPtr<ECS::Components::BoxCollider2D>(m_world, entity, "BoxCollider2D")) {
+        col->HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
+        col->Offset = Vector2D{ 0.0f, 0.0f };
+        col->LayerMask = 0xFFFFFFFFu;
+        col->Flags = 0;  // Not a trigger
+    }
 
     // Name the entity after the file (without extension)
-    auto& nameComp = m_world->Get<Name>(entity);
     std::string filename = std::filesystem::path(imagePath).filename().stem().string();
-    nameComp.Value = ECS::StringTable::Intern(filename);
+    Editor::ECSUtils::SetEntityName(*m_world, entity, filename);
 
     // Success feedback
     /*char msg[512];

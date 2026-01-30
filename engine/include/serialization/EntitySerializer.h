@@ -137,13 +137,15 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BoxCollider2D, HalfExtents, Offset, Rotation, LayerMask, Flags)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CircleCollider2D, Radius, Offset, LayerMask, Flags)
 
-		// Custom serialization for SpriteRenderer2D (char array needs special handling)
+		// Custom serialization for SpriteRenderer2D (StringId paths need special handling)
 		inline void to_json(nlohmann::json& j, const SpriteRenderer2D& sprite) {
+			std::string texturePath = ECS::StringTable::Resolve(sprite.TexturePath);
+			std::string normalTexturePath = ECS::StringTable::Resolve(sprite.NormalTexturePath);
 			j = nlohmann::json{
 				{"TextureId", sprite.TextureId},
-				{"TexturePath", std::string(sprite.TexturePath)},  // Convert char[] to string
+				{"TexturePath", texturePath},
 				{"NormalTextureId", sprite.NormalTextureId},
-				{"NormalTexturePath", std::string(sprite.NormalTexturePath)},
+				{"NormalTexturePath", normalTexturePath},
 				{"Color", sprite.Color},
 				{"Tiling", sprite.Tiling},
 				{"Offset", sprite.Offset}
@@ -151,10 +153,9 @@ namespace ECS {
 		}
 
 		inline void from_json(const nlohmann::json& j, SpriteRenderer2D& sprite) {
-			// Handle TexturePath (char array) first
+			// Handle TexturePath (StringId) first
 			std::string texPath = j.value("TexturePath", std::string());
-			strncpy_s(sprite.TexturePath, texPath.c_str(), sizeof(sprite.TexturePath) - 1);
-			sprite.TexturePath[sizeof(sprite.TexturePath) - 1] = '\0';
+			sprite.TexturePath = texPath.empty() ? 0 : ECS::StringTable::Intern(texPath);
 
 			// IMPORTANT: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
@@ -176,8 +177,7 @@ namespace ECS {
 
 			// Normal map path (optional)
 			std::string normalPath = j.value("NormalTexturePath", std::string());
-			strncpy_s(sprite.NormalTexturePath, normalPath.c_str(), sizeof(sprite.NormalTexturePath) - 1);
-			sprite.NormalTexturePath[sizeof(sprite.NormalTexturePath) - 1] = '\0';
+			sprite.NormalTexturePath = normalPath.empty() ? 0 : ECS::StringTable::Intern(normalPath);
 
 			if (!normalPath.empty()) {
 				auto normalTex = RM.Get<Texture>(normalPath);
@@ -200,13 +200,15 @@ namespace ECS {
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteFlip2D, FlipX, FlipY)
 
-		// Custom serialization for SpriteSheetAnimation2D (char array needs special handling)
+		// Custom serialization for SpriteSheetAnimation2D (StringId paths need special handling)
 		inline void to_json(nlohmann::json& j, const SpriteSheetAnimation2D& anim) {
+			std::string texturePath = ECS::StringTable::Resolve(anim.TexturePath);
+			std::string normalTexturePath = ECS::StringTable::Resolve(anim.NormalTexturePath);
 			j = nlohmann::json{
 				{"TextureId", anim.TextureId},
-				{"TexturePath", std::string(anim.TexturePath)},  // Convert char[] to string
+				{"TexturePath", texturePath},
 				{"NormalTextureId", anim.NormalTextureId},
-				{"NormalTexturePath", std::string(anim.NormalTexturePath)},
+				{"NormalTexturePath", normalTexturePath},
 				{"FrameWidth", anim.FrameWidth},
 				{"FrameHeight", anim.FrameHeight},
 				{"SheetWidth", anim.SheetWidth},
@@ -224,10 +226,9 @@ namespace ECS {
 		}
 
 		inline void from_json(const nlohmann::json& j, SpriteSheetAnimation2D& anim) {
-			// Handle TexturePath (char array) first
+			// Handle TexturePath (StringId) first
 			std::string texPath = j.value("TexturePath", std::string());
-			strncpy_s(anim.TexturePath, texPath.c_str(), sizeof(anim.TexturePath) - 1);
-			anim.TexturePath[sizeof(anim.TexturePath) - 1] = '\0';
+			anim.TexturePath = texPath.empty() ? 0 : ECS::StringTable::Intern(texPath);
 
 			// IMPORTANT: Reload texture from path if available
 			// TextureId is a runtime value that doesn't persist across sessions
@@ -254,8 +255,7 @@ namespace ECS {
 
 			// Normal map path (optional)
 			std::string normalPath = j.value("NormalTexturePath", std::string());
-			strncpy_s(anim.NormalTexturePath, normalPath.c_str(), sizeof(anim.NormalTexturePath) - 1);
-			anim.NormalTexturePath[sizeof(anim.NormalTexturePath) - 1] = '\0';
+			anim.NormalTexturePath = normalPath.empty() ? 0 : ECS::StringTable::Intern(normalPath);
 
 			if (!normalPath.empty()) {
 				auto normalTex = RM.Get<Texture>(normalPath);
@@ -296,16 +296,16 @@ namespace ECS {
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CameraMatrices, View, Projection, ViewProjection)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PrefabInstanceMetadata, PrefabHash, Flags)
 		
-		// Custom serialization for PrefabLink component (char array needs special handling)
+		// Custom serialization for PrefabLink component (StringId path needs special handling)
 		// [DEPRECATED] Kept for backward compatibility during migration to PrefabInstanceMetadata
 		inline void to_json(nlohmann::json& j, const PrefabLink& link) {
-			j = nlohmann::json{ {"prefabPath", std::string(link.prefabPath)} };
+			std::string prefabPath = ECS::StringTable::Resolve(link.PrefabPath);
+			j = nlohmann::json{ {"prefabPath", prefabPath} };
 		}
 
 		inline void from_json(const nlohmann::json& j, PrefabLink& link) {
 			std::string path = j.at("prefabPath").get<std::string>();
-			strncpy_s(link.prefabPath, path.c_str(), sizeof(link.prefabPath) - 1);
-			link.prefabPath[sizeof(link.prefabPath) - 1] = '\0';
+			link.PrefabPath = path.empty() ? 0 : ECS::StringTable::Intern(path);
 		}
 
 		// Custom serialization for Light2D enum
@@ -336,11 +336,13 @@ namespace ECS {
 
 		// Custom serialization for Material2D
 		inline void to_json(nlohmann::json& j, const Material2D& mat) {
+			std::string normalTexturePath = ECS::StringTable::Resolve(mat.NormalTexturePath);
+			std::string mraTexturePath = ECS::StringTable::Resolve(mat.MRA_TexturePath);
 			j = nlohmann::json{
 				{"NormalTextureId", mat.NormalTextureId},
 				{"MRA_TextureId", mat.MRA_TextureId},
-				{"NormalTexturePath", std::string(mat.NormalTexturePath)},
-				{"MRA_TexturePath", std::string(mat.MRA_TexturePath)},
+				{"NormalTexturePath", normalTexturePath},
+				{"MRA_TexturePath", mraTexturePath},
 				{"Metallic", mat.Metallic},
 				{"Smoothness", mat.Smoothness},
 				{"AOStrength", mat.AOStrength},
@@ -353,8 +355,7 @@ namespace ECS {
 		inline void from_json(const nlohmann::json& j, Material2D& mat) {
 			// 1. Handle Normal Map
 			std::string normPath = j.value("NormalTexturePath", std::string());
-			strncpy_s(mat.NormalTexturePath, normPath.c_str(), sizeof(mat.NormalTexturePath) - 1);
-			mat.NormalTexturePath[sizeof(mat.NormalTexturePath) - 1] = '\0';
+			mat.NormalTexturePath = normPath.empty() ? 0 : ECS::StringTable::Intern(normPath);
 
 			if (!normPath.empty()) {
 				auto tex = RM.Get<Texture>(normPath);
@@ -366,8 +367,7 @@ namespace ECS {
 
 			// 2. Handle MRA Map
 			std::string mraPath = j.value("MRA_TexturePath", std::string());
-			strncpy_s(mat.MRA_TexturePath, mraPath.c_str(), sizeof(mat.MRA_TexturePath) - 1);
-			mat.MRA_TexturePath[sizeof(mat.MRA_TexturePath) - 1] = '\0';
+			mat.MRA_TexturePath = mraPath.empty() ? 0 : ECS::StringTable::Intern(mraPath);
 
 			if (!mraPath.empty()) {
 				auto tex = RM.Get<Texture>(mraPath);

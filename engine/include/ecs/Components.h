@@ -28,6 +28,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "math/Vector4D.h"
 #include "math/Quaternion.h"
 #include "math/Matrix4x4.h"
+#include "ecs/StringTable.h"
 #include <nlohmann/json.hpp>
 #include <cstdint>
 
@@ -130,22 +131,19 @@ namespace ECS {
         // Use PrefabInstanceMetadata instead in new code
         struct PrefabLink {
         public:
-            // Fixed size buffer for prefab asset path to maintain 
-            // trivially copyable status for ECS performance
-            static constexpr size_t MaxPathLength = 256;
-            char prefabPath[MaxPathLength] = { 0 };     // Path to the prefab file this entity was created from
+            // Interned prefab path ID (StringTable). 0 = invalid.
+            uint32_t PrefabPath = 0;
             PrefabLink() = default;
 
             // Construct from std::string
             PrefabLink(const std::string& path) { setPath(path); }
 
-            // Safe string copy with null termination guarantee
+            // Intern path into the StringTable
             void setPath(const std::string& path) {
-                strncpy_s(prefabPath, path.c_str(), MaxPathLength - 1);
-                prefabPath[MaxPathLength - 1] = '\0'; // Always null-terminate
+                PrefabPath = path.empty() ? 0 : ECS::StringTable::Intern(path);
             }
             // Convert back to std::string for convenience
-            std::string getPath() const { return std::string(prefabPath); }
+            std::string getPath() const { return PrefabPath ? ECS::StringTable::Resolve(PrefabPath) : std::string(); }
         };
         static_assert(std::is_trivially_copyable_v<PrefabLink>, "PrefabLink must be trivially copyable");
 
@@ -315,9 +313,9 @@ namespace ECS {
             uint32_t EmissiveTextureId = 0;  // 0 = no emissive map
             float EmissiveStrength = 5.0f;   // HDR multiplier
 
-            // Persistent texture path (don't serialize TextureId)
-            char TexturePath[256] = { 0 };
-            char NormalTexturePath[256] = { 0 };
+            // Persistent texture path IDs (StringTable). 0 = invalid.
+            uint32_t TexturePath = 0;
+            uint32_t NormalTexturePath = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -358,11 +356,10 @@ namespace ECS {
             bool Loop = true;                 // Whether animation loops
             bool Playing = true;              // Whether animation is currently playing
             bool UseRow = false;              // Use row-based window instead of StartFrame
-            uint8_t _padding = 0;             // Padding to keep alignment (multiple of 4 bytes)
 
-            // Persistent texture path (don't serialize TextureId)
-            char TexturePath[256] = { 0 };
-            char NormalTexturePath[256] = { 0 };
+            // Persistent texture path IDs (StringTable). 0 = invalid.
+            uint32_t TexturePath = 0;
+            uint32_t NormalTexturePath = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
 
@@ -503,9 +500,9 @@ namespace ECS {
             // --- Shader flags (bitfield) ---
             uint32_t Flags = 0;
 
-            // --- Persistent paths (do NOT serialize texture IDs) ---
-            char NormalTexturePath[256] = { 0 };
-            char MRA_TexturePath[256] = { 0 };
+            // --- Persistent path IDs (StringTable). 0 = invalid. ---
+            uint32_t NormalTexturePath = 0;
+            uint32_t MRA_TexturePath = 0;
 
             uint32_t _padding = 0;            // Alignment / if needed
         };

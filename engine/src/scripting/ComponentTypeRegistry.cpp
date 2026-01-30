@@ -33,8 +33,12 @@ namespace {
 }
 
 namespace ECS {
-#define REGISTER_COMPONENT(T) ComponentRegistry::RegisterWithHash<Components::T>(FNV1a_Hash(#T), #T)
-#define REGISTER_EVENT_COMPONENT(T) ComponentRegistry::RegisterWithHash<Events::T>(FNV1a_Hash(#T), #T)
+#define REGISTER_COMPONENT(T) \
+    ComponentRegistry::RegisterWithHash<Components::T>(FNV1a_Hash(#T), #T); \
+    ComponentRegistry::EnsureHashMapping(FNV1a_Hash(#T), ComponentRegistry::Type<Components::T>(), #T)
+#define REGISTER_EVENT_COMPONENT(T) \
+    ComponentRegistry::RegisterWithHash<Events::T>(FNV1a_Hash(#T), #T); \
+    ComponentRegistry::EnsureHashMapping(FNV1a_Hash(#T), ComponentRegistry::Type<Events::T>(), #T)
 
 #if defined(_DEBUG) || defined(DEBUG)
     namespace {
