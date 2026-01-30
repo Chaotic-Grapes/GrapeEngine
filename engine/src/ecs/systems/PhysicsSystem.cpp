@@ -192,6 +192,7 @@ namespace ECS {
 
     void PhysicsSystem::OnDestroy(World& world) {
         m_previousCollisions.clear();
+        m_previousTriggerOverlaps.clear();
     }
 
     // =====================================================================
@@ -379,26 +380,9 @@ namespace ECS {
         // Create event dispatcher for firing collision events
         ECS::Events::EventDispatcher eventDispatcher(&world);
 
-        // Clear any lingering event components from previous frames
-        // (old code used a global CollisionEventQueue; now remove components directly)
-        world.Each<ECS::Events::CollisionEvent>([&](Entity e, ECS::Events::CollisionEvent&) {
-            if (world.IsAlive(e) && world.Has<ECS::Events::CollisionEvent>(e))
-                world.Remove<ECS::Events::CollisionEvent>(e);
-        });
-        world.Each<ECS::Events::TriggerEvent>([&](Entity e, ECS::Events::TriggerEvent&) {
-            if (world.IsAlive(e) && world.Has<ECS::Events::TriggerEvent>(e))
-                world.Remove<ECS::Events::TriggerEvent>(e);
-        });
-        world.Each<ECS::Events::CollisionExitEvent>([&](Entity e, ECS::Events::CollisionExitEvent&) {
-            if (world.IsAlive(e) && world.Has<ECS::Events::CollisionExitEvent>(e))
-                world.Remove<ECS::Events::CollisionExitEvent>(e);
-        });
-        world.Each<ECS::Events::TriggerExitEvent>([&](Entity e, ECS::Events::TriggerExitEvent&) {
-            if (world.IsAlive(e) && world.Has<ECS::Events::TriggerExitEvent>(e))
-                world.Remove<ECS::Events::TriggerExitEvent>(e);
-        });
         //to clock currentcollision pairs between A and B entities
         std::unordered_set<uint64_t> currentCollisions;
+        std::unordered_set<uint64_t> currentTriggerOverlaps;
 
         // Running frame counter to reset per-frame SFX dedupe
         static uint64_t s_frameCounter = 0;
@@ -461,6 +445,38 @@ namespace ECS {
                 if (!world.Has<Components::CircleCollider2D>(e) && !world.Has<Components::BoxCollider2D>(e)) return;
                 staticEntities.push_back(e); // Push to store and use static entities for checks later
             });
+
+        std::unordered_set<EntityId> broadphaseIds;
+        broadphaseIds.reserve(dynamicEntities.size() + staticEntities.size());
+        for (const auto& e : dynamicEntities) broadphaseIds.insert(e.Index);
+        for (const auto& e : staticEntities) broadphaseIds.insert(e.Index);
+
+        // Include non-rigidbody colliders (triggers or static colliders without a Rigidbody2D).
+        world.Each<Components::LocalTransform>([&](const Entity e, const Components::LocalTransform&) {
+            if (broadphaseIds.find(e.Index) != broadphaseIds.end())
+                return;
+
+            if (const auto* a = world.TryGet<Components::Active>(e)) {
+                if (!a->Enabled) return;
+            }
+
+            if (layerManager) {
+                const auto* layer = world.TryGet<Components::Layer>(e);
+                const uint16_t layerId = layer ? layer->Id : 0;
+                const auto& layerData = layerManager->Get(layerId);
+                if (!layerData.physicsEnabled)
+                    return;
+            }
+
+            if (!world.Has<Components::CircleCollider2D>(e) && !world.Has<Components::BoxCollider2D>(e))
+                return;
+
+            if (world.Has<Components::Rigidbody2D>(e))
+                return;
+
+            staticEntities.push_back(e);
+            broadphaseIds.insert(e.Index);
+        });
 
         // Substep loop: integrate and resolve in smaller time slices.
         for (int step = 0; step < substeps; ++step) {
@@ -622,11 +638,6 @@ namespace ECS {
                     if (!Engine::CanCollide(maskA, layerAId, maskB, layerBId))
                         continue;
 
-                    // Require at least one side to be physically simulated (has rb + velocity).
-                    const bool hasPhysA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
-                    const bool hasPhysB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
-                    if (!hasPhysA && !hasPhysB) continue;
-
                     // Narrow phase: run the appropriate shape test to get contact normal and depth.
                     Engine::Collision::ContactManifold manifold;
                     bool hasCollision = false;
@@ -719,6 +730,30 @@ namespace ECS {
 
                     if (!hasCollision) continue;
 
+                    // Check for triggers on either side
+                    const bool isTriggerA = (circA && (circA->Flags & 0x1u)) || (boxA && (boxA->Flags & 0x1u));
+                    const bool isTriggerB = (circB && (circB->Flags & 0x1u)) || (boxB && (boxB->Flags & 0x1u));
+
+                    // Handle trigger overlaps (no resolution)
+                    if (isTriggerA || isTriggerB) {
+                        if (isTriggerA) {
+                            // Store trigger overlap pair (A is trigger)
+                            const uint64_t key = (static_cast<uint64_t>(A.Index) << 32) | B.Index;
+                            currentTriggerOverlaps.insert(key);
+                        }
+                        if (isTriggerB) {
+                            // Store trigger overlap pair (B is trigger)
+                            const uint64_t key = (static_cast<uint64_t>(B.Index) << 32) | A.Index;
+                            currentTriggerOverlaps.insert(key);
+                        }
+                        continue;
+                    }
+
+                    // Require at least one side to be physically simulated (has rb + velocity).
+                    const bool hasPhysA = world.TryGet<Components::Rigidbody2D>(A) && world.TryGet<Components::LinearVelocity2D>(A);
+                    const bool hasPhysB = world.TryGet<Components::Rigidbody2D>(B) && world.TryGet<Components::LinearVelocity2D>(B);
+                    if (!hasPhysA && !hasPhysB) continue;
+
                     uint64_t pairID = MakeCollisionPairID(A, B);
                     currentCollisions.insert(pairID);
 
@@ -728,16 +763,9 @@ namespace ECS {
                     if (isNewCollision) {
                         // New collision detected
                         eventDispatcher.FireCollisionEvent(
-                            A.Index, B.Index,
+                            ECS::EntityUtils::Pack(A), ECS::EntityUtils::Pack(B),
                             Vector3D(manifold.points[0].X, manifold.points[0].Y, 0.0f),
                             Vector3D(manifold.normal.X, manifold.normal.Y, 0.0f),
-                            Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
-                            0.0f  // TODO: Compute impact magnitude
-                        );
-                        eventDispatcher.FireCollisionEvent(
-                            B.Index, A.Index,
-                            Vector3D(manifold.points[0].X, manifold.points[0].Y, 0.0f),
-                            Vector3D(-manifold.normal.X, -manifold.normal.Y, 0.0f),
                             Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
                             0.0f  // TODO: Compute impact magnitude
                         );
@@ -826,17 +854,13 @@ namespace ECS {
                     uint32_t idA = (pairID >> 32);
                     uint32_t idB = (pairID & 0xFFFFFFFF);
 
-                    Entity entityA{ idA, 0 };
-                    Entity entityB{ idB, 0 };
+                    Entity entityA = world.Resolve(idA);
+                    Entity entityB = world.Resolve(idB);
 
                     if (world.IsAlive(entityA) && world.IsAlive(entityB)) {
                         // Fire collision exit events using EventDispatcher
                         eventDispatcher.FireCollisionExitEvent(
-                            idA, idB,
-                            Vector3D(0.0f, 0.0f, 0.0f)  // TODO: Track last contact point
-                        );
-                        eventDispatcher.FireCollisionExitEvent(
-                            idB, idA,
+                            ECS::EntityUtils::Pack(entityA), ECS::EntityUtils::Pack(entityB),
                             Vector3D(0.0f, 0.0f, 0.0f)  // TODO: Track last contact point
                         );
                     }
@@ -848,7 +872,44 @@ namespace ECS {
             // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
         }
 
-        // Clear ephemeral event components at end of frame
-        eventDispatcher.ClearFrameEvents();
+        // Handle trigger events
+        for (uint64_t pairID : currentTriggerOverlaps) {
+            // Check if was overlapping last frame
+            const bool wasOverlapping = (m_previousTriggerOverlaps.find(pairID) != m_previousTriggerOverlaps.end());
+            const uint32_t triggerId = static_cast<uint32_t>(pairID >> 32);
+            const uint32_t otherId = static_cast<uint32_t>(pairID & 0xFFFFFFFFu);
+
+            // Resolve entities
+            Entity triggerEntity = world.Resolve(triggerId);
+            Entity otherEntity = world.Resolve(otherId);
+
+            // Check if both entities are still alive
+            if (world.IsAlive(triggerEntity) && world.IsAlive(otherEntity)) {
+                if (wasOverlapping) {
+                    eventDispatcher.FireTriggerStayEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                }
+                else {
+                    eventDispatcher.FireTriggerEnterEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                }
+            }
+        }
+
+        // Check for ended trigger overlaps
+        for (uint64_t pairID : m_previousTriggerOverlaps) {
+            if (currentTriggerOverlaps.find(pairID) == currentTriggerOverlaps.end()) {
+                const uint32_t triggerId = static_cast<uint32_t>(pairID >> 32);
+                const uint32_t otherId = static_cast<uint32_t>(pairID & 0xFFFFFFFFu);
+
+                Entity triggerEntity = world.Resolve(triggerId);
+                Entity otherEntity = world.Resolve(otherId);
+
+                if (world.IsAlive(triggerEntity) && world.IsAlive(otherEntity)) {
+                    eventDispatcher.FireTriggerExitEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                }
+            }
+        }
+
+        m_previousTriggerOverlaps = std::move(currentTriggerOverlaps);
+
     }
 }// namespace ECS

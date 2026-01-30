@@ -13,17 +13,57 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 #include "ecs/events/EventDispatcher.h"
+#include "helpers/EntityUtils.h"
+
+namespace {
+    /**
+     * @brief Append an event to the entity's event buffer, creating it if necessary.
+     * If the buffer is full, the event is not added.
+     * @param world Pointer to the ECS world
+     * @param entity The entity to add the event to
+     * @param entityId The packed ID of the entity
+     * @param trackedEntities Vector to track entities that received event buffers
+     * @param evt The event to append
+     * @tparam TBuffer The type of the event buffer component
+     * @tparam TEvent The type of the event to append
+     */
+    template <typename TBuffer, typename TEvent>
+    void AppendEvent(ECS::World* world,
+                     const ECS::Entity entity,
+                     const PackedEntityId entityId,
+                     std::vector<PackedEntityId>& trackedEntities,
+                     const TEvent& evt) {
+        if (!world || !world->IsAlive(entity))
+            return;
+
+        // Try to get existing buffer
+        if (auto* buffer = world->TryGet<TBuffer>(entity)) {
+            // Append event if there's space
+            if (buffer->Count < ECS::Events::kMaxEventBufferSize) {
+                // Add event to buffer
+                buffer->Events[buffer->Count++] = evt;
+            }
+            return;
+        }
+
+        // No existing buffer; create a new one
+        TBuffer newBuffer{};
+        newBuffer.Count = 1;
+        newBuffer.Events[0] = evt;
+        world->Add<TBuffer>(entity, newBuffer);
+        trackedEntities.push_back(entityId);
+    }
+}
 
 namespace ECS::Events {
     EventDispatcher::EventDispatcher(World* world) : world(world) { }
 
     EventDispatcher::~EventDispatcher() {
-        ClearFrameEvents();
     }
 
     void EventDispatcher::FireCollisionEvent(
-        EntityId entity1Id,
-        EntityId entity2Id,
+        PackedEntityId entity1Id,
+        PackedEntityId entity2Id,
         const Vector3D& contactPoint,
         const Vector3D& contactNormal,
         const Vector3D& relativeVelocity,
@@ -32,155 +72,142 @@ namespace ECS::Events {
         if (!world)
             return;
 
-        // Add CollisionEvent to entity1
-        Entity entity1 = world->Resolve(entity1Id);
-        if (world->IsAlive(entity1))
-        {
-            CollisionEvent event1;
-            event1.OtherEntityId = entity2Id;
-            event1.ContactPoint = contactPoint;
-            event1.ContactNormal = contactNormal;
-            event1.RelativeVelocity = relativeVelocity;
-            event1.ImpulseMagnitude = impulseMagnitude;
-            world->Add<CollisionEvent>(entity1, event1);
-            collisionEventEntities.push_back(entity1Id);
-        }
+        // Add CollisionEvent to entity1 buffer
+        Entity entity1 = ECS::EntityUtils::Unpack(entity1Id);
+        if (!world->IsAlive(entity1))
+            return;
+        CollisionEvent event1;
+        event1.OtherEntityId = entity2Id;
+        event1.ContactPoint = contactPoint;
+        event1.ContactNormal = contactNormal;
+        event1.RelativeVelocity = relativeVelocity;
+        event1.ImpulseMagnitude = impulseMagnitude;
+        AppendEvent<CollisionEventBuffer>(world, entity1, entity1Id, collisionEventEntities, event1);
 
-        // Add CollisionEvent to entity2 with inverted normal
-        Entity entity2 = world->Resolve(entity2Id);
-        if (world->IsAlive(entity2))
-        {
-            CollisionEvent event2;
-            event2.OtherEntityId = entity1Id;
-            event2.ContactPoint = contactPoint;
-            event2.ContactNormal = -contactNormal;  // Inverted for other entity
-            event2.RelativeVelocity = -relativeVelocity;  // Inverted
-            event2.ImpulseMagnitude = impulseMagnitude;
-            world->Add<CollisionEvent>(entity2, event2);
-            collisionEventEntities.push_back(entity2Id);
-        }
+        // Add CollisionEvent to entity2 buffer with inverted normal
+        Entity entity2 = ECS::EntityUtils::Unpack(entity2Id);
+        if (!world->IsAlive(entity2))
+            return;
+        CollisionEvent event2;
+        event2.OtherEntityId = entity1Id;
+        event2.ContactPoint = contactPoint;
+        event2.ContactNormal = -contactNormal;  // Inverted for other entity
+        event2.RelativeVelocity = -relativeVelocity;  // Inverted
+        event2.ImpulseMagnitude = impulseMagnitude;
+        AppendEvent<CollisionEventBuffer>(world, entity2, entity2Id, collisionEventEntities, event2);
     }
 
-    void EventDispatcher::FireTriggerEnterEvent(EntityId triggerId, EntityId otherEntityId) {
+    void EventDispatcher::FireTriggerEnterEvent(PackedEntityId triggerId, PackedEntityId otherEntityId) {
         if (!world)
             return;
 
-        Entity trigger = world->Resolve(triggerId);
-        if (world->IsAlive(trigger))
-        {
-            TriggerEvent event;
-            event.OtherEntityId = otherEntityId;
-            event.IsEnter = true;
-            event.IsActive = true;
-            world->Add<TriggerEvent>(trigger, event);
-            triggerEventEntities.push_back(triggerId);
-        }
+        Entity trigger = ECS::EntityUtils::Unpack(triggerId);
+        if (!world->IsAlive(trigger))
+            return;
+        TriggerEvent event;
+        event.OtherEntityId = otherEntityId;
+        event.IsEnter = true;
+        event.IsActive = true;
+        AppendEvent<TriggerEventBuffer>(world, trigger, triggerId, triggerEventEntities, event);
     }
 
-    void EventDispatcher::FireTriggerStayEvent(EntityId triggerId, EntityId otherEntityId) {
+    void EventDispatcher::FireTriggerStayEvent(PackedEntityId triggerId, PackedEntityId otherEntityId) {
         if (!world)
             return;
 
-        Entity trigger = world->Resolve(triggerId);
-        if (world->IsAlive(trigger))
-        {
-            if (auto* triggerEvent = world->TryGet<TriggerEvent>(trigger))
-            {
-                triggerEvent->IsEnter = false;
-                triggerEvent->IsActive = true;
-            }
-        }
+        Entity trigger = ECS::EntityUtils::Unpack(triggerId);
+        if (!world->IsAlive(trigger))
+            return;
+        TriggerEvent event;
+        event.OtherEntityId = otherEntityId;
+        event.IsEnter = false;
+        event.IsActive = true;
+        AppendEvent<TriggerEventBuffer>(world, trigger, triggerId, triggerEventEntities, event);
     }
 
     void EventDispatcher::FireCollisionExitEvent(
-        EntityId entity1Id,
-        EntityId entity2Id,
+        PackedEntityId entity1Id,
+        PackedEntityId entity2Id,
         const Vector3D& lastContactPoint
     ) {
         if (!world)
             return;
 
-        // Add CollisionExitEvent to entity1
-        Entity entity1 = world->Resolve(entity1Id);
-        if (world->IsAlive(entity1))
-        {
-            CollisionExitEvent event1;
-            event1.OtherEntityId = entity2Id;
-            event1.LastContactPoint = lastContactPoint;
-            world->Add<CollisionExitEvent>(entity1, event1);
-            collisionExitEventEntities.push_back(entity1Id);
-        }
+        // Add CollisionExitEvent to entity1 buffer
+        Entity entity1 = ECS::EntityUtils::Unpack(entity1Id);
+        if (!world->IsAlive(entity1))
+            return;
+        CollisionExitEvent event1;
+        event1.OtherEntityId = entity2Id;
+        event1.LastContactPoint = lastContactPoint;
+        AppendEvent<CollisionExitEventBuffer>(world, entity1, entity1Id, collisionExitEventEntities, event1);
 
-        // Add CollisionExitEvent to entity2
-        Entity entity2 = world->Resolve(entity2Id);
-        if (world->IsAlive(entity2))
-        {
-            CollisionExitEvent event2;
-            event2.OtherEntityId = entity1Id;
-            event2.LastContactPoint = lastContactPoint;
-            world->Add<CollisionExitEvent>(entity2, event2);
-            collisionExitEventEntities.push_back(entity2Id);
-        }
+        // Add CollisionExitEvent to entity2 buffer
+        Entity entity2 = ECS::EntityUtils::Unpack(entity2Id);
+        if (!world->IsAlive(entity2))
+            return;
+        CollisionExitEvent event2;
+        event2.OtherEntityId = entity1Id;
+        event2.LastContactPoint = lastContactPoint;
+        AppendEvent<CollisionExitEventBuffer>(world, entity2, entity2Id, collisionExitEventEntities, event2);
     }
 
-    void EventDispatcher::FireTriggerExitEvent(EntityId triggerId, EntityId otherEntityId) {
+    void EventDispatcher::FireTriggerExitEvent(PackedEntityId triggerId, PackedEntityId otherEntityId) {
         if (!world)
             return;
 
-        Entity trigger = world->Resolve(triggerId);
-        if (world->IsAlive(trigger))
-        {
-            TriggerExitEvent event;
-            event.OtherEntityId = otherEntityId;
-            world->Add<TriggerExitEvent>(trigger, event);
-            triggerExitEventEntities.push_back(triggerId);
-        }
+        Entity trigger = ECS::EntityUtils::Unpack(triggerId);
+        if (!world->IsAlive(trigger))
+            return;
+        TriggerExitEvent event;
+        event.OtherEntityId = otherEntityId;
+        AppendEvent<TriggerExitEventBuffer>(world, trigger, triggerId, triggerExitEventEntities, event);
     }
 
     void EventDispatcher::ClearFrameEvents() {
         if (!world)
             return;
 
-        // Clear all CollisionEvent components
-        for (EntityId entityId : collisionEventEntities)
+        // Clear all CollisionEvent buffers
+        for (PackedEntityId entityId : collisionEventEntities)
         {
-            Entity entity = world->Resolve(entityId);
-            if (world->IsAlive(entity) && world->Has<CollisionEvent>(entity))
+            Entity entity = ECS::EntityUtils::Unpack(entityId);
+            if (world->IsAlive(entity) && world->Has<CollisionEventBuffer>(entity))
             {
-                world->Remove<CollisionEvent>(entity);
+                world->Remove<CollisionEventBuffer>(entity);
             }
         }
         collisionEventEntities.clear();
 
-        // Clear all TriggerEvent components
-        for (EntityId entityId : triggerEventEntities)
+        // Clear all TriggerEvent buffers
+        for (PackedEntityId entityId : triggerEventEntities)
         {
-            Entity entity = world->Resolve(entityId);
-            if (world->IsAlive(entity) && world->Has<TriggerEvent>(entity))
+            Entity entity = ECS::EntityUtils::Unpack(entityId);
+            if (world->IsAlive(entity) && world->Has<TriggerEventBuffer>(entity))
             {
-                world->Remove<TriggerEvent>(entity);
+                world->Remove<TriggerEventBuffer>(entity);
             }
         }
         triggerEventEntities.clear();
 
-        // Clear all CollisionExitEvent components
-        for (EntityId entityId : collisionExitEventEntities)
+        // Clear all CollisionExitEvent buffers
+        for (PackedEntityId entityId : collisionExitEventEntities)
         {
-            Entity entity = world->Resolve(entityId);
-            if (world->IsAlive(entity) && world->Has<CollisionExitEvent>(entity))
+            Entity entity = ECS::EntityUtils::Unpack(entityId);
+            if (world->IsAlive(entity) && world->Has<CollisionExitEventBuffer>(entity))
             {
-                world->Remove<CollisionExitEvent>(entity);
+                world->Remove<CollisionExitEventBuffer>(entity);
             }
         }
         collisionExitEventEntities.clear();
 
-        // Clear all TriggerExitEvent components
-        for (EntityId entityId : triggerExitEventEntities)
+        // Clear all TriggerExitEvent buffers
+        for (PackedEntityId entityId : triggerExitEventEntities)
         {
-            Entity entity = world->Resolve(entityId);
-            if (world->IsAlive(entity) && world->Has<TriggerExitEvent>(entity))
+            Entity entity = ECS::EntityUtils::Unpack(entityId);
+            if (world->IsAlive(entity) && world->Has<TriggerExitEventBuffer>(entity))
             {
-                world->Remove<TriggerExitEvent>(entity);
+                world->Remove<TriggerExitEventBuffer>(entity);
             }
         }
         triggerExitEventEntities.clear();

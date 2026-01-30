@@ -26,6 +26,7 @@ Launches the application in editor mode with the level editor interface.
 #include "scripting/ScriptManager.h"
 #include "core/Logger.h"
 #include "scripting/ScriptsCompiler.h"
+#include "ecs/events/EventDispatcher.h"
 
 extern "C" {
     // Forward declare the component deserialize callback registration function
@@ -208,6 +209,7 @@ int main() {
             
             // Execute the filtered systems
             engine.UpdateSystemsByMode(systemModes, world);
+            ECS::Events::ClearFrameEventComponents(world);
         }
         
         // ============================================================

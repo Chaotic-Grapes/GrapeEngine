@@ -39,6 +39,7 @@ namespace ECS {
 
     private:
         std::unordered_set<uint64_t> m_previousCollisions;
+        std::unordered_set<uint64_t> m_previousTriggerOverlaps;
     };
 }
 

@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/ComponentRegistry.h"
 #include "ecs/Components.h"
+#include "ecs/events/EventComponents.h"
 #include <cstdint>
 
 namespace {
@@ -33,6 +34,7 @@ namespace {
 
 namespace ECS {
 #define REGISTER_COMPONENT(T) ComponentRegistry::RegisterWithHash<Components::T>(FNV1a_Hash(#T), #T)
+#define REGISTER_EVENT_COMPONENT(T) ComponentRegistry::RegisterWithHash<Events::T>(FNV1a_Hash(#T), #T)
 
 #if defined(_DEBUG) || defined(DEBUG)
     namespace {
@@ -120,6 +122,12 @@ namespace ECS {
         // Material2D
 		REGISTER_COMPONENT(Material2D);
 
+        // Event buffers (physics events)
+        REGISTER_EVENT_COMPONENT(CollisionEventBuffer);
+        REGISTER_EVENT_COMPONENT(TriggerEventBuffer);
+        REGISTER_EVENT_COMPONENT(CollisionExitEventBuffer);
+        REGISTER_EVENT_COMPONENT(TriggerExitEventBuffer);
+
 #if defined(_DEBUG) || defined(DEBUG)
         // Log the registered component types for debugging
         LogComponentTypeIds("Name", FNV1a_Hash("Name"));
@@ -167,8 +175,14 @@ namespace ECS {
         LogComponentTypeIds("Light2D", FNV1a_Hash("Light2D"));
         LogComponentTypeIds("AudioSource", FNV1a_Hash("AudioSource"));
         LogComponentTypeIds("Material2D", FNV1a_Hash("Material2D"));
+
+        LogComponentTypeIds("CollisionEventBuffer", FNV1a_Hash("CollisionEventBuffer"));
+        LogComponentTypeIds("TriggerEventBuffer", FNV1a_Hash("TriggerEventBuffer"));
+        LogComponentTypeIds("CollisionExitEventBuffer", FNV1a_Hash("CollisionExitEventBuffer"));
+        LogComponentTypeIds("TriggerExitEventBuffer", FNV1a_Hash("TriggerExitEventBuffer"));
 #endif
     }
 }
 
 #undef REGISTER_COMPONENT
+#undef REGISTER_EVENT_COMPONENT

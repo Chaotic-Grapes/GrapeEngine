@@ -9,9 +9,10 @@ namespace GrapeEngine.Scripting.Events;
 /// 
 /// Query for this component to respond to collisions:
 /// <code>
-/// foreach (var (entity, collision) in world.Query&lt;CollisionEvent&gt;())
+/// foreach (var (entity, buffer) in world.Query&lt;CollisionEventBuffer&gt;())
 /// {
-///     Console.WriteLine($"Collision with {collision.OtherEntityId}");
+///     for (int i = 0; i &lt; buffer.Count; ++i)
+///         Console.WriteLine($"Collision with {buffer.GetEvent(i).OtherEntityId}");
 /// }
 /// </code>
 /// </summary>
@@ -50,10 +51,13 @@ public struct CollisionEvent
 /// 
 /// Query for this component to respond to trigger events:
 /// <code>
-/// foreach (var (entity, trigger) in world.Query&lt;TriggerEvent&gt;())
+/// foreach (var (entity, buffer) in world.Query&lt;TriggerEventBuffer&gt;())
 /// {
-///     if (trigger.IsEnter)
-///         Console.WriteLine("Trigger entered!");
+///     for (int i = 0; i &lt; buffer.Count; ++i)
+///     {
+///         if (buffer.GetEvent(i).IsEnter)
+///             Console.WriteLine("Trigger entered!");
+///     }
 /// }
 /// </code>
 /// </summary>
@@ -83,9 +87,10 @@ public struct TriggerEvent
 /// 
 /// Query for this component to respond to collision exit:
 /// <code>
-/// foreach (var (entity, exit) in world.Query&lt;CollisionExitEvent&gt;())
+/// foreach (var (entity, buffer) in world.Query&lt;CollisionExitEventBuffer&gt;())
 /// {
-///     Console.WriteLine($"Stopped colliding with {exit.OtherEntityId}");
+///     for (int i = 0; i &lt; buffer.Count; ++i)
+///         Console.WriteLine($"Stopped colliding with {buffer.GetEvent(i).OtherEntityId}");
 /// }
 /// </code>
 /// </summary>
@@ -109,9 +114,10 @@ public struct CollisionExitEvent
 /// 
 /// Query for this component to respond to trigger exit:
 /// <code>
-/// foreach (var (entity, exit) in world.Query&lt;TriggerExitEvent&gt;())
+/// foreach (var (entity, buffer) in world.Query&lt;TriggerExitEventBuffer&gt;())
 /// {
-///     Console.WriteLine($"Trigger left by {exit.OtherEntityId}");
+///     for (int i = 0; i &lt; buffer.Count; ++i)
+///         Console.WriteLine($"Trigger left by {buffer.GetEvent(i).OtherEntityId}");
 /// }
 /// </code>
 /// </summary>
@@ -121,6 +127,138 @@ public struct TriggerExitEvent
     /// The entity ID that stopped overlapping with this trigger.
     /// </summary>
     public ulong OtherEntityId { get; set; }
+}
+
+/// <summary>
+/// Buffer of collision events for a single entity in the current frame.
+/// </summary>
+public struct CollisionEventBuffer
+{
+    public const int MaxEvents = 8;
+    public int Count;
+    public CollisionEvent Event0;
+    public CollisionEvent Event1;
+    public CollisionEvent Event2;
+    public CollisionEvent Event3;
+    public CollisionEvent Event4;
+    public CollisionEvent Event5;
+    public CollisionEvent Event6;
+    public CollisionEvent Event7;
+
+    public CollisionEvent GetEvent(int index)
+    {
+        return index switch
+        {
+            0 => Event0,
+            1 => Event1,
+            2 => Event2,
+            3 => Event3,
+            4 => Event4,
+            5 => Event5,
+            6 => Event6,
+            7 => Event7,
+            _ => default
+        };
+    }
+}
+
+/// <summary>
+/// Buffer of trigger events for a single entity in the current frame.
+/// </summary>
+public struct TriggerEventBuffer
+{
+    public const int MaxEvents = 8;
+    public int Count;
+    public TriggerEvent Event0;
+    public TriggerEvent Event1;
+    public TriggerEvent Event2;
+    public TriggerEvent Event3;
+    public TriggerEvent Event4;
+    public TriggerEvent Event5;
+    public TriggerEvent Event6;
+    public TriggerEvent Event7;
+
+    public TriggerEvent GetEvent(int index)
+    {
+        return index switch
+        {
+            0 => Event0,
+            1 => Event1,
+            2 => Event2,
+            3 => Event3,
+            4 => Event4,
+            5 => Event5,
+            6 => Event6,
+            7 => Event7,
+            _ => default
+        };
+    }
+}
+
+/// <summary>
+/// Buffer of collision exit events for a single entity in the current frame.
+/// </summary>
+public struct CollisionExitEventBuffer
+{
+    public const int MaxEvents = 8;
+    public int Count;
+    public CollisionExitEvent Event0;
+    public CollisionExitEvent Event1;
+    public CollisionExitEvent Event2;
+    public CollisionExitEvent Event3;
+    public CollisionExitEvent Event4;
+    public CollisionExitEvent Event5;
+    public CollisionExitEvent Event6;
+    public CollisionExitEvent Event7;
+
+    public CollisionExitEvent GetEvent(int index)
+    {
+        return index switch
+        {
+            0 => Event0,
+            1 => Event1,
+            2 => Event2,
+            3 => Event3,
+            4 => Event4,
+            5 => Event5,
+            6 => Event6,
+            7 => Event7,
+            _ => default
+        };
+    }
+}
+
+/// <summary>
+/// Buffer of trigger exit events for a single entity in the current frame.
+/// </summary>
+public struct TriggerExitEventBuffer
+{
+    public const int MaxEvents = 8;
+    public int Count;
+    public TriggerExitEvent Event0;
+    public TriggerExitEvent Event1;
+    public TriggerExitEvent Event2;
+    public TriggerExitEvent Event3;
+    public TriggerExitEvent Event4;
+    public TriggerExitEvent Event5;
+    public TriggerExitEvent Event6;
+    public TriggerExitEvent Event7;
+
+    public TriggerExitEvent GetEvent(int index)
+    {
+        return index switch
+        {
+            0 => Event0,
+            1 => Event1,
+            2 => Event2,
+            3 => Event3,
+            4 => Event4,
+            5 => Event5,
+            6 => Event6,
+            7 => Event7,
+            _ => default
+        };
+    }
 }
 
 

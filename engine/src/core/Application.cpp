@@ -21,6 +21,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/systems/AnimationPreviewSystem.h"
+#include "ecs/events/EventDispatcher.h"
 #include "scripting/ScriptManager.h"
 #include "scripting/ComponentTypeRegistry.h"
 #include "ecs/systems/TransformSystem.h"
@@ -172,6 +173,7 @@ namespace Engine {
                 
                 // Update systems - always run for game mode
                 m_systemManager.UpdateWithDependencies(world);
+                ECS::Events::ClearFrameEventComponents(world);
             }
         }
 

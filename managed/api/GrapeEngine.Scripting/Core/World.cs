@@ -423,14 +423,16 @@ public class World : IDisposable
     /// Events are represented as components and are automatically managed by the C++ physics system:
     /// - Collision events are added when collisions occur
     /// - Trigger events are added when triggers overlap
+    /// - Events are stored in per-entity buffers for the current frame
     /// - All event components are automatically removed at the end of each frame
     /// 
     /// You can query events directly or use the EventSystem convenience methods:
     /// <code>
     /// // Direct query
-    /// foreach (var (entity, collision) in world.Query&lt;CollisionEvent&gt;())
+    /// foreach (var (entity, buffer) in world.Query&lt;CollisionEventBuffer&gt;())
     /// {
-    ///     HandleCollision(entity, collision);
+    ///     for (int i = 0; i &lt; buffer.Count; ++i)
+    ///         HandleCollision(entity, buffer.GetEvent(i));
     /// }
     /// 
     /// // Via EventSystem
