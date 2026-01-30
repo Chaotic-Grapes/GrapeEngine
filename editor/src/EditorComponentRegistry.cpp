@@ -62,6 +62,7 @@ namespace {
     const uint32_t kHashAnimationState2D = Editor::ECSUtils::FNV1aHash("AnimationState2D");
     const uint32_t kHashAudioSource = Editor::ECSUtils::FNV1aHash("AudioSource");
     const uint32_t kHashLayer = Editor::ECSUtils::FNV1aHash("Layer");
+    const uint32_t kHashMaterial2D = Editor::ECSUtils::FNV1aHash("Material2D");
 }
 
 // Callback function pointer for deserializing managed components from JSON
@@ -727,7 +728,7 @@ static void _initializeDefaultRegistry() {
         // Material2D
         {
 			"Material 2D", "Material2D", "ECS::Components::Material2D",
-			ECS::ComponentRegistry::Type<Material2D>(), 0, true, true,
+			GetComponentIdFromHashOrWarn(kHashMaterial2D, "Material2D"), kHashMaterial2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); }),
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 { "NormalTextureId", 0 },
@@ -741,7 +742,7 @@ static void _initializeDefaultRegistry() {
                 { "AlphaCutoff", 0.5f },
                 { "Flags", 0 }
             }; }),
-            COMPONENT_OPS(Material2D, kHashMaterial2D)
+            COMPONENT_OPS_HASH(Material2D, kHashMaterial2D)
         }
     };
 }

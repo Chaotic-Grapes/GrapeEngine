@@ -117,6 +117,9 @@ namespace ECS {
         // Audio
         REGISTER_COMPONENT(AudioSource);
 
+        // Material2D
+		REGISTER_COMPONENT(Material2D);
+
 #if defined(_DEBUG) || defined(DEBUG)
         // Log the registered component types for debugging
         LogComponentTypeIds("Name", FNV1a_Hash("Name"));
@@ -162,8 +165,8 @@ namespace ECS {
         LogComponentTypeIds("CameraMatrices", FNV1a_Hash("CameraMatrices"));
 
         LogComponentTypeIds("Light2D", FNV1a_Hash("Light2D"));
-        
         LogComponentTypeIds("AudioSource", FNV1a_Hash("AudioSource"));
+        LogComponentTypeIds("Material2D", FNV1a_Hash("Material2D"));
 #endif
     }
 }
