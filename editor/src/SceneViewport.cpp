@@ -239,7 +239,7 @@ void SceneViewport::_renderViewport() {
                         glm::vec2(size.x, size.y),
                         view,
                         proj,
-                        false  // isPerspective (editor uses ortho)
+                        camera->UsePerspective
                     );
 
                     // Draw selection outline around selected entity

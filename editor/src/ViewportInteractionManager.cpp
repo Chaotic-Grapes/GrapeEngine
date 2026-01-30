@@ -19,6 +19,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Logger.h"
 #include "math/Matrix4x4.h"
 #include "helpers/TransformUtils.h"
+#include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -233,6 +234,7 @@ namespace Editor {
         Vector3D localPosition;
         Quaternion localRotation;
         Vector3D localScale;
+
         const Matrix4x4 localMatrix4x4 = ToMatrix4x4(localMatrix);
         TransformUtils::DecomposeTRS(localMatrix4x4, localPosition, localRotation, localScale);
 

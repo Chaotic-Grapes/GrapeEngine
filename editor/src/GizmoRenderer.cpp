@@ -96,8 +96,17 @@ namespace Editor {
         // NOT the full window coordinates (which include toolbar)
         ImGuizmo::SetRect(m_viewportX, m_viewportY, m_viewportW, m_viewportH);
 
-        // Convert operation and mode to ImGuizmo types
+        // Convert operation and mode to ImGuizmo types (use 2D constraints in ortho)
         ImGuizmo::OPERATION imguizmoOp = static_cast<ImGuizmo::OPERATION>(static_cast<int>(m_operation));
+        if (!m_isPerspective) {
+            if (m_operation == Operation::Translate) {
+                imguizmoOp = static_cast<ImGuizmo::OPERATION>(ImGuizmo::TRANSLATE_X | ImGuizmo::TRANSLATE_Y);
+            } else if (m_operation == Operation::Rotate) {
+                imguizmoOp = ImGuizmo::ROTATE_Z;
+            } else if (m_operation == Operation::Scale) {
+                imguizmoOp = static_cast<ImGuizmo::OPERATION>(ImGuizmo::SCALE_X | ImGuizmo::SCALE_Y);
+            }
+        }
         ImGuizmo::MODE imguizmoMode = static_cast<ImGuizmo::MODE>(static_cast<int>(m_mode));
 
         // Copy input transform to output (ImGuizmo modifies in-place)
