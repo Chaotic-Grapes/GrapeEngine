@@ -21,6 +21,7 @@ The discovery process:
 
 using System.Reflection;
 using System.Runtime.InteropServices;
+using GrapeEngine.Scripting.Core;
 
 namespace GrapeEngine.Scripting.Internal.Hosting;
 
@@ -236,23 +237,12 @@ internal static class ComponentDiscovery
             registerMethod?.Invoke(null, []);
 
             // Get component metadata for logging
-            var getHashMethod = typeof(ComponentTypeHelper)
-                .GetMethod("GetTypeHash", BindingFlags.Public | BindingFlags.Static)
-                ?.MakeGenericMethod(componentType);
-
-            if (getHashMethod != null)
-            {
-                var hash = (uint)getHashMethod.Invoke(null, [])!;
-                
-                // Add to the type hash mapping for editor deserialization
-                TypeHashToType[hash] = componentType;
-                
-                Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name} (hash: 0x{hash:X8})", LogLevel.Info);
-            }
-            else
-            {
-                Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name}", LogLevel.Info);
-            }
+            uint hash = ComponentTypeHelper.GetTypeHash(componentType);
+            
+            // Add to the type hash mapping for editor deserialization
+            TypeHashToType[hash] = componentType;
+            
+            Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name} (hash: 0x{hash:X8})", LogLevel.Info);
         }
         catch (Exception ex)
         {

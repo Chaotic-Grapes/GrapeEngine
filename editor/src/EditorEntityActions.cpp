@@ -19,6 +19,7 @@ direct ECS manipulation.
 #include "ecs/World.h"
 #include "ecs/Components.h" 
 #include "ecs/StringTable.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include "UndoSystem.h"
 #include <functional>
@@ -58,9 +59,7 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     ECS::Entity e = world.Create();
 
     // Name (StringId)
-    ECS::Components::Name nm{};
-    nm.Value = ECS::StringTable::Intern(name);
-    world.Set<ECS::Components::Name>(e, nm);
+    Editor::ECSUtils::SetEntityName(world, e, name);
 
     // Mandatory LocalTransform
     world.Set<ECS::Components::LocalTransform>(e, ECS::Components::LocalTransform{});
@@ -188,14 +187,13 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         ECS::Entity clone = world.Clone(original);
 
         // Update name to indicate it's a clone
-        if (world.Has<ECS::Components::Name>(clone)) {
-            auto& name = world.Get<ECS::Components::Name>(clone);
-            std::string baseName = ECS::StringTable::Resolve(name.Value);
+        if (auto* name = Editor::ECSUtils::GetNamePtrMutable(world, clone)) {
+            std::string baseName = ECS::StringTable::Resolve(name->Value);
             if (baseName.empty()) {
                 baseName = "Entity";
             }
             std::string newName = baseName + " (Clone)";
-            name.Value = ECS::StringTable::Intern(newName);
+            name->Value = ECS::StringTable::Intern(newName);
         }
 
         // Set parent relationship

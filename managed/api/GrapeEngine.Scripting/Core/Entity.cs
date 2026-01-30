@@ -446,8 +446,11 @@ internal static class ComponentTypeHelper
 
     public static uint GetTypeHash<T>()
     {
-        Type type = typeof(T);
-        
+        return GetTypeHash(typeof(T));
+    }
+
+    public static uint GetTypeHash(Type type)
+    {
         if (_typeHashCache.TryGetValue(type, out uint hash))
         {
             return hash;
@@ -459,7 +462,7 @@ internal static class ComponentTypeHelper
         // not the full qualified name (e.g., "GrapeEngine.Scripting.Components.LocalTransform")
         string typeName = type.Name;
         hash = FNV1aHash(typeName);
-        
+
         _typeHashCache[type] = hash;
         return hash;
     }
@@ -491,7 +494,7 @@ internal static class ComponentTypeHelper
         uint hash = 2166136261u;
         foreach (char c in str)
         {
-            hash ^= c;
+            hash ^= (byte)c;
             hash *= 16777619u;
         }
         return hash;

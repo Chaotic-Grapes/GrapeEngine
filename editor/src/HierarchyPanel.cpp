@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "HierarchyPanel.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include "helpers/MathUtils.h"
 #include "services/Input.h"
@@ -484,9 +485,8 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
     // Build display label with entity name
     std::stringstream oss;
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string resolved = ECS::StringTable::Resolve(nameComp->Value);
         if (!resolved.empty()) {
             oss << resolved;
         }
@@ -569,9 +569,8 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         if (ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer),
             ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
             // Apply rename on Enter
-            if (strlen(m_renameBuffer) > 0 && m_world->Has<ECS::Components::Name>(entity)) {
-                auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-                nameComp.Value = ECS::StringTable::Intern(m_renameBuffer);
+            if (strlen(m_renameBuffer) > 0) {
+                Editor::ECSUtils::SetEntityName(*m_world, entity, m_renameBuffer);
             }
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
@@ -837,9 +836,9 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
 
             // Show entity name as drag preview
             ECS::Entity entity = m_world->Resolve(entityId);
-            if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::Name>(entity)) {
-                const auto& name = m_world->Get<ECS::Components::Name>(entity);
-                std::string resolved = ECS::StringTable::Resolve(name.Value);
+            if (m_world->IsAlive(entity)) {
+                const auto* name = Editor::ECSUtils::GetNamePtr(m_world, entity);
+                std::string resolved = name ? ECS::StringTable::Resolve(name->Value) : std::string();
                 if (resolved.empty()) {
                     resolved = "Entity";
                 }
@@ -1110,9 +1109,8 @@ void HierarchyPanel::_startRename(EntityId entityId) {
 
     // Copy current name to rename buffer
     ECS::Entity entity = m_world->Resolve(entityId);
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string resolved = ECS::StringTable::Resolve(nameComp->Value);
         if (resolved.empty()) {
             resolved = "Entity";
         }
@@ -1276,9 +1274,8 @@ bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
     ECS::Entity entity = m_world->Resolve(entityId);
     if (entity.IsNull() || !m_world->IsAlive(entity)) return false;
 
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        std::string entityName = ECS::StringTable::Resolve(nameComp.Value);
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string entityName = ECS::StringTable::Resolve(nameComp->Value);
         if (entityName.empty()) {
             entityName = "Entity";
         }

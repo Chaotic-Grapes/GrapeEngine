@@ -23,6 +23,7 @@ through a unified system shared by both entities and prefab templates.
 #include "ComponentPropertyEditor.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "EditorFileMenu.h"
@@ -308,9 +309,8 @@ void InspectorPanel::_renderEntityInspector() {
 void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
     // Try to read the Name component for display
     std::string entityName = "Unnamed";
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string resolved = ECS::StringTable::Resolve(nameComp->Value);
         if (!resolved.empty()) {
             entityName = resolved;
         }
@@ -1186,9 +1186,8 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
 
     // Pick a base name for the prefab file
     std::string entityName = "Entity";
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        std::string resolved = ECS::StringTable::Resolve(nameComp.Value);
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string resolved = ECS::StringTable::Resolve(nameComp->Value);
         if (!resolved.empty()) {
             entityName = resolved;
         }

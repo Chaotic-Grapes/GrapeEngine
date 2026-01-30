@@ -62,6 +62,16 @@ namespace Serialization {
 		from_json(j, tmp);
 		return tmp;
 	}
+
+	constexpr uint32_t FNV1aHash(const char* str) {
+		uint32_t hash = 2166136261u;
+		while (*str) {
+			hash ^= static_cast<uint32_t>(*str);
+			hash *= 16777619u;
+			++str;
+		}
+		return hash;
+	}
 }
 #pragma endregion
 
@@ -285,63 +295,87 @@ namespace Serialization {
 
 		struct ComponentInfo {
 			std::string Name;
+			uint32_t TypeHash;
 			SerializeFn Serialize;
 			DeserializeFn Deserialize;
 			HasFn Has;
 			RemoveFn Remove;
 		};
 
-		// Registry: TypeId -> ComponentInfo
-		static std::unordered_map<TypeId, ComponentInfo>& Registry() {
-			static std::unordered_map<TypeId, ComponentInfo> reg;
+		// Registry: TypeHash -> ComponentInfo
+		static std::unordered_map<uint32_t, ComponentInfo>& Registry() {
+			static std::unordered_map<uint32_t, ComponentInfo> reg;
 			return reg;
 		}
 
 		// Registration macro
 		template<typename T>
 		static void RegisterComponent(const char* name) {
-			TypeId tid = ECS::TypeIdOf<T>();
-			Registry()[tid] = ComponentInfo{
+			const uint32_t typeHash = Serialization::FNV1aHash(name);
+			Registry()[typeHash] = ComponentInfo{
 				name,
+				typeHash,
 				// Serialize
-				[](const ECS::World& world, ECS::Entity e, json& j) {
-					if (world.Has<T>(e)) {
-						const T& component = world.Get<T>(e); // Retrieve the component
-						Serialization::to_json_adl<T>(j, component);
-					}
-					else {
+				[typeHash](const ECS::World& world, ECS::Entity e, json& j) {
+					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+					if (id == ECS::NULL_COMPONENT_ID) {
 						j = nullptr;
+						return;
 					}
+
+					if (world.HasById(e, id)) {
+						const void* ptr = const_cast<ECS::World&>(world).GetRawComponentPtr(e, id);
+						if (ptr) {
+							const T& component = *static_cast<const T*>(ptr);
+							Serialization::to_json_adl<T>(j, component);
+							return;
+						}
+					}
+
+					j = nullptr;
 				},
 				// Deserialize
-				[](ECS::World& world, ECS::Entity e, const json& j) {
-					if (world.Has<T>(e)) {
-						world.template Set<T>(e, Serialization::from_json_adl<T>(j));
+				[typeHash](ECS::World& world, ECS::Entity e, const json& j) {
+					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+					if (id == ECS::NULL_COMPONENT_ID) {
+						return;
+					}
+
+					T value = Serialization::from_json_adl<T>(j);
+					void* ptr = world.GetRawComponentPtr(e, id);
+					if (ptr) {
+						*static_cast<T*>(ptr) = value;
 					}
 					else {
-						world.template Add<T>(e, Serialization::from_json_adl<T>(j));
+						world.AddComponentById(e, id, &value, sizeof(T));
 					}
 				},
 				// Has
-				[](const ECS::World& world, ECS::Entity e) -> bool {
-					return world.Has<T>(e);
+				[typeHash](const ECS::World& world, ECS::Entity e) -> bool {
+					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+					if (id == ECS::NULL_COMPONENT_ID) {
+						return false;
+					}
+					return world.HasById(e, id);
 				},
 				// Remove
-				[](ECS::World& world, ECS::Entity e) {
-					if (world.Has<T>(e)) {
-						world.Remove<T>(e);
+				[typeHash](ECS::World& world, ECS::Entity e) {
+					const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(typeHash);
+					if (id == ECS::NULL_COMPONENT_ID) {
+						return;
 					}
+					world.RemoveById(e, id);
 				}
 			};
 		}
 
-		// Serialize a single entity (including both C++ and C# components)
+		// Serialize a single entity (including both C++ and managed components)
 		static json SerializeEntity(const ECS::World& world, const ECS::Entity e) {
 			json entityJson;
 			entityJson["Components"] = json::array();
 
 			// CREATE SORTED COMPONENT LIST
-			std::vector<std::pair<TypeId, ComponentInfo>> sortedComponents;
+			std::vector<std::pair<uint32_t, ComponentInfo>> sortedComponents;
 			for (const auto& [tid, info] : Registry()) {
 				sortedComponents.emplace_back(tid, info);
 			}
@@ -373,14 +407,14 @@ namespace Serialization {
 				}
 			}
 
-			// Also serialize any C# components registered in the native ECS but not in EntitySerializer
+			// Also serialize any managed components registered in the native ECS but not in EntitySerializer
 			// These are components discovered at runtime that don't have C++ serialization
 			auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
 			for (ECS::ComponentTypeId id : allIds) {
 				const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
 				
 				// Skip invalid entries
-				if (nativeMeta.TypeHash == 0) continue;
+				if (nativeMeta.TypeHash == 0 || !nativeMeta.IsManaged) continue;
 				
 				// Determine the component name (from native registry or fallback)
 				std::string componentName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
@@ -401,13 +435,13 @@ namespace Serialization {
 
 				if (alreadyHandled) continue;
 
-				// Only serialize C# components that the entity actually has
+				// Only serialize managed components that the entity actually has
 				bool hasById = world.HasById(e, id);
 
 				if (!hasById) continue;
 
-				// Log that we're serializing a discovered C# component
-				// LOG_INFO("[EntitySerializer] Entity " << e.Index << " has C# component ID " << id << " (hash=0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
+				// Log that we're serializing a discovered managed component
+				// LOG_INFO("[EntitySerializer] Entity " << e.Index << " has managed component ID " << id << " (hash=0x" << std::hex << nativeMeta.TypeHash << std::dec << ")");
 
 				// Try to get per-entity serialized JSON from managed serializer
 				const char* jsonPtr = WorldInterop_SerializeComponentToJson((void*)&world, ECS::EntityUtils::Pack(e), nativeMeta.TypeHash);
@@ -442,10 +476,15 @@ namespace Serialization {
 					}
 
 					std::string typeName = comp["TypeName"].get<std::string>();
+					constexpr const char* kPrefix = "ECS::Components::";
+					std::string normalizedTypeName = typeName;
+					if (normalizedTypeName.rfind(kPrefix, 0) == 0) {
+						normalizedTypeName = normalizedTypeName.substr(std::strlen(kPrefix));
+					}
 					// Try C++ registry first
 					bool found = false;
 					for (const auto& [tid, info] : Registry()) {
-						if (info.Name == typeName) {
+						if (info.Name == typeName || info.Name == normalizedTypeName) {
 							try {
 								info.Deserialize(world, e, comp["Data"]);
 								found = true;
@@ -458,20 +497,20 @@ namespace Serialization {
 						}
 					}
 					
-					// If not found in C++ registry, try to add as C# component
+					// If not found in C++ registry, try to add as managed component
 					if (!found) {
-						// Attempt to look up by name in native registry (C# components)
+						// Attempt to look up by name in native registry (managed components)
 						auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
 						for (ECS::ComponentTypeId id : allIds) {
 							const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
-							if (nativeMeta.TypeHash == 0) continue;
+							if (nativeMeta.TypeHash == 0 || !nativeMeta.IsManaged) continue;
 							std::string nativeName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
-							if (nativeName == typeName) {
-								// Found the C# component by name, add it with zero-initialized data
+							if (nativeName == typeName || nativeName == normalizedTypeName) {
+								// Found the managed component by name, add it with zero-initialized data
 								std::vector<uint8_t> buffer(nativeMeta.Size, 0);
 								void* ptr = world.AddComponentById(e, id, buffer.data(), nativeMeta.Size);
 								if (ptr) {
-									LOG_INFO("[EntitySerializer] Deserialized C# component '" << typeName << "' on entity " << e.Index);
+									LOG_INFO("[EntitySerializer] Deserialized managed component '" << typeName << "' on entity " << e.Index);
 								}
 								found = true;
 								break;
@@ -480,7 +519,7 @@ namespace Serialization {
 					}
 
 					if (!found) {
-						LOG_WARNING("[EntitySerializer] Component '" << typeName << "' not found during deserialization (not in C++ or C# registry)");
+						LOG_WARNING("[EntitySerializer] Component '" << typeName << "' not found during deserialization (not in C++ or managed registry)");
 					}
 				}
 			}
