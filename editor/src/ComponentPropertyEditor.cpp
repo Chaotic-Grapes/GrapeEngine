@@ -1126,7 +1126,7 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
     (void)entity;
     (void)world;
     EditorUI::BeginPropertySection({ "Layer" });
-    // Try to render as a dropdown of known layers from the active scene.
+    // Try to render as a dropdown of known layers from the active scene
     int currentId = static_cast<int>(data.value("Id", 0));
     Scenes::Scene* scene = Engine::CORE ? Engine::CORE->GetSceneManager().GetActive() : nullptr;
     if (scene) {
@@ -1164,5 +1164,106 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
 
     // Fallback: render raw integer if no scene or layers available
     EditorUI::RenderIntProperty("Id", data, "Id");
+    EditorUI::EndPropertySection();
+}
+
+// Renders Material2D component UI for assigning textures and tweaking material properties
+void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+
+    EditorUI::BeginPropertySection({ "Normal Map", "MRA Map", "Metallic", "Smoothness", "AO Strength", "Normal Strength", "Alpha Cutoff", "Flags" });
+
+    // Helper lambda to render a texture slot with drag-and-drop
+    auto RenderTextureSlot = [&](const char* label, const char* pathKey, const char* idKey) {
+        // Fetch texture path from serialized data (empty if none)
+        std::string texPath = data.value(pathKey, "");
+        std::string valueText;
+
+        if (!texPath.empty()) {
+            // Display only the filename, not the full path
+            valueText = std::filesystem::path(texPath).filename().string();
+            // Handle texture reloading if ID is missing (e.g. after scene reload)
+            uint32_t currentId = data.value(idKey, 0u);
+            if (currentId == 0) {
+                // Prevent repeated reload attempts every frame
+                std::string attemptKey = std::string("_LoadAttempt_") + pathKey;
+                if (!data.contains(attemptKey)) {
+                    // Attempt to fetch texture from resource manager
+                    auto tex = RM.Get<Texture>(texPath);
+                    if (tex) {
+                        data[idKey] = static_cast<uint32_t>(tex->ID());
+                        LOG_DEBUG("Reloaded material texture: " << texPath);
+                    }
+                    // Mark reload attempt so we don't spam reloads
+                    data[attemptKey] = true;
+                }
+            }
+        }
+        else {
+            // Default placeholder text when no texture is assigned
+            valueText = "None (drag texture here)";
+        }
+
+        // Render a read-only row displaying the current texture
+        EditorUI::RenderStaticValueRow(label, valueText, texPath.empty());
+
+        // Drag-and-drop target for texture assignment
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+                // Extract dropped file path
+                std::string droppedPath = static_cast<const char*>(payLoad->Data);
+
+                // Validate file extension
+                auto ext = std::filesystem::path(droppedPath).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+                // Accept only image formats
+                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                    auto tex = RM.Get<Texture>(droppedPath);
+                    if (tex) {
+                        // Store texture ID and path in serialized material data
+                        data[idKey] = static_cast<uint32_t>(tex->ID());
+                        data[pathKey] = droppedPath;
+                    }
+                }
+            }
+            // Lowkey copied from audio
+            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                const char* dataBuf = static_cast<const char*>(payLoad->Data);
+                const char* end = dataBuf + payLoad->DataSize;
+                while (dataBuf < end) {
+                    std::string path(dataBuf);
+                    dataBuf += path.size() + 1;
+                    if (path.empty()) continue;
+                    auto ext = std::filesystem::path(path).extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                    auto tex = RM.Get<Texture>(path);
+                    if (tex) {
+                        data[idKey] = static_cast<uint32_t>(tex->ID());
+                        data[pathKey] = path;
+                    }
+                    break; // Only accept the first valid texture
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+    };
+
+    // Texture slots
+    RenderTextureSlot("Normal Map", "NormalTexturePath", "NormalTextureId");
+    RenderTextureSlot("MRA Map", "MRA_TexturePath", "MRA_TextureId");
+
+    // Scalar material properties
+    EditorUI::RenderFloatRow("Metallic", "", data, "Metallic", 0.01f, 0.0f, 1.0f);
+    EditorUI::RenderFloatRow("Smoothness", "", data, "Smoothness", 0.01f, 0.0f, 1.0f);
+    EditorUI::RenderFloatRow("AO Strength", "", data, "AOStrength", 0.01f, 0.0f, 5.0f);
+    EditorUI::RenderFloatRow("Normal Strength", "", data, "NormalStrength", 0.01f, 0.0f, 5.0f);
+    EditorUI::RenderFloatRow("Alpha Cutoff", "", data, "AlphaCutoff", 0.01f, 0.0f, 1.0f);
+
+    // Bitmask/flag-based material options
+    EditorUI::RenderIntProperty("Flags", data, "Flags");
+
     EditorUI::EndPropertySection();
 }

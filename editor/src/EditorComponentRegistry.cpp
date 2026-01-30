@@ -62,6 +62,7 @@ namespace {
     const uint32_t kHashAnimationState2D = Editor::ECSUtils::FNV1aHash("AnimationState2D");
     const uint32_t kHashAudioSource = Editor::ECSUtils::FNV1aHash("AudioSource");
     const uint32_t kHashLayer = Editor::ECSUtils::FNV1aHash("Layer");
+    const uint32_t kHashMaterial2D = Editor::ECSUtils::FNV1aHash("Material2D");
 }
 
 // Callback function pointer for deserializing managed components from JSON
@@ -233,9 +234,13 @@ static auto& _getCppComponentRenderers() {
         if (const auto id = GetComponentIdFromHashOrWarn(kHashAudioSource, "AudioSource"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& data, ECS::Entity e, ECS::World* w) { ui.RenderAudioSource(data, e, w); };
         }
-        
+
         if (const auto id = GetComponentIdFromHashOrWarn(kHashLayer, "Layer"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashLayer, "Material2D"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); };
         }
     }
     
@@ -438,10 +443,25 @@ static auto& _getCppComponentDefaults() {
             }; 
             };
         }
-        
+
         if (const auto id = GetComponentIdFromHashOrWarn(kHashLayer, "Layer"); id != ECS::NULL_COMPONENT_ID) {
             defaults[id] = []() { 
                 return nlohmann::json{{"Id", 0}}; 
+            };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashMaterial2D, "Material2D"); id != ECS::NULL_COMPONENT_ID) {
+            defaults[ECS::ComponentRegistry::Type<Material2D>()] = []() {
+                return nlohmann::json{
+                {"NormalTextureId", 0},
+                {"MRATextureId", 0},
+                {"Metallic", 0.0f},
+                {"Smoothness", 0.5f},
+                {"AOStrength", 1.0f},
+                {"NormalStrength", 1.0f},
+                {"AlphaCutoff", 0.5f},
+                {"Flags", 0}
+            };
             };
         }
     }
@@ -704,6 +724,25 @@ static void _initializeDefaultRegistry() {
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); }),
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Id", 0}}; }),
             COMPONENT_OPS_HASH(Layer, kHashLayer)
+        },
+        // Material2D
+        {
+			"Material 2D", "Material2D", "ECS::Components::Material2D",
+			GetComponentIdFromHashOrWarn(kHashMaterial2D, "Material2D"), kHashMaterial2D, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
+                { "NormalTextureId", 0 },
+                { "MRA_TextureId", 0 },
+                { "NormalTexturePath", "" },
+                { "MRA_TexturePath", "" },
+                { "Metallic", 0.0f },
+                { "Smoothness", 0.5f },
+                { "AOStrength", 1.0f },
+                { "NormalStrength", 1.0f },
+                { "AlphaCutoff", 0.5f },
+                { "Flags", 0 }
+            }; }),
+            COMPONENT_OPS_HASH(Material2D, kHashMaterial2D)
         }
     };
 }

@@ -282,6 +282,58 @@ namespace ECS {
 
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D)
+
+		// Custom serialization for Material2D
+		inline void to_json(nlohmann::json& j, const Material2D& mat) {
+			j = nlohmann::json{
+				{"NormalTextureId", mat.NormalTextureId},
+				{"MRA_TextureId", mat.MRA_TextureId},
+				{"NormalTexturePath", std::string(mat.NormalTexturePath)},
+				{"MRA_TexturePath", std::string(mat.MRA_TexturePath)},
+				{"Metallic", mat.Metallic},
+				{"Smoothness", mat.Smoothness},
+				{"AOStrength", mat.AOStrength},
+				{"NormalStrength", mat.NormalStrength},
+				{"AlphaCutoff", mat.AlphaCutoff},
+				{"Flags", mat.Flags}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, Material2D& mat) {
+			// 1. Handle Normal Map
+			std::string normPath = j.value("NormalTexturePath", std::string());
+			strncpy_s(mat.NormalTexturePath, normPath.c_str(), sizeof(mat.NormalTexturePath) - 1);
+			mat.NormalTexturePath[sizeof(mat.NormalTexturePath) - 1] = '\0';
+
+			if (!normPath.empty()) {
+				auto tex = RM.Get<Texture>(normPath);
+				if (tex) mat.NormalTextureId = static_cast<uint32_t>(tex->ID());
+				else mat.NormalTextureId = 0;
+			} else {
+				mat.NormalTextureId = 0;
+			}
+
+			// 2. Handle MRA Map
+			std::string mraPath = j.value("MRA_TexturePath", std::string());
+			strncpy_s(mat.MRA_TexturePath, mraPath.c_str(), sizeof(mat.MRA_TexturePath) - 1);
+			mat.MRA_TexturePath[sizeof(mat.MRA_TexturePath) - 1] = '\0';
+
+			if (!mraPath.empty()) {
+				auto tex = RM.Get<Texture>(mraPath);
+				if (tex) mat.MRA_TextureId = static_cast<uint32_t>(tex->ID());
+				else mat.MRA_TextureId = 0;
+			} else {
+				mat.MRA_TextureId = 0;
+			}
+
+			// 3. Scalar properties
+			mat.Metallic = j.value("Metallic", 0.0f);
+			mat.Smoothness = j.value("Smoothness", 0.5f);
+			mat.AOStrength = j.value("AOStrength", 1.0f);
+			mat.NormalStrength = j.value("NormalStrength", 1.0f);
+			mat.AlphaCutoff = j.value("AlphaCutoff", 0.5f);
+			mat.Flags = j.value("Flags", 0u);
+		}
 	}
 }
 
@@ -665,6 +717,7 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(AudioSource, ECS::Components::AudioSource, "AudioSource")
 	REGISTER_COMPONENT_SERIALIZER(PrefabLink, ECS::Components::PrefabLink, "PrefabLink")
 	REGISTER_COMPONENT_SERIALIZER(PrefabInstanceMetadata, ECS::Components::PrefabInstanceMetadata, "PrefabInstanceMetadata")
+	REGISTER_COMPONENT_SERIALIZER(Material2D, ECS::Components::Material2D, "Material2D");
 }
 
 #endif
