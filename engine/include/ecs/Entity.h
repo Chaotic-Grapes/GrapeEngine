@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <limits>
 #include <functional>
 #include <atomic>
+#include "ecs/ComponentRegistry.h"
 
 // Unique, stable ids per component type at runtime.
 using TypeId = uint32_t;
@@ -82,26 +83,13 @@ namespace ECS {
     };
 
     /**
-     * @brief Generates a unique TypeId for each component type at runtime.
-     * @return A unique TypeId.
-     */
-    inline TypeId TypeIdNext() {
-        // Thread-safe unique id generation
-        // std::atomic ensures that even in multithreaded contexts,
-        // each call gets a unique value
-        static std::atomic<TypeId> counter{0};
-        return counter++;
-    }
-
-    /**
      * @brief Gets the unique TypeId for the specified component type T.
      * @tparam T The component type.
      * @return The unique TypeId for type T.
      */
     template<typename T>
     inline TypeId TypeIdOf() {
-        static const TypeId id = TypeIdNext();
-        return id;
+        return ComponentRegistry::Type<T>();
     }
 
     /**

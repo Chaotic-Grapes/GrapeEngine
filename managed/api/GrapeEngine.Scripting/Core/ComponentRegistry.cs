@@ -18,6 +18,7 @@ using System.Text.RegularExpressions;
 using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Internal.Unsafe;
 using GrapeEngine.Scripting.Internal.Hosting;
+using GrapeEngine.Scripting.Internal;
 
 namespace GrapeEngine.Scripting.Core;
 
@@ -96,19 +97,36 @@ public static partial class ComponentRegistry
     /// Auto-register a component type if not already registered.
     /// This is called internally before component operations.
     /// </summary>
-    /// <exception cref="InvalidOperationException">If component registration fails</exception>
+    /// <exception cref="InvalidOperationException">If component registration fails or component is not unmanaged</exception>
     internal static void EnsureRegistered<T>() where T : unmanaged
     {
+        // Explicit runtime guard: verify component is truly unmanaged
+        // This catches cases where records, strings, arrays, or object references sneak into components
+        if (!TypeHelper.IsUnmanagedType(typeof(T)))
+        {
+            throw new InvalidOperationException(
+                $"Component '{typeof(T).Name}' is not unmanaged. " +
+                "Components may not contain strings, arrays, or object references. " +
+                "Use StringId via Strings.Intern() instead of string.");
+        }
+
         if (!IsRegistered<T>())
         {
+            uint hash = ComponentTypeHelper.GetTypeHash<T>();
+            string typeName = typeof(T).Name;
+            
             bool registered = Register<T>();
             if (!registered)
             {
                 throw new InvalidOperationException(
-                    $"Failed to register component type {typeof(T).Name}. " +
+                    $"Failed to register component type {typeName} (hash: 0x{hash:X8}). " +
                     $"The native ECS may not have accepted this component type. " +
-                    $"Ensure the component size and alignment are compatible with the native world.");
+                    $"Ensure the component is registered on the C++ side with the same type name and hash. " +
+                    $"Check that ComponentRegistry.Register<{typeName}>() succeeded and the component size ({Marshal.SizeOf<T>()} bytes) is compatible.");
             }
+            
+            // Log successful registration with hash for debugging type mismatches
+            Logging.LogInternal($"[ComponentRegistry] Auto-registered {typeName} (hash: 0x{hash:X8})", LogLevel.Debug);
         }
     }
 

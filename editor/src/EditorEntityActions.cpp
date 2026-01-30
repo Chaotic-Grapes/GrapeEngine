@@ -18,6 +18,8 @@ direct ECS manipulation.
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
 #include "ecs/Components.h" 
+#include "ecs/StringTable.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include "UndoSystem.h"
 #include <functional>
@@ -56,11 +58,8 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     // Create empty entity
     ECS::Entity e = world.Create();
 
-    // Name (char buffer)
-    ECS::Components::Name nm{};
-    strncpy_s(nm.Value, name.c_str(), sizeof(nm.Value) - 1);
-    nm.Value[sizeof(nm.Value) - 1] = '\0';
-    world.Set<ECS::Components::Name>(e, nm);
+    // Name (StringId)
+    Editor::ECSUtils::SetEntityName(world, e, name);
 
     // Mandatory LocalTransform
     world.Set<ECS::Components::LocalTransform>(e, ECS::Components::LocalTransform{});
@@ -112,7 +111,7 @@ void EntityActions::RemoveEntity(EntityId id) {
     std::function<void(EntityId)> deleteRecursive = [&](EntityId entityId) {
         // Collect children first to avoid iterator invalidation
         std::vector<EntityId> children;
-        world.Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
+        world.Each<ECS::Components::Parent>([&](ECS::Entity e, const ECS::Components::Parent& p) {
             if (p.ParentEntity.Index == entityId) {
                 children.push_back(e.Index);
             }
@@ -188,11 +187,13 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         ECS::Entity clone = world.Clone(original);
 
         // Update name to indicate it's a clone
-        if (world.Has<ECS::Components::Name>(clone)) {
-            auto& name = world.Get<ECS::Components::Name>(clone);
-            std::string newName = std::string(name.Value) + " (Clone)";
-            strncpy_s(name.Value, newName.c_str(), sizeof(name.Value) - 1);
-            name.Value[sizeof(name.Value) - 1] = '\0';
+        if (auto* name = Editor::ECSUtils::GetNamePtrMutable(world, clone)) {
+            std::string baseName = ECS::StringTable::Resolve(name->Value);
+            if (baseName.empty()) {
+                baseName = "Entity";
+            }
+            std::string newName = baseName + " (Clone)";
+            name->Value = ECS::StringTable::Intern(newName);
         }
 
         // Set parent relationship
@@ -204,7 +205,7 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         }
         else {
             // Remove parent component if cloning as root
-            if (world.Has<ECS::Parent>(clone)) {
+            if (world.Has<ECS::Components::Parent>(clone)) {
                 world.Detach(clone);
             }
         }
@@ -214,7 +215,7 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
         // Find and clone all children
         std::vector<EntityId> children;
-        world.Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
+        world.Each<ECS::Components::Parent>([&](ECS::Entity e, const ECS::Components::Parent& p) {
             if (p.ParentEntity.Index == entityId) {
                 children.push_back(e.Index);
             }
@@ -230,7 +231,7 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
     // Get the parent of the original entity (if any)
     EntityId originalParentId = ECS::Entity::NPOS32;
-    if (world.Has<ECS::Parent>(entity)) {
+    if (world.Has<ECS::Components::Parent>(entity)) {
         const auto& parent = world.ParentOf(entity);
         originalParentId = parent.Index;
     }

@@ -51,10 +51,6 @@ namespace ECS {
     // Forward declarations
     class PrefabManager;
 
-    // Relationship component for hierarchy
-    // Move this to Components.h?
-    struct Parent { Entity ParentEntity{NULL_ENTITY}; };
-
     // Options for cloning an entity
     struct CloneOptions {
     public:
@@ -202,8 +198,8 @@ namespace ECS {
         void Destroy(const Entity e) {
             // Assume entity is alive
             // If entity participates in hierarchy, unlink it first
-            if (Has<Parent>(e)) {
-                _onComponentRemoving(e, TypeIdOf<Parent>());
+            if (Has<Components::Parent>(e)) {
+                _onComponentRemoving(e, TypeIdOf<Components::Parent>());
             }
 
             // Lookup location and remove from archetype if present
@@ -1102,14 +1098,14 @@ namespace ECS {
 		 * @param parent The parent entity to which the child will be attached
          * @note Assumes both entities are alive
          */
-        void Attach(const Entity child, const Entity parent) { Set<Parent>(child, Parent{parent}); }
+        void Attach(const Entity child, const Entity parent) { Set<Components::Parent>(child, Components::Parent{parent}); }
 
         /**
 		 * @brief Detach a child entity from its parent in the hierarchy.
 		 * @param child The child entity to detach
          * @note Assumes the child entity is alive
          */
-        void Detach(const Entity child)                      { if (Has<Parent>(child)) Remove<Parent>(child); }
+        void Detach(const Entity child)                      { if (Has<Components::Parent>(child)) Remove<Components::Parent>(child); }
 
         /**
 		 * @brief Iterate over all children of the specified parent entity, invoking the provided function for each child.
@@ -1191,8 +1187,8 @@ namespace ECS {
             // **** Cloning Options **** //
 
             // Parent
-            if (!opts.KeepParent && Has<Parent>(dst)) {
-                Set<Parent>(dst, Parent{ NULL_ENTITY }); // Detach safely via Set to keep indices consistent
+            if (!opts.KeepParent && Has<Components::Parent>(dst)) {
+                Set<Components::Parent>(dst, Components::Parent{ NULL_ENTITY }); // Detach safely via Set to keep indices consistent
             }
 
             // Layer
@@ -1567,10 +1563,10 @@ namespace ECS {
             // Handle Parent component additions for hierarchy indexing
             // Update hierarchy indices accordingly
             // Assumes Parent component is well-formed
-            if (t == TypeIdOf<Parent>()) {
+            if (t == TypeIdOf<Components::Parent>()) {
                 // Get Parent component
                 // Then find existing parent in index
-                const auto& p = Get<Parent>(e);
+                const auto& p = Get<Components::Parent>(e);
                 const auto found = m_hierarchy.ParentOf.find(e);
 
                 // If already has a parent, unlink first
@@ -1618,13 +1614,13 @@ namespace ECS {
         // Component changed hook
         void _onComponentChanged(const Entity e, const TypeId t) {
             // Currently only Parent component changes are relevant
-            if (t == TypeIdOf<Parent>())
+            if (t == TypeIdOf<Components::Parent>())
                 _onComponentAdded(e, t); // Reuse addition logic to handle changes
         }
 
         // Component removing hook
         void _onComponentRemoving(const Entity e, const TypeId t) {
-            if (t == TypeIdOf<Parent>()) {
+            if (t == TypeIdOf<Components::Parent>()) {
                 // Unlink from hierarchy indices
                 _unlinkChild(e);
 

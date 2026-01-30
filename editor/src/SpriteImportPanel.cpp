@@ -14,6 +14,7 @@
 #include "SpriteImportPanel.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"                
+#include "ecs/StringTable.h"
 #include "services/ResourceManager.h"           
 #include "core/Logger.h"
 #include "graphics/Texture.hpp" 
@@ -116,7 +117,7 @@ bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pi
     // Name the entity after the file (without extension)
     auto& nameComp = m_world->Get<Name>(entity);
     std::string filename = std::filesystem::path(imagePath).filename().stem().string();
-    strncpy_s(nameComp.Value, filename.c_str(), sizeof(nameComp.Value) - 1);
+    nameComp.Value = ECS::StringTable::Intern(filename);
 
     // Success feedback
     /*char msg[512];

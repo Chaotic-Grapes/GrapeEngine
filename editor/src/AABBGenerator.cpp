@@ -14,6 +14,7 @@
 #include "../editor/AABBGenerator.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"                
+#include "ecs/StringTable.h"
 #include "services/ResourceManager.h"           
 #include "core/Logger.h"
 #include "graphics/Texture.hpp" 
@@ -70,7 +71,7 @@ void SpriteImportPanel::Render()
 
     ImGui::Dummy(ImVec2(0.0f, 8.0f));
     ImGui::TextColored(ImVec4(0.6f, 0.9f, 1.0f, 1.0f), "Pivot: Center");
-    ImGui::TextDisabled("AABB = image width/height ÷ 2");
+    ImGui::TextDisabled("AABB = image width/height ï¿½ 2");
     ImGui::PopFont();
 
     ImGui::End();
@@ -115,15 +116,15 @@ bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pi
     // Name the entity after the file (without extension)
     auto& nameComp = m_world->Get<Name>(entity);
     std::string filename = std::filesystem::path(imagePath).filename().stem().string();
-    strncpy_s(nameComp.Value, filename.c_str(), sizeof(nameComp.Value) - 1);
+    nameComp.Value = ECS::StringTable::Intern(filename);
 
     // Success feedback
     char msg[512];
     sprintf_s(msg,
         "Sprite imported successfully!\n\n"
         "File: %s\n"
-        "Size: %d × %d pixels\n"
-        "Collider HalfExtents: ±%.1f, ±%.1f",
+        "Size: %d ï¿½ %d pixels\n"
+        "Collider HalfExtents: ï¿½%.1f, ï¿½%.1f",
         filename.c_str(), pixelWidth, pixelHeight,
         pixelWidth * 0.5f, pixelHeight * 0.5f);
 
@@ -172,15 +173,15 @@ bool SpriteImportPanel::_createSpriteEntity(const std::string& imagePath, int pi
     // Name the entity after the file (without extension)
     auto& nameComp = m_world->Get<Name>(entity);
     std::string filename = std::filesystem::path(imagePath).filename().stem().string();
-    strncpy_s(nameComp.Value, filename.c_str(), sizeof(nameComp.Value) - 1);
+    nameComp.Value = ECS::StringTable::Intern(filename);
 
     // Success feedback
     char msg[512];
     sprintf_s(msg,
         "Sprite imported successfully!\n\n"
         "File: %s\n"
-        "Size: %d × %d pixels\n"
-        "Collider HalfExtents: ±%.1f, ±%.1f",
+        "Size: %d ï¿½ %d pixels\n"
+        "Collider HalfExtents: ï¿½%.1f, ï¿½%.1f",
         filename.c_str(), pixelWidth, pixelHeight,
         pixelWidth * 0.5f, pixelHeight * 0.5f);
 

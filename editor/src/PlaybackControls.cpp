@@ -31,6 +31,7 @@ Reference:
 #include "serialization/EntitySerializer.h"
 #include "scripting/ScriptManager.h"
 #include "helpers/EntityUtils.h"
+#include "EditorECSUtils.h"
 #include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
@@ -38,7 +39,7 @@ Reference:
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
-// Forward declarations for C# component deserialization interop
+// Forward declarations for managed component deserialization interop
 extern "C" void WorldInterop_DeserializeComponentFromJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash, const char* jsonStr);
 
 // Constructor: stores pointer to the world for playback operations.
@@ -451,20 +452,18 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
 
     const auto& componentsArray = entityJson["Components"];
     
-    // Build a set of TypeIds that should exist after restore
-    std::unordered_set<TypeId> snapshotComponentIds;
+    // Build a set of ComponentTypeIds that should exist after restore
+    std::unordered_set<ECS::ComponentTypeId> snapshotComponentIds;
     auto& registry = Serialization::EntitySerializer::Registry();
     
-    // Map component names from snapshot to TypeIds
+    // Map component names from snapshot to ComponentTypeIds
     for (const auto& comp : componentsArray) {
         if (comp.contains("TypeName")) {
             std::string typeName = comp["TypeName"].get<std::string>();
-            // Find the TypeId for this component name
-            for (const auto& [tid, info] : registry) {
-                if (info.Name == typeName) {
-                    snapshotComponentIds.insert(tid);
-                    break;
-                }
+            uint32_t hash = Editor::ECSUtils::FNV1aHash(typeName.c_str());
+            ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(hash);
+            if (id != ECS::NULL_COMPONENT_ID) {
+                snapshotComponentIds.insert(id);
             }
         }
     }
@@ -475,7 +474,7 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
         const auto& currentComponents = location->ArchetypePtr->GetComponents();
         
         // Check each component on the entity to see if it should be removed
-        std::vector<TypeId> componentsToRemove;
+        std::vector<ECS::ComponentTypeId> componentsToRemove;
         for (const auto& compInfo : currentComponents) {
             // Skip if this component is in the snapshot (we want to keep it)
             if (snapshotComponentIds.find(compInfo.Id) != snapshotComponentIds.end()) {
@@ -490,15 +489,8 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
         }
         
         // Remove components that exist on entity but not in snapshot
-        for (TypeId tid : componentsToRemove) {
-            // Find component in registry and remove it
-            for (const auto& [regTid, info] : registry) {
-                if (regTid == tid) {
-                    LOG_DEBUG("Removing component added during play: " << info.Name);
-                    info.Remove(*m_world, entity);
-                    break;
-                }
-            }
+        for (ECS::ComponentTypeId id : componentsToRemove) {
+            m_world->RemoveById(entity, id);
         }
     }
     
@@ -513,7 +505,7 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
         
         // First, try to deserialize using the C++ EntitySerializer registry
         bool foundInCppRegistry = false;
-        for (const auto& [tid, info] : registry) {
+        for (const auto& [typeHash, info] : registry) {
             if (info.Name == typeName) {
                 try {
                     // The deserializer will use Set or Add as appropriate
@@ -527,17 +519,17 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
             }
         }
         
-        // If not found in C++ registry, it's a C# component, so deserialize via interop
+        // If not found in C++ registry, try managed components via interop
         if (!foundInCppRegistry) {
             // Look up the component in the native ComponentRegistry
             auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
             for (ECS::ComponentTypeId id : allIds) {
                 const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
-                if (nativeMeta.TypeHash == 0) continue;
+                if (nativeMeta.TypeHash == 0 || !nativeMeta.IsManaged) continue;
                 
                 std::string nativeName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
                 if (nativeName == typeName) {
-                    // Found the C# component by name
+                    // Found the managed component by name
                     // Check if the component exists on the entity
                     if (!m_world->HasById(entity, id)) {
                         // Component doesn't exist, add it with zero-initialized data
@@ -554,10 +546,10 @@ void Playback::_restoreEntityState(ECS::Entity entity, const nlohmann::json& ent
                             nativeMeta.TypeHash,
                             jsonStr.c_str()
                         );
-                        LOG_DEBUG("Restored C# component " << typeName << " on entity " << entity.Index);
+                        LOG_DEBUG("Restored managed component " << typeName << " on entity " << entity.Index);
                     }
                     catch (const std::exception& ex) {
-                        LOG_ERROR("Failed to deserialize C# component " << typeName << ": " << ex.what());
+                        LOG_ERROR("Failed to deserialize managed component " << typeName << ": " << ex.what());
                     }
                     break;
                 }
@@ -586,10 +578,10 @@ ECS::Entity Playback::_recreateEntityWithId(uint32_t targetId, const nlohmann::j
             
             // First, try to deserialize using the C++ EntitySerializer registry
             bool foundInCppRegistry = false;
-            for (const auto& [tid, info] : registry) {
-                if (info.Name == typeName) {
-                    try {
-                        info.Deserialize(*m_world, newEntity, componentData);
+        for (const auto& [typeHash, info] : registry) {
+            if (info.Name == typeName) {
+                try {
+                    info.Deserialize(*m_world, newEntity, componentData);
                     } 
                     catch (const std::exception& ex) {
                         LOG_ERROR("Failed to restore component " << typeName << ": " << ex.what());
@@ -599,17 +591,17 @@ ECS::Entity Playback::_recreateEntityWithId(uint32_t targetId, const nlohmann::j
                 }
             }
             
-            // If not found in C++ registry, it's a C# component - deserialize via interop
+            // If not found in C++ registry, try managed components via interop
             if (!foundInCppRegistry) {
                 // Look up the component in the native ComponentRegistry
                 auto allIds = ECS::ComponentRegistry::GetAllComponentIds();
                 for (ECS::ComponentTypeId id : allIds) {
                     const auto& nativeMeta = ECS::ComponentRegistry::Meta(id);
-                    if (nativeMeta.TypeHash == 0) continue;
+                    if (nativeMeta.TypeHash == 0 || !nativeMeta.IsManaged) continue;
                     
                     std::string nativeName = ECS::ComponentRegistry::GetComponentNameFromHash(nativeMeta.TypeHash);
                     if (nativeName == typeName) {
-                        // Found the C# component by name
+                        // Found the managed component by name
                         // Add component with zero-initialized data
                         std::vector<uint8_t> buffer(nativeMeta.Size, 0);
                         m_world->AddComponentById(newEntity, id, buffer.data(), nativeMeta.Size);
@@ -623,10 +615,10 @@ ECS::Entity Playback::_recreateEntityWithId(uint32_t targetId, const nlohmann::j
                                 nativeMeta.TypeHash,
                                 jsonStr.c_str()
                             );
-                            LOG_DEBUG("Restored C# component " << typeName << " on recreated entity " << newEntity.Index);
+                            LOG_DEBUG("Restored managed component " << typeName << " on recreated entity " << newEntity.Index);
                         }
                         catch (const std::exception& ex) {
-                            LOG_ERROR("Failed to deserialize C# component " << typeName << ": " << ex.what());
+                            LOG_ERROR("Failed to deserialize managed component " << typeName << ": " << ex.what());
                         }
                         break;
                     }

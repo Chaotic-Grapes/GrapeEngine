@@ -19,6 +19,7 @@ prefab assets use the same UI path.
 
 #include "ComponentPropertyEditor.h"
 #include "ComponentWidgets.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include <cmath>
@@ -30,6 +31,17 @@ prefab assets use the same UI path.
 #include <algorithm>
 #include "AudioAssetLibrary.h"
 #include "core/Application.h"
+
+namespace {
+    ECS::ComponentTypeId GetComponentIdFromHashOrWarn(uint32_t hash, const char* name) {
+        const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(hash);
+        if (id == ECS::NULL_COMPONENT_ID) {
+            LOG_WARNING("[ComponentPropertyEditor] Missing component ID for '" << name << "' (hash=0x"
+                << std::hex << hash << std::dec << ")");
+        }
+        return id;
+    }
+}
 
 // -----------------------------------------------------------------------------
 // Initialization
@@ -474,8 +486,14 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
             LOG_WARNING("Generate AABB called for dead/invalid entity");
         }
         else {
+            const ECS::ComponentTypeId spriteId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteRenderer2D"), "SpriteRenderer2D");
+            if (spriteId == ECS::NULL_COMPONENT_ID) {
+                LOG_WARNING("Generate AABB: SpriteRenderer2D is not registered");
+                return;
+            }
+
             // Try to get the sprite component; if missing, bail out gracefully
-            auto* sprite = world->TryGet<SpriteRenderer2D>(entity);
+            auto* sprite = static_cast<SpriteRenderer2D*>(world->GetRawComponentPtr(entity, spriteId));
             if (!sprite) {
                 LOG_WARNING("Generate AABB: entity has no SpriteRenderer2D component");
             }
@@ -485,7 +503,13 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                 int pixelHeight = sprite->Height;
 
                 // If the entity already has a BoxCollider2D, update it. Otherwise add one.
-                auto* col = world->TryGet<BoxCollider2D>(entity);
+                const ECS::ComponentTypeId colliderId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("BoxCollider2D"), "BoxCollider2D");
+                if (colliderId == ECS::NULL_COMPONENT_ID) {
+                    LOG_WARNING("Generate AABB: BoxCollider2D is not registered");
+                    return;
+                }
+
+                auto* col = static_cast<BoxCollider2D*>(world->GetRawComponentPtr(entity, colliderId));
                 if (col) {
                     // Update the collider's half-extents based on the sprite size
                     col->HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
@@ -494,7 +518,7 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                     // No collider yet; create and attach a new BoxCollider2D
                     BoxCollider2D newCol;
                     newCol.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
-                    world->Set<BoxCollider2D>(entity, newCol);
+                    world->AddComponentById(entity, colliderId, &newCol, sizeof(newCol));
                 }
             }
         }

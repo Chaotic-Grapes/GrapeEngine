@@ -92,7 +92,14 @@ void BaseViewport::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbol
 }
 
 void BaseViewport::SetWorld(ECS::World* world) {
+    if (m_world == world) {
+        return;
+    }
+
     m_world = world;
+
+    // Clear stale selection when switching scenes to avoid rendering invalid entities.
+    SetSelectedEntity(ECS::Entity::NPOS32);
 
     // Create editor camera if needed
     if (!m_editorCamera) {

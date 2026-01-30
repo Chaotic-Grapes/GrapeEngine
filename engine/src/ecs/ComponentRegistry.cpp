@@ -54,7 +54,7 @@ namespace ComponentRegistryImpl {
         return map;
     }
 
-    // Type hash to component name mapping - for C# components
+    // Type hash to component name mapping - for native and managed components
     // Single instance
     static std::unordered_map<uint32_t, std::string>& GetHashToNameInstance() {
         static std::unordered_map<uint32_t, std::string> map;

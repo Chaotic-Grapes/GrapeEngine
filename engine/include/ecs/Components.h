@@ -22,12 +22,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define COMPONENTS_H
 
 #include "Color.h"
+#include "ecs/Entity.h"
 #include "math/Vector2D.h"
 #include "math/Vector3D.h"
 #include "math/Vector4D.h"
 #include "math/Quaternion.h"
 #include "math/Matrix4x4.h"
 #include <nlohmann/json.hpp>
+#include <cstdint>
 
 /*
 ================================================================================
@@ -95,11 +97,11 @@ namespace ECS {
     namespace Components {
         // ---------------------------------- Core utility/tag components ----------------------------------
 
-        // Lightweight name (fixed-size).
+        // Lightweight name (StringId).
         struct Name {
         public:
-            // UTF-8 bytes, null-terminated if shorter than buffer. Keep small for cache.
-            char Value[64] = {0};
+            // Interned string ID (0 = invalid).
+            uint32_t Value = 0;
         };
         static_assert(std::is_trivially_copyable_v<Name>, "Name must be trivially copyable");
 
@@ -116,6 +118,13 @@ namespace ECS {
             bool Enabled = true;
         };
         static_assert(std::is_trivially_copyable_v<Active>, "Active must be trivially copyable");
+
+        // Parent relationship for hierarchy.
+        struct Parent {
+        public:
+            Entity ParentEntity{NULL_ENTITY};
+        };
+        static_assert(std::is_trivially_copyable_v<Parent>, "Parent must be trivially copyable");
 
         // [DEPRECATED] Legacy prefab link - kept for backward compatibility during migration
         // Use PrefabInstanceMetadata instead in new code
