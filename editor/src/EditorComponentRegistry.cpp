@@ -239,7 +239,7 @@ static auto& _getCppComponentRenderers() {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); };
         }
 
-        if (const auto id = GetComponentIdFromHashOrWarn(kHashLayer, "Material2D"); id != ECS::NULL_COMPONENT_ID) {
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashMaterial2D, "Material2D"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); };
         }
     }
