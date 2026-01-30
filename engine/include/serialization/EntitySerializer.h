@@ -42,6 +42,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 // Forward declarations for managed serialization interop (defined in Interop_World.cpp)
 extern "C" const char* WorldInterop_SerializeComponentToJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash);
+extern "C" void WorldInterop_DeserializeComponentFromJson(void* worldPtr, uint64_t entityId, uint32_t componentTypeHash, const char* jsonStr);
 extern "C" void WorldInterop_FreeSerializedString(const char* s);
 
 using json = nlohmann::json;
@@ -612,6 +613,14 @@ namespace Serialization {
 								std::vector<uint8_t> buffer(nativeMeta.Size, 0);
 								void* ptr = world.AddComponentById(e, id, buffer.data(), nativeMeta.Size);
 								if (ptr) {
+									if (!comp["Data"].is_null()) {
+										const std::string jsonStr = comp["Data"].dump();
+										WorldInterop_DeserializeComponentFromJson(
+											(void*)&world,
+											ECS::EntityUtils::Pack(e),
+											nativeMeta.TypeHash,
+											jsonStr.c_str());
+									}
 									LOG_INFO("[EntitySerializer] Deserialized managed component '" << typeName << "' on entity " << e.Index);
 								}
 								found = true;
