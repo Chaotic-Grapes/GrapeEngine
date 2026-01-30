@@ -29,6 +29,8 @@ prefab assets use the same UI path.
 #include "serialization/EntitySerializer.h"
 #include "services/ResourceManager.h"
 #include <algorithm>
+#include <functional>
+#include <unordered_set>
 #include "AudioAssetLibrary.h"
 #include "core/Application.h"
 
@@ -41,6 +43,78 @@ namespace {
         }
         return id;
     }
+
+    void UpdateSpriteAnimationPreview(nlohmann::json& animData, ECS::Entity entity, ECS::World* world) {
+        if (!world || entity.IsNull() || !world->IsAlive(entity))
+            return;
+        if (!world->Has<ECS::Components::SpriteRenderer2D>(entity))
+            return;
+
+        const int frameWidth = animData.value("FrameWidth", 0);
+        const int frameHeight = animData.value("FrameHeight", 0);
+        const int sheetWidth = animData.value("SheetWidth", 0);
+        const int sheetHeight = animData.value("SheetHeight", 0);
+        if (frameWidth <= 0 || frameHeight <= 0 || sheetWidth <= 0 || sheetHeight <= 0)
+            return;
+
+        const int totalCols = sheetWidth / frameWidth;
+        const int totalRows = sheetHeight / frameHeight;
+        if (totalCols <= 0 || totalRows <= 0)
+            return;
+
+        const bool useRow = animData.value("UseRow", false);
+        int windowStart = 0;
+        int windowCount = 0;
+
+        if (useRow) {
+            const int rowIndex = std::clamp(animData.value("RowIndex", 0), 0, totalRows - 1);
+            const int startCol = std::clamp(animData.value("RowStartColumn", 0), 0, totalCols - 1);
+            const int available = totalCols - startCol;
+            int rowCount = animData.value("RowFrameCount", 0);
+            if (rowCount <= 0 || rowCount > available)
+                rowCount = available;
+            windowStart = rowIndex * totalCols + startCol;
+            windowCount = rowCount;
+        } else {
+            windowStart = std::max(0, animData.value("StartFrame", 0));
+            windowCount = animData.value("FrameCount", 0);
+            if (windowCount <= 0) {
+                const int totalFrames = totalCols * totalRows;
+                windowCount = std::max(1, totalFrames - windowStart);
+            }
+        }
+
+        if (windowCount <= 0)
+            return;
+
+        int localFrame = 0;
+        if (world->Has<ECS::Components::AnimationState2D>(entity)) {
+            localFrame = world->Get<ECS::Components::AnimationState2D>(entity).CurrentFrame;
+        }
+        localFrame = std::clamp(localFrame, 0, windowCount - 1);
+        const int absoluteFrame = windowStart + localFrame;
+        const int col = absoluteFrame % totalCols;
+        const int row = absoluteFrame / totalCols;
+
+        const float u0 = (col * frameWidth) / static_cast<float>(sheetWidth);
+        const float v0 = (row * frameHeight) / static_cast<float>(sheetHeight);
+        const float u1 = ((col + 1) * frameWidth) / static_cast<float>(sheetWidth);
+        const float v1 = ((row + 1) * frameHeight) / static_cast<float>(sheetHeight);
+
+        auto& sprite = world->Get<ECS::Components::SpriteRenderer2D>(entity);
+        const uint32_t textureId = animData.value("TextureId", 0u);
+        if (textureId != 0)
+            sprite.TextureId = textureId;
+        const uint32_t normalId = animData.value("NormalTextureId", 0u);
+        if (normalId != 0)
+            sprite.NormalTextureId = normalId;
+        sprite.Width = frameWidth;
+        sprite.Height = frameHeight;
+        sprite.Tiling = Vector2D{ u1 - u0, v1 - v0 };
+        sprite.Offset = Vector2D{ u0, v0 };
+    }
+
+    std::unordered_set<uint32_t> s_animPreviewedEntities;
 }
 
 // -----------------------------------------------------------------------------
@@ -276,8 +350,31 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
         valueText = "None (drag texture here)";
     }
 
+    std::string normalPath = data.value("NormalTexturePath", "");
+    std::string normalValueText;
+    if (!normalPath.empty()) {
+        normalValueText = std::filesystem::path(normalPath).filename().string();
+        uint32_t currentNormalId = data.value("NormalTextureId", 0u);
+        if (currentNormalId == 0) {
+            if (!data.contains("_NormalTextureLoadAttempted")) {
+                auto normalTex = RM.Get<Texture>(normalPath);
+                if (normalTex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(normalTex->ID());
+                    LOG_DEBUG("Reloaded normal map from path: " << normalPath << ", id=" << normalTex->ID());
+                }
+                else {
+                    LOG_WARNING("Failed to reload normal map from path: " << normalPath);
+                }
+                data["_NormalTextureLoadAttempted"] = true;
+            }
+        }
+    }
+    else {
+        normalValueText = "None (drag normal map here)";
+    }
+
     // Group all sprite related rows under one aligned section
-    EditorUI::BeginPropertySection({ "Sprite", "Color", "Tiling", "Offset" });
+    EditorUI::BeginPropertySection({ "Sprite", "Normal Map", "Color", "Tiling", "Offset" });
 
     // Show the sprite information in a read only row
     EditorUI::RenderStaticValueRow("Sprite", valueText, texPath.empty());
@@ -349,6 +446,58 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
     if (dropped) {
         ImGui::SameLine();
         ImGui::TextColored(EditorStyle::SuccessText, "Texture updated");
+    }
+
+    // Normal map row
+    EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
+    bool droppedNormal = false;
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            std::string droppedPath = static_cast<const char*>(payLoad->Data);
+            auto ext = std::filesystem::path(droppedPath).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                auto tex = RM.Get<Texture>(droppedPath);
+                if (tex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["NormalTexturePath"] = droppedPath;
+                    droppedNormal = true;
+                    LOG_INFO("Dropped normal map: " << droppedPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped normal map: " << droppedPath);
+                }
+            }
+        }
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                auto tex = RM.Get<Texture>(path);
+                if (tex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["NormalTexturePath"] = path;
+                    droppedNormal = true;
+                    LOG_INFO("Dropped normal map: " << path << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped normal map: " << path);
+                }
+                break;
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    if (droppedNormal) {
+        ImGui::SameLine();
+        ImGui::TextColored(EditorStyle::SuccessText, "Normal map updated");
     }
 
     // Color tint applied on top of the sprite
@@ -665,8 +814,7 @@ void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data, ECS::Entity enti
 // Renders the SpriteSheetAnimation2D component properties
 // Controls animated sprite playback from sprite sheets
 void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
-    (void)entity;
-    (void)world;
+    const size_t hashBefore = std::hash<std::string>{}(data.dump());
     // RELOAD TEXTURE FROM PATH ON FIRST RENDER
     // Build a human readable summary of the current texture
     std::string texPath = data.value("TexturePath", "");
@@ -700,9 +848,33 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         valueText = "None (drag sprite sheet here)";
     }
 
+    std::string normalPath = data.value("NormalTexturePath", "");
+    std::string normalValueText;
+    if (!normalPath.empty()) {
+        normalValueText = std::filesystem::path(normalPath).filename().string();
+        uint32_t currentNormalId = data.value("NormalTextureId", 0u);
+        if (currentNormalId == 0) {
+            if (!data.contains("_NormalTextureLoadAttempted")) {
+                auto normalTex = RM.Get<Texture>(normalPath);
+                if (normalTex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(normalTex->ID());
+                    LOG_DEBUG("Reloaded normal sheet from path: " << normalPath << ", id=" << normalTex->ID());
+                }
+                else {
+                    LOG_WARNING("Failed to reload normal sheet from path: " << normalPath);
+                }
+                data["_NormalTextureLoadAttempted"] = true;
+            }
+        }
+    }
+    else {
+        normalValueText = "None (drag normal sheet here)";
+    }
+
 
     // Group all sprite sheet related rows under one aligned section
-    EditorUI::BeginPropertySection({ "Sprite Sheet", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height", "Start Frame", "Frame Count", "FPS", "Loop", "Playing" });
+    EditorUI::BeginPropertySection({ "Sprite Sheet", "Normal Map", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height",
+        "Mode", "Start Frame", "Frame Count", "Row Index", "Row Start Column", "Row Frame Count", "FPS", "Loop", "Playing" });
 
     // Show the sprite sheet information in a read only row
     EditorUI::RenderStaticValueRow("Sprite Sheet", valueText, texPath.empty());
@@ -770,6 +942,58 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         ImGui::EndDragDropTarget();
     }
 
+    // Normal map row
+    EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
+    bool droppedNormal = false;
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            std::string droppedPath = static_cast<const char*>(payLoad->Data);
+            auto ext = std::filesystem::path(droppedPath).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                auto tex = RM.Get<Texture>(droppedPath);
+                if (tex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["NormalTexturePath"] = droppedPath;
+                    droppedNormal = true;
+                    LOG_INFO("Dropped normal sheet: " << droppedPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped normal sheet: " << droppedPath);
+                }
+            }
+        }
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                auto tex = RM.Get<Texture>(path);
+                if (tex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["NormalTexturePath"] = path;
+                    droppedNormal = true;
+                    LOG_INFO("Dropped normal sheet: " << path << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped normal sheet: " << path);
+                }
+                break;
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    if (droppedNormal) {
+        ImGui::SameLine();
+        ImGui::TextColored(EditorStyle::SuccessText, "Normal map updated");
+    }
+
     // Individual frame dimensions
     EditorUI::RenderIntProperty("Frame Width", data, "FrameWidth");
     EditorUI::RenderIntProperty("Frame Height", data, "FrameHeight");
@@ -778,11 +1002,28 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     EditorUI::RenderIntProperty("Sheet Width", data, "SheetWidth");
     EditorUI::RenderIntProperty("Sheet Height", data, "SheetHeight");
 
-    // Which frame to start the animation from
-    EditorUI::RenderIntProperty("Start Frame", data, "StartFrame");
+    int mode = data.value("UseRow", false) ? 1 : 0;
+    const char* modes[] = { "Frame Window", "Row" };
+    ImGui::Text("Mode");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::Combo("##AnimMode", &mode, modes, 2)) {
+        data["UseRow"] = (mode == 1);
+    }
 
-    // How many frames in the animation sequence
-    EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
+    const bool useRow = data.value("UseRow", false);
+    if (!useRow) {
+        // Which frame to start the animation from
+        EditorUI::RenderIntProperty("Start Frame", data, "StartFrame");
+
+        // How many frames in the animation sequence
+        EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
+    } else {
+        EditorUI::RenderIntProperty("Row Index", data, "RowIndex");
+        EditorUI::RenderIntProperty("Row Start Column", data, "RowStartColumn");
+        EditorUI::RenderIntProperty("Row Frame Count", data, "RowFrameCount");
+    }
 
     // Animation speed in frames per second
     EditorUI::RenderFloatRow("FPS", "", data, "FramesPerSecond", 0.5f);
@@ -792,6 +1033,17 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     EditorUI::RenderCheckboxProperty("Playing", data, "Playing");
 
     EditorUI::EndPropertySection();
+
+    const size_t hashAfter = std::hash<std::string>{}(data.dump());
+    const bool needsInitialPreview = world && !entity.IsNull() &&
+        s_animPreviewedEntities.find(entity.Index) == s_animPreviewedEntities.end();
+
+    if (hashAfter != hashBefore || needsInitialPreview) {
+        UpdateSpriteAnimationPreview(data, entity, world);
+        if (world && !entity.IsNull() && world->IsAlive(entity)) {
+            s_animPreviewedEntities.insert(entity.Index);
+        }
+    }
 }
 
 // Renders the ZIndex2D component properties

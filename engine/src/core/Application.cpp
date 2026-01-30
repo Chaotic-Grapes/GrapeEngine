@@ -20,6 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
+#include "ecs/systems/AnimationPreviewSystem.h"
 #include "scripting/ScriptManager.h"
 #include "scripting/ComponentTypeRegistry.h"
 #include "ecs/systems/TransformSystem.h"
@@ -323,6 +324,7 @@ namespace Engine {
         
         // Update Phase Systems
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
+        m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
         m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         
         // Physics Phase Systems

@@ -89,6 +89,74 @@ namespace {
             fileMenu->MarkSceneDirty();
         }
     }
+
+    void UpdateSpriteAnimationPreview(ECS::World* world, ECS::Entity entity) {
+        if (!world || entity.IsNull() || !world->IsAlive(entity))
+            return;
+        if (!world->Has<ECS::Components::SpriteSheetAnimation2D>(entity))
+            return;
+        if (!world->Has<ECS::Components::SpriteRenderer2D>(entity))
+            return;
+
+        const auto& anim = world->Get<ECS::Components::SpriteSheetAnimation2D>(entity);
+        auto& sprite = world->Get<ECS::Components::SpriteRenderer2D>(entity);
+
+        if (anim.FrameWidth <= 0 || anim.FrameHeight <= 0 ||
+            anim.SheetWidth <= 0 || anim.SheetHeight <= 0)
+            return;
+
+        const int totalCols = anim.SheetWidth / anim.FrameWidth;
+        const int totalRows = anim.SheetHeight / anim.FrameHeight;
+        if (totalCols <= 0 || totalRows <= 0)
+            return;
+
+        int windowStart = 0;
+        int windowCount = 0;
+
+        if (anim.UseRow) {
+            const int rowIndex = std::clamp(anim.RowIndex, 0, totalRows - 1);
+            const int startCol = std::clamp(anim.RowStartColumn, 0, totalCols - 1);
+            const int available = totalCols - startCol;
+            int rowCount = anim.RowFrameCount;
+            if (rowCount <= 0 || rowCount > available)
+                rowCount = available;
+            windowStart = rowIndex * totalCols + startCol;
+            windowCount = rowCount;
+        } else {
+            windowStart = std::max(0, anim.StartFrame);
+            windowCount = anim.FrameCount;
+            if (windowCount <= 0) {
+                const int totalFrames = totalCols * totalRows;
+                windowCount = std::max(1, totalFrames - windowStart);
+            }
+        }
+
+        if (windowCount <= 0)
+            return;
+
+        int localFrame = 0;
+        if (world->Has<ECS::Components::AnimationState2D>(entity)) {
+            localFrame = world->Get<ECS::Components::AnimationState2D>(entity).CurrentFrame;
+        }
+        localFrame = std::clamp(localFrame, 0, windowCount - 1);
+        const int absoluteFrame = windowStart + localFrame;
+        const int col = absoluteFrame % totalCols;
+        const int row = absoluteFrame / totalCols;
+
+        const float u0 = (col * anim.FrameWidth) / static_cast<float>(anim.SheetWidth);
+        const float v0 = (row * anim.FrameHeight) / static_cast<float>(anim.SheetHeight);
+        const float u1 = ((col + 1) * anim.FrameWidth) / static_cast<float>(anim.SheetWidth);
+        const float v1 = ((row + 1) * anim.FrameHeight) / static_cast<float>(anim.SheetHeight);
+
+        if (anim.TextureId != 0)
+            sprite.TextureId = anim.TextureId;
+        if (anim.NormalTextureId != 0)
+            sprite.NormalTextureId = anim.NormalTextureId;
+        sprite.Width = anim.FrameWidth;
+        sprite.Height = anim.FrameHeight;
+        sprite.Tiling = Vector2D{ u1 - u0, v1 - v0 };
+        sprite.Offset = Vector2D{ u0, v0 };
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -544,6 +612,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         }
 
         m_componentsToDelete.clear();
+
+        // Keep sprite preview in sync even when the animation UI is collapsed.
+        UpdateSpriteAnimationPreview(m_world, entity);
 
         // Second pass: push any edited JSON values back into ECS components
         // IMPORTANT: Only apply components that were actually modified to prevent
@@ -1041,8 +1112,8 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
     ECS::Entity entity = m_world->Resolve(m_entityId);
     if (!m_world->IsAlive(entity)) return;
 
-    // Transform cannot be removed
-    if (componentType == "LocalTransform") return;
+    // Transform and Layer cannot be removed
+    if (componentType == "LocalTransform" || componentType == "Layer") return;
 
     // // Look up this component's metadata
     const auto* meta = ComponentRegistryUI::Find(componentType);

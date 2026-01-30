@@ -296,6 +296,7 @@ static auto& _getCppComponentDefaults() {
             defaults[id] = []() { 
                 return nlohmann::json{
                 {"TextureId", 0},
+                {"NormalTextureId", 0},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Tiling", {{"X", 1.0f}, {"Y", 1.0f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -307,10 +308,11 @@ static auto& _getCppComponentDefaults() {
         if (const auto id = GetComponentIdFromHashOrWarn(kHashSpriteSheetAnimation2D, "SpriteSheetAnimation2D"); id != ECS::NULL_COMPONENT_ID) {
             defaults[id] = []() { 
                 return nlohmann::json{
-                {"TextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
+                {"TextureId", 0}, {"NormalTextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
-                {"Loop", true}, {"Playing", false}
+                {"RowIndex", 0}, {"RowStartColumn", 0}, {"RowFrameCount", 0},
+                {"Loop", true}, {"Playing", false}, {"UseRow", false}
             }; 
             };
         }
@@ -540,6 +542,7 @@ static void _initializeDefaultRegistry() {
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteRenderer2D(d, e, w); }),
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"TextureId", 0},
+                {"NormalTextureId", 0},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Tiling", {{"X", 1.0f}, {"Y", 1.0f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -553,10 +556,11 @@ static void _initializeDefaultRegistry() {
             GetComponentIdFromHashOrWarn(kHashSpriteSheetAnimation2D, "SpriteSheetAnimation2D"), kHashSpriteSheetAnimation2D, true, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSpriteSheetAnimation2D(d, e, w); }),
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
-                {"TextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
+                {"TextureId", 0}, {"NormalTextureId", 0}, {"FrameWidth", 32}, {"FrameHeight", 32},
                 {"SheetWidth", 256}, {"SheetHeight", 256},
                 {"StartFrame", 0}, {"FrameCount", 1}, {"FramesPerSecond", 10.0f},
-                {"Loop", true}, {"Playing", false}
+                {"RowIndex", 0}, {"RowStartColumn", 0}, {"RowFrameCount", 0},
+                {"Loop", true}, {"Playing", false}, {"UseRow", false}
             }; }),
             COMPONENT_OPS_HASH(SpriteSheetAnimation2D, kHashSpriteSheetAnimation2D)
         },
@@ -720,7 +724,7 @@ static void _initializeDefaultRegistry() {
         // Layer
         {
             "Layer 2D", "Layer", "ECS::Components::Layer",
-            GetComponentIdFromHashOrWarn(kHashLayer, "Layer"), kHashLayer, true, true,
+            GetComponentIdFromHashOrWarn(kHashLayer, "Layer"), kHashLayer, false, true,
             static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderLayer2D(d, e, w); }),
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{{"Id", 0}}; }),
             COMPONENT_OPS_HASH(Layer, kHashLayer)

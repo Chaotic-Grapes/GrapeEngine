@@ -25,7 +25,7 @@
                 },
                 {
                     "Data": {
-                        "Value": "Player"
+                        "Value": "Fishfolk Animation"
                     },
                     "TypeName": "Name"
                 },
@@ -51,16 +51,6 @@
                 },
                 {
                     "Data": {
-                        "Initialized": false,
-                        "ManagedHandle": 0,
-                        "ScriptPath": "..\\..\\EchoesBelow\\Scripts\\ToggleAnimation.cs",
-                        "TypeHash": 0,
-                        "TypeName": "Scripts.ToggleAnimation"
-                    },
-                    "TypeName": "ScriptInstance"
-                },
-                {
-                    "Data": {
                         "Color": {
                             "A": 1.0,
                             "B": 1.0,
@@ -71,11 +61,11 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 3,
+                        "TextureId": 0,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
                         "Tiling": {
-                            "X": 0.009999999776482582,
-                            "Y": 0.009999999776482582
+                            "X": 1.0,
+                            "Y": 1.0
                         }
                     },
                     "TypeName": "SpriteRenderer2D"
@@ -88,37 +78,17 @@
                         "FramesPerSecond": 6.0,
                         "Loop": true,
                         "Playing": true,
+                        "RowFrameCount": 16,
+                        "RowIndex": 0,
+                        "RowStartColumn": 0,
                         "SheetHeight": 160,
                         "SheetWidth": 512,
                         "StartFrame": 0,
-                        "TextureId": 3,
-                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png"
+                        "TextureId": 0,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
+                        "UseRow": true
                     },
                     "TypeName": "SpriteSheetAnimation2D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 5.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 5.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": 0.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
                 }
             ]
         },
@@ -154,7 +124,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.382256269454956,
+                        "AspectRatio": 1.7777777910232544,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -162,36 +132,12 @@
                         "UsePerspective": false
                     },
                     "TypeName": "Camera3D"
-                },
-                {
-                    "Data": {
-                        "Dirty": false,
-                        "Matrix": {
-                            "m00": 1.0,
-                            "m01": 0.0,
-                            "m02": 0.0,
-                            "m03": 0.0,
-                            "m10": 0.0,
-                            "m11": 1.0,
-                            "m12": 0.0,
-                            "m13": 0.0,
-                            "m20": 0.0,
-                            "m21": 0.0,
-                            "m22": 1.0,
-                            "m23": -10.0,
-                            "m30": 0.0,
-                            "m31": 0.0,
-                            "m32": 0.0,
-                            "m33": 1.0
-                        }
-                    },
-                    "TypeName": "WorldTransform"
                 }
             ]
         }
     ],
     "EntityCount": 2,
     "Hierarchy": [],
-    "SceneName": "Scene",
+    "SceneName": "Sprite Animation Sample",
     "Version": "1.0"
 }

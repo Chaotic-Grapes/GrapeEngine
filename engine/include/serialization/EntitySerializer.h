@@ -141,6 +141,8 @@ namespace ECS {
 			j = nlohmann::json{
 				{"TextureId", sprite.TextureId},
 				{"TexturePath", std::string(sprite.TexturePath)},  // Convert char[] to string
+				{"NormalTextureId", sprite.NormalTextureId},
+				{"NormalTexturePath", std::string(sprite.NormalTexturePath)},
 				{"Color", sprite.Color},
 				{"Tiling", sprite.Tiling},
 				{"Offset", sprite.Offset}
@@ -171,6 +173,25 @@ namespace ECS {
 				sprite.TextureId = 0; // No texture path provided
 			}
 
+			// Normal map path (optional)
+			std::string normalPath = j.value("NormalTexturePath", std::string());
+			strncpy_s(sprite.NormalTexturePath, normalPath.c_str(), sizeof(sprite.NormalTexturePath) - 1);
+			sprite.NormalTexturePath[sizeof(sprite.NormalTexturePath) - 1] = '\0';
+
+			if (!normalPath.empty()) {
+				auto normalTex = RM.Get<Texture>(normalPath);
+				if (normalTex) {
+					sprite.NormalTextureId = static_cast<uint32_t>(normalTex->ID());
+				}
+				else {
+					sprite.NormalTextureId = 0;
+					LOG_WARNING("Failed to load normal map from path: " << normalPath);
+				}
+			}
+			else if (normalPath.empty()) {
+				sprite.NormalTextureId = 0;
+			}
+
 			sprite.Color = j.value("Color", ::Color{ 1.0f, 1.0f, 1.0f, 1.0f });
 			sprite.Tiling = j.value("Tiling", Vector2D{ 1, 1 });
 			sprite.Offset = j.value("Offset", Vector2D{ 0, 0 });
@@ -183,15 +204,21 @@ namespace ECS {
 			j = nlohmann::json{
 				{"TextureId", anim.TextureId},
 				{"TexturePath", std::string(anim.TexturePath)},  // Convert char[] to string
+				{"NormalTextureId", anim.NormalTextureId},
+				{"NormalTexturePath", std::string(anim.NormalTexturePath)},
 				{"FrameWidth", anim.FrameWidth},
 				{"FrameHeight", anim.FrameHeight},
 				{"SheetWidth", anim.SheetWidth},
 				{"SheetHeight", anim.SheetHeight},
 				{"StartFrame", anim.StartFrame},
 				{"FrameCount", anim.FrameCount},
+				{"RowIndex", anim.RowIndex},
+				{"RowStartColumn", anim.RowStartColumn},
+				{"RowFrameCount", anim.RowFrameCount},
 				{"FramesPerSecond", anim.FramesPerSecond},
 				{"Loop", anim.Loop},
-				{"Playing", anim.Playing}
+				{"Playing", anim.Playing},
+				{"UseRow", anim.UseRow}
 			};
 		}
 
@@ -224,15 +251,38 @@ namespace ECS {
 				anim.TextureId = 0; // No texture path provided
 			}
 
+			// Normal map path (optional)
+			std::string normalPath = j.value("NormalTexturePath", std::string());
+			strncpy_s(anim.NormalTexturePath, normalPath.c_str(), sizeof(anim.NormalTexturePath) - 1);
+			anim.NormalTexturePath[sizeof(anim.NormalTexturePath) - 1] = '\0';
+
+			if (!normalPath.empty()) {
+				auto normalTex = RM.Get<Texture>(normalPath);
+				if (normalTex) {
+					anim.NormalTextureId = static_cast<uint32_t>(normalTex->ID());
+				}
+				else {
+					anim.NormalTextureId = 0;
+					LOG_WARNING("Failed to load normal sprite sheet from path: " << normalPath);
+				}
+			}
+			else if (normalPath.empty()) {
+				anim.NormalTextureId = 0;
+			}
+
 			anim.FrameWidth = j.value("FrameWidth", 0);
 			anim.FrameHeight = j.value("FrameHeight", 0);
 			anim.SheetWidth = j.value("SheetWidth", 0);
 			anim.SheetHeight = j.value("SheetHeight", 0);
 			anim.StartFrame = j.value("StartFrame", 0);
 			anim.FrameCount = j.value("FrameCount", 0);
+			anim.RowIndex = j.value("RowIndex", 0);
+			anim.RowStartColumn = j.value("RowStartColumn", 0);
+			anim.RowFrameCount = j.value("RowFrameCount", 0);
 			anim.FramesPerSecond = j.value("FramesPerSecond", 0.0f);
 			anim.Loop = j.value("Loop", false);
 			anim.Playing = j.value("Playing", false);
+			anim.UseRow = j.value("UseRow", false);
 		}
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AnimationState2D, CurrentFrame, TimeAccumulator, Finished)
@@ -574,6 +624,11 @@ namespace Serialization {
 						LOG_WARNING("[EntitySerializer] Component '" << typeName << "' not found during deserialization (not in C++ or managed registry)");
 					}
 				}
+			}
+
+			// Ensure every entity has a Layer so editor picking and rendering remain functional.
+			if (!world.Has<ECS::Components::Layer>(e)) {
+				world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
 			}
 			return e;
 		}

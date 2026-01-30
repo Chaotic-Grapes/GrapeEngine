@@ -24,7 +24,7 @@ namespace Editor {
 
     ViewportInteractionManager::ViewportInteractionManager()
         : m_pickingManager{std::make_unique<PickingQueryManager>()}
-        , m_selectedEntityId{0}
+        , m_selectedEntityId{ECS::Entity::NPOS32}
         , m_pendingPickRequestId{0} {
         
         // Set up gizmo interaction callbacks
@@ -80,7 +80,7 @@ namespace Editor {
         }
 
         // Step 2: Update gizmo interaction state (verify entity is valid first)
-        if (m_selectedEntityId != 0 && m_selectedEntityId != ECS::Entity::NPOS32) {
+        if (m_selectedEntityId != ECS::Entity::NPOS32) {
             ECS::Entity entity(m_selectedEntityId);
             if (world.IsAlive(entity)) {
                 m_gizmoController.Update(m_gizmo, m_selectedEntityId);
@@ -92,7 +92,7 @@ namespace Editor {
         // For now, just maintain the pending request.
 
         // Step 4: Apply gizmo transforms if entity is selected and being manipulated
-        if (m_selectedEntityId != 0 && m_selectedEntityId != ECS::Entity::NPOS32 && (m_gizmoController.IsDragging() || m_gizmoController.JustStartedDrag())) {
+        if (m_selectedEntityId != ECS::Entity::NPOS32 && (m_gizmoController.IsDragging() || m_gizmoController.JustStartedDrag())) {
             ECS::Entity entity(m_selectedEntityId);
             if (world.IsAlive(entity)) {
                 // Capture initial transform on drag start

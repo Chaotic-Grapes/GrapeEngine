@@ -304,6 +304,7 @@ namespace ECS {
         struct SpriteRenderer2D {   
         public:
             uint32_t TextureId = 0;
+            uint32_t NormalTextureId = 0;  // 0 = no normal map (future lighting)
             Color Color{1.0f, 1.0f, 1.0f, 1.0f};
             Vector2D Tiling{1.0f, 1.0f};
             Vector2D Offset{0.0f, 0.0f};
@@ -316,6 +317,7 @@ namespace ECS {
 
             // Persistent texture path (don't serialize TextureId)
             char TexturePath[256] = { 0 };
+            char NormalTexturePath[256] = { 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
@@ -342,18 +344,25 @@ namespace ECS {
         struct SpriteSheetAnimation2D {
         public:
             uint32_t TextureId = 0;           // Texture containing the sprite sheet
+            uint32_t NormalTextureId = 0;     // Optional normal map sprite sheet
             int FrameWidth = 0;               // Width of a single frame in pixels
             int FrameHeight = 0;              // Height of a single frame in pixels
             int SheetWidth = 0;               // Total width of the sprite sheet
             int SheetHeight = 0;              // Total height of the sprite sheet
             int StartFrame = 0;               // First frame index in the animation
             int FrameCount = 0;               // Number of frames in the animation
+            int RowIndex = 0;                 // Row index when using row mode
+            int RowStartColumn = 0;           // Start column within the row
+            int RowFrameCount = 0;            // Frames to use in row (0 = rest of row)
             float FramesPerSecond = 10.0f;    // Animation speed (FPS)
             bool Loop = true;                 // Whether animation loops
             bool Playing = true;              // Whether animation is currently playing
+            bool UseRow = false;              // Use row-based window instead of StartFrame
+            uint8_t _padding = 0;             // Padding to keep alignment (multiple of 4 bytes)
 
             // Persistent texture path (don't serialize TextureId)
             char TexturePath[256] = { 0 };
+            char NormalTexturePath[256] = { 0 };
         };
         static_assert(std::is_trivially_copyable_v<SpriteSheetAnimation2D>, "SpriteSheetAnimation2D must be trivially copyable");
 
