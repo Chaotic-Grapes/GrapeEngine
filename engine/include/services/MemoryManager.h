@@ -23,6 +23,7 @@ Provides:
 
 #include <iostream>
 #include <cstddef> 
+#include <mutex>
 #include "Export.h"
 
 class GRAPEENGINE_API MemoryManager {
@@ -68,6 +69,7 @@ private:
 	int m_totalAllocated;           // Total bytes allocated
 	int m_totalFreed;               // Total bytes freed
 	bool m_debugMode;               // Enable/disable debug pattern filling
+	std::recursive_mutex m_mutex;   // Thread safety
 
 	// ============================================================================
 	// MEMORY POOL EXTENSION

@@ -110,6 +110,8 @@ MemoryManager::~MemoryManager() {
 // ============================================================================
 
 void* MemoryManager::Allocate(int size) {
+	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
 	// RECURSION PROTECTION: Prevent infinite loops if pool extension fails repeatedly
 	static thread_local int recursionDepth = 0;
 
@@ -122,22 +124,27 @@ void* MemoryManager::Allocate(int size) {
 
 	recursionDepth++;
 
+	// Align size to 16 bytes to ensure proper alignment for all allocations
+	const int ALIGNMENT = 16;
+	int alignedSize = (size + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
+	if (alignedSize < ALIGNMENT) alignedSize = ALIGNMENT;
+
 	// Get a block of memory of a specified size from the pool
 	// Traverse the address-ordered free linked list to find a suitable block (first-fit strategy)
 	MemoryBlock* current = m_blockListHead;
 
 	while (current != nullptr) {
 		// Check if this block is free and large enough
-		if (!current->allocated && current->size >= size) {
+		if (!current->allocated && current->size >= alignedSize) {
 			// Found a suitable block
 
 			// If the block is the right size, allocate it directly
-			if (current->size == size) {
+			if (current->size == alignedSize) {
 				current->allocated = true;
-				m_totalAllocated += size;
+				m_totalAllocated += alignedSize;
 
 				// Fill with allocated pattern if debug mode enabled
-				if (m_debugMode) memset(current->data, ALLOCATED_PATTERN, size);
+				if (m_debugMode) memset(current->data, ALLOCATED_PATTERN, alignedSize);
 
 				recursionDepth--;
 				return current->data;
@@ -161,8 +168,8 @@ void* MemoryManager::Allocate(int size) {
 				recursionDepth--;
 				return current->data;
 			}
-			remainingBlock->data = static_cast<char*>(current->data) + size;
-			remainingBlock->size = current->size - size;
+			remainingBlock->data = static_cast<char*>(current->data) + alignedSize;
+			remainingBlock->size = current->size - alignedSize;
 
 			// Allocated block = Requested (allocated == true)
 			// So, remaining block (allocated == false)
@@ -176,16 +183,16 @@ void* MemoryManager::Allocate(int size) {
 			}
 
 			// Resize the current block to match allocated size
-			current->size = size;
+			current->size = alignedSize;
 			current->allocated = true;
 
 			// Insert the remaining block after the allocated block
 			current->next = remainingBlock;
 
-			m_totalAllocated += size;
+			m_totalAllocated += alignedSize;
 
 			// Fill with allocated pattern if debug mode enabled
-			if (m_debugMode) memset(allocatedPtr, ALLOCATED_PATTERN, size);
+			if (m_debugMode) memset(allocatedPtr, ALLOCATED_PATTERN, alignedSize);
 
 			// Return pointer to allocated memory
 			recursionDepth--;
@@ -201,12 +208,14 @@ void* MemoryManager::Allocate(int size) {
 	_extendMemoryPool();
 
 	// Try allocating again after extending
-	void* result = Allocate(size);
+	void* result = Allocate(size); // Use original size, it will be aligned again in recursion
 	recursionDepth--;
 	return result;
 }
 
 void MemoryManager::Deallocate(void* ptr) {
+	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
 	// So when we deallocate, we need to merge with adjacent free blocks
 
 	// Example (deallocate 15-byte block):
