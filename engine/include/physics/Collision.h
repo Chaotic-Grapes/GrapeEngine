@@ -37,6 +37,18 @@ namespace Engine {
         Vector2D HalfExtents;
     };
 
+    /**
+     * @brief World-space OBB (oriented bounding box) with center, half-extents, and axes.
+     * Used for narrow-phase collision detection when rotation is required.
+     */
+    struct WorldOBB {
+        Vector2D Center;
+        Vector2D HalfExtents;
+        float Rotation = 0.0f; // radians
+        Vector2D AxisX{ 1.0f, 0.0f };
+        Vector2D AxisY{ 0.0f, 1.0f };
+    };
+
     class Collision {
     public:
         struct LineSegment {

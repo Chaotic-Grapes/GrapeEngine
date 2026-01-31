@@ -351,6 +351,7 @@ namespace ECS {
             glm::vec4 color;
             float thickness;
             bool closed; // for polygons
+            bool filled = false;
         };
         std::vector<WireframeSubmission> m_wireframeQueue;
 

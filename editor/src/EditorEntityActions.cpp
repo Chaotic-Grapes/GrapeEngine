@@ -79,11 +79,6 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     else {
         Editor::ECSUtils::SetComponent(&world, e, "Layer", ECS::Components::Layer{ 0 });
     }
-    // Hash-based check to guard against registry/id mismatches between editor and runtime modules.
-    const ECS::ComponentTypeId layerIdByName = Editor::ECSUtils::GetComponentIdFromName("Layer");
-    if (layerIdByName != ECS::NULL_COMPONENT_ID && !world.HasById(e, layerIdByName)) {
-        Editor::ECSUtils::SetComponent(&world, e, "Layer", ECS::Components::Layer{ 0 });
-    }
 
     // Optional parent
     if (parent != ECS::Entity::NPOS32) {

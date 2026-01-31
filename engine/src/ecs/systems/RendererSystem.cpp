@@ -1075,9 +1075,85 @@ namespace ECS {
                             sub.center,
                             sub.radius,
                             sub.color,
-                            sub.thickness,
+                            sub.filled ? 0.0f : sub.thickness,
                             0
                         );
+
+                        m_renderer->endFrame();
+                        break;
+                    }
+                    case WireframeSubmission::Type::Polygon: {
+                        // Use batch shader for line-based shapes
+                        if (m_shader) {
+                            m_shader->use();
+                            m_shader->setMat4("uViewProj", viewProj);
+                            m_shader->setUniform("uPicking", 0);
+                            m_shader->setUniform("uLightingEnabled", 0);
+                        }
+                        m_renderer->beginFrame();
+
+                        if (sub.filled && sub.vertices.size() >= 3) {
+                            DebugDraw2D::Polygon(*m_renderer, sub.vertices, sub.color, 0);
+                        }
+                        else if (sub.vertices.size() >= 2) {
+                            for (size_t i = 0; i < sub.vertices.size(); ++i) {
+                                size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
+                                if (next < sub.vertices.size()) {
+                                    DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
+                                        sub.thickness, sub.color, 0);
+                                }
+                            }
+                        }
+
+                        m_renderer->endFrame();
+                        break;
+                    }
+                    case WireframeSubmission::Type::Line: {
+                        if (m_shader) {
+                            m_shader->use();
+                            m_shader->setMat4("uViewProj", viewProj);
+                            m_shader->setUniform("uPicking", 0);
+                            m_shader->setUniform("uLightingEnabled", 0);
+                        }
+                        m_renderer->beginFrame();
+
+                        if (sub.vertices.size() == 2) {
+                            DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1],
+                                sub.thickness, sub.color, 0);
+                        }
+
+                        m_renderer->endFrame();
+                        break;
+                    }
+                    case WireframeSubmission::Type::Mesh: {
+                        if (m_shader) {
+                            m_shader->use();
+                            m_shader->setMat4("uViewProj", viewProj);
+                            m_shader->setUniform("uPicking", 0);
+                            m_shader->setUniform("uLightingEnabled", 0);
+                        }
+                        m_renderer->beginFrame();
+
+                        if (!sub.indices.empty()) {
+                            // Draw using indices
+                            for (size_t i = 0; i < sub.indices.size(); i += 2) {
+                                if (i + 1 < sub.indices.size()) {
+                                    uint32_t idx0 = sub.indices[i];
+                                    uint32_t idx1 = sub.indices[i + 1];
+                                    if (idx0 < sub.vertices.size() && idx1 < sub.vertices.size()) {
+                                        DebugDraw2D::Line(*m_renderer, sub.vertices[idx0], sub.vertices[idx1],
+                                            sub.thickness, sub.color, 0);
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            // Draw as sequence of lines
+                            for (size_t i = 0; i + 1 < sub.vertices.size(); i += 2) {
+                                DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[i + 1],
+                                    sub.thickness, sub.color, 0);
+                            }
+                        }
 
                         m_renderer->endFrame();
                         break;
@@ -1095,50 +1171,14 @@ namespace ECS {
                         if (sub.vertices.size() == 4) {
                             const auto& min = sub.vertices[0];
                             const auto& max = sub.vertices[2];
-                            DebugDraw2D::RectStroke(*m_renderer, min, max, sub.thickness, sub.color, 0);
+                            if (sub.filled) {
+                                DebugDraw2D::RectFill(*m_renderer, min, max, sub.color, 0);
+                            }
+                            else {
+                                DebugDraw2D::RectStroke(*m_renderer, min, max, sub.thickness, sub.color, 0);
+                            }
                         }
                         m_renderer->endFrame();
-                        break;
-                    }
-                    case WireframeSubmission::Type::Polygon: {
-                        if (sub.vertices.size() >= 2) {
-                            for (size_t i = 0; i < sub.vertices.size(); ++i) {
-                                size_t next = sub.closed ? (i + 1) % sub.vertices.size() : i + 1;
-                                if (next < sub.vertices.size()) {
-                                    DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[next],
-                                        sub.thickness, sub.color, 0);
-                                }
-                            }
-                        }
-                        break;
-                    }
-                    case WireframeSubmission::Type::Line: {
-                        if (sub.vertices.size() == 2) {
-                            DebugDraw2D::Line(*m_renderer, sub.vertices[0], sub.vertices[1],
-                                sub.thickness, sub.color, 0);
-                        }
-                        break;
-                    }
-                    case WireframeSubmission::Type::Mesh: {
-                        if (!sub.indices.empty()) {
-                            // Draw using indices
-                            for (size_t i = 0; i < sub.indices.size(); i += 2) {
-                                if (i + 1 < sub.indices.size()) {
-                                    uint32_t idx0 = sub.indices[i];
-                                    uint32_t idx1 = sub.indices[i + 1];
-                                    if (idx0 < sub.vertices.size() && idx1 < sub.vertices.size()) {
-                                        DebugDraw2D::Line(*m_renderer, sub.vertices[idx0], sub.vertices[idx1],
-                                            sub.thickness, sub.color, 0);
-                                    }
-                                }
-                            }
-                        } else {
-                            // Draw as sequence of lines
-                            for (size_t i = 0; i + 1 < sub.vertices.size(); i += 2) {
-                                DebugDraw2D::Line(*m_renderer, sub.vertices[i], sub.vertices[i + 1],
-                                    sub.thickness, sub.color, 0);
-                            }
-                        }
                         break;
                     }
                     }
@@ -1298,6 +1338,7 @@ namespace ECS {
         sub.color = color;
         sub.thickness = thickness;
         sub.closed = true;
+        sub.filled = false;
         m_wireframeQueue.push_back(sub);
     }
 
@@ -1312,6 +1353,7 @@ namespace ECS {
         sub.color = color;
         sub.thickness = thickness;
         sub.closed = false;
+        sub.filled = false;
         m_wireframeQueue.push_back(sub);
     }
 
@@ -1325,6 +1367,7 @@ namespace ECS {
         sub.color = color;
         sub.thickness = thickness;
         sub.closed = closed;
+        sub.filled = false;
         m_wireframeQueue.push_back(sub);
     }
 
@@ -1338,6 +1381,7 @@ namespace ECS {
         sub.color = color;
         sub.thickness = thickness;
         sub.closed = false;
+        sub.filled = false;
         m_wireframeQueue.push_back(sub);
     }
 
@@ -1355,6 +1399,7 @@ namespace ECS {
         sub.color = color;
         sub.thickness = thickness;
         sub.closed = false;
+        sub.filled = false;
         m_wireframeQueue.push_back(sub);
     }
 
@@ -1366,39 +1411,82 @@ namespace ECS {
 
         ECS::Entity entity{ entityID };
 
-        // Get world position
-        Vector3D worldPos{0, 0, 0};
-        Vector3D scale{1.0f, 1.0f, 1.0f};
+        // Get world position/rotation/scale (respect WorldTransform if present)
+        Vector3D worldPos{ 0.0f, 0.0f, 0.0f };
+        Vector3D scale{ 1.0f, 1.0f, 1.0f };
+        Quaternion rotation{ 0.0f, 0.0f, 0.0f, 1.0f };
         if (world.Has<ECS::Components::LocalTransform>(entity)) {
-            auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
-            worldPos = lt.Position;
-            scale = lt.Scale;
+            const auto& lt = world.Get<ECS::Components::LocalTransform>(entity);
+            GetRenderTransform(world, entity, lt, worldPos, rotation, scale);
         }
 
-        glm::vec2 worldPos2D{ worldPos.X, worldPos.Y };
+        // Precompute 2D position and angle
+        const glm::vec2 worldPos2D{ worldPos.X, worldPos.Y };
+        const float entityAngleZ = std::atan2(
+            2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
+            1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z)
+        );
+
+        // Helper: Rotate a 2D vector by radians
+        auto rotate2D = [](const glm::vec2& v, float radians) {
+            const float c = std::cos(radians);
+            const float s = std::sin(radians);
+            return glm::vec2(v.x * c - v.y * s, v.x * s + v.y * c);
+        };
 
         // Render 2D Box Collider
         if (world.Has<ECS::Components::BoxCollider2D>(entity)) {
             auto& collider = world.Get<ECS::Components::BoxCollider2D>(entity);
-            
-            glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
-            glm::vec2 halfExtents{ collider.HalfExtents.X * scale.X, collider.HalfExtents.Y * scale.Y };
-            
-            glm::vec2 min = worldPos2D + offset - halfExtents;
-            glm::vec2 max = worldPos2D + offset + halfExtents;
-            
-            SubmitWireframeQuad(min, max, color, 1.f);
+        
+            // Compute box corners
+            const glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
+            const glm::vec2 rotatedOffset = rotate2D(offset, entityAngleZ);
+            const glm::vec2 center = worldPos2D + rotatedOffset;
+            const glm::vec2 halfExtents{ collider.HalfExtents.X * scale.X, collider.HalfExtents.Y * scale.Y };
+
+            // Account for collider rotation
+            const float boxAngle = entityAngleZ + collider.Rotation;
+            const glm::vec2 right = rotate2D(glm::vec2(1.0f, 0.0f), boxAngle);
+            const glm::vec2 up = rotate2D(glm::vec2(0.0f, 1.0f), boxAngle);
+
+            // Define corners
+            glm::vec2 corners[4];
+            corners[0] = center + right * halfExtents.x + up * halfExtents.y;
+            corners[1] = center - right * halfExtents.x + up * halfExtents.y;
+            corners[2] = center - right * halfExtents.x - up * halfExtents.y;
+            corners[3] = center + right * halfExtents.x - up * halfExtents.y;
+
+            // Submit as polygon
+            WireframeSubmission sub;
+            sub.type = WireframeSubmission::Type::Polygon;
+            sub.vertices.assign(corners, corners + 4);
+            sub.color = color;
+            sub.thickness = 1.0f;
+            sub.closed = true;
+            sub.filled = true;
+            m_wireframeQueue.push_back(sub);
         }
 
         // Render 2D Circle Collider - render as polygon for accuracy
         if (world.Has<ECS::Components::CircleCollider2D>(entity)) {
             auto& collider = world.Get<ECS::Components::CircleCollider2D>(entity);
-            
-            glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
-            glm::vec2 center = worldPos2D + offset;
-            float radius = collider.Radius * ((scale.X + scale.Y) * 0.5f);
-            
-            SubmitWireframeCircle(center, radius, color, 0);
+        
+            // Compute circle center and radius
+            const glm::vec2 offset{ collider.Offset.X, collider.Offset.Y };
+            const glm::vec2 rotatedOffset = rotate2D(offset, entityAngleZ);
+            const glm::vec2 center = worldPos2D + rotatedOffset;
+            const float radius = collider.Radius * ((scale.X + scale.Y) * 0.5f);
+        
+            // Submit as filled circle
+            WireframeSubmission sub;
+            sub.type = WireframeSubmission::Type::Circle;
+            sub.center = center;
+            sub.radius = radius;
+            sub.color = color;
+            sub.thickness = 0.0f;
+            sub.closed = false;
+            sub.filled = true;
+            m_wireframeQueue.push_back(sub);
         }
     }
 

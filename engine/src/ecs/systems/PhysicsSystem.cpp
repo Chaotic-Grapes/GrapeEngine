@@ -56,6 +56,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <cfloat>
 #include "helpers/MathUtils.h"
 #include "helpers/EntityUtils.h"
 #include <iostream>
@@ -199,6 +200,10 @@ namespace ECS {
     // Narrow-phase helpers
     // =====================================================================
 
+    static float Dot2D(const Vector2D& a, const Vector2D& b) {
+        return a.X * b.X + a.Y * b.Y;
+    }
+
     /**
     * @brief Circle-circle overlap test with normal/depth output (using world-space shapes).
     * @return true if overlapping; normal points A->B, depth is penetration.
@@ -253,37 +258,71 @@ namespace ECS {
     }
 
     /**
-     * @brief Test box-box collision using Collision utility (using world-space shapes)
+     * @brief Test box-box collision using SAT on oriented boxes (world-space shapes).
      */
     Engine::Collision::ContactManifold TestBoxBox(
-        const Engine::WorldAABB& aabbA,
-        const Engine::WorldAABB& aabbB)
+        const Engine::WorldOBB& obbA,
+        const Engine::WorldOBB& obbB)
     {
-        // Do AABB test using pre-computed world-space shapes
-        Engine::Collision::AABB worldAabbA = Engine::Collision::MakeAABBCenterSize(
-            aabbA.Center, aabbA.HalfExtents * 2.0f
-        );
-        Engine::Collision::AABB worldAabbB = Engine::Collision::MakeAABBCenterSize(
-            aabbB.Center, aabbB.HalfExtents * 2.0f
-        );
+        // Collision test using Separating Axis Theorem (SAT) for OBBs
+        Engine::Collision::ContactManifold manifold;
+        manifold.pointCount = 0;
 
-        Vector2D normal;
-        float penetration;
+        // Compute difference vector between box centers
+        const Vector2D delta = obbB.Center - obbA.Center;
+        const Vector2D axes[4] = { obbA.AxisX, obbA.AxisY, obbB.AxisX, obbB.AxisY };
 
-        // Check if boxes overlap
-        if (!Engine::Collision::AABBvsAABB(worldAabbA, worldAabbB, &normal, &penetration)) {
-            // No collision, return empty manifold
-            return Engine::Collision::ContactManifold();
+        // Track minimum overlap
+        float minOverlap = FLT_MAX;
+        Vector2D bestAxis{ 0.0f, 0.0f };
+
+        // Iterate over all axes
+        // The four axes to test are the normals of the edges of both boxes
+        for (const auto& axis : axes) {
+            // Project both boxes onto the axis
+            const float rA =
+                obbA.HalfExtents.X * std::abs(Dot2D(axis, obbA.AxisX)) +
+                obbA.HalfExtents.Y * std::abs(Dot2D(axis, obbA.AxisY));
+            const float rB =
+                obbB.HalfExtents.X * std::abs(Dot2D(axis, obbB.AxisX)) +
+                obbB.HalfExtents.Y * std::abs(Dot2D(axis, obbB.AxisY));
+            const float dist = std::abs(Dot2D(delta, axis));
+            const float overlap = rA + rB - dist;
+
+            if (overlap <= 0.0f) {
+                return manifold; // separating axis found
+            }
+
+            // Check for minimum overlap
+            if (overlap < minOverlap) {
+                minOverlap = overlap;
+                bestAxis = axis;
+
+                // Ensure normal points from A to B
+                if (Dot2D(delta, axis) < 0.0f) {
+                    bestAxis = bestAxis * -1.0f;
+                }
+            }
         }
 
-        // create simple maniford
-        Engine::Collision::ContactManifold manifold;
-        manifold.normal = normal;
-        manifold.penetration = penetration;
+        // Set manifold normal and penetration depth
+        manifold.normal = bestAxis;
+        manifold.penetration = minOverlap;
 
-        // Single contact point at midpoint
-        manifold.points[0].X = (aabbA.Center.X + aabbB.Center.X) * 0.5f;
-        manifold.points[0].Y = (aabbA.Center.Y + aabbB.Center.Y) * 0.5f;
+        // Compute contact point (approximate as midpoint of support points)
+        // Support points are the furthest points on each box in the direction of the collision normal
+        auto supportPoint = [](const Engine::WorldOBB& obb, const Vector2D& direction) {
+            const float signX = (Dot2D(direction, obb.AxisX) >= 0.0f) ? 1.0f : -1.0f;
+            const float signY = (Dot2D(direction, obb.AxisY) >= 0.0f) ? 1.0f : -1.0f;
+            return obb.Center +
+                obb.AxisX * (obb.HalfExtents.X * signX) +
+                obb.AxisY * (obb.HalfExtents.Y * signY);
+        };
+
+        // Single contact point for box-box
+        const Vector2D pA = supportPoint(obbA, manifold.normal);
+        const Vector2D pB = supportPoint(obbB, manifold.normal * -1.0f);
+        manifold.points[0] = (pA + pB) * 0.5f;
         manifold.pointCount = 1;
 
         return manifold;
@@ -291,64 +330,104 @@ namespace ECS {
 
     /**
      * @brief Test box-box collision using Collision utility
-     * @deprecated Use the WorldAABB version instead
+     * @deprecated Use the world-space OBB version instead
      */
+    [[deprecated("Use the world-space OBB version instead")]]
     Engine::Collision::ContactManifold TestBoxBox(
         const Components::BoxCollider2D& boxA,
         const Components::LocalTransform& transformA,
         const Components::BoxCollider2D& boxB,
         const Components::LocalTransform& transformB)
     {
-        // Compute world-space AABBs and delegate to the world-space version
-        Engine::WorldAABB waabbA = Engine::Physics::GetWorldAABB(boxA, transformA);
-        Engine::WorldAABB waabbB = Engine::Physics::GetWorldAABB(boxB, transformB);
-        return TestBoxBox(waabbA, waabbB);
+        // Compute world-space OBBs and delegate to the world-space version
+        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(boxA, transformA);
+        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(boxB, transformB);
+        return TestBoxBox(obbA, obbB);
     }
 
     /**
-     * @brief Test circle-box collision using Collision utility (using world-space shapes)
+     * @brief Test circle-box collision using OBB (using world-space shapes)
      */
     bool TestCircleBox(
         const Engine::WorldCircle& circle,
-        const Engine::WorldAABB& box,
+        const Engine::WorldOBB& box,
         Vector2D& outNormal,
-        float& outDepth)
+        float& outDepth,
+        Vector2D& outContact)
     {
-        // Build engine shapes for helper.
-        Engine::Collision::AABB aabb = Engine::Collision::MakeAABBCenterSize(
-            box.Center, box.HalfExtents * 2.0f
-        );
-        Engine::Collision::Circle circ;
-        circ.Center = circle.Center;
-        circ.Radius = circle.Radius;
+        // Fast path for axis-aligned boxes
+        if (std::abs(box.Rotation) < 1e-6f) {
+            Engine::Collision::AABB aabb = Engine::Collision::MakeAABBCenterSize(
+                box.Center, box.HalfExtents * 2.0f
+            );
 
-        // temp manifold to capture results
-        Engine::Collision::Manifold manifold;
-        if (Engine::Collision::Overlap(circ, aabb, &manifold)) {
-            outNormal = manifold.Normal;
-            outDepth = manifold.Penetration;
-            return true;
+            // Create collision circle for fast path
+            Engine::Collision::Circle circ;
+            circ.Center = circle.Center;
+            circ.Radius = circle.Radius;
+
+            // Use AABB-circle overlap test
+            Engine::Collision::Manifold manifold;
+            if (Engine::Collision::Overlap(circ, aabb, &manifold)) {
+                outNormal = manifold.Normal;
+                outDepth = manifold.Penetration;
+                outContact = manifold.Contact;
+                return true;
+            }
+
+            return false;
         }
 
-        return false;
+        // Transform circle center into box-local space
+        const Vector2D toCircle = circle.Center - box.Center;
+        const Vector2D localCenter{
+            Dot2D(toCircle, box.AxisX),
+            Dot2D(toCircle, box.AxisY)
+        };
+
+        Engine::Collision::Circle localCircle;
+        localCircle.Center = localCenter;
+        localCircle.Radius = circle.Radius;
+
+        // Create box AABB in local space
+        Engine::Collision::AABB localBox = Engine::Collision::MakeAABBCenterSize(
+            Vector2D{ 0.0f, 0.0f },
+            Vector2D{ box.HalfExtents.X * 2.0f, box.HalfExtents.Y * 2.0f }
+        );
+
+        // Perform local-space circle-AABB overlap test
+        Engine::Collision::Manifold localManifold;
+        if (!Engine::Collision::Overlap(localCircle, localBox, &localManifold)) {
+            return false;
+        }
+
+        // Transform results back to world space
+        outNormal = box.AxisX * localManifold.Normal.X + box.AxisY * localManifold.Normal.Y;
+        outDepth = localManifold.Penetration;
+        outContact = box.Center +
+            box.AxisX * localManifold.Contact.X +
+            box.AxisY * localManifold.Contact.Y;
+        return true;
     }
 
     /**
      * @brief Test circle-box collision using Collision utility
      * @deprecated Use the WorldCircle/WorldAABB version instead
      */
+    [[deprecated("Use the WorldCircle/WorldAABB version instead")]]
     bool TestCircleBox(
         const Components::CircleCollider2D& circle,
         const Components::LocalTransform& circleTransform,
         const Components::BoxCollider2D& box,
         const Components::LocalTransform& boxTransform,
         Vector2D& outNormal,
-        float& outDepth)
+        float& outDepth,
+        Vector2D& outContact)
     {
         // Compute world-space shapes and delegate to the world-space version
         Engine::WorldCircle wc = Engine::Physics::GetWorldCircle(circle, circleTransform);
-        Engine::WorldAABB wa = Engine::Physics::GetWorldAABB(box, boxTransform);
-        return TestCircleBox(wc, wa, outNormal, outDepth);
+        Engine::WorldOBB obb = Engine::Physics::GetWorldOBB(box, boxTransform);
+        return TestCircleBox(wc, obb, outNormal, outDepth, outContact);
     }
 
     // Helper to create unique collision pair ID
@@ -667,30 +746,12 @@ namespace ECS {
                         // Circle-box: single contact point
                         Vector2D n;
                         float depth;
-                        if (TestCircleBox(*circA, *tA, *boxB, *tB, n, depth)) {
+                        Vector2D contact;
+                        if (TestCircleBox(*circA, *tA, *boxB, *tB, n, depth, contact)) {
                             manifold.normal = n;
                             manifold.penetration = depth;
-                            
-                            // Step 3: Compute correct contact point - closest point on box to circle center
-                            Vector2D circleCenter(
-                                tA->Position.X + circA->Offset.X,
-                                tA->Position.Y + circA->Offset.Y
-                            );
-                            Vector2D boxCenter(
-                                tB->Position.X + boxB->Offset.X,
-                                tB->Position.Y + boxB->Offset.Y
-                            );
-                            Vector2D boxHalfExtents(
-                                boxB->HalfExtents.X * tB->Scale.X,
-                                boxB->HalfExtents.Y * tB->Scale.Y
-                            );
-                            
-                            // Clamp circle center to box bounds
-                            Vector2D boxMin = boxCenter - boxHalfExtents;
-                            Vector2D boxMax = boxCenter + boxHalfExtents;
-                            manifold.points[0].X = std::clamp(circleCenter.X, boxMin.X, boxMax.X);
-                            manifold.points[0].Y = std::clamp(circleCenter.Y, boxMin.Y, boxMax.Y);
-                            
+
+                            manifold.points[0] = contact;
                             manifold.pointCount = 1;
                             hasCollision = true;
                         }
@@ -699,30 +760,12 @@ namespace ECS {
                         // Box-circle: single contact point
                         Vector2D n;
                         float depth;
-                        if (TestCircleBox(*circB, *tB, *boxA, *tA, n, depth)) {
+                        Vector2D contact;
+                        if (TestCircleBox(*circB, *tB, *boxA, *tA, n, depth, contact)) {
                             manifold.normal = -n;  // Flip normal
                             manifold.penetration = depth;
-                            
-                            // Step 3: Compute correct contact point - closest point on box to circle center
-                            Vector2D circleCenter(
-                                tB->Position.X + circB->Offset.X,
-                                tB->Position.Y + circB->Offset.Y
-                            );
-                            Vector2D boxCenter(
-                                tA->Position.X + boxA->Offset.X,
-                                tA->Position.Y + boxA->Offset.Y
-                            );
-                            Vector2D boxHalfExtents(
-                                boxA->HalfExtents.X * tA->Scale.X,
-                                boxA->HalfExtents.Y * tA->Scale.Y
-                            );
-                            
-                            // Clamp circle center to box bounds
-                            Vector2D boxMin = boxCenter - boxHalfExtents;
-                            Vector2D boxMax = boxCenter + boxHalfExtents;
-                            manifold.points[0].X = std::clamp(circleCenter.X, boxMin.X, boxMax.X);
-                            manifold.points[0].Y = std::clamp(circleCenter.Y, boxMin.Y, boxMax.Y);
-                            
+
+                            manifold.points[0] = contact;
                             manifold.pointCount = 1;
                             hasCollision = true;
                         }
