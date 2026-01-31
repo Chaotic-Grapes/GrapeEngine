@@ -47,6 +47,9 @@ public static class ScriptFileWatcher
         "\\\\.vscode\\\\",
     ];
 
+    private static bool IsCsFilePath(string fullPath)
+        => fullPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+
     private static bool ShouldIgnorePath(string fullPath)
     {
         if (string.IsNullOrWhiteSpace(fullPath))
@@ -186,7 +189,10 @@ public static class ScriptFileWatcher
 
     private static void OnFileChanged(object sender, FileSystemEventArgs e)
     {
-        if (ShouldIgnorePath(e.FullPath))
+        if (!IsCsFilePath(e.FullPath) || ShouldIgnorePath(e.FullPath))
+            return;
+
+        if (e.ChangeType == WatcherChangeTypes.Changed && !File.Exists(e.FullPath))
             return;
 
         lock (_lock)
@@ -205,12 +211,17 @@ public static class ScriptFileWatcher
 
     private static void OnFileRenamed(object sender, RenamedEventArgs e)
     {
-        if (ShouldIgnorePath(e.FullPath))
-            return;
-
         lock (_lock)
         {
-            _changedFiles.Add(e.FullPath);
+            if (IsCsFilePath(e.OldFullPath) && !ShouldIgnorePath(e.OldFullPath))
+            {
+                _changedFiles.Add(e.OldFullPath);
+            }
+
+            if (IsCsFilePath(e.FullPath) && !ShouldIgnorePath(e.FullPath))
+            {
+                _changedFiles.Add(e.FullPath);
+            }
             
             _debounceTimer?.Stop();
             _debounceTimer?.Start();

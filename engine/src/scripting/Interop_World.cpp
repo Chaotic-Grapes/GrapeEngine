@@ -110,6 +110,52 @@ INTEROP_API void WorldInterop_DestroyEntity(void* worldPtr, uint64_t entityId) {
     }
 }
 
+INTEROP_API uint64_t WorldInterop_InstantiateFromArchetype(void* worldPtr, uint32_t archetypeIndex) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return 0;
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    const auto archetypes = world->GetAllArchetypes(); // Use current archetype list; caller provides index into this snapshot.
+
+    if (archetypeIndex >= archetypes.size()) {
+        LOG_WARNING("[WorldInterop] Archetype index out of range: " << archetypeIndex);
+        return 0;
+    }
+
+    ECS::Archetype* archetype = archetypes[archetypeIndex];
+    if (!archetype) {
+        LOG_WARNING("[WorldInterop] Archetype pointer is null for index: " << archetypeIndex);
+        return 0;
+    }
+
+    ECS::Entity entity = world->Create();
+    for (const auto& info : archetype->GetComponents()) {
+        world->AddComponentById(entity, info.Id, nullptr, info.Size); // Default-construct each component for the archetype.
+    }
+
+    return ECS::EntityUtils::Pack(entity);
+}
+
+INTEROP_API uint64_t WorldInterop_CloneEntity(void* worldPtr, uint64_t entityId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return 0;
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
+
+    if (!world->IsAlive(entity)) {
+        LOG_WARNING("[WorldInterop] CloneEntity failed: entity is not alive");
+        return 0;
+    }
+
+    ECS::Entity cloned = world->Clone(entity); // Preserve all components using the native clone path.
+    return ECS::EntityUtils::Pack(cloned);
+}
+
 INTEROP_API bool WorldInterop_IsEntityAlive(void* worldPtr, uint64_t entityId) {
     if (!worldPtr) {
         return false;

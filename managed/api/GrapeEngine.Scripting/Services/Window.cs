@@ -16,7 +16,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Internal.Unsafe;
 using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Internal.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -47,10 +46,7 @@ public static class Window
     {
         get
         {
-            using (PInvokeTimer.Start("WindowAPI.GetWidth"))
-            {
-                return WindowAPI.GetWidth();
-            }
+            return WindowAPI.GetWidth();
         }
     }
 
@@ -61,10 +57,7 @@ public static class Window
     {
         get
         {
-            using (PInvokeTimer.Start("WindowAPI.GetHeight"))
-            {
-                return WindowAPI.GetHeight();
-            }
+            return WindowAPI.GetHeight();
         }
     }
 
@@ -73,10 +66,7 @@ public static class Window
     /// </summary>
     public static void Resize(int width, int height)
     {
-        using (PInvokeTimer.Start("WindowAPI.Resize"))
-        {
-            WindowAPI.Resize(width, height);
-        }
+        WindowAPI.Resize(width, height);
     }
 
     // ============================================================================
@@ -90,10 +80,7 @@ public static class Window
     {
         get
         {
-            using (PInvokeTimer.Start("WindowAPI.ShouldClose"))
-            {
-                return WindowAPI.ShouldClose();
-            }
+            return WindowAPI.ShouldClose();
         }
     }
 
@@ -102,10 +89,7 @@ public static class Window
     /// </summary>
     public static void Close()
     {
-        using (PInvokeTimer.Start("WindowAPI.Close"))
-        {
-            WindowAPI.Close();
-        }
+        WindowAPI.Close();
     }
 
     /// <summary>
@@ -115,10 +99,7 @@ public static class Window
     {
         get
         {
-            using (PInvokeTimer.Start("WindowAPI.IsFocused"))
-            {
-                return WindowAPI.IsFocused();
-            }
+            return WindowAPI.IsFocused();
         }
     }
 
@@ -129,17 +110,11 @@ public static class Window
     {
         get
         {
-            using (PInvokeTimer.Start("WindowAPI.IsMinimized"))
-            {
-                return WindowAPI.IsMinimized();
-            }
+            return WindowAPI.IsMinimized();
         }
         set
         {
-            using (PInvokeTimer.Start("WindowAPI.SetMinimized"))
-            {
-                WindowAPI.SetMinimized(value);
-            }
+            WindowAPI.SetMinimized(value);
         }
     }
 
@@ -150,17 +125,11 @@ public static class Window
     {
         get
         {
-            using (PInvokeTimer.Start("WindowAPI.IsMaximized"))
-            {
-                return WindowAPI.IsMaximized();
-            }
+            return WindowAPI.IsMaximized();
         }
         set
         {
-            using (PInvokeTimer.Start("WindowAPI.SetMaximized"))
-            {
-                WindowAPI.SetMaximized(value);
-            }
+            WindowAPI.SetMaximized(value);
         }
     }
 
@@ -171,17 +140,11 @@ public static class Window
     {
         get
         {
-            using (PInvokeTimer.Start("WindowAPI.IsVisible"))
-            {
-                return WindowAPI.IsVisible();
-            }
+            return WindowAPI.IsVisible();
         }
         set
         {
-            using (PInvokeTimer.Start("WindowAPI.SetVisible"))
-            {
-                WindowAPI.SetVisible(value);
-            }
+            WindowAPI.SetVisible(value);
         }
     }
 
@@ -192,17 +155,11 @@ public static class Window
     {
         get
         {
-            using (PInvokeTimer.Start("WindowAPI.IsResizable"))
-            {
-                return WindowAPI.IsResizable();
-            }
+            return WindowAPI.IsResizable();
         }
         set
         {
-            using (PInvokeTimer.Start("WindowAPI.SetResizable"))
-            {
-                WindowAPI.SetResizable(value);
-            }
+            WindowAPI.SetResizable(value);
         }
     }
 
@@ -215,10 +172,7 @@ public static class Window
     /// </summary>
     public static void SetMode(WindowMode mode)
     {
-        using (PInvokeTimer.Start("WindowAPI.SetMode"))
-        {
-            WindowAPI.SetMode((int)mode);
-        }
+        WindowAPI.SetMode((int)mode);
     }
 
     /// <summary>
@@ -226,10 +180,7 @@ public static class Window
     /// </summary>
     public static bool HasMode(WindowMode mode)
     {
-        using (PInvokeTimer.Start("WindowAPI.HasMode"))
-        {
-            return WindowAPI.HasMode((int)mode);
-        }
+        return WindowAPI.HasMode((int)mode);
     }
 }
 

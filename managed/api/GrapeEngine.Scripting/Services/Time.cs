@@ -15,7 +15,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 
 using GrapeEngine.Scripting.Internal.Unsafe;
-using GrapeEngine.Scripting.Internal.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -35,10 +34,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetDeltaTime"))
-            {
-                return TimeAPI.GetDeltaTime();
-            }
+            return TimeAPI.GetDeltaTime();
         }
     }
 
@@ -49,10 +45,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetUnscaledDeltaTime"))
-            {
-                return TimeAPI.GetUnscaledDeltaTime();
-            }
+            return TimeAPI.GetUnscaledDeltaTime();
         }
     }
 
@@ -63,10 +56,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetFixedDeltaTime"))
-            {
-                return TimeAPI.GetFixedDeltaTime();
-            }
+            return TimeAPI.GetFixedDeltaTime();
         }
     }
 
@@ -77,10 +67,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetUnscaledFixedDeltaTime"))
-            {
-                return TimeAPI.GetUnscaledFixedDeltaTime();
-            }
+            return TimeAPI.GetUnscaledFixedDeltaTime();
         }
     }
 
@@ -91,10 +78,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetSmoothedDeltaTime"))
-            {
-                return TimeAPI.GetSmoothedDeltaTime();
-            }
+            return TimeAPI.GetSmoothedDeltaTime();
         }
     }
 
@@ -105,10 +89,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetRealTimeSinceStart"))
-            {
-                return TimeAPI.GetRealTimeSinceStart();
-            }
+            return TimeAPI.GetRealTimeSinceStart();
         }
     }
 
@@ -119,10 +100,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetElapsedTime"))
-            {
-                return TimeAPI.GetElapsedTime();
-            }
+            return TimeAPI.GetElapsedTime();
         }
     }
 
@@ -133,10 +111,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetFrameCount"))
-            {
-                return TimeAPI.GetFrameCount();
-            }
+            return TimeAPI.GetFrameCount();
         }
     }
 
@@ -147,10 +122,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetFPS"))
-            {
-                return TimeAPI.GetFPS();
-            }
+            return TimeAPI.GetFPS();
         }
     }
 
@@ -161,10 +133,7 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetFrameTimeMs"))
-            {
-                return TimeAPI.GetFrameTimeMs();
-            }
+            return TimeAPI.GetFrameTimeMs();
         }
     }
 
@@ -179,17 +148,11 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetTimeScale"))
-            {
-                return TimeAPI.GetTimeScale();
-            }
+            return TimeAPI.GetTimeScale();
         }
         set
         {
-            using (PInvokeTimer.Start("TimeAPI.SetTimeScale"))
-            {
-                TimeAPI.SetTimeScale(value);
-            }
+            TimeAPI.SetTimeScale(value);
         }
     }
 
@@ -204,17 +167,11 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetMaximumDeltaTime"))
-            {
-                return TimeAPI.GetMaximumDeltaTime();
-            }
+            return TimeAPI.GetMaximumDeltaTime();
         }
         set
         {
-            using (PInvokeTimer.Start("TimeAPI.SetMaximumDeltaTime"))
-            {
-                TimeAPI.SetMaximumDeltaTime(value);
-            }
+            TimeAPI.SetMaximumDeltaTime(value);
         }
     }
 
@@ -230,17 +187,11 @@ public static class Time
     {
         get
         {
-            using (PInvokeTimer.Start("TimeAPI.GetMaximumFPS"))
-            {
-                return TimeAPI.GetMaximumFPS();
-            }
+            return TimeAPI.GetMaximumFPS();
         }
         set
         {
-            using (PInvokeTimer.Start("TimeAPI.SetMaximumFPS"))
-            {
-                TimeAPI.SetMaximumFPS(value);
-            }
+            TimeAPI.SetMaximumFPS(value);
         }
     }
 }

@@ -16,7 +16,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Internal.Unsafe;
 using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Internal.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -30,10 +29,7 @@ public static class UI
     /// </summary>
     public static bool WasAnyClicked()
     {
-        using (PInvokeTimer.Start("UIAPI.WasAnyClicked"))
-        {
-            return UIAPI.WasAnyClicked();
-        }
+        return UIAPI.WasAnyClicked();
     }
 
     /// <summary>
@@ -41,10 +37,7 @@ public static class UI
     /// </summary>
     public static uint GetClickedActionID()
     {
-        using (PInvokeTimer.Start("UIAPI.GetClickedActionID"))
-        {
-            return UIAPI.GetClickedActionID();
-        }
+        return UIAPI.GetClickedActionID();
     }
 }
 

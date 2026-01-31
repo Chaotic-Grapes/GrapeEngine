@@ -134,7 +134,9 @@ public class World : IDisposable
     {
         unsafe
         {
-            ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
+            ulong entityId = WorldAPI.InstantiateFromArchetype((void*)_nativeWorldPtr, archetypeId); // Native interop treats archetypeId as an index into the world's current archetype list.
+            if (entityId == 0)
+                throw new InvalidOperationException($"Failed to instantiate entity from archetype index {archetypeId}.");
             return new Entity(this, entityId);
         }
     }
@@ -150,7 +152,9 @@ public class World : IDisposable
 
         unsafe
         {
-            ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
+            ulong entityId = WorldAPI.CloneEntity((void*)_nativeWorldPtr, sourceEntity.Id); // Clone via native ECS to preserve all components.
+            if (entityId == 0)
+                throw new InvalidOperationException($"Failed to clone entity {sourceEntity.Id}.");
             return new Entity(this, entityId);
         }
     }

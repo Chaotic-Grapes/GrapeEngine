@@ -19,9 +19,6 @@ global using GrapeEngine.Scripting.Helpers;
 global using GrapeEngine.Math;
 
 // Internal APIs
-global using GrapeEngine.Scripting.Internal.Profiling;
-global using GrapeEngine.Scripting.Internal.Profiling.Optimization;
-global using GrapeEngine.Scripting.Internal.Profiling.Optimization.SIMD;
 global using GrapeEngine.Scripting.Internal.Compiler;
 
 
