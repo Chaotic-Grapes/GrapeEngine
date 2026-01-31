@@ -1,6 +1,5 @@
 using GrapeEngine.Math;
 using GrapeEngine.Scripting.Components;
-using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
@@ -10,13 +9,15 @@ namespace EchoesBelow.Scripts;
 [Component] public record struct PlayerComponent(
     //[Pseudo-SerializeField]
     float moveSpeed,
-    float Time,
-    float lerpFac
+    float time,
+    float lerpFac,
+    float maxSpeed,
+    float angularVelocity
+    
 );
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class Player : SystemBase
 {
-    Vector2 moveDir = Vector2.Zero;
     protected override void OnCreate()
     {
         Log("System Player initialized");
@@ -24,51 +25,85 @@ public class Player : SystemBase
 
     protected override void OnUpdate()
     {
-        foreach(var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D>())
+        foreach(var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D, LocalTransform>())
         {
+            ref LocalTransform transform = ref gameObject.Component4;
             ref LinearVelocity2D lv = ref gameObject.Component2;
-            float moveSpeed = gameObject.Component1.moveSpeed;
+            Vector2 playerDir;
+            Vector2 moveDir = Vector2.Zero;
+            Vector2 moveDirNormalized = Vector2.Zero;
+            float lerpFac = gameObject.Component1.lerpFac * 0.01f; //this allows floating point decimal values
+            float moveSpeed = gameObject.Component1.moveSpeed * 0.01f; //this allows floating point decimal values
+            float maxSpeed = gameObject.Component1.maxSpeed;
+            float angularVelocity = gameObject.Component1.angularVelocity * 0.01f; //100 == 1
 
-            if (Input.IsKeyDown(KeyCode.W) || Input.IsKeyDown(KeyCode.A) ||
-                Input.IsKeyDown(KeyCode.S) || Input.IsKeyDown(KeyCode.D))
-            {
-                if (Input.IsKeyDown(KeyCode.W))
-                {
-                    lv.Value.Y += 0.01f * moveSpeed;
-                    //moveDir.Y = 1;
-                    Log("Up!");
-                }
-                if (Input.IsKeyDown(KeyCode.S))
-                {
-                    lv.Value.Y -= 0.01f * moveSpeed;
-                    //moveDir.Y = -1;
-                    Log("Down!");
-                }
-                if (Input.IsKeyDown(KeyCode.A))
-                {
-                    lv.Value.X -= 0.01f * moveSpeed;
-                    //moveDir.X = -1;
-                    Log("Left!");
-                }
-                if (Input.IsKeyDown(KeyCode.D))
-                {
-                    lv.Value.X += 0.01f * moveSpeed;
-                    //moveDir.X = 1;
-                    Log("Right!");
-                }
-            }
+            moveDir = ProcessInput(moveDir, lerpFac);
+
+            //moveDir = new Vector2(GMath.Lerp(moveDir.X,0,lerpFac/2),GMath.Lerp(moveDir.Y,0,lerpFac/2));
+
+            //NaN protection
+            if (-0.0001f <= moveDir.X && moveDir.X <= 0.0001f && -0.0001f <= moveDir.Y && moveDir.Y <= 0.0001f)
+            moveDirNormalized = Vector2.Zero;
             else
-            {
-                float lerpFac = gameObject.Component1.lerpFac;
-                //moveDir = new Vector2(GMath.Lerp(moveDir.X, 0, 0.01f * lerpFac), GMath.Lerp(moveDir.Y, 0, 0.01f * lerpFac));
-                lv.Value = new Vector2(GMath.Lerp(lv.Value.X, 0, 0.01f * lerpFac), GMath.Lerp(lv.Value.Y, 0, 0.01f * lerpFac));
-                Log("Resting!");
-            }
+            moveDirNormalized = moveDir.Normalized;
+            
 
-            //Log("Pre Normalize");
-            //lv.Value = moveDir.Normalized * 0.01f * moveSpeed;
-            //Log("Normalized and returned");
+            //Assignment of linear Velocities
+            lv.Value.X += moveDir.X * moveSpeed;
+            lv.Value.Y += moveDir.Y * moveSpeed;
+            //Clamping these values to a maxSpeed
+            lv.Value.X = GMath.Clamp(lv.Value.X, -maxSpeed, maxSpeed);
+            lv.Value.Y = GMath.Clamp(lv.Value.Y, -maxSpeed, maxSpeed);
+
+            //Handling Rotation! Aligning Grain to moveDir
+
+            //Convert from ZYX Quaternion to angle in radians
+            //set player direction
+            float angle = Quat2EulerAxisZ(transform.Rotation);
+            playerDir = new Vector2(GMath.Cos(angle + (90 * GMath.Deg2Rad)), GMath.Cos(angle));
+
+            Log($"player up direction: {playerDir}");
         }
+    }
+
+    private static Vector2 ProcessInput(Vector2 moveDir, float lerpFac)
+    {
+        //ProcessInput
+        if (Input.IsKeyDown(KeyCode.W))
+        {
+            moveDir.Y = GMath.Lerp(moveDir.Y, 1, lerpFac);
+        }
+        if (Input.IsKeyDown(KeyCode.S))
+        {
+            moveDir.Y = GMath.Lerp(moveDir.Y, -1, lerpFac);
+        }
+        if (Input.IsKeyDown(KeyCode.A))
+        {
+            moveDir.X = GMath.Lerp(moveDir.X, -1, lerpFac);
+        }
+        if (Input.IsKeyDown(KeyCode.D))
+        {
+            moveDir.X = GMath.Lerp(moveDir.X, 1, lerpFac);
+        }
+
+        moveDir.X = GMath.Lerp(moveDir.X, 0, lerpFac / 2);
+        moveDir.Y = GMath.Lerp(moveDir.Y, 0, lerpFac / 2);
+        return moveDir;
+    }
+
+    private float Quat2EulerAxisZ(Quaternion quat)
+    {
+        //To find out how
+        //Search up Conversion of ZYX Quaternion to Euler Angle (z-yaw)
+        float x = quat.X;
+        float y = quat.Y;
+        float z = quat.Z;
+        float w = quat.W;
+
+        float a = 2 * (w * z + x * y);
+        float b = 1 - (2 * ((y * y) + (z * z)));
+        float outAngle = GMath.Atan2(a, b);
+        return outAngle;
     }
 
     protected override void OnDestroy()
