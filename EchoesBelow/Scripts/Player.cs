@@ -9,11 +9,10 @@ namespace EchoesBelow.Scripts;
 [Component] public record struct PlayerComponent(
     //[Pseudo-SerializeField]
     float moveSpeed,
-    float time,
+    float timer,
     float lerpFac,
     float maxSpeed,
     float angularVelocity
-    
 );
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class Player : SystemBase
@@ -27,8 +26,10 @@ public class Player : SystemBase
     {
         foreach(var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D, LocalTransform>())
         {
+            
             ref LocalTransform transform = ref gameObject.Component4;
             ref LinearVelocity2D lv = ref gameObject.Component2;
+            ref AngularVelocity2D av = ref gameObject.Component3;
             Vector2 playerDir;
             Vector2 moveDir = Vector2.Zero;
             Vector2 moveDirNormalized = Vector2.Zero;
@@ -37,6 +38,7 @@ public class Player : SystemBase
             float maxSpeed = gameObject.Component1.maxSpeed;
             float angularVelocity = gameObject.Component1.angularVelocity * 0.01f; //100 == 1
 
+            //Handling movement and movement direction====================================================
             moveDir = ProcessInput(moveDir, lerpFac);
 
             //moveDir = new Vector2(GMath.Lerp(moveDir.X,0,lerpFac/2),GMath.Lerp(moveDir.Y,0,lerpFac/2));
@@ -46,23 +48,57 @@ public class Player : SystemBase
             moveDirNormalized = Vector2.Zero;
             else
             moveDirNormalized = moveDir.Normalized;
+
             
 
-            //Assignment of linear Velocities
-            lv.Value.X += moveDir.X * moveSpeed;
-            lv.Value.Y += moveDir.Y * moveSpeed;
-            //Clamping these values to a maxSpeed
-            lv.Value.X = GMath.Clamp(lv.Value.X, -maxSpeed, maxSpeed);
-            lv.Value.Y = GMath.Clamp(lv.Value.Y, -maxSpeed, maxSpeed);
-
-            //Handling Rotation! Aligning Grain to moveDir
+            //Handling Rotation! Aligning Grain to moveDir=================================================
 
             //Convert from ZYX Quaternion to angle in radians
-            //set player direction
+            //Find the local "Up" Vector of the Player. Think of this as gameObject.transform.up in Unity
             float angle = Quat2EulerAxisZ(transform.Rotation);
             playerDir = new Vector2(GMath.Cos(angle + (90 * GMath.Deg2Rad)), GMath.Cos(angle));
 
-            Log($"player up direction: {playerDir}");
+            //Find change in angle required using dot product between moveDirNormalized and playerDir
+            //NaN protection when player is facing up or at rest
+            if (-0.0001f < playerDir.X && playerDir.X < 0.0001f && 0.9999f < playerDir.Y && playerDir.Y < 1.0001f)
+            playerDir = new Vector2(0,1);
+            //Dot product operation to determine theta as presented by angleBetween in radians!
+            float angleBetween = GMath.Acos(GMath.Dot(playerDir, moveDirNormalized) / (playerDir.Magnitude * moveDirNormalized.Magnitude));
+            //NaN protection for when angle is at rest
+            angleBetween = (float.IsNaN(angleBetween))? 0 : angleBetween;
+
+
+            //Find change in time required to complete a rotation. This formula requires radians
+            float rotDuration = angleBetween / angularVelocity;
+
+            //start Rotation process
+            bool isRotating = false;
+            if (angleBetween != 0) { isRotating = true; } //Log("Start Rotating"); }
+            if (isRotating)
+            {
+                gameObject.Component1.timer += Time.DeltaTime;
+                av.Value = GMath.Lerp(av.Value,angularVelocity,lerpFac);
+                //Log("Rotating. . . ");
+            }
+            if(gameObject.Component1.timer > rotDuration)
+            {
+                isRotating = false;
+                gameObject.Component1.timer = 0;
+                av.Value = 0;
+                //Log("Finished Rotating");
+            }
+            Log($"Angle In Between: {angleBetween * GMath.Rad2Deg}");
+
+            //Assignment of linear Velocities================================================================
+            if(Input.IsKeyDown(KeyCode.W)|| Input.IsKeyDown(KeyCode.S)
+                || Input.IsKeyDown(KeyCode.A) || Input.IsKeyDown(KeyCode.D))
+            {
+                lv.Value.X += playerDir.X * moveSpeed;
+                lv.Value.Y += playerDir.Y * moveSpeed;
+                //Clamping these values to a maxSpeed
+                lv.Value.X = GMath.Clamp(lv.Value.X, -maxSpeed, maxSpeed);
+                lv.Value.Y = GMath.Clamp(lv.Value.Y, -maxSpeed, maxSpeed);
+            }
         }
     }
 

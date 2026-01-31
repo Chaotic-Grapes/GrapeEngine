@@ -38,7 +38,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.3652174472808838,
+                        "AspectRatio": 1.638260841369629,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -1397,10 +1397,11 @@
                 },
                 {
                     "Data": {
+                        "angularVelocity": 175,
                         "lerpFac": 75,
                         "maxSpeed": 5,
-                        "moveSpeed": 10,
-                        "time": 0
+                        "moveSpeed": 3,
+                        "timer": 0
                     },
                     "TypeName": "Player"
                 }
