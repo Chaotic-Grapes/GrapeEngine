@@ -639,6 +639,10 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
         // Rebuild entity order to reflect restored hierarchy
         m_hierarchyWindow.RebuildEntityOrder();
     }
+
+    if (newState == EditorState::Play && m_console.IsClearOnPlayBuildEnabled()) {
+        m_console.Clear();
+    }
 }
 
 // Handle viewport selection changes (called by Viewport via callback)
