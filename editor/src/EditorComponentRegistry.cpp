@@ -297,6 +297,9 @@ static auto& _getCppComponentDefaults() {
                 return nlohmann::json{
                 {"TextureId", 0},
                 {"NormalTextureId", 0},
+                {"EmissiveTextureId", 0},
+                {"EmissiveStrength", 5.0f},
+                {"EmissiveTexturePath", ""},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Tiling", {{"X", 1.0f}, {"Y", 1.0f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},
@@ -543,6 +546,9 @@ static void _initializeDefaultRegistry() {
             static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json{
                 {"TextureId", 0},
                 {"NormalTextureId", 0},
+                {"EmissiveTextureId", 0},
+                {"EmissiveStrength", 5.0f},
+                {"EmissiveTexturePath", ""},
                 {"Color", {{"R", 1.0f}, {"G", 1.0f}, {"B", 1.0f}, {"A", 1.0f}}},
                 {"Tiling", {{"X", 1.0f}, {"Y", 1.0f}}},
                 {"Offset", {{"X", 0.0f}, {"Y", 0.0f}}},

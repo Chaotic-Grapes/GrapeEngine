@@ -29,6 +29,7 @@ public record struct SpriteRenderer2D
     public float EmissiveStrength;
     public StringId TexturePath;
     public StringId NormalTexturePath;
+    public StringId EmissiveTexturePath;
 }
 
 [StructLayout(LayoutKind.Sequential)]

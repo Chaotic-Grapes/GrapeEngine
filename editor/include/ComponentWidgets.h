@@ -79,6 +79,11 @@ namespace EditorUI {
     void RenderIntProperty(const std::string& label, nlohmann::json& data, 
         const std::string& key);
 
+    // Renders a dropdown to edit a bitmask (up to 32 bits) with labeled entries
+    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data,
+        const std::string& key, const std::vector<std::string>& bitNames,
+        uint32_t defaultMask = 0xFFFFFFFFu);
+
     // Renders a checkbox that toggles boolean values in JSON data
     void RenderCheckboxProperty(const std::string& label, nlohmann::json& data, 
         const std::string& key);

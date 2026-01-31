@@ -141,11 +141,15 @@ namespace ECS {
 		inline void to_json(nlohmann::json& j, const SpriteRenderer2D& sprite) {
 			std::string texturePath = ECS::StringTable::Resolve(sprite.TexturePath);
 			std::string normalTexturePath = ECS::StringTable::Resolve(sprite.NormalTexturePath);
+			std::string emissiveTexturePath = ECS::StringTable::Resolve(sprite.EmissiveTexturePath);
 			j = nlohmann::json{
 				{"TextureId", sprite.TextureId},
 				{"TexturePath", texturePath},
 				{"NormalTextureId", sprite.NormalTextureId},
 				{"NormalTexturePath", normalTexturePath},
+				{"EmissiveTextureId", sprite.EmissiveTextureId},
+				{"EmissiveTexturePath", emissiveTexturePath},
+				{"EmissiveStrength", sprite.EmissiveStrength},
 				{"Color", sprite.Color},
 				{"Tiling", sprite.Tiling},
 				{"Offset", sprite.Offset}
@@ -193,9 +197,28 @@ namespace ECS {
 				sprite.NormalTextureId = 0;
 			}
 
+			// Emissive map path (optional)
+			std::string emissivePath = j.value("EmissiveTexturePath", std::string());
+			sprite.EmissiveTexturePath = emissivePath.empty() ? 0 : ECS::StringTable::Intern(emissivePath);
+
+			if (!emissivePath.empty()) {
+				auto emissiveTex = RM.Get<Texture>(emissivePath);
+				if (emissiveTex) {
+					sprite.EmissiveTextureId = static_cast<uint32_t>(emissiveTex->ID());
+				}
+				else {
+					sprite.EmissiveTextureId = 0;
+					LOG_WARNING("Failed to load emissive map from path: " << emissivePath);
+				}
+			}
+			else if (emissivePath.empty()) {
+				sprite.EmissiveTextureId = 0;
+			}
+
 			sprite.Color = j.value("Color", ::Color{ 1.0f, 1.0f, 1.0f, 1.0f });
 			sprite.Tiling = j.value("Tiling", Vector2D{ 1, 1 });
 			sprite.Offset = j.value("Offset", Vector2D{ 0, 0 });
+			sprite.EmissiveStrength = j.value("EmissiveStrength", 5.0f);
 		}
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SpriteFlip2D, FlipX, FlipY)

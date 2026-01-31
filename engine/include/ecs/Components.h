@@ -316,6 +316,7 @@ namespace ECS {
             // Persistent texture path IDs (StringTable). 0 = invalid.
             uint32_t TexturePath = 0;
             uint32_t NormalTexturePath = 0;
+            uint32_t EmissiveTexturePath = 0;
         };
         static_assert(std::is_trivially_copyable_v<SpriteRenderer2D>, "SpriteRenderer2D must be trivially copyable");
         
