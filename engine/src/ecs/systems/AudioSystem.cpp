@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/AudioSystem.h"
 #include "services/AudioService.h"
 #include "audio/FmodAudioDevice.h"
+#include "core/ProjectPaths.h"
 #include <iostream>
 #include "core/Logger.h"
 #include <set>
@@ -32,14 +33,19 @@ namespace {
     std::unordered_map<uint32_t, std::string> g_cueCache;
     bool g_cacheBuilt = false;
 
+    std::string GetAudioRoot() {
+        return Engine::ProjectPaths::GetProjectRoot();
+    }
+
     // Build the cache by scanning audio folder once
-    void BuildCueCache(const std::string& audioRoot = "assets/Audio") {
+    void BuildCueCache() {
         if (g_cacheBuilt) return;
 
         namespace fs = std::filesystem;
 
+        const std::string audioRoot = GetAudioRoot();
         if (!fs::exists(audioRoot) || !fs::is_directory(audioRoot)) {
-            LOG_WARNING("Audio folder not found: " << audioRoot);
+            LOG_WARNING("Audio root not found: " << audioRoot);
             g_cacheBuilt = true;
             return;
         }
@@ -143,7 +149,7 @@ void AudioSystem::OnUpdate(World& world)
                 if (s_warnedCues.find(src.CueId) == s_warnedCues.end()) {
                     LOG_WARNING("AudioSystem: Entity " << e.Index
                         << " has invalid CueId " << src.CueId
-                        << " (audio file not found in assets/Audio)");
+                        << " (audio file not found under " << GetAudioRoot() << ")");
                     s_warnedCues.insert(src.CueId);
                 }
                 _stopSound(e);

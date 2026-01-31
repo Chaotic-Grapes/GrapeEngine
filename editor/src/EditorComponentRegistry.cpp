@@ -165,7 +165,7 @@ Without these, the macro would end early and break the expansion
 
 // These lambdas provide specialized UI rendering for known C++ components
 // They're stored in a map keyed by component type ID for fast lookup
-static auto& _getCppComponentRenderers() {
+[[maybe_unused]] static auto& _getCppComponentRenderers() {
     static std::unordered_map<ECS::ComponentTypeId, std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>> renderers;
     
     // Initialize on first call
@@ -269,7 +269,7 @@ static auto& _getCppComponentRenderers() {
 }
 
 // Hardcoded default values for known C++ components
-static auto& _getCppComponentDefaults() {
+[[maybe_unused]] static auto& _getCppComponentDefaults() {
     static std::unordered_map<ECS::ComponentTypeId, std::function<nlohmann::json()>> defaults;
     
     if (defaults.empty()) {

@@ -335,6 +335,7 @@ namespace Scenes {
                 }
 
                 world.DestroyAll();
+                scene.GetLayers().ClearEntityMembership();
 
                 int loadedCount = 0;
                 std::vector<ECS::Entity> restoredEntities;

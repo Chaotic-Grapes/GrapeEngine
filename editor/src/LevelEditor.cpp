@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 #include "AudioAssetLibrary.h"
+#include "core/ProjectPaths.h"
 #include "core/Logger.h"
 #include "ecs/systems/RendererSystem.h"
 #include "EditorStyle.h"
@@ -245,8 +246,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     ImGuiStyle& style = ImGui::GetStyle();
 
     // Initialize audio asset library:
-    // this will scan for folder assets/Audio
-    AudioAssetLibrary::Get().Refresh("assets/Audio");
+    // this will scan for audio anywhere under the project root
+    AudioAssetLibrary::Get().Refresh(Engine::ProjectPaths::GetProjectRoot());
 
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
     _loadFonts();

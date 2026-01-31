@@ -80,7 +80,18 @@ namespace ECS {
             // Lock-free read access to component metadata
             // Safe because metadata is only written during registration (protected by std::call_once)
             // and never modified afterward, making reads lock-free for iteration hot paths
-            return _metas()[id];
+            static const ComponentMeta empty{};
+            if (id == NULL_COMPONENT_ID) {
+                LOG_ERROR("[ComponentRegistry] Meta lookup requested for NULL_COMPONENT_ID");
+                return empty;
+            }
+            auto& metas = _metas();
+            const auto it = metas.find(id);
+            if (it == metas.end()) {
+                LOG_ERROR("[ComponentRegistry] Meta lookup failed for unknown component id " << id);
+                return empty;
+            }
+            return it->second;
         }
 
   private:
@@ -143,7 +154,14 @@ namespace ECS {
       template<typename T>
       static void RegisterWithHash(uint32_t typeHash) {
           ComponentTypeId id = Type<T>();
-          _hashToId()[typeHash] = id;
+          auto& hashMap = _hashToId();
+          const auto it = hashMap.find(typeHash);
+          if (it != hashMap.end() && it->second != id) {
+              LOG_ERROR("[ComponentRegistry] Hash remap detected during native registration (hash=0x"
+                  << std::hex << typeHash << std::dec << ", existing id=" << it->second
+                  << ", new id=" << id << ")");
+          }
+          hashMap[typeHash] = id;
           _idToHash()[id] = typeHash;
           auto& meta = _metas()[id];
           meta.TypeHash = typeHash;
@@ -173,7 +191,7 @@ namespace ECS {
           auto& hashMap = _hashToId();
           auto it = hashMap.find(typeHash);
           if (it != hashMap.end() && it->second != id) {
-              LOG_WARNING("[ComponentRegistry] Hash mapping mismatch for '" << typeName
+              LOG_ERROR("[ComponentRegistry] Hash mapping mismatch for '" << typeName
                   << "' (hash=0x" << std::hex << typeHash << std::dec
                   << ", existing id=" << it->second << ", enforced id=" << id << ")");
           }
@@ -222,6 +240,45 @@ namespace ECS {
       }
 
       /**
+       * @brief Get ComponentTypeId from type name.
+       * @param typeName Component type name (no namespace)
+       * @return ComponentTypeId or NULL_COMPONENT_ID if not found
+       */
+      static ComponentTypeId GetComponentIdFromName(const std::string& typeName) {
+          if (typeName.empty()) {
+              return NULL_COMPONENT_ID;
+          }
+
+          auto allIds = GetAllComponentIds();
+          for (ComponentTypeId id : allIds) {
+              const auto& meta = Meta(id);
+              if (meta.TypeHash == 0) {
+                  continue;
+              }
+              const std::string name = GetComponentNameFromHash(meta.TypeHash);
+              if (name == typeName) {
+                  return id;
+              }
+          }
+
+          // Fallback to hash lookup when name map is not ready.
+          uint32_t hash = 2166136261u;
+          for (char c : typeName) {
+              hash ^= static_cast<uint32_t>(static_cast<unsigned char>(c));
+              hash *= 16777619u;
+          }
+
+          ComponentTypeId id = GetComponentIdFromHash(hash);
+          if (id == NULL_COMPONENT_ID) {
+              return NULL_COMPONENT_ID;
+          }
+
+          LOG_ERROR("[ComponentRegistry] Name lookup fell back to hash for '" << typeName
+              << "' (hash=0x" << std::hex << hash << std::dec << "). Registry names not ready?");
+          return id;
+      }
+
+      /**
        * @brief Register a component type with only its type name hash (for C# runtime components)
        * This creates a synthetic entry for C# components that don't have C++ type equivalents.
        * @param typeHash FNV-1a hash of the component type name
@@ -241,7 +298,9 @@ namespace ECS {
               ComponentTypeId existingId = existingIt->second;
               auto& meta = metas[existingId];
               if (!meta.IsManaged) {
-                  LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] Skipping managed registration for native component hash 0x" << std::hex << typeHash << std::dec << " (ID " << existingId << ")");
+                  LOG_ERROR("[ComponentRegistry::RegisterCSharpComponent] Managed registration hit native mapping (hash=0x"
+                      << std::hex << typeHash << std::dec << ", id=" << existingId
+                      << "). Possible registration order or hot-reload issue.");
                   return existingId;
               }
               LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] Updating existing C# component with hash 0x" << std::hex << typeHash << std::dec << " (ID " << existingId << ")");
@@ -269,7 +328,7 @@ namespace ECS {
           meta.TypeHash = typeHash;
           meta.IsManaged = true;
           // C# components don't have C++ constructors/destructors
-          meta.ctor = [](void* p) { std::memset(p, 0, 1); }; // Zero-initialize
+          meta.ctor = nullptr;
           meta.dtor = [](void*) { /* No cleanup for C# components */ };
           
           metas[id] = meta;

@@ -115,7 +115,7 @@ void LayersPanel::SetLayer(EntityId entity, uint16_t layerId) {
     if (!m_scene) return;
     ECS::Entity e{ entity, 0 };
     if (e.IsNull()) return;
-    m_scene->SetLayer(e, layerId);
+    m_scene->SetLayerById(e, layerId);
     if (m_fileMenu) m_fileMenu->MarkSceneDirty();  // Mark scene as modified
 }
 
@@ -386,7 +386,7 @@ void LayersPanel::_renderFooterButtons() {
                     ECS::World& world = scene->GetWorld();
                     for (auto &p : entityLayers) {
                         ECS::Entity e = world.Resolve(p.first);
-                        if (!e.IsNull() && world.IsAlive(e)) scene->SetLayer(e, p.second);
+                        if (!e.IsNull() && world.IsAlive(e)) scene->SetLayerById(e, p.second);
                     }
                 }
             };
@@ -487,63 +487,53 @@ void LayersPanel::_renderCollisionMatrix() {
                 // Checkbox is checked if BOTH directions allow collision (symmetrical matrix)
                 bool collides = ((rowMask & bitForCol) != 0u) && ((colMask & bitForRow) != 0u);
 
-                if (rowId == colId) {
-                    // Diagonal: disabled checkbox (layer can't collide with itself)
-                    ImGui::BeginDisabled();
-                    ImGui::Checkbox("##cell", &collides);
-                    ImGui::EndDisabled();
-                } else {
-                    // Lower triangle: interactive checkbox to toggle collision
-                    bool prevState = collides;
-                    ImGui::Checkbox("##cell", &collides);
+                // Lower triangle (including diagonal): interactive checkbox to toggle collision
+                bool prevState = collides;
+                ImGui::Checkbox("##cell", &collides);
                     
-                    // If state changed, update both layers' masks (symmetrical)
-                    if (collides != prevState) {
-                        uint32_t prevRowMask = lm.GetLayerMask(rowId);
-                        uint32_t prevColMask = lm.GetLayerMask(colId);
+                // If state changed, update both layers' masks (symmetrical)
+                if (collides != prevState) {
+                    uint32_t prevRowMask = lm.GetLayerMask(rowId);
+                    uint32_t prevColMask = lm.GetLayerMask(colId);
 
-                        const uint32_t bitForCol = (colId < 32) ? (1u << colId) : 0u;
-                        const uint32_t bitForRow = (rowId < 32) ? (1u << rowId) : 0u;
+                    uint32_t newRowMask = prevRowMask;
+                    uint32_t newColMask = prevColMask;
 
-                        uint32_t newRowMask = prevRowMask;
-                        uint32_t newColMask = prevColMask;
+                    // Update both masks to maintain symmetry
+                    if (collides) { newRowMask |= bitForCol; newColMask |= bitForRow; }  // Enable collision
+                    else { newRowMask &= ~bitForCol; newColMask &= ~bitForRow; }         // Disable collision
 
-                        // Update both masks to maintain symmetry
-                        if (collides) { newRowMask |= bitForCol; newColMask |= bitForRow; }  // Enable collision
-                        else { newRowMask &= ~bitForCol; newColMask &= ~bitForRow; }         // Disable collision
+                    // Apply masks with world sync so colliders get updated immediately
+                    lm.SetLayerMask(rowId, newRowMask, &m_scene->GetWorld());
+                    lm.SetLayerMask(colId, newColMask, &m_scene->GetWorld());
 
-                        // Apply masks with world sync so colliders get updated immediately
-                        lm.SetLayerMask(rowId, newRowMask, &m_scene->GetWorld());
-                        lm.SetLayerMask(colId, newColMask, &m_scene->GetWorld());
+                    if (m_undoSystem) {
+                        // Command
+                        struct CollisionCmd : public Editor::ICommand {
+                            Scenes::Scene* scene; uint16_t a; uint16_t b; uint32_t prevA; uint32_t prevB; uint32_t nextA; uint32_t nextB;
+                            CollisionCmd(Scenes::Scene* s, uint16_t aa, uint16_t bb, uint32_t pA, uint32_t pB, uint32_t nA, uint32_t nB)
+                                : scene(s), a(aa), b(bb), prevA(pA), prevB(pB), nextA(nA), nextB(nB) {}
 
-                        if (m_undoSystem) {
-                            // Command
-                            struct CollisionCmd : public Editor::ICommand {
-                                Scenes::Scene* scene; uint16_t a; uint16_t b; uint32_t prevA; uint32_t prevB; uint32_t nextA; uint32_t nextB;
-                                CollisionCmd(Scenes::Scene* s, uint16_t aa, uint16_t bb, uint32_t pA, uint32_t pB, uint32_t nA, uint32_t nB)
-                                    : scene(s), a(aa), b(bb), prevA(pA), prevB(pB), nextA(nA), nextB(nB) {}
+                            void Execute() override {
+                                if (!scene)
+                                    return;
 
-                                void Execute() override {
-                                    if (!scene)
-                                        return;
+                                scene->GetLayers().SetLayerMask(a, nextA, &scene->GetWorld());
+                                scene->GetLayers().SetLayerMask(b, nextB, &scene->GetWorld());
+                            }
 
-                                    scene->GetLayers().SetLayerMask(a, nextA, &scene->GetWorld());
-                                    scene->GetLayers().SetLayerMask(b, nextB, &scene->GetWorld());
-                                }
+                            void Undo() override {
+                                if (!scene)
+                                    return;
 
-                                void Undo() override {
-                                    if (!scene)
-                                        return;
-
-                                    scene->GetLayers().SetLayerMask(a, prevA, &scene->GetWorld());
-                                    scene->GetLayers().SetLayerMask(b, prevB, &scene->GetWorld());
-                                }
-                            };
-                            auto cmd = std::make_unique<CollisionCmd>(m_scene, rowId, colId, prevRowMask, prevColMask, newRowMask, newColMask);
-                            m_undoSystem->ExecuteCommand(std::move(cmd));
-                        }
-                        if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+                                scene->GetLayers().SetLayerMask(a, prevA, &scene->GetWorld());
+                                scene->GetLayers().SetLayerMask(b, prevB, &scene->GetWorld());
+                            }
+                        };
+                        auto cmd = std::make_unique<CollisionCmd>(m_scene, rowId, colId, prevRowMask, prevColMask, newRowMask, newColMask);
+                        m_undoSystem->ExecuteCommand(std::move(cmd));
                     }
+                    if (m_fileMenu) m_fileMenu->MarkSceneDirty();
                 }
             }
             ImGui::NextColumn();
@@ -557,14 +547,14 @@ void LayersPanel::_renderCollisionMatrix() {
 
 void LayersPanel::_renderLayersList() {
     auto& lm = m_scene->GetLayers();
+    lm.PruneDeadEntities(m_scene->GetWorld());
     auto layers = lm.ListLayers();
 
-    // Create table with 7 columns: Vis, Name, Count, Render, Update, Physics, Lock
-    if (ImGui::BeginTable("LayersTable", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    // Create table with 6 columns: Vis, Name, Render, Update, Physics, Lock
+    if (ImGui::BeginTable("LayersTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         // Set up column headers and widths
         ImGui::TableSetupColumn("Vis", ImGuiTableColumnFlags_WidthFixed, 40.0f);      // Visibility toggle
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);          // Layer name (editable)
-        ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_WidthFixed, 55.0f);    // Entity count
         ImGui::TableSetupColumn("Render", ImGuiTableColumnFlags_WidthFixed, 90.0f);   // Render enabled
         ImGui::TableSetupColumn("Update", ImGuiTableColumnFlags_WidthFixed, 90.0f);   // Update enabled
         ImGui::TableSetupColumn("Physics", ImGuiTableColumnFlags_WidthFixed, 90.0f);  // Physics enabled
@@ -583,8 +573,6 @@ void LayersPanel::_renderLayersList() {
             bool renderEnabled = lm.IsRenderEnabled(id);
             bool updateEnabled = lm.IsUpdateEnabled(id);
             bool physicsEnabled = lm.IsPhysicsEnabled(id);
-            size_t count = lm.EntitiesIn(id).size();  // Number of entities on this layer
-
             ImGui::TableNextRow();
             ImGui::PushID(static_cast<int>(id));  // Unique ID for this row's widgets
 
@@ -641,12 +629,8 @@ void LayersPanel::_renderLayersList() {
                 }
             }
 
-            // Column 2: Entity count (read-only)
+            // Column 2: Render enabled checkbox
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%zu", count);
-
-            // Column 3: Render enabled checkbox
-            ImGui::TableSetColumnIndex(3);
             ImGui::Checkbox("##render", &renderEnabled);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Render");
             if (renderEnabled != lm.IsRenderEnabled(id)) {
@@ -665,8 +649,8 @@ void LayersPanel::_renderLayersList() {
                 if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
 
-            // Column 4: Update enabled checkbox
-            ImGui::TableSetColumnIndex(4);
+            // Column 3: Update enabled checkbox
+            ImGui::TableSetColumnIndex(3);
             ImGui::Checkbox("##update", &updateEnabled);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Update");
             if (updateEnabled != lm.IsUpdateEnabled(id)) {
@@ -685,8 +669,8 @@ void LayersPanel::_renderLayersList() {
                 if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
 
-            // Column 5: Physics enabled checkbox
-            ImGui::TableSetColumnIndex(5);
+            // Column 4: Physics enabled checkbox
+            ImGui::TableSetColumnIndex(4);
             ImGui::Checkbox("##physics", &physicsEnabled);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Physics");
             if (physicsEnabled != lm.IsPhysicsEnabled(id)) {
@@ -705,8 +689,8 @@ void LayersPanel::_renderLayersList() {
                 if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
 
-            // Column 6: Lock checkbox (prevents editing in hierarchy)
-            ImGui::TableSetColumnIndex(6);
+            // Column 5: Lock checkbox (prevents editing in hierarchy)
+            ImGui::TableSetColumnIndex(5);
             ImGui::Checkbox("##lock", &locked);
             if (locked != lm.IsLocked(id)) {
                 bool prev = lm.IsLocked(id);

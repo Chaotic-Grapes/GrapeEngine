@@ -443,9 +443,6 @@ namespace ECS {
 				{"ColorPressed", button.ColorPressed},
 				{"ColorDisabled", button.ColorDisabled},
 				{"Interactable", button.Interactable},
-				{"Pressed", button.Pressed},
-				{"Released", button.Released},
-				{"Hovered", button.Hovered},
 				{"ActionID", button.ActionID},
 				{"Label", ResolveStringId(button.Label)},
 				{"TransitionDuration", button.TransitionDuration},
@@ -461,9 +458,6 @@ namespace ECS {
 			button.ColorPressed = j.value("ColorPressed", defaults.ColorPressed);
 			button.ColorDisabled = j.value("ColorDisabled", defaults.ColorDisabled);
 			button.Interactable = j.value("Interactable", defaults.Interactable);
-			button.Pressed = j.value("Pressed", defaults.Pressed);
-			button.Released = j.value("Released", defaults.Released);
-			button.Hovered = j.value("Hovered", defaults.Hovered);
 			button.ActionID = j.value("ActionID", defaults.ActionID);
 			button.Label = ReadStringId(j, "Label", defaults.Label);
 			button.TransitionDuration = j.value("TransitionDuration", defaults.TransitionDuration);
@@ -482,7 +476,6 @@ namespace ECS {
 				{"FontPath", ResolveStringId(input.FontPath)},
 				{"MaxCharacters", input.MaxCharacters},
 				{"CurrentCharCount", input.CurrentCharCount},
-				{"Focused", input.Focused},
 				{"Interactable", input.Interactable},
 				{"CaretPosition", input.CaretPosition},
 				{"SelectionStart", input.SelectionStart},
@@ -505,7 +498,6 @@ namespace ECS {
 			input.FontPath = ReadStringId(j, "FontPath", defaults.FontPath);
 			input.MaxCharacters = j.value("MaxCharacters", defaults.MaxCharacters);
 			input.CurrentCharCount = j.value("CurrentCharCount", defaults.CurrentCharCount);
-			input.Focused = j.value("Focused", defaults.Focused);
 			input.Interactable = j.value("Interactable", defaults.Interactable);
 			input.CaretPosition = j.value("CaretPosition", defaults.CaretPosition);
 			input.SelectionStart = j.value("SelectionStart", defaults.SelectionStart);
@@ -515,7 +507,7 @@ namespace ECS {
 			input.Type = static_cast<GUIInputField::InputType>(j.value("Type", static_cast<uint8_t>(defaults.Type)));
 		}
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUISlider, MinValue, MaxValue, CurrentValue, StepSize, BackgroundColor, FillColor, HandleColor, HandleSize, Interactable, ShowValue, ActionID, Dragging, DragOffset)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUISlider, MinValue, MaxValue, CurrentValue, StepSize, BackgroundColor, FillColor, HandleColor, HandleSize, Interactable, ShowValue, ActionID)
 
 		inline void to_json(nlohmann::json& j, const GUICheckbox& checkbox) {
 			j = nlohmann::json{
@@ -575,7 +567,7 @@ namespace ECS {
 			dropdown.ScrollPosition = j.value("ScrollPosition", defaults.ScrollPosition);
 		}
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIScrollView, ScrollPosition, ContentSize, HorizontalScroll, VerticalScroll, ScrollBarWidth, ScrollBarColor, ScrollBarHoverColor, ScrollSensitivity, ScrollDamping, Inertia, ClipContent, VerticalDragging, HorizontalDragging, VerticalScrollVelocity, HorizontalScrollVelocity)
+		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIScrollView, ScrollPosition, ContentSize, HorizontalScroll, VerticalScroll, ScrollBarWidth, ScrollBarColor, ScrollBarHoverColor, ScrollSensitivity, ScrollDamping, Inertia, ClipContent)
 
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUISeparator, Orient, Color, Thickness, Margin)
 

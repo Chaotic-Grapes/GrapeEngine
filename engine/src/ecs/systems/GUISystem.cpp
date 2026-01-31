@@ -55,7 +55,6 @@ namespace ECS {
     // ========================================================================
 
     void GUISystem::OnCreate(World& world) {
-        LOG_INFO("GUISystem initialized");
         // Initialize any per-world resources here if needed
     }
 
@@ -87,7 +86,6 @@ namespace ECS {
     }
 
     void GUISystem::OnDestroy(World& world) {
-        LOG_INFO("GUISystem destroyed");
         // Clean up any per-world resources
         m_modals.clear();
         m_actionRegistry.clear();

@@ -31,28 +31,30 @@ color-coded severity levels.
 // -------------------------------------------------------------------------
 
 void ConsolePanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
-    m_mainFont = mainFont;
-    m_boldFont = boldFont;
-    m_symbolsFont = symbolsFont;
+    m_mainFont = mainFont;        // Regular text rendering
+    m_boldFont = boldFont;        // Level badges (INF, ERR, etc.)
+    m_symbolsFont = symbolsFont;  // Icon glyphs (if needed)
 
     // Clear any messages that accumulated before console was initialized
     Clear();
 
-    m_initialized = true;
+    m_initialized = true;  // Allow message processing from this point forward
 }
 
 void ConsolePanel::Shutdown() {
     // Mark as uninitialized to prevent any new messages
+    // This must happen first to block new AddMessage calls
     m_initialized = false;
 
     // Clear callback to prevent further invocations during shutdown
+    // Prevents logger from calling into destroyed console
     Logger::Get().SetConsoleCallback(nullptr);
 
     // Clear messages
     std::lock_guard<std::mutex> lock(m_messagesMutex);
-    m_messages.clear();
-    m_pendingMessages.clear();
-    m_selectedMessageIds.clear();
+    m_messages.clear();         // Remove all stored messages
+    m_pendingMessages.clear();  // Remove queued messages (when paused)
+    m_selectedMessageIds.clear();  // Clear UI selection state
 }
 
 // -------------------------------------------------------------------------
@@ -63,18 +65,24 @@ void ConsolePanel::Render() {
     ImGui::PushFont(m_mainFont);
     ImGui::Begin("Console");
 
+    // Create thread-safe snapshot of messages for rendering
+    // This allows message queue to be modified on other threads during render
     std::vector<ConsoleMessage> snapshot;
     {
-        std::lock_guard<std::mutex> lock(m_messagesMutex);
-        snapshot = m_messages;
-        m_lastPendingCount = m_pendingMessages.size();
+        std::lock_guard<std::mutex> lock(m_messagesMutex);  // Minimal lock scope
+        snapshot = m_messages;  // Copy entire message vector
+        m_lastPendingCount = m_pendingMessages.size();  // Track paused queue size
     }
 
+    // Initial filter rebuild to count levels for toolbar badges
     _rebuildFilterCache(snapshot);
     _renderToolbar(snapshot);
+    
+    // Rebuild filter if toolbar interactions changed filter settings
     if (m_filterDirty) {
         _rebuildFilterCache(snapshot);
     }
+    
     ImGui::Separator();
     _renderMessages(snapshot);
 
@@ -90,42 +98,56 @@ void ConsolePanel::_renderToolbar(const std::vector<ConsoleMessage>& snapshot) {
 
     ImGui::SameLine();
 
-    // Pause logging toggle
-    const bool paused = m_paused.load();
+    // Pause/Resume toggle: queues messages instead of adding them
+    // Useful when console spam makes it hard to read specific messages
+    const bool paused = m_paused.load();  // Atomic read for thread safety
     if (ImGui::Button(paused ? "Resume" : "Pause")) {
-        m_paused.store(!paused);
+        m_paused.store(!paused);  // Atomic write
         if (paused) {
-            _flushPendingMessages();
+            _flushPendingMessages();  // When resuming, add queued messages
         }
     }
 
-    ImGui::SameLine();
+    ImGui::SameLine(0.0f, 12.0f);
 
-    // Auto-scroll toggle
+    // Auto-scroll toggle: keeps newest messages visible
+    // Only scrolls if user was already at bottom (doesn't interrupt browsing)
     ImGui::Checkbox("Auto-scroll", &m_autoScroll);
 
     ImGui::SameLine();
 
-    // Message count
+    // Display total message count in snapshot
     ImGui::Text("| Messages: %zu", snapshot.size());
 
+    // Show queued message count when paused
+    // Helps user see how many messages are waiting to be displayed
     if (m_paused.load() && m_lastPendingCount > 0) {
         ImGui::SameLine();
         ImGui::Text("| Queued: %zu", m_lastPendingCount);
     }
 
     ImGui::SameLine();
+    // Show filtered count vs eligible count (before level filtering)
     ImGui::Text("| Filtered: %zu / %zu", m_filteredIndices.size(), m_totalEligibleCount);
 
     ImGui::SameLine();
+
+    // Options menu for bulk operations and settings
+    const float optionsWidth = ImGui::CalcTextSize("Options").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float optionsTargetX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - optionsWidth;
+    if (optionsTargetX > ImGui::GetCursorPosX()) {
+        ImGui::SetCursorPosX(optionsTargetX);
+    }
     if (ImGui::Button("Options")) {
         ImGui::OpenPopup("ConsoleOptions");
     }
 
     if (ImGui::BeginPopup("ConsoleOptions")) {
+        // Copy all messages to clipboard (ignores filters)
         if (ImGui::MenuItem("Copy all")) {
             _copyMessagesToClipboard(snapshot, nullptr, false, true, true);
         }
+        // Copy only filtered/visible messages
         if (ImGui::MenuItem("Copy filtered")) {
             _copyMessagesToClipboard(snapshot, &m_filteredIndices, false, true, true);
         }
@@ -133,73 +155,94 @@ void ConsolePanel::_renderToolbar(const std::vector<ConsoleMessage>& snapshot) {
         if (ImGui::MenuItem("Clear")) {
             Clear();
         }
+        // Auto-clear when entering play mode or building
+        // Useful to separate editor logs from runtime logs
         ImGui::Checkbox("Clear on play/build", &m_clearOnPlayBuild);
         ImGui::EndPopup();
     }
 
-    // Filter toggles
+    // Level filter toggle chips: each shows count and can be clicked to toggle
     ImGui::Separator();
     ImGui::Text("Levels:");
     ImGui::SameLine();
 
-    if (_renderLevelChip("##level_inf", "INF", EditorStyle::LogInfo, m_showInfo, m_levelCounts[0])) {
+    // Each chip shows: level name, count, and visual state (active/inactive)
+    // Clicking toggles visibility of that level in the message list
+    if (_renderLevelChip("##level_inf", "INF", _getColorForLevel(LogLevel::INFO), m_showInfo, m_levelCounts[0])) {
         m_showInfo = !m_showInfo;
-        m_filterDirty = true;
+        m_filterDirty = true;  // Mark for filter rebuild
     }
     ImGui::SameLine();
-    if (_renderLevelChip("##level_dbg", "DBG", EditorStyle::LogDebug, m_showDebug, m_levelCounts[1])) {
+    if (_renderLevelChip("##level_dbg", "DBG", _getColorForLevel(LogLevel::DEBUG), m_showDebug, m_levelCounts[1])) {
         m_showDebug = !m_showDebug;
         m_filterDirty = true;
     }
     ImGui::SameLine();
-    if (_renderLevelChip("##level_wrn", "WRN", EditorStyle::LogWarning, m_showWarning, m_levelCounts[2])) {
+    if (_renderLevelChip("##level_wrn", "WRN", _getColorForLevel(LogLevel::WARNING), m_showWarning, m_levelCounts[2])) {
         m_showWarning = !m_showWarning;
         m_filterDirty = true;
     }
     ImGui::SameLine();
-    if (_renderLevelChip("##level_err", "ERR", EditorStyle::DangerText, m_showError, m_levelCounts[3])) {
+    if (_renderLevelChip("##level_err", "ERR", _getColorForLevel(LogLevel::ERROR), m_showError, m_levelCounts[3])) {
         m_showError = !m_showError;
         m_filterDirty = true;
     }
     ImGui::SameLine();
-    if (_renderLevelChip("##level_crt", "CRT", EditorStyle::LogCritical, m_showCritical, m_levelCounts[4])) {
+    if (_renderLevelChip("##level_crt", "CRT", _getColorForLevel(LogLevel::CRITICAL), m_showCritical, m_levelCounts[4])) {
         m_showCritical = !m_showCritical;
         m_filterDirty = true;
     }
 
-    ImGui::SameLine();
+    ImGui::SameLine(0.0f, 12.0f);
+
+    // Collapse repeated messages - groups identical consecutive messages
+    // Shows count badge instead of duplicating rows
     ImGui::Checkbox("Collapse", &m_collapseRepeated);
     if (m_lastCollapseRepeated != m_collapseRepeated) {
-        m_filterDirty = true;
+        m_filterDirty = true;  // Rebuild to apply/unapply grouping
         m_lastCollapseRepeated = m_collapseRepeated;
     }
-
+ 
     ImGui::SameLine();
-    ImGui::Text("Source:");
+    const char* sourceLabel = "Source:";
+    const float sourceLabelWidth = ImGui::CalcTextSize(sourceLabel).x;
+    const float sourceComboWidth = 100.0f;
+    const float sourceSpacing = ImGui::GetStyle().ItemSpacing.x;
+    const float sourceTotalWidth = sourceLabelWidth + sourceSpacing + sourceComboWidth;
+    const float sourceTargetX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - sourceTotalWidth;
+    if (sourceTargetX > ImGui::GetCursorPosX()) {
+        ImGui::SetCursorPosX(sourceTargetX);
+    }
+    ImGui::Text("%s", sourceLabel);
     ImGui::SameLine();
 
+    // Source filter: All/Engine/Script
+    // Filters messages based on where they originated
     const char* sourceOptions[] = { "All", "Engine", "Script" };
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(sourceComboWidth);
     if (ImGui::Combo("##source_filter", &m_sourceFilter, sourceOptions, IM_ARRAYSIZE(sourceOptions))) {
-        m_filterDirty = true;
+        m_filterDirty = true;  // Rebuild to apply new source filter
     }
 
-    // Search bar
+    // Search bar: filters messages by text content
+    // Searches in: message content, timestamp, level name, and source name
     ImGui::Separator();
-    ImGui::SetNextItemWidth(-1);
+    ImGui::SetNextItemWidth(-1);  // Full width
     if (ImGui::InputTextWithHint("##search", "Search messages...", m_searchBuffer, sizeof(m_searchBuffer))) {
-        m_filterDirty = true;
+        m_filterDirty = true;  // Rebuild filter on search text change
     }
 }
 
 void ConsolePanel::_renderMessages(const std::vector<ConsoleMessage>& snapshot) {
-    // Use child region for scrolling
+    // Use child region for independent scrolling within the console window
     ImGui::BeginChild("MessageList", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
 
+    // Ctrl+A to select all visible messages
     ImGuiIO& io = ImGui::GetIO();
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A)) {
         m_selectedMessageIds.clear();
 
+        // Select all messages in all render rows (collapsed or not)
         for (const auto& row : m_renderRows) {
             for (int i = row.firstFilteredIndex; i <= row.lastFilteredIndex; ++i) {
                 const int msgIndex = m_filteredIndices[static_cast<size_t>(i)];
@@ -209,26 +252,34 @@ void ConsolePanel::_renderMessages(const std::vector<ConsoleMessage>& snapshot) 
                 }
             }
         }
+        // Track last selected row for shift-click range selection
         if (!m_renderRows.empty()) {
             m_lastSelectedRow = static_cast<int>(m_renderRows.size() - 1);
         }
     }
 
+    // Check if user was scrolled to bottom BEFORE rendering
+    // We only auto-scroll if they were already at the bottom (don't interrupt browsing)
     const bool wasAtBottom = (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1.0f);
 
+    // Table with 3 columns: Time, Level, Message
     const ImGuiTableFlags tableFlags = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoPadInnerX;
     if (ImGui::BeginTable("ConsoleTable", 3, tableFlags)) {
-        const float timeWidth = 90.0f;
-        const float badgeMinWidth = ImGui::CalcTextSize("CRT").x + 25.0f;
+        // Calculate column widths
+        const float timeWidth = 90.0f;  // Fixed width for timestamps
+        const float badgeMinWidth = ImGui::CalcTextSize("CRT").x + 25.0f;  // Widest badge
         const float levelWidth = badgeMinWidth + ImGui::GetStyle().CellPadding.x * 2.0f + 6.0f;
 
         ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed, timeWidth);
         ImGui::TableSetupColumn("Level", ImGuiTableColumnFlags_WidthFixed, levelWidth);
-        ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);  // Takes remaining space
 
+        // Calculate available width for message text wrapping
+        // Subtract column widths and padding to prevent text overflow
         float messageWrapWidth = ImGui::GetContentRegionAvail().x - timeWidth - levelWidth - ImGui::GetStyle().CellPadding.x * 4.0f;
-        messageWrapWidth = (std::max)(1.0f, messageWrapWidth);
+        messageWrapWidth = (std::max)(1.0f, messageWrapWidth);  // Ensure positive width
 
+        // Render each row (may contain multiple collapsed messages)
         for (int rowIndex = 0; rowIndex < static_cast<int>(m_renderRows.size()); ++rowIndex) {
             _renderMessageRow(snapshot, m_renderRows[static_cast<size_t>(rowIndex)], rowIndex, messageWrapWidth, badgeMinWidth);
         }
@@ -237,9 +288,10 @@ void ConsolePanel::_renderMessages(const std::vector<ConsoleMessage>& snapshot) 
     }
 
     // Auto-scroll to bottom only if user was already at bottom
+    // This prevents interrupting the user when they're scrolling through old messages
     if (m_autoScroll && m_scrollToBottom && wasAtBottom) {
-        ImGui::SetScrollHereY(1.0f);
-        m_scrollToBottom = false;
+        ImGui::SetScrollHereY(1.0f);  // Scroll to bottom
+        m_scrollToBottom = false;     // Reset flag until next message arrives
     }
 
     ImGui::EndChild();
@@ -451,7 +503,7 @@ void ConsolePanel::_renderMessageRow(const std::vector<ConsoleMessage>& snapshot
 
     ImGui::TableSetColumnIndex(1);
     ImGui::PushFont(m_boldFont ? m_boldFont : m_mainFont);
-    _drawPill(_getLevelText(msg.Level), _getBadgeColorForLevel(msg.Level), EditorStyle::Text, badgeMinWidth);
+    _drawPill(_getLevelText(msg.Level), _getColorForLevel(msg.Level), EditorStyle::Text, badgeMinWidth);
     ImGui::PopFont();
 
     ImGui::TableSetColumnIndex(2);
@@ -475,40 +527,45 @@ void ConsolePanel::_renderMessageRow(const std::vector<ConsoleMessage>& snapshot
 void ConsolePanel::AddMessage(LogLevel level, LogSource source, const std::string& timestamp, const std::string& message) {
     // Don't process messages if panel isn't initialized or is shutting down
     // Check this before any other operations to avoid race conditions
+    // Without this check, messages could be added to destroyed data structures
     if (!m_initialized) {
         return;
     }
 
     // Filter: Only store warnings/errors/critical from any source,
     // OR info/debug from SCRIPT source only
+    // This reduces console spam from engine internals while keeping user script logs
     if (level == LogLevel::TRACE) {
-        return; // Never show TRACE in console
+        return; // Never show TRACE in console (too verbose)
     }
 
     if ((level == LogLevel::INFO || level == LogLevel::DEBUG) && source != LogSource::SCRIPT) {
-        return; // Only show INFO/DEBUG from scripts, not engine
+        return; // Only show INFO/DEBUG from scripts, not engine (reduces clutter)
     }
 
     // Thread-safe message insertion
     std::lock_guard<std::mutex> lock(m_messagesMutex);
 
+    // If paused, add to pending queue instead of main message list
+    // This lets users freeze the console to read without losing new messages
     if (m_paused.load()) {
         if (m_pendingMessages.size() >= MAX_MESSAGES) {
-            m_pendingMessages.erase(m_pendingMessages.begin());
+            m_pendingMessages.erase(m_pendingMessages.begin());  // Remove oldest when full
         }
         m_pendingMessages.push_back({ timestamp, level, source, message, m_nextMessageId.fetch_add(1) });
-        return;
+        return;  // Don't add to main list yet
     }
 
-    // Limit message buffer size
+    // Limit message buffer size to prevent unbounded memory growth
+    // Removes oldest messages when limit reached (FIFO queue)
     if (m_messages.size() >= MAX_MESSAGES) {
-        m_selectedMessageIds.erase(m_messages.front().Id);
-        m_messages.erase(m_messages.begin());
+        m_selectedMessageIds.erase(m_messages.front().Id);  // Clear selection if removing selected message
+        m_messages.erase(m_messages.begin());  // Remove oldest
     }
 
     m_messages.push_back({ timestamp, level, source, message, m_nextMessageId.fetch_add(1) });
-    m_filterDirty = true;
-    m_scrollToBottom = true;
+    m_filterDirty = true;      // Mark filter for rebuild to include new message
+    m_scrollToBottom = true;   // Request scroll to show new message
 }
 
 void ConsolePanel::Clear() {
@@ -529,15 +586,18 @@ void ConsolePanel::Clear() {
 // -------------------------------------------------------------------------
 
 void ConsolePanel::_rebuildFilterCache(const std::vector<ConsoleMessage>& snapshot) {
+    // Detect if message count changed (new messages added)
     if (m_lastMessageCount != snapshot.size()) {
-        m_filterDirty = true;
+        m_filterDirty = true;  // Need to reprocess filters
         m_lastMessageCount = snapshot.size();
     }
 
+    // Detect if any level filter checkboxes changed
+    // Compare current state with last frame's state
     if (m_lastShowInfo != m_showInfo || m_lastShowDebug != m_showDebug ||
         m_lastShowWarning != m_showWarning || m_lastShowError != m_showError ||
         m_lastShowCritical != m_showCritical) {
-        m_filterDirty = true;
+        m_filterDirty = true;  // User toggled a level filter
         m_lastShowInfo = m_showInfo;
         m_lastShowDebug = m_showDebug;
         m_lastShowWarning = m_showWarning;
@@ -545,56 +605,66 @@ void ConsolePanel::_rebuildFilterCache(const std::vector<ConsoleMessage>& snapsh
         m_lastShowCritical = m_showCritical;
     }
 
+    // Detect if source filter changed (All/Engine/Script)
     if (m_lastSourceFilter != m_sourceFilter) {
         m_filterDirty = true;
         m_lastSourceFilter = m_sourceFilter;
     }
 
+    // Detect if collapse mode changed
     if (m_lastCollapseRepeated != m_collapseRepeated) {
         m_filterDirty = true;
         m_lastCollapseRepeated = m_collapseRepeated;
     }
 
-    // Cheap rolling hash for search buffer
-    uint32_t searchHash = 2166136261u;
+    // Cheap rolling hash for search buffer to detect changes
+    // Using FNV-1a hash - faster than string comparison for change detection
+    uint32_t searchHash = 2166136261u;  // FNV offset basis
     for (const char* p = m_searchBuffer; *p; ++p) {
         searchHash ^= static_cast<uint8_t>(*p);
-        searchHash *= 16777619u;
+        searchHash *= 16777619u;  // FNV prime
     }
     if (m_lastSearchHash != searchHash) {
-        m_filterDirty = true;
+        m_filterDirty = true;  // Search text changed
         m_lastSearchHash = searchHash;
 
+        // Precompute lowercase version for case-insensitive search
         m_searchLower = m_searchBuffer;
         std::transform(m_searchLower.begin(), m_searchLower.end(), m_searchLower.begin(),
             [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     }
 
+    // Skip rebuild if nothing changed
     if (!m_filterDirty) {
         return;
     }
 
-    m_filteredIndices.clear();
-    m_renderRows.clear();
-    m_totalEligibleCount = 0;
-    m_levelCounts = { 0, 0, 0, 0, 0 };
+    // Clear previous filter results
+    m_filteredIndices.clear();   // Indices of messages that pass filters
+    m_renderRows.clear();        // Rows to render (with collapse grouping)
+    m_totalEligibleCount = 0;    // Count before level filtering
+    m_levelCounts = { 0, 0, 0, 0, 0 };  // Reset counts for filter badges
 
+    // First pass: apply source and search filters, count levels
     for (size_t i = 0; i < snapshot.size(); ++i) {
         const auto& msg = snapshot[i];
 
+        // Source filter: skip if doesn't match selected source
         if (m_sourceFilter == 1 && msg.Source != LogSource::ENGINE) {
-            continue;
+            continue;  // User wants Engine only, this is Script
         }
         if (m_sourceFilter == 2 && msg.Source != LogSource::SCRIPT) {
-            continue;
+            continue;  // User wants Script only, this is Engine
         }
 
+        // Search filter: skip if doesn't match search text
         if (!m_searchLower.empty() && !_messageMatchesSearch(msg, m_searchLower)) {
-            continue;
+            continue;  // Doesn't match search query
         }
 
-        ++m_totalEligibleCount;
+        ++m_totalEligibleCount;  // Passed source and search filters
 
+        // Count messages by level for filter badge display
         switch (msg.Level) {
         case LogLevel::INFO:     ++m_levelCounts[0]; break;
         case LogLevel::DEBUG:    ++m_levelCounts[1]; break;
@@ -604,38 +674,44 @@ void ConsolePanel::_rebuildFilterCache(const std::vector<ConsoleMessage>& snapsh
         default: break;
         }
 
+        // Level filter: add to filtered indices if level is enabled
         if (_shouldDisplayMessage(msg, m_searchLower)) {
             m_filteredIndices.push_back(static_cast<int>(i));
         }
     }
 
+    // Second pass: group consecutive identical messages if collapse enabled
     if (!m_filteredIndices.empty()) {
         RenderRow current;
-        current.firstFilteredIndex = 0;
-        current.lastFilteredIndex = 0;
-        current.count = 1;
+        current.firstFilteredIndex = 0;  // Start of group
+        current.lastFilteredIndex = 0;   // End of group (same as first initially)
+        current.count = 1;               // Number of messages in group
 
+        // Compare each message with previous to find groups
         for (int i = 1; i < static_cast<int>(m_filteredIndices.size()); ++i) {
             const ConsoleMessage& prev = snapshot[static_cast<size_t>(m_filteredIndices[static_cast<size_t>(i - 1)])];
             const ConsoleMessage& next = snapshot[static_cast<size_t>(m_filteredIndices[static_cast<size_t>(i)])];
 
+            // Messages are in same group if collapse is on AND all properties match
             const bool sameGroup = m_collapseRepeated &&
-                prev.Level == next.Level &&
-                prev.Source == next.Source &&
-                prev.Content == next.Content;
+                prev.Level == next.Level &&      // Same severity
+                prev.Source == next.Source &&    // Same origin
+                prev.Content == next.Content;    // Same text
 
             if (sameGroup) {
+                // Extend current group
                 current.lastFilteredIndex = i;
                 ++current.count;
             }
             else {
+                // Save current group and start new one
                 m_renderRows.push_back(current);
                 current.firstFilteredIndex = i;
                 current.lastFilteredIndex = i;
                 current.count = 1;
             }
         }
-        m_renderRows.push_back(current);
+        m_renderRows.push_back(current);  // Don't forget last group
     }
 
     m_filterDirty = false;
@@ -698,23 +774,8 @@ ImVec4 ConsolePanel::_getColorForLevel(LogLevel level) const {
     default:                 base = EditorStyle::Text; break;
     }
 
-    return ImVec4(base.x * shade, base.y * shade, base.z * shade, 0.95f);
+    return ImVec4(base.x * shade, base.y * shade, base.z * shade, 1.0f);
 }
-
-ImVec4 ConsolePanel::_getBadgeColorForLevel(LogLevel level) const {
-    ImVec4 base = _getColorForLevel(level);
-    const float shade = 0.55f;
-    return ImVec4(base.x * shade, base.y * shade, base.z * shade, 0.95f);
-}
-
-// const char* ConsolePanel::_getLevelIcon(LogLevel level) const {
-//     switch (level) {
-//     case LogLevel::WARNING:  return "\xEE\x80\x82";
-//     case LogLevel::ERROR:    return "\xEE\x80\x80";
-//     case LogLevel::CRITICAL: return "\xEE\xA2\x9A";
-//     default:                 return "?";
-//     }
-// }
 
 const char* ConsolePanel::_getLevelText(LogLevel level) const {
     switch (level) {
