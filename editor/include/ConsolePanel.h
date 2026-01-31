@@ -80,7 +80,6 @@ private:
     // Helpers
     // -------------------------------------------------------------------------
     ImVec4 _getColorForLevel(LogLevel level) const;
-    // const char* _getLevelIcon(LogLevel level) const;
     const char* _getLevelText(LogLevel level) const;
     const char* _getSourceText(LogSource source) const;
     void _drawPill(const char* text, const ImVec4& bgColor, const ImVec4& textColor, float minWidth = 0.0f) const;

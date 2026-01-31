@@ -108,7 +108,7 @@ void ConsolePanel::_renderToolbar(const std::vector<ConsoleMessage>& snapshot) {
         }
     }
 
-    ImGui::SameLine();
+    ImGui::SameLine(0.0f, 12.0f);
 
     // Auto-scroll toggle: keeps newest messages visible
     // Only scrolls if user was already at bottom (doesn't interrupt browsing)
@@ -131,7 +131,13 @@ void ConsolePanel::_renderToolbar(const std::vector<ConsoleMessage>& snapshot) {
     ImGui::Text("| Filtered: %zu / %zu", m_filteredIndices.size(), m_totalEligibleCount);
 
     ImGui::SameLine();
+
     // Options menu for bulk operations and settings
+    const float optionsWidth = ImGui::CalcTextSize("Options").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float optionsTargetX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - optionsWidth;
+    if (optionsTargetX > ImGui::GetCursorPosX()) {
+        ImGui::SetCursorPosX(optionsTargetX);
+    }
     if (ImGui::Button("Options")) {
         ImGui::OpenPopup("ConsoleOptions");
     }
@@ -187,7 +193,8 @@ void ConsolePanel::_renderToolbar(const std::vector<ConsoleMessage>& snapshot) {
         m_filterDirty = true;
     }
 
-    ImGui::SameLine();
+    ImGui::SameLine(0.0f, 12.0f);
+
     // Collapse repeated messages - groups identical consecutive messages
     // Shows count badge instead of duplicating rows
     ImGui::Checkbox("Collapse", &m_collapseRepeated);
@@ -195,15 +202,24 @@ void ConsolePanel::_renderToolbar(const std::vector<ConsoleMessage>& snapshot) {
         m_filterDirty = true;  // Rebuild to apply/unapply grouping
         m_lastCollapseRepeated = m_collapseRepeated;
     }
-
+ 
     ImGui::SameLine();
-    ImGui::Text("Source:");
+    const char* sourceLabel = "Source:";
+    const float sourceLabelWidth = ImGui::CalcTextSize(sourceLabel).x;
+    const float sourceComboWidth = 100.0f;
+    const float sourceSpacing = ImGui::GetStyle().ItemSpacing.x;
+    const float sourceTotalWidth = sourceLabelWidth + sourceSpacing + sourceComboWidth;
+    const float sourceTargetX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - sourceTotalWidth;
+    if (sourceTargetX > ImGui::GetCursorPosX()) {
+        ImGui::SetCursorPosX(sourceTargetX);
+    }
+    ImGui::Text("%s", sourceLabel);
     ImGui::SameLine();
 
     // Source filter: All/Engine/Script
     // Filters messages based on where they originated
     const char* sourceOptions[] = { "All", "Engine", "Script" };
-    ImGui::SetNextItemWidth(100.0f);
+    ImGui::SetNextItemWidth(sourceComboWidth);
     if (ImGui::Combo("##source_filter", &m_sourceFilter, sourceOptions, IM_ARRAYSIZE(sourceOptions))) {
         m_filterDirty = true;  // Rebuild to apply new source filter
     }
@@ -760,15 +776,6 @@ ImVec4 ConsolePanel::_getColorForLevel(LogLevel level) const {
 
     return ImVec4(base.x * shade, base.y * shade, base.z * shade, 1.0f);
 }
-
-// const char* ConsolePanel::_getLevelIcon(LogLevel level) const {
-//     switch (level) {
-//     case LogLevel::WARNING:  return "\xEE\x80\x82";
-//     case LogLevel::ERROR:    return "\xEE\x80\x80";
-//     case LogLevel::CRITICAL: return "\xEE\xA2\x9A";
-//     default:                 return "?";
-//     }
-// }
 
 const char* ConsolePanel::_getLevelText(LogLevel level) const {
     switch (level) {
