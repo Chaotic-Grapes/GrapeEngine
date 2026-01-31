@@ -636,17 +636,34 @@ namespace ECS {
             auto& loc = m_locations[e.Index];
             
             // If entity has no archetype, create new one with just this component
-            if (!loc.ArchetypePtr) {
-                const Signature ns({ componentId });
-                Archetype* to = _getOrCreateArchetype(ns);
-                auto [ci, slot] = to->Insert();
-                
-                void* componentPtr = to->GetRaw(componentId, ci, slot);
-                if (data && size > 0) {
-                    std::memcpy(componentPtr, data, size);
-                } else {
-                    const auto& meta = ComponentRegistry::Meta(componentId);
-                    if (meta.ctor) meta.ctor(componentPtr);
+              if (!loc.ArchetypePtr) {
+                  const Signature ns({ componentId });
+                  Archetype* to = _getOrCreateArchetype(ns);
+                  auto [ci, slot] = to->Insert();
+                  
+                  void* componentPtr = to->GetRaw(componentId, ci, slot);
+                  if (data && size > 0) {
+                      const auto& meta = ComponentRegistry::Meta(componentId);
+                      if (meta.Size == 0) {
+                          LOG_ERROR("[World::AddComponentById] Missing component size for ID " << componentId);
+                          return nullptr;
+                      }
+                      if (size != meta.Size) {
+                          LOG_ERROR("[World::AddComponentById] Size mismatch for component ID " << componentId
+                              << " (provided=" << size << ", expected=" << meta.Size << ")");
+                      }
+                      const size_t copySize = std::min(size, meta.Size);
+                      std::memcpy(componentPtr, data, copySize);
+                      if (copySize < meta.Size) {
+                          std::memset(static_cast<uint8_t*>(componentPtr) + copySize, 0, meta.Size - copySize);
+                      }
+                  } else {
+                      const auto& meta = ComponentRegistry::Meta(componentId);
+                      if (meta.ctor) {
+                          meta.ctor(componentPtr);
+                      } else if (meta.Size > 0) {
+                        std::memset(componentPtr, 0, meta.Size);
+                    }
                 }
                 
                 _placeEntity(e, to, ci, slot);
@@ -681,11 +698,28 @@ namespace ECS {
             
             // Initialize new component
             void* componentPtr = to->GetRaw(componentId, ci, slot);
-            if (data && size > 0) {
-                std::memcpy(componentPtr, data, size);
-            } else {
-                const auto& meta = ComponentRegistry::Meta(componentId);
-                if (meta.ctor) meta.ctor(componentPtr);
+              if (data && size > 0) {
+                  const auto& meta = ComponentRegistry::Meta(componentId);
+                  if (meta.Size == 0) {
+                      LOG_ERROR("[World::AddComponentById] Missing component size for ID " << componentId);
+                      return nullptr;
+                  }
+                  if (size != meta.Size) {
+                      LOG_ERROR("[World::AddComponentById] Size mismatch for component ID " << componentId
+                          << " (provided=" << size << ", expected=" << meta.Size << ")");
+                  }
+                  const size_t copySize = std::min(size, meta.Size);
+                  std::memcpy(componentPtr, data, copySize);
+                  if (copySize < meta.Size) {
+                      std::memset(static_cast<uint8_t*>(componentPtr) + copySize, 0, meta.Size - copySize);
+                  }
+              } else {
+                  const auto& meta = ComponentRegistry::Meta(componentId);
+                  if (meta.ctor) {
+                      meta.ctor(componentPtr);
+                } else if (meta.Size > 0) {
+                    std::memset(componentPtr, 0, meta.Size);
+                }
             }
             
             _removeFromArchetype(e, loc);

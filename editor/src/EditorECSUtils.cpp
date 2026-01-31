@@ -25,7 +25,7 @@ namespace Editor::ECSUtils {
 
     ECS::ComponentTypeId GetComponentIdFromName(const char* name) {
         if (!name || !*name) return ECS::NULL_COMPONENT_ID;
-        return ECS::ComponentRegistry::GetComponentIdFromHash(FNV1aHash(name));
+        return ECS::ComponentRegistry::GetComponentIdFromName(name);
     }
 
     static ECS::ComponentTypeId GetNameComponentId() {
