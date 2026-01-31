@@ -65,7 +65,8 @@ public class Entity
     /// </summary>
     internal static unsafe Entity FromId(void* worldPtr, ulong entityId)
     {
-        return new Entity(new World(worldPtr), entityId);
+        var world = World.FromNativePtr((IntPtr)worldPtr);
+        return new Entity(world, entityId);
     }
 
     // ============================================================================

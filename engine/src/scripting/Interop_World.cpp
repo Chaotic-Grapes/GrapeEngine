@@ -130,9 +130,66 @@ INTEROP_API uint64_t WorldInterop_InstantiateFromArchetype(void* worldPtr, uint3
         return 0;
     }
 
+    // Instantiate entity from archetype
     ECS::Entity entity = world->Create();
     for (const auto& info : archetype->GetComponents()) {
         world->AddComponentById(entity, info.Id, nullptr, info.Size); // Default-construct each component for the archetype.
+    }
+
+    return ECS::EntityUtils::Pack(entity);
+}
+
+INTEROP_API uint32_t WorldInterop_GetArchetypeId(void* worldPtr, uint64_t entityId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return 0;
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
+
+    if (!world->IsAlive(entity)) {
+        LOG_WARNING("[WorldInterop] GetArchetypeId failed: entity is not alive");
+        return 0;
+    }
+
+    // Compute archetype ID based on entity's component signature
+    // This assumes that the archetype ID is derived from the component signature hash
+    const auto componentIds = world->GetEntityComponents(entity);
+    ECS::Signature signature(componentIds);
+    const ECS::SignatureHash hasher;
+    return static_cast<uint32_t>(hasher(signature));
+}
+
+INTEROP_API uint64_t WorldInterop_InstantiateFromArchetypeId(void* worldPtr, uint32_t archetypeId) {
+    if (!worldPtr) {
+        LOG_ERROR("[WorldInterop] World pointer is null");
+        return 0;
+    }
+
+    ECS::World* world = GetWorld(worldPtr);
+    const auto archetypes = world->GetAllArchetypes();
+
+    // Find archetype matching the given archetype ID
+    ECS::SignatureHash hasher;
+    ECS::Archetype* matched = nullptr;
+    for (auto* archetype : archetypes) {
+        if (!archetype) continue;
+        if (static_cast<uint32_t>(hasher(archetype->GetSignature())) == archetypeId) {
+            matched = archetype;
+            break;
+        }
+    }
+
+    if (!matched) {
+        LOG_WARNING("[WorldInterop] Archetype ID not found: " << archetypeId);
+        return 0;
+    }
+
+    // Instantiate entity from matched archetype
+    ECS::Entity entity = world->Create();
+    for (const auto& info : matched->GetComponents()) {
+        world->AddComponentById(entity, info.Id, nullptr, info.Size);
     }
 
     return ECS::EntityUtils::Pack(entity);

@@ -50,9 +50,17 @@ internal static partial class WorldAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial ulong InstantiateFromArchetype(void* worldPtr, uint archetypeIndex);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_InstantiateFromArchetypeId")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial ulong InstantiateFromArchetypeId(void* worldPtr, uint archetypeId);
+
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_CloneEntity")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     public static unsafe partial ulong CloneEntity(void* worldPtr, ulong entityId);
+
+    [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_GetArchetypeId")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    public static unsafe partial uint GetArchetypeId(void* worldPtr, ulong entityId);
 
     [LibraryImport("GrapeEngineNative", EntryPoint = "WorldInterop_IsEntityAlive")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
