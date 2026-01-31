@@ -20,9 +20,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Entity.h"
 #include "ecs/Components.h"
 #include "EditorECSUtils.h"
-#include "graphics/renderer.hpp"
-#include "graphics/shader.hpp"
-#include "graphics/debugDraw2D.hpp"
+#include "ecs/systems/RendererSystem.h"
 #include "helpers/TransformUtils.h"
 #include "math/Matrix4x4.h"
 #include "math/Vector3D.h"
@@ -158,15 +156,13 @@ namespace Editor {
     void SelectionOutlineRenderer::RenderOutline(
         ECS::World& world,
         uint32_t selectedEntityID,
-        Renderer* renderer,
-        Shader* shader,
-        const glm::mat4& viewProj,
+        ECS::RendererSystem* rendererSystem,
         float cameraOrthoSize,
         float windowWidth,
         float windowHeight)
     {
         (void)windowWidth;
-        if (selectedEntityID == ECS::Entity::NPOS32 || !renderer || !shader) return;
+        if (selectedEntityID == ECS::Entity::NPOS32 || !rendererSystem) return;
 
         ECS::Entity entity = world.Resolve(selectedEntityID);
         if (entity.IsNull() || !world.IsAlive(entity)) return;
@@ -180,15 +176,10 @@ namespace Editor {
             }
         }
 
-        // Calculate 2px thick outline in screen space
-        const float desiredPx = 2.0f;
+        // Calculate 2.5px thick outline in screen space
+        const float desiredPx = 2.5f;
         const float worldThickness = (cameraOrthoSize / windowHeight) * desiredPx;
         const glm::vec4 selColor(1.0f, 0.85f, 0.15f, 1.0f); // Yellow-ish
-
-        // Setup rendering
-        shader->use();
-        shader->setMat4("uViewProj", viewProj);
-        renderer->beginFrame();
 
         // Get transform
         const auto* lt = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(&world, entity, "LocalTransform");
@@ -222,7 +213,7 @@ namespace Editor {
                 const glm::vec2 min = center - halfExtents;
                 const glm::vec2 max = center + halfExtents;
 
-                DebugDraw2D::RectStroke(*renderer, min, max, worldThickness, selColor, 0);
+                rendererSystem->SubmitWireframeQuad(min, max, selColor, worldThickness);
             }
             else
             {
@@ -246,10 +237,10 @@ namespace Editor {
 
                 for (int i = 0; i < 4; ++i)
                 {
-                    DebugDraw2D::Line(*renderer,
+                    rendererSystem->SubmitWireframeLine(
                         transformedCorners[i],
                         transformedCorners[(i + 1) % 4],
-                        worldThickness, selColor, 0);
+                        selColor, worldThickness);
                 }
             }
         }
@@ -268,7 +259,7 @@ namespace Editor {
                 const glm::vec2 min = { position.X - half.x, position.Y - half.y };
                 const glm::vec2 max = { position.X + half.x, position.Y + half.y };
 
-                DebugDraw2D::RectStroke(*renderer, min, max, worldThickness, selColor, 0);
+                rendererSystem->SubmitWireframeQuad(min, max, selColor, worldThickness);
             }
             else
             {
@@ -291,10 +282,10 @@ namespace Editor {
 
                 for (int i = 0; i < 4; ++i)
                 {
-                    DebugDraw2D::Line(*renderer,
+                    rendererSystem->SubmitWireframeLine(
                         transformedCorners[i],
                         transformedCorners[(i + 1) % 4],
-                        worldThickness, selColor, 0);
+                        selColor, worldThickness);
                 }
             }
         }
@@ -308,11 +299,7 @@ namespace Editor {
                 position.Y + sc->Offset.Y
             };
             const float radius = sc->Radius * ((scale.X + scale.Y) * 0.5f);
-            const glm::vec2 half = { radius, radius };
-            const glm::vec2 min = center - half;
-            const glm::vec2 max = center + half;
-
-            DebugDraw2D::RectStroke(*renderer, min, max, worldThickness, selColor, 0);
+            rendererSystem->SubmitWireframeCircle(center, radius, selColor, worldThickness);
         }
         // 4) LINES
         else if (Editor::ECSUtils::HasComponent(&world, entity, "ShapeLine2D"))
@@ -322,38 +309,15 @@ namespace Editor {
             const glm::vec2 a = { position.X + sl->A.X, position.Y + sl->A.Y };
             const glm::vec2 b = { position.X + sl->B.X, position.Y + sl->B.Y };
 
-            DebugDraw2D::Line(*renderer, a, b, worldThickness, selColor, 0);
+            rendererSystem->SubmitWireframeLine(a, b, selColor, worldThickness);
         }
 
         // Additionally draw an axis-aligned bounding box (AABB) covering the selected entity and its children.
         // This gives a clear wireframe rectangle even if the object is rotated or composed of multiple parts.
         glm::vec2 aabbMin, aabbMax;
         if (ComputeWorldAABB(world, entity, aabbMin, aabbMax)) {
-            DebugDraw2D::RectStroke(*renderer, aabbMin, aabbMax, worldThickness, selColor, 0);
-
-            // Draw corner markers and log their projected positions for debugging
-            const glm::vec4 cornersWorld[4] = {
-                { aabbMin.x, aabbMin.y, 0.0f, 1.0f },
-                { aabbMax.x, aabbMin.y, 0.0f, 1.0f },
-                { aabbMax.x, aabbMax.y, 0.0f, 1.0f },
-                { aabbMin.x, aabbMax.y, 0.0f, 1.0f }
-            };
-
-            for (int i = 0; i < 4; ++i) {
-                const glm::vec4 wc = cornersWorld[i];
-                const glm::vec4 clip = viewProj * wc;
-                if (clip.w != 0.0f) {
-                    const glm::vec3 ndc = glm::vec3(clip) / clip.w;
-                }
-
-                // Draw a visible marker at corner (use pixel->unit conversion for size)
-                const float markerPx = 8.0f;
-                const float markerUnits = PixelsToUnits(markerPx);
-                DebugDraw2D::Point(*renderer, glm::vec2(wc.x, wc.y), markerUnits, glm::vec4(1.0f, 0.2f, 0.2f, 1.0f), 0);
-            }
+            rendererSystem->SubmitWireframeQuad(aabbMin, aabbMax, selColor, worldThickness);
         }
-
-        renderer->endFrame();
     }
 
 }

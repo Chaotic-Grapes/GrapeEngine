@@ -1711,6 +1711,7 @@ namespace ECS {
             // Handle Layer component removals for layer management
             if (t == TypeIdOf<Components::Layer>()) {
                 if (m_layerManager) {
+                    // Get Layer component and notify
                     const auto& layer = Get<Components::Layer>(e);
                     m_layerManager->OnLayerRemoved(e, layer.Id);
                 }

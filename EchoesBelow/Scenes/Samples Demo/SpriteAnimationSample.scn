@@ -57,15 +57,20 @@
                             "G": 1.0,
                             "R": 1.0
                         },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 0,
+                        "TextureId": 6,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
                         "Tiling": {
-                            "X": 1.0,
-                            "Y": 1.0
+                            "X": 0.0625,
+                            "Y": 0.10000000149011612
                         }
                     },
                     "TypeName": "SpriteRenderer2D"
@@ -73,10 +78,12 @@
                 {
                     "Data": {
                         "FrameCount": 16,
-                        "FrameHeight": 32,
+                        "FrameHeight": 16,
                         "FrameWidth": 32,
                         "FramesPerSecond": 6.0,
                         "Loop": true,
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
                         "Playing": true,
                         "RowFrameCount": 16,
                         "RowIndex": 0,
@@ -84,11 +91,35 @@
                         "SheetHeight": 160,
                         "SheetWidth": 512,
                         "StartFrame": 0,
-                        "TextureId": 0,
+                        "TextureId": 6,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
                         "UseRow": true
                     },
                     "TypeName": "SpriteSheetAnimation2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 5.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 5.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
                 }
             ]
         },
@@ -124,7 +155,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.7777777910232544,
+                        "AspectRatio": 2.0617432594299316,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -132,12 +163,98 @@
                         "UsePerspective": false
                     },
                     "TypeName": "Camera3D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 1.0,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 0.0,
+                            "m10": 0.0,
+                            "m11": 1.0,
+                            "m12": 0.0,
+                            "m13": 0.0,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 1.0,
+                            "m23": -10.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
                 }
             ]
         }
     ],
     "EntityCount": 2,
     "Hierarchy": [],
-    "SceneName": "Sprite Animation Sample",
+    "Layers": [
+        {
+            "id": 0,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Background",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 1,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "World",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 2,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Gameplay",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 3,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Foreground",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 98,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "UI",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        },
+        {
+            "id": 99,
+            "locked": false,
+            "mask": 4294967295,
+            "name": "Debug",
+            "physicsEnabled": true,
+            "renderEnabled": true,
+            "updateEnabled": true,
+            "visible": true
+        }
+    ],
+    "SceneName": "Scene",
     "Version": "1.0"
 }

@@ -247,9 +247,7 @@ void SceneViewport::_renderViewport() {
                         Editor::SelectionOutlineRenderer::RenderOutline(
                             *m_world,
                             m_selectedEntity.Index,
-                            rendererSystem->GetRenderer(),
-                            rendererSystem->GetShader(),
-                            proj * view,
+                            rendererSystem,
                             camera->OrthoSize,
                             size.x,
                             size.y
