@@ -40,6 +40,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "ecs/Signature.h"
 #include "ecs/ComponentRegistry.h"
+#include "scene/LayerManager.h"
 
 #include "math/Matrix4x4.h"
 
@@ -435,6 +436,21 @@ namespace ECS {
 
             // If entity has component, update it
             if (Has<T>(e)) {
+                if constexpr (std::is_same_v<T, Components::Layer>) {
+                    // Special handling for Layer component to notify LayerManager
+                    const uint16_t prevLayer = Get<T>(e).Id;
+                    Get<T>(e) = std::move(value);
+
+                    // Then notify layer manager if layer changed
+                    if (m_layerManager && prevLayer != Get<T>(e).Id) {
+                        m_layerManager->OnLayerRemoved(e, prevLayer);
+                        m_layerManager->OnLayerSet(e, Get<T>(e).Id);
+                    }
+
+                    _onComponentChanged(e, TypeIdOf<T>());
+                    return Get<T>(e);
+                }
+
                 // Update existing component by using move semantics
                 Get<T>(e) = std::move(value);
 
@@ -821,7 +837,8 @@ namespace ECS {
                         const uint32_t count = ch->Count();
                         for (uint32_t i = 0; i < count; ++i) {
                             const Entity ent = ch->GetEntity(i);
-                            if (!ent.IsNull()) fn(ent);
+                            if (ent.IsNull()) continue;
+                            fn(ent);
                         }
                     }
                 }
@@ -898,15 +915,15 @@ namespace ECS {
                         }
                         
                         // Get entity array pointer for direct access
-                        const Entity* entities = ch->Entities().data();
-
-                        // Now iterate through all entities in the chunk
-                        for (uint32_t i = 0; i < count; ++i) {
-                            // Invoke the lambda expression with the entity and its components
-                            // This uses a helper function to unpack the component pointers
-                            // std::index_sequence_for is used to generate index sequences for parameter packs
-                            _invokeWithComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
-                        }
+                          const Entity* entities = ch->Entities().data();
+  
+                          // Now iterate through all entities in the chunk
+                          for (uint32_t i = 0; i < count; ++i) {
+                              // Invoke the lambda expression with the entity and its components
+                              // This uses a helper function to unpack the component pointers
+                              // std::index_sequence_for is used to generate index sequences for parameter packs
+                              _invokeWithComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
+                          }
                     }
                 }
             }
@@ -928,16 +945,23 @@ namespace ECS {
                 // Iterate all entities across all archetypes
                 for (const auto& kv : m_archetypes) {
                     const auto& archPtr = kv.second;
-                    if (!archPtr) continue;
-                    const Archetype* arch = archPtr.get();
 
+                    if (!archPtr) continue;
+                    
+                    // Get raw pointer and chunk count
+                    const Archetype* arch = archPtr.get();
                     const uint32_t chunkCount = arch->GetChunkCount();
+
+                    // Iterate through all chunks in the archetype
                     for (uint32_t ci = 0; ci < chunkCount; ++ci) {
                         const Chunk* ch = arch->GetChunk(ci);
                         const uint32_t count = ch->Count();
+
+                        // Iterate through all entities in the chunk
                         for (uint32_t i = 0; i < count; ++i) {
                             const Entity ent = ch->GetEntity(i);
-                            if (!ent.IsNull()) fn(ent);
+                            if (ent.IsNull()) continue;
+                            fn(ent);
                         }
                     }
                 }
@@ -950,12 +974,15 @@ namespace ECS {
                 static uint64_t cacheVersion = 0;
                 static std::array<TypeId, numComponents> typeIds = { 0 };
                 
+                // Check for archetype changes since last cache
                 if (cachedWorld != this || cacheVersion != m_archetypeVersion) {
 
+                    // First time initialization - get component type IDs at runtime
                     if (cachedWorld == nullptr) {
                         typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
                     }
                     
+                    // Build signature for requested components
                     const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
                     cached = _getMatchingArchetypes(req);
                     cacheVersion = m_archetypeVersion;
@@ -966,13 +993,16 @@ namespace ECS {
                 for (const Archetype* arch : matched) {
                     if (!arch) continue;
 
+                    // Precompute component indices for this archetype
                     std::array<uint32_t, numComponents> compIdxs;
                     for (size_t k = 0; k < numComponents; ++k) {
                         compIdxs[k] = arch->GetComponentIndex(typeIds[k]);
                     }
 
+                    // Get chunk count
                     const uint32_t chunkCount = arch->GetChunkCount();
                     
+                    // Iterate through all chunks
                     for (uint32_t ci = 0; ci < chunkCount; ++ci) {
                         const Chunk* ch = arch->GetChunk(ci);
                         const uint32_t count = ch->Count();
@@ -983,13 +1013,15 @@ namespace ECS {
                         std::array<const uint8_t*, numComponents> componentBases;
                         std::array<size_t, numComponents> strides;
                         
+                        // Populate base pointers and strides
                         for (size_t pi = 0; pi < numComponents; ++pi) {
                             componentBases[pi] = static_cast<const uint8_t*>(ch->ComponentBase(compIdxs[pi]));
                             strides[pi] = arch->GetComponentStride(compIdxs[pi]);
                         }
                         
+                        // Get entity array pointer
                         const Entity* entities = ch->Entities().data();
-
+  
                         for (uint32_t i = 0; i < count; ++i) {
                             _invokeWithConstComponents<Ts...>(fn, entities[i], componentBases, strides, i, std::index_sequence_for<Ts...>{});
                         }
@@ -1647,6 +1679,16 @@ namespace ECS {
                 
                 m_hierarchy.ParentOf[e] = p.ParentEntity;   // Set parent mapping
             }
+
+            // Handle Layer component additions for layer management
+            if (t == TypeIdOf<Components::Layer>()) {
+                // Notify LayerManager if present
+                if (m_layerManager) {
+                    // Get Layer component and notify
+                    const auto& layer = Get<Components::Layer>(e);
+                    m_layerManager->OnLayerSet(e, layer.Id);
+                }
+            }
         }
 
         // Component changed hook
@@ -1664,6 +1706,14 @@ namespace ECS {
 
                 // Remove from parent mapping
                 m_hierarchy.ParentOf.erase(e);
+            }
+
+            // Handle Layer component removals for layer management
+            if (t == TypeIdOf<Components::Layer>()) {
+                if (m_layerManager) {
+                    const auto& layer = Get<Components::Layer>(e);
+                    m_layerManager->OnLayerRemoved(e, layer.Id);
+                }
             }
         }
 

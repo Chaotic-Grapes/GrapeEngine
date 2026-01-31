@@ -26,7 +26,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <optional>
 #include <algorithm>
 #include <utility>
-#include "ecs/World.h"
+#include "Export.h"
+#include "ecs/Entity.h"
+
+namespace ECS {
+    class World;
+}
 
 namespace Scenes {
     // Stable layer identifier (never changes once assigned)
@@ -57,7 +62,7 @@ namespace Scenes {
         std::unordered_set<ECS::Entity, ECS::EntityHash> entities;
     };
 
-    class LayerManager {
+    class GRAPEENGINE_API LayerManager {
     public:
 
         // Construct a LayerManager with some sane default layers pre-registered.
@@ -415,30 +420,7 @@ namespace Scenes {
          * Called automatically by SetLayerMask when a world is provided, but can be called
          * manually if needed to force synchronization.
          */
-        void _syncCollidersForLayer(uint16_t layerId, ECS::World* world) {
-            if (!world || layerId >= m_layers.size())
-                return;
-            
-            uint32_t layerMask = m_layers[layerId].collisionMask;
-            
-            // Update all entities in this layer
-            for (ECS::Entity entity : m_layers[layerId].entities) {
-                if (!world->IsAlive(entity))
-                    continue;
-                
-                // Update circle colliders
-                if (world->Has<ECS::Components::CircleCollider2D>(entity)) {
-                    auto& circle = world->Get<ECS::Components::CircleCollider2D>(entity);
-                    circle.LayerMask = layerMask;
-                }
-                
-                // Update box colliders
-                if (world->Has<ECS::Components::BoxCollider2D>(entity)) {
-                    auto& box = world->Get<ECS::Components::BoxCollider2D>(entity);
-                    box.LayerMask = layerMask;
-                }
-            }
-        }
+        void _syncCollidersForLayer(uint16_t layerId, ECS::World* world);
 
         /**
          * @brief Set or clear collision between two layers. This updates both
@@ -577,17 +559,7 @@ namespace Scenes {
         /**
          * @brief Remove dead entities from all layer membership sets.
          */
-        void PruneDeadEntities(ECS::World& world) {
-            for (auto& layer : m_layers) {
-                for (auto it = layer.entities.begin(); it != layer.entities.end(); ) {
-                    if (!world.IsAlive(*it)) {
-                        it = layer.entities.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
-            }
-        }
+        void PruneDeadEntities(ECS::World& world);
 
     private:
         /**

@@ -739,7 +739,11 @@ namespace ECS {
                     }
                     else if (boxA && boxB) {
                         // Box-box: use new manifold generation
-                        manifold = TestBoxBox(*boxA, *tA, *boxB, *tB);
+                        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, *tA);
+                        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, *tB);
+
+                        // Test box-box
+                        manifold = TestBoxBox(obbA, obbB);
                         hasCollision = (manifold.pointCount > 0);
                     }
                     else if (circA && boxB) {
@@ -747,7 +751,13 @@ namespace ECS {
                         Vector2D n;
                         float depth;
                         Vector2D contact;
-                        if (TestCircleBox(*circA, *tA, *boxB, *tB, n, depth, contact)) {
+
+                        // Use world-space shapes
+                        const Engine::WorldCircle wcA = Engine::Physics::GetWorldCircle(*circA, *tA);
+                        const Engine::WorldOBB obbB = Engine::Physics::GetWorldOBB(*boxB, *tB);
+
+                        // Test circle-box
+                        if (TestCircleBox(wcA, obbB, n, depth, contact)) {
                             manifold.normal = n;
                             manifold.penetration = depth;
 
@@ -761,7 +771,13 @@ namespace ECS {
                         Vector2D n;
                         float depth;
                         Vector2D contact;
-                        if (TestCircleBox(*circB, *tB, *boxA, *tA, n, depth, contact)) {
+
+                        // Use world-space shapes
+                        const Engine::WorldCircle wcB = Engine::Physics::GetWorldCircle(*circB, *tB);
+                        const Engine::WorldOBB obbA = Engine::Physics::GetWorldOBB(*boxA, *tA);
+
+                        // Test circle-box (flip normal later)
+                        if (TestCircleBox(wcB, obbA, n, depth, contact)) {
                             manifold.normal = -n;  // Flip normal
                             manifold.penetration = depth;
 
