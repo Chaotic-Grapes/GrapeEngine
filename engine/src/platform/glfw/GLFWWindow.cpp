@@ -68,16 +68,12 @@ namespace Platform {
             return false;
         }
 
-        LOG_INFO("glfwCreateWindow returned GLFWwindow*=" << reinterpret_cast<void*>(m_windowHandle));
-
         m_title = title;
         m_width = width;
         m_height = height;
         m_vsync = vsync;
 
         glfwMakeContextCurrent(m_windowHandle);
-
-        LOG_INFO("glfwGetCurrentContext()=" << reinterpret_cast<void*>(glfwGetCurrentContext()));
 
         // Initialize GLAD
         if (!gladLoadGL()) {
@@ -86,8 +82,6 @@ namespace Platform {
             m_windowHandle = nullptr;
             return false;
         }
-
-        LOG_INFO("gladLoadGL succeeded; glGetString(GL_VERSION)=" << (const char*)glGetString(GL_VERSION));
 
         // Set VSync
         glfwSwapInterval(vsync ? 1 : 0);
@@ -102,7 +96,7 @@ namespace Platform {
         // Setup callbacks
         _setupCallbacks();
 
-        LOG_INFO("GLFWWindow created successfully: " << width << "x" << height);
+        LOG_INFO("[GLFWWindow] Created successfully: " << width << "x" << height);
         return true;
     }
 
