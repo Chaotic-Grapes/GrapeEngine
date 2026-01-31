@@ -554,14 +554,14 @@ void LayersPanel::_renderCollisionMatrix() {
 
 void LayersPanel::_renderLayersList() {
     auto& lm = m_scene->GetLayers();
+    lm.PruneDeadEntities(m_scene->GetWorld());
     auto layers = lm.ListLayers();
 
-    // Create table with 7 columns: Vis, Name, Count, Render, Update, Physics, Lock
-    if (ImGui::BeginTable("LayersTable", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    // Create table with 6 columns: Vis, Name, Render, Update, Physics, Lock
+    if (ImGui::BeginTable("LayersTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         // Set up column headers and widths
         ImGui::TableSetupColumn("Vis", ImGuiTableColumnFlags_WidthFixed, 40.0f);      // Visibility toggle
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);          // Layer name (editable)
-        ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_WidthFixed, 55.0f);    // Entity count
         ImGui::TableSetupColumn("Render", ImGuiTableColumnFlags_WidthFixed, 90.0f);   // Render enabled
         ImGui::TableSetupColumn("Update", ImGuiTableColumnFlags_WidthFixed, 90.0f);   // Update enabled
         ImGui::TableSetupColumn("Physics", ImGuiTableColumnFlags_WidthFixed, 90.0f);  // Physics enabled
@@ -580,8 +580,6 @@ void LayersPanel::_renderLayersList() {
             bool renderEnabled = lm.IsRenderEnabled(id);
             bool updateEnabled = lm.IsUpdateEnabled(id);
             bool physicsEnabled = lm.IsPhysicsEnabled(id);
-            size_t count = lm.EntitiesIn(id).size();  // Number of entities on this layer
-
             ImGui::TableNextRow();
             ImGui::PushID(static_cast<int>(id));  // Unique ID for this row's widgets
 
@@ -638,12 +636,8 @@ void LayersPanel::_renderLayersList() {
                 }
             }
 
-            // Column 2: Entity count (read-only)
+            // Column 2: Render enabled checkbox
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%zu", count);
-
-            // Column 3: Render enabled checkbox
-            ImGui::TableSetColumnIndex(3);
             ImGui::Checkbox("##render", &renderEnabled);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Render");
             if (renderEnabled != lm.IsRenderEnabled(id)) {
@@ -662,8 +656,8 @@ void LayersPanel::_renderLayersList() {
                 if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
 
-            // Column 4: Update enabled checkbox
-            ImGui::TableSetColumnIndex(4);
+            // Column 3: Update enabled checkbox
+            ImGui::TableSetColumnIndex(3);
             ImGui::Checkbox("##update", &updateEnabled);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Update");
             if (updateEnabled != lm.IsUpdateEnabled(id)) {
@@ -682,8 +676,8 @@ void LayersPanel::_renderLayersList() {
                 if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
 
-            // Column 5: Physics enabled checkbox
-            ImGui::TableSetColumnIndex(5);
+            // Column 4: Physics enabled checkbox
+            ImGui::TableSetColumnIndex(4);
             ImGui::Checkbox("##physics", &physicsEnabled);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Physics");
             if (physicsEnabled != lm.IsPhysicsEnabled(id)) {
@@ -702,8 +696,8 @@ void LayersPanel::_renderLayersList() {
                 if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
 
-            // Column 6: Lock checkbox (prevents editing in hierarchy)
-            ImGui::TableSetColumnIndex(6);
+            // Column 5: Lock checkbox (prevents editing in hierarchy)
+            ImGui::TableSetColumnIndex(5);
             ImGui::Checkbox("##lock", &locked);
             if (locked != lm.IsLocked(id)) {
                 bool prev = lm.IsLocked(id);

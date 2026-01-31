@@ -565,6 +565,30 @@ namespace Scenes {
             _initializeDefaults();
         }
 
+        /**
+         * @brief Clear entity membership for all layers without altering layer definitions.
+         */
+        void ClearEntityMembership() {
+            for (auto& layer : m_layers) {
+                layer.entities.clear();
+            }
+        }
+
+        /**
+         * @brief Remove dead entities from all layer membership sets.
+         */
+        void PruneDeadEntities(ECS::World& world) {
+            for (auto& layer : m_layers) {
+                for (auto it = layer.entities.begin(); it != layer.entities.end(); ) {
+                    if (!world.IsAlive(*it)) {
+                        it = layer.entities.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+        }
+
     private:
         /**
          * @brief Initialize default layers (called in constructor and ResetToDefaults).
