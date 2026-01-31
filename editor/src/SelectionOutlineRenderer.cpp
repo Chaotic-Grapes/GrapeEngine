@@ -165,6 +165,7 @@ namespace Editor {
         float windowWidth,
         float windowHeight)
     {
+        (void)windowWidth;
         if (selectedEntityID == ECS::Entity::NPOS32 || !renderer || !shader) return;
 
         ECS::Entity entity = world.Resolve(selectedEntityID);

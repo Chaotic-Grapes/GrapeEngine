@@ -88,6 +88,7 @@ namespace Editor {
     }
 
     uint32_t ViewportInteractionManager::Update(ECS::World& world, const uint32_t selectedEntityId) {
+        (void)world;
         m_selectedEntityId = selectedEntityId;
 
         // Step 1: Poll pending pick results from last frame

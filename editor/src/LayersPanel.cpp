@@ -502,9 +502,6 @@ void LayersPanel::_renderCollisionMatrix() {
                         uint32_t prevRowMask = lm.GetLayerMask(rowId);
                         uint32_t prevColMask = lm.GetLayerMask(colId);
 
-                        const uint32_t bitForCol = (colId < 32) ? (1u << colId) : 0u;
-                        const uint32_t bitForRow = (rowId < 32) ? (1u << rowId) : 0u;
-
                         uint32_t newRowMask = prevRowMask;
                         uint32_t newColMask = prevColMask;
 
