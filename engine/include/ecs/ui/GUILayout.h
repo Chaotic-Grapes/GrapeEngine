@@ -26,12 +26,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define GUI_LAYOUT_H
 
 #include "ecs/World.h"
-#include "ecs/gui/GUIComponents.h"
-#include "Math/Vector2D.h"
+#include "ecs/Components.h"
+#include "math/Vector2D.h"
 #include <vector>
 
 namespace ECS {
-    namespace GUI {
+    namespace UI {
 
         /**
          * @brief Layout calculation result for a single element
@@ -137,6 +137,14 @@ namespace ECS {
                 Vector2D anchorMax,
                 Vector2D parentSize);
 
+            /**
+             * @brief Get all child entities of a container
+             */
+            static std::vector<Entity> GetContainerChildren(
+                World& world,
+                Entity containerEntity,
+                const Components::GUIContainer& container);
+
         private:
             /**
              * @brief Calculate layout for a container's children
@@ -149,8 +157,8 @@ namespace ECS {
             static void CalculateContainerLayout(
                 World& world,
                 Entity containerEntity,
-                const GUIContainer& container,
-                const GUIElement& element,
+                const Components::GUIContainer& container,
+                const Components::GUIElement& element,
                 LayoutContext& context);
 
             /**
@@ -159,7 +167,7 @@ namespace ECS {
             static void CalculateHorizontalBoxLayout(
                 World& world,
                 const std::vector<Entity>& children,
-                const GUIContainer& container,
+                const Components::GUIContainer& container,
                 Vector2D containerSize,
                 Vector2D containerPos);
 
@@ -169,7 +177,7 @@ namespace ECS {
             static void CalculateVerticalBoxLayout(
                 World& world,
                 const std::vector<Entity>& children,
-                const GUIContainer& container,
+                const Components::GUIContainer& container,
                 Vector2D containerSize,
                 Vector2D containerPos);
 
@@ -179,23 +187,16 @@ namespace ECS {
             static void CalculateGridLayout(
                 World& world,
                 const std::vector<Entity>& children,
-                const GUIContainer& container,
+                const Components::GUIContainer& container,
                 Vector2D containerSize,
                 Vector2D containerPos);
-
-            /**
-             * @brief Get all child entities of a container
-             */
-            static std::vector<Entity> GetContainerChildren(
-                World& world,
-                const GUIContainer& container);
 
             /**
              * @brief Apply alignment to an element
              */
             static Vector2D ApplyAlignment(
-                HorizontalAlignment hAlign,
-                VerticalAlignment vAlign,
+                Components::HorizontalAlignment hAlign,
+                Components::VerticalAlignment vAlign,
                 Vector2D elementSize,
                 Vector2D availableSize);
 
@@ -246,7 +247,7 @@ namespace ECS {
                 Entity containerEntity);
         };
 
-    } // namespace GUI
+    } // namespace UI
 } // namespace ECS
 
 #endif

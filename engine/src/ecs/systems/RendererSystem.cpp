@@ -1605,8 +1605,8 @@ namespace ECS {
         // Convert engine types to GLM
         glm::vec2 glmPos(submission.position.X, submission.position.Y);
         glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 glmColor(submission.color.R / 255.0f, submission.color.G / 255.0f,
-                          submission.color.B / 255.0f, submission.color.A / 255.0f);
+        glm::vec4 glmColor(submission.color.R, submission.color.G,
+                          submission.color.B, submission.color.A);
 
         // Submit quad representing the panel (no texture)
         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
@@ -1641,10 +1641,10 @@ namespace ECS {
 
         // Convert color from 0-255 to 0.0-1.0
         glm::vec4 glmColor(
-            submission.color.R / 255.0f,
-            submission.color.G / 255.0f,
-            submission.color.B / 255.0f,
-            submission.color.A / 255.0f
+            submission.color.R,
+            submission.color.G,
+            submission.color.B,
+            submission.color.A
         );
 
         // Screen-space position
@@ -1667,12 +1667,12 @@ namespace ECS {
         // Slider consists of: background track + handle
         glm::vec2 glmPos(submission.position.X, submission.position.Y);
         glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 bgColor(submission.color.R / 255.0f, submission.color.G / 255.0f,
-                         submission.color.B / 255.0f, submission.color.A / 255.0f);
-        glm::vec4 handleColor(submission.secondaryColor.R / 255.0f,
-                             submission.secondaryColor.G / 255.0f,
-                             submission.secondaryColor.B / 255.0f,
-                             submission.secondaryColor.A / 255.0f);
+        glm::vec4 bgColor(submission.color.R, submission.color.G,
+                         submission.color.B, submission.color.A);
+        glm::vec4 handleColor(submission.secondaryColor.R,
+                             submission.secondaryColor.G,
+                             submission.secondaryColor.B,
+                             submission.secondaryColor.A);
 
         // Draw background track (full width, small height)
         float trackHeight = glmSize.y * 0.3f; // Track is 30% of slider height
@@ -1698,12 +1698,12 @@ namespace ECS {
         // Checkbox consists of: box outline + checkmark if checked
         glm::vec2 glmPos(submission.position.X, submission.position.Y);
         glm::vec2 glmSize(submission.size.X, submission.size.Y);
-        glm::vec4 boxColor(submission.color.R / 255.0f, submission.color.G / 255.0f,
-                          submission.color.B / 255.0f, submission.color.A / 255.0f);
-        glm::vec4 checkColor(submission.secondaryColor.R / 255.0f,
-                            submission.secondaryColor.G / 255.0f,
-                            submission.secondaryColor.B / 255.0f,
-                            submission.secondaryColor.A / 255.0f);
+        glm::vec4 boxColor(submission.color.R, submission.color.G,
+                          submission.color.B, submission.color.A);
+        glm::vec4 checkColor(submission.secondaryColor.R,
+                            submission.secondaryColor.G,
+                            submission.secondaryColor.B,
+                            submission.secondaryColor.A);
 
         // Draw checkbox box
         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
@@ -1726,8 +1726,8 @@ namespace ECS {
         // Convert engine types to GLM
         glm::vec2 start(submission.startPos.X, submission.startPos.Y);
         glm::vec2 end(submission.endPos.X, submission.endPos.Y);
-        glm::vec4 color(submission.color.R / 255.0f, submission.color.G / 255.0f,
-                       submission.color.B / 255.0f, submission.color.A / 255.0f);
+        glm::vec4 color(submission.color.R, submission.color.G,
+                       submission.color.B, submission.color.A);
 
         // Calculate line direction and perpendicular
         glm::vec2 direction = glm::normalize(end - start);

@@ -126,6 +126,21 @@ namespace ECS {
         // Material2D
 		REGISTER_COMPONENT(Material2D);
 
+        // GUI
+        REGISTER_COMPONENT(GUIElement);
+        REGISTER_COMPONENT(GUIContainer);
+        REGISTER_COMPONENT(GUIPanel);
+        REGISTER_COMPONENT(GUIButton);
+        REGISTER_COMPONENT(GUIInputField);
+        REGISTER_COMPONENT(GUISlider);
+        REGISTER_COMPONENT(GUICheckbox);
+        REGISTER_COMPONENT(GUIDropdown);
+        REGISTER_COMPONENT(GUIScrollView);
+        REGISTER_COMPONENT(GUISeparator);
+        REGISTER_COMPONENT(GUIText);
+        REGISTER_COMPONENT(GUILayoutGroup);
+        REGISTER_COMPONENT(GUITooltip);
+
         // Event buffers (physics events)
         REGISTER_EVENT_COMPONENT(CollisionEventBuffer);
         REGISTER_EVENT_COMPONENT(TriggerEventBuffer);
@@ -179,6 +194,19 @@ namespace ECS {
         LogComponentTypeIds("Light2D", FNV1a_Hash("Light2D"));
         LogComponentTypeIds("AudioSource", FNV1a_Hash("AudioSource"));
         LogComponentTypeIds("Material2D", FNV1a_Hash("Material2D"));
+        LogComponentTypeIds("GUIElement", FNV1a_Hash("GUIElement"));
+        LogComponentTypeIds("GUIContainer", FNV1a_Hash("GUIContainer"));
+        LogComponentTypeIds("GUIPanel", FNV1a_Hash("GUIPanel"));
+        LogComponentTypeIds("GUIButton", FNV1a_Hash("GUIButton"));
+        LogComponentTypeIds("GUIInputField", FNV1a_Hash("GUIInputField"));
+        LogComponentTypeIds("GUISlider", FNV1a_Hash("GUISlider"));
+        LogComponentTypeIds("GUICheckbox", FNV1a_Hash("GUICheckbox"));
+        LogComponentTypeIds("GUIDropdown", FNV1a_Hash("GUIDropdown"));
+        LogComponentTypeIds("GUIScrollView", FNV1a_Hash("GUIScrollView"));
+        LogComponentTypeIds("GUISeparator", FNV1a_Hash("GUISeparator"));
+        LogComponentTypeIds("GUIText", FNV1a_Hash("GUIText"));
+        LogComponentTypeIds("GUILayoutGroup", FNV1a_Hash("GUILayoutGroup"));
+        LogComponentTypeIds("GUITooltip", FNV1a_Hash("GUITooltip"));
 
         LogComponentTypeIds("CollisionEventBuffer", FNV1a_Hash("CollisionEventBuffer"));
         LogComponentTypeIds("TriggerEventBuffer", FNV1a_Hash("TriggerEventBuffer"));

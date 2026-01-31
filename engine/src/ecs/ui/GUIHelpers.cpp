@@ -20,16 +20,17 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#include "ecs/gui/GUIHelpers.h"
-#include "ecs/gui/GUILayout.h"
+#include "ecs/ui/GUIHelpers.h"
+#include "ecs/ui/GUILayout.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "ecs/StringTable.h"
 #include "core/Logger.h"
+#include <algorithm>
 #include <cmath>
 
 namespace ECS {
-    namespace GUI {
+    namespace UI {
 
         // ====================================================================
         // GUIFactory Implementation
@@ -46,35 +47,34 @@ namespace ECS {
             Entity button = world.Create();
 
             // Add base element
-            auto& element = world.Add<GUIElement>(button);
+            auto& element = world.Add<Components::GUIElement>(button);
             element.Position = position;
             element.Size = size;
-            element.ElementType = GUIElementType::Button;
+            element.ElementType = Components::GUIElementType::Button;
 
             // Add button component
-            auto& guiBtn = world.Add<GUIButton>(button);
+            auto& guiBtn = world.Add<Components::GUIButton>(button);
             guiBtn.ActionID = actionID;
             guiBtn.Interactable = true;
-            guiBtn.State = ButtonState::Normal;
+            guiBtn.State = Components::ButtonState::Normal;
 
             // Add container for hierarchy
-            auto& container = world.Add<GUIContainer>(button);
+            auto& container = world.Add<Components::GUIContainer>(button);
+            world.Add<Components::GUIChildList>(button);
 
             // Add panel for visual style
-            auto& panel = world.Add<GUIPanel>(button);
+            auto& panel = world.Add<Components::GUIPanel>(button);
             panel.BackgroundColor = guiBtn.ColorNormal;
             panel.BorderThickness = 1.0f;
 
             // Add text label
             if (!label.empty()) {
-                auto& text = world.Add<GUIText>(button);
-                strncpy_s(text.Content, label.c_str(), std::min(label.length(), text.MaxTextLength - 1));
-                text.Content[text.MaxTextLength - 1] = '\0';
+                auto& text = world.Add<Components::GUIText>(button);
+                text.Content = ECS::StringTable::Intern(label);
                 text.FontColor = Color{1.0f, 1.0f, 1.0f, 1.0f};
-                text.Alignment = GUIText::TextAlignment::Center;
+                text.Alignment = Components::GUIText::TextAlignment::Center;
                 text.FontSize = 16.0f;
-                strncpy_s(guiBtn.Label, label.c_str(), sizeof(guiBtn.Label) - 1);
-                guiBtn.Label[sizeof(guiBtn.Label) - 1] = '\0';
+                guiBtn.Label = ECS::StringTable::Intern(label);
             }
 
             // Assign name component
@@ -95,16 +95,17 @@ namespace ECS {
 
             Entity panel = world.Create();
 
-            auto& element = world.Add<GUIElement>(panel);
+            auto& element = world.Add<Components::GUIElement>(panel);
             element.Position = position;
             element.Size = size;
-            element.ElementType = GUIElementType::Panel;
+            element.ElementType = Components::GUIElementType::Panel;
 
-            auto& panelComp = world.Add<GUIPanel>(panel);
+            auto& panelComp = world.Add<Components::GUIPanel>(panel);
             panelComp.BackgroundColor = backgroundColor;
 
-            auto& container = world.Add<GUIContainer>(panel);
-            container.Layout = LayoutType::VerticalBox;
+            auto& container = world.Add<Components::GUIContainer>(panel);
+            container.Layout = Components::LayoutType::VerticalBox;
+            world.Add<Components::GUIChildList>(panel);
 
             // Assign to UI layer
             world.Set<ECS::Components::Layer>(panel, ECS::Components::Layer{ 98 });
@@ -127,18 +128,18 @@ namespace ECS {
             
             Entity label = world.Create();
 
-            auto& element = world.Add<GUIElement>(label);
+            auto& element = world.Add<Components::GUIElement>(label);
             element.Position = position;
             element.Size = {200.0f, 30.0f};  // Default size
-            element.ElementType = GUIElementType::Text;
+            element.ElementType = Components::GUIElementType::Text;
 
-            auto& textComp = world.Add<GUIText>(label);
-            strncpy_s(textComp.Content, text.c_str(), std::min(text.length(), textComp.MaxTextLength - 1));
-            textComp.Content[textComp.MaxTextLength - 1] = '\0';
+            auto& textComp = world.Add<Components::GUIText>(label);
+            textComp.Content = text.empty() ? 0 : ECS::StringTable::Intern(text);
             textComp.FontSize = fontSize;
             textComp.FontColor = Color{1.0f, 1.0f, 1.0f, 1.0f};
 
-            auto& container = world.Add<GUIContainer>(label);
+            auto& container = world.Add<Components::GUIContainer>(label);
+            world.Add<Components::GUIChildList>(label);
 
             // Assign to UI layer
             world.Set<ECS::Components::Layer>(label, ECS::Components::Layer{ 98 });
@@ -160,32 +161,31 @@ namespace ECS {
             
             Entity inputField = world.Create();
 
-            auto& element = world.Add<GUIElement>(inputField);
+            auto& element = world.Add<Components::GUIElement>(inputField);
             element.Position = position;
             element.Size = size;
-            element.ElementType = GUIElementType::InputField;
+            element.ElementType = Components::GUIElementType::InputField;
 
-            auto& input = world.Add<GUIInputField>(inputField);
+            auto& input = world.Add<Components::GUIInputField>(inputField);
             input.Interactable = true;
-            strncpy_s(input.Placeholder, placeholder.c_str(), 
-                     std::min(placeholder.length(), (size_t)255));
-            input.Placeholder[255] = '\0';
+            input.Placeholder = placeholder.empty() ? 0 : ECS::StringTable::Intern(placeholder);
 
-            auto& panel = world.Add<GUIPanel>(inputField);
+            auto& panel = world.Add<Components::GUIPanel>(inputField);
             panel.BackgroundColor = Color{0.1f, 0.1f, 0.1f, 1.0f};
             panel.BorderThickness = 1.0f;
 
-            auto& container = world.Add<GUIContainer>(inputField);
+            auto& container = world.Add<Components::GUIContainer>(inputField);
+            world.Add<Components::GUIChildList>(inputField);
 
-                        // Assign to UI layer
-                            world.Set<ECS::Components::Layer>(inputField, ECS::Components::Layer{ 98 });
+            // Assign to UI layer
+            world.Set<ECS::Components::Layer>(inputField, ECS::Components::Layer{ 98 });
 
-                            // Assign name
-                            ECS::Components::Name nm{};
-                            std::string finalName = !name.empty() ? name : "InputField";
-                            nm.Value = ECS::StringTable::Intern(finalName);
-                            world.Set<ECS::Components::Name>(inputField, nm);
-                            return inputField;
+            // Assign name
+            ECS::Components::Name nm{};
+            std::string finalName = !name.empty() ? name : "InputField";
+            nm.Value = ECS::StringTable::Intern(finalName);
+            world.Set<ECS::Components::Name>(inputField, nm);
+            return inputField;
         }
 
         Entity GUIFactory::CreateSlider(
@@ -200,32 +200,33 @@ namespace ECS {
             
             Entity slider = world.Create();
 
-            auto& element = world.Add<GUIElement>(slider);
+            auto& element = world.Add<Components::GUIElement>(slider);
             element.Position = position;
             element.Size = {width, 30.0f};
-            element.ElementType = GUIElementType::Slider;
+            element.ElementType = Components::GUIElementType::Slider;
 
-            auto& sliderComp = world.Add<GUISlider>(slider);
+            auto& sliderComp = world.Add<Components::GUISlider>(slider);
             sliderComp.MinValue = minValue;
             sliderComp.MaxValue = maxValue;
             sliderComp.CurrentValue = initialValue;
             sliderComp.ActionID = actionID;
             sliderComp.Interactable = true;
 
-            auto& panel = world.Add<GUIPanel>(slider);
+            auto& panel = world.Add<Components::GUIPanel>(slider);
             panel.BackgroundColor = sliderComp.BackgroundColor;
 
-            auto& container = world.Add<GUIContainer>(slider);
+            auto& container = world.Add<Components::GUIContainer>(slider);
+            world.Add<Components::GUIChildList>(slider);
 
-                        // Assign to UI layer
-                            world.Set<ECS::Components::Layer>(slider, ECS::Components::Layer{ 98 });
+            // Assign to UI layer
+            world.Set<ECS::Components::Layer>(slider, ECS::Components::Layer{ 98 });
 
-                            // Assign name
-                            ECS::Components::Name nm{};
-                            std::string finalName = !name.empty() ? name : "Slider";
-                            nm.Value = ECS::StringTable::Intern(finalName);
-                            world.Set<ECS::Components::Name>(slider, nm);
-                            return slider;
+            // Assign name
+            ECS::Components::Name nm{};
+            std::string finalName = !name.empty() ? name : "Slider";
+            nm.Value = ECS::StringTable::Intern(finalName);
+            world.Set<ECS::Components::Name>(slider, nm);
+            return slider;
         }
 
         Entity GUIFactory::CreateCheckbox(
@@ -237,30 +238,30 @@ namespace ECS {
             
             Entity checkbox = world.Create();
 
-            auto& element = world.Add<GUIElement>(checkbox);
+            auto& element = world.Add<Components::GUIElement>(checkbox);
             element.Position = position;
             element.Size = {30.0f, 30.0f};
-            element.ElementType = GUIElementType::Checkbox;
+            element.ElementType = Components::GUIElementType::Checkbox;
 
-            auto& checkboxComp = world.Add<GUICheckbox>(checkbox);
+            auto& checkboxComp = world.Add<Components::GUICheckbox>(checkbox);
             checkboxComp.ActionID = actionID;
             checkboxComp.Interactable = true;
             if (!label.empty()) {
-                strncpy_s(checkboxComp.Label, label.c_str(), sizeof(checkboxComp.Label) - 1);
-                checkboxComp.Label[sizeof(checkboxComp.Label) - 1] = '\0';
+                checkboxComp.Label = ECS::StringTable::Intern(label);
             }
 
-            auto& container = world.Add<GUIContainer>(checkbox);
+            auto& container = world.Add<Components::GUIContainer>(checkbox);
+            world.Add<Components::GUIChildList>(checkbox);
 
-                // Assign to UI layer
-                world.Set<ECS::Components::Layer>(checkbox, ECS::Components::Layer{ 98 });
+            // Assign to UI layer
+            world.Set<ECS::Components::Layer>(checkbox, ECS::Components::Layer{ 98 });
 
-                // Assign name
-                ECS::Components::Name nm{};
-                std::string finalName = !name.empty() ? name : label.empty() ? "Checkbox" : label;
-                nm.Value = ECS::StringTable::Intern(finalName);
-                world.Set<ECS::Components::Name>(checkbox, nm);
-                return checkbox;
+            // Assign name
+            ECS::Components::Name nm{};
+            std::string finalName = !name.empty() ? name : label.empty() ? "Checkbox" : label;
+            nm.Value = ECS::StringTable::Intern(finalName);
+            world.Set<ECS::Components::Name>(checkbox, nm);
+            return checkbox;
         }
 
         Entity GUIFactory::CreateDropdown(
@@ -273,57 +274,62 @@ namespace ECS {
             
             Entity dropdown = world.Create();
 
-            auto& element = world.Add<GUIElement>(dropdown);
+            auto& element = world.Add<Components::GUIElement>(dropdown);
             element.Position = position;
             element.Size = {width, 40.0f};
-            element.ElementType = GUIElementType::Dropdown;
+            element.ElementType = Components::GUIElementType::Dropdown;
 
-            auto& dropdownComp = world.Add<GUIDropdown>(dropdown);
+            auto& dropdownComp = world.Add<Components::GUIDropdown>(dropdown);
             dropdownComp.ActionID = actionID;
             dropdownComp.Interactable = true;
-            strncpy_s(dropdownComp.Options, options.c_str(), sizeof(dropdownComp.Options) - 1);
-            dropdownComp.Options[sizeof(dropdownComp.Options) - 1] = '\0';
+            dropdownComp.Options = options.empty() ? 0 : ECS::StringTable::Intern(options);
 
             // Count options (newline-separated)
-            dropdownComp.OptionCount = 1;
-            for (char c : options) {
-                if (c == '\n') {
-                    dropdownComp.OptionCount++;
+            if (!options.empty()) {
+                dropdownComp.OptionCount = 1;
+                for (char c : options) {
+                    if (c == '\n') {
+                        dropdownComp.OptionCount++;
+                    }
                 }
+            } else {
+                dropdownComp.OptionCount = 0;
             }
 
-            auto& panel = world.Add<GUIPanel>(dropdown);
+            auto& panel = world.Add<Components::GUIPanel>(dropdown);
             panel.BackgroundColor = dropdownComp.BackgroundColor;
 
-            auto& container = world.Add<GUIContainer>(dropdown);
+            auto& container = world.Add<Components::GUIContainer>(dropdown);
+            world.Add<Components::GUIChildList>(dropdown);
 
-                // Assign to UI layer
-                world.Set<ECS::Components::Layer>(dropdown, ECS::Components::Layer{ 98 });
+            // Assign to UI layer
+            world.Set<ECS::Components::Layer>(dropdown, ECS::Components::Layer{ 98 });
 
-                // Assign name
-                ECS::Components::Name nm{};
-                std::string finalName = !name.empty() ? name : "Dropdown";
-                nm.Value = ECS::StringTable::Intern(finalName);
-                world.Set<ECS::Components::Name>(dropdown, nm);
-                return dropdown;
+            // Assign name
+            ECS::Components::Name nm{};
+            std::string finalName = !name.empty() ? name : "Dropdown";
+            nm.Value = ECS::StringTable::Intern(finalName);
+            world.Set<ECS::Components::Name>(dropdown, nm);
+            return dropdown;
         }
 
         Entity GUIFactory::CreateContainer(
             World& world,
             Vector2D position,
             Vector2D size,
-            LayoutType layoutType,
+            Components::LayoutType layoutType,
             const std::string& name) {
             
             Entity container = world.Create();
 
-            auto& element = world.Add<GUIElement>(container);
+            auto& element = world.Add<Components::GUIElement>(container);
             element.Position = position;
             element.Size = size;
-            element.ElementType = GUIElementType::Container;
+            element.ElementType = Components::GUIElementType::Container;
 
-            auto& containerComp = world.Add<GUIContainer>(container);
+            auto& containerComp = world.Add<Components::GUIContainer>(container);
             containerComp.Layout = layoutType;
+            world.Add<Components::GUIChildList>(container);
 
               // Assign to UI layer
               world.Set<ECS::Components::Layer>(container, ECS::Components::Layer{ 98 });
@@ -345,26 +351,58 @@ namespace ECS {
             
             Entity separator = world.Create();
 
-            auto& element = world.Add<GUIElement>(separator);
+            auto& element = world.Add<Components::GUIElement>(separator);
             element.Position = position;
             element.Size = horizontal ? Vector2D{length, 1.0f} : Vector2D{1.0f, length};
-            element.ElementType = GUIElementType::Separator;
+            element.ElementType = Components::GUIElementType::Separator;
 
-            auto& sepComp = world.Add<GUISeparator>(separator);
-            sepComp.Orient = horizontal ? GUISeparator::Orientation::Horizontal : 
-                                         GUISeparator::Orientation::Vertical;
+            auto& sepComp = world.Add<Components::GUISeparator>(separator);
+            sepComp.Orient = horizontal ? Components::GUISeparator::Orientation::Horizontal : 
+                                         Components::GUISeparator::Orientation::Vertical;
 
-            auto& container = world.Add<GUIContainer>(separator);
+            auto& container = world.Add<Components::GUIContainer>(separator);
+            world.Add<Components::GUIChildList>(separator);
 
-              // Assign to UI layer
-              world.Set<ECS::Components::Layer>(separator, ECS::Components::Layer{ 98 });
+            // Assign to UI layer
+            world.Set<ECS::Components::Layer>(separator, ECS::Components::Layer{ 98 });
 
-              // Assign name
-              ECS::Components::Name nm{};
-              std::string finalName = !name.empty() ? name : "Separator";
-              nm.Value = ECS::StringTable::Intern(finalName);
-              world.Set<ECS::Components::Name>(separator, nm);
-              return separator;
+            // Assign name
+            ECS::Components::Name nm{};
+            std::string finalName = !name.empty() ? name : "Separator";
+            nm.Value = ECS::StringTable::Intern(finalName);
+            world.Set<ECS::Components::Name>(separator, nm);
+            return separator;
+        }
+
+        void GUIFactory::AttachChild(World& world, Entity parent, Entity child) {
+            if (parent.IsNull() || child.IsNull()) {
+                return;
+            }
+
+            if (!world.Has<Components::GUIChildList>(parent)) {
+                world.Add<Components::GUIChildList>(parent);
+            }
+
+            auto& childList = world.Get<Components::GUIChildList>(parent);
+            for (uint16_t i = 0; i < childList.ChildCount; ++i) {
+                if (childList.Children[i] == child) {
+                    Components::Parent parentComp{};
+                    parentComp.ParentEntity = parent;
+                    world.Set<Components::Parent>(child, parentComp);
+                    return;
+                }
+            }
+
+            if (childList.ChildCount >= Components::GUIChildList::MaxChildren) {
+                LOG_WARNING("GUIFactory::AttachChild: MaxChildren reached for parent " << parent.Index);
+                return;
+            }
+
+            childList.Children[childList.ChildCount++] = child;
+
+            Components::Parent parentComp{};
+            parentComp.ParentEntity = parent;
+            world.Set<Components::Parent>(child, parentComp);
         }
 
         // ====================================================================
@@ -558,15 +596,15 @@ namespace ECS {
         const Color GUIStyle::ErrorColor = Color{1.0f, 0.2f, 0.2f, 1.0f};
         const Color GUIStyle::SuccessColor = Color{0.2f, 1.0f, 0.2f, 1.0f};
 
-        Color GUIStyle::GetButtonColor(ButtonState state) {
+        Color GUIStyle::GetButtonColor(Components::ButtonState state) {
             switch (state) {
-                case ButtonState::Normal:
+                case Components::ButtonState::Normal:
                     return Color{0.3f, 0.3f, 0.3f, 1.0f};
-                case ButtonState::Hovered:
+                case Components::ButtonState::Hovered:
                     return Color{0.4f, 0.4f, 0.4f, 1.0f};
-                case ButtonState::Pressed:
+                case Components::ButtonState::Pressed:
                     return Color{0.2f, 0.2f, 0.2f, 1.0f};
-                case ButtonState::Disabled:
+                case Components::ButtonState::Disabled:
                     return Color{0.15f, 0.15f, 0.15f, 0.5f};
                 default:
                     return Color{0.3f, 0.3f, 0.3f, 1.0f};
@@ -583,5 +621,5 @@ namespace ECS {
             return GUIUtils::LerpColor(startColor, endColor, t);
         }
 
-    } // namespace GUI
+    } // namespace UI
 } // namespace ECS

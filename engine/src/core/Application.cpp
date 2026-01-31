@@ -31,7 +31,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
-#include "ecs/gui/GUISystem.h"
+#include "ecs/systems/GUISystem.h"
 #include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 

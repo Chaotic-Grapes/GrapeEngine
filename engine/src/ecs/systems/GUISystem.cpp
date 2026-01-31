@@ -25,14 +25,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#include "ecs/gui/GUISystem.h"
-#include "ecs/gui/GUILayout.h"
+#include "ecs/systems/GUISystem.h"
+#include "ecs/ui/GUILayout.h"
 #include "ecs/World.h"
 #include "ecs/systems/RendererSystem.h"
 #include "services/Input.h"
 #include "services/TimeSystem.h"
 #include "core/Logger.h"
 #include "core/Application.h"
+#include "ecs/StringTable.h"
 #include "graphics/renderer.hpp"
 #include "graphics/shader.hpp"
 #include "graphics/font.hpp"
@@ -94,10 +95,10 @@ namespace ECS {
 
     SystemMetadata GUISystem::GetMetadata() const {
         return ComponentAccessBuilder("GUISystem")
-            .WriteComponent<GUI::GUIElement>()
+            .WriteComponent<Components::GUIElement>()
             .SetExecutionOrder(0)
             .SetGroup(SystemGroup::PreRender)
-            .SetRunMode(SystemRunMode::PlayOnly)
+            .SetRunMode(SystemRunMode::Always)
             .SetEnabled(true)
             .Build();
     }
@@ -108,7 +109,7 @@ namespace ECS {
 
     void GUISystem::UpdateLayout(World& world) {
         // Use the layout engine to calculate positions and sizes
-        GUI::GUILayout::CalculateLayout(world, m_canvasSize);
+        UI::GUILayout::CalculateLayout(world, m_canvasSize);
     }
 
     void GUISystem::UpdateElementLayout(World& world, Entity entity,
@@ -117,14 +118,14 @@ namespace ECS {
             return;
         }
 
-        if (!world.Has<GUI::GUIElement>(entity)) {
+        if (!world.Has<Components::GUIElement>(entity)) {
             return;
         }
 
-        auto& element = world.Get<GUI::GUIElement>(entity);
+        auto& element = world.Get<Components::GUIElement>(entity);
 
         // Calculate world position based on anchoring
-        Vector2D worldPos = GUI::GUILayout::CalculateAnchoredPosition(
+        Vector2D worldPos = UI::GUILayout::CalculateAnchoredPosition(
             element.Position,
             element.AnchorMin,
             element.AnchorMax,
@@ -137,17 +138,23 @@ namespace ECS {
         element.DirtyLayout = false;
 
         // If this is a container, layout children
-        if (world.Has<GUI::GUIContainer>(entity)) {
-            CalculateContainerLayout(world, entity, element, world.Get<GUI::GUIContainer>(entity));
+        if (world.Has<Components::GUIContainer>(entity)) {
+            CalculateContainerLayout(world, entity, element, world.Get<Components::GUIContainer>(entity));
         }
     }
 
     void GUISystem::CalculateContainerLayout(World& world, Entity containerEntity,
-                                            const GUI::GUIElement& containerElement,
-                                            const GUI::GUIContainer& container) {
+                                            const Components::GUIElement& containerElement,
+                                            const Components::GUIContainer& container) {
         // Layout children based on container's layout type
-        for (uint16_t i = 0; i < container.ChildCount && i < GUI::GUIContainer::MaxChildren; ++i) {
-            Entity child{container.Children[i]};
+        (void)container;
+        if (!world.Has<Components::GUIChildList>(containerEntity)) {
+            return;
+        }
+
+        const auto& childList = world.Get<Components::GUIChildList>(containerEntity);
+        for (uint16_t i = 0; i < childList.ChildCount && i < Components::GUIChildList::MaxChildren; ++i) {
+            Entity child = childList.Children[i];
             if (!child.IsNull()) {
                 UpdateElementLayout(world, child, containerElement.WorldPosition, containerElement.Size);
             }
@@ -187,11 +194,11 @@ namespace ECS {
         
         // Insert each element into grid cells it overlaps
         for (Entity entity : elements) {
-            if (!world.Has<GUI::GUIElement>(entity)) {
+            if (!world.Has<Components::GUIElement>(entity)) {
                 continue;
             }
 
-            const auto& element = world.Get<GUI::GUIElement>(entity);
+            const auto& element = world.Get<Components::GUIElement>(entity);
             if (!element.Active || !element.Visible) {
                 continue;
             }
@@ -235,7 +242,7 @@ namespace ECS {
         if (!rendererSystem) return;
 
         // Update visual states for all GUI elements
-        world.Each<GUI::GUIElement>([&](Entity entity, GUI::GUIElement& element) {
+        world.Each<Components::GUIElement>([&](Entity entity, Components::GUIElement& element) {
             if (!element.Active || !element.Visible) {
                 return;
             }
@@ -250,8 +257,8 @@ namespace ECS {
             bool isDisabled = false;
 
             // Check if element is disabled
-            if (world.Has<GUI::GUIButton>(entity)) {
-                isDisabled = !world.Get<GUI::GUIButton>(entity).Interactable;
+            if (world.Has<Components::GUIButton>(entity)) {
+                isDisabled = !world.Get<Components::GUIButton>(entity).Interactable;
             }
 
             // Calculate target scale
@@ -396,12 +403,12 @@ namespace ECS {
             }
 
             // Skip if not alive or doesn't have GUIElement
-            if (!world.IsAlive(entity) || !world.Has<GUI::GUIElement>(entity)) {
+            if (!world.IsAlive(entity) || !world.Has<Components::GUIElement>(entity)) {
                 continue;
             }
 
             // Get element and check bounds
-            const auto& element = world.Get<GUI::GUIElement>(entity);
+            const auto& element = world.Get<Components::GUIElement>(entity);
             if (!element.Active || !element.Visible) {
                 continue;
             }
@@ -421,7 +428,7 @@ namespace ECS {
 
     void GUISystem::UpdateInteraction(World& world, float deltaTime) {
         // Update button states
-        world.Each<GUI::GUIButton>([&](Entity entity, GUI::GUIButton& button) {
+        world.Each<Components::GUIButton>([&](Entity entity, Components::GUIButton& button) {
             bool isHovered = entity == m_hoveredElement;
             bool isPressed = isHovered && m_mousePressed;
 
@@ -429,46 +436,46 @@ namespace ECS {
         });
 
         // Update sliders
-        world.Each<GUI::GUISlider>([&](Entity entity, GUI::GUISlider& slider) {
+        world.Each<Components::GUISlider>([&](Entity entity, Components::GUISlider& slider) {
             bool isHovered = entity == m_hoveredElement;
-            if (world.Has<GUI::GUIElement>(entity)) {
-                const auto& element = world.Get<GUI::GUIElement>(entity);
+            if (world.Has<Components::GUIElement>(entity)) {
+                const auto& element = world.Get<Components::GUIElement>(entity);
                 UpdateSliderInteraction(world, entity, slider, element, isHovered, m_mousePosition);
             }
         });
 
         // Update input fields
-        if (!m_focusedElement.IsNull() && world.Has<GUI::GUIInputField>(m_focusedElement)) {
-            auto& input = world.Get<GUI::GUIInputField>(m_focusedElement);
+        if (!m_focusedElement.IsNull() && world.Has<Components::GUIInputField>(m_focusedElement)) {
+            auto& input = world.Get<Components::GUIInputField>(m_focusedElement);
             // TODO: Handle text input from keyboard
             UpdateInputField(m_focusedElement, input, true, 0);
         }
 
         // Update scroll views
-        world.Each<GUI::GUIScrollView>([&](Entity entity, GUI::GUIScrollView& scroll) {
-            if (world.Has<GUI::GUIElement>(entity)) {
-                const auto& element = world.Get<GUI::GUIElement>(entity);
+        world.Each<Components::GUIScrollView>([&](Entity entity, Components::GUIScrollView& scroll) {
+            if (world.Has<Components::GUIElement>(entity)) {
+                const auto& element = world.Get<Components::GUIElement>(entity);
                 UpdateScrollView(entity, scroll, element, world);
             }
         });
     }
 
-    void GUISystem::UpdateButtonState(World& world, Entity entity, GUI::GUIButton& button,
+    void GUISystem::UpdateButtonState(World& world, Entity entity, Components::GUIButton& button,
                                      bool mouseOver, bool mousePressed) {
         // Transition between states
         if (!button.Interactable) {
-            button.State = GUI::ButtonState::Disabled;
+            button.State = Components::ButtonState::Disabled;
             return;
         }
 
         if (mousePressed) {
-            button.State = GUI::ButtonState::Pressed;
+            button.State = Components::ButtonState::Pressed;
             button.Pressed = true;
         } else if (mouseOver) {
-            button.State = GUI::ButtonState::Hovered;
+            button.State = Components::ButtonState::Hovered;
             button.Pressed = false;
         } else {
-            button.State = GUI::ButtonState::Normal;
+            button.State = Components::ButtonState::Normal;
             button.Pressed = false;
         }
 
@@ -486,8 +493,8 @@ namespace ECS {
         }
     }
 
-    void GUISystem::UpdateSliderInteraction(World& world, Entity entity, GUI::GUISlider& slider,
-                                           const GUI::GUIElement& element,
+    void GUISystem::UpdateSliderInteraction(World& world, Entity entity, Components::GUISlider& slider,
+                                           const Components::GUIElement& element,
                                            bool mouseOver, Vector2D mousePos) {
         if (!slider.Interactable) {
             return;
@@ -521,7 +528,7 @@ namespace ECS {
         }
     }
 
-    void GUISystem::UpdateInputField(Entity entity, GUI::GUIInputField& input,
+    void GUISystem::UpdateInputField(Entity entity, Components::GUIInputField& input,
                                     bool focused, char inputChar) {
         input.Focused = focused;
 
@@ -536,8 +543,8 @@ namespace ECS {
         // - Selection
     }
 
-    void GUISystem::UpdateScrollView(Entity entity, GUI::GUIScrollView& scroll,
-                                    const GUI::GUIElement& element,
+    void GUISystem::UpdateScrollView(Entity entity, Components::GUIScrollView& scroll,
+                                    const Components::GUIElement& element,
                                     World& world) {
         if (!scroll.VerticalScroll && !scroll.HorizontalScroll) {
             return;
@@ -586,64 +593,64 @@ namespace ECS {
 
     void GUISystem::RenderElement(World& world, Entity entity,
                                  RendererSystem* rendererSystem) {
-        if (!world.Has<GUI::GUIElement>(entity)) {
+        if (!world.Has<Components::GUIElement>(entity)) {
             return;
         }
 
-        auto& element = world.Get<GUI::GUIElement>(entity);
+        auto& element = world.Get<Components::GUIElement>(entity);
 
         if (!element.Active || !element.Visible) {
             return;
         }
 
         // Render based on component type
-        if (world.Has<GUI::GUIPanel>(entity)) {
-            RenderPanel(element, world.Get<GUI::GUIPanel>(entity), rendererSystem);
+        if (world.Has<Components::GUIPanel>(entity)) {
+            RenderPanel(element, world.Get<Components::GUIPanel>(entity), rendererSystem);
         }
 
-        if (world.Has<GUI::GUIButton>(entity)) {
-            RenderButton(entity, element, world.Get<GUI::GUIButton>(entity), rendererSystem);
+        if (world.Has<Components::GUIButton>(entity)) {
+            RenderButton(entity, element, world.Get<Components::GUIButton>(entity), rendererSystem);
         }
 
-        if (world.Has<GUI::GUIText>(entity)) {
-            RenderText(entity, element, world.Get<GUI::GUIText>(entity), rendererSystem);
+        if (world.Has<Components::GUIText>(entity)) {
+            RenderText(entity, element, world.Get<Components::GUIText>(entity), rendererSystem);
         }
 
-        if (world.Has<GUI::GUISlider>(entity)) {
-            RenderSlider(element, world.Get<GUI::GUISlider>(entity), rendererSystem);
+        if (world.Has<Components::GUISlider>(entity)) {
+            RenderSlider(element, world.Get<Components::GUISlider>(entity), rendererSystem);
         }
 
-        if (world.Has<GUI::GUICheckbox>(entity)) {
-            RenderCheckbox(element, world.Get<GUI::GUICheckbox>(entity), rendererSystem);
+        if (world.Has<Components::GUICheckbox>(entity)) {
+            RenderCheckbox(element, world.Get<Components::GUICheckbox>(entity), rendererSystem);
         }
 
-        if (world.Has<GUI::GUIDropdown>(entity)) {
-            RenderDropdown(element, world.Get<GUI::GUIDropdown>(entity), rendererSystem);
+        if (world.Has<Components::GUIDropdown>(entity)) {
+            RenderDropdown(element, world.Get<Components::GUIDropdown>(entity), rendererSystem);
         }
 
-        if (world.Has<GUI::GUISeparator>(entity)) {
-            RenderSeparator(element, world.Get<GUI::GUISeparator>(entity), rendererSystem);
+        if (world.Has<Components::GUISeparator>(entity)) {
+            RenderSeparator(element, world.Get<Components::GUISeparator>(entity), rendererSystem);
         }
     }
 
-    void GUISystem::RenderButton(Entity entity, const GUI::GUIElement& element,
-                                const GUI::GUIButton& button,
+    void GUISystem::RenderButton(Entity entity, const Components::GUIElement& element,
+                                const Components::GUIButton& button,
                                 RendererSystem* rendererSystem) {
         if (!rendererSystem) return;
         
         // Determine button color based on state
         Color bgColor;
         switch (button.State) {
-            case GUI::ButtonState::Hovered:
+            case Components::ButtonState::Hovered:
                 bgColor = button.ColorHovered;
                 break;
-            case GUI::ButtonState::Pressed:
+            case Components::ButtonState::Pressed:
                 bgColor = button.ColorPressed;
                 break;
-            case GUI::ButtonState::Disabled:
+            case Components::ButtonState::Disabled:
                 bgColor = button.ColorDisabled;
                 break;
-            case GUI::ButtonState::Normal:
+            case Components::ButtonState::Normal:
             default:
                 bgColor = button.ColorNormal;
                 break;
@@ -653,8 +660,8 @@ namespace ECS {
         rendererSystem->SubmitGUIPanel(element.WorldPosition, element.Size, bgColor, 0.0f);
     }
 
-    void GUISystem::RenderPanel(const GUI::GUIElement& element,
-                               const GUI::GUIPanel& panel,
+    void GUISystem::RenderPanel(const Components::GUIElement& element,
+                               const Components::GUIPanel& panel,
                                RendererSystem* rendererSystem) {
         if (!rendererSystem) return;
         
@@ -663,27 +670,29 @@ namespace ECS {
                                       panel.BackgroundColor, panel.BorderRadius);
     }
 
-    void GUISystem::RenderText(Entity entity, const GUI::GUIElement& element,
-                              const GUI::GUIText& text,
+    void GUISystem::RenderText(Entity entity, const Components::GUIElement& element,
+                              const Components::GUIText& text,
                               RendererSystem* rendererSystem) {
         if (!rendererSystem) {
             return;
         }
 
         // Get font path, use default if empty
-        std::string fontPath(text.FontPath);
+        std::string fontPath = text.FontPath ? ECS::StringTable::Resolve(text.FontPath) : std::string();
         if (fontPath.empty()) {
             fontPath = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf";
         }
 
+        std::string content = text.Content ? ECS::StringTable::Resolve(text.Content) : std::string();
+
         // Submit text rendering via RendererSystem
-        rendererSystem->SubmitGUIText(fontPath, text.Content, element.WorldPosition,
+        rendererSystem->SubmitGUIText(fontPath, content, element.WorldPosition,
                                       text.FontColor, text.FontSize,
                                       text.ShadowColor, text.ShadowOffset);
     }
 
-    void GUISystem::RenderSlider(const GUI::GUIElement& element,
-                                const GUI::GUISlider& slider,
+    void GUISystem::RenderSlider(const Components::GUIElement& element,
+                                const Components::GUISlider& slider,
                                 RendererSystem* rendererSystem) {
         if (!rendererSystem) return;
         
@@ -698,8 +707,8 @@ namespace ECS {
                                         slider.HandleColor);
     }
 
-    void GUISystem::RenderCheckbox(const GUI::GUIElement& element,
-                                  const GUI::GUICheckbox& checkbox,
+    void GUISystem::RenderCheckbox(const Components::GUIElement& element,
+                                  const Components::GUICheckbox& checkbox,
                                   RendererSystem* rendererSystem) {
         if (!rendererSystem) return;
         
@@ -711,8 +720,8 @@ namespace ECS {
                                          checkbox.CheckedColor, checkbox.BorderColor);
     }
 
-    void GUISystem::RenderDropdown(const GUI::GUIElement& element,
-                                  const GUI::GUIDropdown& dropdown,
+    void GUISystem::RenderDropdown(const Components::GUIElement& element,
+                                  const Components::GUIDropdown& dropdown,
                                   RendererSystem* rendererSystem) {
         if (!rendererSystem) return;
         
@@ -725,7 +734,7 @@ namespace ECS {
             // Each option is rendered below the button
             float optionHeight = element.Size.Y;
             
-            for (uint32_t i = 0; i < dropdown.OptionCount && i < GUI::GUIDropdown::MaxOptions; ++i) {
+            for (uint32_t i = 0; i < dropdown.OptionCount && i < Components::GUIDropdown::MaxOptions; ++i) {
                 Vector2D optionPos = element.WorldPosition;
                 optionPos.Y += element.Size.Y * (i + 1); // Offset each option below the button
                 
@@ -738,15 +747,15 @@ namespace ECS {
         }
     }
 
-    void GUISystem::RenderSeparator(const GUI::GUIElement& element,
-                                   const GUI::GUISeparator& separator,
+    void GUISystem::RenderSeparator(const Components::GUIElement& element,
+                                   const Components::GUISeparator& separator,
                                    RendererSystem* rendererSystem) {
         if (!rendererSystem) return;
         
         // Calculate start and end points based on orientation
         Vector2D startPos, endPos;
         
-        if (separator.Orient == GUI::GUISeparator::Orientation::Horizontal) {
+        if (separator.Orient == Components::GUISeparator::Orientation::Horizontal) {
             // Horizontal line across the width
             float centerY = element.WorldPosition.Y + element.Size.Y * 0.5f;
             startPos = { element.WorldPosition.X, centerY };
@@ -766,7 +775,7 @@ namespace ECS {
     // Utility Methods
     // ========================================================================
 
-    bool GUISystem::IsPointInElement(Vector2D point, const GUI::GUIElement& element) const {
+    bool GUISystem::IsPointInElement(Vector2D point, const Components::GUIElement& element) const {
         return point.X >= element.WorldPosition.X &&
                point.X <= element.WorldPosition.X + element.Size.X &&
                point.Y >= element.WorldPosition.Y &&
@@ -777,7 +786,7 @@ namespace ECS {
         std::vector<Entity> elements;
         
         // Collect all GUI elements
-        world.Each<GUI::GUIElement>([&](Entity entity, const GUI::GUIElement& element) {
+        world.Each<Components::GUIElement>([&](Entity entity, const Components::GUIElement& element) {
             if (element.Active && element.Visible) {
                 elements.push_back(entity);
             }
@@ -785,29 +794,29 @@ namespace ECS {
 
         // Sort by Z-order
         std::sort(elements.begin(), elements.end(), [&world](Entity a, Entity b) {
-            auto& elemA = world.Get<GUI::GUIElement>(a);
-            auto& elemB = world.Get<GUI::GUIElement>(b);
+            auto& elemA = world.Get<Components::GUIElement>(a);
+            auto& elemB = world.Get<Components::GUIElement>(b);
             return elemA.ZOrder < elemB.ZOrder;
         });
 
         return elements;
     }
 
-    bool GUISystem::ValidateInputField(const GUI::GUIInputField& input,
+    bool GUISystem::ValidateInputField(const Components::GUIInputField& input,
                                        const std::string& text) const {
         // TODO: Validate based on input type
         switch (input.Type) {
-            case GUI::GUIInputField::InputType::Integer:
+            case Components::GUIInputField::InputType::Integer:
                 // Check if all characters are digits
                 break;
-            case GUI::GUIInputField::InputType::Decimal:
+            case Components::GUIInputField::InputType::Decimal:
                 // Check if valid float
                 break;
-            case GUI::GUIInputField::InputType::Alphanumeric:
+            case Components::GUIInputField::InputType::Alphanumeric:
                 // Check if alphanumeric
                 break;
-            case GUI::GUIInputField::InputType::Password:
-            case GUI::GUIInputField::InputType::Standard:
+            case Components::GUIInputField::InputType::Password:
+            case Components::GUIInputField::InputType::Standard:
             default:
                 // Accept all
                 break;

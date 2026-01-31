@@ -32,8 +32,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include "ecs/ISystem.h"
 #include "ecs/World.h"
-#include "ecs/gui/GUIComponents.h"
-#include "Math/Vector2D.h"
+#include "ecs/Components.h"
+#include "math/Vector2D.h"
 #include "Color.h"
 #include <functional>
 #include <unordered_map>
@@ -64,11 +64,11 @@ namespace ECS {
      * 
      * // Create a GUI element in your scene
      * Entity panel = world.Create();
-     * auto& guiElement = world.Emplace<ECS::GUI::GUIElement>(panel);
+     * auto& guiElement = world.Emplace<ECS::Components::GUIElement>(panel);
      * guiElement.Position = {100, 100};
      * guiElement.Size = {300, 200};
      * 
-     * auto& guiPanel = world.Emplace<ECS::GUI::GUIPanel>(panel);
+     * auto& guiPanel = world.Emplace<ECS::Components::GUIPanel>(panel);
      * guiPanel.BackgroundColor = Color(0.2f, 0.2f, 0.2f, 1.0f);
      * 
      * // System automatically handles layout, input, and rendering
@@ -244,8 +244,8 @@ namespace ECS {
          * @brief Calculate layout for a container's children
          */
         void CalculateContainerLayout(World& world, Entity containerEntity,
-                                     const GUI::GUIElement& containerElement,
-                                     const GUI::GUIContainer& container);
+                                     const Components::GUIElement& containerElement,
+                                     const Components::GUIContainer& container);
 
         /**
          * @brief Handle all input events (mouse, keyboard, touch)
@@ -271,56 +271,56 @@ namespace ECS {
         /**
          * @brief Submit button rendering to RendererSystem
          */
-        void RenderButton(Entity entity, const GUI::GUIElement& element,
-                         const GUI::GUIButton& button,
+        void RenderButton(Entity entity, const Components::GUIElement& element,
+                         const Components::GUIButton& button,
                          RendererSystem* rendererSystem);
 
         /**
          * @brief Submit panel rendering to RendererSystem
          */
-        void RenderPanel(const GUI::GUIElement& element,
-                        const GUI::GUIPanel& panel,
+        void RenderPanel(const Components::GUIElement& element,
+                        const Components::GUIPanel& panel,
                         RendererSystem* rendererSystem);
 
         /**
          * @brief Submit text rendering to RendererSystem
          */
-        void RenderText(Entity entity, const GUI::GUIElement& element,
-                       const GUI::GUIText& text,
+        void RenderText(Entity entity, const Components::GUIElement& element,
+                       const Components::GUIText& text,
                        RendererSystem* rendererSystem);
 
         /**
          * @brief Submit slider rendering to RendererSystem
          */
-        void RenderSlider(const GUI::GUIElement& element,
-                         const GUI::GUISlider& slider,
+        void RenderSlider(const Components::GUIElement& element,
+                         const Components::GUISlider& slider,
                          RendererSystem* rendererSystem);
 
         /**
          * @brief Submit checkbox rendering to RendererSystem
          */
-        void RenderCheckbox(const GUI::GUIElement& element,
-                           const GUI::GUICheckbox& checkbox,
+        void RenderCheckbox(const Components::GUIElement& element,
+                           const Components::GUICheckbox& checkbox,
                            RendererSystem* rendererSystem);
 
         /**
          * @brief Submit dropdown rendering to RendererSystem
          */
-        void RenderDropdown(const GUI::GUIElement& element,
-                           const GUI::GUIDropdown& dropdown,
+        void RenderDropdown(const Components::GUIElement& element,
+                           const Components::GUIDropdown& dropdown,
                            RendererSystem* rendererSystem);
 
         /**
          * @brief Submit separator rendering to RendererSystem
          */
-        void RenderSeparator(const GUI::GUIElement& element,
-                            const GUI::GUISeparator& separator,
+        void RenderSeparator(const Components::GUIElement& element,
+                            const Components::GUISeparator& separator,
                             RendererSystem* rendererSystem);
 
         /**
          * @brief Check if a point is inside a GUI element's bounds
          */
-        bool IsPointInElement(Vector2D point, const GUI::GUIElement& element) const;
+        bool IsPointInElement(Vector2D point, const Components::GUIElement& element) const;
 
         /**
          * @brief Raycast to find topmost GUI element at position
@@ -330,33 +330,33 @@ namespace ECS {
         /**
          * @brief Update button state based on interaction
          */
-        void UpdateButtonState(World& world, Entity entity, GUI::GUIButton& button,
+        void UpdateButtonState(World& world, Entity entity, Components::GUIButton& button,
                               bool mouseOver, bool mousePressed);
 
         /**
          * @brief Update slider interaction
          */
-        void UpdateSliderInteraction(World& world, Entity entity, GUI::GUISlider& slider,
-                                    const GUI::GUIElement& element,
+        void UpdateSliderInteraction(World& world, Entity entity, Components::GUISlider& slider,
+                                    const Components::GUIElement& element,
                                     bool mouseOver, Vector2D mousePos);
 
         /**
          * @brief Update text input field
          */
-        void UpdateInputField(Entity entity, GUI::GUIInputField& input,
+        void UpdateInputField(Entity entity, Components::GUIInputField& input,
                              bool focused, char inputChar);
 
         /**
          * @brief Validate input field text
          */
-        bool ValidateInputField(const GUI::GUIInputField& input, 
+        bool ValidateInputField(const Components::GUIInputField& input, 
                                const std::string& text) const;
 
         /**
          * @brief Update scroll view
          */
-        void UpdateScrollView(Entity entity, GUI::GUIScrollView& scroll,
-                             const GUI::GUIElement& element,
+        void UpdateScrollView(Entity entity, Components::GUIScrollView& scroll,
+                             const Components::GUIElement& element,
                              World& world);
 
         /**

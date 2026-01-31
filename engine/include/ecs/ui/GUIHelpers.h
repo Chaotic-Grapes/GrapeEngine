@@ -26,14 +26,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #define GUI_HELPERS_H
 
 #include "ecs/World.h"
-#include "ecs/gui/GUIComponents.h"
-#include "Math/Vector2D.h"
+#include "ecs/Components.h"
+#include "math/Vector2D.h"
 #include "Color.h"
 #include <string>
 #include "Export.h"
 
 namespace ECS {
-    namespace GUI {
+    namespace UI {
 
         /**
          * @brief Factory for creating common GUI elements
@@ -183,7 +183,7 @@ namespace ECS {
                 World& world,
                 Vector2D position,
                 Vector2D size,
-                LayoutType layoutType = LayoutType::VerticalBox,
+                Components::LayoutType layoutType = Components::LayoutType::VerticalBox,
                 const std::string& name = "");
 
             /**
@@ -200,6 +200,14 @@ namespace ECS {
                 float length,
                 bool horizontal = true,
                 const std::string& name = "");
+
+            /**
+             * @brief Attach a child to a GUI parent using ECS components
+             * @param world The ECS world
+             * @param parent Parent GUI entity
+             * @param child Child GUI entity
+             */
+            static void AttachChild(World& world, Entity parent, Entity child);
         };
 
         /**
@@ -372,7 +380,7 @@ namespace ECS {
             /**
              * @brief Get color for a button in a specific state
              */
-            static Color GetButtonColor(ButtonState state);
+            static Color GetButtonColor(Components::ButtonState state);
 
             /**
              * @brief Get transition color based on time
@@ -384,7 +392,7 @@ namespace ECS {
                 float totalTime);
         };
 
-    } // namespace GUI
+    } // namespace UI
 } // namespace ECS
 
 #endif

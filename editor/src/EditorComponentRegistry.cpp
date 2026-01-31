@@ -63,6 +63,27 @@ namespace {
     const uint32_t kHashAudioSource = Editor::ECSUtils::FNV1aHash("AudioSource");
     const uint32_t kHashLayer = Editor::ECSUtils::FNV1aHash("Layer");
     const uint32_t kHashMaterial2D = Editor::ECSUtils::FNV1aHash("Material2D");
+    const uint32_t kHashGUIElement = Editor::ECSUtils::FNV1aHash("GUIElement");
+    const uint32_t kHashGUIContainer = Editor::ECSUtils::FNV1aHash("GUIContainer");
+    const uint32_t kHashGUIPanel = Editor::ECSUtils::FNV1aHash("GUIPanel");
+    const uint32_t kHashGUIButton = Editor::ECSUtils::FNV1aHash("GUIButton");
+    const uint32_t kHashGUIInputField = Editor::ECSUtils::FNV1aHash("GUIInputField");
+    const uint32_t kHashGUISlider = Editor::ECSUtils::FNV1aHash("GUISlider");
+    const uint32_t kHashGUICheckbox = Editor::ECSUtils::FNV1aHash("GUICheckbox");
+    const uint32_t kHashGUIDropdown = Editor::ECSUtils::FNV1aHash("GUIDropdown");
+    const uint32_t kHashGUIScrollView = Editor::ECSUtils::FNV1aHash("GUIScrollView");
+    const uint32_t kHashGUISeparator = Editor::ECSUtils::FNV1aHash("GUISeparator");
+    const uint32_t kHashGUIText = Editor::ECSUtils::FNV1aHash("GUIText");
+    const uint32_t kHashGUILayoutGroup = Editor::ECSUtils::FNV1aHash("GUILayoutGroup");
+    const uint32_t kHashGUITooltip = Editor::ECSUtils::FNV1aHash("GUITooltip");
+
+    template<typename T>
+    nlohmann::json MakeDefaultJson() {
+        T value{};
+        nlohmann::json j;
+        Serialization::to_json_adl(j, value);
+        return j;
+    }
 }
 
 // Callback function pointer for deserializing managed components from JSON
@@ -753,6 +774,110 @@ static void _initializeDefaultRegistry() {
                 { "Flags", 0 }
             }; }),
             COMPONENT_OPS_HASH(Material2D, kHashMaterial2D)
+        },
+        // GUI Element
+        {
+            "GUI Element", "GUIElement", "ECS::Components::GUIElement",
+            GetComponentIdFromHashOrWarn(kHashGUIElement, "GUIElement"), kHashGUIElement, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUIElement>(); }),
+            COMPONENT_OPS_HASH(GUIElement, kHashGUIElement)
+        },
+        // GUI Container
+        {
+            "GUI Container", "GUIContainer", "ECS::Components::GUIContainer",
+            GetComponentIdFromHashOrWarn(kHashGUIContainer, "GUIContainer"), kHashGUIContainer, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUIContainer>(); }),
+            COMPONENT_OPS_HASH(GUIContainer, kHashGUIContainer)
+        },
+        // GUI Panel
+        {
+            "GUI Panel", "GUIPanel", "ECS::Components::GUIPanel",
+            GetComponentIdFromHashOrWarn(kHashGUIPanel, "GUIPanel"), kHashGUIPanel, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUIPanel>(); }),
+            COMPONENT_OPS_HASH(GUIPanel, kHashGUIPanel)
+        },
+        // GUI Button
+        {
+            "GUI Button", "GUIButton", "ECS::Components::GUIButton",
+            GetComponentIdFromHashOrWarn(kHashGUIButton, "GUIButton"), kHashGUIButton, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUIButton>(); }),
+            COMPONENT_OPS_HASH(GUIButton, kHashGUIButton)
+        },
+        // GUI Input Field
+        {
+            "GUI Input Field", "GUIInputField", "ECS::Components::GUIInputField",
+            GetComponentIdFromHashOrWarn(kHashGUIInputField, "GUIInputField"), kHashGUIInputField, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUIInputField>(); }),
+            COMPONENT_OPS_HASH(GUIInputField, kHashGUIInputField)
+        },
+        // GUI Slider
+        {
+            "GUI Slider", "GUISlider", "ECS::Components::GUISlider",
+            GetComponentIdFromHashOrWarn(kHashGUISlider, "GUISlider"), kHashGUISlider, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUISlider>(); }),
+            COMPONENT_OPS_HASH(GUISlider, kHashGUISlider)
+        },
+        // GUI Checkbox
+        {
+            "GUI Checkbox", "GUICheckbox", "ECS::Components::GUICheckbox",
+            GetComponentIdFromHashOrWarn(kHashGUICheckbox, "GUICheckbox"), kHashGUICheckbox, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUICheckbox>(); }),
+            COMPONENT_OPS_HASH(GUICheckbox, kHashGUICheckbox)
+        },
+        // GUI Dropdown
+        {
+            "GUI Dropdown", "GUIDropdown", "ECS::Components::GUIDropdown",
+            GetComponentIdFromHashOrWarn(kHashGUIDropdown, "GUIDropdown"), kHashGUIDropdown, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUIDropdown>(); }),
+            COMPONENT_OPS_HASH(GUIDropdown, kHashGUIDropdown)
+        },
+        // GUI Scroll View
+        {
+            "GUI Scroll View", "GUIScrollView", "ECS::Components::GUIScrollView",
+            GetComponentIdFromHashOrWarn(kHashGUIScrollView, "GUIScrollView"), kHashGUIScrollView, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUIScrollView>(); }),
+            COMPONENT_OPS_HASH(GUIScrollView, kHashGUIScrollView)
+        },
+        // GUI Separator
+        {
+            "GUI Separator", "GUISeparator", "ECS::Components::GUISeparator",
+            GetComponentIdFromHashOrWarn(kHashGUISeparator, "GUISeparator"), kHashGUISeparator, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUISeparator>(); }),
+            COMPONENT_OPS_HASH(GUISeparator, kHashGUISeparator)
+        },
+        // GUI Text
+        {
+            "GUI Text", "GUIText", "ECS::Components::GUIText",
+            GetComponentIdFromHashOrWarn(kHashGUIText, "GUIText"), kHashGUIText, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUIText>(); }),
+            COMPONENT_OPS_HASH(GUIText, kHashGUIText)
+        },
+        // GUI Layout Group
+        {
+            "GUI Layout Group", "GUILayoutGroup", "ECS::Components::GUILayoutGroup",
+            GetComponentIdFromHashOrWarn(kHashGUILayoutGroup, "GUILayoutGroup"), kHashGUILayoutGroup, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUILayoutGroup>(); }),
+            COMPONENT_OPS_HASH(GUILayoutGroup, kHashGUILayoutGroup)
+        },
+        // GUI Tooltip
+        {
+            "GUI Tooltip", "GUITooltip", "ECS::Components::GUITooltip",
+            GetComponentIdFromHashOrWarn(kHashGUITooltip, "GUITooltip"), kHashGUITooltip, true, true,
+            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
+            static_cast<std::function<nlohmann::json()>>([]() { return MakeDefaultJson<GUITooltip>(); }),
+            COMPONENT_OPS_HASH(GUITooltip, kHashGUITooltip)
         }
     };
 }

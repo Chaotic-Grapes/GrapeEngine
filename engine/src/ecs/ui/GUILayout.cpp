@@ -23,14 +23,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
-#include "ecs/gui/GUILayout.h"
+#include "ecs/ui/GUILayout.h"
 #include "ecs/World.h"
+#include "ecs/Components.h"
 #include "core/Logger.h"
 #include <algorithm>
 #include <cmath>
 
 namespace ECS {
-    namespace GUI {
+    namespace UI {
 
         // ====================================================================
         // GUILayout Implementation
@@ -40,16 +41,19 @@ namespace ECS {
             LayoutContext context(canvasSize);
 
             // Find all root GUI elements (those without parents or with invalid parents)
-            world.Each<GUIElement, GUIContainer>([&](Entity entity, GUIElement& element, GUIContainer& container) {
-                if (container.Parent == 0) {
+            world.Each<Components::GUIElement, Components::GUIContainer>([&](Entity entity, Components::GUIElement&, Components::GUIContainer& container) {
+                (void)container;
+                const auto* parent = world.TryGet<Components::Parent>(entity);
+                if (!parent || parent->ParentEntity.IsNull()) {
                     // Root element - calculate from canvas
                     CalculateElementLayout(world, entity, context);
                 }
             });
 
             // Also handle elements without containers
-            world.Each<GUIElement>([&](Entity entity, GUIElement& element) {
-                if (!world.Has<GUIContainer>(entity)) {
+            world.Each<Components::GUIElement>([&](Entity entity, Components::GUIElement& element) {
+                (void)element;
+                if (!world.Has<Components::GUIContainer>(entity)) {
                     // Orphaned element - calculate from canvas
                     CalculateElementLayout(world, entity, context);
                 }
@@ -62,11 +66,11 @@ namespace ECS {
                 return LayoutResult{ {0, 0}, {100, 100}, {0, 0}, {0, 0}, {100, 100}, false };
             }
 
-            if (!world.Has<GUIElement>(entity)) {
+            if (!world.Has<Components::GUIElement>(entity)) {
                 return LayoutResult{ {0, 0}, {100, 100}, {0, 0}, {0, 0}, {100, 100}, false };
             }
 
-            auto& element = world.Get<GUIElement>(entity);
+            auto& element = world.Get<Components::GUIElement>(entity);
 
             // Skip if layout is clean and not forced
             if (!element.DirtyLayout && !context.ForceRecalculate) {
@@ -93,12 +97,12 @@ namespace ECS {
             element.WorldPosition = worldPos;
 
             // If this is a container, layout children
-            if (world.Has<GUIContainer>(entity)) {
+            if (world.Has<Components::GUIContainer>(entity)) {
                 LayoutContext childContext = context;
                 childContext.ParentPosition = worldPos;
                 childContext.ParentSize = element.Size;
 
-                auto& container = world.Get<GUIContainer>(entity);
+                auto& container = world.Get<Components::GUIContainer>(entity);
                 CalculateContainerLayout(world, entity, container, element, childContext);
             }
 
@@ -173,34 +177,31 @@ namespace ECS {
         void GUILayout::CalculateContainerLayout(
             World& world,
             Entity containerEntity,
-            const GUIContainer& container,
-            const GUIElement& element,
+            const Components::GUIContainer& container,
+            const Components::GUIElement& element,
             LayoutContext& context) {
             
             switch (container.Layout) {
-                case LayoutType::HorizontalBox:
-                    CalculateHorizontalBoxLayout(world, GetContainerChildren(world, container),
+                case Components::LayoutType::HorizontalBox:
+                    CalculateHorizontalBoxLayout(world, GetContainerChildren(world, containerEntity, container),
                                                container, element.Size, element.WorldPosition);
                     break;
 
-                case LayoutType::VerticalBox:
-                    CalculateVerticalBoxLayout(world, GetContainerChildren(world, container),
+                case Components::LayoutType::VerticalBox:
+                    CalculateVerticalBoxLayout(world, GetContainerChildren(world, containerEntity, container),
                                              container, element.Size, element.WorldPosition);
                     break;
 
-                case LayoutType::Grid:
-                    CalculateGridLayout(world, GetContainerChildren(world, container),
+                case Components::LayoutType::Grid:
+                    CalculateGridLayout(world, GetContainerChildren(world, containerEntity, container),
                                       container, element.Size, element.WorldPosition);
                     break;
 
-                case LayoutType::Absolute:
+                case Components::LayoutType::Absolute:
                 default:
                     // Absolute positioning - each child uses own Position/Size
-                    for (uint16_t i = 0; i < container.ChildCount && i < GUIContainer::MaxChildren; ++i) {
-                        if (container.Children[i] != 0) {
-                            Entity child{container.Children[i]};
-                            CalculateElementLayout(world, child, context);
-                        }
+                    for (const Entity child : GetContainerChildren(world, containerEntity, container)) {
+                        CalculateElementLayout(world, child, context);
                     }
                     break;
             }
@@ -209,7 +210,7 @@ namespace ECS {
         void GUILayout::CalculateHorizontalBoxLayout(
             World& world,
             const std::vector<Entity>& children,
-            const GUIContainer& container,
+            const Components::GUIContainer& container,
             Vector2D containerSize,
             Vector2D containerPos) {
             
@@ -223,23 +224,23 @@ namespace ECS {
 
             // Calculate total preferred width
             for (const Entity& child : children) {
-                if (world.Has<GUIElement>(child)) {
-                    totalPreferredWidth += world.Get<GUIElement>(child).Size.X;
+                if (world.Has<Components::GUIElement>(child)) {
+                    totalPreferredWidth += world.Get<Components::GUIElement>(child).Size.X;
                 }
             }
 
             // Distribute width
             float currentX = containerPos.X + container.Spacing;
             for (const Entity& child : children) {
-                if (!world.Has<GUIElement>(child)) {
+                if (!world.Has<Components::GUIElement>(child)) {
                     continue;
                 }
 
-                auto& childElement = world.Get<GUIElement>(child);
+                auto& childElement = world.Get<Components::GUIElement>(child);
                 childElement.WorldPosition = {currentX, containerPos.Y};
 
                 // Apply padding
-                if (world.Has<GUILayoutGroup>(child)) {
+                if (world.Has<Components::GUILayoutGroup>(child)) {
                     // Use flexible sizing
                     if (container.ChildForceExpandWidth) {
                         childElement.Size.X = availableWidth / children.size();
@@ -249,11 +250,11 @@ namespace ECS {
                 currentX += childElement.Size.X + container.Spacing;
 
                 // Recursively layout children
-                if (world.Has<GUIContainer>(child)) {
+                if (world.Has<Components::GUIContainer>(child)) {
                     LayoutContext childContext;
                     childContext.ParentPosition = childElement.WorldPosition;
                     childContext.ParentSize = childElement.Size;
-                    CalculateContainerLayout(world, child, world.Get<GUIContainer>(child),
+                    CalculateContainerLayout(world, child, world.Get<Components::GUIContainer>(child),
                                            childElement, childContext);
                 }
             }
@@ -262,7 +263,7 @@ namespace ECS {
         void GUILayout::CalculateVerticalBoxLayout(
             World& world,
             const std::vector<Entity>& children,
-            const GUIContainer& container,
+            const Components::GUIContainer& container,
             Vector2D containerSize,
             Vector2D containerPos) {
             
@@ -276,23 +277,23 @@ namespace ECS {
 
             // Calculate total preferred height
             for (const Entity& child : children) {
-                if (world.Has<GUIElement>(child)) {
-                    totalPreferredHeight += world.Get<GUIElement>(child).Size.Y;
+                if (world.Has<Components::GUIElement>(child)) {
+                    totalPreferredHeight += world.Get<Components::GUIElement>(child).Size.Y;
                 }
             }
 
             // Distribute height (top to bottom)
             float currentY = containerPos.Y + container.Spacing;
             for (const Entity& child : children) {
-                if (!world.Has<GUIElement>(child)) {
+                if (!world.Has<Components::GUIElement>(child)) {
                     continue;
                 }
 
-                auto& childElement = world.Get<GUIElement>(child);
+                auto& childElement = world.Get<Components::GUIElement>(child);
                 childElement.WorldPosition = {containerPos.X, currentY};
 
                 // Apply padding
-                if (world.Has<GUILayoutGroup>(child)) {
+                if (world.Has<Components::GUILayoutGroup>(child)) {
                     // Use flexible sizing
                     if (container.ChildForceExpandHeight) {
                         childElement.Size.Y = availableHeight / children.size();
@@ -302,11 +303,11 @@ namespace ECS {
                 currentY += childElement.Size.Y + container.Spacing;
 
                 // Recursively layout children
-                if (world.Has<GUIContainer>(child)) {
+                if (world.Has<Components::GUIContainer>(child)) {
                     LayoutContext childContext;
                     childContext.ParentPosition = childElement.WorldPosition;
                     childContext.ParentSize = childElement.Size;
-                    CalculateContainerLayout(world, child, world.Get<GUIContainer>(child),
+                    CalculateContainerLayout(world, child, world.Get<Components::GUIContainer>(child),
                                            childElement, childContext);
                 }
             }
@@ -315,7 +316,7 @@ namespace ECS {
         void GUILayout::CalculateGridLayout(
             World& world,
             const std::vector<Entity>& children,
-            const GUIContainer& container,
+            const Components::GUIContainer& container,
             Vector2D containerSize,
             Vector2D containerPos) {
             
@@ -332,12 +333,12 @@ namespace ECS {
             for (uint32_t row = 0; row < (children.size() + container.GridColumns - 1) / container.GridColumns; ++row) {
                 for (uint32_t col = 0; col < container.GridColumns && childIndex < children.size(); ++col) {
                     const Entity& child = children[childIndex];
-                    if (!world.Has<GUIElement>(child)) {
+                    if (!world.Has<Components::GUIElement>(child)) {
                         childIndex++;
                         continue;
                     }
 
-                    auto& childElement = world.Get<GUIElement>(child);
+                    auto& childElement = world.Get<Components::GUIElement>(child);
                     childElement.Size = {cellWidth, cellHeight};
                     childElement.WorldPosition = {
                         containerPos.X + col * (cellWidth + container.GridCellPaddingX),
@@ -351,15 +352,20 @@ namespace ECS {
 
         std::vector<Entity> GUILayout::GetContainerChildren(
             World& world,
-            const GUIContainer& container) {
+            Entity containerEntity,
+            const Components::GUIContainer& container) {
             
             std::vector<Entity> children;
-            for (uint16_t i = 0; i < container.ChildCount && i < GUIContainer::MaxChildren; ++i) {
-                if (container.Children[i] != 0) {
-                    Entity child{container.Children[i]};
-                    if (world.IsAlive(child)) {
-                        children.push_back(child);
-                    }
+            (void)container;
+            if (!world.Has<Components::GUIChildList>(containerEntity)) {
+                return children;
+            }
+
+            const auto& childList = world.Get<Components::GUIChildList>(containerEntity);
+            for (uint16_t i = 0; i < childList.ChildCount && i < Components::GUIChildList::MaxChildren; ++i) {
+                Entity child = childList.Children[i];
+                if (world.IsAlive(child)) {
+                    children.push_back(child);
                 }
             }
             return children;
@@ -370,16 +376,14 @@ namespace ECS {
                 return;
             }
 
-            if (world.Has<GUIElement>(entity)) {
-                world.Get<GUIElement>(entity).DirtyLayout = true;
+            if (world.Has<Components::GUIElement>(entity)) {
+                world.Get<Components::GUIElement>(entity).DirtyLayout = true;
             }
 
             // Invalidate parent
-            if (world.Has<GUIContainer>(entity)) {
-                uint32_t parentId = world.Get<GUIContainer>(entity).Parent;
-                if (parentId != 0) {
-                    Entity parent{parentId};
-                    InvalidateLayout(world, parent);
+            if (const auto* parent = world.TryGet<Components::Parent>(entity)) {
+                if (!parent->ParentEntity.IsNull()) {
+                    InvalidateLayout(world, parent->ParentEntity);
                 }
             }
         }
@@ -389,18 +393,14 @@ namespace ECS {
                 return;
             }
 
-            if (world.Has<GUIElement>(entity)) {
-                world.Get<GUIElement>(entity).DirtyLayout = true;
+            if (world.Has<Components::GUIElement>(entity)) {
+                world.Get<Components::GUIElement>(entity).DirtyLayout = true;
             }
 
             // Invalidate children
-            if (world.Has<GUIContainer>(entity)) {
-                const auto& container = world.Get<GUIContainer>(entity);
-                for (uint16_t i = 0; i < container.ChildCount && i < GUIContainer::MaxChildren; ++i) {
-                    if (container.Children[i] != 0) {
-                        Entity child{container.Children[i]};
-                        InvalidateLayoutRecursive(world, child);
-                    }
+            if (world.Has<Components::GUIContainer>(entity)) {
+                for (const Entity child : GetContainerChildren(world, entity, world.Get<Components::GUIContainer>(entity))) {
+                    InvalidateLayoutRecursive(world, child);
                 }
             }
         }
@@ -410,33 +410,30 @@ namespace ECS {
                 return {100.0f, 100.0f};
             }
 
-            if (!world.Has<GUIElement>(entity)) {
+            if (!world.Has<Components::GUIElement>(entity)) {
                 return {100.0f, 100.0f};
             }
 
             // If has content, measure it
-            if (world.Has<GUI::GUIText>(entity)) {
+            if (world.Has<Components::GUIText>(entity)) {
                 // TODO: Measure text dimensions
                 return {200.0f, 30.0f};
             }
 
             // If container, sum children
-            if (world.Has<GUIContainer>(entity)) {
-                const auto& container = world.Get<GUIContainer>(entity);
+            if (world.Has<Components::GUIContainer>(entity)) {
+                const auto& container = world.Get<Components::GUIContainer>(entity);
                 Vector2D totalSize{0, 0};
 
-                for (uint16_t i = 0; i < container.ChildCount && i < GUIContainer::MaxChildren; ++i) {
-                        if (container.Children[i] != 0) {
-                        Entity child{container.Children[i]};
-                        Vector2D childSize = CalculatePreferredSize(world, child);
+                for (const Entity child : GetContainerChildren(world, entity, container)) {
+                    Vector2D childSize = CalculatePreferredSize(world, child);
 
-                        if (container.Layout == LayoutType::HorizontalBox) {
-                            totalSize.X += childSize.X;
-                            totalSize.Y = std::max(totalSize.Y, childSize.Y);
-                        } else {  // VerticalBox and others
-                            totalSize.X = std::max(totalSize.X, childSize.X);
-                            totalSize.Y += childSize.Y;
-                        }
+                    if (container.Layout == Components::LayoutType::HorizontalBox) {
+                        totalSize.X += childSize.X;
+                        totalSize.Y = std::max(totalSize.Y, childSize.Y);
+                    } else {  // VerticalBox and others
+                        totalSize.X = std::max(totalSize.X, childSize.X);
+                        totalSize.Y += childSize.Y;
                     }
                 }
 
@@ -455,8 +452,8 @@ namespace ECS {
                 return {100.0f, 100.0f};
             }
 
-            if (world.Has<GUILayoutGroup>(entity)) {
-                auto& group = world.Get<GUILayoutGroup>(entity);
+            if (world.Has<Components::GUILayoutGroup>(entity)) {
+                auto& group = world.Get<Components::GUILayoutGroup>(entity);
                 if (!group.DirtyPreferredSize) {
                     return { group.PreferredWidth, group.PreferredHeight };
                 }
@@ -464,8 +461,8 @@ namespace ECS {
 
             Vector2D size = CalculateSizeFromChildren(world, entity);
 
-            if (world.Has<GUILayoutGroup>(entity)) {
-                auto& group = world.Get<GUILayoutGroup>(entity);
+            if (world.Has<Components::GUILayoutGroup>(entity)) {
+                auto& group = world.Get<Components::GUILayoutGroup>(entity);
                 group.PreferredWidth = size.X;
                 group.PreferredHeight = size.Y;
                 group.DirtyPreferredSize = false;
@@ -479,17 +476,13 @@ namespace ECS {
                 return;
             }
 
-            if (world.Has<GUILayoutGroup>(entity)) {
-                world.Get<GUILayoutGroup>(entity).DirtyPreferredSize = true;
+            if (world.Has<Components::GUILayoutGroup>(entity)) {
+                world.Get<Components::GUILayoutGroup>(entity).DirtyPreferredSize = true;
             }
 
-            if (world.Has<GUIContainer>(entity)) {
-                const auto& container = world.Get<GUIContainer>(entity);
-                for (uint16_t i = 0; i < container.ChildCount && i < GUIContainer::MaxChildren; ++i) {
-                    if (container.Children[i] != 0) {
-                        Entity child{container.Children[i]};
-                        InvalidatePreferredSize(world, child);
-                    }
+            if (world.Has<Components::GUIContainer>(entity)) {
+                for (const Entity child : GUILayout::GetContainerChildren(world, entity, world.Get<Components::GUIContainer>(entity))) {
+                    InvalidatePreferredSize(world, child);
                 }
             }
         }
@@ -501,20 +494,18 @@ namespace ECS {
                 return totalSize;
             }
 
-            if (!world.Has<GUIContainer>(containerEntity)) {
+            if (!world.Has<Components::GUIContainer>(containerEntity)) {
                 return totalSize;
             }
 
-            const auto& container = world.Get<GUIContainer>(containerEntity);
+            const auto& container = world.Get<Components::GUIContainer>(containerEntity);
 
-            for (uint16_t i = 0; i < container.ChildCount && i < GUIContainer::MaxChildren; ++i) {
-                if (container.Children[i] == 0) continue;
-                Entity child{container.Children[i]};
+            for (const Entity child : GUILayout::GetContainerChildren(world, containerEntity, container)) {
                 if (!world.IsAlive(child)) continue;
 
                 Vector2D childSize = GUILayout::CalculatePreferredSize(world, child);
 
-                if (container.Layout == LayoutType::HorizontalBox) {
+                if (container.Layout == Components::LayoutType::HorizontalBox) {
                     totalSize.X += childSize.X;
                     totalSize.Y = std::max(totalSize.Y, childSize.Y);
                 } else { // VerticalBox, Grid, Absolute - treat as stacking vertically by default
@@ -526,5 +517,5 @@ namespace ECS {
             return totalSize;
         }
 
-    } // namespace GUI
+    } // namespace UI
 } // namespace ECS
