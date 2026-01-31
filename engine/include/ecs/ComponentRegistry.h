@@ -32,6 +32,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_map>
 #include <mutex>
 #include <atomic>  // For atomic operations in lock-free component registration
+#include <string>
+#include <cstring>
 
 namespace ECS {
   using ComponentTypeId = uint32_t;
@@ -42,6 +44,7 @@ namespace ECS {
         size_t Size{0};               // Size of the component type in bytes
         size_t Align{0};              // Alignment requirement of the component type
         uint32_t TypeHash{0};         // FNV-1a hash of component type name (for C# interop)
+        bool IsManaged{false};        // True if this component originated from managed (C#) registration
         void (*ctor)(void*){nullptr}; // Constructor function pointer
         void (*dtor)(void*){nullptr}; // Destructor function pointer
   };
@@ -141,6 +144,44 @@ namespace ECS {
       static void RegisterWithHash(uint32_t typeHash) {
           ComponentTypeId id = Type<T>();
           _hashToId()[typeHash] = id;
+          _idToHash()[id] = typeHash;
+          auto& meta = _metas()[id];
+          meta.TypeHash = typeHash;
+          meta.IsManaged = false;
+      }
+
+      /**
+       * @brief Register a component type with its type name hash and name (for C# interop + editor)
+       * @tparam T The component type
+       * @param typeHash FNV-1a hash of the component type name
+       * @param typeName Component type name (no namespace)
+       */
+      template<typename T>
+      static void RegisterWithHash(uint32_t typeHash, const char* typeName) {
+          RegisterWithHash<T>(typeHash);
+          _hashToName()[typeHash] = typeName;
+      }
+
+      /**
+       * @brief Ensure the hash mapping points to the provided component id.
+       * Logs when an existing mapping disagrees and overwrites it.
+       * @param typeHash FNV-1a hash of the component type name
+       * @param id Component type id to enforce
+       * @param typeName Component type name (no namespace)
+       */
+      static void EnsureHashMapping(uint32_t typeHash, ComponentTypeId id, const char* typeName) {
+          auto& hashMap = _hashToId();
+          auto it = hashMap.find(typeHash);
+          if (it != hashMap.end() && it->second != id) {
+              LOG_WARNING("[ComponentRegistry] Hash mapping mismatch for '" << typeName
+                  << "' (hash=0x" << std::hex << typeHash << std::dec
+                  << ", existing id=" << it->second << ", enforced id=" << id << ")");
+          }
+          hashMap[typeHash] = id;
+          _idToHash()[id] = typeHash;
+          if (typeName && *typeName) {
+              _hashToName()[typeHash] = typeName;
+          }
       }
 
       /**
@@ -189,9 +230,35 @@ namespace ECS {
        * @return ComponentTypeId of the registered component
        */
       static ComponentTypeId RegisterCSharpComponent(uint32_t typeHash, size_t size, size_t alignment) {
-          ComponentTypeId id = _nextId();
           auto& metas = _metas();
           auto& hashMap = _hashToId();
+          auto& idToHash = _idToHash();
+          
+          // Check if this component has already been registered (e.g., in a previous hot reload)
+          // If so, reuse the existing ID and update the metadata
+          auto existingIt = hashMap.find(typeHash);
+          if (existingIt != hashMap.end()) {
+              ComponentTypeId existingId = existingIt->second;
+              auto& meta = metas[existingId];
+              if (!meta.IsManaged) {
+                  LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] Skipping managed registration for native component hash 0x" << std::hex << typeHash << std::dec << " (ID " << existingId << ")");
+                  return existingId;
+              }
+              LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] Updating existing C# component with hash 0x" << std::hex << typeHash << std::dec << " (ID " << existingId << ")");
+              
+              // Update the existing metadata with new size/alignment (schema may have changed)
+              meta.Size = size;
+              meta.Align = alignment;
+              meta.TypeHash = typeHash;
+              meta.IsManaged = true;
+              // Keep the same ctor/dtor (zero-initialize)
+              idToHash[existingId] = typeHash;
+              
+              return existingId;
+          }
+          
+          // New component - create a new ID
+          ComponentTypeId id = _nextId();
           
           LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] BEFORE: _metas has " << metas.size() << " entries");
           
@@ -200,12 +267,14 @@ namespace ECS {
           meta.Size = size;
           meta.Align = alignment;
           meta.TypeHash = typeHash;
+          meta.IsManaged = true;
           // C# components don't have C++ constructors/destructors
           meta.ctor = [](void* p) { std::memset(p, 0, 1); }; // Zero-initialize
           meta.dtor = [](void*) { /* No cleanup for C# components */ };
           
           metas[id] = meta;
           hashMap[typeHash] = id;
+          idToHash[id] = typeHash;
           
           LOG_INFO("[ComponentRegistry::RegisterCSharpComponent] AFTER: _metas has " << metas.size() << " entries, added ID " << id);
           

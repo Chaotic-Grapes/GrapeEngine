@@ -19,6 +19,7 @@ prefab assets use the same UI path.
 
 #include "ComponentPropertyEditor.h"
 #include "ComponentWidgets.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include <imgui.h>
 #include <cmath>
@@ -28,8 +29,154 @@ prefab assets use the same UI path.
 #include "serialization/EntitySerializer.h"
 #include "services/ResourceManager.h"
 #include <algorithm>
+#include <functional>
+#include <unordered_set>
+#include <cstdio>
 #include "AudioAssetLibrary.h"
 #include "core/Application.h"
+
+namespace {
+    ECS::ComponentTypeId GetComponentIdFromHashOrWarn(uint32_t hash, const char* name) {
+        const ECS::ComponentTypeId id = ECS::ComponentRegistry::GetComponentIdFromHash(hash);
+        if (id == ECS::NULL_COMPONENT_ID) {
+            LOG_WARNING("[ComponentPropertyEditor] Missing component ID for '" << name << "' (hash=0x"
+                << std::hex << hash << std::dec << ")");
+        }
+        return id;
+    }
+
+    void UpdateSpriteAnimationPreview(nlohmann::json& animData, ECS::Entity entity, ECS::World* world) {
+        if (!world || entity.IsNull() || !world->IsAlive(entity))
+            return;
+        if (!Editor::ECSUtils::HasComponent(world, entity, "SpriteRenderer2D"))
+            return;
+
+        const int frameWidth = animData.value("FrameWidth", 0);
+        const int frameHeight = animData.value("FrameHeight", 0);
+        const int sheetWidth = animData.value("SheetWidth", 0);
+        const int sheetHeight = animData.value("SheetHeight", 0);
+        if (frameWidth <= 0 || frameHeight <= 0 || sheetWidth <= 0 || sheetHeight <= 0)
+            return;
+
+        const int totalCols = sheetWidth / frameWidth;
+        const int totalRows = sheetHeight / frameHeight;
+        if (totalCols <= 0 || totalRows <= 0)
+            return;
+
+        const bool useRow = animData.value("UseRow", false);
+        int windowStart = 0;
+        int windowCount = 0;
+
+        if (useRow) {
+            const int rowIndex = std::clamp(animData.value("RowIndex", 0), 0, totalRows - 1);
+            const int startCol = std::clamp(animData.value("RowStartColumn", 0), 0, totalCols - 1);
+            const int available = totalCols - startCol;
+            int rowCount = animData.value("RowFrameCount", 0);
+            if (rowCount <= 0 || rowCount > available)
+                rowCount = available;
+            windowStart = rowIndex * totalCols + startCol;
+            windowCount = rowCount;
+        } else {
+            windowStart = std::max(0, animData.value("StartFrame", 0));
+            windowCount = animData.value("FrameCount", 0);
+            if (windowCount <= 0) {
+                const int totalFrames = totalCols * totalRows;
+                windowCount = std::max(1, totalFrames - windowStart);
+            }
+        }
+
+        if (windowCount <= 0)
+            return;
+
+        int localFrame = 0;
+        if (Editor::ECSUtils::HasComponent(world, entity, "AnimationState2D")) {
+            const auto* animState = Editor::ECSUtils::GetComponentPtr<ECS::Components::AnimationState2D>(world, entity, "AnimationState2D");
+            if (animState) {
+                localFrame = animState->CurrentFrame;
+            }
+        }
+        localFrame = std::clamp(localFrame, 0, windowCount - 1);
+        const int absoluteFrame = windowStart + localFrame;
+        const int col = absoluteFrame % totalCols;
+        const int row = absoluteFrame / totalCols;
+
+        const float u0 = (col * frameWidth) / static_cast<float>(sheetWidth);
+        const float v0 = (row * frameHeight) / static_cast<float>(sheetHeight);
+        const float u1 = ((col + 1) * frameWidth) / static_cast<float>(sheetWidth);
+        const float v1 = ((row + 1) * frameHeight) / static_cast<float>(sheetHeight);
+
+        auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(world, entity, "SpriteRenderer2D");
+        if (!sprite) {
+            return;
+        }
+        const uint32_t textureId = animData.value("TextureId", 0u);
+        if (textureId != 0)
+            sprite->TextureId = textureId;
+        const uint32_t normalId = animData.value("NormalTextureId", 0u);
+        if (normalId != 0)
+            sprite->NormalTextureId = normalId;
+        sprite->Width = frameWidth;
+        sprite->Height = frameHeight;
+        sprite->Tiling = Vector2D{ u1 - u0, v1 - v0 };
+        sprite->Offset = Vector2D{ u0, v0 };
+    }
+
+    std::unordered_set<uint32_t> s_animPreviewedEntities;
+
+    /**
+     * @brief Builds default tag mask names ("Tag 0", "Tag 1", ..., "Tag 31").
+     * @return Vector of tag mask names.
+     */
+    std::vector<std::string> BuildTagMaskNames() {
+        std::vector<std::string> names;
+        names.reserve(32);
+        for (int i = 0; i < 32; ++i) {
+            names.emplace_back("Tag " + std::to_string(i)); // Default name
+        }
+        return names;
+    }
+
+    /**
+     * @brief Builds layer mask names based on the current scene's layers.
+     * Defaults to "Layer 0", "Layer 1", ..., "Layer 31" if no custom names exist.
+     * @return Vector of layer mask names.
+     */
+    std::vector<std::string> BuildLayerMaskNames() {
+        std::vector<std::string> names(32);
+        for (int i = 0; i < 32; ++i) {
+            names[i] = "Layer " + std::to_string(i); // Default name
+        }
+
+        // Get active scene
+        Scenes::Scene* scene = Engine::CORE ? Engine::CORE->GetSceneManager().GetActive() : nullptr;
+        if (!scene) {
+            return names; // No active scene, return defaults
+        }
+
+        // Override with actual layer names from the scene
+        auto layers = scene->GetLayers().ListLayers();
+        for (const auto& entry : layers) {
+            if (entry.first < 32 && !entry.second.empty()) {
+                names[entry.first] = entry.second; // Use custom layer name
+            }
+        }
+        return names;
+    }
+
+    /**
+     * @brief Builds generic flag names with a given prefix ("<prefix> 0", "<prefix> 1", ..., "<prefix> 31").
+     * @param prefix The prefix for each flag name.
+     * @return Vector of generic flag names.
+     */
+    std::vector<std::string> BuildGenericFlagNames(const char* prefix) {
+        std::vector<std::string> names;
+        names.reserve(32);
+        for (int i = 0; i < 32; ++i) {
+            names.emplace_back(std::string(prefix) + " " + std::to_string(i));
+        }
+        return names;
+    }
+}
 
 // -----------------------------------------------------------------------------
 // Initialization
@@ -86,16 +233,8 @@ void ComponentUI::RenderTagMask(nlohmann::json& data, ECS::Entity entity, ECS::W
     (void)world;
     EditorUI::BeginPropertySection({ "Tag Mask" });
 
-    // Tag mask is a bitfield stored as integer
-    int mask = data.value("Mask", 0);
-
-    ImGui::Text("Mask");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::SetNextItemWidth(150.0f);
-    if (ImGui::InputInt("##Mask", &mask)) {
-        data["Mask"] = mask;
-    }
+    static const std::vector<std::string> kTagNames = BuildTagMaskNames();
+    EditorUI::RenderBitmaskDropdown("Mask", data, "Mask", kTagNames, 0u);
 
     EditorUI::EndPropertySection();
 }
@@ -264,8 +403,62 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
         valueText = "None (drag texture here)";
     }
 
+    std::string normalPath = data.value("NormalTexturePath", "");
+    std::string normalValueText;
+    if (!normalPath.empty()) {
+        normalValueText = std::filesystem::path(normalPath).filename().string();
+        uint32_t currentNormalId = data.value("NormalTextureId", 0u);
+        if (currentNormalId == 0) {
+            if (!data.contains("_NormalTextureLoadAttempted")) {
+                auto normalTex = RM.Get<Texture>(normalPath);
+                if (normalTex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(normalTex->ID());
+                    LOG_DEBUG("Reloaded normal map from path: " << normalPath << ", id=" << normalTex->ID());
+                }
+                else {
+                    LOG_WARNING("Failed to reload normal map from path: " << normalPath);
+                }
+                data["_NormalTextureLoadAttempted"] = true;
+            }
+        }
+    }
+    else {
+        normalValueText = "None (drag normal map here)";
+    }
+
+    // Emissive map
+    std::string emissivePath = data.value("EmissiveTexturePath", "");
+    std::string emissiveValueText;
+
+    // Try to reload emissive texture if path is set but ID is 0
+    if (!emissivePath.empty()) {
+        // Show only the file name
+        emissiveValueText = std::filesystem::path(emissivePath).filename().string();
+        uint32_t currentEmissiveId = data.value("EmissiveTextureId", 0u); // Get current ID
+
+        // Only try to reload if ID is 0
+        if (currentEmissiveId == 0) {
+            if (!data.contains("_EmissiveTextureLoadAttempted")) {
+                auto emissiveTex = RM.Get<Texture>(emissivePath); // Try to load texture
+
+                // If successful, store ID in JSON
+                if (emissiveTex) {
+                    data["EmissiveTextureId"] = static_cast<uint32_t>(emissiveTex->ID());
+                    LOG_DEBUG("Reloaded emissive map from path: " << emissivePath << ", id=" << emissiveTex->ID());
+                }
+                else {
+                    LOG_WARNING("Failed to reload emissive map from path: " << emissivePath);
+                }
+                data["_EmissiveTextureLoadAttempted"] = true;
+            }
+        }
+    }
+    else {
+        emissiveValueText = "None (drag emissive map here)";
+    }
+
     // Group all sprite related rows under one aligned section
-    EditorUI::BeginPropertySection({ "Sprite", "Color", "Tiling", "Offset" });
+    EditorUI::BeginPropertySection({ "Sprite", "Normal Map", "Emissive Map", "Emissive Strength", "Color", "Tiling", "Offset" });
 
     // Show the sprite information in a read only row
     EditorUI::RenderStaticValueRow("Sprite", valueText, texPath.empty());
@@ -339,6 +532,135 @@ void ComponentUI::RenderSpriteRenderer2D(nlohmann::json& data, ECS::Entity entit
         ImGui::TextColored(EditorStyle::SuccessText, "Texture updated");
     }
 
+    // Normal map row
+    EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
+    bool droppedNormal = false;
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            std::string droppedPath = static_cast<const char*>(payLoad->Data);
+            auto ext = std::filesystem::path(droppedPath).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                auto tex = RM.Get<Texture>(droppedPath);
+                if (tex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["NormalTexturePath"] = droppedPath;
+                    droppedNormal = true;
+                    LOG_INFO("Dropped normal map: " << droppedPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped normal map: " << droppedPath);
+                }
+            }
+        }
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                auto tex = RM.Get<Texture>(path);
+                if (tex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["NormalTexturePath"] = path;
+                    droppedNormal = true;
+                    LOG_INFO("Dropped normal map: " << path << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped normal map: " << path);
+                }
+                break;
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    if (droppedNormal) {
+        ImGui::SameLine();
+        ImGui::TextColored(EditorStyle::SuccessText, "Normal map updated");
+    }
+
+    // Emissive map row
+    EditorUI::RenderStaticValueRow("Emissive Map", emissiveValueText, emissivePath.empty());
+    bool droppedEmissive = false;
+
+    // Allow users to drag a texture asset from the asset browser into this control
+    if (ImGui::BeginDragDropTarget()) {
+        // Accept payloads tagged as ASSET_PATH which contain a file path string
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            std::string droppedPath = static_cast<const char*>(payLoad->Data);
+            auto ext = std::filesystem::path(droppedPath).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            // Only accept common image formats as emissive textures
+            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                auto tex = RM.Get<Texture>(droppedPath);
+
+                // If successful, store texture ID and path in JSON so renderer can use them
+                if (tex) {
+                    data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["EmissiveTexturePath"] = droppedPath;
+                    droppedEmissive = true;
+                    LOG_INFO("Dropped emissive map: " << droppedPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped emissive map: " << droppedPath);
+                }
+            }
+        }
+
+        // Support multiple paths payloads
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+
+            // Process each path in the payload
+            while (dataBuf < end) {
+                // Extract null-terminated path string
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+
+                // Skip empty paths
+                if (path.empty()) continue;
+
+                // Extract file extension and normalise to lowercase for comparison
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+                // Only accept common image formats as emissive textures
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+
+                // Try to load the texture
+                auto tex = RM.Get<Texture>(path);
+
+                // If successful, store texture ID and path in JSON so renderer can use them
+                if (tex) {
+                    data["EmissiveTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["EmissiveTexturePath"] = path;
+                    droppedEmissive = true;
+                    LOG_INFO("Dropped emissive map: " << path << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped emissive map: " << path);
+                }
+                break;
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    if (droppedEmissive) {
+        ImGui::SameLine();
+        ImGui::TextColored(EditorStyle::SuccessText, "Emissive map updated");
+    }
+
+    // Emissive strength multiplier
+    EditorUI::RenderFloatRow("Emissive Strength", "", data, "EmissiveStrength", 0.1f, 0.0f, 100.0f);
+
     // Color tint applied on top of the sprite
     EditorUI::RenderColorProperty("Color##Sprite", data["Color"]);
 
@@ -361,8 +683,13 @@ void ComponentUI::RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, EC
     // Mass in kilograms
     EditorUI::RenderFloatRow("Mass", "kg", data, "Mass", 0.1f);
 
-    // Inverse mass is 1 / mass 
-    EditorUI::RenderFloatRow("Inverse Mass", "1/kg", data, "InverseMass", 0.1f);
+    // Inverse mass is derived from mass; keep it in sync and render read-only
+    const float mass = data.value("Mass", 1.0f);
+    const float invMass = (mass <= 0.0f) ? 0.0f : (1.0f / mass);
+    data["InverseMass"] = invMass;
+    char invBuf[64];
+    std::snprintf(invBuf, sizeof(invBuf), "%.4f 1/kg", invMass);
+    EditorUI::RenderStaticValueRow("Inverse Mass", invBuf);
 
     // Linear damping slows translational motion over time
     EditorUI::RenderFloatRow("Linear Damping", "", data, "LinearDamping", 0.01f);
@@ -373,8 +700,12 @@ void ComponentUI::RenderRigidbody2D(nlohmann::json& data, ECS::Entity entity, EC
     // Gravity scale lets this body feel heavier or lighter than global gravity
     EditorUI::RenderFloatRow("Gravity Scale", "", data, "GravityScale", 0.1f);
 
-    // Flags hold raw bit values used by the physics engine
-    EditorUI::RenderIntProperty("Flags", data, "Flags");
+    static const std::vector<std::string> kRigidbodyFlagNames = {
+        "Kinematic",
+        "Use Gravity",
+        "Fixed Rotation"
+    };
+    EditorUI::RenderBitmaskDropdown("Flags", data, "Flags", kRigidbodyFlagNames, 0u);
     EditorUI::EndPropertySection();
 }
 
@@ -430,7 +761,8 @@ void ComponentUI::RenderCircleCollider2D(nlohmann::json& data, ECS::Entity entit
     EditorUI::RenderFloatRow("Radius##Circle", "px", data, "Radius", 1.0f);
 
     // Layer mask decides which other layers this collider can interact with
-    EditorUI::RenderIntProperty("Layer Mask##Circle", data, "LayerMask");
+    const std::vector<std::string> layerNames = BuildLayerMaskNames();
+    EditorUI::RenderBitmaskDropdown("Layer Mask##Circle", data, "LayerMask", layerNames, 0xFFFFFFFFu);
     EditorUI::EndPropertySection();
 }
 
@@ -459,7 +791,8 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
     EditorUI::RenderFloatRow("Rotation##Box", "degrees", data, "Rotation", 1.0f);
 
     // Layer mask selects which collision layers the box interacts with
-    EditorUI::RenderIntProperty("Layer Mask##Box", data, "LayerMask");
+    const std::vector<std::string> layerNames = BuildLayerMaskNames();
+    EditorUI::RenderBitmaskDropdown("Layer Mask##Box", data, "LayerMask", layerNames, 0xFFFFFFFFu);
 
     // Auto-generates or updates a BoxCollider2D (AABB) for the selected entity based on its sprite size.
     if (ImGui::Button("Generate AABB")) { // Sam
@@ -474,8 +807,14 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
             LOG_WARNING("Generate AABB called for dead/invalid entity");
         }
         else {
+            const ECS::ComponentTypeId spriteId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("SpriteRenderer2D"), "SpriteRenderer2D");
+            if (spriteId == ECS::NULL_COMPONENT_ID) {
+                LOG_WARNING("Generate AABB: SpriteRenderer2D is not registered");
+                return;
+            }
+
             // Try to get the sprite component; if missing, bail out gracefully
-            auto* sprite = world->TryGet<SpriteRenderer2D>(entity);
+            auto* sprite = static_cast<SpriteRenderer2D*>(world->GetRawComponentPtr(entity, spriteId));
             if (!sprite) {
                 LOG_WARNING("Generate AABB: entity has no SpriteRenderer2D component");
             }
@@ -485,7 +824,13 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                 int pixelHeight = sprite->Height;
 
                 // If the entity already has a BoxCollider2D, update it. Otherwise add one.
-                auto* col = world->TryGet<BoxCollider2D>(entity);
+                const ECS::ComponentTypeId colliderId = GetComponentIdFromHashOrWarn(Editor::ECSUtils::FNV1aHash("BoxCollider2D"), "BoxCollider2D");
+                if (colliderId == ECS::NULL_COMPONENT_ID) {
+                    LOG_WARNING("Generate AABB: BoxCollider2D is not registered");
+                    return;
+                }
+
+                auto* col = static_cast<BoxCollider2D*>(world->GetRawComponentPtr(entity, colliderId));
                 if (col) {
                     // Update the collider's half-extents based on the sprite size
                     col->HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
@@ -494,7 +839,7 @@ void ComponentUI::RenderBoxCollider2D(nlohmann::json& data, ECS::Entity entity, 
                     // No collider yet; create and attach a new BoxCollider2D
                     BoxCollider2D newCol;
                     newCol.HalfExtents = Vector2D{ pixelWidth * 0.5f, pixelHeight * 0.5f };
-                    world->Set<BoxCollider2D>(entity, newCol);
+                    world->AddComponentById(entity, colliderId, &newCol, sizeof(newCol));
                 }
             }
         }
@@ -641,8 +986,7 @@ void ComponentUI::RenderPhysicsMaterial2D(nlohmann::json& data, ECS::Entity enti
 // Renders the SpriteSheetAnimation2D component properties
 // Controls animated sprite playback from sprite sheets
 void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
-    (void)entity;
-    (void)world;
+    const size_t hashBefore = std::hash<std::string>{}(data.dump());
     // RELOAD TEXTURE FROM PATH ON FIRST RENDER
     // Build a human readable summary of the current texture
     std::string texPath = data.value("TexturePath", "");
@@ -676,9 +1020,33 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         valueText = "None (drag sprite sheet here)";
     }
 
+    std::string normalPath = data.value("NormalTexturePath", "");
+    std::string normalValueText;
+    if (!normalPath.empty()) {
+        normalValueText = std::filesystem::path(normalPath).filename().string();
+        uint32_t currentNormalId = data.value("NormalTextureId", 0u);
+        if (currentNormalId == 0) {
+            if (!data.contains("_NormalTextureLoadAttempted")) {
+                auto normalTex = RM.Get<Texture>(normalPath);
+                if (normalTex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(normalTex->ID());
+                    LOG_DEBUG("Reloaded normal sheet from path: " << normalPath << ", id=" << normalTex->ID());
+                }
+                else {
+                    LOG_WARNING("Failed to reload normal sheet from path: " << normalPath);
+                }
+                data["_NormalTextureLoadAttempted"] = true;
+            }
+        }
+    }
+    else {
+        normalValueText = "None (drag normal sheet here)";
+    }
+
 
     // Group all sprite sheet related rows under one aligned section
-    EditorUI::BeginPropertySection({ "Sprite Sheet", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height", "Start Frame", "Frame Count", "FPS", "Loop", "Playing" });
+    EditorUI::BeginPropertySection({ "Sprite Sheet", "Normal Map", "Frame Width", "Frame Height", "Sheet Width", "Sheet Height",
+        "Mode", "Start Frame", "Frame Count", "Row Index", "Row Start Column", "Row Frame Count", "FPS", "Loop", "Playing" });
 
     // Show the sprite sheet information in a read only row
     EditorUI::RenderStaticValueRow("Sprite Sheet", valueText, texPath.empty());
@@ -746,6 +1114,58 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
         ImGui::EndDragDropTarget();
     }
 
+    // Normal map row
+    EditorUI::RenderStaticValueRow("Normal Map", normalValueText, normalPath.empty());
+    bool droppedNormal = false;
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+            std::string droppedPath = static_cast<const char*>(payLoad->Data);
+            auto ext = std::filesystem::path(droppedPath).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                auto tex = RM.Get<Texture>(droppedPath);
+                if (tex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["NormalTexturePath"] = droppedPath;
+                    droppedNormal = true;
+                    LOG_INFO("Dropped normal sheet: " << droppedPath << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped normal sheet: " << droppedPath);
+                }
+            }
+        }
+        if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+            const char* dataBuf = static_cast<const char*>(payLoad->Data);
+            const char* end = dataBuf + payLoad->DataSize;
+            while (dataBuf < end) {
+                std::string path(dataBuf);
+                dataBuf += path.size() + 1;
+                if (path.empty()) continue;
+                auto ext = std::filesystem::path(path).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                auto tex = RM.Get<Texture>(path);
+                if (tex) {
+                    data["NormalTextureId"] = static_cast<uint32_t>(tex->ID());
+                    data["NormalTexturePath"] = path;
+                    droppedNormal = true;
+                    LOG_INFO("Dropped normal sheet: " << path << ", id=" << tex->ID());
+                }
+                else {
+                    LOG_ERROR("Failed to load dropped normal sheet: " << path);
+                }
+                break;
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    if (droppedNormal) {
+        ImGui::SameLine();
+        ImGui::TextColored(EditorStyle::SuccessText, "Normal map updated");
+    }
+
     // Individual frame dimensions
     EditorUI::RenderIntProperty("Frame Width", data, "FrameWidth");
     EditorUI::RenderIntProperty("Frame Height", data, "FrameHeight");
@@ -754,11 +1174,28 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     EditorUI::RenderIntProperty("Sheet Width", data, "SheetWidth");
     EditorUI::RenderIntProperty("Sheet Height", data, "SheetHeight");
 
-    // Which frame to start the animation from
-    EditorUI::RenderIntProperty("Start Frame", data, "StartFrame");
+    int mode = data.value("UseRow", false) ? 1 : 0;
+    const char* modes[] = { "Frame Window", "Row" };
+    ImGui::Text("Mode");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::Combo("##AnimMode", &mode, modes, 2)) {
+        data["UseRow"] = (mode == 1);
+    }
 
-    // How many frames in the animation sequence
-    EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
+    const bool useRow = data.value("UseRow", false);
+    if (!useRow) {
+        // Which frame to start the animation from
+        EditorUI::RenderIntProperty("Start Frame", data, "StartFrame");
+
+        // How many frames in the animation sequence
+        EditorUI::RenderIntProperty("Frame Count", data, "FrameCount");
+    } else {
+        EditorUI::RenderIntProperty("Row Index", data, "RowIndex");
+        EditorUI::RenderIntProperty("Row Start Column", data, "RowStartColumn");
+        EditorUI::RenderIntProperty("Row Frame Count", data, "RowFrameCount");
+    }
 
     // Animation speed in frames per second
     EditorUI::RenderFloatRow("FPS", "", data, "FramesPerSecond", 0.5f);
@@ -768,6 +1205,17 @@ void ComponentUI::RenderSpriteSheetAnimation2D(nlohmann::json& data, ECS::Entity
     EditorUI::RenderCheckboxProperty("Playing", data, "Playing");
 
     EditorUI::EndPropertySection();
+
+    const size_t hashAfter = std::hash<std::string>{}(data.dump());
+    const bool needsInitialPreview = world && !entity.IsNull() &&
+        s_animPreviewedEntities.find(entity.Index) == s_animPreviewedEntities.end();
+
+    if (hashAfter != hashBefore || needsInitialPreview) {
+        UpdateSpriteAnimationPreview(data, entity, world);
+        if (world && !entity.IsNull() && world->IsAlive(entity)) {
+            s_animPreviewedEntities.insert(entity.Index);
+        }
+    }
 }
 
 // Renders the ZIndex2D component properties
@@ -800,11 +1248,16 @@ void ComponentUI::RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::W
         data["LightType"] = lightType;
     }
 
-    // Position (used for Point lights)
-    EditorUI::RenderVector3DRow("Position##Light2D", data["Position"], "X", "Y", "Z", 0.1f);
-
-    // Direction (used for Directional lights)
-    EditorUI::RenderVector3DRow("Direction##Light2D", data["Direction"], "X", "Y", "Z", 0.1f);
+    const bool isPointLight = (lightType == 1);
+    if (isPointLight) {
+        // Position and range are used for Point lights
+        EditorUI::RenderVector3DRow("Position##Light2D", data["Position"], "X", "Y", "Z", 0.1f);
+        EditorUI::RenderFloatRow("Range##Light2D", "units", data, "Range", 0.5f);
+    }
+    else {
+        // Direction is used for Directional lights
+        EditorUI::RenderVector3DRow("Direction##Light2D", data["Direction"], "X", "Y", "Z", 0.1f);
+    }
 
     // Color
     if (!data.contains("Color")) {
@@ -814,9 +1267,6 @@ void ComponentUI::RenderLight2D(nlohmann::json& data, ECS::Entity entity, ECS::W
 
     // Intensity
     EditorUI::RenderFloatRow("Intensity##Light2D", "", data, "Intensity", 0.1f);
-
-    // Range (for Point lights)
-    EditorUI::RenderFloatRow("Range##Light2D", "units", data, "Range", 0.5f);
 
     // Casts Shadows
     EditorUI::RenderCheckboxProperty("Casts Shadows##Light2D", data, "CastsShadows");
@@ -1102,7 +1552,7 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
     (void)entity;
     (void)world;
     EditorUI::BeginPropertySection({ "Layer" });
-    // Try to render as a dropdown of known layers from the active scene.
+    // Try to render as a dropdown of known layers from the active scene
     int currentId = static_cast<int>(data.value("Id", 0));
     Scenes::Scene* scene = Engine::CORE ? Engine::CORE->GetSceneManager().GetActive() : nullptr;
     if (scene) {
@@ -1140,5 +1590,107 @@ void ComponentUI::RenderLayer2D(nlohmann::json& data, ECS::Entity entity, ECS::W
 
     // Fallback: render raw integer if no scene or layers available
     EditorUI::RenderIntProperty("Id", data, "Id");
+    EditorUI::EndPropertySection();
+}
+
+// Renders Material2D component UI for assigning textures and tweaking material properties
+void ComponentUI::RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+
+    EditorUI::BeginPropertySection({ "Normal Map", "MRA Map", "Metallic", "Smoothness", "AO Strength", "Normal Strength", "Alpha Cutoff", "Flags" });
+
+    // Helper lambda to render a texture slot with drag-and-drop
+    auto RenderTextureSlot = [&](const char* label, const char* pathKey, const char* idKey) {
+        // Fetch texture path from serialized data (empty if none)
+        std::string texPath = data.value(pathKey, "");
+        std::string valueText;
+
+        if (!texPath.empty()) {
+            // Display only the filename, not the full path
+            valueText = std::filesystem::path(texPath).filename().string();
+            // Handle texture reloading if ID is missing (e.g. after scene reload)
+            uint32_t currentId = data.value(idKey, 0u);
+            if (currentId == 0) {
+                // Prevent repeated reload attempts every frame
+                std::string attemptKey = std::string("_LoadAttempt_") + pathKey;
+                if (!data.contains(attemptKey)) {
+                    // Attempt to fetch texture from resource manager
+                    auto tex = RM.Get<Texture>(texPath);
+                    if (tex) {
+                        data[idKey] = static_cast<uint32_t>(tex->ID());
+                        LOG_DEBUG("Reloaded material texture: " << texPath);
+                    }
+                    // Mark reload attempt so we don't spam reloads
+                    data[attemptKey] = true;
+                }
+            }
+        }
+        else {
+            // Default placeholder text when no texture is assigned
+            valueText = "None (drag texture here)";
+        }
+
+        // Render a read-only row displaying the current texture
+        EditorUI::RenderStaticValueRow(label, valueText, texPath.empty());
+
+        // Drag-and-drop target for texture assignment
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATH")) {
+                // Extract dropped file path
+                std::string droppedPath = static_cast<const char*>(payLoad->Data);
+
+                // Validate file extension
+                auto ext = std::filesystem::path(droppedPath).extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+                // Accept only image formats
+                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                    auto tex = RM.Get<Texture>(droppedPath);
+                    if (tex) {
+                        // Store texture ID and path in serialized material data
+                        data[idKey] = static_cast<uint32_t>(tex->ID());
+                        data[pathKey] = droppedPath;
+                    }
+                }
+            }
+            // Lowkey copied from audio
+            if (const ImGuiPayload* payLoad = ImGui::AcceptDragDropPayload("ASSET_PATHS")) {
+                const char* dataBuf = static_cast<const char*>(payLoad->Data);
+                const char* end = dataBuf + payLoad->DataSize;
+                while (dataBuf < end) {
+                    std::string path(dataBuf);
+                    dataBuf += path.size() + 1;
+                    if (path.empty()) continue;
+                    auto ext = std::filesystem::path(path).extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    if (ext != ".png" && ext != ".jpg" && ext != ".jpeg") continue;
+                    auto tex = RM.Get<Texture>(path);
+                    if (tex) {
+                        data[idKey] = static_cast<uint32_t>(tex->ID());
+                        data[pathKey] = path;
+                    }
+                    break; // Only accept the first valid texture
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+    };
+
+    // Texture slots
+    RenderTextureSlot("Normal Map", "NormalTexturePath", "NormalTextureId");
+    RenderTextureSlot("MRA Map", "MRA_TexturePath", "MRA_TextureId");
+
+    // Scalar material properties
+    EditorUI::RenderFloatRow("Metallic", "", data, "Metallic", 0.01f, 0.0f, 1.0f);
+    EditorUI::RenderFloatRow("Smoothness", "", data, "Smoothness", 0.01f, 0.0f, 1.0f);
+    EditorUI::RenderFloatRow("AO Strength", "", data, "AOStrength", 0.01f, 0.0f, 5.0f);
+    EditorUI::RenderFloatRow("Normal Strength", "", data, "NormalStrength", 0.01f, 0.0f, 5.0f);
+    EditorUI::RenderFloatRow("Alpha Cutoff", "", data, "AlphaCutoff", 0.01f, 0.0f, 1.0f);
+
+    // Bitmask/flag-based material options
+    static const std::vector<std::string> kMaterialFlagNames = BuildGenericFlagNames("Flag");
+    EditorUI::RenderBitmaskDropdown("Flags", data, "Flags", kMaterialFlagNames, 0u);
+
     EditorUI::EndPropertySection();
 }

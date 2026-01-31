@@ -37,10 +37,21 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 // Uses the project's char_t type already employed throughout this file.
 using get_hostfxr_path_fn = int(*)(char_t* path, size_t* path_size, void* reserved);
 
-// Forward-declare native callback so managed watcher registration can pass
-// its address before the function definition appears later in this file.
+// Forward-declare native callbacks so managed code registration can pass
+// their addresses before the function definitions appear later.
 extern "C" void __cdecl Native_CompileStatusCallback(int status, int progress, const char* message);
 extern "C" void __cdecl Native_HotReloadCallback(const char* assemblyPath);
+
+// Forward-declare ScriptManager (needed for callback wrapper)
+namespace ECS { class ScriptManager; }
+ECS::ScriptManager* g_scriptManagerInstance = nullptr;
+
+// Wrapper callback that invokes the registered callback in ScriptManager
+extern "C" void __cdecl Native_OnScriptsChanged(const char* scriptsDir) {
+    if (g_scriptManagerInstance) {
+        g_scriptManagerInstance->OnScriptsChanged(scriptsDir);
+    }
+}
 
 namespace ECS {
 
@@ -82,7 +93,8 @@ namespace ECS {
     // ============================================================================
 
     ScriptManager::ScriptManager() {
-        // Constructor
+        // Set global instance for callback access
+        g_scriptManagerInstance = this;
     }
 
     ScriptManager::~ScriptManager() {
@@ -188,46 +200,64 @@ namespace ECS {
             return false;
         }
 
-        m_loadedAssemblies.push_back(assemblyPath);
+        // Single assembly model: enforce one active gameplay assembly
+        m_loadedAssemblyPath = resolved;
         LOG_INFO("[ScriptManager] Assembly loaded successfully");
         return true;
     }
 
     /**
-     * @brief Unload a previously loaded assembly.
-     * @param assemblyPath Path to the assembly to unload
+     * @brief Unload the currently loaded script assembly.
      * @return true if unloaded successfully
      * 
-     * Note: This will destroy all systems from that assembly.
-     * For hot reload, use ReloadAssembly() instead.
+     * Single-assembly model: unloads the one active gameplay assembly.
+     * Do not call directly during hot reload - use HotReloadAssembly() instead.
      */
-    bool ScriptManager::UnloadAssembly(const std::string& assemblyPath) {
+    bool ScriptManager::UnloadScriptAssembly() {
         if (!m_initialized || !m_unloadAssembly) {
+            LOG_ERROR("[ScriptManager] UnloadScriptAssembly not available");
             return false;
         }
 
-        // TODO: Implement AssemblyLoadContext unloading
-        LOG_WARNING("[ScriptManager] UnloadAssembly not yet implemented (requires AssemblyLoadContext)");
-        return false;
+        // Call managed UnloadAssembly to destroy AssemblyLoadContext
+        // This will release all file locks on the DLL
+        int result = m_unloadAssembly(m_loadedAssemblyPath.c_str());
+        if (result == 0) {
+            LOG_INFO("[ScriptManager] Successfully unloaded assembly: " << m_loadedAssemblyPath);
+            m_loadedAssemblyPath.clear();
+            return true;
+        }
+        else {
+            LOG_ERROR("[ScriptManager] Failed to unload assembly: " << m_loadedAssemblyPath);
+            return false;
+        }
     }
 
+    void ScriptManager::SetCurrentWorldForHotReload(World* world) {
+        if (!m_initialized || !m_setCurrentWorldForHotReload) {
+            LOG_WARNING("[ScriptManager] SetCurrentWorldForHotReload not available");
+            return;
+        }
+
+        // Call the managed function to set the current world pointer
+        // This allows UnloadAssembly to clear components from the active world
+        m_setCurrentWorldForHotReload(world);
+        LOG_INFO("[ScriptManager] Set current world for hot reload");
+    }
     /**
-     * @brief Reload an assembly for hot reload support.
-     * @param assemblyPath Path to the assembly to reload
-     * @return true if reloaded successfully
+     * @brief Centralized hot reload orchestration controlled by C++.
+     * @param scriptDirectory Directory containing .cs files
+     * @param assemblyPath Path where assembly will be written
+     * @return true if hot reload succeeded
      * 
-     * Preserves system state where possible during reload.
+     * C++ controls the entire flow:
+     * 1. Compile scripts (C# writes to temp file)
+     * 2. Completely unload the old assembly
+     * 3. Force garbage collection to release file locks
+     * 4. Move temp DLL -> final DLL
+     * 5. Load the new assembly
+     * 6. Trigger hot reload callback for system re-discovery
      */
-    bool ScriptManager::ReloadAssembly(const std::string& assemblyPath) {
-        // TODO: Implement hot reload
-        // 1. Save system state
-        // 2. Unload old assembly
-        // 3. Load new assembly
-        // 4. Restore system state
-        LOG_WARNING("[ScriptManager] ReloadAssembly not yet implemented (hot reload)");
-        return false;
-    }
-
     /**
      * @brief Handle hot reload completion callback from C#.
      * @param assemblyPath Path to the reloaded assembly
@@ -273,14 +303,11 @@ namespace ECS {
         }
 
         LOG_INFO("[ScriptManager] Discovering scripted systems...");
-        // Log native-tracked loaded assemblies for diagnostics
-        if (!m_loadedAssemblies.empty()) {
-            std::stringstream ss;
-            ss << "[ScriptManager] Native loaded assemblies (" << m_loadedAssemblies.size() << "):\n";
-            for (const auto& a : m_loadedAssemblies) ss << "  - " << a << "\n";
-            LOG_INFO(ss.str());
+        // Log native-tracked loaded assembly for diagnostics
+        if (!m_loadedAssemblyPath.empty()) {
+            LOG_INFO("[ScriptManager] Native loaded assembly: " << m_loadedAssemblyPath);
         } else {
-            LOG_INFO("[ScriptManager] No native-loaded assemblies recorded");
+            LOG_INFO("[ScriptManager] No native-loaded assembly recorded");
         }
         // Call managed function to discover all ISystem implementations
         // DiscoverSystems now creates instances and returns INSTANCE handles
@@ -357,93 +384,32 @@ namespace ECS {
         return static_cast<int>(systems.size());
     }
 
-    /**
-     * @brief Compile C# scripts in a directory to an assembly using Roslyn.
-     * @param scriptDirectory Path to directory containing .cs files
-     * @param outputAssembly Path for output assembly (e.g., "GameScripts.dll")
-     * @return true if compilation succeeded, false otherwise
-     */
-    bool ScriptManager::CompileScriptsInDirectory(const std::string& scriptDirectory,
-                                                  const std::string& outputAssembly) {
-        if (!m_initialized) {
-            LOG_ERROR("[ScriptManager] Cannot compile - CLR not initialized");
-            return false;
-        }
-
-        if (!m_compileDirectory) {
-            LOG_ERROR("[ScriptManager] Compile delegate not available");
-            return false;
-        }
-
-        if (scriptDirectory.empty() || outputAssembly.empty()) {
-            LOG_ERROR("[ScriptManager] Invalid directory or output assembly path");
-            return false;
-        }
-
-        LOG_INFO("[ScriptManager] Compiling scripts from: " << scriptDirectory);
-
-        int rc = m_compileDirectory(scriptDirectory.c_str(), outputAssembly.c_str());
-
-        if (rc == 0) {
-            // Even if the simple compile returned success, try to fetch diagnostics
-            // from the richer diagnostic API if available. Some managed builds
-            // may log exceptions but still return 0; ensure we detect that.
-            if (m_compileDirectoryWithDiag && m_freeManagedString) {
-                void* p = m_compileDirectoryWithDiag(scriptDirectory.c_str(), outputAssembly.c_str());
-                if (p != nullptr) {
-                    const char* diagC = static_cast<const char*>(p);
-                    std::string diags = diagC ? std::string(diagC) : std::string("(no diagnostics)");
-                    m_freeManagedString(p);
-
-                    auto toLower = [](const std::string& s) {
-                        std::string r; r.reserve(s.size());
-                        for (char c : s) r.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-                        return r;
-                    };
-
-                    std::string diagLower = toLower(diags);
-                    bool hasError = (diagLower.find("error") != std::string::npos) ||
-                                    (diagLower.find("exception") != std::string::npos) ||
-                                    (diagLower.find("failed") != std::string::npos) ||
-                                    (diagLower.find("could not load file or assembly") != std::string::npos);
-
-                    if (hasError) {
-                        std::string summary = SummarizeDiagnostics(diags);
-                        LOG_ERROR("Compilation reported diagnostics despite success return code: " << summary);
-                        {
-                            std::lock_guard<std::mutex> lock(m_compileMutex);
-                            m_compileMessage = diags;
-                        }
-                        return false;
-                    }
-                }
+    bool ScriptManager::CopyScriptingAssemblyToDirectory(const std::string& targetDir) {
+        try {
+            // GrapeEngine.Scripting.dll is typically in the current working directory (build output)
+            std::filesystem::path sourceDir = std::filesystem::current_path();
+            std::filesystem::path scriptingSource = sourceDir / "GrapeEngine.Scripting.dll";
+            
+            if (!std::filesystem::exists(scriptingSource)) {
+                LOG_WARNING("[ScriptManager] Could not find GrapeEngine.Scripting.dll at: " << scriptingSource.string());
+                return false;
             }
-
-            LOG_INFO("[ScriptManager] Script compilation succeeded: " << outputAssembly);
-            {
-                std::lock_guard<std::mutex> lock(m_compileMutex);
-                m_compileMessage = "Compilation successful";
+            
+            // Ensure target directory exists
+            std::filesystem::path targetPath(targetDir);
+            if (!std::filesystem::exists(targetPath)) {
+                std::filesystem::create_directories(targetPath);
             }
+            
+            // Copy the assembly to the target directory
+            std::filesystem::path scriptingDest = targetPath / "GrapeEngine.Scripting.dll";
+            std::filesystem::copy_file(scriptingSource, scriptingDest, std::filesystem::copy_options::overwrite_existing);
+            
+            LOG_INFO("[ScriptManager] Copied GrapeEngine.Scripting.dll to: " << scriptingDest.string());
             return true;
-        }
-        else {
-            LOG_ERROR("Script compilation failed with error code: " << rc);
-            // Try to get diagnostics if available
-            if (m_compileDirectoryWithDiag && m_freeManagedString) {
-                void* p = m_compileDirectoryWithDiag(scriptDirectory.c_str(), outputAssembly.c_str());
-
-                if (p != nullptr) {
-                    const char* diagC = static_cast<const char*>(p);
-                    std::string diags = diagC ? std::string(diagC) : std::string("(no diagnostics)");
-                    std::string summary = SummarizeDiagnostics(diags);
-                    LOG_ERROR("Failed to compile scripts: " << summary);
-                    {
-                        std::lock_guard<std::mutex> lock(m_compileMutex);
-                        m_compileMessage = diags;
-                    }
-                    m_freeManagedString(p);
-                }
-            }
+        } 
+        catch (const std::exception& e) {
+            LOG_ERROR("[ScriptManager] Failed to copy GrapeEngine.Scripting.dll: " << e.what());
             return false;
         }
     }
@@ -451,9 +417,13 @@ namespace ECS {
     /**
      * @brief Compile scripts and return diagnostics as a string.
      * @param scriptDirectory Path to directory containing .cs files
-     * @param outputAssembly Path for output assembly
+     * @param outputAssembly Path for output assembly (used by C# to find temp location)
      * @param outDiagnostics Reference to store compilation error/warning messages
-     * @return true if compilation succeeded
+     * @return true if temp assembly was created, false otherwise
+     * 
+     * Success is determined by existence of temp assembly file, not diagnostics.
+     * Diagnostics are informational only and never prevent reload.
+     * C++ controls assembly lifecycle (unload, move, load).
      */
     bool ScriptManager::CompileScriptsWithDiagnostics(const std::string& scriptDirectory,
                                                       const std::string& outputAssembly,
@@ -478,89 +448,41 @@ namespace ECS {
 
         LOG_INFO("[ScriptManager] Compiling scripts from: " << scriptDirectory);
 
-        // Try to get diagnostics
+        // Retrieve diagnostics (informational only)
         if (m_compileDirectoryWithDiag && m_freeManagedString) {
             void* p = m_compileDirectoryWithDiag(scriptDirectory.c_str(), outputAssembly.c_str());
             
             if (p != nullptr) {
                 const char* diagC = static_cast<const char*>(p);
-                    outDiagnostics = diagC ? std::string(diagC) : std::string("(no diagnostics)");
-                    m_freeManagedString(p);
-
-                    // If diagnostics contain error-like text, treat as failure even if an assembly exists
-                    auto toLower = [](const std::string& s) {
-                        std::string r; r.reserve(s.size());
-                        for (char c : s) r.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-                        return r;
-                    };
-
-                    std::string diagLower = toLower(outDiagnostics);
-
-                    if (!diagLower.empty()) {
-                        std::string summary = SummarizeDiagnostics(outDiagnostics);
-                        LOG_ERROR("Compilation failed: " << summary);
-                        {
-                            std::lock_guard<std::mutex> lock(m_compileMutex);
-                            m_compileMessage = outDiagnostics;
-                        }
-                        return false;
-                    }
-
-                    // Check if output assembly was created (success indicator)
-                    // Note: The compiler may write to a versioned path (GameScripts_hotreload_1.dll),
-                    // so we query the actual compiled path instead of checking the original output path.
-                    if (m_getLastCompiledAssemblyPath) {
-                        void* pathPtr = m_getLastCompiledAssemblyPath();
-                        if (pathPtr == nullptr) {
-                            std::string errMsg = "Compilation reported success, but no compiled assembly path was returned";
-                            LOG_ERROR(errMsg);
-                            {
-                                std::lock_guard<std::mutex> lock(m_compileMutex);
-                                m_compileMessage = errMsg;
-                            }
-                            return false;
-                        }
-                        const char* compiledPath = static_cast<const char*>(pathPtr);
-                        std::string compiledPathStr(compiledPath ? compiledPath : "");
-                        m_freeManagedString(pathPtr);
-
-                        if (compiledPathStr.empty() || !std::filesystem::exists(compiledPathStr)) {
-                            std::string summary = SummarizeDiagnostics(outDiagnostics);
-                            LOG_ERROR("Compilation failed (no output assembly at " << compiledPathStr << "): " << summary);
-                            {
-                                std::lock_guard<std::mutex> lock(m_compileMutex);
-                                m_compileMessage = outDiagnostics;
-                            }
-                            return false;
-                        }
-                    } else if (!std::filesystem::exists(outputAssembly)) {
-                        // Fallback if GetLastCompiledAssemblyPath is not available
-                        std::string summary = SummarizeDiagnostics(outDiagnostics);
-                        LOG_ERROR("Compilation failed (no output assembly): " << summary);
-                        {
-                            std::lock_guard<std::mutex> lock(m_compileMutex);
-                            m_compileMessage = outDiagnostics;
-                        }
-                        return false;
-                    }
-            }
-        }
-        else {
-            // Fallback to basic compile without diagnostics
-            int rc = m_compileDirectory(scriptDirectory.c_str(), outputAssembly.c_str());
-            if (rc != 0) {
-                outDiagnostics = "Compilation failed with return code: " + std::to_string(rc);
-                LOG_ERROR("[ScriptManager] " << outDiagnostics);
-                {
-                    std::lock_guard<std::mutex> lock(m_compileMutex);
-                    m_compileMessage = outDiagnostics;
-                }
-                return false;
+                outDiagnostics = diagC ? std::string(diagC) : std::string("(no diagnostics)");
+                m_freeManagedString(p);
+                LOG_INFO("[ScriptManager] Compilation diagnostics captured (" 
+                        << outDiagnostics.size() << " chars)");
             }
         }
 
-        LOG_INFO("[ScriptManager] Script compilation succeeded: " << outputAssembly);
-        outDiagnostics = "Compilation successful";
+        // Success is determined ONLY by temp assembly existence, not diagnostics
+        std::string tempAssemblyPath = outputAssembly;
+        if (m_getLastCompiledTempAssemblyPath) {
+            void* pathPtr = m_getLastCompiledTempAssemblyPath();
+            if (pathPtr != nullptr) {
+                const char* tempPath = static_cast<const char*>(pathPtr);
+                tempAssemblyPath = tempPath ? std::string(tempPath) : outputAssembly;
+                m_freeManagedString(pathPtr);
+                LOG_INFO("[ScriptManager] Temporary assembly path: " << tempAssemblyPath);
+            }
+        }
+
+        if (!std::filesystem::exists(tempAssemblyPath)) {
+            LOG_ERROR("[ScriptManager] Compilation failed - no temp assembly at: " << tempAssemblyPath);
+            {
+                std::lock_guard<std::mutex> lock(m_compileMutex);
+                m_compileMessage = outDiagnostics;
+            }
+            return false;
+        }
+
+        LOG_INFO("[ScriptManager] Compilation succeeded - temp assembly created");
         {
             std::lock_guard<std::mutex> lock(m_compileMutex);
             m_compileMessage = "Compilation successful";
@@ -584,10 +506,10 @@ namespace ECS {
             LOG_ERROR("[ScriptManager] StartWatching returned error: " << rc);
             return false;
         }
-        // If managed watcher supports setting a native compile-status callback, register it now
-        if (m_setCompileCallback) {
+        // Register callback for script changes (invokes registered callback in ScriptManager)
+        if (m_registerScriptChangedCallback) {
             // Pass pointer to native function that will be called by managed code
-            m_setCompileCallback(reinterpret_cast<void*>(&Native_CompileStatusCallback));
+            m_registerScriptChangedCallback(reinterpret_cast<void*>(&Native_OnScriptsChanged));
         }
         LOG_INFO("[ScriptManager] Started watching: " << directory.c_str());
         return true;
@@ -600,6 +522,20 @@ namespace ECS {
         if (!m_initialized || !m_stopWatching) return;
         m_stopWatching();
         LOG_INFO("[ScriptManager] Stopped script watching");
+    }
+
+    /**
+     * @brief Callback invoked by C# file watcher when scripts change.
+     * Forwards to the registered callback if one is set.
+     * @param scriptsDir Directory where changes were detected
+     */
+    void ScriptManager::OnScriptsChanged(const std::string& scriptsDir) {
+        if (m_scriptChangedCallback) {
+            LOG_INFO("[ScriptManager] Scripts changed, invoking callback for: " << scriptsDir);
+            m_scriptChangedCallback(scriptsDir);
+        } else {
+            LOG_WARNING("[ScriptManager] Scripts changed but no callback registered");
+        }
     }
 
     // ============================================================================
@@ -792,8 +728,8 @@ namespace ECS {
 
         // Type and method names in C# ScriptHost/ScriptFileWatcher
         // Use assembly-qualified type names so hostfxr can resolve UnmanagedCallersOnly methods
-        const char_t* scriptHostTypeName =  DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptHost, GrapeEngine.Scripting");
-        const char_t* watcherTypeName =     DOTNET_STRING("GrapeEngine.Scripting.Hosting.ScriptFileWatcher, GrapeEngine.Scripting");
+        const char_t* scriptHostTypeName = DOTNET_STRING("GrapeEngine.Scripting.Internal.Hosting.ScriptHost, GrapeEngine.Scripting");
+        const char_t* watcherTypeName    = DOTNET_STRING("GrapeEngine.Scripting.Internal.Hosting.ScriptFileWatcher, GrapeEngine.Scripting");
         std::stringstream sucstream{};
         std::stringstream errstream{};
 
@@ -852,6 +788,7 @@ namespace ECS {
         // Core ScriptHost methods
         success &= loadMethod("GetManagedExceptionForHResult",    scriptHostTypeName, reinterpret_cast<void**>(&m_getExceptionInfoForHR));
         success &= loadMethod("LoadAssembly",                     scriptHostTypeName, reinterpret_cast<void**>(&m_loadAssembly));
+        success &= loadMethod("SetCurrentWorldForHotReload",      scriptHostTypeName, reinterpret_cast<void**>(&m_setCurrentWorldForHotReload));
         success &= loadMethod("UnloadAssembly",                   scriptHostTypeName, reinterpret_cast<void**>(&m_unloadAssembly));
         success &= loadMethod("ReloadAssembly",                   scriptHostTypeName, reinterpret_cast<void**>(&m_reloadAssembly));
         success &= loadMethod("DiscoverSystems",                  scriptHostTypeName, reinterpret_cast<void**>(&m_discoverSystems));
@@ -864,7 +801,6 @@ namespace ECS {
         success &= loadMethod("CallSystemOnCreate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnCreate));
         success &= loadMethod("CallSystemOnUpdate",               scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnUpdate));
         success &= loadMethod("CallSystemOnDestroy",              scriptHostTypeName, reinterpret_cast<void**>(&m_callSystemOnDestroy));
-        success &= loadMethod("FlushLogs",                         scriptHostTypeName, reinterpret_cast<void**>(&m_flushLogs));
         success &= loadMethod("CompileScriptsInDirectory",        scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectory));
         success &= loadMethod("CompileDirectoryWithDiagnostics",  scriptHostTypeName, reinterpret_cast<void**>(&m_compileDirectoryWithDiag));
         success &= loadMethod("CompileAndReload",                 scriptHostTypeName, reinterpret_cast<void**>(&m_compileAndReload));
@@ -872,15 +808,19 @@ namespace ECS {
         success &= loadMethod("GetLastDiagnosticsCount",          scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticsCount));
         success &= loadMethod("GetLastDiagnosticAt",              scriptHostTypeName, reinterpret_cast<void**>(&m_getLastDiagnosticAt));
         success &= loadMethod("FreeStringFromManaged",            scriptHostTypeName, reinterpret_cast<void**>(&m_freeManagedString));
-        success &= loadMethod("GetLastCompiledAssemblyPath",      scriptHostTypeName, reinterpret_cast<void**>(&m_getLastCompiledAssemblyPath));
+        success &= loadMethod("GetLastCompiledAssemblyPath",      scriptHostTypeName, reinterpret_cast<void**>(&m_getLastCompiledTempAssemblyPath));
         success &= loadMethod("RegisterHotReloadCallback",        scriptHostTypeName, reinterpret_cast<void**>(&m_registerHotReloadCallback));
         success &= loadMethod("DeserializeComponentFromJson",     scriptHostTypeName, reinterpret_cast<void**>(&m_deserializeComponentFromJson));
 
         // ScriptFileWatcher methods
         success &= loadMethod("StartWatching",                    watcherTypeName, reinterpret_cast<void**>(&m_startWatching), LoadLabel::Watcher);
         success &= loadMethod("StopWatching",                     watcherTypeName, reinterpret_cast<void**>(&m_stopWatching), LoadLabel::Watcher);
-        success &= loadMethod("SetCompileCallback",               watcherTypeName, reinterpret_cast<void**>(&m_setCompileCallback), LoadLabel::Watcher);
-        success &= loadMethod("SetOutputAssemblyPath",            watcherTypeName, reinterpret_cast<void**>(&m_setOutputAssemblyPath), LoadLabel::Watcher);
+        success &= loadMethod("RegisterScriptChangedCallback",    watcherTypeName, reinterpret_cast<void**>(&m_registerScriptChangedCallback), LoadLabel::Watcher);
+        
+        // Hot reload support methods
+        success &= loadMethod("ClearAllManagedComponentsFromEntities", scriptHostTypeName, reinterpret_cast<void**>(&m_clearAllManagedComponents));
+        success &= loadMethod("RegisterRemoveComponentCallback", scriptHostTypeName, reinterpret_cast<void**>(&m_registerRemoveComponentCallback));
+        success &= loadMethod("ForceGarbageCollection",          scriptHostTypeName, reinterpret_cast<void**>(&m_forceGarbageCollection));
         
         // Log results
         if (!sucstream.str().empty()) // Log any successes
@@ -890,10 +830,10 @@ namespace ECS {
             return false;
         }
 
-        // Register the hot reload callback so C# can notify us when reload completes
+        // Register the C++ hot reload callback so C# can notify us when reload completes
         if (m_registerHotReloadCallback) {
             m_registerHotReloadCallback(reinterpret_cast<void*>(&Native_HotReloadCallback));
-            LOG_INFO("[ScriptManager] Registered hot reload callback");
+            LOG_INFO("[ScriptManager] Registered hot reload callback with managed code");
         }
 
         // All delegates loaded successfully, so return true
@@ -926,7 +866,27 @@ namespace ECS {
     void ScriptManager::CleanupScriptedSystems() {
         m_scriptedSystems.clear();
         m_systemsByAssembly.clear();
-        m_loadedAssemblies.clear();
+        m_loadedAssemblyPath.clear();
+    }
+
+    /**
+     * @brief Force a garbage collection in the managed runtime.
+     * Invokes System.GC.Collect and WaitForPendingFinalizers.
+     */
+    void ScriptManager::ForceGarbageCollection() {
+        // Prefer calling the managed helper if available (exposed via ScriptHost)
+        if (m_forceGarbageCollection) {
+            try {
+                m_forceGarbageCollection();
+                return;
+            }
+            catch (...) {
+                LOG_WARNING("[ScriptManager] m_forceGarbageCollection threw an exception");
+            }
+        }
+
+        // Fallback: if no managed helper is available, log a warning.
+        LOG_WARNING("[ScriptManager] No managed ForceGarbageCollection available; unable to force GC from native side");
     }
 
     // ============================================================================
@@ -1090,8 +1050,16 @@ namespace ECS {
                 // Add read components to builder
                 if (readCount > 0) {
                     std::vector<ComponentTypeId> readIds;
+                    readIds.reserve(static_cast<size_t>(readCount));
                     for (int i = 0; i < readCount && i < static_cast<int>(readHashes.size()); ++i) {
-                        readIds.push_back(ComponentTypeId(readHashes[i]));
+                        const uint32_t hash = readHashes[i];
+                        const ComponentTypeId id = ComponentRegistry::GetComponentIdFromHash(hash);
+                        if (id == NULL_COMPONENT_ID) {
+                            LOG_WARNING("[ScriptSystemWrapper] Unknown read component hash 0x" << std::hex << hash << std::dec
+                                << " for system '" << systemName << "'");
+                            continue;
+                        }
+                        readIds.push_back(id);
                     }
                     builder.ReadComponents(readIds);
                 }
@@ -1099,8 +1067,16 @@ namespace ECS {
                 // Add write components to builder
                 if (writeCount > 0) {
                     std::vector<ComponentTypeId> writeIds;
+                    writeIds.reserve(static_cast<size_t>(writeCount));
                     for (int i = 0; i < writeCount && i < static_cast<int>(writeHashes.size()); ++i) {
-                        writeIds.push_back(ComponentTypeId(writeHashes[i]));
+                        const uint32_t hash = writeHashes[i];
+                        const ComponentTypeId id = ComponentRegistry::GetComponentIdFromHash(hash);
+                        if (id == NULL_COMPONENT_ID) {
+                            LOG_WARNING("[ScriptSystemWrapper] Unknown write component hash 0x" << std::hex << hash << std::dec
+                                << " for system '" << systemName << "'");
+                            continue;
+                        }
+                        writeIds.push_back(id);
                     }
                     builder.WriteComponents(writeIds);
                 }
@@ -1213,3 +1189,28 @@ void ECS::ScriptManager::GetCompileStatus(int& outStatus, int& outProgress, std:
     outProgress = m_compileProgress;
     outMessage = m_compileMessage;
 }
+
+void ECS::ScriptManager::RemoveComponentFromAllEntitiesByHash(ECS::World& world, uint32_t componentTypeHash)
+{
+    // Get the component type ID from the hash using ComponentRegistry
+    ECS::ComponentTypeId componentId = ECS::ComponentRegistry::GetComponentIdFromHash(componentTypeHash);
+    
+    if (componentId == ECS::NULL_COMPONENT_ID)
+    {
+        // This can happen during hot reload if:
+        // 1. The component hash was never registered (e.g., new component type)
+        // 2. The hash calculation changed between versions
+        // 3. ComponentDiscovery returned a type that isn't in the registry yet
+        // This is not an error - just skip removal for this component type
+        LOG_DEBUG("[ScriptManager] RemoveComponentFromAllEntitiesByHash: Component hash 0x" << std::hex << componentTypeHash << std::dec << " not found in registry (may not have been registered yet)");
+        return;
+    }
+    
+    LOG_INFO("[ScriptManager] Removing component ID " << componentId << " (hash: 0x" << std::hex << componentTypeHash << std::dec << ") from all entities");
+    
+    // Call the World method to remove this component from all entities
+    world.RemoveComponentFromAllEntities(componentId);
+    
+    LOG_INFO("[ScriptManager] Successfully removed component ID " << componentId << " from all entities");
+}
+

@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "graphics/RenderGraph.hpp"
 #include "core/Application.h"
 #include "ecs/Components.h"
+#include "EditorECSUtils.h"
 
 // -------------------------------------------------------------------------
 // Update
@@ -59,27 +60,33 @@ void GameViewport::_renderViewport() {
     ImGui::Begin("Game", nullptr);
 
     auto* rendererSystem = _getRendererSystem();
-    
     if (!rendererSystem) {
         ImGui::TextDisabled("No game renderer not initialized");
     }
     else {
+        const ECS::ComponentTypeId cameraId = Editor::ECSUtils::GetComponentIdFromName("Camera3D");
         // Check if there's an active camera in the scene
         bool hasCameraComponent = false;
         bool hasActiveCamera = false;
         int cameraCount = 0;
 
-        if (m_world) {
-            m_world->Each<ECS::Components::Camera3D>(
-                [&](ECS::Entity e, ECS::Components::Camera3D& cam) {
-                    (void)e;
-                    hasCameraComponent = true;
-                    cameraCount++;
-                    if (cam.Active) {
-                        hasActiveCamera = true;
-                    }
+        if (m_world && cameraId != ECS::NULL_COMPONENT_ID) {
+            m_world->Each([&](ECS::Entity e) {
+                if (!m_world->HasById(e, cameraId)) {
+                    return;
                 }
-            );
+
+                auto* cam = static_cast<ECS::Components::Camera3D*>(m_world->GetRawComponentPtr(e, cameraId));
+                if (!cam) {
+                    return;
+                }
+
+                hasCameraComponent = true;
+                cameraCount++;
+                if (cam->Active) {
+                    hasActiveCamera = true;
+                }
+            });
         }
 
         if (!hasCameraComponent) {
@@ -151,11 +158,15 @@ void GameViewport::_renderViewport() {
             }
             
             // Update camera aspect ratio to match display size
-            if (m_world) {
-                m_world->Each<ECS::Components::Camera3D>([targetRatio](ECS::Entity e, ECS::Components::Camera3D& cam) {
-                    (void)e;
-                    if (cam.Active) {
-                        cam.AspectRatio = targetRatio;
+            if (m_world && cameraId != ECS::NULL_COMPONENT_ID) {
+                m_world->Each([&](ECS::Entity e) {
+                    if (!m_world->HasById(e, cameraId)) {
+                        return;
+                    }
+
+                    auto* cam = static_cast<ECS::Components::Camera3D*>(m_world->GetRawComponentPtr(e, cameraId));
+                    if (cam && cam->Active) {
+                        cam->AspectRatio = targetRatio;
                     }
                 });
             }

@@ -194,6 +194,16 @@ namespace ECS {
                                  const uint32_t* indices, size_t indexCount,
                                  const glm::vec4& color, float thickness);
 
+        /**
+         * @brief Submit collider debug visualizations for an entity
+         * @param world ECS world containing the entity
+         * @param entityID ID of entity with colliders to render
+         * @param color RGBA color for collider wireframes
+         * @param thickness Line thickness in world units
+         */
+        void SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
+                                     const glm::vec4& color);
+
         // ====================================================================
         // GUI Rendering APIs
         // ====================================================================
@@ -336,9 +346,12 @@ namespace ECS {
             Type type;
             std::vector<glm::vec2> vertices;
             std::vector<uint32_t> indices;
+            glm::vec2 center; // for circles
+            float radius;     // for circles
             glm::vec4 color;
             float thickness;
             bool closed; // for polygons
+            bool filled = false;
         };
         std::vector<WireframeSubmission> m_wireframeQueue;
 

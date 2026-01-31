@@ -14,29 +14,31 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using System.Reflection;
 using GrapeEngine.Scripting.Internal.Hosting;
+using GrapeEngine.Scripting.Internal.Unsafe;
+using GrapeEngine.Scripting.Services;
+using System.Globalization;
 
 namespace GrapeEngine.Scripting.Internal.Compiler;
 
 internal static class RoslynCompiler
 {
-    // Store diagnostics as a list of individual messages so callers can
-    // choose how to present them (UI can enumerate, logs can summarize).
+    // Cache line maps per file for O(1) lookup of line/column information
+    private static readonly Dictionary<SyntaxTree, SourceText> _lineCache = [];
+
+    // Store diagnostics as a list of individual messages for summary purposes
     private static readonly List<string> _lastDiagnosticsList = [];
-    
-    // Store the path to the last compiled assembly (may be versioned)
-    private static string _lastCompiledAssemblyPath = "";
-    
+
+    // Store the temporary assembly path after compilation (C++ moves it after unload)
+    private static string _lastCompiledTempAssemblyPath = "";
+
     // Store the last compiled PDB bytes for retrieval
     private static byte[]? _lastCompiledPdbBytes = null;
-    
-    // Track compilation count: 0 = initial/boot compilation, 1+ = hot reload
-    // First compilation writes to GameScripts.dll directly
-    // Subsequent compilations write to GameScripts_hotreload_N.dll for hot reload safety
-    private static int _compilationCount = 0;
 
-    public static int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath, IEnumerable<string>? references = null)
+    public static int CompileDirectoryToAssembly(string dirPath, string outputAssemblyPath,
+        IEnumerable<string>? references = null)
     {
         _lastDiagnosticsList.Clear();
 
@@ -47,18 +49,18 @@ internal static class RoslynCompiler
         {
             if (!Directory.Exists(dirPath))
             {
-                Logging.Log($"Directory not found: {dirPath}", LogLevel.Warning);
+                Logging.LogInternal($"Directory not found: {dirPath}", LogLevel.Warning);
                 return -1;
             }
 
             // Gather all .cs files (exclude build artifacts)
             var csFiles = Directory.GetFiles(dirPath, "*.cs", SearchOption.AllDirectories)
-                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && 
+                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") &&
                             !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
                 .ToArray();
             if (csFiles.Length == 0)
             {
-                Logging.Log($"No .cs files found in {dirPath}", LogLevel.Warning);
+                Logging.LogInternal($"No .cs files found in {dirPath}", LogLevel.Warning);
                 return -1;
             }
 
@@ -67,9 +69,9 @@ internal static class RoslynCompiler
             {
                 // Read source code with encoding for PDB emission
                 var sourceText = Microsoft.CodeAnalysis.Text.SourceText.From(
-                    File.ReadAllText(file), 
+                    File.ReadAllText(file),
                     System.Text.Encoding.UTF8);
-                
+
                 // Parse and add to syntax trees with encoding metadata
                 syntaxTrees.Add(CSharpSyntaxTree.ParseText(sourceText, path: file));
             }
@@ -79,18 +81,19 @@ internal static class RoslynCompiler
             // Default references: mscorlib, System, System.Core, netstandard and current ScriptHost assembly
             var refs = new List<MetadataReference>();
 
-            // Add commonly available references
-            var trustedAssemblies = (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string)?.Split(Path.PathSeparator) ?? [];
+            // Add all trusted platform assemblies to ensure all system types are available
+            // (List<>, Dictionary<>, etc. from System.Collections.Generic are critical)
+            var trustedAssemblies =
+                (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string)?.Split(Path.PathSeparator) ?? [];
             foreach (var asmPath in trustedAssemblies)
             {
-                var name = Path.GetFileName(asmPath);
-                if (name.StartsWith("System") || name.StartsWith("mscorlib") || name.StartsWith("netstandard") || name.StartsWith("Microsoft.CSharp") || name.StartsWith("System.Private.CoreLib"))
+                try
                 {
-                    try
-                    {
-                        refs.Add(MetadataReference.CreateFromFile(asmPath));
-                    }
-                    catch { }
+                    refs.Add(MetadataReference.CreateFromFile(asmPath));
+                }
+                catch
+                {
+                    // Skip any assemblies that can't be loaded
                 }
             }
 
@@ -103,15 +106,17 @@ internal static class RoslynCompiler
                     refs.Add(MetadataReference.CreateFromFile(scriptApi.Location));
                 }
             }
-            catch { }
+            catch
+            {
+            }
 
             // Add user-provided references
             if (references != null)
             {
                 refs.AddRange(
-                    from r 
-                        in references 
-                    where File.Exists(r) 
+                    from r
+                        in references
+                    where File.Exists(r)
                     select MetadataReference.CreateFromFile(r));
             }
 
@@ -119,7 +124,8 @@ internal static class RoslynCompiler
                 assemblyName,
                 syntaxTrees: syntaxTrees,
                 references: refs.Distinct(),
-                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Debug)
+                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: OptimizationLevel.Debug)
             );
 
             // Emit to an in-memory stream first so we only write an output assembly
@@ -132,37 +138,27 @@ internal static class RoslynCompiler
                 if (!emitResult.Success)
                 {
                     _lastDiagnosticsList.Clear();
-                    foreach (var diag in emitResult.Diagnostics)
+
+                    // Process each diagnostic individually for O(1) per diagnostic
+                    foreach (var diagnostic in emitResult.Diagnostics)
                     {
-                        var location = diag.Location.GetLineSpan();
+                        if (diagnostic.Severity != DiagnosticSeverity.Error &&
+                            diagnostic.Severity != DiagnosticSeverity.Warning)
+                            continue;
+
+                        // Report diagnostic to native side with structured data
+                        ReportDiagnostic(diagnostic);
+
+                        // Store for later summary access (for backward compatibility)
+                        var location = diagnostic.Location.GetLineSpan();
                         var filePath = location.Path;
                         var lineNumber = location.StartLinePosition.Line + 1;
                         var columnNumber = location.StartLinePosition.Character + 1;
-
-                        var line = $"{filePath}({lineNumber},{columnNumber}): {diag.Id}: {diag.GetMessage()}";
-
-                        if (diag.Severity == DiagnosticSeverity.Error)
-                            errors.Add(line);
-                        else if (diag.Severity == DiagnosticSeverity.Warning)
-                            warnings.Add(line);
-
+                        var line =
+                            $"{filePath}({lineNumber},{columnNumber}): {diagnostic.Id}: {diagnostic.GetMessage(CultureInfo.InvariantCulture)}";
                         _lastDiagnosticsList.Add(line);
                     }
 
-                    // Emit each diagnostic as a separate managed log entry so the
-                    // native ConsolePanel receives them as independent messages.
-                    try
-                    {
-                        foreach (var line in errors)
-                        {
-                            Logging.Log(line, LogLevel.Error);
-                        }
-                        foreach (var line in warnings)
-                        {
-                            Logging.Log(line, LogLevel.Warning);
-                        }
-                    }
-                    catch { }
                     // Do not write any output file on failure
                     return -1;
                 }
@@ -172,80 +168,35 @@ internal static class RoslynCompiler
                 {
                     var bytes = ms.ToArray();
                     var pdbBytes = pdbStream.ToArray();
-                    
+
                     // Store PDB bytes for retrieval
                     _lastCompiledPdbBytes = pdbBytes.Length > 0 ? pdbBytes : null;
-                    
-                    string finalAssemblyPath;
-                    
-                    // First compilation (count=0): write directly to GameScripts.dll
-                    // Subsequent compilations (count>0): use versioned names for hot reload safety
-                    if (_compilationCount == 0)
+
+                    // Write to output assembly path directly
+                    // (C++ handles temp->final moves during hot reload if needed)
+                    Logging.LogInternal($"[RoslynCompiler] Writing assembly to: {outputAssemblyPath}", LogLevel.Info);
+
+                    File.WriteAllBytes(outputAssemblyPath, bytes);
+                    Logging.LogInternal($"[RoslynCompiler] Wrote assembly: {outputAssemblyPath}", LogLevel.Info);
+
+                    // Write PDB alongside the assembly
+                    if (pdbBytes is { Length: > 0 })
                     {
-                        // Initial boot compilation - write directly to the original path
-                        Logging.LogInternal($"[RoslynCompiler] First compilation (boot) - writing directly to: {outputAssemblyPath}", LogLevel.Info);
-                        
-                        // Ensure the output directory exists
-                        var dir = Path.GetDirectoryName(outputAssemblyPath) ?? "";
-                        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                        var pdbPath = Path.ChangeExtension(outputAssemblyPath, ".pdb");
+                        try
                         {
-                            Directory.CreateDirectory(dir);
+                            File.WriteAllBytes(pdbPath, pdbBytes);
+                            Logging.LogInternal($"[RoslynCompiler] Wrote PDB: {pdbPath}", LogLevel.Debug);
                         }
-                        
-                        // Write DLL directly to the original path
-                        File.WriteAllBytes(outputAssemblyPath, bytes);
-                        Logging.LogInternal($"[RoslynCompiler] Wrote initial assembly: {outputAssemblyPath}", LogLevel.Info);
-                        
-                        // Write PDB if provided
-                        if (pdbBytes is { Length: > 0 })
+                        catch (Exception pdbEx)
                         {
-                            var pdbPath = Path.ChangeExtension(outputAssemblyPath, ".pdb");
-                            try
-                            {
-                                File.WriteAllBytes(pdbPath, pdbBytes);
-                                Logging.LogInternal($"[RoslynCompiler] Wrote PDB: {pdbPath}", LogLevel.Debug);
-                            }
-                            catch (Exception pdbEx)
-                            {
-                                Logging.LogInternal($"[RoslynCompiler] Warning: Failed to write PDB: {pdbEx.Message}", LogLevel.Warning);
-                            }
+                            Logging.LogInternal($"[RoslynCompiler] Warning: Failed to write PDB: {pdbEx.Message}",
+                                LogLevel.Warning);
                         }
-                        
-                        finalAssemblyPath = outputAssemblyPath;
                     }
-                    else
-                    {
-                        // Hot reload compilation (count>0): use versioned assembly loading
-                        // Create GameScripts_hotreload_1.dll, GameScripts_hotreload_2.dll, etc.
-                        // This avoids file-locking issues when unloading old versions.
-                        Logging.LogInternal($"[RoslynCompiler] Hot reload compilation (count={_compilationCount}) - using versioned path", LogLevel.Info);
-                        
-                        var versionedPath = AssemblyManager.LoadVersionedAssembly(outputAssemblyPath, bytes, pdbBytes);
-                        
-                        if (versionedPath == null)
-                        {
-                            _lastDiagnosticsList.Clear();
-                            var errMsg = $"Failed to write versioned assembly {outputAssemblyPath}.\nCheck AssemblyManager logs for details.";
-                            _lastDiagnosticsList.Add(errMsg);
-                            try 
-                            {
-                                Logging.Log(errMsg, LogLevel.Error);
-                            }
-                            catch { }
-                            return -1;
-                        }
-                        
-                        finalAssemblyPath = versionedPath;
-                    }
-                    
-                    // Increment compilation counter after successful write
-                    _compilationCount++;
-                    
-                    // Update the output path to point to the actual assembly
-                    // The caller (TriggerCompileAndReloadManaged) will use this path to load the new version
-                    // Note: GrapeEngine.Scripting copy is now handled in native code (EditorMain.cpp) on startup
-                    // Store the actual path (either original or versioned) for retrieval by the caller
-                    _lastCompiledAssemblyPath = finalAssemblyPath;
+
+                    // Store the actual path for retrieval (same as output path)
+                    _lastCompiledTempAssemblyPath = outputAssemblyPath;
                 }
                 catch (Exception ex)
                 {
@@ -253,11 +204,14 @@ internal static class RoslynCompiler
                     _lastDiagnosticsList.Clear();
                     var errMsg = $"Failed to write assembly {outputAssemblyPath}:\n{ex}";
                     _lastDiagnosticsList.Add(errMsg);
-                    try 
+                    try
                     {
-                        Logging.Log(errMsg, LogLevel.Error);
+                        Logging.LogInternal(errMsg, LogLevel.Error);
                     }
-                    catch { }
+                    catch
+                    {
+                    }
+
                     return -1;
                 }
             }
@@ -267,26 +221,29 @@ internal static class RoslynCompiler
         }
         catch (Exception ex)
         {
-            Logging.Log($"Compilation error: {ex}", LogLevel.Error);
+            Logging.LogInternal($"Compilation error: {ex}", LogLevel.Error);
             _lastDiagnosticsList.Clear();
             _lastDiagnosticsList.Add(ex.ToString());
             try
             {
-                Logging.Log(ex.ToString(), LogLevel.Error);
+                Logging.LogInternal(ex.ToString(), LogLevel.Error);
             }
-            catch { }
+            catch
+            {
+            }
+
             return -1;
         }
     }
 
-    public static string GetLastCompiledAssemblyPath()
+    public static string GetLastCompiledTempAssemblyPath()
     {
-        return _lastCompiledAssemblyPath;
+        return _lastCompiledTempAssemblyPath;
     }
 
     public static string GetLastDiagnostics()
     {
-        return _lastDiagnosticsList.Count == 0 
+        return _lastDiagnosticsList.Count == 0
             ? string.Empty
             : string.Join("\n", _lastDiagnosticsList);
     }
@@ -303,11 +260,57 @@ internal static class RoslynCompiler
         return _lastDiagnosticsList[index];
     }
 
-    
     public static byte[]? GetLastCompiledPdbBytes()
     {
         return _lastCompiledPdbBytes;
     }
-} 
 
+    /// <summary>
+    /// Report a single diagnostic to the native side with structured data.
+    /// O(1) processing per diagnostic with cached line maps.
+    /// </summary>
+    private static void ReportDiagnostic(Diagnostic diagnostic)
+    {
+        if (!diagnostic.Location.IsInSource)
+            return;
 
+        var tree = diagnostic.Location.SourceTree;
+        if (tree == null)
+            return;
+
+        // Cache line map per file for O(1) lookup
+        if (!_lineCache.TryGetValue(tree, out var sourceText))
+        {
+            sourceText = tree.GetText();
+            _lineCache[tree] = sourceText;
+        }
+
+        var span = diagnostic.Location.SourceSpan;
+        var linePos = sourceText.Lines.GetLinePosition(span.Start);
+
+        // Convert severity to byte for P/Invoke
+        byte severity = diagnostic.Severity switch
+        {
+            DiagnosticSeverity.Warning => 1, // Warning
+            DiagnosticSeverity.Error => 2, // Error
+            _ => 0 // Default/Hidden
+        };
+
+        try
+        {
+            DebugAPI.ScriptDiagnostic(
+                diagnostic.Id,
+                severity,
+                tree.FilePath ?? "Unknown",
+                linePos.Line + 1,
+                linePos.Character + 1,
+                diagnostic.GetMessage(CultureInfo.InvariantCulture)
+            );
+        }
+        catch (Exception ex)
+        {
+            // If reporting fails, at least log it internally
+            Logging.LogInternal($"Failed to report diagnostic: {ex.Message}", LogLevel.Warning);
+        }
+    }
+}

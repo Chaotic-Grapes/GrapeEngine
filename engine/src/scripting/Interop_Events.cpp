@@ -33,8 +33,8 @@ using namespace ECS::Events;
  * @brief Fire a collision event between two entities.
  * Adds CollisionEvent components to both entities.
  * @param worldPtr Pointer to the World instance
- * @param entity1Id ID of the first entity
- * @param entity2Id ID of the second entity
+ * @param entity1Id Packed ID of the first entity
+ * @param entity2Id Packed ID of the second entity
  * @param contactPointX X component of the contact point
  * @param contactPointY Y component of the contact point
  * @param contactPointZ Z component of the contact point
@@ -48,8 +48,8 @@ using namespace ECS::Events;
  */
 INTEROP_API void WorldInterop_FireCollisionEvent(
     void* worldPtr,
-    EntityId entity1Id,
-    EntityId entity2Id,
+    PackedEntityId entity1Id,
+    PackedEntityId entity2Id,
     float contactPointX,
     float contactPointY,
     float contactPointZ,
@@ -84,13 +84,13 @@ INTEROP_API void WorldInterop_FireCollisionEvent(
  * @brief Fire a trigger enter event.
  * Adds a TriggerEvent component to the trigger entity.
  * @param worldPtr Pointer to the World instance
- * @param triggerId ID of the trigger entity
- * @param otherEntityId ID of the other entity entering the trigger
+ * @param triggerId Packed ID of the trigger entity
+ * @param otherEntityId Packed ID of the other entity entering the trigger
  */
 INTEROP_API void WorldInterop_FireTriggerEnterEvent(
     void* worldPtr,
-    EntityId triggerId,
-    EntityId otherEntityId
+    PackedEntityId triggerId,
+    PackedEntityId otherEntityId
 ) {
     if (!worldPtr) return;
     
@@ -103,13 +103,13 @@ INTEROP_API void WorldInterop_FireTriggerEnterEvent(
  * @brief Fire a trigger stay event (entity still overlapping).
  * Adds a TriggerEvent component to the trigger entity.
  * @param worldPtr Pointer to the World instance
- * @param triggerId ID of the trigger entity
- * @param otherEntityId ID of the other entity staying in the trigger
+ * @param triggerId Packed ID of the trigger entity
+ * @param otherEntityId Packed ID of the other entity staying in the trigger
  */
 INTEROP_API void WorldInterop_FireTriggerStayEvent(
     void* worldPtr,
-    EntityId triggerId,
-    EntityId otherEntityId
+    PackedEntityId triggerId,
+    PackedEntityId otherEntityId
 ) {
     if (!worldPtr) return;
     
@@ -122,16 +122,16 @@ INTEROP_API void WorldInterop_FireTriggerStayEvent(
  * @brief Fire a collision exit event.
  * Adds CollisionExitEvent components to both entities.
  * @param worldPtr Pointer to the World instance
- * @param entity1Id ID of the first entity
- * @param entity2Id ID of the second entity
+ * @param entity1Id Packed ID of the first entity
+ * @param entity2Id Packed ID of the second entity
  * @param lastContactPointX X component of the last contact point
  * @param lastContactPointY Y component of the last contact point
  * @param lastContactPointZ Z component of the last contact point
  */
 INTEROP_API void WorldInterop_FireCollisionExitEvent(
     void* worldPtr,
-    EntityId entity1Id,
-    EntityId entity2Id,
+    PackedEntityId entity1Id,
+    PackedEntityId entity2Id,
     float lastContactPointX,
     float lastContactPointY,
     float lastContactPointZ
@@ -149,13 +149,13 @@ INTEROP_API void WorldInterop_FireCollisionExitEvent(
  * @brief Fire a trigger exit event.
  * Adds a TriggerExitEvent component to the trigger entity.
  * @param worldPtr Pointer to the World instance
- * @param triggerId ID of the trigger entity
- * @param otherEntityId ID of the other entity exiting the trigger
+ * @param triggerId Packed ID of the trigger entity
+ * @param otherEntityId Packed ID of the other entity exiting the trigger
  */
 INTEROP_API void WorldInterop_FireTriggerExitEvent(
     void* worldPtr,
-    EntityId triggerId,
-    EntityId otherEntityId
+    PackedEntityId triggerId,
+    PackedEntityId otherEntityId
 ) {
     if (!worldPtr) return;
     

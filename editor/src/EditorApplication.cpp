@@ -22,7 +22,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "physics/Physics.h"
 #include "platform/IPlatformContext.h"
 #include "platform/IWindow.h"
+#include "scripting/ScriptManager.h"
 #include <filesystem>
+
+// Initialize static members
+Engine::Application* EditorApplication::s_editorApplication = nullptr;
+ECS::World* EditorApplication::s_editorWorld = nullptr;
 
 EditorApplication::EditorApplication(Engine::Application* engine) : m_engine(engine), m_editorService(nullptr), m_initialized(false) { }
 
@@ -100,6 +105,67 @@ void EditorApplication::EndFrame() {
     // End frame processing in editor service
     if (m_editorService) {
         m_editorService->EndFrame();
+    }
+}
+
+void EditorApplication::InitializeScriptCallbacks(ECS::ScriptManager* scriptManager, ECS::World* world) {
+    if (!scriptManager) {
+        LOG_WARNING("[EditorApplication] Cannot initialize script callbacks: scriptManager is null");
+        return;
+    }
+    
+    // Store global pointers for callback access (world may be updated during hot reload)
+    s_editorApplication = m_engine;
+    s_editorWorld = world;
+    
+    // Register the component removal callback for hot reload
+    auto registerRemoveCallback = scriptManager->GetRegisterRemoveComponentCallback();
+    if (registerRemoveCallback) {
+        // Create static lambda that captures globals for callback
+        static auto removalCallback = [](uint32_t componentTypeHash) {
+            try {
+                if (!s_editorApplication) {
+                    LOG_WARNING("[EditorApplication::RemoveComponentCallback] Application not initialized");
+                    return;
+                }
+                
+                // Get the current active scene's world (or use stored world as fallback)
+                ECS::World* targetWorld = s_editorWorld;
+                if (auto* sceneManager = &s_editorApplication->GetSceneManager()) {
+                    if (auto* activeScene = sceneManager->GetActive()) {
+                        targetWorld = &activeScene->GetWorld();
+                    }
+                }
+                
+                if (!targetWorld) {
+                    LOG_WARNING("[EditorApplication::RemoveComponentCallback] No target world available");
+                    return;
+                }
+                
+                LOG_INFO("[EditorApplication::RemoveComponentCallback] Removing component type 0x" << std::hex << componentTypeHash << std::dec << " from all entities");
+                
+                auto* scriptMgr = s_editorApplication->GetScriptManager();
+                if (!scriptMgr) {
+                    LOG_WARNING("[EditorApplication::RemoveComponentCallback] No script manager available");
+                    return;
+                }
+                
+                scriptMgr->RemoveComponentFromAllEntitiesByHash(*targetWorld, componentTypeHash);
+            }
+            catch (const std::exception& e) {
+                LOG_ERROR("[EditorApplication::RemoveComponentCallback] Exception: " << e.what());
+            }
+            catch (...) {
+                LOG_ERROR("[EditorApplication::RemoveComponentCallback] Unknown exception");
+            }
+        };
+        
+        // Wrap the lambda in a function pointer
+        static void (*callbackFuncPtr)(uint32_t) = 
+            [](uint32_t hash) { removalCallback(hash); };
+        
+        registerRemoveCallback(reinterpret_cast<void*>(callbackFuncPtr));
+        LOG_INFO("[EditorApplication] Registered remove component callback with managed runtime");
     }
 }
 

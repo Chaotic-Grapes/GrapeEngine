@@ -9,18 +9,18 @@
 Editor UI registry that bridges the native ECS ComponentRegistry with editor operations.
 
 This registry queries the native ECS::ComponentRegistry (which is the single source of truth
-for all registered components - both C++ and C#) and provides editor-specific metadata:
+for all registered components - both C++ and managed) and provides editor-specific metadata:
 - Display names for UI presentation
 - Custom render functions for specialized component editors
 - Default JSON values for new instances
 
 The native registry is queried at runtime to discover all registered components. For each
 component, the editor either uses a hardcoded specialized renderer (C++ components) or a
-generic JSON editor (C# components).
+generic JSON editor (managed components).
 
 This approach ensures:
 1. Single source of truth: ECS::ComponentRegistry
-2. No redundancy: C# components discovered at runtime are automatically available
+2. No redundancy: managed components discovered at runtime are automatically available
 3. Separation of concerns: Native registry handles ECS, editor registry handles UI
 */
 /* End Header *******************************************************************/
@@ -48,11 +48,11 @@ struct ComponentUIMetadata {
     ECS::ComponentTypeId ComponentId; // Unique ID from native registry (for deduplication)
     uint32_t TypeHash;          // FNV-1a hash from native registry
     bool CanDelete;             // Whether component can be removed from entities
-    bool IsBuiltin;             // Whether this is a hardcoded C++ component (vs dynamically discovered C# component)
+    bool IsBuiltin;             // Whether this is a hardcoded C++ component (vs dynamically discovered managed component)
 
     // Render function for editing component properties
     // For C++ components: calls specialized RenderXXX function
-    // For C# components: uses generic JSON editor
+    // For managed components: uses generic JSON editor
     std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)> RenderUI;
 
     // Returns default JSON values for creating new component instances
@@ -78,14 +78,14 @@ struct ComponentUIMetadata {
 class ComponentRegistryUI {
 public:
     // Returns all registered component metadata from the native ECS registry.
-    // Queries ECS::ComponentRegistry to discover C++ and C# components.
+    // Queries ECS::ComponentRegistry to discover C++ and managed components.
     static const std::vector<ComponentUIMetadata>& GetAll();
 
     // Finds component metadata by type name (short or full).
     static const ComponentUIMetadata* Find(const std::string& typeName);
 
     // Rebuild the editor registry by querying the native ECS registry.
-    // Called after C# components have been registered.
+    // Called after managed components have been registered.
     static void RebuildFromNativeRegistry();
 
 private:

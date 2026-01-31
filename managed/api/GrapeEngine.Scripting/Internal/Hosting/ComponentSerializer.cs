@@ -57,6 +57,27 @@ internal static class ComponentSerializer
         _types[hash] = t;
     }
 
+    /// <summary>
+    /// Clear all registered types from the serializer cache.
+    /// Called during assembly unload to break references to types from the loaded assembly.
+    /// </summary>
+    public static void ClearAllRegisteredTypes()
+    {
+        try
+        {
+            int count = _types.Count;
+            _types.Clear();
+            if (count > 0)
+            {
+                Logging.LogInternal($"[ComponentSerializer] Cleared {count} registered component types", LogLevel.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentSerializer] Error clearing registered types: {ex.Message}", LogLevel.Error);
+        }
+    }
+
     private static IntPtr ManagedSerializeCallback(uint typeHash, IntPtr data, int size)
     {
         try

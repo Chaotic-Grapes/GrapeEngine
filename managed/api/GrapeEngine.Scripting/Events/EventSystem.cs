@@ -5,8 +5,7 @@ namespace GrapeEngine.Scripting.Events;
 /// <summary>
 /// Provides ergonomic access to physics event components.
 /// 
-/// The C++ EventDispatcher automatically adds CollisionEvent, TriggerEvent, and 
-/// CollisionExitEvent components to entities when physics events occur.
+/// The C++ EventDispatcher automatically adds per-entity event buffers when physics events occur.
 /// This EventSystem provides convenience methods to query for these events.
 /// 
 /// Event components are automatically removed at the end of each frame by the C++ ECS.
@@ -14,9 +13,10 @@ namespace GrapeEngine.Scripting.Events;
 /// <remarks>
 /// This is a thin wrapper around component queries. You can also query events directly:
 /// <code>
-/// foreach (var (entity, collision) in world.Query&lt;CollisionEvent&gt;())
+/// foreach (var (entity, buffer) in world.Query&lt;CollisionEventBuffer&gt;())
 /// {
-///     HandleCollision(entity, collision);
+///     for (int i = 0; i &lt; buffer.Count; ++i)
+///         HandleCollision(entity, buffer.GetEvent(i));
 /// }
 /// </code>
 /// </remarks>
@@ -33,7 +33,9 @@ public class EventSystem(World world)
     public bool HasCollisionEvent(ulong entityId)
     {
         var entity = Entity.FromId(_world, entityId);
-        return entity.IsAlive && entity.HasComponent<CollisionEvent>();
+        if (!entity.IsAlive || !entity.HasComponent<CollisionEventBuffer>())
+            return false;
+        return entity.GetComponent<CollisionEventBuffer>().Count > 0;
     }
 
     /// <summary>
@@ -43,9 +45,10 @@ public class EventSystem(World world)
     public CollisionEvent? GetCollisionEvent(ulong entityId)
     {
         var entity = Entity.FromId(_world, entityId);
-        if (entity.IsAlive && entity.HasComponent<CollisionEvent>())
+        if (entity.IsAlive && entity.HasComponent<CollisionEventBuffer>())
         {
-            return entity.GetComponent<CollisionEvent>();
+            var buffer = entity.GetComponent<CollisionEventBuffer>();
+            return buffer.Count > 0 ? buffer.GetEvent(0) : null;
         }
         return null;
     }
@@ -59,7 +62,9 @@ public class EventSystem(World world)
     public bool HasTriggerEvent(ulong entityId)
     {
         var entity = Entity.FromId(_world, entityId);
-        return entity.IsAlive && entity.HasComponent<TriggerEvent>();
+        if (!entity.IsAlive || !entity.HasComponent<TriggerEventBuffer>())
+            return false;
+        return entity.GetComponent<TriggerEventBuffer>().Count > 0;
     }
 
     /// <summary>
@@ -69,9 +74,10 @@ public class EventSystem(World world)
     public TriggerEvent? GetTriggerEvent(ulong entityId)
     {
         var entity = Entity.FromId(_world, entityId);
-        if (entity.IsAlive && entity.HasComponent<TriggerEvent>())
+        if (entity.IsAlive && entity.HasComponent<TriggerEventBuffer>())
         {
-            return entity.GetComponent<TriggerEvent>();
+            var buffer = entity.GetComponent<TriggerEventBuffer>();
+            return buffer.Count > 0 ? buffer.GetEvent(0) : null;
         }
         return null;
     }
@@ -84,7 +90,9 @@ public class EventSystem(World world)
     public bool HasCollisionExitEvent(ulong entityId)
     {
         var entity = Entity.FromId(_world, entityId);
-        return entity.IsAlive && entity.HasComponent<CollisionExitEvent>();
+        if (!entity.IsAlive || !entity.HasComponent<CollisionExitEventBuffer>())
+            return false;
+        return entity.GetComponent<CollisionExitEventBuffer>().Count > 0;
     }
 
     /// <summary>
@@ -94,9 +102,10 @@ public class EventSystem(World world)
     public CollisionExitEvent? GetCollisionExitEvent(ulong entityId)
     {
         var entity = Entity.FromId(_world, entityId);
-        if (entity.IsAlive && entity.HasComponent<CollisionExitEvent>())
+        if (entity.IsAlive && entity.HasComponent<CollisionExitEventBuffer>())
         {
-            return entity.GetComponent<CollisionExitEvent>();
+            var buffer = entity.GetComponent<CollisionExitEventBuffer>();
+            return buffer.Count > 0 ? buffer.GetEvent(0) : null;
         }
         return null;
     }
@@ -109,10 +118,8 @@ public class EventSystem(World world)
         get
         {
             int count = 0;
-            foreach (var _ in _world.Query<CollisionEvent>())
-            {
-                count++;
-            }
+            foreach (var (_, buffer) in _world.Query<CollisionEventBuffer>())
+                count += buffer.Count;
             return count;
         }
     }
@@ -125,10 +132,8 @@ public class EventSystem(World world)
         get
         {
             int count = 0;
-            foreach (var _ in _world.Query<TriggerEvent>())
-            {
-                count++;
-            }
+            foreach (var (_, buffer) in _world.Query<TriggerEventBuffer>())
+                count += buffer.Count;
             return count;
         }
     }
@@ -141,10 +146,8 @@ public class EventSystem(World world)
         get
         {
             int count = 0;
-            foreach (var _ in _world.Query<CollisionExitEvent>())
-            {
-                count++;
-            }
+            foreach (var (_, buffer) in _world.Query<CollisionExitEventBuffer>())
+                count += buffer.Count;
             return count;
         }
     }
@@ -154,9 +157,10 @@ public class EventSystem(World world)
     /// </summary>
     public IEnumerable<(Entity Entity, CollisionEvent Event)> GetAllCollisionEvents()
     {
-        foreach (var (entity, collision) in _world.Query<CollisionEvent>())
+        foreach (var (entity, buffer) in _world.Query<CollisionEventBuffer>())
         {
-            yield return (entity, collision);
+            for (int i = 0; i < buffer.Count; ++i)
+                yield return (entity, buffer.GetEvent(i));
         }
     }
 
@@ -165,9 +169,10 @@ public class EventSystem(World world)
     /// </summary>
     public IEnumerable<(Entity Entity, TriggerEvent Event)> GetAllTriggerEvents()
     {
-        foreach (var (entity, trigger) in _world.Query<TriggerEvent>())
+        foreach (var (entity, buffer) in _world.Query<TriggerEventBuffer>())
         {
-            yield return (entity, trigger);
+            for (int i = 0; i < buffer.Count; ++i)
+                yield return (entity, buffer.GetEvent(i));
         }
     }
 
@@ -176,9 +181,10 @@ public class EventSystem(World world)
     /// </summary>
     public IEnumerable<(Entity Entity, CollisionExitEvent Event)> GetAllCollisionExitEvents()
     {
-        foreach (var (entity, exit) in _world.Query<CollisionExitEvent>())
+        foreach (var (entity, buffer) in _world.Query<CollisionExitEventBuffer>())
         {
-            yield return (entity, exit);
+            for (int i = 0; i < buffer.Count; ++i)
+                yield return (entity, buffer.GetEvent(i));
         }
     }
 }

@@ -65,7 +65,8 @@ public class Entity
     /// </summary>
     internal static unsafe Entity FromId(void* worldPtr, ulong entityId)
     {
-        return new Entity(new World(worldPtr), entityId);
+        var world = World.FromNativePtr((IntPtr)worldPtr);
+        return new Entity(world, entityId);
     }
 
     // ============================================================================
@@ -109,6 +110,7 @@ public class Entity
         
         ComponentRegistry.EnsureRegistered<T>();
         uint typeHash = ComponentTypeHelper.GetTypeHash<T>();
+        string typeName = typeof(T).Name;
 
         unsafe
         {
@@ -119,10 +121,29 @@ public class Entity
             void* componentPtr = WorldAPI.GetComponentPtr(nativePtr, _id, typeHash);
             if (componentPtr == null)
             {
+                // Enhanced error reporting for component access failures
+                // As per query_getcomponent_issues.pdf: component is either not registered on native side,
+                // not added to entity, or type hash mismatch between C# and C++
+                
+                bool hasComponent = WorldAPI.HasComponent(nativePtr, _id, typeHash);
+                bool isAlive = WorldAPI.IsEntityAlive(nativePtr, _id);
+                
+                string reason;
+                if (!isAlive)
+                    reason = "the entity is dead or invalid";
+                else if (!hasComponent)
+                    reason = "the component was never added to this entity";
+                else
+                    reason = "the component exists but GetComponentPtr returned null (possible native-side issue)";
+                
                 throw new InvalidOperationException(
-                    $"Entity {_id} does not have component {typeof(T).Name} " +
-                    $"(hash: 0x{typeHash:X8}). The component may not be registered on the native side, " +
-                    $"or the entity was destroyed. Check that ComponentRegistry.Register<{typeof(T).Name}>() was called.");
+                    $"Entity {_id} does not have component {typeName} (hash: 0x{typeHash:X8}). " +
+                    $"Reason: {reason}. " +
+                    $"This can happen if:\n" +
+                    $"  1. The component is not registered on the native (C++) side\n" +
+                    $"  2. The type hash mismatch between C# (using '{typeName}') and C++ (using different name)\n" +
+                    $"  3. AddComponent<{typeName}>() was never called for this entity\n" +
+                    $"Check that the native ECS has registered this component type with matching name and hash.");
             }
 
             return ref *(T*)componentPtr;
@@ -426,8 +447,11 @@ internal static class ComponentTypeHelper
 
     public static uint GetTypeHash<T>()
     {
-        Type type = typeof(T);
-        
+        return GetTypeHash(typeof(T));
+    }
+
+    public static uint GetTypeHash(Type type)
+    {
         if (_typeHashCache.TryGetValue(type, out uint hash))
         {
             return hash;
@@ -439,9 +463,31 @@ internal static class ComponentTypeHelper
         // not the full qualified name (e.g., "GrapeEngine.Scripting.Components.LocalTransform")
         string typeName = type.Name;
         hash = FNV1aHash(typeName);
-        
+
         _typeHashCache[type] = hash;
         return hash;
+    }
+
+    /// <summary>
+    /// Clear the type hash cache during assembly unload.
+    /// This is critical for hot reload: the cache holds Type references that prevent
+    /// the AssemblyLoadContext from being garbage collected.
+    /// </summary>
+    internal static void ClearTypeHashCache()
+    {
+        try
+        {
+            int count = _typeHashCache.Count;
+            _typeHashCache.Clear();
+            if (count > 0)
+            {
+                Logging.LogInternal($"[ComponentTypeHelper] Cleared {count} type hash cache entries", LogLevel.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentTypeHelper] Error clearing type hash cache: {ex.Message}", LogLevel.Error);
+        }
     }
 
     private static uint FNV1aHash(string str)
@@ -449,7 +495,7 @@ internal static class ComponentTypeHelper
         uint hash = 2166136261u;
         foreach (char c in str)
         {
-            hash ^= c;
+            hash ^= (byte)c;
             hash *= 16777619u;
         }
         return hash;

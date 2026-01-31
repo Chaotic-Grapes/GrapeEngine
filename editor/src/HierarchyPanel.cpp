@@ -29,12 +29,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "HierarchyPanel.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include "helpers/MathUtils.h"
 #include "services/Input.h"
 #include "serialization/EntitySerializer.h"
 #include "core/Application.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/StringTable.h"
 #include "helpers/PrefabUtils.h"
 #include <imgui.h>
 #include <sstream>
@@ -73,7 +75,7 @@ namespace {
     // Returns true if entity should be filtered out (hidden)
     bool ShouldHideFromHierarchy(ECS::World* world, ECS::Entity entity) {
         // Also hide entities that are not alive or null, or the camera editor entity
-        if (!world || entity.IsNull() || !world->IsAlive(entity) || world->Has<ECS::Components::CameraEditor3D>(entity))
+        if (!world || entity.IsNull() || !world->IsAlive(entity) || Editor::ECSUtils::HasComponent(world, entity, "CameraEditor3D"))
             return true;
 
         return false;
@@ -93,7 +95,7 @@ namespace {
             return false;
 
         // Protect editor cameras from modification
-        if (world->Has<ECS::Components::CameraEditor3D>(entity))
+        if (Editor::ECSUtils::HasComponent(world, entity, "CameraEditor3D"))
             return true;
 
         return false;
@@ -118,11 +120,15 @@ void HierarchyPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symb
     m_entityActions = entityActions;
 
     // Subscribe to viewport entity selection messages to sync hierarchy with viewport
-    m_entitySelectedSubscription = Messaging::MessageSystem::Subscribe<Messaging::EditorEntitySelected>(
-        [this](const Messaging::EditorEntitySelected& event) {
-            // When viewport selects an entity, update hierarchy selection and expand parent nodes
-            if (event.EntityId != ECS::Entity::NPOS32) {
-                SetSelectedEntity(event.EntityId);
+        m_entitySelectedSubscription = Messaging::MessageSystem::Subscribe<Messaging::EditorEntitySelected>(
+            [this](const Messaging::EditorEntitySelected& event) {
+                if (!m_world) {
+                    return;
+                }
+
+                // When viewport selects an entity, update hierarchy selection and expand parent nodes
+                if (event.EntityId != ECS::Entity::NPOS32) {
+                    SetSelectedEntity(event.EntityId);
                 
                 // Expand all ancestor nodes to reveal the selected entity
                 ECS::Entity entity = m_world->Resolve(event.EntityId);
@@ -351,25 +357,25 @@ void HierarchyPanel::_renderHeader() {
         if (ImGui::BeginMenu("Create UI")) {
             if (ImGui::MenuItem("Button")) {
                 if (m_world) {
-                    ECS::Entity e = ECS::GUI::GUIFactory::CreateButton(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{120.0f, 30.0f}, "Button", 0U, entityName);
+                    ECS::Entity e = ECS::UI::GUIFactory::CreateButton(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{120.0f, 30.0f}, "Button", 0U, entityName);
                     selectAndMark(e);
                 }
             }
             if (ImGui::MenuItem("Panel")) {
                 if (m_world) {
-                    ECS::Entity e = ECS::GUI::GUIFactory::CreatePanel(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{300.0f, 200.0f}, {0.2f, 0.2f, 0.2f, 1.0f}, entityName);
+                    ECS::Entity e = ECS::UI::GUIFactory::CreatePanel(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{300.0f, 200.0f}, {0.2f, 0.2f, 0.2f, 1.0f}, entityName);
                     selectAndMark(e);
                 }
             }
             if (ImGui::MenuItem("Label")) {
                 if (m_world) {
-                    ECS::Entity e = ECS::GUI::GUIFactory::CreateLabel(*m_world, Vector2D{10.0f, 10.0f}, "Label", 16.0f, entityName);
+                    ECS::Entity e = ECS::UI::GUIFactory::CreateLabel(*m_world, Vector2D{10.0f, 10.0f}, "Label", 16.0f, entityName);
                     selectAndMark(e);
                 }
             }
             if (ImGui::MenuItem("Input Field")) {
                 if (m_world) {
-                    ECS::Entity e = ECS::GUI::GUIFactory::CreateInputField(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{200.0f, 30.0f}, "Enter text...", entityName);
+                    ECS::Entity e = ECS::UI::GUIFactory::CreateInputField(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{200.0f, 30.0f}, "Enter text...", entityName);
                     selectAndMark(e);
                 }
             }
@@ -467,13 +473,13 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
     bool hasChildren = !children.empty();
 
     // Check if this is a prefab instance FIRST (needed for color, both parent and child)
-    bool isPrefabInstance = m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
+    bool isPrefabInstance = Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata");
 
     if (!isPrefabInstance) {
         // Check if any parent has prefab component
         ECS::Entity parent = m_world->ParentOf(entity);
         while (!parent.IsNull()) {
-            if (m_world->Has<ECS::Components::PrefabInstanceMetadata>(parent)) {
+            if (Editor::ECSUtils::HasComponent(m_world, parent, "PrefabInstanceMetadata")) {
                 isPrefabInstance = true;
                 break;
             }
@@ -483,38 +489,46 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
 
     // Build display label with entity name
     std::stringstream oss;
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        oss << nameComp.Value;
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string resolved = ECS::StringTable::Resolve(nameComp->Value);
+        if (!resolved.empty()) {
+            oss << resolved;
+        }
+        else {
+            oss << "Entity";
+        }
     }
     else {
         oss << "Entity";
     }
 
     // Append prefab indicator if this is a prefab instance
-    if (isPrefabInstance && m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
-        const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
+    if (isPrefabInstance && Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata")) {
+        const auto* meta = Editor::ECSUtils::GetComponentPtr<ECS::Components::PrefabInstanceMetadata>(m_world, entity, "PrefabInstanceMetadata");
+        if (!meta) {
+            return;
+        }
         oss << " [Prefab";
         
         // Try to show prefab name if manager is available, otherwise show hash
         if (m_prefabManager) {
-            std::string prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
+            std::string prefabPath = m_prefabManager->GetPrefabPath(meta->PrefabHash);
             if (!prefabPath.empty()) {
                 std::string prefabName = std::filesystem::path(prefabPath).stem().string();
                 oss << ":" << prefabName;
             }
             else {
-                oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
+                oss << ":0x" << std::hex << meta->PrefabHash << std::dec;
             }
         }
         else {
-            oss << ":0x" << std::hex << meta.PrefabHash << std::dec;
+            oss << ":0x" << std::hex << meta->PrefabHash << std::dec;
         }
         
         oss << "]";
 
         // Show modification indicator
-        if (PrefabUtils::IsModified(meta)) {
+        if (PrefabUtils::IsModified(*meta)) {
             oss << " *";
         }
     }
@@ -562,10 +576,8 @@ void HierarchyPanel::_renderEntityNode(EntityId entityId, int depth) {
         if (ImGui::InputText("##RenameInput", m_renameBuffer, sizeof(m_renameBuffer),
             ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
             // Apply rename on Enter
-            if (strlen(m_renameBuffer) > 0 && m_world->Has<ECS::Components::Name>(entity)) {
-                auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-                strncpy_s(nameComp.Value, m_renameBuffer, sizeof(nameComp.Value) - 1);
-                nameComp.Value[sizeof(nameComp.Value) - 1] = '\0';
+            if (strlen(m_renameBuffer) > 0) {
+                Editor::ECSUtils::SetEntityName(*m_world, entity, m_renameBuffer);
             }
             m_renamingEntityId = ECS::Entity::NPOS32;
         }
@@ -831,9 +843,13 @@ void HierarchyPanel::_handleNodeDragDrop(EntityId entityId) {
 
             // Show entity name as drag preview
             ECS::Entity entity = m_world->Resolve(entityId);
-            if (m_world->IsAlive(entity) && m_world->Has<ECS::Components::Name>(entity)) {
-                const auto& name = m_world->Get<ECS::Components::Name>(entity);
-                ImGui::Text("%s", name.Value);
+            if (m_world->IsAlive(entity)) {
+                const auto* name = Editor::ECSUtils::GetNamePtr(m_world, entity);
+                std::string resolved = name ? ECS::StringTable::Resolve(name->Value) : std::string();
+                if (resolved.empty()) {
+                    resolved = "Entity";
+                }
+                ImGui::Text("%s", resolved.c_str());
             }
         }
         ImGui::EndDragDropSource();
@@ -1007,11 +1023,11 @@ void HierarchyPanel::_renderEntityContextMenu() {
 
             // Detach Prefab: removes prefab metadata from entity
             if (selectionCount == 1) {
-                bool hasMeta = m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity);
+                bool hasMeta = Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata");
 
                 if (hasMeta) {
                     if (ImGui::Selectable("Detach Prefab")) {
-                        m_world->Remove<ECS::Components::PrefabInstanceMetadata>(entity);
+                        Editor::ECSUtils::RemoveComponent(m_world, entity, "PrefabInstanceMetadata");
                         if (m_prefabManager) {
                             m_prefabManager->RemoveInstance(entity);
                         }
@@ -1100,9 +1116,12 @@ void HierarchyPanel::_startRename(EntityId entityId) {
 
     // Copy current name to rename buffer
     ECS::Entity entity = m_world->Resolve(entityId);
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        strncpy_s(m_renameBuffer, nameComp.Value, sizeof(m_renameBuffer) - 1);
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string resolved = ECS::StringTable::Resolve(nameComp->Value);
+        if (resolved.empty()) {
+            resolved = "Entity";
+        }
+        strncpy_s(m_renameBuffer, resolved.c_str(), sizeof(m_renameBuffer) - 1);
         m_renameBuffer[sizeof(m_renameBuffer) - 1] = '\0';
     }
     else {
@@ -1188,7 +1207,7 @@ EntityId HierarchyPanel::_instantiatePrefabAsChild(const std::string& prefabPath
         ECS::Components::PrefabInstanceMetadata meta;
         meta.PrefabHash = hash;
         meta.Flags = 0;  // Not modified yet
-        m_world->Add<ECS::Components::PrefabInstanceMetadata>(rootEntity, meta);
+        Editor::ECSUtils::AddComponent(m_world, rootEntity, "PrefabInstanceMetadata", meta);
 
         // Mark scene as dirty
         if (m_fileMenu) {
@@ -1262,9 +1281,11 @@ bool HierarchyPanel::_matchesSearchFilter(EntityId entityId) const {
     ECS::Entity entity = m_world->Resolve(entityId);
     if (entity.IsNull() || !m_world->IsAlive(entity)) return false;
 
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        const auto& nameComp = m_world->Get<ECS::Components::Name>(entity);
-        std::string entityName = nameComp.Value;
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string entityName = ECS::StringTable::Resolve(nameComp->Value);
+        if (entityName.empty()) {
+            entityName = "Entity";
+        }
 
         // Convert both to lowercase for case-insensitive search
         std::string lowerName = entityName;

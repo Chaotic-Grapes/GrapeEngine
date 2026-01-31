@@ -43,13 +43,13 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "math/Matrix4x4.h"
 
+namespace Scenes {
+    class LayerManager;  // Forward declaration for World::m_layerManager
+}
+
 namespace ECS {
     // Forward declarations
     class PrefabManager;
-
-    // Relationship component for hierarchy
-    // Move this to Components.h?
-    struct Parent { Entity ParentEntity{NULL_ENTITY}; };
 
     // Options for cloning an entity
     struct CloneOptions {
@@ -198,8 +198,8 @@ namespace ECS {
         void Destroy(const Entity e) {
             // Assume entity is alive
             // If entity participates in hierarchy, unlink it first
-            if (Has<Parent>(e)) {
-                _onComponentRemoving(e, TypeIdOf<Parent>());
+            if (Has<Components::Parent>(e)) {
+                _onComponentRemoving(e, TypeIdOf<Components::Parent>());
             }
 
             // Lookup location and remove from archetype if present
@@ -798,14 +798,15 @@ namespace ECS {
                 // Use compile-time query ID to cache archetype list pointer per unique component set
                 // Should be faster than unordered_map because template instantiation happens at compile-time
                 using QueryTag = std::tuple<std::decay_t<Ts>...>; // std::decay_t removes references and cv-qualifiers from types
-                static const std::vector<Archetype*>* cached = nullptr;
+                static std::vector<Archetype*> cached;
+                static const World* cachedWorld = nullptr;
                 static uint64_t cacheVersion = 0;  // Track which archetype version we last processed
                 static std::array<TypeId, numComponents> typeIds = { 0 };
                 
                 // Check only archetypes added since last version
-                if (cached == nullptr || cacheVersion != m_archetypeVersion) {
+                if (cachedWorld != this || cacheVersion != m_archetypeVersion) {
                     // First time initialization - get component type IDs at runtime
-                    if (cached == nullptr) {
+                    if (cachedWorld == nullptr) {
                         typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
                     }
 
@@ -813,12 +814,13 @@ namespace ECS {
                     const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
 
                     // Get matching archetypes and update cache
-                    cached = &_getMatchingArchetypes(req);
+                    cached = _getMatchingArchetypes(req);
                     
                     // Update version to current
                     cacheVersion = m_archetypeVersion;
+                    cachedWorld = this;
                 }
-                const auto& matched = *cached; // Get cached archetype list (shouldn't be null here either way)
+                const auto& matched = cached; // Cached by value to avoid pointer invalidation
                 
                 // Iterate through all matched archetypes
                 for (Archetype* arch : matched) {
@@ -909,21 +911,23 @@ namespace ECS {
             }
             else {
                 using QueryTag = std::tuple<std::decay_t<Ts>...>;
-                static const std::vector<Archetype*>* cached = nullptr;
+                static std::vector<Archetype*> cached;
+                static const World* cachedWorld = nullptr;
                 static uint64_t cacheVersion = 0;
                 static std::array<TypeId, numComponents> typeIds = { 0 };
                 
-                if (cached == nullptr || cacheVersion != m_archetypeVersion) {
+                if (cachedWorld != this || cacheVersion != m_archetypeVersion) {
 
-                    if (cached == nullptr) {
+                    if (cachedWorld == nullptr) {
                         typeIds = { TypeIdOf<std::decay_t<Ts>>()... };
                     }
                     
                     const Signature req(std::vector<TypeId>(typeIds.begin(), typeIds.end()));
-                    cached = &_getMatchingArchetypes(req);
+                    cached = _getMatchingArchetypes(req);
                     cacheVersion = m_archetypeVersion;
+                    cachedWorld = this;
                 }
-                const auto& matched = *cached;
+                const auto& matched = cached;
                 
                 for (const Archetype* arch : matched) {
                     if (!arch) continue;
@@ -1045,19 +1049,67 @@ namespace ECS {
         }
 
         /**
+         * @brief Remove a specific component type from all entities that have it.
+         * @param componentId The component type ID to remove
+         * 
+         * This is a bulk operation that iterates through all entities in the world
+         * and removes the specified component from any entity that has it.
+         * 
+         * Useful for hot reload scenarios where a component type is no longer valid
+         * and must be removed from all entities before new definitions are registered.
+         * 
+         * @note This operation calls _onComponentRemoving hooks for each entity.
+         * @note The operation is relatively expensive as it iterates all entities.
+         */
+        void RemoveComponentFromAllEntities(ComponentTypeId componentId) {
+            // Collect all entities that have this component
+            // We collect first to avoid invalidating iterators during removal
+            std::vector<Entity> entitiesToUpdate;
+            
+            // Iterate all archetypes to find those that contain this component
+            for (const auto& kv : m_archetypes) {
+                const auto& archPtr = kv.second;
+                if (!archPtr) continue;
+                
+                Archetype* arch = archPtr.get();
+                if (!arch->Has(componentId)) {
+                    continue; // Skip archetypes that don't have this component
+                }
+                
+                // Collect all entities from this archetype
+                const uint32_t chunkCount = arch->GetChunkCount();
+                for (uint32_t ci = 0; ci < chunkCount; ++ci) {
+                    Chunk* ch = arch->GetChunk(ci);
+                    const uint32_t count = ch->Count();
+                    for (uint32_t i = 0; i < count; ++i) {
+                        const Entity ent = ch->GetEntity(i);
+                        if (!ent.IsNull()) {
+                            entitiesToUpdate.push_back(ent);
+                        }
+                    }
+                }
+            }
+            
+            // Now remove the component from all collected entities
+            for (const Entity& ent : entitiesToUpdate) {
+                RemoveById(ent, componentId);
+            }
+        }
+
+        /**
 		 * @brief Attach a child entity to a parent entity in the hierarchy.
 		 * @param child The child entity to attach
 		 * @param parent The parent entity to which the child will be attached
          * @note Assumes both entities are alive
          */
-        void Attach(const Entity child, const Entity parent) { Set<Parent>(child, Parent{parent}); }
+        void Attach(const Entity child, const Entity parent) { Set<Components::Parent>(child, Components::Parent{parent}); }
 
         /**
 		 * @brief Detach a child entity from its parent in the hierarchy.
 		 * @param child The child entity to detach
          * @note Assumes the child entity is alive
          */
-        void Detach(const Entity child)                      { if (Has<Parent>(child)) Remove<Parent>(child); }
+        void Detach(const Entity child)                      { if (Has<Components::Parent>(child)) Remove<Components::Parent>(child); }
 
         /**
 		 * @brief Iterate over all children of the specified parent entity, invoking the provided function for each child.
@@ -1139,8 +1191,8 @@ namespace ECS {
             // **** Cloning Options **** //
 
             // Parent
-            if (!opts.KeepParent && Has<Parent>(dst)) {
-                Set<Parent>(dst, Parent{ NULL_ENTITY }); // Detach safely via Set to keep indices consistent
+            if (!opts.KeepParent && Has<Components::Parent>(dst)) {
+                Set<Components::Parent>(dst, Components::Parent{ NULL_ENTITY }); // Detach safely via Set to keep indices consistent
             }
 
             // Layer
@@ -1183,6 +1235,23 @@ namespace ECS {
          * @param manager Pointer to the PrefabManager
          */
         void SetPrefabManager(PrefabManager* manager) { m_prefabManager = manager; }
+
+        // ************** Layer Management Access ************** //
+
+        /**
+         * @brief Get the LayerManager associated with this world.
+         * LayerManager is owned by the parent Scene and accessed through World
+         * for use by systems (PhysicsSystem, RendererSystem, etc.).
+         * @return LayerManager* Pointer to the LayerManager, or nullptr if not set
+         */
+        Scenes::LayerManager* GetLayerManager() const { return m_layerManager; }
+
+        /**
+         * @brief Set the LayerManager for this world.
+         * Called by Scene when creating its World.
+         * @param manager Pointer to the LayerManager
+         */
+        void SetLayerManager(Scenes::LayerManager* manager) { m_layerManager = manager; }
 
         // ************** Entity Location ************** //
 
@@ -1498,10 +1567,10 @@ namespace ECS {
             // Handle Parent component additions for hierarchy indexing
             // Update hierarchy indices accordingly
             // Assumes Parent component is well-formed
-            if (t == TypeIdOf<Parent>()) {
+            if (t == TypeIdOf<Components::Parent>()) {
                 // Get Parent component
                 // Then find existing parent in index
-                const auto& p = Get<Parent>(e);
+                const auto& p = Get<Components::Parent>(e);
                 const auto found = m_hierarchy.ParentOf.find(e);
 
                 // If already has a parent, unlink first
@@ -1549,13 +1618,13 @@ namespace ECS {
         // Component changed hook
         void _onComponentChanged(const Entity e, const TypeId t) {
             // Currently only Parent component changes are relevant
-            if (t == TypeIdOf<Parent>())
+            if (t == TypeIdOf<Components::Parent>())
                 _onComponentAdded(e, t); // Reuse addition logic to handle changes
         }
 
         // Component removing hook
         void _onComponentRemoving(const Entity e, const TypeId t) {
-            if (t == TypeIdOf<Parent>()) {
+            if (t == TypeIdOf<Components::Parent>()) {
                 // Unlink from hierarchy indices
                 _unlinkChild(e);
 
@@ -1689,6 +1758,10 @@ namespace ECS {
 
         // PrefabManager for managing prefab instances and registration
         PrefabManager* m_prefabManager = nullptr;
+
+        // LayerManager pointer for accessing layer state from systems
+        // Set by Scene::CreateWorld() to allow systems to query layer enable/disable flags
+        Scenes::LayerManager* m_layerManager = nullptr;
     };
 }
 

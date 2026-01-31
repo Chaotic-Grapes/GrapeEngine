@@ -31,7 +31,7 @@ which entity the user is working with.
 #include <unordered_set>
 #include <functional>
 #include "EditorEntityActions.h"
-#include "ecs/gui/GUIHelpers.h"
+#include "ecs/ui/GUIHelpers.h"
 #include "core/messaging/MessageSystem.h"
 
 // Forward declaration

@@ -15,6 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using GrapeEngine.Scripting.Core;
 using GrapeEngine.Scripting.Internal.Hosting;
 
 namespace GrapeEngine.Scripting.Core.Dependencies;
@@ -98,11 +99,10 @@ public static class ComponentAccessBridge
     /// Must match the C++ hashing algorithm for proper dependency detection.
     /// </summary>
     /// <param name="componentType">Component type to hash</param>
-    /// <returns>FNV-1a 32-bit hash of the component's full name</returns>
+    /// <returns>FNV-1a 32-bit hash of the component's short name</returns>
     public static uint GetComponentTypeHash(Type componentType)
     {
-        var name = componentType.FullName ?? componentType.Name;
-        return Fnv1aHash(name);
+        return ComponentTypeHelper.GetTypeHash(componentType);
     }
 
     /// <summary>
@@ -119,7 +119,7 @@ public static class ComponentAccessBridge
 
         foreach (var c in input)
         {
-            hash ^= c;
+            hash ^= (byte)c;
             hash *= fnvPrime;
         }
 

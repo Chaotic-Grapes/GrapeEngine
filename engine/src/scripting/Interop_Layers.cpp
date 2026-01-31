@@ -158,3 +158,93 @@ INTEROP_API int32_t EngineInterop_Layers_IdOf(const char* name) {
 
     return static_cast<int32_t>(opt.value());
 }
+
+/**
+ * @brief Check if a layer has rendering enabled
+ *
+ * @param layerId The layer identifier to query
+ * @return uint8_t Non-zero if rendering is enabled, zero otherwise or on error
+ */
+INTEROP_API uint8_t EngineInterop_Layers_IsRenderEnabled(uint16_t layerId) {
+    if (!Engine::CORE)
+        return 0;
+
+    Scenes::Scene* scene = Engine::CORE->GetSceneManager().GetActive();
+    if (!scene)
+        return 0;
+
+    const auto& layerData = scene->GetLayers().Get(layerId);
+    return layerData.renderEnabled ? 1 : 0;
+}
+
+/**
+ * @brief Check if a layer has updates enabled
+ *
+ * @param layerId The layer identifier to query
+ * @return uint8_t Non-zero if updates are enabled, zero otherwise or on error
+ */
+INTEROP_API uint8_t EngineInterop_Layers_IsUpdateEnabled(uint16_t layerId) {
+    if (!Engine::CORE)
+        return 0;
+
+    Scenes::Scene* scene = Engine::CORE->GetSceneManager().GetActive();
+    if (!scene)
+        return 0;
+
+    const auto& layerData = scene->GetLayers().Get(layerId);
+    return layerData.updateEnabled ? 1 : 0;
+}
+
+/**
+ * @brief Check if a layer has physics enabled
+ *
+ * @param layerId The layer identifier to query
+ * @return uint8_t Non-zero if physics is enabled, zero otherwise or on error
+ */
+INTEROP_API uint8_t EngineInterop_Layers_IsPhysicsEnabled(uint16_t layerId) {
+    if (!Engine::CORE)
+        return 0;
+
+    Scenes::Scene* scene = Engine::CORE->GetSceneManager().GetActive();
+    if (!scene)
+        return 0;
+
+    const auto& layerData = scene->GetLayers().Get(layerId);
+    return layerData.physicsEnabled ? 1 : 0;
+}
+
+/**
+ * @brief Check if a layer is visible in the editor
+ *
+ * @param layerId The layer identifier to query
+ * @return uint8_t Non-zero if visible, zero otherwise or on error
+ */
+INTEROP_API uint8_t EngineInterop_Layers_IsVisible(uint16_t layerId) {
+    if (!Engine::CORE)
+        return 0;
+
+    Scenes::Scene* scene = Engine::CORE->GetSceneManager().GetActive();
+    if (!scene)
+        return 0;
+
+    const auto& layerData = scene->GetLayers().Get(layerId);
+    return layerData.editorVisible ? 1 : 0;
+}
+
+/**
+ * @brief Check if a layer is locked in the editor
+ *
+ * @param layerId The layer identifier to query
+ * @return uint8_t Non-zero if locked, zero otherwise or on error
+ */
+INTEROP_API uint8_t EngineInterop_Layers_IsLocked(uint16_t layerId) {
+    if (!Engine::CORE)
+        return 0;
+
+    Scenes::Scene* scene = Engine::CORE->GetSceneManager().GetActive();
+    if (!scene)
+        return 0;
+
+    const auto& layerData = scene->GetLayers().Get(layerId);
+    return layerData.editorLocked ? 1 : 0;
+}

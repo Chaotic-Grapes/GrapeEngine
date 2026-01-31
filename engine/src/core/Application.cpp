@@ -20,6 +20,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
+#include "ecs/systems/AnimationPreviewSystem.h"
+#include "ecs/events/EventDispatcher.h"
 #include "scripting/ScriptManager.h"
 #include "scripting/ComponentTypeRegistry.h"
 #include "ecs/systems/TransformSystem.h"
@@ -29,7 +31,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
-#include "ecs/gui/GUISystem.h"
+#include "ecs/systems/GUISystem.h"
 #include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 
@@ -171,6 +173,7 @@ namespace Engine {
                 
                 // Update systems - always run for game mode
                 m_systemManager.UpdateWithDependencies(world);
+                ECS::Events::ClearFrameEventComponents(world);
             }
         }
 
@@ -276,11 +279,6 @@ namespace Engine {
         if (modes & (1 << static_cast<int>(ECS::SystemRunMode::EditOnly))) {
             m_systemManager.UpdateSystemsForMode(ECS::SystemRunMode::EditOnly, world);
         }
-
-        // Flush any buffered logs from C# systems to the native side
-        if (m_scriptManager && m_scriptManager->GetFlushLogs()) {
-            m_scriptManager->GetFlushLogs()();
-        }
     }
 
     void Application::_initializeServices() {
@@ -328,6 +326,7 @@ namespace Engine {
         
         // Update Phase Systems
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
+        m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
         m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         
         // Physics Phase Systems

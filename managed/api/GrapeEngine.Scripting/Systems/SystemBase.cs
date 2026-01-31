@@ -6,7 +6,9 @@
 */
 /* End Header *******************************************************************/
 
+using System.Runtime.CompilerServices;
 using GrapeEngine.Scripting.Internal.Query;
+using GrapeEngine.Scripting.Services;
 
 namespace GrapeEngine.Scripting.Systems;
 
@@ -75,14 +77,48 @@ public abstract class SystemBase : ISystem
     }
 
     /// <summary>
-    /// Log a message prefixed with the system's type name.
+    /// Log a message at the specified level.
     /// </summary>
     /// <param name="message">Message text</param>
     /// <param name="level">Log level</param>
     protected static void Log(string message, LogLevel level = LogLevel.Info)
-    {
-        Logging.Log(message, level);
-    }
+        => Services.Log.Write(message, level);
+
+    /// <summary>
+    /// Log a message using a factory function.
+    /// </summary>
+    /// <param name="messageFactory">Function that produces the message text</param>
+    /// <param name="level">Log level</param>
+    protected static void Log(Func<string> messageFactory, LogLevel level = LogLevel.Info)
+        => Services.Log.Write(messageFactory, level);
+
+    /// <summary>
+    /// Log a message at the specified level with source location.
+    /// </summary>
+    /// <param name="message">Message text</param>
+    /// <param name="level">Log level</param>
+    /// <param name="file">Source file path (automatically provided)</param>
+    /// <param name="line">Source line number (automatically provided)</param>
+    protected static void LogFrom(
+        string message,
+        LogLevel level = LogLevel.Info,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0)
+        => Services.Log.Write(message, level, file, line);
+
+    /// <summary>
+    /// Log a message using a factory function with source location.
+    /// </summary>
+    /// <param name="messageFactory">Function that produces the message text</param>
+    /// <param name="level">Log level</param>
+    /// <param name="file">Source file path (automatically provided)</param>
+    /// <param name="line">Source line number (automatically provided)</param>
+    public static void LogFrom(
+        Func<string> messageFactory,
+        LogLevel level = LogLevel.Info,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0)
+        => Services.Log.Write(messageFactory, level, file, line);
 
     /// <summary>
     /// Override for cleanup logic.

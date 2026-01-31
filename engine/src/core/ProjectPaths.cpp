@@ -6,8 +6,6 @@
 \date   20th November 2025
 \brief
 Implementation of centralized project path management.
-
-TODO: This is a temporary solution until the editor is separated from the engine.
 */
 /* End Header *******************************************************************/
 
@@ -22,11 +20,9 @@ namespace Engine {
     bool ProjectPaths::s_initialized = false;
     
     void ProjectPaths::Initialize(const std::string& projectRoot) {
-        // TODO: When editor is separated, validate that projectRoot exists and contains ProjectSettings.json
         s_projectRoot = projectRoot;
         s_initialized = true;
         
-        // TODO: This is temporary - remove when editor is separated
         // Ensure all required directories exist
         EnsureDirectoryExists(GetAssetsPath());
         
@@ -40,7 +36,7 @@ namespace Engine {
     
     std::string ProjectPaths::GetProjectRoot() {
         if (!s_initialized) {
-            // TODO: Remove this fallback when editor is separated - should error instead
+            // TODO: Remove this fallback when editor is separated, should error instead
             LOG_WARNING("ProjectPaths not initialized, using default 'EchoesBelow'");
             return "EchoesBelow";
         }

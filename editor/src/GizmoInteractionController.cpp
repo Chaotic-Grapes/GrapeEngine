@@ -23,7 +23,7 @@ namespace Editor {
         return m_initialTransform.ComputeDelta(m_finalTransform);
     }
 
-    void GizmoInteractionController::Update(const GizmoRenderer& gizmo, uint32_t activeEntityId) {
+    void GizmoInteractionController::Update(const GizmoRenderer& gizmo, uint32_t activeEntityId, const CachedTransformState& currentTransform) {
         // Store previous state to detect transitions
         m_previousState = m_state;
 
@@ -46,6 +46,7 @@ namespace Editor {
                 if (gizmoBeingUsed) {
                     m_state = State::Dragging;
                     m_draggedEntityId = activeEntityId;
+                    m_initialTransform = currentTransform;
                     _fireOnDragStart();
                 }
                 // Return to Idle if mouse leaves gizmo
@@ -60,6 +61,7 @@ namespace Editor {
                 if (!gizmoBeingUsed) {
                     // Transition to Releasing when mouse released
                     m_state = State::Releasing;
+                    m_finalTransform = currentTransform;
                     _fireOnDragEnd();
                 }
                 break;

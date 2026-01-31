@@ -11,27 +11,38 @@ Pure data components using record structs for immutability and value semantics.
 
 using GrapeEngine.Math;
 using System.Runtime.InteropServices;
+using GrapeEngine.Scripting.Core;
 
 namespace GrapeEngine.Scripting.Components;
 
 /// <summary>
 /// Name component: String identifier for an entity.
-/// Uses fixed-size char array for unmanaged memory layout.
+/// Uses StringId for unmanaged, blittable storage.
+/// 
+/// Usage:
+/// <code>
+/// entity.AddComponent(new Name(Strings.Intern("Player")));
+/// string name = Strings.Resolve(entity.GetComponent&lt;Name&gt;().Value);
+/// </code>
 /// </summary>
-[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+[StructLayout(LayoutKind.Sequential)]
 public record struct Name
 {
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
-    public char[] Value;
+    /// <summary>
+    /// The interned string identifier.
+    /// Use Strings.Intern() to create, Strings.Resolve() to read.
+    /// </summary>
+    public StringId Value;
 
-    public Name(string value)
+    /// <summary>
+    /// Create a Name component with an interned string.
+    /// </summary>
+    public Name(StringId value)
     {
-        Value = new char[64];
-        var chars = value.ToCharArray();
-        Array.Copy(chars, Value, (int)GMath.Min(chars.Length, 63));
+        Value = value;
     }
 
-    public override readonly string ToString() => new string(Value).TrimEnd('\0');
+    public override readonly string ToString() => Strings.Resolve(Value) ?? "<null>";
 }
 
 /// <summary>
@@ -45,6 +56,44 @@ public record struct TagMask(uint Mask);
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public record struct Active(bool Enabled);
+
+/// <summary>
+/// Parent component: Represents the parent-child relationship.
+/// This component is automatically managed when using World.Attach() or Entity.AttachTo().
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+public record struct Parent
+{
+    /// <summary>
+    /// The ID of the parent entity (encoded as index and generation).
+    /// </summary>
+    public ulong ParentEntityId;
+
+    /// <summary>
+    /// Create a Parent component with the given parent entity ID.
+    /// </summary>
+    /// <param name="parentId">The parent entity ID</param>
+    public Parent(ulong parentId)
+    {
+        ParentEntityId = parentId;
+    }
+
+    /// <summary>
+    /// Create a Parent component from a parent entity.
+    /// </summary>
+    /// <param name="parentEntity">The parent entity</param>
+    public Parent(Entity parentEntity)
+    {
+        ParentEntityId = parentEntity.Id;
+    }
+
+    /// <summary>
+    /// Check if this parent is valid (not null/invalid entity).
+    /// </summary>
+    public readonly bool IsValid => ParentEntityId != ulong.MaxValue;
+
+    public override readonly string ToString() => $"Parent({ParentEntityId})";
+}
 
 /// <summary>
 /// Prefab instance metadata component: Runtime data for prefab instances.

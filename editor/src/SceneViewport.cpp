@@ -239,7 +239,7 @@ void SceneViewport::_renderViewport() {
                         glm::vec2(size.x, size.y),
                         view,
                         proj,
-                        false  // isPerspective (editor uses ortho)
+                        camera->UsePerspective
                     );
 
                     // Draw selection outline around selected entity
@@ -254,6 +254,12 @@ void SceneViewport::_renderViewport() {
                             size.x,
                             size.y
                         );
+                    }
+
+                    // Submit collider debug visualization for selected entity
+                    if (!m_selectedEntity.IsNull() && m_world) {
+                        const glm::vec4 colliderColor{ 1.0f, 0.64f, 0.0f, 0.45f }; // Orange with some transparency
+                        rendererSystem->SubmitColliderDebugDraw(*m_world, m_selectedEntity.Index, colliderColor);
                     }
 
                     // Render gizmo via interaction manager

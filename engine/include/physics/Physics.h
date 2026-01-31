@@ -5,6 +5,8 @@
 #include "ecs/Components.h"
 #include "math/Vector2D.h"
 #include "Collision.h"
+#include <algorithm>
+#include <cmath>
 
 namespace Engine {
     class GRAPEENGINE_API Physics {
@@ -73,6 +75,134 @@ namespace Engine {
             const Collision::ContactManifold& manifold,
             const ECS::Components::PhysicsMaterial2D& physics
         );
+
+        // =========================================================================
+        // World-space shape helpers (Step 1 of refactor)
+        // =========================================================================
+        // These compute world-space shapes by applying transform position, collider
+        // offset, and scale - ensuring consistent shapes between broad and narrow phase.
+
+        /**
+         * @brief Compute world-space circle from components.
+         * Applies transform position, collider offset, and scale to radius.
+         */
+        static WorldCircle GetWorldCircle(
+            const ECS::Components::CircleCollider2D& circle,
+            const ECS::Components::LocalTransform& transform)
+        {
+            WorldCircle result;
+
+            // Rotate local offset by entity rotation
+            const Quaternion& q = transform.Rotation;
+            const float angle = std::atan2(
+                2.0f * (q.W * q.Z + q.X * q.Y),
+                1.0f - 2.0f * (q.Y * q.Y + q.Z * q.Z)
+            );
+            const float c = std::cos(angle);
+            const float s = std::sin(angle);
+            const Vector2D offset{
+                circle.Offset.X * c - circle.Offset.Y * s,
+                circle.Offset.X * s + circle.Offset.Y * c
+            };
+
+            result.Center.X = transform.Position.X + offset.X;
+            result.Center.Y = transform.Position.Y + offset.Y;
+            
+            // Apply scale (use average of X and Y scale)
+            const float scale = (std::abs(transform.Scale.X) + std::abs(transform.Scale.Y)) * 0.5f;
+            result.Radius = circle.Radius * scale;
+            
+            return result;
+        }
+
+        /**
+         * @brief Compute world-space AABB from components.
+         * Applies transform position, collider offset, and scale to half-extents.
+         */
+        static WorldAABB GetWorldAABB(
+            const ECS::Components::BoxCollider2D& box,
+            const ECS::Components::LocalTransform& transform)
+        {
+            const WorldOBB obb = GetWorldOBB(box, transform);
+
+            // Compute AABB from OBB corners (for broad-phase)
+            Vector2D corners[4] = {
+                obb.Center + obb.AxisX * obb.HalfExtents.X + obb.AxisY * obb.HalfExtents.Y,
+                obb.Center - obb.AxisX * obb.HalfExtents.X + obb.AxisY * obb.HalfExtents.Y,
+                obb.Center - obb.AxisX * obb.HalfExtents.X - obb.AxisY * obb.HalfExtents.Y,
+                obb.Center + obb.AxisX * obb.HalfExtents.X - obb.AxisY * obb.HalfExtents.Y
+            };
+
+            // Find min/max X and Y from corners
+            float minX = corners[0].X;
+            float maxX = corners[0].X;
+            float minY = corners[0].Y;
+            float maxY = corners[0].Y;
+
+            // Iterate over remaining corners to find min/max X and Y
+            for (int i = 1; i < 4; ++i) {
+                minX = std::min(minX, corners[i].X);
+                maxX = std::max(maxX, corners[i].X);
+                minY = std::min(minY, corners[i].Y);
+                maxY = std::max(maxY, corners[i].Y);
+            }
+
+            // Construct AABB
+            WorldAABB result;
+            result.Center.X = (minX + maxX) * 0.5f;
+            result.Center.Y = (minY + maxY) * 0.5f;
+            result.HalfExtents.X = (maxX - minX) * 0.5f;
+            result.HalfExtents.Y = (maxY - minY) * 0.5f;
+
+            return result;
+        }
+
+        /**
+         * @brief Compute world-space OBB from components.
+         * Applies transform position, collider offset, scale, and rotation.
+         */
+        static WorldOBB GetWorldOBB(
+            const ECS::Components::BoxCollider2D& box,
+            const ECS::Components::LocalTransform& transform)
+        {
+            WorldOBB result;
+
+            // Compute entity Z rotation from quaternion
+            const Quaternion& q = transform.Rotation;
+            const float entityAngle = std::atan2(
+                2.0f * (q.W * q.Z + q.X * q.Y),
+                1.0f - 2.0f * (q.Y * q.Y + q.Z * q.Z)
+            );
+
+            // Precompute cosine and sine of entity rotation
+            const float c = std::cos(entityAngle);
+            const float s = std::sin(entityAngle);
+
+            // Rotate local offset by entity rotation
+            const Vector2D offset{ box.Offset.X, box.Offset.Y };
+            const Vector2D rotatedOffset{
+                offset.X * c - offset.Y * s,
+                offset.X * s + offset.Y * c
+            };
+
+            result.Center.X = transform.Position.X + rotatedOffset.X;
+            result.Center.Y = transform.Position.Y + rotatedOffset.Y;
+
+            // Apply scale to half-extents
+            result.HalfExtents.X = box.HalfExtents.X * std::abs(transform.Scale.X);
+            result.HalfExtents.Y = box.HalfExtents.Y * std::abs(transform.Scale.Y);
+
+            // Compute final rotation
+            result.Rotation = entityAngle + box.Rotation;
+
+            // Compute axes
+            const float cr = std::cos(result.Rotation);
+            const float sr = std::sin(result.Rotation);
+            result.AxisX = Vector2D(cr, sr);
+            result.AxisY = Vector2D(-sr, cr);
+
+            return result;
+        }
 
     private:
         static Vector2D m_gravity;

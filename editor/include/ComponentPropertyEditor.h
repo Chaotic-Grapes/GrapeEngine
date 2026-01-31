@@ -112,6 +112,9 @@ public:
     // render simple editors for booleans, integers, floats and strings.
     void RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+	// Renders material component for assigning materials to renderers
+	void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
 private:
     // -------------------------------------------------------------------------
     // State

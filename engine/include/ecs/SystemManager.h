@@ -727,11 +727,29 @@ namespace ECS {
          * avoiding unnecessary lookups on empty groups.
          */
         void _updateAllGroupsForMode(SystemRunMode mode, World& world) {
-            // Update owned systems - iterate only through groups that exist
-            for (auto& [group, systems] : m_systemGroups) {
-                for (auto& system : systems) {
+            const SystemGroup orderedGroups[] = {
+                SystemGroup::PreUpdate,
+                SystemGroup::Update,
+                SystemGroup::PostUpdate,
+                SystemGroup::PrePhysics,
+                SystemGroup::Physics,
+                SystemGroup::PostPhysics,
+                SystemGroup::PreRender,
+                SystemGroup::Render,
+                SystemGroup::PostRender
+            };
+
+            for (SystemGroup group : orderedGroups) {
+                _updateGroupForMode(group, mode, world);
+            }
+        }
+
+        void _updateGroupForMode(SystemGroup group, SystemRunMode mode, World& world) {
+            // Update owned systems
+            auto itOwned = m_systemGroups.find(group);
+            if (itOwned != m_systemGroups.end()) {
+                for (auto& system : itOwned->second) {
                     if (system->IsEnabled() && system->GetRunMode() == mode) {
-                        // Profile this system's execution
                         TimeSystem::Instance().ProfileBegin(system->GetMetadata().GetName().c_str());
                         system->OnUpdate(world);
                         TimeSystem::Instance().ProfileEnd();
@@ -739,12 +757,11 @@ namespace ECS {
                 }
             }
 
-            // Update scripted systems - iterate only through groups that exist
-            for (auto& [group, systems] : m_scriptedSystemGroups) {
-                for (auto* system : systems) {
+            // Update scripted systems
+            auto itScripted = m_scriptedSystemGroups.find(group);
+            if (itScripted != m_scriptedSystemGroups.end()) {
+                for (auto* system : itScripted->second) {
                     if (system->IsEnabled() && system->GetRunMode() == mode) {
-                        // Profile this system's execution
-                        // Use cached name to avoid expensive P/Invoke metadata lookups
                         auto it = m_systemNameCache.find(system);
                         const char* systemName = (it != m_systemNameCache.end()) ? 
                             it->second.c_str() : "Unknown";

@@ -44,7 +44,7 @@ public record struct AngularVelocity2D
 public record struct Rigidbody2D
 {
     public float Mass;
-    public float InverseMass;
+    private float _inverseMass;
     public float LinearDamping;
     public float AngularDamping;
     public float GravityScale;
@@ -73,12 +73,14 @@ public record struct Rigidbody2D
         set => Flags = value ? (Flags | FLAG_FIXED_ROTATION) : (Flags & ~FLAG_FIXED_ROTATION);
     }
 
+    public readonly float InverseMass => _inverseMass;
+
     public static Rigidbody2D Dynamic(float mass = 1.0f)
     {
         return new Rigidbody2D
         {
             Mass = mass,
-            InverseMass = mass > 0 ? 1f / mass : 0,
+            _inverseMass = mass > 0 ? 1f / mass : 0,
             LinearDamping = 0f,
             AngularDamping = 0f,
             GravityScale = 1f,
@@ -91,7 +93,7 @@ public record struct Rigidbody2D
         return new Rigidbody2D
         {
             Mass = 0,
-            InverseMass = 0,
+            _inverseMass = 0,
             LinearDamping = 0,
             AngularDamping = 0,
             GravityScale = 0,

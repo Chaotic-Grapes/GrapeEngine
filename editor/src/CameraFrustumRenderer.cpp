@@ -15,6 +15,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "CameraFrustumRenderer.h"
 #include "ecs/Components.h"
+#include "EditorECSUtils.h"
 #include "graphics/debugDraw2D.hpp"
 #include "graphics/renderer.hpp"
 #include "graphics/shader.hpp"
@@ -35,28 +36,45 @@ namespace Editor {
         shader.setMat4("uViewProj", viewProj);
         renderer.beginFrame();
 
+        const ECS::ComponentTypeId localTransformId = Editor::ECSUtils::GetComponentIdFromName("LocalTransform");
+        const ECS::ComponentTypeId cameraId = Editor::ECSUtils::GetComponentIdFromName("Camera3D");
+
+        if (localTransformId == ECS::NULL_COMPONENT_ID || cameraId == ECS::NULL_COMPONENT_ID) {
+            renderer.endFrame();
+            return;
+        }
+
         // Find active game cameras (excluding editor camera if specified)
-        world.Each<ECS::Components::LocalTransform, ECS::Components::Camera3D>(
-            [&](ECS::Entity entity,
-                const ECS::Components::LocalTransform& camTransform,
-                const ECS::Components::Camera3D& camera)
-            {
+        world.Each([&](ECS::Entity entity) {
+                if (!world.HasById(entity, localTransformId) || !world.HasById(entity, cameraId)) {
+                    return;
+                }
+
+                const auto* camTransform = static_cast<const ECS::Components::LocalTransform*>(
+                    world.GetRawComponentPtr(entity, localTransformId));
+                const auto* camera = static_cast<const ECS::Components::Camera3D*>(
+                    world.GetRawComponentPtr(entity, cameraId));
+
+                if (!camTransform || !camera) {
+                    return;
+                }
+
                 // Skip the excluded entity (typically the editor camera)
                 if (excludeEntityId != 0 && entity.Index == excludeEntityId) {
                     return;
                 }
 
                 // Skip inactive cameras
-                if (!camera.Active) {
+                if (!camera->Active) {
                     return;
                 }
 
                 // Calculate camera frustum bounds in world space
-                const float halfH = camera.OrthoSize * 0.5f;
-                const float halfW = halfH * camera.AspectRatio;
+                const float halfH = camera->OrthoSize * 0.5f;
+                const float halfW = halfH * camera->AspectRatio;
 
                 // Camera position in world space
-                const glm::vec2 camPos(camTransform.Position.X, camTransform.Position.Y);
+                const glm::vec2 camPos(camTransform->Position.X, camTransform->Position.Y);
 
                 // Frustum corners (centered on camera position)
                 const glm::vec2 frustumMin = camPos - glm::vec2(halfW, halfH);
@@ -71,8 +89,7 @@ namespace Editor {
 
                 DebugDraw2D::RectStroke(renderer, frustumMin, frustumMax,
                     worldThickness, frustumColor, 0);
-            }
-        );
+            });
 
         renderer.endFrame();
     }

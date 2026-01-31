@@ -43,7 +43,7 @@ namespace EditorUI {
 
     // Renders a float property editor with drag control and label
     void RenderFloatRow(const std::string& label, const std::string& fieldLabel, 
-        nlohmann::json& data, const std::string& key, float dragSpeed);
+        nlohmann::json& data, const std::string& key, float dragSpeed, float min = 0.0f, float max = 0.0f);
 
     // -------------------------------------------------------------------------
     // Vector Editing
@@ -78,6 +78,11 @@ namespace EditorUI {
     // Renders an integer input field with drag control for numeric values
     void RenderIntProperty(const std::string& label, nlohmann::json& data, 
         const std::string& key);
+
+    // Renders a dropdown to edit a bitmask (up to 32 bits) with labeled entries
+    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data,
+        const std::string& key, const std::vector<std::string>& bitNames,
+        uint32_t defaultMask = 0xFFFFFFFFu);
 
     // Renders a checkbox that toggles boolean values in JSON data
     void RenderCheckboxProperty(const std::string& label, nlohmann::json& data, 

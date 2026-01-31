@@ -30,7 +30,6 @@ public static class ScriptFileWatcher
     private static readonly Lock _lock = new();
     private static Action<string>? _onFileChanged;
     private static string? _watchedDirectory;
-    private static string? _outputAssemblyPath;  // Output path for compiled scripts
 
     // Ignore paths that commonly change during builds/compilation and can cause feedback loops.
     // NOTE: FileSystemWatcher doesn't support excludes, so we filter in handlers.
@@ -47,6 +46,9 @@ public static class ScriptFileWatcher
         "\\\\Release\\\\",
         "\\\\.vscode\\\\",
     ];
+
+    private static bool IsCsFilePath(string fullPath)
+        => fullPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
 
     private static bool ShouldIgnorePath(string fullPath)
     {
@@ -69,15 +71,24 @@ public static class ScriptFileWatcher
         return false;
     }
 
-    // Native compile status callback (function pointer set by native ScriptManager)
-    // Signature: void callback(int status, int progress, sbyte* messageUtf8)
-    private static unsafe delegate* unmanaged[Cdecl]<int, int, sbyte*, void> _compileCallback = null;
+    /// <summary>
+    /// Delegate for native C++ callback when C# files change.
+    /// C++ decides what to do (compile, reload, etc.)
+    /// Signature: void callback(const char* scriptDirectory)
+    /// </summary>
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void NativeScriptChangedCallback(string directoryPath);
+
+    /// <summary>
+    /// Function pointer to native callback (set by C++ during initialization).
+    /// </summary>
+    private static IntPtr _nativeScriptChangedCallback = IntPtr.Zero;
 
     /// <summary>
     /// Start watching a directory for C# file changes.
     /// Called from C++ via interop.
-    /// directoryPathPtr: Source scripts directory to watch
-    /// userData: Reserved for future use (normally would be output path as string)
+    /// 
+    /// C# only detects and notifies; C++ decides what to do.
     /// </summary>
     [UnmanagedCallersOnly]
     public static unsafe int StartWatching(char* directoryPathPtr, void* userData)
@@ -94,7 +105,7 @@ public static class ScriptFileWatcher
 
             Logging.LogInternal($"[ScriptFileWatcher] Starting file watcher for: {directoryPath}", LogLevel.Info);
 
-            // Remember watched directory for compile+reload
+            // Remember watched directory
             _watchedDirectory = directoryPath;
 
             // Stop existing watcher if any
@@ -131,28 +142,16 @@ public static class ScriptFileWatcher
     }
 
     /// <summary>
-    /// Set the native compile-status callback function pointer.
-    /// Called by native code (ScriptManager) to register a callback that
-    /// receives compile start/progress/finish notifications.
+    /// Register the native callback for when C# files change.
+    /// Called by C++ to set up the notification channel.
+    /// 
+    /// C++ will be notified when files change, then decides orchestration.
     /// </summary>
     [UnmanagedCallersOnly]
-    public static unsafe void SetCompileCallback(nint callbackPtr)
+    public static void RegisterScriptChangedCallback(IntPtr callbackPtr)
     {
-        _compileCallback = (delegate* unmanaged[Cdecl]<int, int, sbyte*, void>)callbackPtr;
-    }
-
-    /// <summary>
-    /// Set the output assembly path for hot reload compilations.
-    /// Called from C++ to standardize where compiled scripts are written.
-    /// </summary>
-    [UnmanagedCallersOnly]
-    public static unsafe void SetOutputAssemblyPath(char* outputPathPtr)
-    {
-        if (outputPathPtr != null)
-        {
-            _outputAssemblyPath = Marshal.PtrToStringUTF8((IntPtr)outputPathPtr);
-            Logging.LogInternal($"[ScriptFileWatcher] Output assembly path set to: {_outputAssemblyPath}", LogLevel.Info);
-        }
+        _nativeScriptChangedCallback = callbackPtr;
+        Logging.LogInternal("[ScriptFileWatcher] Script changed callback registered", LogLevel.Info);
     }
 
     /// <summary>
@@ -190,7 +189,10 @@ public static class ScriptFileWatcher
 
     private static void OnFileChanged(object sender, FileSystemEventArgs e)
     {
-        if (ShouldIgnorePath(e.FullPath))
+        if (!IsCsFilePath(e.FullPath) || ShouldIgnorePath(e.FullPath))
+            return;
+
+        if (e.ChangeType == WatcherChangeTypes.Changed && !File.Exists(e.FullPath))
             return;
 
         lock (_lock)
@@ -209,12 +211,17 @@ public static class ScriptFileWatcher
 
     private static void OnFileRenamed(object sender, RenamedEventArgs e)
     {
-        if (ShouldIgnorePath(e.FullPath))
-            return;
-
         lock (_lock)
         {
-            _changedFiles.Add(e.FullPath);
+            if (IsCsFilePath(e.OldFullPath) && !ShouldIgnorePath(e.OldFullPath))
+            {
+                _changedFiles.Add(e.OldFullPath);
+            }
+
+            if (IsCsFilePath(e.FullPath) && !ShouldIgnorePath(e.FullPath))
+            {
+                _changedFiles.Add(e.FullPath);
+            }
             
             _debounceTimer?.Stop();
             _debounceTimer?.Start();
@@ -223,7 +230,7 @@ public static class ScriptFileWatcher
         Logging.LogInternal($"[ScriptFileWatcher] Detected rename: {e.OldName} -> {e.Name}", LogLevel.Debug);
     }
 
-    private static unsafe void OnDebounceTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    private static void OnDebounceTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
         HashSet<string> filesToProcess;
         lock (_lock)
@@ -239,101 +246,33 @@ public static class ScriptFileWatcher
 
         Logging.LogInternal($"[ScriptFileWatcher] Processing {filesToProcess.Count} changed file(s)", LogLevel.Info);
 
-        // Notify callback (if registered)
+        // Notify internal callback (if registered)
         foreach (var file in filesToProcess)
         {
             _onFileChanged?.Invoke(file);
         }
 
-        // Trigger recompilation and reload in background; report status via callback
+        // Notify C++ that scripts changed.
+        // C++ will decide what to do: compile, reload, etc.
+        // This is just a notification, not orchestration.
         try
         {
-            if (!string.IsNullOrEmpty(_watchedDirectory))
+            if (!string.IsNullOrEmpty(_watchedDirectory) && _nativeScriptChangedCallback != IntPtr.Zero)
             {
-                // Use the output assembly path if set, otherwise default to temp location
-                // For consistency, this should always be set to the temp path by C++
-                string outPath = !string.IsNullOrEmpty(_outputAssemblyPath) 
-                    ? _outputAssemblyPath
-                    : Path.Combine(_watchedDirectory, "GameScripts.dll");
-                    
-                Logging.LogInternal($"[ScriptFileWatcher] Hot reload triggered - compiling and reloading: {_watchedDirectory} -> {outPath}", LogLevel.Info);
+                Logging.LogInternal($"[ScriptFileWatcher] Notifying C++ that scripts changed", LogLevel.Info);
 
-                // Notify native that compilation started (status 1, progress indeterminate (-1))
-                if (_compileCallback != null)
-                {
-                    unsafe
-                    {
-                        IntPtr p = ToUtf8Ptr("Compiling...");
-                        try 
-                        { 
-                            _compileCallback(1, -1, (sbyte*)p.ToPointer()); 
-                        }
-                        finally
-                        { 
-                            if (p != IntPtr.Zero)
-                                Marshal.FreeHGlobal(p); 
-                        }
-                    }
-                }
-
-                // Run compile+reload asynchronously so file-watcher thread isn't blocked
-                Task.Run(() => 
-                {
-                    var r = ScriptHost.TriggerCompileAndReloadManaged(_watchedDirectory, outPath);
-
-                    // Collect Roslyn diagnostics (if any) so we can forward full details to native callback
-                    var diags = RoslynCompiler.GetLastDiagnostics() ?? string.Empty;
-
-                    // If diagnostics are empty, fallback to simple messages
-                    string msg;
-                    if (!string.IsNullOrWhiteSpace(diags)) 
-                    {
-                        msg = diags;
-                    }
-                    else 
-                    {
-                        msg = r == 0 ? "OK" : "Compilation failed";
-                    }
-
-                    // Notify native of completion: status 3 = success, 4 = failure
-                    if (_compileCallback != null)
-                    {
-                        unsafe
-                        {
-                            IntPtr pmsg = ToUtf8Ptr(msg);
-                            try
-                            {
-                                _compileCallback(r == 0 ? 3 : 4, r == 0 
-                                    ? 100 
-                                    : 0, (sbyte*)pmsg.ToPointer()); 
-                            }
-                            finally
-                            { 
-                                if (pmsg != IntPtr.Zero)
-                                    Marshal.FreeHGlobal(pmsg); 
-                            }
-                        }
-                    }
-                });
+                var callback = Marshal.GetDelegateForFunctionPointer<NativeScriptChangedCallback>(_nativeScriptChangedCallback);
+                callback?.Invoke(_watchedDirectory);
             }
             else
             {
-                Logging.LogInternal("[ScriptFileWatcher] No watched directory registered for hot reload", LogLevel.Warning);
+                Logging.LogInternal("[ScriptFileWatcher] No C++ callback registered", LogLevel.Warning);
             }
         }
         catch (Exception ex)
         {
-            Logging.LogInternal($"[ScriptFileWatcher] Error during hot reload: {ex.Message}", LogLevel.Error);
+            Logging.LogInternal($"[ScriptFileWatcher] Error notifying C++ of script changes: {ex.Message}", LogLevel.Error);
         }
-    }
-
-    private static IntPtr ToUtf8Ptr(string s)
-    {
-        var bytes = Encoding.UTF8.GetBytes(s + '\0');
-        IntPtr p = Marshal.AllocHGlobal(bytes.Length);
-        Marshal.Copy(bytes, 0, p, bytes.Length);
-
-        return p;
     }
 }
 

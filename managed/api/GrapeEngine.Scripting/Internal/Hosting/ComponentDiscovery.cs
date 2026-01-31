@@ -21,6 +21,7 @@ The discovery process:
 
 using System.Reflection;
 using System.Runtime.InteropServices;
+using GrapeEngine.Scripting.Core;
 
 namespace GrapeEngine.Scripting.Internal.Hosting;
 
@@ -43,9 +44,10 @@ internal static class ComponentDiscovery
     /// </summary>
     public static void DiscoverAndRegisterAll()
     {
-        // Clear the registration cache to allow re-registration of modified component types
-        // This is REQUIRED for hot reload to work otherwise modified components won't be re-registered
-        ComponentRegistry.ClearRegistrationCache();
+        // NOTE: Do NOT clear the registration cache here!
+        // It must be cleared AFTER ClearAllManagedComponentsFromEntities() completes,
+        // so that component removal can still find the old component hashes/IDs.
+        // The cache will be cleared by the caller after component cleanup.
 
         var components = DiscoverComponents();
         Logging.LogInternal($"[ComponentDiscovery] Found {components.Count} component types", LogLevel.Info);
@@ -235,23 +237,12 @@ internal static class ComponentDiscovery
             registerMethod?.Invoke(null, []);
 
             // Get component metadata for logging
-            var getHashMethod = typeof(ComponentTypeHelper)
-                .GetMethod("GetTypeHash", BindingFlags.Public | BindingFlags.Static)
-                ?.MakeGenericMethod(componentType);
-
-            if (getHashMethod != null)
-            {
-                var hash = (uint)getHashMethod.Invoke(null, [])!;
-                
-                // Add to the type hash mapping for editor deserialization
-                TypeHashToType[hash] = componentType;
-                
-                Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name} (hash: 0x{hash:X8})", LogLevel.Info);
-            }
-            else
-            {
-                Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name}", LogLevel.Info);
-            }
+            uint hash = ComponentTypeHelper.GetTypeHash(componentType);
+            
+            // Add to the type hash mapping for editor deserialization
+            TypeHashToType[hash] = componentType;
+            
+            Logging.LogInternal($"[ComponentDiscovery] Registered {componentType.Name} (hash: 0x{hash:X8})", LogLevel.Info);
         }
         catch (Exception ex)
         {
@@ -282,6 +273,27 @@ internal static class ComponentDiscovery
 
         // Include everything else (user scripts)
         return true;
+    }
+
+    /// <summary>
+    /// Clear all cached component type mappings.
+    /// Called during assembly unload to break references to types from the loaded assembly.
+    /// </summary>
+    public static void ClearTypeCache()
+    {
+        try
+        {
+            int count = TypeHashToType.Count;
+            TypeHashToType.Clear();
+            if (count > 0)
+            {
+                Logging.LogInternal($"[ComponentDiscovery] Cleared {count} component type cache entries", LogLevel.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.LogInternal($"[ComponentDiscovery] Error clearing type cache: {ex.Message}", LogLevel.Error);
+        }
     }
 
 }

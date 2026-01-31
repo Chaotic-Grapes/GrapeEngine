@@ -16,7 +16,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 
 using GrapeEngine.Scripting.Internal.Unsafe;
-using GrapeEngine.Scripting.Internal.Profiling;
 
 namespace GrapeEngine.Scripting.Services;
 
@@ -37,10 +36,7 @@ public static class Input
     /// <returns>True if the key was just pressed this frame.</returns>
     public static bool IsKeyPressed(int key)
     {
-        using (PInvokeTimer.Start("InputAPI.IsKeyPressed"))
-        {
-            return InputAPI.IsKeyPressed(key);
-        }
+        return InputAPI.IsKeyPressed(key);
     }
 
     /// <summary>
@@ -50,10 +46,7 @@ public static class Input
     /// <returns>True if the key is currently down.</returns>
     public static bool IsKeyDown(int key)
     {
-        using (PInvokeTimer.Start("InputAPI.IsKeyDown"))
-        {
-            return InputAPI.IsKeyDown(key);
-        }
+        return InputAPI.IsKeyDown(key);
     }
 
     /// <summary>
@@ -63,10 +56,7 @@ public static class Input
     /// <returns>True if the key was released this frame.</returns>
     public static bool IsKeyUp(int key)
     {
-        using (PInvokeTimer.Start("InputAPI.IsKeyUp"))
-        {
-            return InputAPI.IsKeyUp(key);
-        }
+        return InputAPI.IsKeyUp(key);
     }
 
     // ============================================================================
@@ -80,10 +70,7 @@ public static class Input
     /// <returns>True if the button is currently pressed.</returns>
     public static bool IsMousePressed(int button)
     {
-        using (PInvokeTimer.Start("InputAPI.IsMousePressed"))
-        {
-            return InputAPI.IsMousePressed(button);
-        }
+        return InputAPI.IsMousePressed(button);
     }
 
     /// <summary>
@@ -93,10 +80,7 @@ public static class Input
     {
         get
         {
-            using (PInvokeTimer.Start("InputAPI.GetMouseX"))
-            {
-                return InputAPI.GetMouseX();
-            }
+            return InputAPI.GetMouseX();
         }
     }
 
@@ -107,10 +91,7 @@ public static class Input
     {
         get
         {
-            using (PInvokeTimer.Start("InputAPI.GetMouseY"))
-            {
-                return InputAPI.GetMouseY();
-            }
+            return InputAPI.GetMouseY();
         }
     }
 
@@ -121,10 +102,7 @@ public static class Input
     {
         get
         {
-            using (PInvokeTimer.Start("InputAPI.GetScrollX"))
-            {
-                return InputAPI.GetScrollX();
-            }
+            return InputAPI.GetScrollX();
         }
     }
 
@@ -135,10 +113,7 @@ public static class Input
     {
         get
         {
-            using (PInvokeTimer.Start("InputAPI.GetScrollY"))
-            {
-                return InputAPI.GetScrollY();
-            }
+            return InputAPI.GetScrollY();
         }
     }
 }

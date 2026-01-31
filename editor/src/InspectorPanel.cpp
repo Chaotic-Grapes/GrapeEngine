@@ -23,6 +23,7 @@ through a unified system shared by both entities and prefab templates.
 #include "ComponentPropertyEditor.h"
 #include "ComponentWidgets.h"
 #include "EditorComponentRegistry.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include "serialization/EntitySerializer.h"
 #include "EditorFileMenu.h"
@@ -31,6 +32,7 @@ through a unified system shared by both entities and prefab templates.
 #include "ecs/World.h"
 #include "ecs/Entity.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/StringTable.h"
 #include "helpers/PrefabUtils.h"
 #include <imgui.h>
 #include <filesystem>
@@ -51,12 +53,12 @@ namespace {
 
         // Only add the component if the entity does not already have it
         // world Has<T> checks if this entity already contains a component of type T
-        if (!world->Has<T>(instance)) {
-            // Add<T> attaches the component to the entity and returns a reference to it
-            auto& c = world->Add<T>(instance);
+        if (!Editor::ECSUtils::HasComponent(world, instance, expectedName.c_str())) {
+            T value{};
             // from_json fills the new component using values from the json 
             // This allows prefabs and saved scenes to restore component state exactly
-            from_json(compData, c);
+            from_json(compData, value);
+            Editor::ECSUtils::AddComponent(world, instance, expectedName.c_str(), value);
         }
         // true means this template handled the component successfully
         return true;
@@ -76,7 +78,7 @@ namespace {
             return false;
 
         // Protect editor cameras from modification
-        if (world->Has<ECS::Components::CameraEditor3D>(entity))
+        if (Editor::ECSUtils::HasComponent(world, entity, "CameraEditor3D"))
             return true;
 
         return false;
@@ -86,6 +88,80 @@ namespace {
         if (fileMenu) {
             fileMenu->MarkSceneDirty();
         }
+    }
+
+    void UpdateSpriteAnimationPreview(ECS::World* world, ECS::Entity entity) {
+        if (!world || entity.IsNull() || !world->IsAlive(entity))
+            return;
+        if (!Editor::ECSUtils::HasComponent(world, entity, "SpriteSheetAnimation2D"))
+            return;
+        if (!Editor::ECSUtils::HasComponent(world, entity, "SpriteRenderer2D"))
+            return;
+
+        const auto* anim = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteSheetAnimation2D>(world, entity, "SpriteSheetAnimation2D");
+        auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(world, entity, "SpriteRenderer2D");
+        if (!anim || !sprite) {
+            return;
+        }
+
+        if (anim->FrameWidth <= 0 || anim->FrameHeight <= 0 ||
+            anim->SheetWidth <= 0 || anim->SheetHeight <= 0)
+            return;
+
+        const int totalCols = anim->SheetWidth / anim->FrameWidth;
+        const int totalRows = anim->SheetHeight / anim->FrameHeight;
+        if (totalCols <= 0 || totalRows <= 0)
+            return;
+
+        int windowStart = 0;
+        int windowCount = 0;
+
+        if (anim->UseRow) {
+            const int rowIndex = std::clamp(anim->RowIndex, 0, totalRows - 1);
+            const int startCol = std::clamp(anim->RowStartColumn, 0, totalCols - 1);
+            const int available = totalCols - startCol;
+            int rowCount = anim->RowFrameCount;
+            if (rowCount <= 0 || rowCount > available)
+                rowCount = available;
+            windowStart = rowIndex * totalCols + startCol;
+            windowCount = rowCount;
+        } else {
+            windowStart = std::max(0, anim->StartFrame);
+            windowCount = anim->FrameCount;
+            if (windowCount <= 0) {
+                const int totalFrames = totalCols * totalRows;
+                windowCount = std::max(1, totalFrames - windowStart);
+            }
+        }
+
+        if (windowCount <= 0)
+            return;
+
+        int localFrame = 0;
+        if (Editor::ECSUtils::HasComponent(world, entity, "AnimationState2D")) {
+            const auto* animState = Editor::ECSUtils::GetComponentPtr<ECS::Components::AnimationState2D>(world, entity, "AnimationState2D");
+            if (animState) {
+                localFrame = animState->CurrentFrame;
+            }
+        }
+        localFrame = std::clamp(localFrame, 0, windowCount - 1);
+        const int absoluteFrame = windowStart + localFrame;
+        const int col = absoluteFrame % totalCols;
+        const int row = absoluteFrame / totalCols;
+
+        const float u0 = (col * anim->FrameWidth) / static_cast<float>(anim->SheetWidth);
+        const float v0 = (row * anim->FrameHeight) / static_cast<float>(anim->SheetHeight);
+        const float u1 = ((col + 1) * anim->FrameWidth) / static_cast<float>(anim->SheetWidth);
+        const float v1 = ((row + 1) * anim->FrameHeight) / static_cast<float>(anim->SheetHeight);
+
+        if (anim->TextureId != 0)
+            sprite->TextureId = anim->TextureId;
+        if (anim->NormalTextureId != 0)
+            sprite->NormalTextureId = anim->NormalTextureId;
+        sprite->Width = anim->FrameWidth;
+        sprite->Height = anim->FrameHeight;
+        sprite->Tiling = Vector2D{ u1 - u0, v1 - v0 };
+        sprite->Offset = Vector2D{ u0, v0 };
     }
 }
 
@@ -128,10 +204,12 @@ void InspectorPanel::InspectEntity(EntityId id) {
         return;
     }
 
+    const EntityId previousId = m_entityId;
+
     // IMPORTANT: Clear edit state when entity selection changes
     // This prevents the inspector from comparing the new entity's transform
     // against the previous entity's captured transform
-    if (m_entityId != id) {
+    if (previousId != id) {
         m_editState.isEditing = false;
         m_editState.entityId = 0;
     }
@@ -306,37 +384,44 @@ void InspectorPanel::_renderEntityInspector() {
 // Draw entity name, ID and prefab link information at the top of the inspector
 void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
     // Try to read the Name component for display
-    const char* entityName = "Unnamed";
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        entityName = m_world->Get<ECS::Components::Name>(entity).Value;
+    std::string entityName = "Unnamed";
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string resolved = ECS::StringTable::Resolve(nameComp->Value);
+        if (!resolved.empty()) {
+            entityName = resolved;
+        }
     }
 
     // Show the basic header line: Entity <Name> (ID)
     ImGui::Text("Entity ");
     ImGui::SameLine();
-    ImGui::TextDisabled("%s (ID: %u)", entityName, (unsigned)m_entityId);
+    ImGui::TextDisabled("%s (ID: %u)", entityName.c_str(), (unsigned)m_entityId);
 
     // If this entity came from a prefab show the link and an Open Prefab button
-    if (m_world->Has<ECS::Components::PrefabInstanceMetadata>(entity)) {
-        const auto& meta = m_world->Get<ECS::Components::PrefabInstanceMetadata>(entity);
+    if (Editor::ECSUtils::HasComponent(m_world, entity, "PrefabInstanceMetadata")) {
+        const auto* meta = Editor::ECSUtils::GetComponentPtr<ECS::Components::PrefabInstanceMetadata>(m_world, entity, "PrefabInstanceMetadata");
+        if (!meta) {
+            ImGui::Separator();
+            return;
+        }
         ImGui::Separator();
         ImGui::Text("Prefab Instance");
 
         // Show the prefab path (looked up from PrefabManager)
         std::string prefabPath;
         if (m_prefabManager) {
-            prefabPath = m_prefabManager->GetPrefabPath(meta.PrefabHash);
+            prefabPath = m_prefabManager->GetPrefabPath(meta->PrefabHash);
         }
         
         ImGui::SameLine();
         if (!prefabPath.empty()) {
             ImGui::TextDisabled("%s", std::filesystem::path(prefabPath).filename().string().c_str());
         } else {
-            ImGui::TextDisabled("0x%08X", meta.PrefabHash);
+            ImGui::TextDisabled("0x%08X", meta->PrefabHash);
         }
 
         // Show modification indicator if modified
-        if (PrefabUtils::IsModified(meta)) {
+        if (PrefabUtils::IsModified(*meta)) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "(Modified)");
         }
@@ -379,7 +464,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
                     meta.Flags = 0;
-                    m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
+                    Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
 
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
@@ -406,7 +491,7 @@ void InspectorPanel::_renderEntityHeader(ECS::Entity entity) {
                     ECS::Components::PrefabInstanceMetadata meta;
                     meta.PrefabHash = hash;
                     meta.Flags = 0;
-                    m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
+                    Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
 
                     m_statusMessage = "Prefab linked to entity";
                     m_statusTimer = 2.0f;
@@ -455,11 +540,14 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                 m_editState.entityId = entity.Index;
 
                 // Capture initial transform state
-                if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
-                    const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
-                    m_editState.startPosition = lt.Position;
-                    m_editState.startRotation = lt.Rotation;
-                    m_editState.startScale = lt.Scale;
+                if (Editor::ECSUtils::HasComponent(m_world, entity, "LocalTransform")) {
+                    const auto* lt = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
+                    if (!lt) {
+                        return;
+                    }
+                    m_editState.startPosition = lt->Position;
+                    m_editState.startRotation = lt->Rotation;
+                    m_editState.startScale = lt->Scale;
                 }
             }
         }
@@ -540,6 +628,9 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         m_componentsToDelete.clear();
 
+        // Keep sprite preview in sync even when the animation UI is collapsed.
+        UpdateSpriteAnimationPreview(m_world, entity);
+
         // Second pass: push any edited JSON values back into ECS components
         // IMPORTANT: Only apply components that were actually modified to prevent
         // unnecessarily overwriting entity data every frame (which can cause teleporting)
@@ -573,8 +664,11 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         // Record undo when editing finishes
         if (m_editState.isEditing && !ImGui::IsAnyItemActive()) {
             // Editing just finished - record the change
-            if (m_undoSystem && m_world->Has<ECS::Components::LocalTransform>(entity)) {
-                const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
+            if (m_undoSystem && Editor::ECSUtils::HasComponent(m_world, entity, "LocalTransform")) {
+                const auto* lt = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(m_world, entity, "LocalTransform");
+                if (!lt) {
+                    return;
+                }
 
                 // Use epsilon comparison for floating point values to avoid spurious undo records
                 constexpr float EPSILON = 0.0001f;
@@ -591,15 +685,15 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                 };
 
                 // Only record if something actually changed beyond floating point precision
-                bool posChanged = vec3Changed(m_editState.startPosition, lt.Position);
-                bool rotChanged = quatChanged(m_editState.startRotation, lt.Rotation);
-                bool scaleChanged = vec3Changed(m_editState.startScale, lt.Scale);
+                bool posChanged = vec3Changed(m_editState.startPosition, lt->Position);
+                bool rotChanged = quatChanged(m_editState.startRotation, lt->Rotation);
+                bool scaleChanged = vec3Changed(m_editState.startScale, lt->Scale);
 
                 if (posChanged || rotChanged || scaleChanged) {
                     m_undoSystem->RecordTransformChange(
                         entity.Index,
                         m_editState.startPosition, m_editState.startRotation, m_editState.startScale,
-                        lt.Position, lt.Rotation, lt.Scale
+                        lt->Position, lt->Rotation, lt->Scale
                     );
                     LOG_DEBUG("[Inspector] Recorded transform change for undo");
                 }
@@ -1036,8 +1130,8 @@ void InspectorPanel::_removeComponentFromEntity(const std::string& componentType
     ECS::Entity entity = m_world->Resolve(m_entityId);
     if (!m_world->IsAlive(entity)) return;
 
-    // Transform cannot be removed
-    if (componentType == "LocalTransform") return;
+    // Transform and Layer cannot be removed
+    if (componentType == "LocalTransform" || componentType == "Layer") return;
 
     // // Look up this component's metadata
     const auto* meta = ComponentRegistryUI::Find(componentType);
@@ -1181,8 +1275,11 @@ void InspectorPanel::_saveEntityAsPrefab(ECS::Entity entity) {
 
     // Pick a base name for the prefab file
     std::string entityName = "Entity";
-    if (m_world->Has<ECS::Components::Name>(entity)) {
-        entityName = m_world->Get<ECS::Components::Name>(entity).Value;
+    if (const auto* nameComp = Editor::ECSUtils::GetNamePtr(m_world, entity)) {
+        std::string resolved = ECS::StringTable::Resolve(nameComp->Value);
+        if (!resolved.empty()) {
+            entityName = resolved;
+        }
 
         // Replace characters that are illegal or unsafe in file paths
         std::replace_if(entityName.begin(), entityName.end(),
@@ -1250,13 +1347,25 @@ void InspectorPanel::_applyPrefabToInstances() {
         ECS::PrefabManager::NormalizePath(m_prefabPath)
     );
 
-    m_world->Each<ECS::Components::PrefabInstanceMetadata>([&](ECS::Entity entity, ECS::Components::PrefabInstanceMetadata& meta) {
-        // Apply only to instances that match the prefab we are editing
-        if (meta.PrefabHash == targetHash) {
-            _applyPrefabDataToEntity(entity);
-            count++;
-        }
-    });
+    const ECS::ComponentTypeId prefabMetaId = Editor::ECSUtils::GetComponentIdFromName("PrefabInstanceMetadata");
+    if (prefabMetaId != ECS::NULL_COMPONENT_ID) {
+        m_world->Each([&](ECS::Entity entity) {
+            if (!m_world->HasById(entity, prefabMetaId)) {
+                return;
+            }
+
+            auto* meta = static_cast<ECS::Components::PrefabInstanceMetadata*>(m_world->GetRawComponentPtr(entity, prefabMetaId));
+            if (!meta) {
+                return;
+            }
+
+            // Apply only to instances that match the prefab we are editing
+            if (meta->PrefabHash == targetHash) {
+                _applyPrefabDataToEntity(entity);
+                count++;
+            }
+        });
+    }
 
     m_statusMessage = "Applied to " + std::to_string(count) + " instance(s)";
     m_statusTimer = 2.0f;
