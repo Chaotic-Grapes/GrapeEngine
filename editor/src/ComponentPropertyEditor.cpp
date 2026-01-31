@@ -1427,51 +1427,12 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
 
     uint32_t cueId = data.value("CueId", 0u);
     auto& lib = AudioAssetLibrary::Get();
-    const auto& clips = lib.GetAllClips();
 
-    const AudioAssetLibrary::ClipInfo* selectedClip = nullptr;
-    for (const auto& clip : clips) {
-        if (clip.id == cueId) {
-            selectedClip = &clip;
-            break;
-        }
-    }
+    const AudioAssetLibrary::ClipInfo* selectedClip = lib.FindById(cueId);
+    std::string currentLabel = selectedClip ? selectedClip->name : "None (drag audio here)";
 
-    std::string currentLabel;
-    if (!selectedClip)
-        currentLabel = "None (Audio Clip)";
-    else
-        currentLabel = selectedClip->name;
-
-    // Audio Clip combo box - aligned properly
-    ImGui::Text("%s", "Audio Clip");
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
-    ImGui::SetNextItemWidth(90.0f);
-
-    if (ImGui::BeginCombo("##AudioClipCombo", currentLabel.c_str())) {
-        // "None" option
-        bool isNone = (cueId == 0);
-        if (ImGui::Selectable("None (Audio Clip)", isNone)) {
-            data["CueId"] = 0;
-            cueId = 0;
-        }
-        if (isNone)
-            ImGui::SetItemDefaultFocus();
-
-        // One option per known clip
-        for (const auto& clip : clips) {
-            bool isSelected = (clip.id == cueId);
-            if (ImGui::Selectable(clip.name.c_str(), isSelected)) {
-                data["CueId"] = clip.id;
-                cueId = clip.id;
-            }
-            if (isSelected)
-                ImGui::SetItemDefaultFocus();
-        }
-
-        ImGui::EndCombo();
-    }
+    // Audio clip row + drag drop support like SpriteRenderer2D
+    EditorUI::RenderStaticValueRow("Audio Clip", currentLabel, selectedClip == nullptr);
 
     // Drag-drop support
     if (ImGui::BeginDragDropTarget()) {

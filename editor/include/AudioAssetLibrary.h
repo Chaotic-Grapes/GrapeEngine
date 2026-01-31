@@ -6,7 +6,7 @@
  *
  * @details
  * Provides a centralized audio asset management system that recursively scans the
- * assets/Audio directory to discover all supported audio files (.wav, .ogg, .mp3, .flac),
+ * project root to discover all supported audio files (.wav, .ogg, .mp3, .flac),
  * automatically generates stable hash-based CueIds from normalized file paths, and
  * maintains efficient lookup maps for path-to-CueId and CueId-to-path resolution.
  */
@@ -37,7 +37,7 @@ public:
     /*
       Refresh(audioRoot)
       -------------------
-      Scans a root folder (e.g. "assets/Audio") and ALL subfolders.
+      Scans a root folder (e.g. project root) and ALL subfolders.
 
       Finds all supported audio file formats:
           .wav, .ogg, .mp3, .flac
@@ -66,7 +66,7 @@ public:
         if (!fs::exists(root) || !fs::is_directory(root))
             return;
 
-        // Recursively walk all subfolders under assets/Audio/
+        // Recursively walk all subfolders under the root
         for (auto& entry : fs::recursive_directory_iterator(root)) {
             if (!entry.is_regular_file())
                 continue;
@@ -77,7 +77,7 @@ public:
             if (ext != ".wav" && ext != ".ogg" && ext != ".mp3" && ext != ".flac")
                 continue;
 
-            // Build normalized path "assets/Audio/.../file.wav"
+            // Build normalized path
             std::string relPath = Normalize(entry.path().string());
 
             // Name = filename without extension
@@ -166,9 +166,9 @@ private:
         Normalize(path)
         ----------------
         Ensures all paths look consistent internally:
-            "assets\Audio\BGMs\file.wav"
+            "Project\\Assets\\Audio\\BGMs\\file.wav"
         becomes:
-            "assets/Audio/BGMs/file.wav"
+            "Project/Assets/Audio/BGMs/file.wav"
 
         This is critical for:
             - consistent hashing
