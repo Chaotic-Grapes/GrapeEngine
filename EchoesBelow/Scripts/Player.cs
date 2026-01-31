@@ -26,7 +26,7 @@ public class Player : SystemBase
     {
         foreach(var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D, LocalTransform>())
         {
-
+            
             ref LocalTransform transform = ref gameObject.Component4;
             ref LinearVelocity2D lv = ref gameObject.Component2;
             ref AngularVelocity2D av = ref gameObject.Component3;
@@ -45,9 +45,9 @@ public class Player : SystemBase
 
             //NaN protection
             if (-0.0001f <= moveDir.X && moveDir.X <= 0.0001f && -0.0001f <= moveDir.Y && moveDir.Y <= 0.0001f)
-                moveDirNormalized = Vector2.Zero;
+            moveDirNormalized = Vector2.Zero;
             else
-                moveDirNormalized = moveDir.Normalized;
+            moveDirNormalized = moveDir.Normalized;
 
             //Handling Rotation! Aligning Grain to moveDir=================================================
 
@@ -59,11 +59,12 @@ public class Player : SystemBase
             //Find change in angle required using dot product between moveDirNormalized and playerDir
             //NaN protection when player is facing up or at rest
             if (-0.0001f < playerDir.X && playerDir.X < 0.0001f && 0.9999f < playerDir.Y && playerDir.Y < 1.0001f)
-                playerDir = new Vector2(0, 1);
+            playerDir = new Vector2(0,1);
             //Dot product operation to determine theta as presented by angleBetween in radians!
             float angleBetween = GMath.Acos(GMath.Dot(playerDir, moveDirNormalized) / (playerDir.Magnitude * moveDirNormalized.Magnitude));
             //NaN protection for when angle is at rest
-            angleBetween = (float.IsNaN(angleBetween)) ? 0 : angleBetween;
+            angleBetween = (float.IsNaN(angleBetween))? 0 : angleBetween;
+
 
             //Find change in time required to complete a rotation. This formula requires radians
             float rotDuration = angleBetween / angularVelocity;
@@ -74,10 +75,10 @@ public class Player : SystemBase
             if (isRotating)
             {
                 gameObject.Component1.timer += Time.DeltaTime;
-                av.Value = GMath.Lerp(av.Value, angularVelocity, lerpFac);
+                av.Value = GMath.Lerp(av.Value,angularVelocity,lerpFac);
                 //Log("Rotating. . . ");
             }
-            if (gameObject.Component1.timer > rotDuration)
+            if(gameObject.Component1.timer > rotDuration)
             {
                 isRotating = false;
                 gameObject.Component1.timer = 0;
@@ -87,20 +88,15 @@ public class Player : SystemBase
             Log($"Angle In Between: {angleBetween * GMath.Rad2Deg}");
 
             //Assignment of linear Velocities================================================================
-            AddRelativeForce(lv, playerDir, moveSpeed, maxSpeed);
-        }
-    }
-
-    private static void AddRelativeForce(LinearVelocity2D lv, Vector2 playerDir, float moveSpeed, float maxSpeed)
-    {
-        if (Input.IsKeyDown(KeyCode.W) || Input.IsKeyDown(KeyCode.S)
-                        || Input.IsKeyDown(KeyCode.A) || Input.IsKeyDown(KeyCode.D))
-        {
-            lv.Value.X += playerDir.X * moveSpeed;
-            lv.Value.Y += playerDir.Y * moveSpeed;
-            //Clamping these values to a maxSpeed
-            lv.Value.X = GMath.Clamp(lv.Value.X, -maxSpeed, maxSpeed);
-            lv.Value.Y = GMath.Clamp(lv.Value.Y, -maxSpeed, maxSpeed);
+            if(Input.IsKeyDown(KeyCode.W)|| Input.IsKeyDown(KeyCode.S)
+                || Input.IsKeyDown(KeyCode.A) || Input.IsKeyDown(KeyCode.D))
+            {
+                lv.Value.X += playerDir.X * moveSpeed;
+                lv.Value.Y += playerDir.Y * moveSpeed;
+                //Clamping these values to a maxSpeed
+                lv.Value.X = GMath.Clamp(lv.Value.X, -maxSpeed, maxSpeed);
+                lv.Value.Y = GMath.Clamp(lv.Value.Y, -maxSpeed, maxSpeed);
+            }
         }
     }
 
