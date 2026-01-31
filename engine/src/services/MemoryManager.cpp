@@ -18,7 +18,6 @@ Implements the custom MemoryManager class for efficient memory allocation.
 /* End Header *******************************************************************/
 
 #include "services/MemoryManager.h"
-#include "core/Logger.h"
 #include <cstdlib>
 #include <cstring>
 
@@ -44,9 +43,12 @@ MemoryManager::MemoryManager(int totalBytes, bool debugMode)
 	void* memoryPool = malloc(totalBytes);
 
 	if (!memoryPool) {
-		LOG_CRITICAL("MemoryManager: Failed to allocate initial memory pool of " << totalBytes << " bytes.");
+		// CRITICAL: Failed to allocate initial pool, cannot proceed
 		return;
 	}
+
+	printf("MemoryManager: Initial pool allocated successfully!\n");
+	fflush(stdout);
 
 	// Fill with unallocated pattern if debug mode is enabled
 	if (m_debugMode) memset(memoryPool, UNALLOCATED_PATTERN, totalBytes);
@@ -54,7 +56,7 @@ MemoryManager::MemoryManager(int totalBytes, bool debugMode)
 	// Create the first page node
 	MemoryPage* firstPage = (MemoryPage*)malloc(sizeof(MemoryPage));
 	if (!firstPage) {
-		LOG_CRITICAL("MemoryManager: Failed to allocate page metadata.");
+		// CRITICAL: Failed to allocate page metadata
 		free(memoryPool);
 		return;
 	}
@@ -67,7 +69,7 @@ MemoryManager::MemoryManager(int totalBytes, bool debugMode)
 	// We need space for the MemoryBlock metadata, so allocate it using malloc
 	MemoryBlock* initialBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
 	if (!initialBlock) {
-		LOG_CRITICAL("MemoryManager: Failed to allocate block metadata.");
+		// CRITICAL: Failed to allocate block metadata
 		free(firstPage);
 		free(memoryPool);
 		return;
@@ -81,7 +83,7 @@ MemoryManager::MemoryManager(int totalBytes, bool debugMode)
 	// Set as head of the block list
 	m_blockListHead = initialBlock;
 
-	if (m_debugMode) LOG_INFO("MemoryManager: Debug mode ENABLED, memory patterns active");
+	// Debug mode is now active (if enabled)
 }
 
 MemoryManager::~MemoryManager() {
@@ -108,14 +110,17 @@ MemoryManager::~MemoryManager() {
 // ============================================================================
 
 void* MemoryManager::Allocate(int size) {
-	// PROOF: Log usage to verify integration
-	static int allocCount = 0;
-	allocCount++;
+	// RECURSION PROTECTION: Prevent infinite loops if pool extension fails repeatedly
+	static thread_local int recursionDepth = 0;
 
-	// Log first 5 allocations and then every 1000th to avoid spam but prove usage
-	if (allocCount <= 5 || allocCount % 1000 == 0) {
-		LOG_INFO("MemoryManager: Allocating " << size << " bytes (Total Allocs: " << allocCount << ")");
+	if (recursionDepth > 5) {
+		// Too many recursive calls: malloc is probably exhausted or pool extension is broken
+		// Return nullptr to prevent stack overflow
+		recursionDepth = 0;
+		return nullptr;
 	}
+
+	recursionDepth++;
 
 	// Get a block of memory of a specified size from the pool
 	// Traverse the address-ordered free linked list to find a suitable block (first-fit strategy)
@@ -133,6 +138,8 @@ void* MemoryManager::Allocate(int size) {
 
 				// Fill with allocated pattern if debug mode enabled
 				if (m_debugMode) memset(current->data, ALLOCATED_PATTERN, size);
+
+				recursionDepth--;
 				return current->data;
 			}
 
@@ -150,6 +157,8 @@ void* MemoryManager::Allocate(int size) {
 
 				// Fill with allocated pattern if debug mode enabled
 				if (m_debugMode) memset(current->data, ALLOCATED_PATTERN, current->size);
+
+				recursionDepth--;
 				return current->data;
 			}
 			remainingBlock->data = static_cast<char*>(current->data) + size;
@@ -179,6 +188,7 @@ void* MemoryManager::Allocate(int size) {
 			if (m_debugMode) memset(allocatedPtr, ALLOCATED_PATTERN, size);
 
 			// Return pointer to allocated memory
+			recursionDepth--;
 			return allocatedPtr;
 		}
 
@@ -186,13 +196,14 @@ void* MemoryManager::Allocate(int size) {
 	}
 
 	// On failure (no suitable block found): need to extend memory pool
-	LOG_WARNING("MemoryManager: Out of memory! Extending pool by " << m_defaultPageSize
-		<< " bytes (" << (m_defaultPageSize / 1024) << " KB)");
+	// WARNING: Out of memory, extending pool
 
 	_extendMemoryPool();
 
 	// Try allocating again after extending
-	return Allocate(size);
+	void* result = Allocate(size);
+	recursionDepth--;
+	return result;
 }
 
 void MemoryManager::Deallocate(void* ptr) {
@@ -227,7 +238,7 @@ void MemoryManager::Deallocate(void* ptr) {
 	}
 
 	// If block not found, do nothing (or warn)
-	LOG_WARNING("MemoryManager: Attempted to deallocate invalid pointer.");
+	// WARNING: Attempted to deallocate invalid pointer
 }
 
 // ============================================================================
@@ -239,7 +250,7 @@ void MemoryManager::_extendMemoryPool() {
 	void* newPageMemory = malloc(m_defaultPageSize);
 
 	if (!newPageMemory) {
-		LOG_CRITICAL("MemoryManager: Failed to extend memory pool.");
+		// CRITICAL: Failed to extend memory pool
 		return;
 	}
 
@@ -249,7 +260,7 @@ void MemoryManager::_extendMemoryPool() {
 	// Create new page metadata
 	MemoryPage* newPage = (MemoryPage*)malloc(sizeof(MemoryPage));
 	if (!newPage) {
-		LOG_CRITICAL("MemoryManager: Failed to allocate page metadata.");
+		// CRITICAL: Failed to allocate page metadata
 		free(newPageMemory);
 		return;
 	}
@@ -267,7 +278,7 @@ void MemoryManager::_extendMemoryPool() {
 	// Create a new free block for this page
 	MemoryBlock* newBlock = (MemoryBlock*)malloc(sizeof(MemoryBlock));
 	if (!newBlock) {
-		LOG_CRITICAL("MemoryManager: Failed to allocate block metadata.");
+		// CRITICAL: Failed to allocate block metadata
 		// Page is added but no block: this will leak, but prevents crash
 		return;
 	}
@@ -280,8 +291,7 @@ void MemoryManager::_extendMemoryPool() {
 	// Insert this new block in address-ordered position
 	_insertBlockAddressOrdered(newBlock);
 
-	LOG_INFO("MemoryManager: Pool extended! New page added: " << m_defaultPageSize
-		<< " bytes (" << (m_defaultPageSize / 1024) << " KB)");
+	// INFO: Pool extended successfully
 }
 
 // ============================================================================
@@ -378,8 +388,7 @@ void MemoryManager::_mergeAdjacentFreeBlocks(MemoryBlock* block) {
 
 void MemoryManager::SetDebugMode(bool enabled) {
 	m_debugMode = enabled;
-	if (m_debugMode) LOG_INFO("MemoryManager: Debug mode ENABLED");
-	else LOG_INFO("MemoryManager: Debug mode DISABLED");
+	// Debug mode changed (logging removed to prevent recursion)
 }
 
 void MemoryManager::Dump(std::ostream& os) {
@@ -444,9 +453,9 @@ MemoryManager& MemoryManager::GetInstance() {
 // Static instance with 1MB default pool size
 // Debug mode enabled in debug builds
 #ifdef _DEBUG
-	static MemoryManager instance(1024 * 1024, true);  // 1 MB default, debug ON
+	static MemoryManager instance(10 * 1024 * 1024, true);  // 10 MB default, debug ON
 #else
-	static MemoryManager instance(1024 * 1024, false); // 1 MB default, debug OFF
+	static MemoryManager instance(10 * 1024 * 1024, false); // 10 MB default, debug OFF
 #endif
 	return instance;
 }

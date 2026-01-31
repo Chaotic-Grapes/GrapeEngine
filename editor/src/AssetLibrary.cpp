@@ -419,6 +419,7 @@ void AssetLibrary::_replaceTexture(const std::string& selectedAsset, std::string
         else {
             LOG_INFO("Replace cancelled by user");
         }
+    }
 
 #else
     LOG_WARNING("File dialog not implemented for this platform");

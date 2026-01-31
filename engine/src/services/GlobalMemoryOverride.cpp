@@ -1,5 +1,4 @@
 #include "services/MemoryManager.h"
-#include "core/Logger.h"
 #include <new>
 
 // ============================================================================
@@ -28,7 +27,7 @@ void* operator new(size_t size) {
 	void* ptr = MemoryManager::GetInstance().Allocate(static_cast<int>(size));
 
 	if (!ptr) {
-		LOG_CRITICAL("MemoryManager: Global new failed to allocate " << size << " bytes.");
+		// CRITICAL: Allocation failed but we can't log it (would cause infinite recursion)
 		throw std::bad_alloc();
 	}
 
@@ -51,7 +50,7 @@ void* operator new[](size_t size) {
 	void* ptr = MemoryManager::GetInstance().Allocate(static_cast<int>(size));
 
 	if (!ptr) {
-		LOG_CRITICAL("MemoryManager: Global new[] failed to allocate " << size << " bytes.");
+		// CRITICAL: Allocation failed but we can't log it (would cause infinite recursion)
 		throw std::bad_alloc();
 	}
 

@@ -25,7 +25,7 @@ Provides:
 #include <cstddef> 
 #include "Export.h"
 
-class MemoryManager {
+class GRAPEENGINE_API MemoryManager {
 private:
 	// ============================================================================
 	// DEBUG PATTERNS

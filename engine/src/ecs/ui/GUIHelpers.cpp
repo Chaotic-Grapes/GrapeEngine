@@ -26,6 +26,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "ecs/StringTable.h"
 #include "core/Logger.h"
+#include "services/ResourceManager.h"
 #include <algorithm>
 #include <cmath>
 
