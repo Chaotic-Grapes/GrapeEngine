@@ -1350,6 +1350,223 @@ void ComponentUI::RenderAnimationState2D(nlohmann::json& data, ECS::Entity entit
     EditorUI::EndPropertySection();
 }
 
+void ComponentUI::RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+
+    if (!data.contains("ReferenceSize")) data["ReferenceSize"] = { {"X", 1920.0f}, {"Y", 1080.0f} };
+    if (!data.contains("ScaleFactor")) data["ScaleFactor"] = 1.0f;
+    if (!data.contains("Alignment")) data["Alignment"] = 0;
+    if (!data.contains("Offset")) data["Offset"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("ScaleMode")) data["ScaleMode"] = 0;
+    if (!data.contains("DebugDraw")) data["DebugDraw"] = false;
+    if (!data.contains("DebugBoundsColor")) data["DebugBoundsColor"] = { {"R", 0.2f}, {"G", 0.8f}, {"B", 1.0f}, {"A", 0.6f} };
+    if (!data.contains("DebugPaddingColor")) data["DebugPaddingColor"] = { {"R", 1.0f}, {"G", 0.8f}, {"B", 0.2f}, {"A", 0.6f} };
+    if (!data.contains("DebugAnchorColor")) data["DebugAnchorColor"] = { {"R", 1.0f}, {"G", 0.2f}, {"B", 0.2f}, {"A", 0.8f} };
+
+    EditorUI::BeginPropertySection({ "Reference Size", "Scale Factor", "Scale Mode", "Alignment", "Offset", "Debug Draw", "Bounds Color", "Padding Color", "Anchor Color" });
+    EditorUI::RenderVector2DRow("Reference Size", data["ReferenceSize"], "X", "Y", 1.0f);
+    EditorUI::RenderFloatRow("Scale Factor", "x", data, "ScaleFactor", 0.01f);
+    const char* scaleModes[] = { "Fit", "Fill", "Match Width", "Match Height" };
+    int scaleMode = data.value("ScaleMode", 0);
+    scaleMode = std::max(0, std::min(scaleMode, 3));
+    ImGui::Text("Scale Mode");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUICanvasScaleMode", scaleModes[scaleMode])) {
+        for (int i = 0; i < 4; ++i) {
+            bool selected = (scaleMode == i);
+            if (ImGui::Selectable(scaleModes[i], selected)) {
+                scaleMode = i;
+                data["ScaleMode"] = scaleMode;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    const char* alignOptions[] = {
+        "Center", "Top Left", "Top", "Top Right",
+        "Left", "Right", "Bottom Left", "Bottom", "Bottom Right"
+    };
+    int alignment = data.value("Alignment", 0);
+    alignment = std::max(0, std::min(alignment, 8));
+    ImGui::Text("Alignment");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUICanvasAlignCombo", alignOptions[alignment])) {
+        for (int i = 0; i < 9; ++i) {
+            bool selected = (alignment == i);
+            if (ImGui::Selectable(alignOptions[i], selected)) {
+                alignment = i;
+                data["Alignment"] = alignment;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
+    EditorUI::RenderCheckboxProperty("Debug Draw", data, "DebugDraw");
+    EditorUI::RenderColorRow("Bounds Color", data["DebugBoundsColor"]);
+    EditorUI::RenderColorRow("Padding Color", data["DebugPaddingColor"]);
+    EditorUI::RenderColorRow("Anchor Color", data["DebugAnchorColor"]);
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+
+    if (!data.contains("Position")) data["Position"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("Size")) data["Size"] = { {"X", 100.0f}, {"Y", 100.0f} };
+    if (!data.contains("AnchorMin")) data["AnchorMin"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("AnchorMax")) data["AnchorMax"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("Offset")) data["Offset"] = { {"X", 0.0f}, {"Y", 0.0f} };
+    if (!data.contains("Active")) data["Active"] = true;
+    if (!data.contains("Visible")) data["Visible"] = true;
+    if (!data.contains("Raycast")) data["Raycast"] = true;
+    if (!data.contains("HAlign")) data["HAlign"] = 0;
+    if (!data.contains("VAlign")) data["VAlign"] = 0;
+    if (!data.contains("ElementType")) data["ElementType"] = 0;
+    if (!data.contains("PaddingLeft")) data["PaddingLeft"] = 0.0f;
+    if (!data.contains("PaddingRight")) data["PaddingRight"] = 0.0f;
+    if (!data.contains("PaddingTop")) data["PaddingTop"] = 0.0f;
+    if (!data.contains("PaddingBottom")) data["PaddingBottom"] = 0.0f;
+    if (!data.contains("ZOrder")) data["ZOrder"] = 0;
+
+    EditorUI::BeginPropertySection({
+        "Position", "Size", "Anchor Min", "Anchor Max", "Offset",
+        "Active", "Visible", "Raycast", "H Align", "V Align",
+        "Element Type", "Padding Left", "Padding Right", "Padding Top", "Padding Bottom",
+        "Z Order"
+    });
+
+    EditorUI::RenderVector2DRow("Position", data["Position"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Size", data["Size"], "X", "Y", 1.0f);
+    EditorUI::RenderVector2DRow("Anchor Min", data["AnchorMin"], "X", "Y", 0.01f);
+    EditorUI::RenderVector2DRow("Anchor Max", data["AnchorMax"], "X", "Y", 0.01f);
+    EditorUI::RenderVector2DRow("Offset", data["Offset"], "X", "Y", 1.0f);
+
+    EditorUI::RenderCheckboxProperty("Active", data, "Active");
+    EditorUI::RenderCheckboxProperty("Visible", data, "Visible");
+    EditorUI::RenderCheckboxProperty("Raycast", data, "Raycast");
+
+    const char* hAlignOptions[] = { "Left", "Center", "Right", "Stretch" };
+    const char* vAlignOptions[] = { "Top", "Middle", "Bottom", "Stretch" };
+    const char* elementTypes[] = {
+        "Custom", "Container", "Button", "Panel", "Text", "Image",
+        "InputField", "Slider", "Checkbox", "Dropdown", "ScrollView", "Separator"
+    };
+
+    int hAlign = data.value("HAlign", 0);
+    ImGui::Text("H Align");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##HAlignCombo", hAlignOptions[hAlign])) {
+        for (int i = 0; i < 4; ++i) {
+            bool selected = (hAlign == i);
+            if (ImGui::Selectable(hAlignOptions[i], selected)) {
+                hAlign = i;
+                data["HAlign"] = hAlign;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    int vAlign = data.value("VAlign", 0);
+    ImGui::Text("V Align");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##VAlignCombo", vAlignOptions[vAlign])) {
+        for (int i = 0; i < 4; ++i) {
+            bool selected = (vAlign == i);
+            if (ImGui::Selectable(vAlignOptions[i], selected)) {
+                vAlign = i;
+                data["VAlign"] = vAlign;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    int elementType = data.value("ElementType", 0);
+    ImGui::Text("Element Type");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##ElementTypeCombo", elementTypes[elementType])) {
+        for (int i = 0; i < 12; ++i) {
+            bool selected = (elementType == i);
+            if (ImGui::Selectable(elementTypes[i], selected)) {
+                elementType = i;
+                data["ElementType"] = elementType;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    EditorUI::RenderFloatRow("Padding Left", "px", data, "PaddingLeft", 0.1f);
+    EditorUI::RenderFloatRow("Padding Right", "px", data, "PaddingRight", 0.1f);
+    EditorUI::RenderFloatRow("Padding Top", "px", data, "PaddingTop", 0.1f);
+    EditorUI::RenderFloatRow("Padding Bottom", "px", data, "PaddingBottom", 0.1f);
+    EditorUI::RenderIntProperty("Z Order", data, "ZOrder");
+
+    EditorUI::EndPropertySection();
+}
+
+void ComponentUI::RenderGUIContainer(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+
+    if (!data.contains("Layout")) data["Layout"] = 2;
+    if (!data.contains("Spacing")) data["Spacing"] = 5.0f;
+    if (!data.contains("ChildForceExpandWidth")) data["ChildForceExpandWidth"] = false;
+    if (!data.contains("ChildForceExpandHeight")) data["ChildForceExpandHeight"] = false;
+    if (!data.contains("GridColumns")) data["GridColumns"] = 1;
+    if (!data.contains("GridCellPaddingX")) data["GridCellPaddingX"] = 0.0f;
+    if (!data.contains("GridCellPaddingY")) data["GridCellPaddingY"] = 0.0f;
+    if (!data.contains("PreferredWidthDynamic")) data["PreferredWidthDynamic"] = false;
+    if (!data.contains("PreferredHeightDynamic")) data["PreferredHeightDynamic"] = false;
+    if (!data.contains("MinWidth")) data["MinWidth"] = 0.0f;
+    if (!data.contains("MinHeight")) data["MinHeight"] = 0.0f;
+
+    EditorUI::BeginPropertySection({
+        "Layout", "Spacing", "Expand Width", "Expand Height",
+        "Grid Columns", "Grid Pad X", "Grid Pad Y",
+        "Prefer Width", "Prefer Height", "Min Width", "Min Height"
+    });
+
+    const char* layoutOptions[] = { "Absolute", "Horizontal Box", "Vertical Box", "Grid", "Docking" };
+    int layout = data.value("Layout", 2);
+    ImGui::Text("Layout");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    if (ImGui::BeginCombo("##GUILayoutCombo", layoutOptions[layout])) {
+        for (int i = 0; i < 5; ++i) {
+            bool selected = (layout == i);
+            if (ImGui::Selectable(layoutOptions[i], selected)) {
+                layout = i;
+                data["Layout"] = layout;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    EditorUI::RenderFloatRow("Spacing", "px", data, "Spacing", 0.1f);
+    EditorUI::RenderCheckboxProperty("Expand Width", data, "ChildForceExpandWidth");
+    EditorUI::RenderCheckboxProperty("Expand Height", data, "ChildForceExpandHeight");
+    EditorUI::RenderIntProperty("Grid Columns", data, "GridColumns");
+    EditorUI::RenderFloatRow("Grid Pad X", "px", data, "GridCellPaddingX", 0.1f);
+    EditorUI::RenderFloatRow("Grid Pad Y", "px", data, "GridCellPaddingY", 0.1f);
+    EditorUI::RenderCheckboxProperty("Prefer Width", data, "PreferredWidthDynamic");
+    EditorUI::RenderCheckboxProperty("Prefer Height", data, "PreferredHeightDynamic");
+    EditorUI::RenderFloatRow("Min Width", "px", data, "MinWidth", 0.1f);
+    EditorUI::RenderFloatRow("Min Height", "px", data, "MinHeight", 0.1f);
+
+    EditorUI::EndPropertySection();
+}
+
 // Generic renderer for C# / unknown components. Uses EditorUI helpers where possible
 // so the look & feel matches other component UIs.
 void ComponentUI::RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {

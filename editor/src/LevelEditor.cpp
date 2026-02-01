@@ -25,6 +25,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include "UndoSystem.h"
 #include "ViewportPicking.h"
+#include "ecs/ui/GUIContext.h"
 #include <core/Application.h>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -561,6 +562,8 @@ void LevelEditor::_loadFonts() {
 // -------------------------------------------------------------------------
 // Begin frame - handle input and request picking before systems update
 void LevelEditor::BeginFrame() {
+    auto& guiCtx = ECS::UI::GUIContext::Get();
+    guiCtx.UseViewportBounds = false;
     // Begin frame for all viewports - handle input and request picking
     m_sceneViewport.BeginFrame();
     m_gameViewport.BeginFrame();

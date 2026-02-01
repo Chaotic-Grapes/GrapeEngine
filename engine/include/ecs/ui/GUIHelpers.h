@@ -364,7 +364,7 @@ namespace ECS {
         /**
          * @brief Color palette and style utilities
          */
-        class GRAPEENGINE_API GUIStyle {
+        class GRAPEENGINE_API GUIStylePalette {
         public:
             // Default colors
             static const Color PrimaryColor;      // Main accent color

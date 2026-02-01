@@ -26,12 +26,14 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "scripting/ComponentTypeRegistry.h"
 #include "ecs/systems/TransformSystem.h"
 #include "ecs/systems/AudioSystem.h"
+#include "ecs/systems/GUIInputSystem.h"
+#include "ecs/systems/GUILayoutSystem.h"
+#include "ecs/systems/GUIRenderSystem.h"
 #include "scene/Scene.h"
 #include "services/Input.h"
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
-#include "ecs/systems/GUISystem.h"
 #include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 
@@ -337,8 +339,10 @@ namespace Engine {
         // Render Phase Systems
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
         
-        // Register GUI system
-        m_systemManager.RegisterSystem<ECS::GUISystem>();
+        // Register GUI systems
+        m_systemManager.RegisterSystem<ECS::GUILayoutSystem>();
+        m_systemManager.RegisterSystem<ECS::GUIInputSystem>();
+        m_systemManager.RegisterSystem<ECS::GUIRenderSystem>();
 
         // Build dependency graphs (analyzes component access)
         m_systemManager.BuildDependencyGraphs();

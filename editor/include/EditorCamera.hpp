@@ -164,6 +164,7 @@ namespace Editor {
         Engine::Camera m_camera;
         bool m_isViewportFocused = false;
         bool m_is2DMode = false; // default: 3D by ResetTo3D in ctor
+        float m_2DPlaneZ = 0.0f;
 
         // ====================================================================
         // Orbit / target data
@@ -194,6 +195,12 @@ namespace Editor {
         glm::quat m_smoothRotation;
         float m_posLerpSpeed = 12.0f;
         float m_rotLerpSpeed = 18.0f;
+        bool m_focusActive = false;
+        glm::vec3 m_focusTarget = glm::vec3(0.0f);
+        float m_focusDistance = 0.0f;
+        float m_focusOrthoSize = 0.0f;
+        float m_focusLerpSpeed = 10.0f;
+        bool m_hadNavigationInput = false;
 
         // Constraints
         float m_minDistance = 0.2f;
@@ -237,6 +244,9 @@ namespace Editor {
 
         // Smooth the camera's position and rotation towards target transforms.
         void _applySmoothing(float dt);                      // lerp position/rotation for smoothness
+        void _apply2DTargetToCamera();
+        void _applyFocusSmoothing(float dt);
+        float _getSpeedScale() const;
 
         // Non-copyable
         EditorCamera(const EditorCamera&) = delete;

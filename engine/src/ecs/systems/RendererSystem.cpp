@@ -1204,6 +1204,7 @@ namespace ECS {
 
                 // Bind LDR for reading/writing
                 ldr->Bind();
+                glViewport(0, 0, ldr->Width(), ldr->Height());
 
                 // Enable blending for GUI elements
                 GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
@@ -1211,12 +1212,17 @@ namespace ECS {
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
                 // Use batch shader for GUI panels
+                const float width = static_cast<float>(ldr->Width());
+                const float height = static_cast<float>(ldr->Height());
+                glm::mat4 screenOrtho = glm::ortho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
+                m_guiTextProjection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+                m_guiViewportHeight = height;
                 if (m_shader) {
                     m_shader->use();
-                    glm::mat4 screenOrtho = glm::ortho(0.0f, 1920.0f, 0.0f, 1080.0f, -1.0f, 1.0f);
                     m_shader->setMat4("uViewProj", screenOrtho);
                     m_shader->setUniform("uLightingEnabled", 0);
                 }
+                m_guiProjection = screenOrtho;
 
                 m_renderer->beginFrame();
 
@@ -1495,7 +1501,9 @@ namespace ECS {
     // ========================================================================
 
     void RendererSystem::SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
-                                       const Color& color, float cornerRadius) {
+                                        const Color& color, float cornerRadius,
+                                        bool clipEnabled, const Vector2D& clipPos,
+                                        const Vector2D& clipSize) {
         if (!m_renderer) return;
 
         GUISubmission submission;
@@ -1504,14 +1512,19 @@ namespace ECS {
         submission.size = size;
         submission.color = color;
         submission.cornerRadius = cornerRadius;
+        submission.clipEnabled = clipEnabled;
+        submission.clipPos = clipPos;
+        submission.clipSize = clipSize;
 
         m_guiSubmissionQueue.push_back(submission);
     }
 
     void RendererSystem::SubmitGUIText(const std::string& fontPath, const std::string& text,
-                                      const Vector2D& position, const Color& color,
-                                      float fontSize, const Color& shadowColor,
-                                      const Vector2D& shadowOffset) {
+                                       const Vector2D& position, const Color& color,
+                                       float fontSize, const Color& shadowColor,
+                                       const Vector2D& shadowOffset,
+                                       bool clipEnabled, const Vector2D& clipPos,
+                                       const Vector2D& clipSize) {
         if (!m_renderer) return;
 
         GUISubmission submission;
@@ -1523,14 +1536,19 @@ namespace ECS {
         submission.fontSize = fontSize;
         submission.shadowColor = shadowColor;
         submission.shadowOffset = shadowOffset;
+        submission.clipEnabled = clipEnabled;
+        submission.clipPos = clipPos;
+        submission.clipSize = clipSize;
 
         m_guiSubmissionQueue.push_back(submission);
     }
 
     void RendererSystem::SubmitGUISlider(const Vector2D& position, const Vector2D& size,
-                                        float value, const Color& backgroundColor,
-                                        const Color& handleColor, const Color& borderColor,
-                                        float borderRadius) {
+                                         float value, const Color& backgroundColor,
+                                         const Color& handleColor, const Color& borderColor,
+                                         float borderRadius,
+                                         bool clipEnabled, const Vector2D& clipPos,
+                                         const Vector2D& clipSize) {
         if (!m_renderer) return;
 
         GUISubmission submission;
@@ -1542,13 +1560,18 @@ namespace ECS {
         submission.secondaryColor = handleColor;
         submission.borderColor = borderColor;
         submission.cornerRadius = borderRadius;
+        submission.clipEnabled = clipEnabled;
+        submission.clipPos = clipPos;
+        submission.clipSize = clipSize;
 
         m_guiSubmissionQueue.push_back(submission);
     }
 
     void RendererSystem::SubmitGUICheckbox(const Vector2D& position, const Vector2D& size,
-                                          bool checked, const Color& boxColor,
-                                          const Color& checkColor, const Color& borderColor) {
+                                           bool checked, const Color& boxColor,
+                                           const Color& checkColor, const Color& borderColor,
+                                           bool clipEnabled, const Vector2D& clipPos,
+                                           const Vector2D& clipSize) {
         if (!m_renderer) return;
 
         GUISubmission submission;
@@ -1559,12 +1582,17 @@ namespace ECS {
         submission.color = boxColor;
         submission.secondaryColor = checkColor;
         submission.borderColor = borderColor;
+        submission.clipEnabled = clipEnabled;
+        submission.clipPos = clipPos;
+        submission.clipSize = clipSize;
 
         m_guiSubmissionQueue.push_back(submission);
     }
 
     void RendererSystem::SubmitGUILine(const Vector2D& startPos, const Vector2D& endPos,
-                                      const Color& color, float thickness) {
+                                       const Color& color, float thickness,
+                                       bool clipEnabled, const Vector2D& clipPos,
+                                       const Vector2D& clipSize) {
         if (!m_renderer) return;
 
         GUISubmission submission;
@@ -1573,6 +1601,9 @@ namespace ECS {
         submission.endPos = endPos;
         submission.color = color;
         submission.thickness = thickness;
+        submission.clipEnabled = clipEnabled;
+        submission.clipPos = clipPos;
+        submission.clipSize = clipSize;
 
         m_guiSubmissionQueue.push_back(submission);
     }
@@ -1584,18 +1615,89 @@ namespace ECS {
     void RendererSystem::ProcessGUISubmissions() {
         if (!m_renderer) return;
 
+        bool sawText = false;
+        bool scissorEnabled = false;
+        Vector2D currentClipPos{0.0f, 0.0f};
+        Vector2D currentClipSize{0.0f, 0.0f};
+
+        auto applyScissor = [&](const GUISubmission& submission) {
+            if (!submission.clipEnabled || submission.clipSize.X <= 0.0f || submission.clipSize.Y <= 0.0f) {
+                if (scissorEnabled) {
+                    glDisable(GL_SCISSOR_TEST);
+                    scissorEnabled = false;
+                }
+                return;
+            }
+
+            if (scissorEnabled &&
+                currentClipPos.X == submission.clipPos.X &&
+                currentClipPos.Y == submission.clipPos.Y &&
+                currentClipSize.X == submission.clipSize.X &&
+                currentClipSize.Y == submission.clipSize.Y) {
+                return;
+            }
+
+            currentClipPos = submission.clipPos;
+            currentClipSize = submission.clipSize;
+            glEnable(GL_SCISSOR_TEST);
+            scissorEnabled = true;
+
+            const int scissorX = static_cast<int>(std::round(currentClipPos.X));
+            const int scissorY = static_cast<int>(std::round(m_guiViewportHeight - (currentClipPos.Y + currentClipSize.Y)));
+            const int scissorW = static_cast<int>(std::round(currentClipSize.X));
+            const int scissorH = static_cast<int>(std::round(currentClipSize.Y));
+            glScissor(scissorX, scissorY, scissorW, scissorH);
+        };
+
         for (const auto& submission : m_guiSubmissionQueue) {
+            if (submission.type == GUISubmission::Type::Text) {
+                sawText = true;
+                continue;
+            }
+
             if (submission.type == GUISubmission::Type::Panel) {
+                applyScissor(submission);
                 ProcessGUIPanel(submission);
-            } else if (submission.type == GUISubmission::Type::Text) {
-                ProcessGUIText(submission);
             } else if (submission.type == GUISubmission::Type::Slider) {
+                applyScissor(submission);
                 ProcessGUISlider(submission);
             } else if (submission.type == GUISubmission::Type::Checkbox) {
+                applyScissor(submission);
                 ProcessGUICheckbox(submission);
             } else if (submission.type == GUISubmission::Type::Line) {
+                applyScissor(submission);
                 ProcessGUILine(submission);
             }
+        }
+
+        if (sawText) {
+            m_renderer->endFrame();
+
+            if (m_textShader) {
+                m_textShader->use();
+                m_textShader->setMat4("uProjection", m_guiTextProjection);
+            }
+            m_renderer->beginFrame();
+
+            for (const auto& submission : m_guiSubmissionQueue) {
+                if (submission.type == GUISubmission::Type::Text) {
+                    applyScissor(submission);
+                    ProcessGUIText(submission);
+                }
+            }
+
+            m_renderer->endFrame();
+
+            if (m_shader) {
+                m_shader->use();
+                m_shader->setMat4("uViewProj", m_guiProjection);
+                m_shader->setUniform("uLightingEnabled", 0);
+            }
+            m_renderer->beginFrame();
+        }
+
+        if (scissorEnabled) {
+            glDisable(GL_SCISSOR_TEST);
         }
 
         m_guiSubmissionQueue.clear();
@@ -1611,7 +1713,8 @@ namespace ECS {
         // Submit quad representing the panel (no texture)
         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
         GLuint textureId = 0; // no texture (solid color)
-        m_renderer->submitQuad(glmPos, glmSize, textureId, uvRect, glmColor, 0.0f, 1.0f, 0, 0u, 0.0f);
+        const glm::vec2 center = glmPos;
+        m_renderer->submitQuad(center, glmSize, textureId, uvRect, glmColor, 0.0f, 1.0f, 0, 0u, 0.0f);
     }
 
     void RendererSystem::ProcessGUIText(const GUISubmission& submission) {
@@ -1638,6 +1741,7 @@ namespace ECS {
 
         // Use text shader for SDF rendering
         m_textShader->use();
+        m_textShader->setMat4("uProjection", m_guiTextProjection);
 
         // Convert color from 0-255 to 0.0-1.0
         glm::vec4 glmColor(
@@ -1647,8 +1751,12 @@ namespace ECS {
             submission.color.A
         );
 
-        // Screen-space position
-        glm::vec2 screenPos(submission.position.X, submission.position.Y);
+        const float scale = submission.fontSize / static_cast<float>(it->second->getPixelSize());
+        const float ascent = it->second->getAscent() * scale;
+
+        // Screen-space position (submission position is top-left in GUI space)
+        glm::vec2 screenPos(submission.position.X,
+                            m_guiViewportHeight - (submission.position.Y + ascent));
 
         // Submit text to renderer for SDF rendering
         // The renderer's submitText handles font geometry generation and batching
@@ -1675,13 +1783,15 @@ namespace ECS {
                              submission.secondaryColor.A);
 
         // Draw background track (full width, small height)
+        glmPos -= glmSize * 0.5f;
         float trackHeight = glmSize.y * 0.3f; // Track is 30% of slider height
         glm::vec2 trackPos = glmPos + glm::vec2(0, (glmSize.y - trackHeight) * 0.5f);
         glm::vec2 trackSize(glmSize.x, trackHeight);
 
         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
         GLuint textureId = 0;
-        m_renderer->submitQuad(trackPos, trackSize, textureId, uvRect, bgColor, 0.0f, 1.0f, 0, 0u, 0.0f);
+        const glm::vec2 trackCenter = trackPos + trackSize * 0.5f;
+        m_renderer->submitQuad(trackCenter, trackSize, textureId, uvRect, bgColor, 0.0f, 1.0f, 0, 0u, 0.0f);
 
         // Draw handle (circle/rounded rect at value position)
         float handleWidth = glmSize.y * 0.8f; // Handle width = slider height * 0.8
@@ -1689,7 +1799,8 @@ namespace ECS {
         glm::vec2 handlePos(handleX, glmPos.y);
         glm::vec2 handleSize(handleWidth, glmSize.y);
 
-        m_renderer->submitQuad(handlePos, handleSize, textureId, uvRect, handleColor, 0.0f, 1.0f, 0, 0u, 0.0f);
+        const glm::vec2 handleCenter = handlePos + handleSize * 0.5f;
+        m_renderer->submitQuad(handleCenter, handleSize, textureId, uvRect, handleColor, 0.0f, 1.0f, 0, 0u, 0.0f);
     }
 
     void RendererSystem::ProcessGUICheckbox(const GUISubmission& submission) {
@@ -1706,9 +1817,11 @@ namespace ECS {
                             submission.secondaryColor.A);
 
         // Draw checkbox box
+        glmPos -= glmSize * 0.5f;
         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
         GLuint textureId = 0;
-        m_renderer->submitQuad(glmPos, glmSize, textureId, uvRect, boxColor, 0.0f, 1.0f, 0, 0u, 0.0f);
+        const glm::vec2 boxCenter = glmPos + glmSize * 0.5f;
+        m_renderer->submitQuad(boxCenter, glmSize, textureId, uvRect, boxColor, 0.0f, 1.0f, 0, 0u, 0.0f);
 
         // Draw checkmark if checked (as a simple X shape with two diagonal lines)
         if (submission.checked) {
@@ -1716,7 +1829,8 @@ namespace ECS {
             float inset = glmSize.x * 0.2f;
             glm::vec2 checkPos = glmPos + glm::vec2(inset, inset);
             glm::vec2 checkSize = glmSize - glm::vec2(inset * 2.0f, inset * 2.0f);
-            m_renderer->submitQuad(checkPos, checkSize, textureId, uvRect, checkColor, 0.0f, 1.0f, 0, 0u, 0.0f);
+            const glm::vec2 checkCenter = checkPos + checkSize * 0.5f;
+            m_renderer->submitQuad(checkCenter, checkSize, textureId, uvRect, checkColor, 0.0f, 1.0f, 0, 0u, 0.0f);
         }
     }
 
@@ -1749,7 +1863,7 @@ namespace ECS {
 
         glm::vec4 uvRect(0.0f, 0.0f, 1.0f, 1.0f);
         GLuint textureId = 0;
-        m_renderer->submitQuad(center - size * 0.5f, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
+        m_renderer->submitQuad(center, size, textureId, uvRect, color, 0.0f, 1.0f, 0, 0u, 0.0f);
     }
 
     void RendererSystem::SetDebugTileMap(const TileMap& map, const Tileset& tileset)

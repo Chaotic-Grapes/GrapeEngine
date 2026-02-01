@@ -30,6 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/Application.h"
 #include "ecs/Components.h"
 #include "EditorECSUtils.h"
+#include "ecs/ui/GUIContext.h"
 
 // -------------------------------------------------------------------------
 // Update
@@ -182,6 +183,19 @@ void GameViewport::_renderViewport() {
                 const uint32_t textureId = acc.GetTexture("LDR");
                 if (textureId > 0) {
                     ImGui::Image(textureId, displaySize, ImVec2(0, 1), ImVec2(1, 0));
+                    const bool isGameImageHovered = ImGui::IsItemHovered();
+                    m_isViewportHovered = isGameImageHovered;
+                    {
+                        const ImVec2 viewportScreenPos = ImGui::GetItemRectMin();
+                        auto& guiCtx = ECS::UI::GUIContext::Get();
+                        if (isGameImageHovered || !guiCtx.UseViewportBounds) {
+                            const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+                            guiCtx.ViewportOrigin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
+                            guiCtx.ViewportSize = { displaySize.x * fbScale.x, displaySize.y * fbScale.y };
+                            guiCtx.ViewportDisplayScale = { fbScale.x, fbScale.y };
+                            guiCtx.UseViewportBounds = true;
+                        }
+                    }
                 }
                 else {
                     ImGui::TextDisabled("Texture ID is 0 - render graph issue");

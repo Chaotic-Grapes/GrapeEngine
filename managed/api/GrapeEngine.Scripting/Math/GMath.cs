@@ -13,6 +13,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 */
 /* End Header *******************************************************************/
 
+using System;
 using GrapeEngine.Math;
 using GrapeEngine.Scripting.Internal.Unsafe;
 
@@ -249,6 +250,84 @@ public static class GMath
     /// </summary>
     public static float Lerp(float a, float b, float t) => MathAPI.Lerp(a, b, t);
 
+    /// <summary>
+    /// Inverse linear interpolation between a and b for value (clamped to 0-1).
+    /// </summary>
+    public static float InverseLerp(float a, float b, float value)
+    {
+        float range = b - a;
+        if (range == 0f)
+            return 0f;
+
+        return Clamp((value - a) / range, 0f, 1f);
+    }
+
+    /// <summary>
+    /// Inverse linear interpolation between a and b for value (clamped to 0-1).
+    /// </summary>
+    public static double InverseLerp(double a, double b, double value)
+    {
+        double range = b - a;
+        if (range == 0.0)
+            return 0.0;
+
+        return Clamp((value - a) / range, 0.0, 1.0);
+    }
+
+    /// <summary>
+    /// Remap a value from an input range to an output range.
+    /// </summary>
+    public static float Remap(float inMin, float inMax, float outMin, float outMax, float value)
+        => Lerp(outMin, outMax, InverseLerp(inMin, inMax, value));
+
+    /// <summary>
+    /// Remap a value from an input range to an output range.
+    /// </summary>
+    public static double Remap(double inMin, double inMax, double outMin, double outMax, double value)
+        => outMin + (outMax - outMin) * InverseLerp(inMin, inMax, value);
+
+    /// <summary>
+    /// Move current toward target by maxDelta without overshooting.
+    /// </summary>
+    public static float MoveTowards(float current, float target, float maxDelta)
+    {
+        float delta = target - current;
+        float absDelta = Abs(delta);
+        if (absDelta <= maxDelta)
+            return target;
+
+        if (maxDelta < 0f)
+            return current;
+
+        return current + (delta / absDelta) * maxDelta;
+    }
+
+    /// <summary>
+    /// Move current toward target by maxDelta without overshooting.
+    /// </summary>
+    public static double MoveTowards(double current, double target, double maxDelta)
+    {
+        double delta = target - current;
+        double absDelta = System.Math.Abs(delta);
+        if (absDelta <= maxDelta)
+            return target;
+
+        if (maxDelta < 0.0)
+            return current;
+
+        return current + (delta / absDelta) * maxDelta;
+    }
+
+    /// <summary>
+    /// Smoothly interpolate between a and b using a Hermite curve.
+    /// </summary>
+    public static float SmoothStep(float a, float b, float t)
+    {
+        t = Clamp(t, 0f, 1f);
+        t = t * t * (3f - 2f * t);
+        return Lerp(a, b, t);
+    }
+
     // ============================================================================
     // Basic Math
     // ============================================================================
@@ -383,6 +462,106 @@ public static class GMath
     /// </summary>
     public static ulong Max(ulong a, ulong b) => MathAPI.MaxULong64(a, b);
 
+    /// <summary>
+    /// Get the sign of an integer (-1, 0, or 1).
+    /// </summary>
+    public static int Sign(int value) => value > 0 ? 1 : (value < 0 ? -1 : 0);
+
+    /// <summary>
+    /// Get the sign of a float (-1, 0, or 1).
+    /// </summary>
+    public static float Sign(float value) => value > 0f ? 1f : (value < 0f ? -1f : 0f);
+
+    /// <summary>
+    /// Get the sign of a double (-1, 0, or 1).
+    /// </summary>
+    public static double Sign(double value) => value > 0.0 ? 1.0 : (value < 0.0 ? -1.0 : 0.0);
+
+    /// <summary>
+    /// Compare two floats within a tolerance.
+    /// </summary>
+    public static bool Approximately(float a, float b, float epsilon = Epsilon) => Abs(a - b) <= epsilon;
+
+    /// <summary>
+    /// Compare two doubles within a tolerance.
+    /// </summary>
+    public static bool Approximately(double a, double b, double epsilon = Epsilon) => System.Math.Abs(a - b) <= epsilon;
+
+    /// <summary>
+    /// Compute e raised to the specified power.
+    /// </summary>
+    public static float Exp(float value) => MathF.Exp(value);
+
+    /// <summary>
+    /// Compute the natural logarithm.
+    /// </summary>
+    public static float Log(float value) => MathF.Log(value);
+
+    /// <summary>
+    /// Compute the base-10 logarithm.
+    /// </summary>
+    public static float Log10(float value) => MathF.Log10(value);
+
+    /// <summary>
+    /// Compute the floating-point remainder of value/length.
+    /// </summary>
+    public static float Fmod(float value, float length) => length == 0f ? 0f : value % length;
+
+    /// <summary>
+    /// Compute the floating-point remainder of value/length.
+    /// </summary>
+    public static double Fmod(double value, double length) => length == 0.0 ? 0.0 : value % length;
+
+    /// <summary>
+    /// Compute the integer remainder of value/length.
+    /// </summary>
+    public static int Mod(int value, int length) => length == 0 ? 0 : value % length;
+
+    /// <summary>
+    /// Round up to the nearest integer.
+    /// </summary>
+    public static int CeilToInt(float value) => (int)MathF.Ceiling(value);
+
+    /// <summary>
+    /// Round down to the nearest integer.
+    /// </summary>
+    public static int FloorToInt(float value) => (int)MathF.Floor(value);
+
+    /// <summary>
+    /// Round to the nearest integer.
+    /// </summary>
+    public static int RoundToInt(float value) => (int)MathF.Round(value);
+
+    /// <summary>
+    /// Check if a float is finite (not NaN or Infinity).
+    /// </summary>
+    public static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+
+    /// <summary>
+    /// Check if a double is finite (not NaN or Infinity).
+    /// </summary>
+    public static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+
+    /// <summary>
+    /// Check if a float is NaN.
+    /// </summary>
+    public static bool IsNaN(float value) => float.IsNaN(value);
+
+    /// <summary>
+    /// Check if a double is NaN.
+    /// </summary>
+    public static bool IsNaN(double value) => double.IsNaN(value);
+
+    /// <summary>
+    /// Check if a float is Infinity.
+    /// </summary>
+    public static bool IsInfinity(float value) => float.IsInfinity(value);
+
+    /// <summary>
+    /// Check if a double is Infinity.
+    /// </summary>
+    public static bool IsInfinity(double value) => double.IsInfinity(value);
+
     // ============================================================================
     // Trigonometry
     // ============================================================================
@@ -431,6 +610,56 @@ public static class GMath
     /// Convert radians to degrees.
     /// </summary>
     public static float RadToDeg(float radians) => MathAPI.RadToDeg(radians);
+
+    /// <summary>
+    /// Repeat a value so it stays within [0, length).
+    /// </summary>
+    public static float Repeat(float value, float length)
+    {
+        if (length == 0f)
+            return 0f;
+
+        return value - MathAPI.Floor(value / length) * length;
+    }
+
+    /// <summary>
+    /// Ping-pong a value so it oscillates between 0 and length.
+    /// </summary>
+    public static float PingPong(float value, float length)
+    {
+        if (length == 0f)
+            return 0f;
+
+        float repeated = Repeat(value, length * 2f);
+        return length - Abs(repeated - length);
+    }
+
+    /// <summary>
+    /// Calculate the shortest difference between two angles in degrees.
+    /// </summary>
+    public static float DeltaAngle(float fromDeg, float toDeg)
+    {
+        float delta = Repeat(toDeg - fromDeg, 360f);
+        return delta > 180f ? delta - 360f : delta;
+    }
+
+    /// <summary>
+    /// Wrap an angle in radians to [-Pi, Pi].
+    /// </summary>
+    public static float WrapAngleRad(float radians)
+    {
+        float wrapped = Repeat(radians + Pi, Tau);
+        return wrapped - Pi;
+    }
+
+    /// <summary>
+    /// Wrap an angle in degrees to [-180, 180].
+    /// </summary>
+    public static float WrapAngleDeg(float degrees)
+    {
+        float wrapped = Repeat(degrees + 180f, 360f);
+        return wrapped - 180f;
+    }
 
     // ============================================================================
     // Vector2 Operations
@@ -496,6 +725,31 @@ public static class GMath
     }
 
     /// <summary>
+    /// Clamp a vector's magnitude to a minimum and maximum length.
+    /// </summary>
+    public static Vector2 ClampMagnitude(Vector2 v, float minLength, float maxLength)
+    {
+        if (minLength > maxLength)
+        {
+            float temp = minLength;
+            minLength = maxLength;
+            maxLength = temp;
+        }
+
+        float length = Length(v);
+        if (length == 0f)
+            return v;
+
+        if (length < minLength)
+            return v * (minLength / length);
+
+        if (length > maxLength)
+            return v * (maxLength / length);
+
+        return v;
+    }
+
+    /// <summary>
     /// Get the angle (in radians) from vector a to vector b.
     /// </summary>
     public static float AngleTo(Vector2 from, Vector2 to) => MathAPI.AngleTo(from.X, from.Y, to.X, to.Y);
@@ -517,6 +771,74 @@ public static class GMath
         float x = v.X, y = v.Y;
         MathAPI.Rotate2D(ref x, ref y, angle);
         return new Vector2(x, y);
+    }
+
+    /// <summary>
+    /// Project a onto onto.
+    /// </summary>
+    public static Vector2 Project(Vector2 a, Vector2 onto)
+    {
+        float denom = Dot(onto, onto);
+        if (denom <= Epsilon)
+            return Vector2.Zero;
+
+        return onto * (Dot(a, onto) / denom);
+    }
+
+    /// <summary>
+    /// Reflect v across a normal.
+    /// </summary>
+    public static Vector2 Reflect(Vector2 v, Vector2 normal)
+    {
+        float denom = Dot(normal, normal);
+        if (denom <= Epsilon)
+            return v;
+
+        return v - normal * (2f * Dot(v, normal) / denom);
+    }
+
+    /// <summary>
+    /// Get the left-hand perpendicular of a vector.
+    /// </summary>
+    public static Vector2 Perp(Vector2 v) => new(-v.Y, v.X);
+
+    /// <summary>
+    /// Get the angle (in radians) from the positive X axis.
+    /// </summary>
+    public static float Angle(Vector2 v) => Atan2(v.Y, v.X);
+
+    /// <summary>
+    /// Move current toward target by maxDelta without overshooting.
+    /// </summary>
+    public static Vector2 MoveTowards(Vector2 current, Vector2 target, float maxDelta)
+    {
+        Vector2 delta = new(target.X - current.X, target.Y - current.Y);
+        float dist = Length(delta);
+        if (dist <= maxDelta || dist <= Epsilon)
+            return target;
+
+        return current + delta * (maxDelta / dist);
+    }
+
+    /// <summary>
+    /// Generate a random boolean.
+    /// </summary>
+    public static bool Random() => Random(0, 1) == 1;
+
+    /// <summary>
+    /// Generate a random Vector2 within a min/max range.
+    /// </summary>
+    public static Vector2 Random(Vector2 min, Vector2 max)
+        => new(Random(min.X, max.X), Random(min.Y, max.Y));
+
+    /// <summary>
+    /// Generate a random Vector2 inside the unit circle.
+    /// </summary>
+    public static Vector2 RandomInsideUnitCircle()
+    {
+        float angle = Random(0f, Tau);
+        float radius = MathAPI.Sqrt(Random(0f, 1f)); // sqrt for uniform area distribution
+        return new Vector2(MathAPI.Cos(angle) * radius, MathAPI.Sin(angle) * radius);
     }
 
     // Helper to swap min and max if min > max

@@ -42,6 +42,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "ecs/ui/GUIContext.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -75,9 +76,9 @@ void SceneViewport::EndFrame() {
 void SceneViewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
 
-    // Toggle FPS overlay in the Scene viewport (editor-only)
-    if (Input::IsKeyPressed(KEY_F)) {
-        m_showSceneFpsOverlay = !m_showSceneFpsOverlay;
+    // Focus selected entity when the scene viewport is active.
+    if (Input::IsKeyPressed(KEY_F) && !m_selectedEntity.IsNull()) {
+        FocusOnEntity(m_selectedEntity.Index);
     }
 
     // Update viewport interaction manager (gizmo, picking, selection, transforms)
@@ -201,6 +202,14 @@ void SceneViewport::_renderViewport() {
 
             // Get the drawing position of the rendered image
             ImVec2 viewportScreenPos = ImGui::GetItemRectMin();
+            auto& guiCtx = ECS::UI::GUIContext::Get();
+            if (isSceneImageHovered || !guiCtx.UseViewportBounds) {
+                const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+                guiCtx.ViewportOrigin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
+                guiCtx.ViewportSize = { size.x * fbScale.x, size.y * fbScale.y };
+                guiCtx.ViewportDisplayScale = { fbScale.x, fbScale.y };
+                guiCtx.UseViewportBounds = true;
+            }
 
             // Handle mouse click picking on the viewport image
             // Don't pick if gizmo is being used or hovered
@@ -267,10 +276,6 @@ void SceneViewport::_renderViewport() {
                 }
             }
 
-            // Draw FPS overlay if enabled
-            if (m_showSceneFpsOverlay) {
-                _drawFpsOverlay(viewportScreenPos, size);
-            }
         }
     }
     else {
