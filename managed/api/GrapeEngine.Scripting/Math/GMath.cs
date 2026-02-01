@@ -308,7 +308,7 @@ public static class GMath
     public static double MoveTowards(double current, double target, double maxDelta)
     {
         double delta = target - current;
-        double absDelta = Math.Abs(delta);
+        double absDelta = System.Math.Abs(delta);
         if (absDelta <= maxDelta)
             return target;
 
@@ -485,7 +485,7 @@ public static class GMath
     /// <summary>
     /// Compare two doubles within a tolerance.
     /// </summary>
-    public static bool Approximately(double a, double b, double epsilon = Epsilon) => Math.Abs(a - b) <= epsilon;
+    public static bool Approximately(double a, double b, double epsilon = Epsilon) => System.Math.Abs(a - b) <= epsilon;
 
     /// <summary>
     /// Compute e raised to the specified power.

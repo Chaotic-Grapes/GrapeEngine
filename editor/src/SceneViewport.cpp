@@ -76,6 +76,11 @@ void SceneViewport::EndFrame() {
 void SceneViewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
 
+    // Focus selected entity when the scene viewport is active.
+    if (Input::IsKeyPressed(KEY_F) && !m_selectedEntity.IsNull()) {
+        FocusOnEntity(m_selectedEntity.Index);
+    }
+
     // Update viewport interaction manager (gizmo, picking, selection, transforms)
     uint32_t newSelectedEntity = m_interactionMgr.Update(*m_world, m_selectedEntity.Index);
     

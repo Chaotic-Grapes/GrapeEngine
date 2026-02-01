@@ -155,13 +155,6 @@ namespace Editor {
         if (Input::IsKeyPressed(KEY_3)) { ResetTo3D(); }
         if (Input::IsKeyPressed(KEY_V)) { ToggleViewMode(); } // optional
 
-        // Focus selected (editor should compute bounds and call FocusBounds; here we handle F to reframe current target)
-        if (Input::IsKeyPressed(KEY_F)) {
-            // If editor selection system is available, call FocusBounds(min,max) from editor code.
-            // Here we simply refocus to current target to reframe using distance.
-            Focus(m_target);
-        }
-
         // Priority: Free-look (RMB), Orbit (Alt+LMB), Pan (MMB), Alt+RMB zoom drag
         if (rmb) {
             // Free-look (fly) mode: rotate camera by mouse and allow WASD movement
@@ -383,18 +376,20 @@ namespace Editor {
 
     void EditorCamera::Focus(const glm::vec3& worldPoint) {
         // Move pivot to worldPoint and maintain distance (or adjust if too small)
-        m_target = worldPoint;
+        glm::vec3 desiredTarget = worldPoint;
         if (m_is2DMode || !m_camera.UsePerspective) {
-            m_target.z = m_2DPlaneZ;
+            desiredTarget.z = m_2DPlaneZ;
         }
 
         // If current distance is tiny, pick a sensible default
-        if (m_distance < 0.001f)
-            m_distance = 8.0f;
+        float desiredDistance = m_distance;
+        if (desiredDistance < 0.001f) {
+            desiredDistance = 8.0f;
+        }
 
         // Recompute yaw/pitch from position->target
-        m_focusTarget = m_target;
-        m_focusDistance = m_distance;
+        m_focusTarget = desiredTarget;
+        m_focusDistance = desiredDistance;
         m_focusOrthoSize = m_camera.OrthoSize;
         m_focusActive = true;
         m_smoothPosition = m_camera.Position;
@@ -430,14 +425,14 @@ namespace Editor {
             m_camera.OrthoSize = glm::clamp(maxExtentXY * 1.1f, m_minOrthoSize, m_maxOrthoSize);
         }
 
-        // Set target and place camera back along forward vector
-        m_target = centre;
+        // Desired focus target for smooth framing
+        glm::vec3 desiredTarget = centre;
         if (m_is2DMode || !m_camera.UsePerspective) {
-            m_target.z = m_2DPlaneZ;
+            desiredTarget.z = m_2DPlaneZ;
         }
 
         // If current camera forward is degenerate, recompute yaw/pitch from position->target
-        glm::vec3 toTarget = m_target - m_camera.Position;
+        glm::vec3 toTarget = desiredTarget - m_camera.Position;
         float dist = glm::length(toTarget);
         if (dist > 1e-5f) {
             glm::vec3 n = glm::normalize(toTarget);
@@ -452,7 +447,7 @@ namespace Editor {
         }
 
         // Setup focus smoothing targets
-        m_focusTarget = m_target;
+        m_focusTarget = desiredTarget;
         m_focusDistance = m_distance;
         m_focusOrthoSize = m_camera.OrthoSize;
         m_focusActive = true;
