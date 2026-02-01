@@ -369,9 +369,10 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); 
                    m_hierarchyWindow.SetViewport(&m_sceneViewport); 
                    m_hierarchyWindow.SetFileMenu(&m_fileMenu);
+                   m_hierarchyWindow.SetUndoSystem(&m_undoSystem); // Enable reorder undo/redo.
         },
         [this]() { m_hierarchyWindow.Render(); },
-        [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
+        [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); m_hierarchyWindow.SetUndoSystem(&m_undoSystem); } // Keep undo wired after world changes.
     );
 
     _registerPanel("Inspector",

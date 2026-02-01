@@ -167,6 +167,30 @@ namespace Editor {
     };
 
     // ========================================================================
+    // Entity Reorder Command
+    // ========================================================================
+
+    class ReorderEntitiesCommand : public ICommand {
+    public:
+        ReorderEntitiesCommand(
+            EntityId parentId,
+            std::function<void(const std::vector<EntityId>&)> applyOrder,
+            std::vector<EntityId> before,
+            std::vector<EntityId> after
+        );
+
+        void Execute() override;
+        void Undo() override;
+
+        bool UpdateAfter(EntityId parentId, const std::vector<EntityId>& after); // Coalesce to new "after".
+
+    private:
+        EntityId m_parentId = ECS::Entity::NPOS32; // Parent id that owns the order list.
+        std::function<void(const std::vector<EntityId>&)> m_applyOrder; // Apply hook for order updates.
+        std::vector<EntityId> m_before; // Original order for undo.
+        std::vector<EntityId> m_after; // New order for redo.
+    };
+    // ========================================================================
     // Undo System Manager
     // ========================================================================
 
@@ -237,6 +261,7 @@ namespace Editor {
 
         void RecordEntityCreation(EntityId entityId);
         void RecordEntityDeletion(EntityId entityId);
+        bool CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after); // Merge reorder into last command.
 
     private:
         ECS::World* m_world = nullptr;
