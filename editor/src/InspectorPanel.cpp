@@ -89,127 +89,104 @@ namespace {
             fileMenu->MarkSceneDirty();
         }
     }
+}
 
-    // Helper to update prefab instances in a scene file on disk
-    void UpdatePrefabInSceneFile(const std::filesystem::path& scenePath,
-        const nlohmann::json& prefabData,
-        const std::vector<uint32_t>& targetHashes)
-    {
-        // 1. Load Scene JSON
+namespace {
+    void UpdatePrefabInSceneFile(const std::filesystem::path& scenePath, const nlohmann::json& prefabData, const std::vector<uint32_t>& targetHashes) {
         std::ifstream inFile(scenePath);
         if (!inFile.is_open()) {
-            LOG_ERROR("Failed to open scene file for prefab update: " << scenePath);
             return;
         }
-
         nlohmann::json sceneJson;
         try {
             inFile >> sceneJson;
         }
-        catch (const std::exception& e) {
-            LOG_ERROR("Failed to parse scene JSON: " << scenePath << " Error: " << e.what());
+        catch (...) {
+            inFile.close();
             return;
         }
         inFile.close();
-
-        // Validate scene format
         if (!sceneJson.contains("Entities") || !sceneJson["Entities"].is_array()) {
             return;
         }
-
-        bool sceneModified = false;
-        int updatedCount = 0;
-
-        // Get components to apply
         const nlohmann::json* componentsToApply = nullptr;
-        if (prefabData.contains("Components")) {
+        if (prefabData.contains("Components") && prefabData["Components"].is_array()) {
             componentsToApply = &prefabData["Components"];
-        }
-        else if (prefabData.contains("Entity") && prefabData["Entity"].contains("Components")) {
+        } else if (prefabData.contains("Entity") && prefabData["Entity"].contains("Components") && prefabData["Entity"]["Components"].is_array()) {
             componentsToApply = &prefabData["Entity"]["Components"];
         }
-
-        if (!componentsToApply || !componentsToApply->is_array()) {
+        if (!componentsToApply) {
             return;
         }
-
-        // 2. Iterate entities
+        bool sceneModified = false;
         for (auto& entity : sceneJson["Entities"]) {
             if (!entity.contains("Components") || !entity["Components"].is_array()) continue;
-
             bool isInstance = false;
-
-            // Check components for PrefabInstanceMetadata or PrefabLink
             for (const auto& comp : entity["Components"]) {
                 if (!comp.contains("TypeName") || !comp.contains("Data")) continue;
-
-                std::string typeName = comp["TypeName"];
-
+                std::string typeName = comp["TypeName"].get<std::string>();
                 if (typeName == "PrefabInstanceMetadata" || typeName == "ECS::Components::PrefabInstanceMetadata") {
                     if (comp["Data"].contains("PrefabHash")) {
-                        uint32_t instanceHash = comp["Data"]["PrefabHash"].get<uint32_t>();
-                        for (uint32_t h : targetHashes) {
-                            if (instanceHash == h) {
-                                isInstance = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                else if (typeName == "PrefabLink" || typeName == "ECS::Components::PrefabLink") {
-                    if (comp["Data"].contains("prefabPath")) {
-                        std::string path = comp["Data"]["prefabPath"];
-                        uint32_t hash = ECS::PrefabManager::ComputeHash(ECS::PrefabManager::NormalizePath(path));
-                        for (uint32_t h : targetHashes) {
-                            if (hash == h) {
-                                isInstance = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (isInstance) break;
-            }
-
-            if (isInstance) {
-                // 3. Update components
-                // Iterate through prefab components and apply them to the entity JSON
-                for (const auto& prefabComp : *componentsToApply) {
-                    if (!prefabComp.contains("TypeName") || !prefabComp.contains("Data")) continue;
-
-                    std::string prefabTypeName = prefabComp["TypeName"];
-
-                    // Find matching component in entity
-                    bool found = false;
-                    for (auto& entityComp : entity["Components"]) {
-                        if (entityComp["TypeName"] == prefabTypeName) {
-                            // Overwrite Data
-                            entityComp["Data"] = prefabComp["Data"];
-                            found = true;
-                            sceneModified = true;
+                        uint32_t hashValue = 0;
+                        try { hashValue = comp["Data"]["PrefabHash"].get<uint32_t>(); } catch (...) { }
+                        if (std::find(targetHashes.begin(), targetHashes.end(), hashValue) != targetHashes.end()) {
+                            isInstance = true;
                             break;
                         }
                     }
-
-                    // If not found, add it
-                    if (!found) {
-                        entity["Components"].push_back(prefabComp);
-                        sceneModified = true;
+                } else if (typeName == "PrefabLink" || typeName == "ECS::Components::PrefabLink") {
+                    if (comp["Data"].contains("prefabPath")) {
+                        std::string path = comp["Data"]["prefabPath"].get<std::string>();
+                        uint32_t hashValue = ECS::PrefabManager::ComputeHash(ECS::PrefabManager::NormalizePath(path));
+                        if (std::find(targetHashes.begin(), targetHashes.end(), hashValue) != targetHashes.end()) {
+                            isInstance = true;
+                            break;
+                        }
                     }
                 }
-                updatedCount++;
+            }
+            if (!isInstance) continue;
+            for (const auto& prefabComp : *componentsToApply) {
+                if (!prefabComp.contains("TypeName") || !prefabComp.contains("Data")) continue;
+                std::string prefabTypeName = prefabComp["TypeName"].get<std::string>();
+                std::string shortTypeName = prefabTypeName;
+                const std::string prefix = "ECS::Components::";
+                if (shortTypeName.size() >= prefix.size() && shortTypeName.compare(0, prefix.size(), prefix) == 0) {
+                    shortTypeName = shortTypeName.substr(prefix.size());
+                }
+                bool found = false;
+                for (auto& entityComp : entity["Components"]) {
+                    if (!entityComp.contains("TypeName")) continue;
+                    std::string typeName = entityComp["TypeName"].get<std::string>();
+                    
+                    // Handle both full and short names for existing components
+                    std::string shortExistingName = typeName;
+                    if (shortExistingName.size() >= prefix.size() && shortExistingName.compare(0, prefix.size(), prefix) == 0) {
+                        shortExistingName = shortExistingName.substr(prefix.size());
+                    }
+
+                    if (typeName == prefabTypeName || shortExistingName == shortTypeName) {
+                        entityComp["Data"] = prefabComp["Data"];
+                        found = true;
+                        sceneModified = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    nlohmann::json newComp = nlohmann::json::object();
+                    newComp["TypeName"] = shortTypeName;
+                    newComp["Data"] = prefabComp["Data"];
+                    entity["Components"].push_back(newComp);
+                    sceneModified = true;
+                }
             }
         }
-
-        // 4. Save Scene JSON if modified
         if (sceneModified) {
             std::ofstream outFile(scenePath);
             if (!outFile.is_open()) {
-                LOG_ERROR("Failed to write scene file: " << scenePath);
                 return;
             }
             outFile << sceneJson.dump(4);
-            LOG_INFO("Updated " << updatedCount << " instances in " << scenePath);
         }
     }
 }
@@ -249,16 +226,7 @@ void InspectorPanel::InspectEntity(EntityId id) {
     if (IsProtectedEntity(m_world, id)) {
         m_mode = InspectionMode::None;
         m_entityId = 0; // Clear selection
-        m_editState.isEditing = false; // Reset edit state
         return;
-    }
-
-    // IMPORTANT: Clear edit state when entity selection changes
-    // This prevents the inspector from comparing the new entity's transform
-    // against the previous entity's captured transform
-    if (m_entityId != id) {
-        m_editState.isEditing = false;
-        m_editState.entityId = 0;
     }
 
     m_entityId = id;
@@ -368,8 +336,6 @@ void InspectorPanel::InspectPrefab(const std::string& path) {
 void InspectorPanel::ClearSelection() {
     m_mode = InspectionMode::None;
     m_entityId = 0;
-    m_editState.isEditing = false;
-    m_editState.entityId = 0;
     m_prefabPath.clear();
     m_prefabData = {};
     m_componentsToDelete.clear();
@@ -568,9 +534,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
 
         static nlohmann::json editStartState;
         static bool isEditing = false;
-        
-        // Track which components were actually modified this frame
-        std::unordered_set<std::string> modifiedComponents;
 
         // Capture initial state when starting to edit
         if (!m_editState.isEditing) {
@@ -621,7 +584,6 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
                         isEditing = true;
                     }
                     wasEdited = true;
-                    modifiedComponents.insert(typeName); // Track which component changed
                 }
 
                 ImGui::Dummy(ImVec2(0, 4));
@@ -666,33 +628,17 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
         m_componentsToDelete.clear();
 
         // Second pass: push any edited JSON values back into ECS components
-        // IMPORTANT: Only apply components that were actually modified to prevent
-        // unnecessarily overwriting entity data every frame (which can cause teleporting)
         for (const auto& componentEntry : entityJson["Components"]) {
             // Validate again; same same
             if (!componentEntry.contains("TypeName") || !componentEntry["TypeName"].is_string()) continue;
             if (!componentEntry.contains("Data") || !componentEntry["Data"].is_object()) continue;
 
             std::string typeName = componentEntry["TypeName"];
-            
-            // Only apply if this component was modified this frame
-            if (modifiedComponents.find(typeName) == modifiedComponents.end()) {
-                continue; // Skip unmodified components
-            }
-            
             const auto* meta = ComponentRegistryUI::Find(typeName);
             // Apply edited JSON to the actual ECS component
             if (meta) {
-                LOG_DEBUG("[Inspector] Applying modified component: " << typeName << " to entity " << entity.Index);
                 meta->ApplyToEntity(m_world, entity, componentEntry["Data"]);
             }
-        }
-
-        // Re-serialize after applying changes so the displayed values stay fresh
-        // This ensures if the component was modified by transform system or other systems,
-        // the inspector shows the current values rather than stale cached values
-        if (wasEdited) {
-            entityJson = Serialization::EntitySerializer::SerializeEntity(*m_world, entity);
         }
 
         // Record undo when editing finishes
@@ -701,24 +647,10 @@ void InspectorPanel::_renderEntityComponents(ECS::Entity entity) {
             if (m_undoSystem && m_world->Has<ECS::Components::LocalTransform>(entity)) {
                 const auto& lt = m_world->Get<ECS::Components::LocalTransform>(entity);
 
-                // Use epsilon comparison for floating point values to avoid spurious undo records
-                constexpr float EPSILON = 0.0001f;
-                auto vec3Changed = [EPSILON](const Vector3D& a, const Vector3D& b) {
-                    return (std::abs(a.X - b.X) > EPSILON || 
-                            std::abs(a.Y - b.Y) > EPSILON || 
-                            std::abs(a.Z - b.Z) > EPSILON);
-                };
-                auto quatChanged = [EPSILON](const Quaternion& a, const Quaternion& b) {
-                    return (std::abs(a.W - b.W) > EPSILON || 
-                            std::abs(a.X - b.X) > EPSILON || 
-                            std::abs(a.Y - b.Y) > EPSILON || 
-                            std::abs(a.Z - b.Z) > EPSILON);
-                };
-
-                // Only record if something actually changed beyond floating point precision
-                bool posChanged = vec3Changed(m_editState.startPosition, lt.Position);
-                bool rotChanged = quatChanged(m_editState.startRotation, lt.Rotation);
-                bool scaleChanged = vec3Changed(m_editState.startScale, lt.Scale);
+                // Only record if something actually changed
+                bool posChanged = (m_editState.startPosition != lt.Position);
+                bool rotChanged = (m_editState.startRotation != lt.Rotation);
+                bool scaleChanged = (m_editState.startScale != lt.Scale);
 
                 if (posChanged || rotChanged || scaleChanged) {
                     m_undoSystem->RecordTransformChange(
@@ -802,7 +734,7 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
             });
 
         // Limit the popup height and make the list scrollable
-        // float avail = ImGui::GetContentRegionAvail().y;
+        float avail = ImGui::GetContentRegionAvail().y;
         float maxListHeight = 400.f;
         if (maxListHeight < 120.0f) maxListHeight = 120.0f;
 
@@ -1022,7 +954,7 @@ void InspectorPanel::_renderPrefabActions() {
 
         // Limit popup height and make the list scrollable
 
-        // float avail = ImGui::GetContentRegionAvail().y;
+        float avail = ImGui::GetContentRegionAvail().y;
         float maxListHeight = 400.0f;
         if (maxListHeight < 120.0f) maxListHeight = 120.0f;
         ImGui::BeginChild("AddComponentListPrefab", ImVec2(0, maxListHeight), false, ImGuiWindowFlags_None);
@@ -1367,81 +1299,66 @@ void InspectorPanel::_applyPrefabToInstances() {
     // Make sure the prefab file on disk is up to date
     _savePrefabData();
 
-    // Iterate over every entity that has a PrefabInstanceMetadata component
-    int count = 0;
-
-    // Compute valid hashes for this prefab (Absolute AND Relative)
-    // This handles cases where instances were saved with different path formats
+    // Compute hashes for robust matching
     std::vector<uint32_t> targetHashes;
+    
+    // 1. Absolute path hash
+    uint32_t absHash = ECS::PrefabManager::ComputeHash(
+        ECS::PrefabManager::NormalizePath(m_prefabPath)
+    );
+    targetHashes.push_back(absHash);
 
-    // 1. Hash from absolute path (normalized)
-    std::string normalizedAbsPath = ECS::PrefabManager::NormalizePath(m_prefabPath);
-    targetHashes.push_back(ECS::PrefabManager::ComputeHash(normalizedAbsPath));
-
-    // 2. Hash from relative path (normalized)
+    // 2. Relative path hash
     std::string relativePath = Engine::ProjectPaths::ToRelativePath(m_prefabPath);
     if (!relativePath.empty()) {
-        std::string normalizedRelPath = ECS::PrefabManager::NormalizePath(relativePath);
-        uint32_t relHash = ECS::PrefabManager::ComputeHash(normalizedRelPath);
-        // Avoid duplicate
-        if (relHash != targetHashes[0]) {
+        uint32_t relHash = ECS::PrefabManager::ComputeHash(
+            ECS::PrefabManager::NormalizePath(relativePath)
+        );
+        // Only add if different to avoid duplicates
+        if (relHash != absHash) {
             targetHashes.push_back(relHash);
         }
     }
 
-    // Apply to active scene (in-memory)
+    // Iterate over every entity that has a PrefabInstanceMetadata component
+    int count = 0;
     m_world->Each<ECS::Components::PrefabInstanceMetadata>([&](ECS::Entity entity, ECS::Components::PrefabInstanceMetadata& meta) {
-        // Apply only to instances that match the prefab we are editing
-        bool match = false;
-        for (uint32_t h : targetHashes) {
-            if (meta.PrefabHash == h) {
-                match = true;
-                break;
-            }
-        }
-
-        if (match) {
+        // Check if the entity's hash matches any of our target hashes
+        if (std::find(targetHashes.begin(), targetHashes.end(), meta.PrefabHash) != targetHashes.end()) {
             _applyPrefabDataToEntity(entity);
             count++;
         }
     });
 
-    // NEW LOGIC: Apply to ALL OTHER SCENES (Files on disk)
-    // Get active scene path to avoid double processing
-    std::string activeScenePath = "";
-    if (Engine::CORE && Engine::CORE->GetSceneManager().GetActive()) {
-        activeScenePath = Engine::CORE->GetSceneManager().GetActive()->GetPath();
-        // Normalize path for comparison
-        activeScenePath = ECS::PrefabManager::NormalizePath(activeScenePath);
-    }
-
-    try {
-        // Iterate recursively over assets folder
-        std::string assetsDir = Engine::ProjectPaths::GetAssetsPath();
-        if (std::filesystem::exists(assetsDir)) {
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(assetsDir)) {
-                if (entry.is_regular_file()) {
-                    std::string ext = entry.path().extension().string();
-                    // Case insensitive check for extension? usually lower case on windows or strict
-                    // Let's assume .scn or .scene
-                    if (ext == ".scn" || ext == ".scene") {
-                        std::string entryPath = entry.path().string();
-                        std::string normalizedEntryPath = ECS::PrefabManager::NormalizePath(entryPath);
-
-                        // Skip active scene
-                        if (normalizedEntryPath != activeScenePath) {
-                            UpdatePrefabInSceneFile(entry.path(), m_prefabData, targetHashes);
-                        }
-                    }
-                }
-            }
+    std::string activeScenePath;
+    if (Engine::CORE) {
+        auto* activeScene = Engine::CORE->GetSceneManager().GetActive();
+        if (activeScene) {
+            activeScenePath = ECS::PrefabManager::NormalizePath(activeScene->GetPath());
         }
     }
-    catch (const std::exception& e) {
-        LOG_ERROR("Error iterating scenes for prefab update: " << e.what());
+    
+    // Scan all scene files
+    int fileCount = 0;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(Engine::ProjectPaths::GetProjectRoot())) {
+        if (!entry.is_regular_file()) continue;
+        
+        auto ext = entry.path().extension().string();
+        if (ext != ".scn" && ext != ".scene") continue;
+        
+        std::string scenePath = entry.path().string();
+        std::string normalizedScenePath = ECS::PrefabManager::NormalizePath(scenePath);
+        
+        // Skip active scene to avoid conflict
+        if (!activeScenePath.empty() && normalizedScenePath == activeScenePath) continue;
+        
+        UpdatePrefabInSceneFile(scenePath, m_prefabData, targetHashes);
+        fileCount++;
     }
 
-    m_statusMessage = "Applied to " + std::to_string(count) + " instance(s) in active scene + others on disk";
+    LOG_INFO("Global Prefab Sync complete. Patched instances in " << fileCount << " external scene files.");
+
+    m_statusMessage = "Applied to " + std::to_string(count) + " loaded instance(s) and scanned " + std::to_string(fileCount) + " files";
     m_statusTimer = 2.0f;
 }
 
