@@ -300,6 +300,43 @@ namespace Editor {
     }
 
     // ========================================================================
+    // ReorderEntitiesCommand Implementation
+    // ========================================================================
+
+ReorderEntitiesCommand::ReorderEntitiesCommand(
+    EntityId parentId,
+    std::function<void(const std::vector<EntityId>&)> applyOrder,
+    std::vector<EntityId> before,
+    std::vector<EntityId> after
+)
+    : m_parentId(parentId)
+    , m_applyOrder(std::move(applyOrder)) // Store apply hook for undo/redo.
+    , m_before(std::move(before)) // Snapshot for undo.
+    , m_after(std::move(after)) // Snapshot for redo.
+{
+}
+
+    void ReorderEntitiesCommand::Execute() {
+        if (m_applyOrder) {
+            m_applyOrder(m_after);
+        }
+    }
+
+    void ReorderEntitiesCommand::Undo() {
+        if (m_applyOrder) {
+            m_applyOrder(m_before);
+        }
+    }
+
+    bool ReorderEntitiesCommand::UpdateAfter(EntityId parentId, const std::vector<EntityId>& after) {
+        if (parentId != m_parentId) {
+            return false;
+        }
+        m_after = after;
+        return true;
+    }
+
+    // ========================================================================
     // UndoSystem Implementation
     // ========================================================================
 
@@ -489,5 +526,23 @@ namespace Editor {
 
         LOG_DEBUG("[UndoSystem] Entity deletion recorded. Undo stack size: " << m_undoStack.size());
     }
+
+    bool UndoSystem::CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after) {
+        if (m_undoStack.empty()) {
+            return false;
+        }
+
+        auto* command = dynamic_cast<ReorderEntitiesCommand*>(m_undoStack.back().get());
+    if (!command) {
+        return false;
+    }
+
+    if (!command->UpdateAfter(parentId, after)) { // Only coalesce if parent matches.
+        return false;
+    }
+
+    m_redoStack.clear(); // Coalescing invalidates redo history.
+    return true;
+}
 
 } // namespace Editor
