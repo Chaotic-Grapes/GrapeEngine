@@ -26,11 +26,49 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/Components.h"
 #include "ecs/StringTable.h"
 #include "core/Logger.h"
+#include "graphics/Font.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace ECS {
     namespace UI {
+        namespace {
+            constexpr int kMeasurementFontSize = 96;
+            const std::string kDefaultFontPath = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf";
+
+            const Font& GetFontForMeasurement(const std::string& fontPath) {
+                static std::unordered_map<std::string, std::shared_ptr<Font>> fontCache;
+
+                const std::string resolvedPath = fontPath.empty() ? kDefaultFontPath : fontPath;
+                auto it = fontCache.find(resolvedPath);
+                if (it != fontCache.end()) {
+                    return *it->second;
+                }
+
+                try {
+                    auto font = std::make_shared<Font>(resolvedPath, kMeasurementFontSize);
+                    fontCache[resolvedPath] = font;
+                    return *font;
+                } catch (const std::exception& e) {
+                    LOG_WARNING("GUITextUtils::MeasureText failed to load font " << resolvedPath << ": " << e.what());
+                }
+
+                auto fallback = fontCache.find(kDefaultFontPath);
+                if (fallback != fontCache.end()) {
+                    return *fallback->second;
+                }
+
+                auto font = std::make_shared<Font>(kDefaultFontPath, kMeasurementFontSize);
+                fontCache[kDefaultFontPath] = font;
+                return *font;
+            }
+
+            float GetGlyphAdvance(const Font& font, char c) {
+                const Glyph& glyph = font.getGlyph(c);
+                return static_cast<float>(glyph.advance);
+            }
+        }
 
         // ====================================================================
         // GUIFactory Implementation
@@ -512,12 +550,31 @@ namespace ECS {
             const std::string& text,
             const std::string& fontPath,
             float fontSize) {
-            
-            // TODO: Implement actual text measurement using font system
-            // For now, return estimated size
-            float width = text.length() * fontSize * 0.6f;
-            float height = fontSize;
-            return {width, height};
+            if (text.empty()) {
+                return { 0.0f, 0.0f };
+            }
+
+            const Font& font = GetFontForMeasurement(fontPath);
+            const float scale = fontSize / static_cast<float>(font.getPixelSize());
+            const float lineHeight = font.getLineHeight() * scale;
+
+            float maxWidth = 0.0f;
+            float currentWidth = 0.0f;
+            float totalHeight = lineHeight;
+
+            for (char c : text) {
+                if (c == '\n') {
+                    maxWidth = std::max(maxWidth, currentWidth);
+                    currentWidth = 0.0f;
+                    totalHeight += lineHeight;
+                    continue;
+                }
+
+                currentWidth += GetGlyphAdvance(font, c) * scale;
+            }
+
+            maxWidth = std::max(maxWidth, currentWidth);
+            return { maxWidth, totalHeight };
         }
 
         std::string GUITextUtils::TruncateText(
@@ -526,14 +583,41 @@ namespace ECS {
             float fontSize,
             float maxWidth,
             const std::string& suffix) {
-            
-            // TODO: Implement proper text truncation with font measurement
-            if (text.length() * fontSize * 0.6f <= maxWidth) {
+            if (text.empty()) {
                 return text;
             }
 
-            size_t maxChars = static_cast<size_t>(maxWidth / (fontSize * 0.6f)) - suffix.length();
-            return text.substr(0, maxChars) + suffix;
+            const Font& font = GetFontForMeasurement(fontPath);
+            const float scale = fontSize / static_cast<float>(font.getPixelSize());
+
+            float width = 0.0f;
+            for (char c : text) {
+                width += GetGlyphAdvance(font, c) * scale;
+            }
+
+            if (width <= maxWidth) {
+                return text;
+            }
+
+            float suffixWidth = 0.0f;
+            for (char c : suffix) {
+                suffixWidth += GetGlyphAdvance(font, c) * scale;
+            }
+
+            float targetWidth = std::max(0.0f, maxWidth - suffixWidth);
+            float currentWidth = 0.0f;
+            size_t count = 0;
+
+            for (char c : text) {
+                float advance = GetGlyphAdvance(font, c) * scale;
+                if (currentWidth + advance > targetWidth) {
+                    break;
+                }
+                currentWidth += advance;
+                ++count;
+            }
+
+            return text.substr(0, count) + suffix;
         }
 
         std::vector<std::string> GUITextUtils::WrapText(
@@ -541,19 +625,38 @@ namespace ECS {
             const std::string& fontPath,
             float fontSize,
             float maxWidth) {
-            
             std::vector<std::string> lines;
-            
-            // TODO: Implement proper text wrapping with word boundaries
-            // For now, simple character-based wrapping
-            size_t charsPerLine = static_cast<size_t>(maxWidth / (fontSize * 0.6f));
-            
-            for (size_t i = 0; i < text.length(); i += charsPerLine) {
-                lines.push_back(text.substr(i, charsPerLine));
+            if (text.empty()) {
+                return lines;
             }
 
-            if (lines.empty()) {
-                lines.push_back("");
+            const Font& font = GetFontForMeasurement(fontPath);
+            const float scale = fontSize / static_cast<float>(font.getPixelSize());
+
+            std::string currentLine;
+            float currentWidth = 0.0f;
+
+            for (char c : text) {
+                if (c == '\n') {
+                    lines.push_back(currentLine);
+                    currentLine.clear();
+                    currentWidth = 0.0f;
+                    continue;
+                }
+
+                float advance = GetGlyphAdvance(font, c) * scale;
+                if (currentWidth + advance > maxWidth && !currentLine.empty()) {
+                    lines.push_back(currentLine);
+                    currentLine.clear();
+                    currentWidth = 0.0f;
+                }
+
+                currentLine += c;
+                currentWidth += advance;
+            }
+
+            if (!currentLine.empty()) {
+                lines.push_back(currentLine);
             }
 
             return lines;
@@ -586,17 +689,17 @@ namespace ECS {
         // GUIStyle Implementation
         // ====================================================================
 
-        const Color GUIStyle::PrimaryColor = Color{0.2f, 0.7f, 1.0f, 1.0f};
-        const Color GUIStyle::SecondaryColor = Color{1.0f, 0.6f, 0.2f, 1.0f};
-        const Color GUIStyle::BackgroundColor = Color{0.15f, 0.15f, 0.15f, 1.0f};
-        const Color GUIStyle::TextColor = Color{1.0f, 1.0f, 1.0f, 1.0f};
-        const Color GUIStyle::BorderColor = Color{0.5f, 0.5f, 0.5f, 1.0f};
-        const Color GUIStyle::HighlightColor = Color{0.2f, 0.5f, 1.0f, 1.0f};
-        const Color GUIStyle::DisabledColor = Color{0.3f, 0.3f, 0.3f, 0.5f};
-        const Color GUIStyle::ErrorColor = Color{1.0f, 0.2f, 0.2f, 1.0f};
-        const Color GUIStyle::SuccessColor = Color{0.2f, 1.0f, 0.2f, 1.0f};
+        const Color GUIStylePalette::PrimaryColor = Color{0.2f, 0.7f, 1.0f, 1.0f};
+        const Color GUIStylePalette::SecondaryColor = Color{1.0f, 0.6f, 0.2f, 1.0f};
+        const Color GUIStylePalette::BackgroundColor = Color{0.15f, 0.15f, 0.15f, 1.0f};
+        const Color GUIStylePalette::TextColor = Color{1.0f, 1.0f, 1.0f, 1.0f};
+        const Color GUIStylePalette::BorderColor = Color{0.5f, 0.5f, 0.5f, 1.0f};
+        const Color GUIStylePalette::HighlightColor = Color{0.2f, 0.5f, 1.0f, 1.0f};
+        const Color GUIStylePalette::DisabledColor = Color{0.3f, 0.3f, 0.3f, 0.5f};
+        const Color GUIStylePalette::ErrorColor = Color{1.0f, 0.2f, 0.2f, 1.0f};
+        const Color GUIStylePalette::SuccessColor = Color{0.2f, 1.0f, 0.2f, 1.0f};
 
-        Color GUIStyle::GetButtonColor(Components::ButtonState state) {
+        Color GUIStylePalette::GetButtonColor(Components::ButtonState state) {
             switch (state) {
                 case Components::ButtonState::Normal:
                     return Color{0.3f, 0.3f, 0.3f, 1.0f};
@@ -611,7 +714,7 @@ namespace ECS {
             }
         }
 
-        Color GUIStyle::GetTransitionColor(
+        Color GUIStylePalette::GetTransitionColor(
             const Color& startColor,
             const Color& endColor,
             float elapsedTime,

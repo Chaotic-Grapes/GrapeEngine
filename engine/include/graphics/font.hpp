@@ -55,6 +55,8 @@ public:
     glm::ivec2 getAtlasSize() const { return m_atlasSize; }
     int getPixelSize() const { return m_pixelSize; }
     float getLineHeight() const { return m_lineHeight; }
+    float getAscent() const { return m_ascent; }
+    float getDescent() const { return m_descent; }
 
 private:
     void cleanup();
@@ -63,6 +65,8 @@ private:
     std::string m_path{};
     int m_pixelSize = 0;
     float m_lineHeight = 0.0f;
+    float m_ascent = 0.0f;
+    float m_descent = 0.0f;
 
     // Font data kept in memory for stb_truetype
     std::vector<unsigned char> m_fontBuffer;

@@ -292,6 +292,10 @@ namespace EditorUI {
         }
     }
 
+    void RenderColorRow(const std::string& label, nlohmann::json& colorData) {
+        RenderColorProperty(label, colorData);
+    }
+
     // Renders a text field for editing a JSON string key
     // Reads the string, copies it into a local buffer, then writes back if the InputText reports a change
     void RenderTextProperty(const std::string& label, nlohmann::json& data, const std::string& key) {

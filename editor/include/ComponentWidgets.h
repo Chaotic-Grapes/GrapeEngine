@@ -71,6 +71,9 @@ namespace EditorUI {
     // Renders a color picker that edits RGBA values in JSON color data
     void RenderColorProperty(const std::string& label, nlohmann::json& colorData);
 
+    // Renders a color picker aligned as a property row
+    void RenderColorRow(const std::string& label, nlohmann::json& colorData);
+
     // Renders a text input field that edits string values in JSON data
     void RenderTextProperty(const std::string& label, nlohmann::json& data, 
         const std::string& key);

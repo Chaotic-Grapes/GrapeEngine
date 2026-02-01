@@ -67,12 +67,16 @@ Font::Font(Font&& other) noexcept
     , m_fontBuffer(std::move(other.m_fontBuffer))
     , m_pixelSize(other.m_pixelSize)
     , m_lineHeight(other.m_lineHeight)
+    , m_ascent(other.m_ascent)
+    , m_descent(other.m_descent)
     , m_atlasTex(other.m_atlasTex)
     , m_atlasSize(other.m_atlasSize)
     , m_glyphs(std::move(other.m_glyphs))
 {
     other.m_pixelSize = 0;
     other.m_lineHeight = 0.0f;
+    other.m_ascent = 0.0f;
+    other.m_descent = 0.0f;
     other.m_atlasTex = 0;
     other.m_atlasSize = { 0, 0 };
 }
@@ -85,12 +89,16 @@ Font& Font::operator=(Font&& other) noexcept {
         m_fontBuffer = std::move(other.m_fontBuffer);
         m_pixelSize = other.m_pixelSize;
         m_lineHeight = other.m_lineHeight;
+        m_ascent = other.m_ascent;
+        m_descent = other.m_descent;
         m_atlasTex = other.m_atlasTex;
         m_atlasSize = other.m_atlasSize;
         m_glyphs = std::move(other.m_glyphs);
 
         other.m_pixelSize = 0;
         other.m_lineHeight = 0.0f;
+        other.m_ascent = 0.0f;
+        other.m_descent = 0.0f;
         other.m_atlasTex = 0;
         other.m_atlasSize = { 0, 0 };
     }
@@ -116,6 +124,8 @@ void Font::loadAtlas() {
     stbtt_GetFontVMetrics(&font, &ascent, &descent, &lineGap);
     float scale = stbtt_ScaleForPixelHeight(&font, static_cast<float>(m_pixelSize));
     m_lineHeight = (ascent - descent + lineGap) * scale;
+    m_ascent = ascent * scale;
+    m_descent = descent * scale;
 
     m_atlasSize = { AtlasWidth, AtlasHeight };
     std::vector<unsigned char> atlasData(AtlasWidth * AtlasHeight, 0);

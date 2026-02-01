@@ -33,6 +33,10 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/ISystem.h"
 #include "ecs/World.h"
 #include "ecs/Components.h"
+#include "ecs/ui/GUIEventQueue.h"
+#include "ecs/ui/GUIRenderCommandBuffer.h"
+#include "ecs/ui/GUIRuntimeState.h"
+#include "ecs/ui/GUIStringCache.h"
 #include "math/Vector2D.h"
 #include "Color.h"
 #include <functional>
@@ -130,6 +134,11 @@ namespace ECS {
          * @return Entity of hovered element, or null if none
          */
         Entity GetHoveredElement() const { return m_hoveredElement; }
+
+        /**
+         * @brief Access GUI events captured this frame
+         */
+        const UI::GUIEventQueue& GetEventQueue() const { return m_eventQueue; }
 
         /**
          * @brief Show a tooltip at a specific location
@@ -265,57 +274,54 @@ namespace ECS {
         /**
          * @brief Render a specific GUI element
          */
-        void RenderElement(World& world, Entity entity, 
-                          RendererSystem* rendererSystem);
+        void RenderElement(World& world, Entity entity);
 
         /**
          * @brief Submit button rendering to RendererSystem
          */
         void RenderButton(Entity entity, const Components::GUIElement& element,
-                         const Components::GUIButton& button,
-                         RendererSystem* rendererSystem);
+                         const Components::GUIButton& button);
 
         /**
          * @brief Submit panel rendering to RendererSystem
          */
         void RenderPanel(const Components::GUIElement& element,
-                        const Components::GUIPanel& panel,
-                        RendererSystem* rendererSystem);
+                        const Components::GUIPanel& panel);
 
         /**
          * @brief Submit text rendering to RendererSystem
          */
         void RenderText(Entity entity, const Components::GUIElement& element,
-                       const Components::GUIText& text,
-                       RendererSystem* rendererSystem);
+                       const Components::GUIText& text);
 
         /**
          * @brief Submit slider rendering to RendererSystem
          */
         void RenderSlider(const Components::GUIElement& element,
-                         const Components::GUISlider& slider,
-                         RendererSystem* rendererSystem);
+                         const Components::GUISlider& slider);
 
         /**
          * @brief Submit checkbox rendering to RendererSystem
          */
         void RenderCheckbox(const Components::GUIElement& element,
-                           const Components::GUICheckbox& checkbox,
-                           RendererSystem* rendererSystem);
+                           const Components::GUICheckbox& checkbox);
 
         /**
          * @brief Submit dropdown rendering to RendererSystem
          */
         void RenderDropdown(const Components::GUIElement& element,
-                           const Components::GUIDropdown& dropdown,
-                           RendererSystem* rendererSystem);
+                           const Components::GUIDropdown& dropdown);
 
         /**
          * @brief Submit separator rendering to RendererSystem
          */
         void RenderSeparator(const Components::GUIElement& element,
-                            const Components::GUISeparator& separator,
-                            RendererSystem* rendererSystem);
+                            const Components::GUISeparator& separator);
+
+        /**
+         * @brief Submit buffered GUI commands to RendererSystem
+         */
+        void FlushRenderCommands(RendererSystem* rendererSystem);
 
         /**
          * @brief Check if a point is inside a GUI element's bounds
@@ -385,6 +391,12 @@ namespace ECS {
 
         // Action registry
         std::unordered_map<uint32_t, std::function<void(World&, Entity)>> m_actionRegistry;
+
+        // Per-frame GUI data
+        UI::GUIEventQueue m_eventQueue;
+        UI::GUIRenderCommandBuffer m_renderCommandBuffer;
+        UI::GUIRuntimeStateMap m_runtimeStates;
+        UI::GUIStringCache m_stringCache;
 
         // Input and focus state
         Entity m_focusedElement{ NULL_ENTITY };

@@ -530,6 +530,25 @@ namespace ECS {
             Stretch = 3
         };
 
+        enum class GUICanvasAlignment : uint8_t {
+            Center = 0,
+            TopLeft = 1,
+            Top = 2,
+            TopRight = 3,
+            Left = 4,
+            Right = 5,
+            BottomLeft = 6,
+            Bottom = 7,
+            BottomRight = 8
+        };
+
+        enum class GUICanvasScaleMode : uint8_t {
+            Fit = 0,
+            Fill = 1,
+            MatchWidth = 2,
+            MatchHeight = 3
+        };
+
         enum class LayoutType : uint8_t {
             Absolute = 0,       // Fixed position and size
             HorizontalBox = 1,  // Children arranged horizontally
@@ -560,15 +579,33 @@ namespace ECS {
             Separator = 11
         };
 
+
         // ============================================================================
         // Core GUI Components
         // ============================================================================
 
         /**
+         * @brief Global GUI canvas settings for reference scaling.
+         * Use a single instance to define the design resolution and scale factor.
+         */
+        struct GUICanvas {
+            Vector2D ReferenceSize{ 1920.0f, 1080.0f };
+            float ScaleFactor = 1.0f;
+            GUICanvasAlignment Alignment = GUICanvasAlignment::Center;
+            Vector2D Offset{ 0.0f, 0.0f };
+            GUICanvasScaleMode ScaleMode = GUICanvasScaleMode::Fit;
+            bool DebugDraw = false;
+            Color DebugBoundsColor{ 0.2f, 0.8f, 1.0f, 0.6f };
+            Color DebugPaddingColor{ 1.0f, 0.8f, 0.2f, 0.6f };
+            Color DebugAnchorColor{ 1.0f, 0.2f, 0.2f, 0.8f };
+        };
+        static_assert(std::is_trivially_copyable_v<GUICanvas>, "GUICanvas must be trivially copyable");
+
+        /**
          * @brief Base component for all GUI elements
          * Provides positioning, sizing, visibility, and anchoring
          */
-        struct GUIElement {
+                struct GUIElement {
             // Layout and positioning
             Vector2D Position{ 0.0f, 0.0f };      // Local position (relative to parent)
             Vector2D Size{ 100.0f, 100.0f };      // Width and height in pixels
@@ -596,16 +633,24 @@ namespace ECS {
             int16_t ZOrder = 0;
 
             // Cached world position (computed by layout system)
-            Vector2D WorldPosition{ 0.0f, 0.0f };
-            bool DirtyLayout = true;              // Marks that layout needs recomputation
-        };
-        static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
+                    Vector2D WorldPosition{ 0.0f, 0.0f };
+                    bool DirtyLayout = true;              // Marks that layout needs recomputation
+                };
+                static_assert(std::is_trivially_copyable_v<GUIElement>, "GUIElement must be trivially copyable");
 
-        /**
-         * @brief Container component for managing child elements
-         * Supports various layout types (Box, Grid, etc.)
-         */
-        struct GUIContainer {
+                /**
+                 * @brief Style reference for GUI elements (StringTable ID)
+                 */
+        struct GUIStyleRef {
+            uint32_t StyleId = 0;
+        };
+        static_assert(std::is_trivially_copyable_v<GUIStyleRef>, "GUIStyleRef must be trivially copyable");
+
+                /**
+                 * @brief Container component for managing child elements
+                 * Supports various layout types (Box, Grid, etc.)
+                 */
+                struct GUIContainer {
             LayoutType Layout = LayoutType::VerticalBox;
 
             // Box layout properties
@@ -661,6 +706,55 @@ namespace ECS {
         static_assert(std::is_trivially_copyable_v<GUIPanel>, "GUIPanel must be trivially copyable");
 
         /**
+         * @brief GUI Text component (separate from general Text component)
+         * Optimized for GUI rendering with anchoring and alignment
+         */
+        struct GUIText {
+                    static constexpr size_t MaxTextLength = 512;
+
+                    uint32_t Content = 0;
+                    uint32_t FontPath = 0;
+
+            float FontSize = 16.0f;
+            Color FontColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+
+            enum class TextAlignment : uint8_t {
+                Left = 0,
+                Center = 1,
+                Right = 2,
+                Justified = 3
+            } Alignment = TextAlignment::Left;
+
+            bool BestFit = false;                 // Auto-scale font to fit
+            float MinFontSize = 10.0f;
+            float MaxFontSize = 100.0f;
+
+            bool RichText = false;                // Support for color tags, etc.
+            bool WordWrap = true;
+
+            // Shadow effect
+            bool CastShadow = false;
+            Color ShadowColor{ 0.0f, 0.0f, 0.0f, 0.3f };
+            Vector2D ShadowOffset{ 1.0f, -1.0f };
+
+            // Outline
+            bool HasOutline = false;
+            Color OutlineColor{ 0.0f, 0.0f, 0.0f, 1.0f };
+            float OutlineWidth = 1.0f;
+        };
+        static_assert(std::is_trivially_copyable_v<GUIText>, "GUIText must be trivially copyable");
+
+        struct GUITextSettings {
+            uint32_t FontPath = 0;
+            float FontSize = 16.0f;
+            Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+            GUIText::TextAlignment Alignment = GUIText::TextAlignment::Left;
+            Color ShadowColor{ 0.0f, 0.0f, 0.0f, 0.0f };
+            Vector2D ShadowOffset{ 0.0f, 0.0f };
+        };
+        static_assert(std::is_trivially_copyable_v<GUITextSettings>, "GUITextSettings must be trivially copyable");
+
+        /**
          * @brief Button component with state and interaction
          */
                 struct GUIButton {
@@ -672,21 +766,23 @@ namespace ECS {
             Color ColorPressed{ 0.2f, 0.2f, 0.2f, 1.0f };
             Color ColorDisabled{ 0.15f, 0.15f, 0.15f, 0.5f };
 
-            // Button properties
-            bool Interactable = true;
-            bool Pressed = false;                 // True if pressed this frame
-            bool Released = false;                // True if released this frame
-            bool Hovered = false;
+              // Button properties
+              bool Interactable = true;
+              bool Pressed = false;                 // True if pressed this frame
+              bool Released = false;                // True if released this frame
+              bool Hovered = false;
 
-                    // Action callback ID (maps to GUISystem's action registry)
-                    uint32_t ActionID = 0;
+                      // Action callback ID (maps to GUISystem's action registry)
+                      uint32_t ActionID = 0;
 
-                    // Button label (for convenience, usually separate Text component)
-                    uint32_t Label = 0;
+                      // Button label (for convenience, usually separate Text component)
+                      uint32_t Label = 0;
+            bool UseLabelTextSettings = false;
+            GUITextSettings LabelTextSettings{};
 
-            // Transition effects
-            float TransitionDuration = 0.1f;      // Time to transition between states
-            float TransitionTimer = 0.0f;         // Current transition time
+              // Transition effects
+              float TransitionDuration = 0.1f;      // Time to transition between states
+              float TransitionTimer = 0.0f;         // Current transition time
         };
         static_assert(std::is_trivially_copyable_v<GUIButton>, "GUIButton must be trivially copyable");
 
@@ -699,13 +795,17 @@ namespace ECS {
                     uint32_t Content = 0;
                     uint32_t Placeholder = 0;
 
-                    Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-                    Color BackgroundColor{ 0.1f, 0.1f, 0.1f, 1.0f };
-                    Color CaretColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-                    Color SelectionColor{ 0.2f, 0.5f, 1.0f, 0.5f };
+              Color TextColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+              Color BackgroundColor{ 0.1f, 0.1f, 0.1f, 1.0f };
+              Color CaretColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+              Color SelectionColor{ 0.2f, 0.5f, 1.0f, 0.5f };
 
-                    float FontSize = 16.0f;
-                    uint32_t FontPath = 0;
+              float FontSize = 16.0f;
+              uint32_t FontPath = 0;
+            bool UseTextSettings = false;
+            GUITextSettings TextSettings{};
+            bool UsePlaceholderSettings = false;
+            GUITextSettings PlaceholderSettings{};
 
             uint32_t MaxCharacters = 0;           // 0 = unlimited
             uint32_t CurrentCharCount = 0;
@@ -771,6 +871,10 @@ namespace ECS {
 
             float BorderThickness = 1.0f;
             float CheckSize = 20.0f;
+            float LabelFontSize = 16.0f;
+            HorizontalAlignment LabelAlignment = HorizontalAlignment::Left;
+            bool UseLabelTextSettings = false;
+            GUITextSettings LabelTextSettings{};
 
             // Callback
             uint32_t ActionID = 0;
@@ -799,6 +903,8 @@ namespace ECS {
 
             float ItemHeight = 30.0f;
             float MaxHeight = 200.0f;            // Max height before scrolling
+            bool UseOptionTextSettings = false;
+            GUITextSettings OptionTextSettings{};
 
             // Callback
             uint32_t ActionID = 0;
@@ -858,44 +964,6 @@ namespace ECS {
         };
         static_assert(std::is_trivially_copyable_v<GUISeparator>, "GUISeparator must be trivially copyable");
 
-        /**
-         * @brief GUI Text component (separate from general Text component)
-         * Optimized for GUI rendering with anchoring and alignment
-         */
-                struct GUIText {
-                    static constexpr size_t MaxTextLength = 512;
-
-                    uint32_t Content = 0;
-                    uint32_t FontPath = 0;
-
-            float FontSize = 16.0f;
-            Color FontColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-
-            enum class TextAlignment : uint8_t {
-                Left = 0,
-                Center = 1,
-                Right = 2,
-                Justified = 3
-            } Alignment = TextAlignment::Left;
-
-            bool BestFit = false;                 // Auto-scale font to fit
-            float MinFontSize = 10.0f;
-            float MaxFontSize = 100.0f;
-
-            bool RichText = false;                // Support for color tags, etc.
-            bool WordWrap = true;
-
-            // Shadow effect
-            bool CastShadow = false;
-            Color ShadowColor{ 0.0f, 0.0f, 0.0f, 0.3f };
-            Vector2D ShadowOffset{ 1.0f, -1.0f };
-
-            // Outline
-            bool HasOutline = false;
-            Color OutlineColor{ 0.0f, 0.0f, 0.0f, 1.0f };
-            float OutlineWidth = 1.0f;
-        };
-        static_assert(std::is_trivially_copyable_v<GUIText>, "GUIText must be trivially copyable");
 
         /**
          * @brief GUI Layout Group component (for automatic layout calculation)

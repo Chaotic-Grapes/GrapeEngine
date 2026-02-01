@@ -94,6 +94,18 @@ namespace ECS {
                 element.Size
             );
 
+            if (const auto* parent = world.TryGet<Components::Parent>(entity)) {
+                if (!parent->ParentEntity.IsNull() && world.Has<Components::GUIScrollView>(parent->ParentEntity)) {
+                    const auto& scroll = world.Get<Components::GUIScrollView>(parent->ParentEntity);
+                    if (scroll.HorizontalScroll) {
+                        worldPos.X -= scroll.ScrollPosition.X;
+                    }
+                    if (scroll.VerticalScroll) {
+                        worldPos.Y -= scroll.ScrollPosition.Y;
+                    }
+                }
+            }
+
             element.WorldPosition = worldPos;
 
             // If this is a container, layout children

@@ -127,7 +127,9 @@ namespace ECS {
 		REGISTER_COMPONENT(Material2D);
 
         // GUI
+        REGISTER_COMPONENT(GUICanvas);
         REGISTER_COMPONENT(GUIElement);
+        REGISTER_COMPONENT(GUIStyleRef);
         REGISTER_COMPONENT(GUIContainer);
         REGISTER_COMPONENT(GUIPanel);
         REGISTER_COMPONENT(GUIButton);
@@ -194,7 +196,9 @@ namespace ECS {
         LogComponentTypeIds("Light2D", FNV1a_Hash("Light2D"));
         LogComponentTypeIds("AudioSource", FNV1a_Hash("AudioSource"));
         LogComponentTypeIds("Material2D", FNV1a_Hash("Material2D"));
+        LogComponentTypeIds("GUICanvas", FNV1a_Hash("GUICanvas"));
         LogComponentTypeIds("GUIElement", FNV1a_Hash("GUIElement"));
+        LogComponentTypeIds("GUIStyleRef", FNV1a_Hash("GUIStyleRef"));
         LogComponentTypeIds("GUIContainer", FNV1a_Hash("GUIContainer"));
         LogComponentTypeIds("GUIPanel", FNV1a_Hash("GUIPanel"));
         LogComponentTypeIds("GUIButton", FNV1a_Hash("GUIButton"));

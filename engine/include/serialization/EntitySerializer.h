@@ -431,7 +431,65 @@ namespace ECS {
 			return defaultId;
 		}
 
+		inline void to_json(nlohmann::json& j, const GUICanvas& canvas) {
+			j = nlohmann::json{
+				{"ReferenceSize", canvas.ReferenceSize},
+				{"ScaleFactor", canvas.ScaleFactor},
+				{"Alignment", canvas.Alignment},
+				{"Offset", canvas.Offset},
+				{"ScaleMode", static_cast<uint8_t>(canvas.ScaleMode)},
+				{"DebugDraw", canvas.DebugDraw},
+				{"DebugBoundsColor", canvas.DebugBoundsColor},
+				{"DebugPaddingColor", canvas.DebugPaddingColor},
+				{"DebugAnchorColor", canvas.DebugAnchorColor}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, GUICanvas& canvas) {
+			const GUICanvas defaults{};
+			canvas.ReferenceSize = j.value("ReferenceSize", defaults.ReferenceSize);
+			canvas.ScaleFactor = j.value("ScaleFactor", defaults.ScaleFactor);
+			canvas.Alignment = j.value("Alignment", defaults.Alignment);
+			canvas.Offset = j.value("Offset", defaults.Offset);
+			canvas.ScaleMode = static_cast<GUICanvasScaleMode>(
+				j.value("ScaleMode", static_cast<uint8_t>(defaults.ScaleMode)));
+			canvas.DebugDraw = j.value("DebugDraw", defaults.DebugDraw);
+			canvas.DebugBoundsColor = j.value("DebugBoundsColor", defaults.DebugBoundsColor);
+			canvas.DebugPaddingColor = j.value("DebugPaddingColor", defaults.DebugPaddingColor);
+			canvas.DebugAnchorColor = j.value("DebugAnchorColor", defaults.DebugAnchorColor);
+		}
+		inline void to_json(nlohmann::json& j, const GUITextSettings& settings) {
+			j = nlohmann::json{
+				{"FontPath", ResolveStringId(settings.FontPath)},
+				{"FontSize", settings.FontSize},
+				{"Color", settings.TextColor},
+				{"Alignment", static_cast<uint8_t>(settings.Alignment)},
+				{"ShadowColor", settings.ShadowColor},
+				{"ShadowOffset", settings.ShadowOffset}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, GUITextSettings& settings) {
+			const GUITextSettings defaults{};
+			settings.FontPath = ReadStringId(j, "FontPath", defaults.FontPath);
+			settings.FontSize = j.value("FontSize", defaults.FontSize);
+			settings.TextColor = j.value("Color", defaults.TextColor);
+			settings.Alignment = static_cast<GUIText::TextAlignment>(j.value(
+				"Alignment", static_cast<uint8_t>(defaults.Alignment)));
+			settings.ShadowColor = j.value("ShadowColor", defaults.ShadowColor);
+			settings.ShadowOffset = j.value("ShadowOffset", defaults.ShadowOffset);
+		}
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIElement, Position, Size, AnchorMin, AnchorMax, Offset, Active, Visible, Raycast, HAlign, VAlign, ElementType, PaddingLeft, PaddingRight, PaddingTop, PaddingBottom, ZOrder, WorldPosition, DirtyLayout)
+		inline void to_json(nlohmann::json& j, const GUIStyleRef& style) {
+			j = nlohmann::json{
+				{"StyleId", ResolveStringId(style.StyleId)}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, GUIStyleRef& style) {
+			const GUIStyleRef defaults{};
+			style.StyleId = ReadStringId(j, "StyleId", defaults.StyleId);
+		}
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIContainer, Layout, Spacing, ChildForceExpandWidth, ChildForceExpandHeight, GridColumns, GridCellPaddingX, GridCellPaddingY, PreferredWidthDynamic, PreferredHeightDynamic, MinWidth, MinHeight)
 		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GUIPanel, BackgroundColor, BorderColor, BorderThickness, BorderRadius, CastShadow, ShadowColor, ShadowOffset, ShadowBlur, ClipContent)
 
@@ -445,6 +503,8 @@ namespace ECS {
 				{"Interactable", button.Interactable},
 				{"ActionID", button.ActionID},
 				{"Label", ResolveStringId(button.Label)},
+				{"UseLabelTextSettings", button.UseLabelTextSettings},
+				{"LabelTextSettings", button.LabelTextSettings},
 				{"TransitionDuration", button.TransitionDuration},
 				{"TransitionTimer", button.TransitionTimer}
 			};
@@ -460,6 +520,8 @@ namespace ECS {
 			button.Interactable = j.value("Interactable", defaults.Interactable);
 			button.ActionID = j.value("ActionID", defaults.ActionID);
 			button.Label = ReadStringId(j, "Label", defaults.Label);
+			button.UseLabelTextSettings = j.value("UseLabelTextSettings", defaults.UseLabelTextSettings);
+			button.LabelTextSettings = j.value("LabelTextSettings", defaults.LabelTextSettings);
 			button.TransitionDuration = j.value("TransitionDuration", defaults.TransitionDuration);
 			button.TransitionTimer = j.value("TransitionTimer", defaults.TransitionTimer);
 		}
@@ -474,6 +536,10 @@ namespace ECS {
 				{"SelectionColor", input.SelectionColor},
 				{"FontSize", input.FontSize},
 				{"FontPath", ResolveStringId(input.FontPath)},
+				{"UseTextSettings", input.UseTextSettings},
+				{"TextSettings", input.TextSettings},
+				{"UsePlaceholderSettings", input.UsePlaceholderSettings},
+				{"PlaceholderSettings", input.PlaceholderSettings},
 				{"MaxCharacters", input.MaxCharacters},
 				{"CurrentCharCount", input.CurrentCharCount},
 				{"Interactable", input.Interactable},
@@ -496,6 +562,10 @@ namespace ECS {
 			input.SelectionColor = j.value("SelectionColor", defaults.SelectionColor);
 			input.FontSize = j.value("FontSize", defaults.FontSize);
 			input.FontPath = ReadStringId(j, "FontPath", defaults.FontPath);
+			input.UseTextSettings = j.value("UseTextSettings", defaults.UseTextSettings);
+			input.TextSettings = j.value("TextSettings", defaults.TextSettings);
+			input.UsePlaceholderSettings = j.value("UsePlaceholderSettings", defaults.UsePlaceholderSettings);
+			input.PlaceholderSettings = j.value("PlaceholderSettings", defaults.PlaceholderSettings);
 			input.MaxCharacters = j.value("MaxCharacters", defaults.MaxCharacters);
 			input.CurrentCharCount = j.value("CurrentCharCount", defaults.CurrentCharCount);
 			input.Interactable = j.value("Interactable", defaults.Interactable);
@@ -518,6 +588,10 @@ namespace ECS {
 				{"BorderColor", checkbox.BorderColor},
 				{"BorderThickness", checkbox.BorderThickness},
 				{"CheckSize", checkbox.CheckSize},
+				{"LabelFontSize", checkbox.LabelFontSize},
+				{"LabelAlignment", static_cast<uint8_t>(checkbox.LabelAlignment)},
+				{"UseLabelTextSettings", checkbox.UseLabelTextSettings},
+				{"LabelTextSettings", checkbox.LabelTextSettings},
 				{"ActionID", checkbox.ActionID},
 				{"Label", ResolveStringId(checkbox.Label)}
 			};
@@ -532,6 +606,11 @@ namespace ECS {
 			checkbox.BorderColor = j.value("BorderColor", defaults.BorderColor);
 			checkbox.BorderThickness = j.value("BorderThickness", defaults.BorderThickness);
 			checkbox.CheckSize = j.value("CheckSize", defaults.CheckSize);
+			checkbox.LabelFontSize = j.value("LabelFontSize", defaults.LabelFontSize);
+			checkbox.LabelAlignment = static_cast<HorizontalAlignment>(j.value(
+				"LabelAlignment", static_cast<uint8_t>(defaults.LabelAlignment)));
+			checkbox.UseLabelTextSettings = j.value("UseLabelTextSettings", defaults.UseLabelTextSettings);
+			checkbox.LabelTextSettings = j.value("LabelTextSettings", defaults.LabelTextSettings);
 			checkbox.ActionID = j.value("ActionID", defaults.ActionID);
 			checkbox.Label = ReadStringId(j, "Label", defaults.Label);
 		}
@@ -547,6 +626,8 @@ namespace ECS {
 				{"HighlightColor", dropdown.HighlightColor},
 				{"ItemHeight", dropdown.ItemHeight},
 				{"MaxHeight", dropdown.MaxHeight},
+				{"UseOptionTextSettings", dropdown.UseOptionTextSettings},
+				{"OptionTextSettings", dropdown.OptionTextSettings},
 				{"ActionID", dropdown.ActionID},
 				{"ScrollPosition", dropdown.ScrollPosition}
 			};
@@ -563,6 +644,8 @@ namespace ECS {
 			dropdown.HighlightColor = j.value("HighlightColor", defaults.HighlightColor);
 			dropdown.ItemHeight = j.value("ItemHeight", defaults.ItemHeight);
 			dropdown.MaxHeight = j.value("MaxHeight", defaults.MaxHeight);
+			dropdown.UseOptionTextSettings = j.value("UseOptionTextSettings", defaults.UseOptionTextSettings);
+			dropdown.OptionTextSettings = j.value("OptionTextSettings", defaults.OptionTextSettings);
 			dropdown.ActionID = j.value("ActionID", defaults.ActionID);
 			dropdown.ScrollPosition = j.value("ScrollPosition", defaults.ScrollPosition);
 		}
@@ -1063,7 +1146,9 @@ namespace Serialization {
 	REGISTER_COMPONENT_SERIALIZER(PrefabLink, ECS::Components::PrefabLink, "PrefabLink")
 	REGISTER_COMPONENT_SERIALIZER(PrefabInstanceMetadata, ECS::Components::PrefabInstanceMetadata, "PrefabInstanceMetadata")
 	REGISTER_COMPONENT_SERIALIZER(Material2D, ECS::Components::Material2D, "Material2D");
+	REGISTER_COMPONENT_SERIALIZER(GUICanvas, ECS::Components::GUICanvas, "GUICanvas")
 	REGISTER_COMPONENT_SERIALIZER(GUIElement, ECS::Components::GUIElement, "GUIElement")
+	REGISTER_COMPONENT_SERIALIZER(GUIStyleRef, ECS::Components::GUIStyleRef, "GUIStyleRef")
 	REGISTER_COMPONENT_SERIALIZER(GUIContainer, ECS::Components::GUIContainer, "GUIContainer")
 	REGISTER_COMPONENT_SERIALIZER(GUIPanel, ECS::Components::GUIPanel, "GUIPanel")
 	REGISTER_COMPONENT_SERIALIZER(GUIButton, ECS::Components::GUIButton, "GUIButton")

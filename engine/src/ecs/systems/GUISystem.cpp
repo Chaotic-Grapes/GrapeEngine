@@ -27,17 +27,19 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/systems/GUISystem.h"
 #include "ecs/ui/GUILayout.h"
+#include "ecs/ui/GUIHelpers.h"
+#include "ecs/ui/GUIContext.h"
 #include "ecs/World.h"
 #include "ecs/systems/RendererSystem.h"
 #include "services/Input.h"
 #include "services/TimeSystem.h"
 #include "core/Logger.h"
 #include "core/Application.h"
-#include "ecs/StringTable.h"
 #include "graphics/renderer.hpp"
 #include "graphics/shader.hpp"
 #include "graphics/font.hpp"
 #include "helpers/MathUtils.h"
+#include "ecs/StringTable.h"
 #include <algorithm>
 #include <glm/vec2.hpp>
 #include <memory>
@@ -60,6 +62,15 @@ namespace ECS {
 
     void GUISystem::OnUpdate(World& world) {
         const float deltaTime = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+        m_eventQueue.Clear();
+        m_renderCommandBuffer.Clear();
+        m_stringCache.Clear();
+        for (auto& [id, state] : m_runtimeStates) {
+            state.Hovered = false;
+            state.Pressed = false;
+            state.Released = false;
+        }
+
         // Phase 0: Build spatial grid for hit-testing acceleration
         if (m_spatialGridDirty) {
             BuildSpatialGrid(world);
@@ -319,13 +330,35 @@ namespace ECS {
         m_mouseDown = mouseDown;
 
         // Raycast to find element under mouse using spatial grid
+        Entity previousHovered = m_hoveredElement;
         m_hoveredElement = RaycastGUI(world, m_mousePosition);
+        if (previousHovered != m_hoveredElement) {
+            if (!previousHovered.IsNull()) {
+                m_eventQueue.Push(UI::GUIEventType::HoverExited, previousHovered, m_mousePosition);
+            }
+            if (!m_hoveredElement.IsNull()) {
+                m_eventQueue.Push(UI::GUIEventType::HoverEntered, m_hoveredElement, m_mousePosition);
+            }
+        }
+
+        if (!m_hoveredElement.IsNull()) {
+            m_runtimeStates[m_hoveredElement.Index].Hovered = true;
+        }
 
         // Track pressed element
         if (mousePressed && !m_hoveredElement.IsNull()) {
             m_pressedElement = m_hoveredElement;
+            m_runtimeStates[m_pressedElement.Index].Pressed = true;
+            m_eventQueue.Push(UI::GUIEventType::Pressed, m_pressedElement, m_mousePosition);
         }
         if (mouseReleased) {
+            if (!m_pressedElement.IsNull()) {
+                m_runtimeStates[m_pressedElement.Index].Released = true;
+                m_eventQueue.Push(UI::GUIEventType::Released, m_pressedElement, m_mousePosition);
+                if (m_pressedElement == m_hoveredElement) {
+                    m_eventQueue.Push(UI::GUIEventType::Clicked, m_pressedElement, m_mousePosition);
+                }
+            }
             m_pressedElement = NULL_ENTITY;
         }
 
@@ -356,6 +389,24 @@ namespace ECS {
             // Set drag if hovering over draggable element
             if (!m_hoveredElement.IsNull()) {
                 m_draggedElement = m_hoveredElement;
+            }
+
+            Entity previousFocused = m_focusedElement;
+            if (!m_hoveredElement.IsNull() && world.Has<Components::GUIInputField>(m_hoveredElement)) {
+                m_focusedElement = m_hoveredElement;
+            } else {
+                m_focusedElement = NULL_ENTITY;
+            }
+
+            if (previousFocused != m_focusedElement) {
+                if (!previousFocused.IsNull()) {
+                    m_eventQueue.Push(UI::GUIEventType::Unfocused, previousFocused, m_mousePosition);
+                    m_runtimeStates[previousFocused.Index].Focused = false;
+                }
+                if (!m_focusedElement.IsNull()) {
+                    m_eventQueue.Push(UI::GUIEventType::Focused, m_focusedElement, m_mousePosition);
+                    m_runtimeStates[m_focusedElement.Index].Focused = true;
+                }
             }
         }
 
@@ -460,34 +511,39 @@ namespace ECS {
 
     void GUISystem::UpdateButtonState(World& world, Entity entity, Components::GUIButton& button,
                                      bool mouseOver, bool mousePressed) {
+        auto& runtimeState = m_runtimeStates[entity.Index];
+        runtimeState.Hovered = mouseOver;
+
         // Transition between states
         if (!button.Interactable) {
             button.State = Components::ButtonState::Disabled;
+            runtimeState.Pressed = false;
             return;
         }
 
         if (mousePressed) {
             button.State = Components::ButtonState::Pressed;
-            button.Pressed = true;
+            runtimeState.Pressed = true;
         } else if (mouseOver) {
             button.State = Components::ButtonState::Hovered;
-            button.Pressed = false;
+            runtimeState.Pressed = false;
         } else {
             button.State = Components::ButtonState::Normal;
-            button.Pressed = false;
+            runtimeState.Pressed = false;
         }
 
         // Check for release and trigger action
-        if (m_mouseReleased && mouseOver && !button.Pressed) {
+        if (m_mouseReleased && mouseOver && m_pressedElement == entity) {
             if (button.ActionID != 0) {
-                auto it = m_actionRegistry.find(button.ActionID);
-                if (it != m_actionRegistry.end()) {
+                auto& registry = UI::GUIContext::Get().ActionRegistry;
+                auto it = registry.find(button.ActionID);
+                if (it != registry.end()) {
                     it->second(world, entity);
                 }
             }
-            button.Released = true;
+            runtimeState.Released = true;
         } else {
-            button.Released = false;
+            runtimeState.Released = false;
         }
     }
 
@@ -498,14 +554,16 @@ namespace ECS {
             return;
         }
 
+        auto& runtimeState = m_runtimeStates[entity.Index];
+
         // Check if mouse started dragging on slider handle
         if (m_mousePressed && mouseOver && m_draggedElement == entity) {
-            slider.Dragging = true;
-            slider.DragOffset = mousePos.X - element.WorldPosition.X;
+            runtimeState.Dragging = true;
+            runtimeState.DragOffset = mousePos.X - element.WorldPosition.X;
         }
 
         // Update slider value while dragging
-        if (slider.Dragging && m_mouseDown) {
+        if (runtimeState.Dragging && m_mouseDown) {
             float sliderX = mousePos.X - element.WorldPosition.X;
             float sliderWidth = element.Size.X;
             float ratio = std::max(0.0f, std::min(1.0f, sliderX / sliderWidth));
@@ -522,14 +580,12 @@ namespace ECS {
 
         // Stop dragging on mouse release
         if (m_mouseReleased) {
-            slider.Dragging = false;
+            runtimeState.Dragging = false;
         }
     }
 
     void GUISystem::UpdateInputField(Entity entity, Components::GUIInputField& input,
                                     bool focused, char inputChar) {
-        input.Focused = focused;
-
         if (!focused || !input.Interactable) {
             return;
         }
@@ -572,14 +628,14 @@ namespace ECS {
         // Render each element
         for (Entity entity : guiElements) {
             if (world.IsAlive(entity)) {
-                RenderElement(world, entity, rendererSystem);
+                RenderElement(world, entity);
             }
         }
 
         // Render modals on top
         for (Entity modal : m_modals) {
             if (world.IsAlive(modal)) {
-                RenderElement(world, modal, rendererSystem);
+                RenderElement(world, modal);
             }
         }
 
@@ -587,10 +643,11 @@ namespace ECS {
         if (m_tooltip.Visible) {
             // TODO: Render tooltip via RendererSystem
         }
+
+        FlushRenderCommands(rendererSystem);
     }
 
-    void GUISystem::RenderElement(World& world, Entity entity,
-                                 RendererSystem* rendererSystem) {
+    void GUISystem::RenderElement(World& world, Entity entity) {
         if (!world.Has<Components::GUIElement>(entity)) {
             return;
         }
@@ -603,39 +660,36 @@ namespace ECS {
 
         // Render based on component type
         if (world.Has<Components::GUIPanel>(entity)) {
-            RenderPanel(element, world.Get<Components::GUIPanel>(entity), rendererSystem);
+            RenderPanel(element, world.Get<Components::GUIPanel>(entity));
         }
 
         if (world.Has<Components::GUIButton>(entity)) {
-            RenderButton(entity, element, world.Get<Components::GUIButton>(entity), rendererSystem);
+            RenderButton(entity, element, world.Get<Components::GUIButton>(entity));
         }
 
         if (world.Has<Components::GUIText>(entity)) {
-            RenderText(entity, element, world.Get<Components::GUIText>(entity), rendererSystem);
+            RenderText(entity, element, world.Get<Components::GUIText>(entity));
         }
 
         if (world.Has<Components::GUISlider>(entity)) {
-            RenderSlider(element, world.Get<Components::GUISlider>(entity), rendererSystem);
+            RenderSlider(element, world.Get<Components::GUISlider>(entity));
         }
 
         if (world.Has<Components::GUICheckbox>(entity)) {
-            RenderCheckbox(element, world.Get<Components::GUICheckbox>(entity), rendererSystem);
+            RenderCheckbox(element, world.Get<Components::GUICheckbox>(entity));
         }
 
         if (world.Has<Components::GUIDropdown>(entity)) {
-            RenderDropdown(element, world.Get<Components::GUIDropdown>(entity), rendererSystem);
+            RenderDropdown(element, world.Get<Components::GUIDropdown>(entity));
         }
 
         if (world.Has<Components::GUISeparator>(entity)) {
-            RenderSeparator(element, world.Get<Components::GUISeparator>(entity), rendererSystem);
+            RenderSeparator(element, world.Get<Components::GUISeparator>(entity));
         }
     }
 
     void GUISystem::RenderButton(Entity entity, const Components::GUIElement& element,
-                                const Components::GUIButton& button,
-                                RendererSystem* rendererSystem) {
-        if (!rendererSystem) return;
-        
+                                const Components::GUIButton& button) {
         // Determine button color based on state
         Color bgColor;
         switch (button.State) {
@@ -655,77 +709,107 @@ namespace ECS {
         }
 
         // Submit button panel rendering
-        rendererSystem->SubmitGUIPanel(element.WorldPosition, element.Size, bgColor, 0.0f);
+        Vector2D center{
+            element.WorldPosition.X + element.Size.X * 0.5f,
+            element.WorldPosition.Y + element.Size.Y * 0.5f
+        };
+        m_renderCommandBuffer.SubmitPanel(center, element.Size, bgColor, 0.0f);
     }
 
     void GUISystem::RenderPanel(const Components::GUIElement& element,
-                               const Components::GUIPanel& panel,
-                               RendererSystem* rendererSystem) {
-        if (!rendererSystem) return;
-        
+                               const Components::GUIPanel& panel) {
         // Submit panel rendering to RendererSystem
-        rendererSystem->SubmitGUIPanel(element.WorldPosition, element.Size, 
-                                      panel.BackgroundColor, panel.BorderRadius);
+        Vector2D center{
+            element.WorldPosition.X + element.Size.X * 0.5f,
+            element.WorldPosition.Y + element.Size.Y * 0.5f
+        };
+        m_renderCommandBuffer.SubmitPanel(center, element.Size,
+                                          panel.BackgroundColor, panel.BorderRadius);
     }
 
     void GUISystem::RenderText(Entity entity, const Components::GUIElement& element,
-                              const Components::GUIText& text,
-                              RendererSystem* rendererSystem) {
-        if (!rendererSystem) {
-            return;
+                              const Components::GUIText& text) {
+        (void)entity;
+        const std::string content = ECS::StringTable::Resolve(text.Content);
+        const std::string fontPath = ECS::StringTable::Resolve(text.FontPath);
+        const Vector2D measured = UI::GUITextUtils::MeasureText(content, fontPath, text.FontSize);
+
+        const float contentWidth = std::max(0.0f, element.Size.X - element.PaddingLeft - element.PaddingRight);
+        const float contentHeight = std::max(0.0f, element.Size.Y - element.PaddingTop - element.PaddingBottom);
+
+        float x = element.WorldPosition.X + element.PaddingLeft;
+        switch (text.Alignment) {
+            case Components::GUIText::TextAlignment::Center:
+                x += (contentWidth - measured.X) * 0.5f;
+                break;
+            case Components::GUIText::TextAlignment::Right:
+                x += contentWidth - measured.X;
+                break;
+            case Components::GUIText::TextAlignment::Justified:
+            case Components::GUIText::TextAlignment::Left:
+            default:
+                break;
         }
 
-        // Get font path, use default if empty
-        std::string fontPath = text.FontPath ? ECS::StringTable::Resolve(text.FontPath) : std::string();
-        if (fontPath.empty()) {
-            fontPath = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf";
+        float y = element.WorldPosition.Y + element.PaddingTop;
+        switch (element.VAlign) {
+            case Components::VerticalAlignment::Middle:
+                y += (contentHeight - measured.Y) * 0.5f;
+                break;
+            case Components::VerticalAlignment::Bottom:
+                y += contentHeight - measured.Y;
+                break;
+            case Components::VerticalAlignment::Stretch:
+            case Components::VerticalAlignment::Top:
+            default:
+                break;
         }
 
-        std::string content = text.Content ? ECS::StringTable::Resolve(text.Content) : std::string();
-
-        // Submit text rendering via RendererSystem
-        rendererSystem->SubmitGUIText(fontPath, content, element.WorldPosition,
-                                      text.FontColor, text.FontSize,
-                                      text.ShadowColor, text.ShadowOffset);
+        m_renderCommandBuffer.SubmitText(text.FontPath, text.Content, { x, y },
+                                         text.FontColor, text.FontSize,
+                                         text.ShadowColor, text.ShadowOffset);
     }
 
     void GUISystem::RenderSlider(const Components::GUIElement& element,
-                                const Components::GUISlider& slider,
-                                RendererSystem* rendererSystem) {
-        if (!rendererSystem) return;
-        
+                                const Components::GUISlider& slider) {
         // Normalize current value to 0.0-1.0 range for the slider handle position
         float normalizedValue = (slider.CurrentValue - slider.MinValue) / 
                                 (slider.MaxValue - slider.MinValue);
         normalizedValue = std::max(0.0f, std::min(1.0f, normalizedValue));
         
         // Submit slider rendering via RendererSystem
-        rendererSystem->SubmitGUISlider(element.WorldPosition, element.Size,
-                                        normalizedValue, slider.BackgroundColor,
-                                        slider.HandleColor);
+        Vector2D center{
+            element.WorldPosition.X + element.Size.X * 0.5f,
+            element.WorldPosition.Y + element.Size.Y * 0.5f
+        };
+        m_renderCommandBuffer.SubmitSlider(center, element.Size,
+                                           normalizedValue, slider.BackgroundColor,
+                                           slider.HandleColor);
     }
 
     void GUISystem::RenderCheckbox(const Components::GUIElement& element,
-                                  const Components::GUICheckbox& checkbox,
-                                  RendererSystem* rendererSystem) {
-        if (!rendererSystem) return;
-        
+                                  const Components::GUICheckbox& checkbox) {
         // Submit checkbox rendering via RendererSystem
         // Use appropriate color based on checked state
         Color boxColor = checkbox.IsChecked ? checkbox.CheckedColor : checkbox.UncheckedColor;
-        rendererSystem->SubmitGUICheckbox(element.WorldPosition, element.Size,
-                                         checkbox.IsChecked, boxColor,
-                                         checkbox.CheckedColor, checkbox.BorderColor);
+        Vector2D center{
+            element.WorldPosition.X + element.Size.X * 0.5f,
+            element.WorldPosition.Y + element.Size.Y * 0.5f
+        };
+        m_renderCommandBuffer.SubmitCheckbox(center, element.Size,
+                                             checkbox.IsChecked, boxColor,
+                                             checkbox.CheckedColor, checkbox.BorderColor);
     }
 
     void GUISystem::RenderDropdown(const Components::GUIElement& element,
-                                  const Components::GUIDropdown& dropdown,
-                                  RendererSystem* rendererSystem) {
-        if (!rendererSystem) return;
-        
+                                  const Components::GUIDropdown& dropdown) {
         // Render dropdown button
-        rendererSystem->SubmitGUIPanel(element.WorldPosition, element.Size,
-                                      dropdown.BackgroundColor);
+        Vector2D center{
+            element.WorldPosition.X + element.Size.X * 0.5f,
+            element.WorldPosition.Y + element.Size.Y * 0.5f
+        };
+        m_renderCommandBuffer.SubmitPanel(center, element.Size,
+                                          dropdown.BackgroundColor, 0.0f);
 
         // If dropdown is open, render the options list
         if (dropdown.IsOpen && dropdown.OptionCount > 0) {
@@ -740,16 +824,17 @@ namespace ECS {
                 Color optionColor = (i == dropdown.SelectedIndex) ?
                                    dropdown.HighlightColor : dropdown.BackgroundColor;
                 
-                rendererSystem->SubmitGUIPanel(optionPos, element.Size, optionColor);
+                Vector2D optionCenter{
+                    optionPos.X + element.Size.X * 0.5f,
+                    optionPos.Y + element.Size.Y * 0.5f
+                };
+                m_renderCommandBuffer.SubmitPanel(optionCenter, element.Size, optionColor, 0.0f);
             }
         }
     }
 
     void GUISystem::RenderSeparator(const Components::GUIElement& element,
-                                   const Components::GUISeparator& separator,
-                                   RendererSystem* rendererSystem) {
-        if (!rendererSystem) return;
-        
+                                   const Components::GUISeparator& separator) {
         // Calculate start and end points based on orientation
         Vector2D startPos, endPos;
         
@@ -766,7 +851,44 @@ namespace ECS {
         }
         
         // Submit separator line via RendererSystem
-        rendererSystem->SubmitGUILine(startPos, endPos, separator.Color, separator.Thickness);
+        m_renderCommandBuffer.SubmitLine(startPos, endPos, separator.Color, separator.Thickness);
+    }
+
+    void GUISystem::FlushRenderCommands(RendererSystem* rendererSystem) {
+        if (!rendererSystem) {
+            return;
+        }
+
+        static const std::string kDefaultFont = "assets/fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf";
+
+        for (const auto& cmd : m_renderCommandBuffer.Commands()) {
+            switch (cmd.Type) {
+                case UI::GUIRenderCommandType::Panel:
+                    rendererSystem->SubmitGUIPanel(cmd.Position, cmd.Size, cmd.PrimaryColor, cmd.ScalarA);
+                    break;
+                case UI::GUIRenderCommandType::Text: {
+                    const std::string& resolvedFont = m_stringCache.Resolve(cmd.FontId);
+                    const std::string& fontPath = resolvedFont.empty() ? kDefaultFont : resolvedFont;
+                    const std::string& content = m_stringCache.Resolve(cmd.TextId);
+                    rendererSystem->SubmitGUIText(fontPath, content, cmd.Position,
+                                                  cmd.PrimaryColor, cmd.ScalarA,
+                                                  cmd.SecondaryColor, cmd.Offset);
+                    break;
+                }
+                case UI::GUIRenderCommandType::Slider:
+                    rendererSystem->SubmitGUISlider(cmd.Position, cmd.Size, cmd.ScalarA,
+                                                    cmd.PrimaryColor, cmd.SecondaryColor);
+                    break;
+                case UI::GUIRenderCommandType::Checkbox:
+                    rendererSystem->SubmitGUICheckbox(cmd.Position, cmd.Size, cmd.Flag,
+                                                      cmd.PrimaryColor, cmd.SecondaryColor,
+                                                      cmd.TertiaryColor);
+                    break;
+                case UI::GUIRenderCommandType::Line:
+                    rendererSystem->SubmitGUILine(cmd.Position, cmd.End, cmd.PrimaryColor, cmd.ScalarA);
+                    break;
+            }
+        }
     }
 
     // ========================================================================
@@ -841,16 +963,13 @@ namespace ECS {
     // ========================================================================
 
     void GUISystem::RegisterAction(uint32_t actionID, std::function<void(World&, Entity)> callback) {
-        m_actionRegistry[actionID] = callback;
+        UI::GUIContext::Get().RegisterAction(actionID, std::move(callback));
         LOG_DEBUG("Registered GUI action ID: " << actionID);
     }
 
     void GUISystem::UnregisterAction(uint32_t actionID) {
-        auto it = m_actionRegistry.find(actionID);
-        if (it != m_actionRegistry.end()) {
-            m_actionRegistry.erase(it);
-            LOG_DEBUG("Unregistered GUI action ID: " << actionID);
-        }
+        UI::GUIContext::Get().UnregisterAction(actionID);
+        LOG_DEBUG("Unregistered GUI action ID: " << actionID);
     }
 
     void GUISystem::ShowTooltip(const std::string& text, Vector2D position, float duration) {
