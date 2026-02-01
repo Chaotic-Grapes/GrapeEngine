@@ -1,15 +1,16 @@
 /* Start Header *****************************************************************/
 /*!
 \file   UndoSystem.cpp
-\author Daniel Kay Neo Zuo Feng
-\date   14th November 2025
+\author Samantha Leong Sher Yen
+\par    s.leong@digipen.edu
+\date   21th January 2026
 \brief
 Implementation of the UndoSystem and command types used to support
 undo/redo operations within the editor. This system records user actions,
 applies them via command objects, and restores previous states when
 undoing or redoing actions.
 
-Copyright (C) 2025 DigiPen Institute of Technology.
+Copyright (C) 2026 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
@@ -193,14 +194,25 @@ namespace Editor {
     }
 
     void CreateEntityCommand::Undo() {
-        // Undo, deletes entity
-        if (!m_world || !m_world->IsAlive(m_entity)) {
+        // Undo creation = soft delete (deactivate)
+        if (!m_world) {
+            LOG_WARNING("[UndoSystem] Cannot undo entity creation - world is null");
+            return;
+        }
+
+        if (!m_world->IsAlive(m_entity)) {
             LOG_WARNING("[UndoSystem] Cannot undo entity creation - entity already deleted");
             return;
         }
 
-        // Actually destroy the entity
-        m_world->Destroy(m_entity);
+        if (m_world->Has<ECS::Components::Active>(m_entity)) {
+            m_world->Get<ECS::Components::Active>(m_entity).Enabled = false;
+        }
+        else {
+            m_world->Add<ECS::Components::Active>(m_entity, ECS::Components::Active{ false });
+        }
+
+        LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " deactivated (undo creation)");
 
         if (m_onEntityDeleted) {
             m_onEntityDeleted();
@@ -229,6 +241,27 @@ namespace Editor {
             if (transform) {
                 m_hasTransform = true;
                 m_savedTransform = *transform;
+            }
+
+            auto* layer = Editor::ECSUtils::GetComponentPtr<ECS::Components::Layer>(
+                m_world, entity, "Layer");
+            if (layer) {
+                m_hasLayer = true;
+                m_savedLayer = *layer;
+            }
+
+            auto* name = Editor::ECSUtils::GetComponentPtr<ECS::Components::Name>(
+                m_world, entity, "Name");
+            if (name) {
+                m_hasName = true;
+                m_savedName = *name;
+            }
+
+            auto* active = Editor::ECSUtils::GetComponentPtr<ECS::Components::Active>(
+                m_world, entity, "Active");
+            if (active) {
+                m_hasActive = true;
+                m_savedActive = *active;
             }
 
             auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(
@@ -261,20 +294,39 @@ namespace Editor {
         }
 
         // Deactivate entity
-        Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", ECS::Components::Active{ false });
+        if (m_world->Has<ECS::Components::Active>(m_entity)) {
+            m_world->Get<ECS::Components::Active>(m_entity).Enabled = false;
+        }
+        else {
+            m_world->Add<ECS::Components::Active>(m_entity, ECS::Components::Active{ false });
+        }
 
         LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " deleted");
     }
 
     void DeleteEntityCommand::Undo() {
-        if (!m_world || !m_world->IsAlive(m_entity)) {
-            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - entity invalid");
+        if (!m_world) {
+            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - world is null");
+            return;
+        }
+
+        // For soft delete system: entity should still be alive, just deactivated
+        if (!m_world->IsAlive(m_entity)) {
+            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - entity no longer exists in ECS");
             return;
         }
 
         // Restore entity state
         if (m_hasTransform) {
             Editor::ECSUtils::SetComponent(m_world, m_entity, "LocalTransform", m_savedTransform);
+        }
+
+        if (m_hasLayer) {
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Layer", m_savedLayer);
+        }
+
+        if (m_hasName) {
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Name", m_savedName);
         }
 
         if (m_hasSprite) {
@@ -289,8 +341,13 @@ namespace Editor {
             Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeCircle2D", m_savedCircle);
         }
 
-        // Reactivate entity
-        Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", ECS::Components::Active{ true });
+        // Restore Active component last (this will re-enable the entity)
+        if (m_hasActive) {
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", m_savedActive);
+        }
+        else {
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", ECS::Components::Active{ true });
+        }
 
         if (m_onEntityRestored) {
             m_onEntityRestored();
@@ -303,18 +360,18 @@ namespace Editor {
     // ReorderEntitiesCommand Implementation
     // ========================================================================
 
-ReorderEntitiesCommand::ReorderEntitiesCommand(
-    EntityId parentId,
-    std::function<void(const std::vector<EntityId>&)> applyOrder,
-    std::vector<EntityId> before,
-    std::vector<EntityId> after
-)
-    : m_parentId(parentId)
-    , m_applyOrder(std::move(applyOrder)) // Store apply hook for undo/redo.
-    , m_before(std::move(before)) // Snapshot for undo.
-    , m_after(std::move(after)) // Snapshot for redo.
-{
-}
+    ReorderEntitiesCommand::ReorderEntitiesCommand(
+        EntityId parentId,
+        std::function<void(const std::vector<EntityId>&)> applyOrder,
+        std::vector<EntityId> before,
+        std::vector<EntityId> after
+    )
+        : m_parentId(parentId)
+        , m_applyOrder(std::move(applyOrder))
+        , m_before(std::move(before))
+        , m_after(std::move(after))
+    {
+    }
 
     void ReorderEntitiesCommand::Execute() {
         if (m_applyOrder) {
@@ -533,16 +590,16 @@ ReorderEntitiesCommand::ReorderEntitiesCommand(
         }
 
         auto* command = dynamic_cast<ReorderEntitiesCommand*>(m_undoStack.back().get());
-    if (!command) {
-        return false;
-    }
+        if (!command) {
+            return false;
+        }
 
-    if (!command->UpdateAfter(parentId, after)) { // Only coalesce if parent matches.
-        return false;
-    }
+        if (!command->UpdateAfter(parentId, after)) {
+            return false;
+        }
 
-    m_redoStack.clear(); // Coalescing invalidates redo history.
-    return true;
-}
+        m_redoStack.clear();
+        return true;
+    }
 
 } // namespace Editor

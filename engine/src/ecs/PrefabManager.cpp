@@ -3,6 +3,8 @@
 \file    PrefabManager.cpp
 \author  Muhammad Nur Fadzly Bin Zulkifli (100%)
 \par     muhammadnurfadzly.b@digipen.edu
+\author  Samantha Leong Sher Yen
+\par     s.leong@digipen.edu
 \par     
 \brief
 This file contains the implementation of the PrefabManager class, providing
