@@ -60,13 +60,13 @@ public class CompChecker : SystemBase
         }
         Log("________________________________________________________________________________", LogLevel.Debug); i++;
 
-        foreach (var result in World.Query<Layer>())
-        {
-            Log($"{i}) Found Layer belonging to ID: {result.Entity.Id}");
-            ref var storedComponent = ref result.Component1;
-            storedComponent.Id = 2;
-            Log($"Done: {storedComponent.Id}");
-        }
+        //foreach (var result in World.Query<Layer>()) //DEPRECATED
+        //{
+        //    Log($"{i}) Found Layer belonging to ID: {result.Entity.Id}");
+        //    ref var storedComponent = ref result.Component1;
+        //    storedComponent.Id = 2;
+        //    Log($"Done: {storedComponent.Id}");
+        //}
         Log("________________________________________________________________________________", LogLevel.Debug); i++;
 
         foreach (var result in World.Query<LocalTransform>())

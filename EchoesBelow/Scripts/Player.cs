@@ -17,6 +17,7 @@ namespace EchoesBelow.Scripts;
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class Player : SystemBase
 {
+    public static Compass abs_InputDirection = Compass.N, abs_SpriteDirection = Compass.N; //default
     protected override void OnCreate()
     {
         Log("System Player initialized");
@@ -38,19 +39,15 @@ public class Player : SystemBase
             float maxSpeed = gameObject.Component1.maxSpeed;
             float angularVelocity = gameObject.Component1.angularVelocity * 0.01f; //100 == 1
 
-            //Handling movement and movement direction====================================================
             moveDir = ProcessInput(moveDir, lerpFac);
 
-            //moveDir = new Vector2(GMath.Lerp(moveDir.X,0,lerpFac/2),GMath.Lerp(moveDir.Y,0,lerpFac/2));
-
-            //NaN protection
-            if (-0.0001f <= moveDir.X && moveDir.X <= 0.0001f && -0.0001f <= moveDir.Y && moveDir.Y <= 0.0001f)
+            //NaN protection for normalization
+            if (-0.0001f <= moveDir.X && moveDir.X <= 0.0001f 
+            && -0.0001f <= moveDir.Y && moveDir.Y <= 0.0001f)
             moveDirNormalized = Vector2.Zero;
-            else
-            moveDirNormalized = moveDir.Normalized;
+            else moveDirNormalized = moveDir.Normalized;
 
             //Handling Rotation! Aligning Grain to moveDir=================================================
-
             //Convert from ZYX Quaternion to angle in radians
             //Find the local "Up" Vector of the Player. Think of this as gameObject.transform.up in Unity
             float angle = Quat2EulerAxisZ(transform.Rotation);
@@ -58,20 +55,65 @@ public class Player : SystemBase
 
             //Find change in angle required using dot product between moveDirNormalized and playerDir
             //NaN protection when player is facing up or at rest
-            if (-0.0001f < playerDir.X && playerDir.X < 0.0001f && 0.9999f < playerDir.Y && playerDir.Y < 1.0001f)
+            if (-0.0001f < playerDir.X && playerDir.X < 0.0001f 
+            && 0.9999f < playerDir.Y && playerDir.Y < 1.0001f)
             playerDir = new Vector2(0,1);
-            //Dot product operation to determine theta as presented by angleBetween in radians!
-            float angleBetween = GMath.Acos(GMath.Dot(playerDir, moveDirNormalized) / (playerDir.Magnitude * moveDirNormalized.Magnitude));
-            //NaN protection for when angle is at rest
-            angleBetween = (float.IsNaN(angleBetween))? 0 : angleBetween;
 
+            //============================================================================================
+            //Find InputAbsDirection direction
+            if      (Input.IsKeyDown(KeyCode.W) && Input.IsKeyDown(KeyCode.A))  abs_InputDirection = Compass.NW;
+            else if (Input.IsKeyDown(KeyCode.S) && Input.IsKeyDown(KeyCode.A))  abs_InputDirection = Compass.SW;
+            else if (Input.IsKeyDown(KeyCode.S) && Input.IsKeyDown(KeyCode.D))  abs_InputDirection = Compass.SE;
+            else if (Input.IsKeyDown(KeyCode.W) && Input.IsKeyDown(KeyCode.D))  abs_InputDirection = Compass.NE;
+            else if (Input.IsKeyDown(KeyCode.W))    abs_InputDirection = Compass.N;
+            else if (Input.IsKeyDown(KeyCode.A))    abs_InputDirection = Compass.W;
+            else if (Input.IsKeyDown(KeyCode.S))    abs_InputDirection = Compass.S;
+            else if (Input.IsKeyDown(KeyCode.D))    abs_InputDirection = Compass.E;
+
+            //Find CompassDirection base on transform Rotation,  
+            //maybe next time use radians in nice increments of 0.125
+            float rotZ = Quat2EulerAxisZ(transform.Rotation) * GMath.Rad2Deg;
+            if      ( 22.5f  <rotZ&&rotZ<   67.5f)  abs_SpriteDirection = Compass.NW;
+            else if ( 112.5f <rotZ&&rotZ<  157.5f)  abs_SpriteDirection = Compass.SW;
+            else if (-157.5f <rotZ&&rotZ< -112.5f)  abs_SpriteDirection = Compass.SE;
+            else if (-67.5f  <rotZ&&rotZ< - 22.5f)  abs_SpriteDirection = Compass.NE;
+            else if (-22.5f  <rotZ&&rotZ<   22.5f)  abs_SpriteDirection = Compass.N;
+            else if ( 67.5f  <rotZ&&rotZ<  112.5f)  abs_SpriteDirection = Compass.W;
+            else if ( 157.5f <rotZ||rotZ< -157.5f)  abs_SpriteDirection = Compass.S;
+            else if (-112.5f <rotZ&&rotZ< - 67.5f)  abs_SpriteDirection = Compass.E;
+           
+            Log($"InputDirection:  {abs_InputDirection}");
+            Log($"SpriteDirection: {abs_SpriteDirection}");
+
+            //Dot product operation to determine theta as presented by angleBetween in radians!
+            float angleBetween_rad = GMath.Acos(GMath.Dot(playerDir, moveDirNormalized) / (playerDir.Magnitude * moveDirNormalized.Magnitude));
+            angleBetween_rad = (float.IsNaN(angleBetween_rad))? 0 : angleBetween_rad;
+
+            //Adjust the angles and rotduration here
+
+            //try heuristics idea
+
+
+            //float rawDifference_rad = (abs_InputDirection - abs_SpriteDirection) * GMath.Deg2Rad;
+            //Log("rawDifference: " + angleDifference);
+            //if (angleDifference < 0)
+            //{
+            //    //angleBetween_rad = 2 - angleBetween_rad;
+            //    angularVelocity = -gameObject.Component1.angularVelocity * 0.01f;
+            //    Log("Switching Polarity! of angularVelocity");
+            //}
+            //else
+            //{
+            //    angularVelocity = gameObject.Component1.angularVelocity * 0.01f;
+            //}
+            
 
             //Find change in time required to complete a rotation. This formula requires radians
-            float rotDuration = angleBetween / angularVelocity;
+            float rotDuration = angleBetween_rad / angularVelocity;
 
             //start Rotation process
             bool isRotating = false;
-            if (angleBetween != 0) { isRotating = true; } //Log("Start Rotating"); }
+            if (angleBetween_rad != 0) { isRotating = true; } //Log("Start Rotating"); }
             if (isRotating)
             {
                 gameObject.Component1.timer += Time.DeltaTime;
@@ -85,7 +127,7 @@ public class Player : SystemBase
                 av.Value = 0;
                 //Log("Finished Rotating");
             }
-            Log($"Angle In Between: {angleBetween * GMath.Rad2Deg}");
+            //Log($"Angle In Between: {angleBetween * GMath.Rad2Deg}");
 
             //Assignment of linear Velocities================================================================
             if(Input.IsKeyDown(KeyCode.W)|| Input.IsKeyDown(KeyCode.S)
@@ -102,23 +144,10 @@ public class Player : SystemBase
 
     private static Vector2 ProcessInput(Vector2 moveDir, float lerpFac)
     {
-        //ProcessInput
-        if (Input.IsKeyDown(KeyCode.W))
-        {
-            moveDir.Y = GMath.Lerp(moveDir.Y, 1, lerpFac);
-        }
-        if (Input.IsKeyDown(KeyCode.S))
-        {
-            moveDir.Y = GMath.Lerp(moveDir.Y, -1, lerpFac);
-        }
-        if (Input.IsKeyDown(KeyCode.A))
-        {
-            moveDir.X = GMath.Lerp(moveDir.X, -1, lerpFac);
-        }
-        if (Input.IsKeyDown(KeyCode.D))
-        {
-            moveDir.X = GMath.Lerp(moveDir.X, 1, lerpFac);
-        }
+        if (Input.IsKeyDown(KeyCode.W)) moveDir.Y = GMath.Lerp(moveDir.Y, 1, lerpFac);
+        if (Input.IsKeyDown(KeyCode.S)) moveDir.Y = GMath.Lerp(moveDir.Y, -1, lerpFac);
+        if (Input.IsKeyDown(KeyCode.A)) moveDir.X = GMath.Lerp(moveDir.X, -1, lerpFac);
+        if (Input.IsKeyDown(KeyCode.D)) moveDir.X = GMath.Lerp(moveDir.X, 1, lerpFac);
 
         moveDir.X = GMath.Lerp(moveDir.X, 0, lerpFac / 2);
         moveDir.Y = GMath.Lerp(moveDir.Y, 0, lerpFac / 2);
@@ -139,9 +168,24 @@ public class Player : SystemBase
         float outAngle = GMath.Atan2(a, b);
         return outAngle;
     }
-
+    private float AngleDifference(float heading1, float heading2)
+    {
+        float diff = (heading2 - heading1 + 180) % 360 - 180;
+        return diff < -180 ? diff + 360 : diff;
+    }
     protected override void OnDestroy()
     {
         Log("System Player destroyed");
+    }
+    public enum Compass
+    {
+        NE = 45,
+        E  = 90,
+        SE = 135,
+        S  = 180,
+        SW = 225,
+        W  = 270,
+        NW = 315,
+        N  = 0
     }
 }
