@@ -76,11 +76,6 @@ void SceneViewport::EndFrame() {
 void SceneViewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
 
-    // Toggle FPS overlay in the Scene viewport (editor-only)
-    if (Input::IsKeyPressed(KEY_F)) {
-        m_showSceneFpsOverlay = !m_showSceneFpsOverlay;
-    }
-
     // Update viewport interaction manager (gizmo, picking, selection, transforms)
     uint32_t newSelectedEntity = m_interactionMgr.Update(*m_world, m_selectedEntity.Index);
     
@@ -276,10 +271,6 @@ void SceneViewport::_renderViewport() {
                 }
             }
 
-            // Draw FPS overlay if enabled
-            if (m_showSceneFpsOverlay) {
-                _drawFpsOverlay(viewportScreenPos, size);
-            }
         }
     }
     else {
