@@ -111,6 +111,10 @@ namespace ECS {
             Vector2D LayoutCanvasSize{ 1920.0f, 1080.0f };
             Vector2D CanvasOffset{ 0.0f, 0.0f };
             float CanvasScale = 1.0f;
+            Vector2D ViewportOrigin{ 0.0f, 0.0f };
+            Vector2D ViewportSize{ 0.0f, 0.0f };
+            Vector2D ViewportDisplayScale{ 1.0f, 1.0f };
+            bool UseViewportBounds = false;
             Vector2D MousePosition{ 0.0f, 0.0f };
             Vector2D MouseDragStart{ 0.0f, 0.0f };
             bool MouseDown = false;

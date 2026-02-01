@@ -42,6 +42,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "ecs/ui/GUIContext.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -201,6 +202,14 @@ void SceneViewport::_renderViewport() {
 
             // Get the drawing position of the rendered image
             ImVec2 viewportScreenPos = ImGui::GetItemRectMin();
+            auto& guiCtx = ECS::UI::GUIContext::Get();
+            if (isSceneImageHovered || !guiCtx.UseViewportBounds) {
+                const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+                guiCtx.ViewportOrigin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
+                guiCtx.ViewportSize = { size.x * fbScale.x, size.y * fbScale.y };
+                guiCtx.ViewportDisplayScale = { fbScale.x, fbScale.y };
+                guiCtx.UseViewportBounds = true;
+            }
 
             // Handle mouse click picking on the viewport image
             // Don't pick if gizmo is being used or hovered

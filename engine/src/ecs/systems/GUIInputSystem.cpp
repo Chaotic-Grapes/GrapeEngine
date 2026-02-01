@@ -348,6 +348,23 @@ namespace ECS {
         glm::dvec2 mousePosDouble;
         Input::GetMousePosition(mousePosDouble.x, mousePosDouble.y);
         Vector2D screenPos{ static_cast<float>(mousePosDouble.x), static_cast<float>(mousePosDouble.y) };
+        bool mouseInViewport = true;
+        if (ctx.UseViewportBounds && ctx.ViewportSize.X > 0.0f && ctx.ViewportSize.Y > 0.0f) {
+            screenPos.X *= ctx.ViewportDisplayScale.X;
+            screenPos.Y *= ctx.ViewportDisplayScale.Y;
+            screenPos.X -= ctx.ViewportOrigin.X;
+            screenPos.Y -= ctx.ViewportOrigin.Y;
+            mouseInViewport = (screenPos.X >= 0.0f && screenPos.Y >= 0.0f &&
+                screenPos.X <= ctx.ViewportSize.X && screenPos.Y <= ctx.ViewportSize.Y);
+            if (mouseInViewport) {
+                const float scaleX = (ctx.CanvasSize.X > 0.0f) ? (ctx.CanvasSize.X / ctx.ViewportSize.X) : 1.0f;
+                const float scaleY = (ctx.CanvasSize.Y > 0.0f) ? (ctx.CanvasSize.Y / ctx.ViewportSize.Y) : 1.0f;
+                screenPos.X *= scaleX;
+                screenPos.Y *= scaleY;
+            } else {
+                screenPos = { -1.0f, -1.0f };
+            }
+        }
         if (ctx.CanvasScale > 0.0f) {
             screenPos.X = (screenPos.X - ctx.CanvasOffset.X) / ctx.CanvasScale;
             screenPos.Y = (screenPos.Y - ctx.CanvasOffset.Y) / ctx.CanvasScale;
@@ -359,7 +376,7 @@ namespace ECS {
         ctx.MouseDown = Input::IsMouseDown(MOUSE_LEFT);
 
         Entity previousHovered = ctx.HoveredElement;
-        ctx.HoveredElement = RaycastGUI(world, ctx.MousePosition);
+        ctx.HoveredElement = mouseInViewport ? RaycastGUI(world, ctx.MousePosition) : ECS::NULL_ENTITY;
         if (previousHovered != ctx.HoveredElement) {
             if (!previousHovered.IsNull()) {
                 ctx.EventQueue.Push(UI::GUIEventType::HoverExited, previousHovered, ctx.MousePosition);
