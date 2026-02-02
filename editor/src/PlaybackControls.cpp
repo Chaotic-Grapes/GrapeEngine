@@ -24,6 +24,7 @@ Reference:
 #include "PlaybackControls.h"
 #include "services/Input.h"
 #include "services/TimeSystem.h"
+#include "services/MemoryManager.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include "core/Application.h"
@@ -217,6 +218,83 @@ void Playback::Render() {
     button("\xEE\x81\x84", m_editorState == EditorState::Paused || m_editorState == EditorState::Step, EditorState::Step, "Stepping 1 physics frame", true, "Step (Alt+P)");
     ImGui::PopFont();
 
+    // Memory Allocator Test UI
+    // Positioned at the far right of the bar
+    ImGui::PushFont(m_mainFont);
+    ImGui::SetWindowFontScale(0.8f); // Smaller font and checkbox
+    
+    const char* checkLabel = "Custom Allocator";  // Checkbox label
+	const char* btnLabel = "Test Allocator";      // Button label
+	char timeLabel[32] = "";                      // Buffer for time display
+
+	// Only show time if we have a valid last test time (not sentinel/invalid value of -1.0)
+    if (m_lastTestTime >= 0.0) snprintf(timeLabel, sizeof(timeLabel), "Time: %.2f ms", m_lastTestTime);
+    
+	// Access current style for size calculations
+    ImGuiStyle& style = ImGui::GetStyle();
+
+	// Checkbox width includes text size + padding + inner spacing + checkbox square
+    float checkWidth = ImGui::CalcTextSize(checkLabel).x + style.FramePadding.x * 2 + style.ItemInnerSpacing.x + ImGui::GetFrameHeight();
+    
+	// Button width includes text size + padding
+    float btnWidth = ImGui::CalcTextSize(btnLabel).x + style.FramePadding.x * 2;
+    
+	// Time label width includes text size + spacing
+    float timeWidth = m_lastTestTime >= 0.0 ? ImGui::CalcTextSize(timeLabel).x + style.ItemSpacing.x : 0.0f;
+    
+	// Spacing between elements
+    float spacing = style.ItemSpacing.x;
+
+	// Total group width
+    float groupWidth = checkWidth + spacing + btnWidth + spacing + timeWidth;
+
+    // Remaining width after buttons
+    float availRight = ImGui::GetContentRegionAvail().x;
+    
+    // Cursor is currently after the last button so reset to the right edge
+    // GetWindowContentRegionMax().x is the right edge of the content area
+    float rightEdge = ImGui::GetWindowContentRegionMax().x;
+    float startX = rightEdge - groupWidth - style.WindowPadding.x;
+    
+    // Move cursor to startX if possible to prevent overlapping center buttons
+    if (startX > ImGui::GetCursorPosX()) ImGui::SameLine(startX);
+    else ImGui::SameLine();
+
+    // Vertical alignment fix: Align text to frame padding to center vertically with buttons
+    ImGui::AlignTextToFramePadding();
+    ImGui::Checkbox(checkLabel, &m_useCustomAllocator);
+    ImGui::SameLine();
+
+    // Run test with 10,000 allocations between 16 and 1024 bytes
+    if (ImGui::Button(btnLabel)) m_lastTestTime = MemoryManager::GetInstance().Benchmark(m_useCustomAllocator, 10000, 16, 1024);
+
+	// Tooltip for button
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::Text("Performance Test:");
+        ImGui::Text("- Allocates & frees 10,000 random blocks");
+        ImGui::Text("- Block sizes: 16B to 1024B");
+        ImGui::Text("- Measures total execution time");
+        ImGui::EndTooltip();
+    }
+
+	// Display time if valid
+    if (m_lastTestTime >= 0.0) {
+        ImGui::SameLine();
+        
+        // Color coding based on performance
+        ImVec4 color;
+        if (m_lastTestTime < 10.0) color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);      // Green for fast (< 10ms)
+        else if (m_lastTestTime < 30.0) color = ImVec4(1.0f, 0.8f, 0.2f, 1.0f); // Yellow for warning (10-30ms)
+        else color = ImVec4(1.0f, 0.2f, 0.2f, 1.0f);                            // Red for slow (> 30ms)
+        
+		// Display time label with color
+        ImGui::TextColored(color, "%s", timeLabel);
+    }
+
+    // Reset font scale and pop font stack
+    ImGui::SetWindowFontScale(1.0f); 
+    ImGui::PopFont();
     ImGui::PopStyleVar();
     ImGui::End();
 }
@@ -319,7 +397,7 @@ void Playback::_restoreWorldState() {
         }
     });
 
-    for (auto entity : entitiesToDestroy) {
+    for (const auto& entity : entitiesToDestroy) {
         m_world->Destroy(entity);
     }
 

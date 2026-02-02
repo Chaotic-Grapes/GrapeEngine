@@ -129,6 +129,10 @@ public:
 	// Get current debug mode state
 	bool GetDebugMode() const { return m_debugMode; }
 
+	// Runs a performance test allocating and freeing memory
+	// Returns time taken in milliseconds
+	double Benchmark(bool useCustom, int allocationCount, int minSize, int maxSize);
+
 	// ============================================================================
 	// SINGLETON PATTERN
 	// ============================================================================

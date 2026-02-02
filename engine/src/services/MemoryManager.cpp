@@ -20,6 +20,10 @@ Implements the custom MemoryManager class for efficient memory allocation.
 #include "services/MemoryManager.h"
 #include <cstdlib>
 #include <cstring>
+#include <vector>
+#include <chrono>
+#include <random>
+#include <ctime>
 
 // ============================================================================
 // CONSTRUCTORS
@@ -454,17 +458,65 @@ void MemoryManager::Dump(std::ostream& os) {
 	os << "========================================" << std::endl;
 }
 
+double MemoryManager::Benchmark(bool useCustom, int allocationCount, int minSize, int maxSize) {
+	// Allocate arrays for pointers and sizes using raw malloc to avoid
+	// interfering with the allocator being tested (if new is overloaded)
+	void** pointers = (void**)malloc(allocationCount * sizeof(void*));
+	int* sizes = (int*)malloc(allocationCount * sizeof(int));
+
+	// Check for allocation failures
+	if (!pointers || !sizes) {
+		if (pointers) free(pointers);
+		if (sizes) free(sizes);
+		return -1.0; // Failed to allocate test harness
+	}
+
+	// Seed random number generator
+	// Use rand() to avoid std lib overhead/issues
+	srand(static_cast<unsigned int>(time(NULL)));
+
+	// Generate random sizes for each allocation
+	for (int i{}; i < allocationCount; i++) {
+		sizes[i] = minSize + (rand() % (maxSize - minSize + 1));
+		pointers[i] = nullptr;
+	}
+
+	// Start timing
+	auto start = std::chrono::high_resolution_clock::now();
+
+	// If useCustom is true, use MemoryManager; else use global new/delete
+	if (useCustom) {
+		for (int i{}; i < allocationCount; i++) pointers[i] = Allocate(sizes[i]);
+		for (int i{}; i < allocationCount; i++) if (pointers[i]) Deallocate(pointers[i]);
+	}
+	else {
+		// Use "new/delete" default allocator (global operators) without invoking 
+		// constructors/destructors, to keep the test fair
+		// (since MemoryManager::Allocate also doesn't invoke constructors)
+		for (int i{}; i < allocationCount; i++) pointers[i] = ::operator new(sizes[i]);
+		for (int i{}; i < allocationCount; i++) if (pointers[i]) ::operator delete(pointers[i]);
+	}
+
+	// End timing
+	auto end = std::chrono::high_resolution_clock::now();
+
+	// Calculate elapsed time in milliseconds
+	std::chrono::duration<double, std::milli> elapsed = end - start;
+
+	// Free test harness arrays
+	free(pointers);
+	free(sizes);
+
+	// Return elapsed time
+	return elapsed.count();
+}
+
 // ============================================================================
 // SINGLETON PATTERN
 // ============================================================================
 
 MemoryManager& MemoryManager::GetInstance() {
-// Static instance with 1MB default pool size
-// Debug mode enabled in debug builds
-#ifdef _DEBUG
-	static MemoryManager instance(10 * 1024 * 1024, true);  // 10 MB default, debug ON
-#else
-	static MemoryManager instance(10 * 1024 * 1024, false); // 10 MB default, debug OFF
-#endif
+	// Static instance with 10 MB default pool size
+	static MemoryManager instance(10 * 1024 * 1024, false);  // 10 MB default, debug ON
 	return instance;
 }
