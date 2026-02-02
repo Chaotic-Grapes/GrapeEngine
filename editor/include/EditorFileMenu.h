@@ -93,6 +93,8 @@ public:
             m_hasUnsavedChanges = true;
         }
     }
+    // Expose dirty state for play-mode guards.
+    bool HasUnsavedChanges() const { return m_hasUnsavedChanges; }
 
     // -------------------------------------------------------------------------
     // Keyboard Shortcuts
