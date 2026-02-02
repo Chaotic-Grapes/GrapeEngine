@@ -100,8 +100,6 @@ void SceneViewport::HandleInWorldInteraction() {
     // If selection changed due to picking, update our selected entity
     if (newSelectedEntity != m_selectedEntity.Index) {
         SetSelectedEntity(newSelectedEntity);
-        // Publish selection change message
-        Messaging::MessageSystem::Broadcast(Messaging::EntitySelectionRequested(newSelectedEntity, false));
     }
 }
 
@@ -441,55 +439,6 @@ void SceneViewport::_renderViewport() {
                 guiCtx.UseViewportBounds = true;
             }
 
-            // Handle mouse click picking on the viewport image
-            // Don't pick if gizmo is being used or hovered
-            // Let tile palette consume clicks when active.
-            bool tilePaletteHandledClick = false;
-            const bool canUseTilePalette = m_tilePalettePanel && m_tilePalettePanel->CanHandleViewportInput();
-            if (isSceneImageHovered && canUseTilePalette) {
-                double mx = 0, my = 0;
-                Input::GetMousePosition(mx, my);
-                glm::mat4 view = m_editorCamera->GetCamera()->GetViewMatrix();
-                glm::mat4 proj = m_editorCamera->GetCamera()->GetProjectionMatrix();
-                const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
-                glm::vec2 vpMin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
-                glm::vec2 vpSize = { size.x * fbScale.x, size.y * fbScale.y };
-                glm::vec2 localPos = glm::vec2(mx, my) - vpMin;
-                glm::vec4 ndc;
-                ndc.x = (2.0f * localPos.x) / vpSize.x - 1.0f;
-                ndc.y = 1.0f - (2.0f * localPos.y) / vpSize.y;
-                ndc.z = 0.0f;
-                ndc.w = 1.0f;
-                glm::mat4 invViewProj = glm::inverse(proj * view);
-                glm::vec4 world4 = invViewProj * ndc;
-                glm::vec2 worldPos = { world4.x, world4.y };
-                m_tilePalettePanel->OnViewportHover(worldPos);
-                bool left = Input::IsMousePressed(MOUSE_LEFT);
-                bool right = Input::IsMousePressed(MOUSE_RIGHT);
-                if (left || right) {
-                    tilePaletteHandledClick = m_tilePalettePanel->OnViewportClick(worldPos, right);
-                }
-            }
-            if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {
-                // Check if gizmo should block input
-                bool gizmoBlocking = m_interactionMgr.ShouldBlockInput();
-                
-                if (!gizmoBlocking) {
-                    double mx = 0, my = 0;
-                    Input::GetMousePosition(mx, my);
-                    
-                    // Request a pick via the interaction manager's picking manager
-                    // We need access to renderer system to make the request
-                    auto* rs = _getRendererSystem();
-                    if (rs && m_world) {
-                        m_interactionMgr.RequestPick(
-                            static_cast<float>(mx),
-                            static_cast<float>(my),
-                            rs);
-                    }
-                }
-            }
-
             // Prepare interaction manager with current viewport state
             // IMPORTANT: Use viewportScreenPos which is the actual rendered image position
             if (m_editorCamera) {
@@ -497,7 +446,7 @@ void SceneViewport::_renderViewport() {
                 if (camera) {
                     glm::mat4 view = camera->GetViewMatrix();
                     glm::mat4 proj = camera->GetProjectionMatrix();
-                    
+
                     // Prepare interaction manager frame (must be called before Update in HandleInWorldInteraction)
                     // Note: This is called here after camera is updated
                     m_interactionMgr.PrepareFrame(
@@ -507,6 +456,53 @@ void SceneViewport::_renderViewport() {
                         proj,
                         camera->UsePerspective
                     );
+
+                    // Handle mouse click picking on the viewport image
+                    // Don't pick if gizmo is being used or hovered
+                    // Let tile palette consume clicks when active.
+                    bool tilePaletteHandledClick = false;
+                    const bool canUseTilePalette = m_tilePalettePanel && m_tilePalettePanel->CanHandleViewportInput();
+                    if (isSceneImageHovered && canUseTilePalette) {
+                        double mx = 0, my = 0;
+                        Input::GetMousePosition(mx, my);
+                        const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+                        glm::vec2 vpMin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
+                        glm::vec2 vpSize = { size.x * fbScale.x, size.y * fbScale.y };
+                        glm::vec2 localPos = glm::vec2(mx, my) - vpMin;
+                        glm::vec4 ndc;
+                        ndc.x = (2.0f * localPos.x) / vpSize.x - 1.0f;
+                        ndc.y = 1.0f - (2.0f * localPos.y) / vpSize.y;
+                        ndc.z = 0.0f;
+                        ndc.w = 1.0f;
+                        glm::mat4 invViewProj = glm::inverse(proj * view);
+                        glm::vec4 world4 = invViewProj * ndc;
+                        glm::vec2 worldPos = { world4.x, world4.y };
+                        m_tilePalettePanel->OnViewportHover(worldPos);
+                        bool left = Input::IsMousePressed(MOUSE_LEFT);
+                        bool right = Input::IsMousePressed(MOUSE_RIGHT);
+                        if (left || right) {
+                            tilePaletteHandledClick = m_tilePalettePanel->OnViewportClick(worldPos, right);
+                        }
+                    }
+                    if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT) && !tilePaletteHandledClick) {
+                        // Check if gizmo should block input
+                        bool gizmoBlocking = m_interactionMgr.ShouldBlockInput();
+
+                        if (!gizmoBlocking) {
+                            double mx = 0, my = 0;
+                            Input::GetMousePosition(mx, my);
+
+                            // Request a pick via the interaction manager's picking manager
+                            // We need access to renderer system to make the request
+                            auto* rs = _getRendererSystem();
+                            if (rs && m_world) {
+                                m_interactionMgr.RequestPick(
+                                    static_cast<float>(mx),
+                                    static_cast<float>(my),
+                                    rs);
+                            }
+                        }
+                    }
 
                     // Draw grid/axes overlays anchored to camera view.
                     if (m_showGrid || m_showAxes) {

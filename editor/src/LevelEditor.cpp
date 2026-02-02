@@ -682,12 +682,8 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 
     // Handle state transitions
     if (newState == EditorState::Edit) {
-        // Note: Entity IDs are now preserved during restore, so selection can remain valid
-        // However, we still clear selection as a safe UX pattern when stopping play mode
-        m_hierarchyWindow.SetSelectedEntity(ECS::Entity::NPOS32);
-        m_inspector.ClearSelection();
-
-        // Rebuild entity order to reflect restored hierarchy
+        // Entity IDs are preserved during restore, so keep selection intact.
+        // Rebuild entity order to reflect restored hierarchy.
         m_hierarchyWindow.RebuildEntityOrder();
     }
 

@@ -21,7 +21,7 @@ namespace GrapeEngine.Scripting.Systems.Attributes;
 /// <param name="group">The execution group in which the system will run. Determines the order and context in which the system is executed.</param>
 /// <param name="runMode">The run mode for the system. Specifies whether the system runs in edit mode, play mode, or both. The default is
 /// SystemRunMode.EditOnly.</param>
-[AttributeUsage(AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Class, Inherited = true)]
 public class SystemAttribute(SystemGroup group, SystemRunMode runMode = SystemRunMode.EditOnly) : Attribute
 {
     /// <summary>

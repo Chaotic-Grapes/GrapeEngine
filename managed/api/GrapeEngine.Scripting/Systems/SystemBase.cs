@@ -51,7 +51,10 @@ public abstract class SystemBase : ISystem
     {
         // Ensure the protected World property is up-to-date for derived systems
         if (World != world)
+        {
             World = world;
+            _queryCache?.Clear();
+        }
         // Call derived OnUpdate for sequential execution
         OnUpdate();
     }

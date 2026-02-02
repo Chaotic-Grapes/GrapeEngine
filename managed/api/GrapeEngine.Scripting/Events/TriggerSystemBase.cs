@@ -1,5 +1,5 @@
 using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Systems;
+using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems.Attributes;
 
 namespace GrapeEngine.Scripting.Events;
@@ -14,10 +14,30 @@ namespace GrapeEngine.Scripting.Events;
 public abstract class TriggerSystemBase : SystemBase
 {
     private readonly Dictionary<ulong, Dictionary<ulong, TriggerEvent>> _active = [];
+    private int _lastProcessedFrame = -1;
+    private IntPtr _lastWorldPtr = IntPtr.Zero;
 
     protected sealed override void OnUpdate()
     {
         var world = World!;
+        unsafe
+        {
+            var worldPtr = (IntPtr)world.NativePtr;
+            if (worldPtr != _lastWorldPtr)
+            {
+                _active.Clear();
+                _lastProcessedFrame = -1;
+                _lastWorldPtr = worldPtr;
+            }
+        }
+
+        var frame = Time.FrameCount;
+        if (_lastProcessedFrame == frame)
+            return;
+        _lastProcessedFrame = frame;
+        var enterCount = 0;
+        var exitCount = 0;
+        var stayCount = 0;
 
         // Enter: TriggerEventBuffer contains enter events for the frame.
         foreach (var (entity, buffer) in world.Query<TriggerEventBuffer>())
@@ -38,6 +58,7 @@ public abstract class TriggerSystemBase : SystemBase
                 {
                     map[evt.OtherEntityId] = evt;
                     OnTriggerEnter(entity, evt);
+                    enterCount++;
                 }
             }
         }
@@ -55,6 +76,7 @@ public abstract class TriggerSystemBase : SystemBase
                 if (map.Remove(evt.OtherEntityId))
                 {
                     OnTriggerExit(entity, evt);
+                    exitCount++;
                 }
             }
         }
@@ -70,6 +92,7 @@ public abstract class TriggerSystemBase : SystemBase
             foreach (var entry in kvp.Value)
             {
                 OnTriggerStay(self, entry.Value);
+                stayCount++;
             }
         }
     }
@@ -88,4 +111,5 @@ public abstract class TriggerSystemBase : SystemBase
     /// Called when a trigger overlap ends.
     /// </summary>
     protected virtual void OnTriggerExit(Entity self, TriggerExitEvent evt) { }
+
 }

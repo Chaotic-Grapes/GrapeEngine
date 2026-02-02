@@ -378,10 +378,13 @@ void ScriptsCompiler::_backgroundHotReloadOrchestrate() {
         // Step 3: Wait for main thread to unload and move file, then transition to LoadingAssembly
         {
             std::unique_lock<std::mutex> lock(m_stateMutex);
-            m_stateChanged.wait(lock, [this]() { 
-                return m_hotReloadState == HotReloadState::LoadingAssembly || m_shutdownRequested.load();
+            m_stateChanged.wait(lock, [this]() {
+                return m_hotReloadState == HotReloadState::LoadingAssembly
+                    || m_hotReloadState == HotReloadState::Failed
+                    || m_shutdownRequested.load();
             });
             if (m_shutdownRequested.load()) return;
+            if (m_hotReloadState == HotReloadState::Failed) return;
         }
         
         m_scriptManager->SetCompileStatus(2, 75, "Loading new assembly...");
