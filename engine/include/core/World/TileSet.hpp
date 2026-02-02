@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <cstdint>
 
+#include "Export.h"
 #include "TileTypes.hpp"
 
 // Simple POD UV rectangle (normalized 0..1)
@@ -31,7 +32,7 @@ struct TileDef {
 // Tileset:
 // Maps TileID -> UVs in a texture atlas.
 // No rendering, no editor logic, no collision (yet).
-class Tileset
+class GRAPEENGINE_API Tileset
 {
 public:
     // Texture atlas handle (engine-level ID, not a graphics object)

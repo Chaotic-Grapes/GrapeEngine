@@ -5,12 +5,13 @@
 #include <cassert>
 #include <string>
 
+#include "Export.h"
 #include "TileLayer.hpp"
 #include "TileTypes.hpp" // TileID, EMPTY_TILE
 
 // Owns multiple TileLayer(s) and defines the world-units-per-tile scale.
 // Thin coordinator: no rendering, ECS, collision, or metadata.
-class TileMap
+class GRAPEENGINE_API TileMap
 {
 public:
     explicit TileMap(float tileSize);
