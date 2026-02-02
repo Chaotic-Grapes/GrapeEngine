@@ -20,6 +20,7 @@ polling system counters while the game is not running.
 #include "PerformancePanel.h"
 #include "services/TimeSystem.h"
 #include "ecs/SystemManager.h"
+#include "services/MemoryManager.h"
 #include "ecs/World.h"
 #include "core/Logger.h"
 #include <imgui.h>
@@ -73,6 +74,8 @@ void PerformancePanel::Render(bool /*isPlaying*/) {
     // Render system usage table
     _renderSystemsTable();
 
+    // Render memory benchmark
+    _renderMemoryBenchmark();
     ImGui::End();
 }
 
@@ -293,6 +296,62 @@ void PerformancePanel::_renderSystemsTable() {
 
         ImGui::EndTable();
     }
+}
+
+void PerformancePanel::_renderMemoryBenchmark() {
+    ImGui::PushFont(m_boldFont);
+    ImGui::Text("Memory Benchmark");
+    ImGui::PopFont();
+
+    // Memory Allocator Test UI
+    // Positioned at the far right of the bar
+    ImGui::PushFont(m_mainFont);
+
+    const char* checkLabel = "Custom Allocator";  // Checkbox label
+    const char* btnLabel = "Test Allocator";      // Button label
+    char timeLabel[32] = "";                      // Buffer for time display
+
+    // Only show time if we have a valid last test time (not sentinel/invalid value of -1.0)
+    if (m_lastTestTime >= 0.0) snprintf(timeLabel, sizeof(timeLabel), "Time: %.2f ms", m_lastTestTime);
+    
+    // Access current style for size calculations
+    ImGuiStyle& style = ImGui::GetStyle();
+
+    // Vertical alignment fix: Align text to frame padding to center vertically with buttons
+    ImGui::AlignTextToFramePadding();
+    ImGui::Checkbox(checkLabel, &m_useCustomAllocator);
+    ImGui::SameLine();
+
+    // Run test with 10,000 allocations between 16 and 1024 bytes
+    if (ImGui::Button(btnLabel)) m_lastTestTime = MemoryManager::GetInstance().Benchmark(m_useCustomAllocator, 10000, 16, 1024);
+
+    // Tooltip for button
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::Text("Performance Test:");
+        ImGui::Text("- Allocates & frees 10,000 random blocks");
+        ImGui::Text("- Block sizes: 16B to 1024B");
+        ImGui::Text("- Measures total execution time");
+        ImGui::EndTooltip();
+    }
+
+    // Display time if valid
+    if (m_lastTestTime >= 0.0) {
+        ImGui::SameLine();
+        
+        // Color coding based on performance
+        ImVec4 color;
+        if (m_lastTestTime < 10.0) color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);      // Green for fast (< 10ms)
+        else if (m_lastTestTime < 30.0) color = ImVec4(1.0f, 0.8f, 0.2f, 1.0f); // Yellow for warning (10-30ms)
+        else color = ImVec4(1.0f, 0.2f, 0.2f, 1.0f);                            // Red for slow (> 30ms)
+        
+        // Display time label with color
+        ImGui::TextColored(color, "%s", timeLabel);
+    }
+
+    // Reset font scale and pop font stack
+    // ImGui::SetWindowFontScale(1.0f); 
+    ImGui::PopFont();
 }
 
 // -------------------------------------------------------------------------

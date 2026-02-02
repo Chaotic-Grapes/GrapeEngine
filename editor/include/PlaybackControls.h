@@ -61,10 +61,6 @@ private:
 
     // Event callback
     std::function<void(EditorState, EditorState)> m_onStateChanged;
-
-    // Memory allocator Testing
-    bool m_useCustomAllocator = true;
-	double m_lastTestTime = -1.0;  // Just a sentinel value (to indicate no test run yet)
 };
 
 #endif

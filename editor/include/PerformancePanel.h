@@ -80,11 +80,16 @@ private:
     
     std::map<std::string, CachedScopeData> m_cachedScopes;
 
+    // Memory allocator Testing
+    bool m_useCustomAllocator = true;
+    double m_lastTestTime = -1.0;  // Just a sentinel value (to indicate no test run yet)
+
     // Private rendering methods
     void _updateCachedData();
     void _renderHeader();
     void _renderOverviewStats();
     void _renderSystemsTable();
+    void _renderMemoryBenchmark();
 };
 
 #endif
