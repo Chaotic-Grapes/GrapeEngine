@@ -790,7 +790,7 @@ void LevelEditor::SetScene(Scenes::Scene* scene) {
         bool hasTileMap = false;
         
         // Iterate all entities with TileMapComponent
-        world->Each<ECS::Components::TileMapComponent>([&](ECS::Entity e, ECS::Components::TileMapComponent& tc) {
+        world->Each<ECS::Components::TileMapComponent>([&](ECS::Components::TileMapComponent& tc) {
             hasTileMap = true;
             m_tilePalette.Initialize(tc.Map, m_tilePalette.GetTileset(), world);
         });
@@ -802,13 +802,14 @@ void LevelEditor::SetScene(Scenes::Scene* scene) {
             nameComp.Value = ECS::StringTable::Intern("TileMap");
             world->Add<ECS::Components::Name>(e, nameComp);
             
-            auto tileMap = std::make_shared<TileMap>(100, 100, 32.0f); // Default size
+            auto tileMap = std::make_shared<TileMap>(32.0f); // Default size
+            tileMap->AddLayer(100, 100); //AddLayer to set the 100x100 dimensions
             world->Add<ECS::Components::TileMapComponent>(e, tileMap);
             
             // Initialize palette with new map
             m_tilePalette.Initialize(tileMap, m_tilePalette.GetTileset(), world);
             
-            LOG_INFO("Auto-initialized default TileMap entity.");
+            LOG_INFO("Auto-initialized default TileMap entity with 32.0f tileSize.");
         }
     }
 
