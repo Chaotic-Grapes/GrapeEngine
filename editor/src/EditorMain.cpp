@@ -26,6 +26,7 @@ Launches the application in editor mode with the level editor interface.
 #include "scripting/ScriptManager.h"
 #include "core/Logger.h"
 #include "scripting/ScriptsCompiler.h"
+#include "ecs/events/EventDispatcher.h"
 
 extern "C" {
     // Forward declare the component deserialize callback registration function
@@ -42,6 +43,9 @@ extern "C" {
 int main() {
     // Enable memory leak detection in debug builds
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
+    // Log current working directory for debugging
+    LOG_INFO(std::filesystem::current_path());
 
     // Delete temporary compiled script assemblies from previous runs
     {
@@ -113,6 +117,7 @@ int main() {
     EditorState previousState = EditorState::Edit;
 
     LOG_INFO("Using GPU: " << glGetString(GL_RENDERER));
+
 
     // Editor main loop
     while (engine.IsRunning()) {
@@ -208,6 +213,7 @@ int main() {
             
             // Execute the filtered systems
             engine.UpdateSystemsByMode(systemModes, world);
+            ECS::Events::ClearFrameEventComponents(world);
         }
         
         // ============================================================

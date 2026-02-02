@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/systems/AnimationSystem.h"
 #include "ecs/Components.h"
+#include "graphics/SpriteSheetUtils.h"
 #include <algorithm>
 #include <vector>
 #include "services/TimeSystem.h"
@@ -29,11 +30,11 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 namespace ECS {
     SystemMetadata AnimationSystem::GetMetadata() const {
         ComponentAccessBuilder builder("Animation");
-        // Read accesses
+        // Define which components this system reads from
         builder.ReadComponent<Components::SpriteSheetAnimation2D>();
         builder.ReadComponent<Components::AnimationState2D>();
         builder.ReadComponent<Components::Active>();
-        // Write accesses
+        // Define which components this system modifies
         builder.WriteComponent<Components::SpriteSheetAnimation2D>();
         builder.WriteComponent<Components::AnimationState2D>();
         builder.WriteComponent<Components::SpriteRenderer2D>();
@@ -44,96 +45,100 @@ namespace ECS {
         return builder.Build();
     }
 
+    // Logic here is the similar to AnimationPreviewSystem
     void AnimationSystem::OnUpdate(World& world) {
+        // Get the delta time since the last frame for animation timing
         const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
-        // Process all entities with animation components
+        // Iterate through all entities that have animation and animation state components
         world.Each<Components::SpriteSheetAnimation2D, Components::AnimationState2D>(
             [&](Entity entity, Components::SpriteSheetAnimation2D& anim, Components::AnimationState2D& state) {
-                // Skip disabled entities
+                // Skip processing if the entity is disabled
                 if (const auto* active = world.TryGet<Components::Active>(entity)) {
                     if (!active->Enabled)
                         return;
                 }
 
-                // Skip if animation is not playing
-                if (!anim.Playing)
+                // Validate animation dimensions; skip if any dimension is invalid
+                if (anim.FrameWidth <= 0 || anim.FrameHeight <= 0 ||
+                    anim.SheetWidth <= 0 || anim.SheetHeight <= 0)
                     return;
 
-                // Skip if already finished (for non-looping animations)
-                if (state.Finished && !anim.Loop)
+                // Calculate the sprite sheet layout (columns and rows) based on frame dimensions
+                const auto layout = SpriteSheetUtils::ComputeLayout(
+                    anim.FrameWidth, anim.FrameHeight, anim.SheetWidth, anim.SheetHeight);
+                if (layout.TotalCols <= 0 || layout.TotalRows <= 0)
                     return;
 
-                // Invalid configuration check
-                if (anim.FrameCount <= 0 || anim.FramesPerSecond <= 0.0f)
+                // Determine which frames to play based on animation mode (row-based or frame-range based)
+                SpriteSheetUtils::Window window{};
+                if (anim.UseRow) {
+                    window = SpriteSheetUtils::ComputeRowWindow(
+                        anim.RowIndex, anim.RowStartColumn, anim.RowFrameCount,
+                        layout.TotalCols, layout.TotalRows);
+                } else {
+                    window = SpriteSheetUtils::ComputeWindow(
+                        anim.StartFrame, anim.FrameCount,
+                        layout.TotalCols, layout.TotalRows);
+                }
+
+                if (window.Count <= 0)
                     return;
 
-                // Accumulate time
-                state.TimeAccumulator += dt;
+                // Reset frame index if it's out of bounds
+                if (state.CurrentFrame < 0 || state.CurrentFrame >= window.Count)
+                    state.CurrentFrame = 0;
 
-                // Calculate time per frame
-                const float frameTime = 1.0f / anim.FramesPerSecond;
+                // Reset finished flag if animation is set to loop
+                if (anim.Loop)
+                    state.Finished = false;
 
-                // Advance frames if enough time has passed
-                while (state.TimeAccumulator >= frameTime) {
-                    state.TimeAccumulator -= frameTime;
-                    state.CurrentFrame++;
+                // Determine if animation should advance: must be playing, have valid FPS, and either loop or not yet finished
+                const bool canAdvance = anim.Playing && anim.FramesPerSecond > 0.0f &&
+                    (anim.Loop || !state.Finished);
 
-                    // Handle frame wrapping
-                    if (state.CurrentFrame >= anim.FrameCount) {
-                        if (anim.Loop) { // Since it's looping, reset variables
-                            state.CurrentFrame = 0; // Reset to first frame
-                            state.Finished = false; // Reset finished flag
-                        }
-                        else {
-                            // Non-looping animation finished
-                            state.CurrentFrame = anim.FrameCount - 1; // Clamp to last frame since while loop advances it
-                            state.Finished = true;                    // Mark as finished
-                            state.TimeAccumulator = 0.0f;             // Clear accumulator
-                            break;
+                if (canAdvance) {
+                    // Add elapsed time to accumulator for frame timing
+                    state.TimeAccumulator += dt;
+
+                    // Calculate how much time each frame should be displayed
+                    const float frameTime = 1.0f / anim.FramesPerSecond;
+
+                    // Advance animation frame when accumulated time exceeds frame duration
+                    while (state.TimeAccumulator >= frameTime) {
+                        state.TimeAccumulator -= frameTime;
+                        state.CurrentFrame++;
+
+                        // Wrap frame index or stop animation when reaching the end
+                        if (state.CurrentFrame >= window.Count) {
+                            if (anim.Loop) {
+                                state.CurrentFrame = 0;
+                                state.Finished = false;
+                            }
+                            else {
+                                state.CurrentFrame = window.Count - 1;
+                                state.Finished = true;
+                                state.TimeAccumulator = 0.0f;
+                                break;
+                            }
                         }
                     }
                 }
 
-                // Calculate the absolute frame index in the sprite sheet
-                const int absoluteFrame = anim.StartFrame + state.CurrentFrame;
+                // Calculate the absolute frame index in the sprite sheet and compute UV coordinates for rendering
+                const int absoluteFrame = window.Start + state.CurrentFrame;
+                const glm::vec4 uv = SpriteSheetUtils::ComputeUV(
+                    absoluteFrame, anim.FrameWidth, anim.FrameHeight, anim.SheetWidth, anim.SheetHeight);
 
-                // Only compute sprite-sheet layout and UVs if a SpriteRenderer2D exists for this entity (reduce unnecessary work)
-                // Also, advance animation state above even when no sprite is present
+                // Update the sprite renderer with current frame data; only do this if the sprite component exists
+                // Animation state is advanced regardless to maintain consistency even without a renderer
                 if (auto* sprite = world.TryGet<Components::SpriteRenderer2D>(entity)) {
-                    // Calculate sprite sheet layout
-                    const int cols = (anim.SheetWidth > 0 && anim.FrameWidth > 0) // Check. Also avoid division by zero
-                        ? std::max(1, anim.SheetWidth / anim.FrameWidth) : 1;     // Clamp to at least 1
-
-                    const int rows = (anim.SheetHeight > 0 && anim.FrameHeight > 0)
-                        ? std::max(1, anim.SheetHeight / anim.FrameHeight) : 1;
-
-                    // Extra safety check
-                    if (cols <= 0 || rows <= 0)
-                        return;
-
-                    // Calculate row and column for this frame
-                    const int col = absoluteFrame % cols; // Column index
-                    const int row = absoluteFrame / cols; // Row index
-
-                    // Calculate UV coordinates (normalized 0-1)
-                    // (col     * frameWidth, row     * frameHeight) = top-left corner
-                    // (col + 1 * frameWidth, row + 1 * frameHeight) = bottom-right corner
-                    // (col     * frameWidth, row + 1 * frameHeight) = bottom-left corner
-                    // (col + 1 * frameWidth, row     * frameHeight) = top-right corner
-                    const float u0 =       static_cast<float>(col * anim.FrameWidth)  / static_cast<float>(anim.SheetWidth);
-                    const float v0 =       static_cast<float>(row * anim.FrameHeight) / static_cast<float>(anim.SheetHeight);
-                    // const float u1 = u0 + (static_cast<float>(anim.FrameWidth)        / static_cast<float>(anim.SheetWidth));
-                    // const float v1 = v0 + (static_cast<float>(anim.FrameHeight)       / static_cast<float>(anim.SheetHeight));
-
                     // Update SpriteRenderer2D
                     sprite->TextureId = anim.TextureId;
+                    sprite->NormalTextureId = anim.NormalTextureId;
                     sprite->Width = anim.FrameWidth;
                     sprite->Height = anim.FrameHeight;
-                    sprite->Tiling = Vector2D{
-                        static_cast<float>(anim.FrameWidth)  / static_cast<float>(anim.SheetWidth),
-                        static_cast<float>(anim.FrameHeight) / static_cast<float>(anim.SheetHeight)
-                    };
-                    sprite->Offset = Vector2D{ u0, v0 };
+                    sprite->Tiling = Vector2D{ uv.z - uv.x, uv.w - uv.y };
+                    sprite->Offset = Vector2D{ uv.x, uv.y };
                 }
             }
         );

@@ -1,8 +1,9 @@
 /* Start Header *****************************************************************/
 /*!
 \file   UndoSystem.h
-\author Daniel Kay Neo Zuo Feng
-\date   14th November 2025
+\author Samantha Leong Sher Yen
+\par    s.leong@digipen.edu
+\date   21th January 2026
 \brief
 Declaration of the undo/redo command system used by the editor.
 
@@ -11,11 +12,11 @@ Command Pattern. It supports reversible editor actions such as transform
 modifications, entity creation, and entity deletion by encapsulating each
 operation into a command object that can be executed, undone, and redone.
 
-The UndoSystem serves as the editor’s central history manager, ensuring that
+The UndoSystem serves as the editor's central history manager, ensuring that
 entity edits and scene interactions remain fully reversible and consistent
 with ECS state.
 
-Copyright (C) 2025 DigiPen Institute of Technology.
+Copyright (C) 2026 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
@@ -113,7 +114,7 @@ namespace Editor {
 
         bool m_hasName = false;
         ECS::Components::Name m_savedName;
-
+        
         bool m_hasActive = false;
         ECS::Components::Active m_savedActive;
 
@@ -156,6 +157,15 @@ namespace Editor {
         bool m_hasTransform = false;
         ECS::Components::LocalTransform m_savedTransform;
 
+        bool m_hasLayer = false;
+        ECS::Components::Layer m_savedLayer;
+
+        bool m_hasName = false;
+        ECS::Components::Name m_savedName;
+
+        bool m_hasActive = false;
+        ECS::Components::Active m_savedActive;
+        
         bool m_hasSprite = false;
         ECS::Components::SpriteRenderer2D m_savedSprite;
 
@@ -166,6 +176,30 @@ namespace Editor {
         ECS::Components::ShapeCircle2D m_savedCircle;
     };
 
+    // ========================================================================
+    // Entity Reorder Command
+    // ========================================================================
+
+    class ReorderEntitiesCommand : public ICommand {
+    public:
+        ReorderEntitiesCommand(
+            EntityId parentId,
+            std::function<void(const std::vector<EntityId>&)> applyOrder,
+            std::vector<EntityId> before,
+            std::vector<EntityId> after
+        );
+
+        void Execute() override;
+        void Undo() override;
+
+        bool UpdateAfter(EntityId parentId, const std::vector<EntityId>& after); // Coalesce to new "after".
+
+    private:
+        EntityId m_parentId = ECS::Entity::NPOS32; // Parent id that owns the order list.
+        std::function<void(const std::vector<EntityId>&)> m_applyOrder; // Apply hook for order updates.
+        std::vector<EntityId> m_before; // Original order for undo.
+        std::vector<EntityId> m_after; // New order for redo.
+    };
     // ========================================================================
     // Undo System Manager
     // ========================================================================
@@ -237,6 +271,7 @@ namespace Editor {
 
         void RecordEntityCreation(EntityId entityId);
         void RecordEntityDeletion(EntityId entityId);
+        bool CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after); // Merge reorder into last command.
 
     private:
         ECS::World* m_world = nullptr;

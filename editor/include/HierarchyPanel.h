@@ -28,15 +28,17 @@ which entity the user is working with.
 #include <imgui.h>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <unordered_set>
 #include <functional>
 #include "EditorEntityActions.h"
-#include "ecs/gui/GUIHelpers.h"
+#include "ecs/ui/GUIHelpers.h"
 #include "core/messaging/MessageSystem.h"
 
 // Forward declaration
 class BaseViewport;
 namespace ECS { class PrefabManager; }
+namespace Editor { class UndoSystem; }
 
 // EntityId is a numeric identifier for entities in the ECS world
 using EntityId = uint32_t;
@@ -71,13 +73,14 @@ public:
     void SetSelectedEntity(EntityId id);
     void SetSelectedEntities(const std::unordered_set<EntityId>& ids);
     void SetViewport(BaseViewport* viewport) { m_viewport = viewport; }
+    void SetUndoSystem(Editor::UndoSystem* undoSystem) { m_undoSystem = undoSystem; } // Allow hierarchy reorder undo/redo.
     const std::unordered_set<EntityId>& GetSelectedEntities() const { return m_selectedEntityIds; }
     EntityId GetPrimarySelectedEntity() const { return m_selectedEntityIds.empty() ? ECS::Entity::NPOS32 : *m_selectedEntityIds.begin(); }
     void SetFileMenu(EditorFileMenu* fileMenu) { m_fileMenu = fileMenu; }
 
     // Entity order for scene serialization (preserves visual hierarchy order)
     const std::vector<EntityId>& GetEntityOrder() const { return m_entityOrder; }
-    void SetEntityOrder(const std::vector<EntityId>& order) { m_entityOrder = order; }
+    void SetEntityOrder(const std::vector<EntityId>& order);
     void RebuildEntityOrder(); // Rebuild from current hierarchy state
 
     // Clear UI state (selection, rename mode, context menu) - call when scene changes
@@ -164,10 +167,10 @@ private:
     // -------------------------------------------------------------------------
 
     // Get all root entities (entities without Parent component)
-    std::vector<EntityId> _getRootEntities() const;
+    std::vector<EntityId> _getRootEntities();
 
     // Get all direct children of a parent entity
-    std::vector<EntityId> _getChildren(EntityId parentId) const;
+    std::vector<EntityId> _getChildren(EntityId parentId);
 
     // Rebuild entity order list by traversing hierarchy depth-first
     void _rebuildEntityOrderRecursive(EntityId entityId);
@@ -177,6 +180,17 @@ private:
 
     // Handle clicking empty space to clear selection
     void _selectEmptySpace();
+
+    // Seed root order from serialized entity order when possible.
+    void _seedRootOrderFromEntityOrder(); // Restore UI order from serialized entity order.
+
+    // Order maintenance helpers
+    void _appendToOrderList(std::vector<EntityId>& order, EntityId entityId); // Append if not already present.
+    void _removeFromOrderList(std::vector<EntityId>& order, EntityId entityId); // Remove entity from order list.
+    void _removeEntityFromOrders(EntityId entityId); // Remove entity from root and child order lists.
+    void _moveEntityInOrder(std::vector<EntityId>& order, EntityId entityId, EntityId targetId); // Insert after target.
+    void _applyOrder(EntityId parentId, const std::vector<EntityId>& order); // Apply order to root/child storage.
+    void _recordOrderChange(EntityId parentId, const std::vector<EntityId>& before, const std::vector<EntityId>& after); // Push undo command.
 
     // -------------------------------------------------------------------------
     // State
@@ -193,6 +207,7 @@ private:
     BaseViewport* m_viewport = nullptr;             // For entity focus
     EditorFileMenu* m_fileMenu = nullptr;
     ECS::PrefabManager* m_prefabManager = nullptr; // Prefab manager (from SceneManager)
+    Editor::UndoSystem* m_undoSystem = nullptr;    // Undo system for reorder actions.
 
     // Selection state
     std::unordered_set<EntityId> m_selectedEntityIds;   // Currently selected entity IDs (empty = no selection)
@@ -217,9 +232,16 @@ private:
     float m_lastClickTime = 0.0f;                       // Time of last click
     static constexpr float RENAME_DELAY_THRESHOLD = 0.75f; // Delay threshold for rename (in seconds)
 
+    // Reorder undo coalescing
+    EntityId m_lastReorderParentId = ECS::Entity::NPOS32; // Parent id for coalescing reorder undo.
+    float m_lastReorderTime = -1000.0f;                   // Timestamp for coalescing reorder undo.
+    static constexpr float REORDER_COALESCE_WINDOW = 0.6f; // Time window to merge reorder commands.
+
     // Entity order for scene serialization (preserves visual hierarchy order)
     // This is a HINT for saving - the ECS World's HierarchyIndex is the source of truth for rendering
-    std::vector<EntityId> m_entityOrder;            // Ordered list for serialization
+    std::vector<EntityId> m_entityOrder;            // Ordered list for serialization.
+    std::vector<EntityId> m_rootOrder;              // Persistent root order for stable hierarchy display.
+    std::unordered_map<EntityId, std::vector<EntityId>> m_childOrder; // Persistent per-parent child order.
 
     // DON'T REMOVE: IMPORTANT
     std::vector<EntityId> m_deferredDeletions;

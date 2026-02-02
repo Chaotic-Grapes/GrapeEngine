@@ -60,6 +60,21 @@ namespace ECS {
         const auto& lt = world.Get<Components::LocalTransform>(e);
         auto& wt = world.Get<Components::WorldTransform>(e);
 
+        // Layer check: if layer updates are disabled, skip updating this subtree
+        auto* layerManager = world.GetLayerManager();
+        if (layerManager) {
+            const auto* layer = world.TryGet<Components::Layer>(e);
+            
+            // If the layer is disabled for updates, skip updating this subtree
+            if (layer && !layerManager->IsUpdateEnabled(layer->Id)) {
+                const std::optional<Matrix4x4> frozenWorld = wt.Matrix;
+                world.ForChildren(e, [&](const Entity c) {
+                    _updateSubtree(world, c, frozenWorld);
+                });
+                return;
+            }
+        }
+
         const Matrix4x4 local = TransformUtils::MakeTRS(lt.Position, lt.Rotation, lt.Scale);
         Matrix4x4 worldM = parentWorld.has_value() ? (parentWorld.value() * local) : local;
 

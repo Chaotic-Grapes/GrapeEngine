@@ -26,7 +26,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <optional>
 #include <algorithm>
 #include <utility>
-#include "ecs/World.h"
+#include "Export.h"
+#include "ecs/Entity.h"
+
+namespace ECS {
+    class World;
+}
 
 namespace Scenes {
     // Stable layer identifier (never changes once assigned)
@@ -57,7 +62,7 @@ namespace Scenes {
         std::unordered_set<ECS::Entity, ECS::EntityHash> entities;
     };
 
-    class LayerManager {
+    class GRAPEENGINE_API LayerManager {
     public:
 
         // Construct a LayerManager with some sane default layers pre-registered.
@@ -382,18 +387,40 @@ namespace Scenes {
             return m_layers[id].physicsEnabled;
         }
 
-        // Get the collision mask for a layer (defaults to all ones)
+        /**
+         * @brief Get the collision mask for a layer.
+         * @param id The layer ID.
+         * @return The collision mask.
+         */
         uint32_t GetLayerMask(uint16_t id) const {
             if (id >= m_layers.size())
                 return 0xFFFFFFFFu;
             return m_layers[id].collisionMask;
         }
 
-        // Set the collision mask for a layer.
-        void SetLayerMask(uint16_t id, uint32_t mask) {
+        /**
+         * @brief Set the collision mask for a layer and sync all colliders in that layer.
+         * @param id The layer ID.
+         * @param mask The new collision mask.
+         * @param world Optional pointer to ECS World for syncing collider components.
+         *             If nullptr, only the layer mask is updated (no collider sync).
+         */
+        void SetLayerMask(uint16_t id, uint32_t mask, ECS::World* world = nullptr) {
             _ensureCapacity(id);
             m_layers[id].collisionMask = mask;
+            
+            // If a world is provided, sync all colliders in this layer with the new mask
+            if (world != nullptr) {
+                _syncCollidersForLayer(id, world);
+            }
         }
+        
+        /**
+         * @brief Update all colliders in a layer to use the layer's current collision mask.
+         * Called automatically by SetLayerMask when a world is provided, but can be called
+         * manually if needed to force synchronization.
+         */
+        void _syncCollidersForLayer(uint16_t layerId, ECS::World* world);
 
         /**
          * @brief Set or clear collision between two layers. This updates both
@@ -519,6 +546,20 @@ namespace Scenes {
             m_drawOrder.clear();
             _initializeDefaults();
         }
+
+        /**
+         * @brief Clear entity membership for all layers without altering layer definitions.
+         */
+        void ClearEntityMembership() {
+            for (auto& layer : m_layers) {
+                layer.entities.clear();
+            }
+        }
+
+        /**
+         * @brief Remove dead entities from all layer membership sets.
+         */
+        void PruneDeadEntities(ECS::World& world);
 
     private:
         /**

@@ -428,19 +428,7 @@ public class CommandBuffer(World world) : IDisposable
     /// </summary>
     private static ulong GetComponentTypeHash<T>() where T : unmanaged
     {
-        // FNV-1a hash of type name
-        if (typeof(T).FullName is not string typeName)
-            throw new InvalidOperationException("Type must have a full name");
-
-        var hash = 14695981039346656037;
-
-        foreach (var c in typeName)
-        {
-            hash ^= c;
-            hash *= 1099511628211;
-        }
-
-        return hash;
+        return ComponentTypeHelper.GetTypeHash<T>();
     }
 
     /// <summary>

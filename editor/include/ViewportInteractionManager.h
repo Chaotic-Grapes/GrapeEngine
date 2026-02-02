@@ -219,7 +219,6 @@ namespace Editor {
         // Interaction state
         uint32_t m_selectedEntityId = 0;
         uint32_t m_pendingPickRequestId = 0;  // 0 = no pending request
-        CachedTransformState m_dragInitialTransform;
 
         /**
          * @brief Handle a completed pick result

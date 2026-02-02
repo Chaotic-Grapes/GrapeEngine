@@ -10,6 +10,7 @@ Rendering and UI-related ECS component types.
 
 using GrapeEngine.Math;
 using GrapeEngine.Scripting.Components;
+using GrapeEngine.Scripting.Core;
 using System.Runtime.InteropServices;
 
 namespace GrapeEngine.Scripting.Components;
@@ -18,6 +19,7 @@ namespace GrapeEngine.Scripting.Components;
 public record struct SpriteRenderer2D
 {
     public uint TextureId;
+    public uint NormalTextureId;
     public Color Color;
     public Vector2 Tiling;
     public Vector2 Offset;
@@ -25,6 +27,9 @@ public record struct SpriteRenderer2D
     public int Height;
     public uint EmissiveTextureId;
     public float EmissiveStrength;
+    public StringId TexturePath;
+    public StringId NormalTexturePath;
+    public StringId EmissiveTexturePath;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -44,15 +49,22 @@ public record struct SpriteShader2D
 public record struct SpriteSheetAnimation2D
 {
     public uint TextureId;
+    public uint NormalTextureId;
     public int FrameWidth;
     public int FrameHeight;
     public int SheetWidth;
     public int SheetHeight;
     public int StartFrame;
     public int FrameCount;
+    public int RowIndex;
+    public int RowStartColumn;
+    public int RowFrameCount;
     public float FramesPerSecond;
     public bool Loop;
     public bool Playing;
+    public bool UseRow;
+    public StringId TexturePath;
+    public StringId NormalTexturePath;
 }
 
 [StructLayout(LayoutKind.Sequential)]

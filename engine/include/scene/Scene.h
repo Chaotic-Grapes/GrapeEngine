@@ -28,6 +28,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/World.h"
 #include "scene/LayerManager.h"
+#include "Export.h"
 #include <memory>
 #include <string>
 
@@ -45,7 +46,7 @@ namespace Scenes {
      * The SceneManager is responsible for executing systems on the scene based
      * on its SystemProfile.
      */
-    class Scene {
+    class GRAPEENGINE_API Scene {
     public:
         Scene() {
             // Set LayerManager pointer on World so systems can access it
@@ -124,6 +125,14 @@ namespace Scenes {
         }
 
         /**
+         * @brief Creates an empty entity on the specified layer.
+         * @param layerId The layer ID to assign the entity to.
+         * @param parent Optional parent entity to establish hierarchy.
+         * @return The created ECS::Entity.
+         */
+        ECS::Entity CreateEntityOnLayer(const uint16_t layerId, const std::optional<ECS::Entity> parent = std::nullopt);
+
+        /**
          * @brief Destroys an entity in the scene.
          * @param entity The entity to destroy.
          */
@@ -160,6 +169,34 @@ namespace Scenes {
 
             m_world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{id});
             m_layers.OnLayerSet(e, id);
+
+            // Synchronize the collider's LayerMask with the layer manager's collision mask.
+            // This ensures that physics collision checks will use the correct layer-based collision rules.
+            _syncCollidersToLayer(e, id);
+        }
+
+        /**
+         * @brief Set the layer of an entity using the registry hash mapping.
+         * Used by editor code to avoid cross-module TypeId mismatches.
+         * @param e The entity to modify.
+         * @param id The ID of the layer to assign to the entity.
+         */
+        void SetLayerById(const ECS::Entity e, const uint16_t id);
+
+        /**
+         * @brief Internal helper: sync an entity's colliders to a layer's collision mask.
+         * Called by SetLayer and should be called whenever colliders are added to an entity with a layer.
+         */
+        void _syncCollidersToLayer(const ECS::Entity e, const uint16_t layerId) {
+            uint32_t layerMask = m_layers.GetLayerMask(layerId);
+            if (m_world.Has<ECS::Components::CircleCollider2D>(e)) {
+                auto& circle = m_world.Get<ECS::Components::CircleCollider2D>(e);
+                circle.LayerMask = layerMask;
+            }
+            if (m_world.Has<ECS::Components::BoxCollider2D>(e)) {
+                auto& box = m_world.Get<ECS::Components::BoxCollider2D>(e);
+                box.LayerMask = layerMask;
+            }
         }
 
         /**

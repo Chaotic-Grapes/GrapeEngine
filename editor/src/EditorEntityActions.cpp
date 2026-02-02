@@ -18,6 +18,9 @@ direct ECS manipulation.
 #include "serialization/EntitySerializer.h"
 #include "ecs/World.h"
 #include "ecs/Components.h" 
+#include "ecs/ComponentRegistry.h"
+#include "ecs/StringTable.h"
+#include "EditorECSUtils.h"
 #include "core/Logger.h"
 #include "UndoSystem.h"
 #include <functional>
@@ -53,32 +56,28 @@ EntityId EntityActions::AddEntity(const std::string& name, EntityId parent) {
     if (!m_scene) return ECS::Entity::NPOS32;
     ECS::World& world = m_scene->GetWorld();
 
-    // Create empty entity
-    ECS::Entity e = world.Create();
+    // Create entity on default layer so LayerManager stays in sync
+    ECS::Entity e = m_scene->CreateEntityOnLayer(0);
 
-    // Name (char buffer)
-    ECS::Components::Name nm{};
-    strncpy_s(nm.Value, name.c_str(), sizeof(nm.Value) - 1);
-    nm.Value[sizeof(nm.Value) - 1] = '\0';
-    world.Set<ECS::Components::Name>(e, nm);
+    // Name (StringId)
+    Editor::ECSUtils::SetEntityName(world, e, name);
 
     // Mandatory LocalTransform
-    world.Set<ECS::Components::LocalTransform>(e, ECS::Components::LocalTransform{});
+    Editor::ECSUtils::SetComponent(&world, e, "LocalTransform", ECS::Components::LocalTransform{});
 
     // Ensure WorldTransform exists so hierarchy/system queries that require it see the entity
     // Initialize as dirty so systems will compute it on the next update
     ECS::Components::WorldTransform wt{};
     wt.Dirty = true;
-    world.Set<ECS::Components::WorldTransform>(e, wt);
+    Editor::ECSUtils::SetComponent(&world, e, "WorldTransform", wt);
 
-    // Default render layer (0) so the renderer includes the entity
-    // Use Scene::SetLayer instead of writing the component directly so
-    // the Scene's LayerManager is updated (keeps the editor counts in sync).
-    if (m_scene) {
-        m_scene->SetLayer(e, 0);
-    }
-    else {
-        world.Set<ECS::Components::Layer>(e, ECS::Components::Layer{ 0 });
+    // Verify Layer component exists
+    const uint32_t layerHash = Editor::ECSUtils::FNV1aHash("Layer");
+    const ECS::ComponentTypeId layerIdFromHash = ECS::ComponentRegistry::GetComponentIdFromHash(layerHash);
+
+    // Log error if Layer component is missing (should not happen)
+    if (layerIdFromHash != ECS::NULL_COMPONENT_ID && !world.HasById(e, layerIdFromHash)) {
+        LOG_ERROR("[EditorEntityActions] New entity missing Layer component (id=" << e.Index << ")");
     }
 
     // Optional parent
@@ -112,11 +111,16 @@ void EntityActions::RemoveEntity(EntityId id) {
     std::function<void(EntityId)> deleteRecursive = [&](EntityId entityId) {
         // Collect children first to avoid iterator invalidation
         std::vector<EntityId> children;
-        world.Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
-            if (p.ParentEntity.Index == entityId) {
-                children.push_back(e.Index);
-            }
+        const ECS::ComponentTypeId parentId = Editor::ECSUtils::GetComponentIdFromName("Parent");
+        if (parentId != ECS::NULL_COMPONENT_ID) {
+            world.Each([&](ECS::Entity e) {
+                if (!world.HasById(e, parentId)) return;
+                const auto* parent = static_cast<const ECS::Components::Parent*>(world.GetRawComponentPtr(e, parentId));
+                if (parent && parent->ParentEntity.Index == entityId) {
+                    children.push_back(e.Index);
+                }
             });
+        }
 
         // Recursively delete all children
         for (auto childId : children) {
@@ -146,7 +150,7 @@ void EntityActions::ClearAllEntities() {
     std::vector<ECS::Entity> allEntities;
     world.Each([&](ECS::Entity e) {
         // Keep editor camera
-        if (world.Has<ECS::Components::CameraEditor3D>(e)) {
+        if (Editor::ECSUtils::HasComponent(&world, e, "CameraEditor3D")) {
             return;
         }
         allEntities.push_back(e);
@@ -188,11 +192,13 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         ECS::Entity clone = world.Clone(original);
 
         // Update name to indicate it's a clone
-        if (world.Has<ECS::Components::Name>(clone)) {
-            auto& name = world.Get<ECS::Components::Name>(clone);
-            std::string newName = std::string(name.Value) + " (Clone)";
-            strncpy_s(name.Value, newName.c_str(), sizeof(name.Value) - 1);
-            name.Value[sizeof(name.Value) - 1] = '\0';
+        if (auto* name = Editor::ECSUtils::GetNamePtrMutable(world, clone)) {
+            std::string baseName = ECS::StringTable::Resolve(name->Value);
+            if (baseName.empty()) {
+                baseName = "Entity";
+            }
+            std::string newName = baseName + " (Clone)";
+            name->Value = ECS::StringTable::Intern(newName);
         }
 
         // Set parent relationship
@@ -204,7 +210,7 @@ EntityId EntityActions::CloneEntity(EntityId id) {
         }
         else {
             // Remove parent component if cloning as root
-            if (world.Has<ECS::Parent>(clone)) {
+            if (Editor::ECSUtils::HasComponent(&world, clone, "Parent")) {
                 world.Detach(clone);
             }
         }
@@ -214,11 +220,16 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
         // Find and clone all children
         std::vector<EntityId> children;
-        world.Each<ECS::Parent>([&](ECS::Entity e, const ECS::Parent& p) {
-            if (p.ParentEntity.Index == entityId) {
-                children.push_back(e.Index);
-            }
+        const ECS::ComponentTypeId parentId = Editor::ECSUtils::GetComponentIdFromName("Parent");
+        if (parentId != ECS::NULL_COMPONENT_ID) {
+            world.Each([&](ECS::Entity e) {
+                if (!world.HasById(e, parentId)) return;
+                const auto* parent = static_cast<const ECS::Components::Parent*>(world.GetRawComponentPtr(e, parentId));
+                if (parent && parent->ParentEntity.Index == entityId) {
+                    children.push_back(e.Index);
+                }
             });
+        }
 
         // Recursively clone children with this clone as their parent
         for (auto childId : children) {
@@ -230,7 +241,7 @@ EntityId EntityActions::CloneEntity(EntityId id) {
 
     // Get the parent of the original entity (if any)
     EntityId originalParentId = ECS::Entity::NPOS32;
-    if (world.Has<ECS::Parent>(entity)) {
+    if (Editor::ECSUtils::HasComponent(&world, entity, "Parent")) {
         const auto& parent = world.ParentOf(entity);
         originalParentId = parent.Index;
     }

@@ -43,7 +43,7 @@ namespace Editor {
         Vector3D posDelta = final.Position - this->Position;
 
         // Compute rotation delta as the relative rotation
-        Quaternion rotDelta = final.Rotation;
+        Quaternion rotDelta = final.Rotation * this->Rotation.Inverse();
 
         // Compute scale delta
         Vector3D scaleDelta = final.Scale - this->Scale;

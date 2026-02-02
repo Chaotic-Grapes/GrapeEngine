@@ -16,6 +16,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 /* End Header *******************************************************************/
 
 #include "AudioAssetLibrary.h"
+#include "core/ProjectPaths.h"
 #include "core/Logger.h"
 #include "ecs/systems/RendererSystem.h"
 #include "EditorStyle.h"
@@ -24,10 +25,12 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include "UndoSystem.h"
 #include "ViewportPicking.h"
+#include "ecs/ui/GUIContext.h"
 #include <core/Application.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CompilePanel.h"
+#include "TilePalettePanel.h"
 #include <cmath>
 
 #ifdef ERROR
@@ -163,6 +166,7 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Layers", rightNode);
+    ImGui::DockBuilderDockWindow("Tile Palette", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
@@ -245,8 +249,8 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     ImGuiStyle& style = ImGui::GetStyle();
 
     // Initialize audio asset library:
-    // this will scan for folder assets/Audio
-    AudioAssetLibrary::Get().Refresh("assets/Audio");
+    // this will scan for audio anywhere under the project root
+    AudioAssetLibrary::Get().Refresh(Engine::ProjectPaths::GetProjectRoot());
 
     style.ChildBorderSize = 0.75f; // Subtle child border for visual separation
     _loadFonts();
@@ -368,9 +372,10 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() { m_hierarchyWindow.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world, &m_entityActions); 
                    m_hierarchyWindow.SetViewport(&m_sceneViewport); 
                    m_hierarchyWindow.SetFileMenu(&m_fileMenu);
+                   m_hierarchyWindow.SetUndoSystem(&m_undoSystem); // Enable reorder undo/redo.
         },
         [this]() { m_hierarchyWindow.Render(); },
-        [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); }
+        [this](ECS::World* w) { m_hierarchyWindow.SetWorld(w); m_hierarchyWindow.SetUndoSystem(&m_undoSystem); } // Keep undo wired after world changes.
     );
 
     _registerPanel("Inspector",
@@ -382,6 +387,14 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         },
         [this]() { m_inspector.Render(); },
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
+    );
+
+    _registerPanel("Tile Palette",
+        [this]() {
+            m_tilePalette.Initialize(nullptr, nullptr, m_world);
+        },
+        [this]() { m_tilePalette.Render(); },
+        [this](ECS::World* w) { m_tilePalette.SetWorld(w); }
     );
 
     _registerPanel("Layers",
@@ -461,6 +474,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Wire up file menu to viewports after panels are initialized
     m_sceneViewport.SetFileMenu(&m_fileMenu);
     m_gameViewport.SetFileMenu(&m_fileMenu);
+    m_sceneViewport.SetTilePalette(&m_tilePalette);
 
     // Set up hierarchy selection callback to sync with inspector and viewports
     m_hierarchyWindow.OnSelectionChanged([this](const EntityId id) {
@@ -559,6 +573,8 @@ void LevelEditor::_loadFonts() {
 // -------------------------------------------------------------------------
 // Begin frame - handle input and request picking before systems update
 void LevelEditor::BeginFrame() {
+    auto& guiCtx = ECS::UI::GUIContext::Get();
+    guiCtx.UseViewportBounds = false;
     // Begin frame for all viewports - handle input and request picking
     m_sceneViewport.BeginFrame();
     m_gameViewport.BeginFrame();
@@ -638,6 +654,10 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 
         // Rebuild entity order to reflect restored hierarchy
         m_hierarchyWindow.RebuildEntityOrder();
+    }
+
+    if (newState == EditorState::Play && m_console.IsClearOnPlayBuildEnabled()) {
+        m_console.Clear();
     }
 }
 

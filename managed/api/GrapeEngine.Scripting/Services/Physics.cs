@@ -14,7 +14,6 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 using GrapeEngine.Scripting.Internal.Unsafe;
 using GrapeEngine.Scripting.Core;
-using GrapeEngine.Scripting.Internal.Profiling;
 using GrapeEngine.Math;
 
 namespace GrapeEngine.Scripting.Services;
@@ -29,12 +28,9 @@ public static class Physics
     /// </summary>
     public static void SetGravity(World world, Vector2 gravity)
     {
-        using (PInvokeTimer.Start("PhysicsAPI.SetGravity"))
+        unsafe
         {
-            unsafe
-            {
-                PhysicsAPI.SetGravity(world.NativePtr, gravity.X, gravity.Y);
-            }
+            PhysicsAPI.SetGravity(world.NativePtr, gravity.X, gravity.Y);
         }
     }
 
@@ -43,14 +39,11 @@ public static class Physics
     /// </summary>
     public static Vector2 GetGravity(World world)
     {
-        using (PInvokeTimer.Start("PhysicsAPI.GetGravity"))
+        unsafe
         {
-            unsafe
-            {
-                float x, y;
-                PhysicsAPI.GetGravity(world.NativePtr, &x, &y);
-                return new Vector2(x, y);
-            }
+            float x, y;
+            PhysicsAPI.GetGravity(world.NativePtr, &x, &y);
+            return new Vector2(x, y);
         }
     }
 
@@ -59,12 +52,9 @@ public static class Physics
     /// </summary>
     public static void SetEnabled(World world, bool enabled)
     {
-        using (PInvokeTimer.Start("PhysicsAPI.SetEnabled"))
+        unsafe
         {
-            unsafe
-            {
-                PhysicsAPI.SetEnabled(world.NativePtr, enabled);
-            }
+            PhysicsAPI.SetEnabled(world.NativePtr, enabled);
         }
     }
 
@@ -73,12 +63,9 @@ public static class Physics
     /// </summary>
     public static bool IsEnabled(World world)
     {
-        using (PInvokeTimer.Start("PhysicsAPI.IsEnabled"))
+        unsafe
         {
-            unsafe
-            {
-                return PhysicsAPI.IsEnabled(world.NativePtr);
-            }
+            return PhysicsAPI.IsEnabled(world.NativePtr);
         }
     }
 
@@ -87,12 +74,9 @@ public static class Physics
     /// </summary>
     public static void ApplyForce(World world, Entity entity, Vector2 force)
     {
-        using (PInvokeTimer.Start("PhysicsAPI.ApplyForce"))
+        unsafe
         {
-            unsafe
-            {
-                PhysicsAPI.ApplyForce(world.NativePtr, entity.Id, force.X, force.Y);
-            }
+            PhysicsAPI.ApplyForce(world.NativePtr, entity.Id, force.X, force.Y);
         }
     }
 
@@ -101,12 +85,9 @@ public static class Physics
     /// </summary>
     public static void ApplyImpulse(World world, Entity entity, Vector2 impulse)
     {
-        using (PInvokeTimer.Start("PhysicsAPI.ApplyImpulse"))
+        unsafe
         {
-            unsafe
-            {
-                PhysicsAPI.ApplyImpulse(world.NativePtr, entity.Id, impulse.X, impulse.Y);
-            }
+            PhysicsAPI.ApplyImpulse(world.NativePtr, entity.Id, impulse.X, impulse.Y);
         }
     }
 
@@ -115,14 +96,11 @@ public static class Physics
     /// </summary>
     public static Vector2 GetVelocity(World world, Entity entity)
     {
-        using (PInvokeTimer.Start("PhysicsAPI.GetVelocity"))
+        unsafe
         {
-            unsafe
-            {
-                float x, y;
-                PhysicsAPI.GetVelocity(world.NativePtr, entity.Id, &x, &y);
-                return new Vector2(x, y);
-            }
+            float x, y;
+            PhysicsAPI.GetVelocity(world.NativePtr, entity.Id, &x, &y);
+            return new Vector2(x, y);
         }
     }
 
@@ -131,12 +109,9 @@ public static class Physics
     /// </summary>
     public static void SetVelocity(World world, Entity entity, Vector2 velocity)
     {
-        using (PInvokeTimer.Start("PhysicsAPI.SetVelocity"))
+        unsafe
         {
-            unsafe
-            {
-                PhysicsAPI.SetVelocity(world.NativePtr, entity.Id, velocity.X, velocity.Y);
-            }
+            PhysicsAPI.SetVelocity(world.NativePtr, entity.Id, velocity.X, velocity.Y);
         }
     }
 }

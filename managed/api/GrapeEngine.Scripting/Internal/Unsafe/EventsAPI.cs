@@ -35,8 +35,8 @@ internal partial class EventsAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     internal static unsafe partial void FireCollisionEvent(
         void* worldPtr,
-        uint entity1Id,
-        uint entity2Id,
+        ulong entity1Id,
+        ulong entity2Id,
         float contactPointX,
         float contactPointY,
         float contactPointZ,
@@ -56,8 +56,8 @@ internal partial class EventsAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     internal static unsafe partial void FireTriggerEnterEvent(
         void* worldPtr,
-        uint triggerId,
-        uint otherEntityId
+        ulong triggerId,
+        ulong otherEntityId
     );
 
     /// <summary>
@@ -67,8 +67,8 @@ internal partial class EventsAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     internal static unsafe partial void FireTriggerStayEvent(
         void* worldPtr,
-        uint triggerId,
-        uint otherEntityId
+        ulong triggerId,
+        ulong otherEntityId
     );
 
     /// <summary>
@@ -78,8 +78,8 @@ internal partial class EventsAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     internal static unsafe partial void FireCollisionExitEvent(
         void* worldPtr,
-        uint entity1Id,
-        uint entity2Id,
+        ulong entity1Id,
+        ulong entity2Id,
         float lastContactPointX,
         float lastContactPointY,
         float lastContactPointZ
@@ -92,8 +92,8 @@ internal partial class EventsAPI
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     internal static unsafe partial void FireTriggerExitEvent(
         void* worldPtr,
-        uint triggerId,
-        uint otherEntityId
+        ulong triggerId,
+        ulong otherEntityId
     );
 
     /// <summary>

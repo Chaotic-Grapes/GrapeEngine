@@ -38,6 +38,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "PerformancePanel.h"
 #include "SpriteImportPanel.h"
 #include "SystemsPanel.h"
+#include "TilePalettePanel.h"
 
 struct LevelEditorConfig {
     float TextFontSize = 23.0f;
@@ -114,6 +115,7 @@ private:
     PerformancePanel m_performancePanel;
     SpriteImportPanel m_spriteImportPanel;
     SystemsPanel m_systemsPanel;
+    TilePalettePanel m_tilePalette;
 
     // Panel registry
     std::vector<PanelRegistration> m_panelRegistry;

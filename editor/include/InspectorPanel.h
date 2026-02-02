@@ -256,67 +256,38 @@ void InspectorPanel::_renderComponentSection(const std::string& headerName, cons
     nlohmann::json& data, T renderContent, bool canDelete)
 {
     // DefaultOpen: Component starts expanded for immediate editing access
-    // Framed: Adds visual border around header for clear section separation  
+    // Framed: Adds visual border around header for clear section separation
     // SpanFullWidth: Header uses entire available width regardless of content
     bool nodeOpen = ImGui::CollapsingHeader(headerName.c_str(),
         ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanFullWidth);
 
+    if (ImGui::BeginPopupContextItem(("ComponentHeaderContext##" + componentType).c_str())) {
+        if (!canDelete) ImGui::BeginDisabled();
+        ImGui::PushStyleColor(ImGuiCol_Header, EditorStyle::DangerButton);
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, EditorStyle::DangerButtonHover);
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, EditorStyle::DangerButtonActive);
+        if (ImGui::MenuItem("Remove Component")) {
+            if (canDelete) {
+                m_componentsToDelete.push_back(componentType);
+            }
+        }
+        ImGui::PopStyleColor(3);
+        if (!canDelete) {
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("Transform cannot be removed");
+            }
+            ImGui::EndDisabled();
+        }
+        ImGui::EndPopup();
+    }
+
     // Create collapsing header with specific behavior flags
     if (nodeOpen) {
-        const char* deleteIcon = "\xEE\xA1\xB2";         // Trash icon
-        ImVec2 contentCursorPos = ImGui::GetCursorPos(); // Save position before button for content alignment
-
-        // CalcTextSize returns pixel dimensions of icon text
-        ImGui::PushFont(m_symbolsFont);
-        float iconWidth = ImGui::CalcTextSize(deleteIcon).x;
-
-        // Button width = icon width + padding on both sides (FramePadding.x * 2)
-        float btnWidth = iconWidth + ImGui::GetStyle().FramePadding.x * 2.0f;
-        ImGui::PopFont();
-
-        // X position = total content width - button width = right edge alignment
-        // Y position = original cursor Y + 5px offset for vertical centering in header
-        float deleteButtonX = EditorUI::GetContentWidth() - btnWidth;
-        ImGui::SetCursorPos(ImVec2(deleteButtonX, contentCursorPos.y + 5.0f));
-
-        // Disable interaction if not deletable
-        if (!canDelete) ImGui::BeginDisabled();
-        ImGui::PushFont(m_symbolsFont);
-
-        // Button: Transparent background (RGBA 0,0,0,0 = fully transparent)
-        // ButtonHovered: Dark gray with 30% opacity when mouse over
-        // ButtonActive: Medium gray with 50% opacity when clicked
-        // Text: Red color if deletable, gray if disabled (Transform component)
-        ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::Transparent);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::Scale(EditorStyle::FrameBgHover, 0.3f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::Scale(EditorStyle::FrameBgActive, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_Text, canDelete ? EditorStyle::DangerText : EditorStyle::TextDisabled);
-
-        // Create button with unique ID to avoid ImGui ID conflicts
-        // ## ensures each button has distinct identifier
-        bool clicked = ImGui::SmallButton((std::string(deleteIcon) + "##Delete" + componentType).c_str());
-
-        ImGui::PopStyleColor(4); // Restore original ImGui colors (pop 4 pushed colors)
-        ImGui::PopFont();
-        if (!canDelete) ImGui::EndDisabled();
-
-        // AllowWhenDisabled flag shows tooltip even for disabled buttons
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip(canDelete ? "Remove Component" : "Transform cannot be removed");
-        }
-
-        // Schedule component for deferred deletion if clicked to prevent modifying data 
-        // during UI iteration
-        if (clicked && canDelete) {
-            m_componentsToDelete.push_back(componentType);
-        }
-
-        // Restore cursor to original position saved before button
-        ImGui::SetCursorPos(contentCursorPos);
-        ImGui::Dummy(ImVec2(0.0f, 5.0f));
-
-        // After header + trash icon, display component-specific UI
+        // After header, display component-specific UI
         renderContent(data);
+
+        ImGui::Spacing();
+        ImGui::Spacing();
     }
 }
 

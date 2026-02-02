@@ -22,6 +22,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/AudioSystem.h"
 #include "services/AudioService.h"
 #include "audio/FmodAudioDevice.h"
+#include "core/ProjectPaths.h"
 #include <iostream>
 #include "core/Logger.h"
 #include <set>
@@ -33,14 +34,19 @@ namespace {
     std::unordered_map<uint32_t, std::string> g_cueCache;
     bool g_cacheBuilt = false;
 
-	// TODO: Do not hardcode audio folder path. Use ProjectPaths and scan for all audio files
+    std::string GetAudioRoot() {
+        return Engine::ProjectPaths::GetProjectRoot();
+    }
+
     // Build the cache by scanning audio folder once
-    void BuildCueCache(const std::string& audioRoot = "assets/Audio") {
+    void BuildCueCache() {
         if (g_cacheBuilt) return;
 
         namespace fs = std::filesystem;
 
+        const std::string audioRoot = GetAudioRoot();
         if (!fs::exists(audioRoot) || !fs::is_directory(audioRoot)) {
+            LOG_WARNING("Audio root not found: " << audioRoot);
             g_cacheBuilt = true;
             return;
         }

@@ -31,6 +31,8 @@ public class World : IDisposable
 {
     private readonly IntPtr _nativeWorldPtr;
     private bool _disposed;
+    private static readonly Dictionary<IntPtr, WeakReference<World>> _worldCache = [];
+    private static readonly object _worldCacheLock = new();
 
     /// <summary>
     /// Internal constructor. World instances are created by the engine.
@@ -47,6 +49,25 @@ public class World : IDisposable
     {
         _nativeWorldPtr = nativeWorldPtr;
         _disposed = false;
+    }
+
+    /// <summary>
+    /// Get a cached World wrapper for a native pointer to avoid wrapper churn.
+    /// </summary>
+    internal static World FromNativePtr(IntPtr nativeWorldPtr)
+    {
+        lock (_worldCacheLock)
+        {
+            if (_worldCache.TryGetValue(nativeWorldPtr, out var existing) &&
+                existing.TryGetTarget(out var world))
+            {
+                return world;
+            }
+
+            var created = new World(nativeWorldPtr);
+            _worldCache[nativeWorldPtr] = new WeakReference<World>(created);
+            return created;
+        }
     }
 
     /// <summary>
@@ -134,7 +155,9 @@ public class World : IDisposable
     {
         unsafe
         {
-            ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
+            ulong entityId = WorldAPI.InstantiateFromArchetypeId((void*)_nativeWorldPtr, archetypeId); // Archetype ID is a stable signature hash (see GetArchetypeId).
+            if (entityId == 0)
+                throw new InvalidOperationException($"Failed to instantiate entity from archetype ID {archetypeId}.");
             return new Entity(this, entityId);
         }
     }
@@ -150,8 +173,25 @@ public class World : IDisposable
 
         unsafe
         {
-            ulong entityId = WorldAPI.CreateEntity((void*)_nativeWorldPtr);
+            ulong entityId = WorldAPI.CloneEntity((void*)_nativeWorldPtr, sourceEntity.Id); // Clone via native ECS to preserve all components.
+            if (entityId == 0)
+                throw new InvalidOperationException($"Failed to clone entity {sourceEntity.Id}.");
             return new Entity(this, entityId);
+        }
+    }
+
+    /// <summary>
+    /// Get the stable archetype ID for an entity (signature hash).
+    /// </summary>
+    /// <param name="entity">The entity to inspect</param>
+    /// <returns>Stable archetype ID for the entity's current signature</returns>
+    public uint GetArchetypeId(Entity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+
+        unsafe
+        {
+            return WorldAPI.GetArchetypeId((void*)_nativeWorldPtr, entity.Id);
         }
     }
 
@@ -423,14 +463,16 @@ public class World : IDisposable
     /// Events are represented as components and are automatically managed by the C++ physics system:
     /// - Collision events are added when collisions occur
     /// - Trigger events are added when triggers overlap
+    /// - Events are stored in per-entity buffers for the current frame
     /// - All event components are automatically removed at the end of each frame
     /// 
     /// You can query events directly or use the EventSystem convenience methods:
     /// <code>
     /// // Direct query
-    /// foreach (var (entity, collision) in world.Query&lt;CollisionEvent&gt;())
+    /// foreach (var (entity, buffer) in world.Query&lt;CollisionEventBuffer&gt;())
     /// {
-    ///     HandleCollision(entity, collision);
+    ///     for (int i = 0; i &lt; buffer.Count; ++i)
+    ///         HandleCollision(entity, buffer.GetEvent(i));
     /// }
     /// 
     /// // Via EventSystem
@@ -466,6 +508,16 @@ public class World : IDisposable
         {
             _disposed = true;
             GC.SuppressFinalize(this);
+
+            lock (_worldCacheLock)
+            {
+                if (_worldCache.TryGetValue(_nativeWorldPtr, out var existing) &&
+                    existing.TryGetTarget(out var cached) &&
+                    ReferenceEquals(cached, this))
+                {
+                    _worldCache.Remove(_nativeWorldPtr);
+                }
+            }
         }
     }
 

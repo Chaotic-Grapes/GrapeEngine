@@ -1050,8 +1050,16 @@ namespace ECS {
                 // Add read components to builder
                 if (readCount > 0) {
                     std::vector<ComponentTypeId> readIds;
+                    readIds.reserve(static_cast<size_t>(readCount));
                     for (int i = 0; i < readCount && i < static_cast<int>(readHashes.size()); ++i) {
-                        readIds.push_back(ComponentTypeId(readHashes[i]));
+                        const uint32_t hash = readHashes[i];
+                        const ComponentTypeId id = ComponentRegistry::GetComponentIdFromHash(hash);
+                        if (id == NULL_COMPONENT_ID) {
+                            LOG_WARNING("[ScriptSystemWrapper] Unknown read component hash 0x" << std::hex << hash << std::dec
+                                << " for system '" << systemName << "'");
+                            continue;
+                        }
+                        readIds.push_back(id);
                     }
                     builder.ReadComponents(readIds);
                 }
@@ -1059,8 +1067,16 @@ namespace ECS {
                 // Add write components to builder
                 if (writeCount > 0) {
                     std::vector<ComponentTypeId> writeIds;
+                    writeIds.reserve(static_cast<size_t>(writeCount));
                     for (int i = 0; i < writeCount && i < static_cast<int>(writeHashes.size()); ++i) {
-                        writeIds.push_back(ComponentTypeId(writeHashes[i]));
+                        const uint32_t hash = writeHashes[i];
+                        const ComponentTypeId id = ComponentRegistry::GetComponentIdFromHash(hash);
+                        if (id == NULL_COMPONENT_ID) {
+                            LOG_WARNING("[ScriptSystemWrapper] Unknown write component hash 0x" << std::hex << hash << std::dec
+                                << " for system '" << systemName << "'");
+                            continue;
+                        }
+                        writeIds.push_back(id);
                     }
                     builder.WriteComponents(writeIds);
                 }

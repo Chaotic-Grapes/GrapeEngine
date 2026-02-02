@@ -153,51 +153,6 @@ public class Scene
     }
 
     /// <summary>
-    /// Creates an entity on a specific layer.
-    /// </summary>
-    /// <param name="layerId">The layer ID to assign the entity to.</param>
-    /// <returns>The created entity.</returns>
-    public Entity CreateOnLayer(ushort layerId)
-    {
-        unsafe
-        {
-            ulong entityId = SceneAPI.CreateOnLayer(_scenePtr, layerId);
-            return Entity.FromId(GetWorld(), entityId);
-        }
-    }
-
-    /// <summary>
-    /// Assigns an entity to a layer.
-    /// </summary>
-    /// <param name="entity">The entity to move.</param>
-    /// <param name="layerId">The target layer ID.</param>
-    public void SetLayer(Entity entity, ushort layerId)
-    {
-        if (entity == null)
-            throw new ArgumentNullException(nameof(entity));
-
-        unsafe
-        {
-            SceneAPI.SetLayer(_scenePtr, entity.Id, layerId);
-        }
-    }
-
-    /// <summary>
-    /// Removes an entity from its layer.
-    /// </summary>
-    /// <param name="entity">The entity to remove from its layer.</param>
-    public void RemoveFromLayer(Entity entity)
-    {
-        if (entity == null)
-            throw new ArgumentNullException(nameof(entity));
-
-        unsafe
-        {
-            SceneAPI.RemoveFromLayer(_scenePtr, entity.Id);
-        }
-    }
-
-    /// <summary>
     /// Internal method to access the native scene pointer.
     /// </summary>
     internal unsafe void* NativePtr => _scenePtr;

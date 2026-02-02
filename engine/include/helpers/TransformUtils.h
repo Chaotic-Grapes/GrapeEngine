@@ -62,27 +62,13 @@ public:
 
     // Decompose TRS (assumes no shear, uniform basis)
     static void DecomposeTRS(const Matrix4x4& m, Vector3D& outPosition, Quaternion& outRotation, Vector3D& outScale) {
-        // Extract translation (assuming it is stored in the last row or column depends on convention)
-        // Here we assume translation is in the last row m30..m32 for row-major; if using last column m03..m23, adapt as needed
-        // If Matrix4x4::Translation uses last column, swap the extraction accordingly
+        // Matrix4x4::Translation stores translation in the last column (m03/m13/m23).
+        outPosition = Vector3D(m.m03, m.m13, m.m23);
 
-        // Heuristic: test magnitudes of (m30,m31,m32) vs (m03,m13,m23) to decide where translation likely is
-        float rowTransMag2 = m.m30*m.m30 + m.m31*m.m31 + m.m32*m.m32;
-        float colTransMag2 = m.m03*m.m03 + m.m13*m.m13 + m.m23*m.m23;
-        bool useRow = rowTransMag2 >= colTransMag2;
-
-        if (useRow) {
-            outPosition = Vector3D(m.m30, m.m31, m.m32);
-        }
-        else {
-            outPosition = Vector3D(m.m03, m.m13, m.m23);
-        }
-
-        // Extract scale from basis vectors (columns of rotation-scale if column-major, rows if row-major)
-        // Read as if the rotation-scale is in upper-left 3x3 in row-major storage
-        Vector3D basisX(m.m00, m.m01, m.m02);
-        Vector3D basisY(m.m10, m.m11, m.m12);
-        Vector3D basisZ(m.m20, m.m21, m.m22);
+        // Extract scale from basis vectors (columns of rotation-scale in M = T * R * S).
+        Vector3D basisX(m.m00, m.m10, m.m20);
+        Vector3D basisY(m.m01, m.m11, m.m21);
+        Vector3D basisZ(m.m02, m.m12, m.m22);
 
         float sx = std::sqrt(basisX.X*basisX.X + basisX.Y*basisX.Y + basisX.Z*basisX.Z);
         float sy = std::sqrt(basisY.X*basisY.X + basisY.Y*basisY.Y + basisY.Z*basisY.Z);
@@ -93,35 +79,45 @@ public:
         if (sy > 0.0f) { basisY = basisY / sy; }
         if (sz > 0.0f) { basisZ = basisZ / sz; }
 
-        // Reconstruct quaternion from rotation matrix (row-major, 3x3)
-        float trace = basisX.X + basisY.Y + basisZ.Z;
+        // Reconstruct quaternion from rotation matrix (row-major 3x3 elements m00..m22).
+        const float m00 = basisX.X;
+        const float m01 = basisY.X;
+        const float m02 = basisZ.X;
+        const float m10 = basisX.Y;
+        const float m11 = basisY.Y;
+        const float m12 = basisZ.Y;
+        const float m20 = basisX.Z;
+        const float m21 = basisY.Z;
+        const float m22 = basisZ.Z;
+
+        float trace = m00 + m11 + m22;
         Quaternion q;
         if (trace > 0.0f) {
             float s = std::sqrt(trace + 1.0f) * 2.0f;
             q.W = 0.25f * s;
-            q.X = (basisZ.Y - basisY.Z) / s;
-            q.Y = (basisX.Z - basisZ.X) / s;
-            q.Z = (basisY.X - basisX.Y) / s;
+            q.X = (m21 - m12) / s;
+            q.Y = (m02 - m20) / s;
+            q.Z = (m10 - m01) / s;
         }
-        else if (basisX.X > basisY.Y && basisX.X > basisZ.Z) {
-            float s = std::sqrt(1.0f + basisX.X - basisY.Y - basisZ.Z) * 2.0f;
-            q.W = (basisZ.Y - basisY.Z) / s;
+        else if (m00 > m11 && m00 > m22) {
+            float s = std::sqrt(1.0f + m00 - m11 - m22) * 2.0f;
+            q.W = (m21 - m12) / s;
             q.X = 0.25f * s;
-            q.Y = (basisX.Y + basisY.X) / s;
-            q.Z = (basisX.Z + basisZ.X) / s;
+            q.Y = (m01 + m10) / s;
+            q.Z = (m02 + m20) / s;
         }
-        else if (basisY.Y > basisZ.Z) {
-            float s = std::sqrt(1.0f + basisY.Y - basisX.X - basisZ.Z) * 2.0f;
-            q.W = (basisX.Z - basisZ.X) / s;
-            q.X = (basisX.Y + basisY.X) / s;
+        else if (m11 > m22) {
+            float s = std::sqrt(1.0f + m11 - m00 - m22) * 2.0f;
+            q.W = (m02 - m20) / s;
+            q.X = (m01 + m10) / s;
             q.Y = 0.25f * s;
-            q.Z = (basisY.Z + basisZ.Y) / s;
+            q.Z = (m12 + m21) / s;
         }
         else {
-            float s = std::sqrt(1.0f + basisZ.Z - basisX.X - basisY.Y) * 2.0f;
-            q.W = (basisY.X - basisX.Y) / s;
-            q.X = (basisX.Z + basisZ.X) / s;
-            q.Y = (basisY.Z + basisZ.Y) / s;
+            float s = std::sqrt(1.0f + m22 - m00 - m11) * 2.0f;
+            q.W = (m10 - m01) / s;
+            q.X = (m02 + m20) / s;
+            q.Y = (m12 + m21) / s;
             q.Z = 0.25f * s;
         }
 

@@ -23,8 +23,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <glm/glm.hpp>
 
 // Forward declarations
-class Renderer;
-class Shader;
+namespace ECS {
+    class RendererSystem;
+}
 
 namespace Editor {
 
@@ -47,9 +48,7 @@ namespace Editor {
         static void RenderOutline(
             ECS::World& world,
             uint32_t selectedEntityID,
-            Renderer* renderer,
-            Shader* shader,
-            const glm::mat4& viewProj,
+            ECS::RendererSystem* rendererSystem,
             float cameraOrthoSize,
             float windowWidth,
             float windowHeight

@@ -263,6 +263,22 @@ INTEROP_API bool SceneManagerInterop_LoadScene(void* sceneManagerPtr, uint64_t s
     return manager->LoadScene(static_cast<size_t>(sceneIndex), filename);
 }
 
+/**
+ * @brief Restart a scene by reloading it from disk
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index to reload
+ * @param filename Path to the scene file
+ * @return true on success, false on failure
+ */
+INTEROP_API bool SceneManagerInterop_RestartScene(void* sceneManagerPtr, uint64_t sceneIndex, const char* filename) {
+    if (!sceneManagerPtr || !filename)
+        return false;
+
+    Scenes::SceneManager* manager = static_cast<Scenes::SceneManager*>(sceneManagerPtr);
+    return manager->RestartScene(static_cast<size_t>(sceneIndex), filename);
+}
+
 // ============================================================================
 // Scene Properties
 // ============================================================================
@@ -400,53 +416,6 @@ INTEROP_API void SceneInterop_DestroyEntity(void* scenePtr, uint64_t entityId) {
     Scenes::Scene* scene = static_cast<Scenes::Scene*>(scenePtr);
     ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
     scene->DestroyEntity(entity);
-}
-
-/**
- * @brief Create a new entity on the specified layer
- *
- * @param scenePtr Pointer to the Scene
- * @param layerId Layer identifier
- * @return uint64_t Packed entity id of the created entity, or 0 on failure
- */
-INTEROP_API uint64_t SceneInterop_CreateOnLayer(void* scenePtr, uint16_t layerId) {
-    if (!scenePtr)
-        return 0;
-
-    Scenes::Scene* scene = static_cast<Scenes::Scene*>(scenePtr);
-    ECS::Entity entity = scene->CreateOnLayer(layerId);
-    return ECS::EntityUtils::Pack(entity);
-}
-
-/**
- * @brief Set the layer of an entity
- *
- * @param scenePtr Pointer to the Scene
- * @param entityId Packed entity id
- * @param layerId Layer identifier to assign
- */
-INTEROP_API void SceneInterop_SetLayer(void* scenePtr, uint64_t entityId, uint16_t layerId) {
-    if (!scenePtr)
-        return;
-
-    Scenes::Scene* scene = static_cast<Scenes::Scene*>(scenePtr);
-    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
-    scene->SetLayer(entity, layerId);
-}
-
-/**
- * @brief Remove an entity from its current layer
- *
- * @param scenePtr Pointer to the Scene
- * @param entityId Packed entity id
- */
-INTEROP_API void SceneInterop_RemoveFromLayer(void* scenePtr, uint64_t entityId) {
-    if (!scenePtr)
-        return;
-
-    Scenes::Scene* scene = static_cast<Scenes::Scene*>(scenePtr);
-    ECS::Entity entity = ECS::EntityUtils::Unpack(entityId);
-    scene->RemoveFromLayer(entity);
 }
 
 // ============================================================================

@@ -26,6 +26,7 @@ Provides:
 #include "serialization/EntitySerializer.h"
 #include "ecs/Entity.h"
 #include "ecs/PrefabManager.h"
+#include "EditorECSUtils.h"
 #include "InspectorPanel.h"
 #include "services/Input.h"
 #include "ScriptTemplates.h"
@@ -778,7 +779,7 @@ void AssetBrowserPanel::_loadPrefab() {
                 ECS::Components::PrefabInstanceMetadata meta;
                 meta.PrefabHash = hash;
                 meta.Flags = 0;
-                m_world->Add<ECS::Components::PrefabInstanceMetadata>(entity, meta);
+                Editor::ECSUtils::AddComponent(m_world, entity, "PrefabInstanceMetadata", meta);
 
                 // Log info and update status message on successful load
                 LOG_INFO("Loaded prefab: " << std::filesystem::path(m_selectedAsset).filename().string());

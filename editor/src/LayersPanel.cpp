@@ -17,6 +17,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include "core/Logger.h"
 #include "ecs/Components.h"
+#include "EditorECSUtils.h"
 #include "EditorFileMenu.h"
 #include "HierarchyPanel.h"
 #include "EditorEntityActions.h"
@@ -33,7 +34,9 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #endif
 #endif
 
+#include <algorithm>
 #include <fstream>
+#include <unordered_set>
 
 void LayersPanel::Initialize(ImFont* mainFont, ImFont* boldFont, ImFont* symbolsFont) {
     m_mainFont = mainFont;
@@ -47,12 +50,13 @@ void LayersPanel::MoveLayer(uint16_t fromId, uint16_t toId) {
     if (fromId == toId) return;
 
     lm.MoveLayer(fromId, toId);
+    // Register this action with the undo system to allow reversing the move
     if (m_undoSystem) {
         struct MoveCmd : public Editor::ICommand {
             Scenes::Scene* scene; uint16_t from; uint16_t to;
             MoveCmd(Scenes::Scene* s, uint16_t f, uint16_t t) : scene(s), from(f), to(t) {}
             void Execute() override { if (!scene) return; scene->GetLayers().MoveLayer(from, to); }
-            void Undo() override { if (!scene) return; scene->GetLayers().MoveLayer(to, from); }
+            void Undo() override { if (!scene) return; scene->GetLayers().MoveLayer(to, from); }  // Reverse the move
         };
 
         auto cmd = std::make_unique<MoveCmd>(m_scene, fromId, toId);
@@ -64,6 +68,7 @@ void LayersPanel::Render() {
     if (m_mainFont) ImGui::PushFont(m_mainFont);
     ImGui::Begin("Layers");
 
+    // Early exit if no scene is loaded
     if (!m_scene) {
         ImGui::TextDisabled("No scene attached");
         if (m_mainFont) ImGui::PopFont();
@@ -72,11 +77,13 @@ void LayersPanel::Render() {
     }
 
     try {
-        _renderHeader();
-        _renderLayersList();
-        _renderCollisionMatrix();
-        _renderImportConfirm();
-        _renderStatusPopup();
+        // Render all UI sections in order
+        _renderHeader();            // Add new layer input
+        _renderLayersList();        // Table of existing layers with controls
+        _renderFooterButtons();     // Save/Load/Reset buttons
+        _renderCollisionMatrix();   // Collision checkbox matrix
+        _renderImportConfirm();     // Import overwrite confirmation popup
+        _renderStatusPopup();       // Status messages popup
     }
     catch (const std::exception &e) {
         LOG_ERROR("Exception in LayersPanel::Render(): " << e.what());
@@ -98,22 +105,23 @@ LayersPanel::~LayersPanel() {
 
 void LayersPanel::SetScene(Scenes::Scene* scene) {
     m_scene = scene;
-    m_pendingImport.clear();
-    m_showImportConfirm = false;
-    m_statusMessage.clear();
-    m_renameBuffers.clear();  // Clear rename buffers when scene changes
+    m_pendingImport.clear();      // Clear pending layer import data
+    m_showImportConfirm = false;  // Close any open import dialog
+    m_statusMessage.clear();      // Clear status messages
+    m_renameBuffers.clear();      // Clear rename buffers when scene changes
 }
 
 void LayersPanel::SetLayer(EntityId entity, uint16_t layerId) {
     if (!m_scene) return;
     ECS::Entity e{ entity, 0 };
     if (e.IsNull()) return;
-    m_scene->SetLayer(e, layerId);
-    if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+    m_scene->SetLayerById(e, layerId);
+    if (m_fileMenu) m_fileMenu->MarkSceneDirty();  // Mark scene as modified
 }
 
 // Draws the given text as vertically stacked characters (visual 90° clockwise)
 // This is a portable substitute for rotated text (ImGui has no built-in text rotation).
+// Used for column headers in the collision matrix to save horizontal space
 static void DrawVerticalTextClockwise(const std::string &text) {
     ImDrawList* draw = ImGui::GetWindowDrawList();
     ImVec2 cursor = ImGui::GetCursorScreenPos();
@@ -122,17 +130,19 @@ static void DrawVerticalTextClockwise(const std::string &text) {
     float fontSize = ImGui::GetFontSize() * 0.72f;
     ImFont* font = ImGui::GetFont();
     size_t len = text.size();
-    float lineGap = 2.0f; // small gap between stacked chars
+    float lineGap = 2.0f;  // Small gap between stacked characters
     float totalHeight = (fontSize + lineGap) * static_cast<float>(len);
 
     // Reserve vertical layout space so subsequent items align correctly.
     ImGui::Dummy(ImVec2(0.0f, totalHeight));
 
+    // Draw each character centered in the column, stacked vertically
     float startX = cursor.x + colWidth * 0.5f;
     float startY = cursor.y;
     for (size_t i = 0; i < len; ++i) {
         char buf[2] = { text[i], '\0' };
         ImVec2 ts = ImGui::CalcTextSize(buf, nullptr, false, 0.0f);
+        // Center each character horizontally in the column
         ImVec2 pos(startX - ts.x * 0.5f, startY + (fontSize + lineGap) * static_cast<float>(i));
         draw->AddText(font, fontSize, pos, ImGui::GetColorU32(ImGuiCol_Text), buf);
     }
@@ -142,13 +152,26 @@ static void DrawVerticalTextClockwise(const std::string &text) {
 void LayersPanel::_renderHeader() {
     auto& lm = m_scene->GetLayers();
 
-    // Header: new layer
+    // Calculate optimal width for input field to fill available space
+    const float buttonWidth = ImGui::CalcTextSize("Add").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float inputWidth = ImGui::GetContentRegionAvail().x - buttonWidth - spacing;
+    if (inputWidth > 50.0f) {
+        ImGui::SetNextItemWidth(inputWidth);
+    }
+    
+    // Input field for new layer name
     ImGui::InputText("##NewLayerName", m_newLayerName, sizeof(m_newLayerName));
     ImGui::SameLine();
+    
+    // Add button to create the new layer
     if (ImGui::Button("Add")) {
         std::string nm(m_newLayerName);
         if (!nm.empty()) {
+            // Create the layer and get its assigned ID
             uint16_t id = lm.CreateLayer(nm);
+            
+            // Register with undo system for Ctrl+Z support
             if (m_undoSystem) {
                 struct CreateLayerCmd : public Editor::ICommand {
                     Scenes::Scene* scene;
@@ -156,30 +179,37 @@ void LayersPanel::_renderHeader() {
                     std::string name;
                     CreateLayerCmd(Scenes::Scene* s, uint16_t i, std::string n) : scene(s), id(i), name(std::move(n)) {}
                     void Execute() override { if (!scene) return; scene->GetLayers().CreateLayerAt(id, name); }
-                    void Undo() override { if (!scene) return; scene->GetLayers().RemoveLayer(id); }
+                    void Undo() override { if (!scene) return; scene->GetLayers().RemoveLayer(id); }  // Remove on undo
                 };
                 auto cmd = std::make_unique<CreateLayerCmd>(m_scene, id, nm);
                 m_undoSystem->ExecuteCommand(std::move(cmd));
             }
             if (m_fileMenu) m_fileMenu->MarkSceneDirty();
         }
-        ImGui::Separator();
     }
-    ImGui::SameLine();
+    ImGui::Separator();
+}
+
+void LayersPanel::_renderFooterButtons() {
+    auto& lm = m_scene->GetLayers();
+
+    // Save button
     if (ImGui::Button("Save")) {
         if (m_fileMenu) {
+            // Use file menu to save entire scene (preferred method)
             m_fileMenu->SaveScene();
             m_statusMessage = "Scene saved (layers persisted).";
             m_statusType = LayersPanel::StatusType::Success;
         }
         else {
+            // Fallback: export layers to standalone JSON file
             nlohmann::json j = nlohmann::json::array();
             auto layersListE = lm.ListLayers();
             for (const auto& p : layersListE) {
                 nlohmann::json e;
                 e["id"] = p.first;
                 e["name"] = p.second;
-                e["mask"] = lm.GetLayerMask(p.first);
+                e["mask"] = lm.GetLayerMask(p.first);  // Collision mask
                 e["visible"] = lm.IsVisible(p.first);
                 e["locked"] = lm.IsLocked(p.first);
                 j.push_back(e);
@@ -202,19 +232,114 @@ void LayersPanel::_renderHeader() {
 #endif
         }
     }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save layer definitions and collision matrix.");
+
     ImGui::SameLine();
+    
+    // Load button
+    if (ImGui::Button("Load")) {
+#ifdef _WIN32
+        // Show Windows file open dialog
+        char filename[MAX_PATH] = "";
+        OPENFILENAMEA ofn{};
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner = nullptr;
+        ofn.lpstrFilter = "JSON files\0*.json\0All files\0*.*\0";
+        ofn.lpstrFile = filename;
+        ofn.nMaxFile = MAX_PATH;
+        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+
+        if (GetOpenFileNameA(&ofn)) {
+            std::ifstream ifs(ofn.lpstrFile, std::ios::binary);
+
+            if (ifs) {
+                std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+                try {
+                    auto j = nlohmann::json::parse(content);
+
+                    // Handle both standalone array and object with "Layers" key
+                    if (j.is_object() && j.contains("Layers")) j = j["Layers"];
+                    if (j.is_array()) {
+                        // Clear any previous pending import
+                        m_pendingImport.clear();
+
+                        // Process each layer in the import file
+                        for (auto &e : j) {
+                            if (e.contains("id") && e.contains("name")) {
+                                uint16_t id = static_cast<uint16_t>(e["id"].get<int>());
+                                std::string name = e["name"].get<std::string>();
+
+                                // Build import entry with all available properties
+                                LayersPanel::LayerImportEntry entry;
+                                entry.Id = id;
+                                entry.Name = name;
+
+                                // Optional properties - only present if in JSON
+                                if (e.contains("mask")) {
+                                    entry.Mask = static_cast<uint32_t>(e["mask"].get<uint32_t>());
+                                    entry.HasMask = true;
+                                }
+                                if (e.contains("visible")) {
+                                    entry.Visible = e["visible"].get<bool>();
+                                    entry.HasVisible = true;
+                                }
+                                if (e.contains("locked")) {
+                                    entry.Locked = e["locked"].get<bool>();
+                                    entry.HasLocked = true;
+                                }
+
+                                // Try to create at the specified index. If the slot is free, apply immediately.
+                                if (lm.CreateLayerAt(entry.Id, entry.Name)) {
+                                    // Layer slot was free so apply all properties immediately
+                                    if (entry.HasMask) lm.SetLayerMask(entry.Id, entry.Mask);
+                                    if (entry.HasVisible) lm.SetVisibility(entry.Id, entry.Visible);
+                                    if (entry.HasLocked) lm.SetLocked(entry.Id, entry.Locked);
+                                }
+                                else {
+                                    // Slot is occupied: defer to pending import and ask user for confirmation
+                                    m_pendingImport.push_back(entry);
+                                }
+                            }
+                        }
+
+                        // If any layers conflict with existing ones, show confirmation dialog
+                        if (!m_pendingImport.empty()) {
+                            m_showImportConfirm = true;
+                            ImGui::OpenPopup("OverwriteLayersConfirm");
+                        }
+
+                        if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+                    }
+                }
+                catch (...) { /* ignore parse errors */ }
+            }
+        }
+#endif
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Load layer definitions and collision matrix.");
+
+    ImGui::SameLine();
+    
+    // Reset button - returns all layers to default state (red styling for destructive action)
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.7f, 0.15f, 0.15f, 1.0f));
     if (ImGui::Button("Reset")) {
-        // Snapshot current state
+        // Snapshot current state for undo functionality
         std::vector<std::string> prevNames;
         std::vector<uint32_t> prevMasks;
         std::vector<bool> prevVis;
         std::vector<bool> prevLocked;
         auto list = lm.ListLayers();
+        
+        // Find highest layer ID to determine array size
         uint16_t maxId = 0; for (auto &p : list) maxId = std::max<uint16_t>(maxId, p.first);
         prevNames.resize(maxId + 1);
         prevMasks.resize(maxId + 1);
         prevVis.resize(maxId + 1);
         prevLocked.resize(maxId + 1);
+        
+        // Save current state of all layers
         for (uint16_t i = 0; i <= maxId; ++i) {
             std::string name;
             for (auto &pp : list) { if (pp.first == i) { name = pp.second; break; } }
@@ -224,14 +349,20 @@ void LayersPanel::_renderHeader() {
             prevLocked[i] = lm.IsLocked(i);
         }
 
-        // Snapshot entity layer assignments
+        // Snapshot entity layer assignments so we can restore them on undo
         std::vector<std::pair<uint32_t, uint16_t>> entityLayers;
         ECS::World& world = m_scene->GetWorld();
         world.Each([&](ECS::Entity e) {
-            if (world.Has<ECS::Components::Layer>(e)) entityLayers.emplace_back(e.Index, world.Get<ECS::Components::Layer>(e).Id);
+            if (!Editor::ECSUtils::HasComponent(&world, e, "Layer")) {
+                return;
+            }
+            const auto* layer = Editor::ECSUtils::GetComponentPtr<ECS::Components::Layer>(&world, e, "Layer");
+            if (layer) {
+                entityLayers.emplace_back(e.Index, layer->Id);
+            }
         });
 
-        // Apply reset
+        // Apply reset to defaults (creates default layer)
         lm.ResetToDefaults();
 
         if (m_undoSystem) {
@@ -255,7 +386,7 @@ void LayersPanel::_renderHeader() {
                     ECS::World& world = scene->GetWorld();
                     for (auto &p : entityLayers) {
                         ECS::Entity e = world.Resolve(p.first);
-                        if (!e.IsNull() && world.IsAlive(e)) scene->SetLayer(e, p.second);
+                        if (!e.IsNull() && world.IsAlive(e)) scene->SetLayerById(e, p.second);
                     }
                 }
             };
@@ -268,79 +399,10 @@ void LayersPanel::_renderHeader() {
         m_statusMessage = "Layers reset to default.";
         m_statusType = LayersPanel::StatusType::Info;
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Load")) {
-#ifdef _WIN32
-        char filename[MAX_PATH] = "";
-        OPENFILENAMEA ofn{};
-        ofn.lStructSize = sizeof(ofn);
-        ofn.hwndOwner = nullptr;
-        ofn.lpstrFilter = "JSON files\0*.json\0All files\0*.*\0";
-        ofn.lpstrFile = filename;
-        ofn.nMaxFile = MAX_PATH;
-        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
-        if (GetOpenFileNameA(&ofn)) {
-            std::ifstream ifs(ofn.lpstrFile, std::ios::binary);
-            if (ifs) {
-                std::string content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-                try {
-                    auto j = nlohmann::json::parse(content);
-                    if (j.is_object() && j.contains("Layers")) j = j["Layers"];
-                    if (j.is_array()) {
-                        // Clear any previous pending import
-                        m_pendingImport.clear();
+    ImGui::PopStyleColor(3);
 
-                        for (auto &e : j) {
-                            if (e.contains("id") && e.contains("name")) {
-                                uint16_t id = static_cast<uint16_t>(e["id"].get<int>());
-                                std::string name = e["name"].get<std::string>();
-
-                                LayersPanel::LayerImportEntry entry;
-                                entry.Id = id;
-                                entry.Name = name;
-
-                                if (e.contains("mask")) {
-                                    entry.Mask = static_cast<uint32_t>(e["mask"].get<uint32_t>());
-                                    entry.HasMask = true;
-                                }
-                                if (e.contains("visible")) {
-                                    entry.Visible = e["visible"].get<bool>();
-                                    entry.HasVisible = true;
-                                }
-                                if (e.contains("locked")) {
-                                    entry.Locked = e["locked"].get<bool>();
-                                    entry.HasLocked = true;
-                                }
-
-                                // Try to create at the specified index. If the slot is free, apply immediately.
-                                if (lm.CreateLayerAt(entry.Id, entry.Name)) {
-                                    if (entry.HasMask) lm.SetLayerMask(entry.Id, entry.Mask);
-                                    if (entry.HasVisible) lm.SetVisibility(entry.Id, entry.Visible);
-                                    if (entry.HasLocked) lm.SetLocked(entry.Id, entry.Locked);
-                                }
-                                else {
-                                    // Slot is occupied: defer to pending import and ask user
-                                    m_pendingImport.push_back(entry);
-                                }
-                            }
-                        }
-
-                        if (!m_pendingImport.empty()) {
-                            m_showImportConfirm = true;
-                            ImGui::OpenPopup("OverwriteLayersConfirm");
-                        }
-
-                        if (m_fileMenu) m_fileMenu->MarkSceneDirty();
-                    }
-                }
-                catch (...) { /* ignore parse errors */ }
-            }
-        }
-#endif
-    }
-
-    // Tooltips for Save/Load
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Saves/loads both the layer definitions and the collision matrix.");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Reset layers to defaults.");
+    ImGui::Separator();
 }
 
 void LayersPanel::_renderCollisionMatrix() {
@@ -348,11 +410,17 @@ void LayersPanel::_renderCollisionMatrix() {
     ImGui::Separator();
     if (!ImGui::CollapsingHeader("Collision Matrix", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
+    // Reset Matrix button
+    // Enables all collisions (sets all bits to 1)
     if (ImGui::Button("Reset Matrix")) {
         auto layersListR = lm.ListLayers();
+        
+        // Save current masks for undo
         std::vector<std::pair<uint16_t, uint32_t>> prev;
         prev.reserve(layersListR.size());
         for (const auto& p : layersListR) prev.emplace_back(p.first, lm.GetLayerMask(p.first));
+        
+        // Enable all collisions (all bits set)
         for (const auto& p : layersListR) lm.SetLayerMask(p.first, 0xFFFFFFFFu);
         if (m_undoSystem) {
             struct BatchMaskCmd : public Editor::ICommand {
@@ -372,53 +440,72 @@ void LayersPanel::_renderCollisionMatrix() {
     const int count = static_cast<int>(layersList.size());
     if (count <= 0) return;
 
-    // Fill remaining available panel height for the matrix child
+    // Create scrollable child window for the matrix, filling remaining panel height
     ImVec2 avail = ImGui::GetContentRegionAvail();
     ImGui::BeginChild("LayerMatrixChild", ImVec2(0, avail.y > 50.0f ? avail.y : 50.0f), true);
+    
+    // Set up columns: one for row labels + one per layer
     ImGui::Columns(count + 1, "layer_matrix_cols");
+    
+    // Top-left corner cell (empty)
     ImGui::Text("\n");
     ImGui::NextColumn();
+    
+    // Column headers - vertical text to save space
     for (int c = 0; c < count; ++c) {
         const auto& p = layersList[c];
         DrawVerticalTextClockwise(p.second);
         ImGui::NextColumn();
     }
 
+    // Render matrix grid - each cell represents collision between two layers
     for (int r = 0; r < count; ++r) {
         const uint16_t rowId = layersList[r].first;
+        
+        // Row label (layer name)
         ImGui::TextWrapped("%s", layersList[r].second.c_str());
         ImGui::NextColumn();
 
+        // Render cells for this row
+        // Show full grid, but upper triangle (c > r) uses empty dummy controls for symmetry
         for (int c = 0; c < count; ++c) {
             const uint16_t colId = layersList[c].first;
-            uint32_t rowMask = lm.GetLayerMask(rowId);
-            const uint32_t bit = (colId < 32) ? (1u << colId) : 0u;
-            bool collides = (rowMask & bit) != 0u;
-
+            
+            // Unique ID for this cell to avoid ImGui conflicts
             ImGui::PushID((int)rowId * 1000 + (int)colId);
-            if (rowId == colId) {
-                ImGui::BeginDisabled();
-                ImGui::Checkbox("##cell", &collides);
-                ImGui::EndDisabled();
-                ImGui::NextColumn();
+            
+            if (c > r) {
+                // Upper triangle: use empty dummy (matrix is symmetrical)
+                ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight()));
             } else {
+                // Lower triangle and diagonal: show checkbox
+                uint32_t rowMask = lm.GetLayerMask(rowId);
+                uint32_t colMask = lm.GetLayerMask(colId);
+                const uint32_t bitForCol = (colId < 32) ? (1u << colId) : 0u;  // Bit representing colId
+                const uint32_t bitForRow = (rowId < 32) ? (1u << rowId) : 0u;  // Bit representing rowId
+                
+                // Checkbox is checked if BOTH directions allow collision (symmetrical matrix)
+                bool collides = ((rowMask & bitForCol) != 0u) && ((colMask & bitForRow) != 0u);
+
+                // Lower triangle (including diagonal): interactive checkbox to toggle collision
                 bool prevState = collides;
                 ImGui::Checkbox("##cell", &collides);
+                    
+                // If state changed, update both layers' masks (symmetrical)
                 if (collides != prevState) {
                     uint32_t prevRowMask = lm.GetLayerMask(rowId);
                     uint32_t prevColMask = lm.GetLayerMask(colId);
 
-                    const uint32_t bitForCol = (colId < 32) ? (1u << colId) : 0u;
-                    const uint32_t bitForRow = (rowId < 32) ? (1u << rowId) : 0u;
-
                     uint32_t newRowMask = prevRowMask;
                     uint32_t newColMask = prevColMask;
 
-                    if (collides) { newRowMask |= bitForCol; newColMask |= bitForRow; }
-                    else { newRowMask &= ~bitForCol; newColMask &= ~bitForRow; }
+                    // Update both masks to maintain symmetry
+                    if (collides) { newRowMask |= bitForCol; newColMask |= bitForRow; }  // Enable collision
+                    else { newRowMask &= ~bitForCol; newColMask &= ~bitForRow; }         // Disable collision
 
-                    lm.SetLayerMask(rowId, newRowMask);
-                    lm.SetLayerMask(colId, newColMask);
+                    // Apply masks with world sync so colliders get updated immediately
+                    lm.SetLayerMask(rowId, newRowMask, &m_scene->GetWorld());
+                    lm.SetLayerMask(colId, newColMask, &m_scene->GetWorld());
 
                     if (m_undoSystem) {
                         // Command
@@ -431,16 +518,16 @@ void LayersPanel::_renderCollisionMatrix() {
                                 if (!scene)
                                     return;
 
-                                scene->GetLayers().SetLayerMask(a, nextA);
-                                scene->GetLayers().SetLayerMask(b, nextB);
+                                scene->GetLayers().SetLayerMask(a, nextA, &scene->GetWorld());
+                                scene->GetLayers().SetLayerMask(b, nextB, &scene->GetWorld());
                             }
 
                             void Undo() override {
                                 if (!scene)
                                     return;
 
-                                scene->GetLayers().SetLayerMask(a, prevA);
-                                scene->GetLayers().SetLayerMask(b, prevB);
+                                scene->GetLayers().SetLayerMask(a, prevA, &scene->GetWorld());
+                                scene->GetLayers().SetLayerMask(b, prevB, &scene->GetWorld());
                             }
                         };
                         auto cmd = std::make_unique<CollisionCmd>(m_scene, rowId, colId, prevRowMask, prevColMask, newRowMask, newColMask);
@@ -448,8 +535,8 @@ void LayersPanel::_renderCollisionMatrix() {
                     }
                     if (m_fileMenu) m_fileMenu->MarkSceneDirty();
                 }
-                ImGui::NextColumn();
             }
+            ImGui::NextColumn();
             ImGui::PopID();
         }
     }
@@ -460,267 +547,170 @@ void LayersPanel::_renderCollisionMatrix() {
 
 void LayersPanel::_renderLayersList() {
     auto& lm = m_scene->GetLayers();
+    lm.PruneDeadEntities(m_scene->GetWorld());
     auto layers = lm.ListLayers();
 
-    for (auto& p : layers) {
-        const uint16_t id = p.first;
-        std::string name = p.second;
-        bool visible = lm.IsVisible(id);
-        bool locked = lm.IsLocked(id);
-        size_t count = lm.EntitiesIn(id).size();
+    // Create table with 6 columns: Vis, Name, Render, Update, Physics, Lock
+    if (ImGui::BeginTable("LayersTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        // Set up column headers and widths
+        ImGui::TableSetupColumn("Vis", ImGuiTableColumnFlags_WidthFixed, 40.0f);      // Visibility toggle
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);          // Layer name (editable)
+        ImGui::TableSetupColumn("Render", ImGuiTableColumnFlags_WidthFixed, 90.0f);   // Render enabled
+        ImGui::TableSetupColumn("Update", ImGuiTableColumnFlags_WidthFixed, 90.0f);   // Update enabled
+        ImGui::TableSetupColumn("Physics", ImGuiTableColumnFlags_WidthFixed, 90.0f);  // Physics enabled
+        ImGui::TableSetupColumn("Lock", ImGuiTableColumnFlags_WidthFixed, 90.0f);     // Lock layer
 
-        ImGui::PushID(static_cast<int>(id));
-        ImGui::Columns(4, nullptr, false);
-        ImGui::SetColumnWidth(0, 40);
-        ImGui::Checkbox("##vis", &visible);
-        if (visible != lm.IsVisible(id)) {
-            bool prev = lm.IsVisible(id);
-            lm.SetVisibility(id, visible);
+        ImGui::TableHeadersRow();
 
-            if (m_undoSystem) {
-                // Command
-                struct VisCmd : public Editor::ICommand {
-                    Scenes::Scene* scene; uint16_t id; bool prev; bool next;
-                    VisCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+        // Render a row for each layer
+        for (auto& p : layers) {
+            const uint16_t id = p.first;
+            std::string name = p.second;
+            
+            // Fetch current layer properties
+            bool visible = lm.IsVisible(id);
+            bool locked = lm.IsLocked(id);
+            bool renderEnabled = lm.IsRenderEnabled(id);
+            bool updateEnabled = lm.IsUpdateEnabled(id);
+            bool physicsEnabled = lm.IsPhysicsEnabled(id);
+            ImGui::TableNextRow();
+            ImGui::PushID(static_cast<int>(id));  // Unique ID for this row's widgets
 
-                    void Execute() override {
-                        if (!scene)
-                            return;
+            // Column 0: Visibility checkbox
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Checkbox("##vis", &visible);
+            if (visible != lm.IsVisible(id)) {
+                bool prev = lm.IsVisible(id);
+                lm.SetVisibility(id, visible);
 
-                        scene->GetLayers().SetVisibility(id, next); 
-                    }
-
-                    void Undo() override {
-                        if (!scene)
-                            return;
-
-                        scene->GetLayers().SetVisibility(id, prev); 
-                    }
-                };
-
-                auto cmd = std::make_unique<VisCmd>(m_scene, id, prev, visible);
-                m_undoSystem->ExecuteCommand(std::move(cmd));
-            }
-        }
-        ImGui::NextColumn();
-
-        ImGui::SetColumnWidth(1, 200);
-
-        // Initialize or retrieve the persistent rename buffer for this layer
-        if (m_renameBuffers.find(id) == m_renameBuffers.end()) {
-            m_renameBuffers[id] = {};
-            strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), name.c_str());
-        }
-
-        char* buf = m_renameBuffers[id].data();
-        if (ImGui::InputText("##name", buf, m_renameBuffers[id].size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            std::string newName(buf);
-            // Only proceed if the name actually changed
-            if (newName != name) {
-                std::string prevName = name;
-                lm.RenameLayer(id, newName);
-
-                // Update the buffer to reflect the new name from the layer system
-                strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), newName.c_str());
-
+                // Register with undo system
                 if (m_undoSystem) {
-                    // Command
-                    struct RenameCmd : public Editor::ICommand {
-                        Scenes::Scene* scene; uint16_t id; std::string prev; std::string next;
-                        RenameCmd(Scenes::Scene* s, uint16_t i, std::string p, std::string n) : scene(s), id(i), prev(std::move(p)), next(std::move(n)) {}
-                        void Execute() override {
-                            if (!scene)
-                                return;
-                            scene->GetLayers().RenameLayer(id, next);
-                        }
-
-                        void Undo() override {
-                            if (!scene)
-                                return;
-                            scene->GetLayers().RenameLayer(id, prev);
-                        }
+                    struct VisCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        VisCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetVisibility(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetVisibility(id, prev); }
                     };
-
-                    auto cmd = std::make_unique<RenameCmd>(m_scene, id, prevName, newName);
+                    auto cmd = std::make_unique<VisCmd>(m_scene, id, prev, visible);
                     m_undoSystem->ExecuteCommand(std::move(cmd));
                 }
-
-                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
             }
-        }
-        ImGui::NextColumn();
 
-        ImGui::SetColumnWidth(2, 60);
-        ImGui::Text("%zu", count);
-        ImGui::NextColumn();
-
-        ImGui::SetColumnWidth(3, 120);
-        ImGui::Checkbox("Lock", &locked);
-        if (locked != lm.IsLocked(id)) {
-            bool prev = lm.IsLocked(id);
-            lm.SetLocked(id, locked);
-
-            if (m_undoSystem) {
-                // Command
-                struct LockCmd : public Editor::ICommand {
-                    Scenes::Scene* scene; uint16_t id; bool prev; bool next;
-                    LockCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
-                    void Execute() override { if (!scene) return; scene->GetLayers().SetLocked(id, next); }
-                    void Undo() override { if (!scene) return; scene->GetLayers().SetLocked(id, prev); }
-                };
-                auto cmd = std::make_unique<LockCmd>(m_scene, id, prev, locked);
-                m_undoSystem->ExecuteCommand(std::move(cmd));
+            // Column 1: Layer name (editable text field with Enter to confirm)
+            ImGui::TableSetColumnIndex(1);
+            
+            // Initialize rename buffer for this layer if not already done
+            if (m_renameBuffers.find(id) == m_renameBuffers.end()) {
+                m_renameBuffers[id] = {};
+                strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), name.c_str());
             }
-        }
-        ImGui::Columns(1);
 
-        // Drag & Drop source/target for reordering
-        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
-            ImGui::SetDragDropPayload("LAYER_PAYLOAD", &id, sizeof(id));
-            ImGui::Text("%s", name.c_str());
-            ImGui::EndDragDropSource();
-        }
-        if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("LAYER_PAYLOAD")) {
-                uint16_t fromId = *(const uint16_t*)payload->Data;
+            char* buf = m_renameBuffers[id].data();
+            
+            // Enter key commits the rename
+            if (ImGui::InputText("##name", buf, m_renameBuffers[id].size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                std::string newName(buf);
+                if (newName != name) {
+                    std::string prevName = name;
+                    lm.RenameLayer(id, newName);
+                    strcpy_s(m_renameBuffers[id].data(), m_renameBuffers[id].size(), newName.c_str());
 
-                if (fromId != id && m_scene) {
-                    // Determine source and destination indices within the current visible list
-                    auto layersListLocal = lm.ListLayers();
-                    int srcIdx = -1, dstIdx = -1;
-                    for (size_t i = 0; i < layersListLocal.size(); ++i) {
-                        if (layersListLocal[i].first == fromId) srcIdx = static_cast<int>(i);
-                        if (layersListLocal[i].first == id) dstIdx = static_cast<int>(i);
-                    }
-
-                    if (srcIdx != -1 && dstIdx != -1 && srcIdx != dstIdx && m_undoSystem) {
-                        struct MoveCmd : public Editor::ICommand {
-                            Scenes::Scene* scene; int fromIndex; int toIndex;
-                            MoveCmd(Scenes::Scene* s, int f, int t) : scene(s), fromIndex(f), toIndex(t) {}
-
-                            void Execute() override {
-                                if (!scene)
-                                    return;
-
-                                auto &lm = scene->GetLayers();
-                                auto layers = lm.ListLayers();
-
-                                if (fromIndex < 0 || toIndex < 0 ||
-                                    fromIndex >= (int)layers.size() || toIndex >= (int)layers.size())
-                                    return;
-
-                                // perform adjacent swaps to move element
-                                if (fromIndex < toIndex) {
-                                    for (int i = fromIndex; i < toIndex; ++i) {
-                                        auto cur = lm.ListLayers();
-                                        lm.SwapLayers(cur[i].first, cur[i+1].first);
-                                    }
-                                }
-                                else if (fromIndex > toIndex) {
-                                    for (int i = fromIndex; i > toIndex; --i) {
-                                        auto cur = lm.ListLayers();
-                                        lm.SwapLayers(cur[i].first, cur[i-1].first);
-                                    }
-                                }
-                            }
-
-                            void Undo() override {
-                                if (!scene)
-                                    return;
-                                auto &lm = scene->GetLayers();
-
-                                // reverse the same swaps using current ordering
-                                if (fromIndex < toIndex) {
-                                    for (int i = toIndex; i > fromIndex; --i) {
-                                        auto cur = lm.ListLayers();
-                                        lm.SwapLayers(cur[i].first, cur[i-1].first);
-                                    }
-                                }
-                                else if (fromIndex > toIndex) {
-                                    for (int i = toIndex; i < fromIndex; ++i) {
-                                        auto cur = lm.ListLayers();
-                                        lm.SwapLayers(cur[i].first, cur[i+1].first);
-                                    }
-                                }
-                            }
+                    if (m_undoSystem) {
+                        struct RenameCmd : public Editor::ICommand {
+                            Scenes::Scene* scene; uint16_t id; std::string prev; std::string next;
+                            RenameCmd(Scenes::Scene* s, uint16_t i, std::string p, std::string n) : scene(s), id(i), prev(std::move(p)), next(std::move(n)) {}
+                            void Execute() override { if (!scene) return; scene->GetLayers().RenameLayer(id, next); }
+                            void Undo() override { if (!scene) return; scene->GetLayers().RenameLayer(id, prev); }
                         };
-
-                        auto cmd = std::make_unique<MoveCmd>(m_scene, srcIdx, dstIdx);
+                        auto cmd = std::make_unique<RenameCmd>(m_scene, id, prevName, newName);
                         m_undoSystem->ExecuteCommand(std::move(cmd));
-                        if (m_fileMenu) m_fileMenu->MarkSceneDirty();
                     }
+                    if (m_fileMenu) m_fileMenu->MarkSceneDirty();
                 }
             }
-            ImGui::EndDragDropTarget();
+
+            // Column 2: Render enabled checkbox
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Checkbox("##render", &renderEnabled);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Render");
+            if (renderEnabled != lm.IsRenderEnabled(id)) {
+                bool prev = lm.IsRenderEnabled(id);
+                lm.SetRenderEnabled(id, renderEnabled);
+                if (m_undoSystem) {
+                    struct RenderCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        RenderCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetRenderEnabled(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetRenderEnabled(id, prev); }
+                    };
+                    auto cmd = std::make_unique<RenderCmd>(m_scene, id, prev, renderEnabled);
+                    m_undoSystem->ExecuteCommand(std::move(cmd));
+                }
+                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+            }
+
+            // Column 3: Update enabled checkbox
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Checkbox("##update", &updateEnabled);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Update");
+            if (updateEnabled != lm.IsUpdateEnabled(id)) {
+                bool prev = lm.IsUpdateEnabled(id);
+                lm.SetUpdateEnabled(id, updateEnabled);
+                if (m_undoSystem) {
+                    struct UpdateCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        UpdateCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetUpdateEnabled(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetUpdateEnabled(id, prev); }
+                    };
+                    auto cmd = std::make_unique<UpdateCmd>(m_scene, id, prev, updateEnabled);
+                    m_undoSystem->ExecuteCommand(std::move(cmd));
+                }
+                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+            }
+
+            // Column 4: Physics enabled checkbox
+            ImGui::TableSetColumnIndex(4);
+            ImGui::Checkbox("##physics", &physicsEnabled);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Physics");
+            if (physicsEnabled != lm.IsPhysicsEnabled(id)) {
+                bool prev = lm.IsPhysicsEnabled(id);
+                lm.SetPhysicsEnabled(id, physicsEnabled);
+                if (m_undoSystem) {
+                    struct PhysicsCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        PhysicsCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetPhysicsEnabled(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetPhysicsEnabled(id, prev); }
+                    };
+                    auto cmd = std::make_unique<PhysicsCmd>(m_scene, id, prev, physicsEnabled);
+                    m_undoSystem->ExecuteCommand(std::move(cmd));
+                }
+                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
+            }
+
+            // Column 5: Lock checkbox (prevents editing in hierarchy)
+            ImGui::TableSetColumnIndex(5);
+            ImGui::Checkbox("##lock", &locked);
+            if (locked != lm.IsLocked(id)) {
+                bool prev = lm.IsLocked(id);
+                lm.SetLocked(id, locked);
+                if (m_undoSystem) {
+                    struct LockCmd : public Editor::ICommand {
+                        Scenes::Scene* scene; uint16_t id; bool prev; bool next;
+                        LockCmd(Scenes::Scene* s, uint16_t i, bool p, bool n) : scene(s), id(i), prev(p), next(n) {}
+                        void Execute() override { if (!scene) return; scene->GetLayers().SetLocked(id, next); }
+                        void Undo() override { if (!scene) return; scene->GetLayers().SetLocked(id, prev); }
+                    };
+                    auto cmd = std::make_unique<LockCmd>(m_scene, id, prev, locked);
+                    m_undoSystem->ExecuteCommand(std::move(cmd));
+                }
+            }
+
+            ImGui::PopID();
         }
 
-        // Row actions: Up/Down reorder, Select, Assign
-        ImGui::SameLine();
-        ImGui::SameLine();
-        if (ImGui::Button("▲")) {
-            // Move current entry one slot up using SwapLayers via an undoable command
-            int currentIdx = -1;
-            auto curList = lm.ListLayers();
-            for (size_t i = 0; i < curList.size(); ++i) if (curList[i].first == id) { currentIdx = static_cast<int>(i); break; }
-            if (currentIdx > 0 && m_undoSystem) {
-                struct MoveCmd : public Editor::ICommand {
-                    Scenes::Scene* scene; int fromIndex; int toIndex;
-                    MoveCmd(Scenes::Scene* s, int f, int t) : scene(s), fromIndex(f), toIndex(t) {}
-                    void Execute() override {
-                        if (!scene) return;
-                        auto &lm = scene->GetLayers();
-                        // perform adjacent swaps to move element
-                        for (int i = fromIndex; i > toIndex; --i) {
-                            auto cur = lm.ListLayers();
-                            lm.SwapLayers(cur[i].first, cur[i-1].first);
-                        }
-                    }
-                    void Undo() override {
-                        if (!scene) return;
-                        auto &lm = scene->GetLayers();
-                        for (int i = toIndex; i < fromIndex; ++i) {
-                            auto cur = lm.ListLayers();
-                            lm.SwapLayers(cur[i].first, cur[i+1].first);
-                        }
-                    }
-                };
-                auto cmd = std::make_unique<MoveCmd>(m_scene, currentIdx, currentIdx - 1);
-                m_undoSystem->ExecuteCommand(std::move(cmd));
-                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("▼")) {
-            int currentIdx = -1;
-            auto curList = lm.ListLayers();
-            for (size_t i = 0; i < curList.size(); ++i) if (curList[i].first == id) { currentIdx = static_cast<int>(i); break; }
-            if (currentIdx >= 0 && currentIdx < static_cast<int>(curList.size()) - 1 && m_undoSystem) {
-                struct MoveCmd : public Editor::ICommand {
-                    Scenes::Scene* scene; int fromIndex; int toIndex;
-                    MoveCmd(Scenes::Scene* s, int f, int t) : scene(s), fromIndex(f), toIndex(t) {}
-                    void Execute() override {
-                        if (!scene) return;
-                        auto &lm = scene->GetLayers();
-                        for (int i = fromIndex; i < toIndex; ++i) {
-                            auto cur = lm.ListLayers();
-                            lm.SwapLayers(cur[i].first, cur[i+1].first);
-                        }
-                    }
-                    void Undo() override {
-                        if (!scene) return;
-                        auto &lm = scene->GetLayers();
-                        for (int i = toIndex; i > fromIndex; --i) {
-                            auto cur = lm.ListLayers();
-                            lm.SwapLayers(cur[i].first, cur[i-1].first);
-                        }
-                    }
-                };
-                auto cmd = std::make_unique<MoveCmd>(m_scene, currentIdx, currentIdx + 1);
-                m_undoSystem->ExecuteCommand(std::move(cmd));
-                if (m_fileMenu) m_fileMenu->MarkSceneDirty();
-            }
-        }
-        ImGui::PopID();
+        ImGui::EndTable();
     }
 }
 
@@ -735,6 +725,7 @@ void LayersPanel::_renderImportConfirm() {
     ImGui::TextWrapped("The import contains layers whose IDs are already in use. Overwrite existing layers?");
     ImGui::Separator();
 
+    // Show list of conflicting layers
     ImGui::BeginChild("PendingImportList", ImVec2(0, 140), true);
     for (const auto &entry : m_pendingImport) {
         ImGui::Text("%d: %s   mask=0x%08X   vis=%s   locked=%s",
@@ -747,8 +738,12 @@ void LayersPanel::_renderImportConfirm() {
     ImGui::EndChild();
 
     ImGui::Separator();
+    
+    // Apply button
     if (ImGui::Button("Apply")) {
         auto& lm = m_scene->GetLayers();
+        
+        // Save current state of layers being overwritten for undo
         std::vector<std::tuple<uint16_t, std::string, uint32_t, bool, bool>> prev;
         prev.reserve(m_pendingImport.size());
 
@@ -759,6 +754,7 @@ void LayersPanel::_renderImportConfirm() {
             prev.emplace_back(entry.Id, pname, lm.GetLayerMask(entry.Id), lm.IsVisible(entry.Id), lm.IsLocked(entry.Id));
         }
 
+        // Apply imported layer data
         for (const auto &entry : m_pendingImport) {
             if (!lm.CreateLayerAt(entry.Id, entry.Name)) lm.RenameLayer(entry.Id, entry.Name);
             if (entry.HasMask) lm.SetLayerMask(entry.Id, entry.Mask);
@@ -821,6 +817,7 @@ void LayersPanel::_renderImportConfirm() {
     ImGui::EndPopup();
 }
 
+// Renders status message popup (success/error/info messages)
 void LayersPanel::_renderStatusPopup() {
     if (m_statusMessage.empty()) return;
     ImGui::OpenPopup("LayersStatus");
@@ -828,14 +825,16 @@ void LayersPanel::_renderStatusPopup() {
     if (!ImGui::BeginPopupModal("LayersStatus", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
+    // Color-code messages based on type
     if (m_statusType == LayersPanel::StatusType::Success) {
-        ImGui::TextColored(ImVec4(0.15f, 0.7f, 0.15f, 1.0f), "%s", m_statusMessage.c_str());
+        ImGui::TextColored(ImVec4(0.15f, 0.7f, 0.15f, 1.0f), "%s", m_statusMessage.c_str());  // Green
     } else if (m_statusType == LayersPanel::StatusType::Error) {
-        ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "%s", m_statusMessage.c_str());
+        ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "%s", m_statusMessage.c_str());    // Red
     } else {
-        ImGui::Text("%s", m_statusMessage.c_str());
+        ImGui::Text("%s", m_statusMessage.c_str());  // Default color for Info
     }
 
+    // Close button
     if (ImGui::Button("OK")) {
         m_statusMessage.clear();
         ImGui::CloseCurrentPopup();

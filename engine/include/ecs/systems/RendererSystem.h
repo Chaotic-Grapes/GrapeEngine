@@ -194,18 +194,30 @@ namespace ECS {
                                  const uint32_t* indices, size_t indexCount,
                                  const glm::vec4& color, float thickness);
 
+        /**
+         * @brief Submit collider debug visualizations for an entity
+         * @param world ECS world containing the entity
+         * @param entityID ID of entity with colliders to render
+         * @param color RGBA color for collider wireframes
+         * @param thickness Line thickness in world units
+         */
+        void SubmitColliderDebugDraw(ECS::World& world, uint32_t entityID,
+                                     const glm::vec4& color);
+
         // ====================================================================
         // GUI Rendering APIs
         // ====================================================================
         /**
          * @brief Submit a GUI panel/quad to be rendered
-         * @param position Top-left corner in screen space
+         * @param position Center in screen space
          * @param size Width and height of the panel
          * @param color RGBA color for the panel
          * @param cornerRadius Corner radius for rounded rectangles (0 = sharp corners)
          */
         void SubmitGUIPanel(const Vector2D& position, const Vector2D& size,
-                           const Color& color, float cornerRadius = 0.0f);
+                            const Color& color, float cornerRadius = 0.0f,
+                            bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
+                            const Vector2D& clipSize = {0.0f, 0.0f});
 
         /**
          * @brief Submit a GUI text to be rendered with SDF
@@ -218,13 +230,15 @@ namespace ECS {
          * @param shadowOffset Shadow offset in pixels
          */
         void SubmitGUIText(const std::string& fontPath, const std::string& text,
-                          const Vector2D& position, const Color& color,
-                          float fontSize, const Color& shadowColor = Color(0U, 0U, 0U, 0U),
-                          const Vector2D& shadowOffset = Vector2D(0, 0));
+                           const Vector2D& position, const Color& color,
+                           float fontSize, const Color& shadowColor = Color(0U, 0U, 0U, 0U),
+                           const Vector2D& shadowOffset = Vector2D(0, 0),
+                           bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
+                           const Vector2D& clipSize = {0.0f, 0.0f});
 
         /**
          * @brief Submit a GUI slider to be rendered
-         * @param position Top-left corner in screen space
+         * @param position Center in screen space
          * @param size Width and height of the slider
          * @param value Current value (0.0-1.0)
          * @param backgroundColor Track background color
@@ -233,13 +247,15 @@ namespace ECS {
          * @param borderRadius Corner radius for handles
          */
         void SubmitGUISlider(const Vector2D& position, const Vector2D& size,
-                            float value, const Color& backgroundColor,
-                            const Color& handleColor, const Color& borderColor = Color(200U, 200U, 200U, 255U),
-                            float borderRadius = 4.0f);
+                             float value, const Color& backgroundColor,
+                             const Color& handleColor, const Color& borderColor = Color(200U, 200U, 200U, 255U),
+                             float borderRadius = 4.0f,
+                             bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
+                             const Vector2D& clipSize = {0.0f, 0.0f});
 
         /**
          * @brief Submit a GUI checkbox to be rendered
-         * @param position Top-left corner in screen space
+         * @param position Center in screen space
          * @param size Size of the checkbox box
          * @param checked Whether checkbox is checked
          * @param boxColor Checkbox box color
@@ -247,8 +263,10 @@ namespace ECS {
          * @param borderColor Border color
          */
         void SubmitGUICheckbox(const Vector2D& position, const Vector2D& size,
-                              bool checked, const Color& boxColor,
-                              const Color& checkColor, const Color& borderColor = Color(200U, 200U, 200U, 255U));
+                               bool checked, const Color& boxColor,
+                               const Color& checkColor, const Color& borderColor = Color(200U, 200U, 200U, 255U),
+                               bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
+                               const Vector2D& clipSize = {0.0f, 0.0f});
 
         /**
          * @brief Submit a GUI line (separator) to be rendered
@@ -258,7 +276,9 @@ namespace ECS {
          * @param thickness Line thickness in pixels
          */
         void SubmitGUILine(const Vector2D& startPos, const Vector2D& endPos,
-                          const Color& color, float thickness = 1.0f);
+                           const Color& color, float thickness = 1.0f,
+                           bool clipEnabled = false, const Vector2D& clipPos = {0.0f, 0.0f},
+                           const Vector2D& clipSize = {0.0f, 0.0f});
 
         // Call from editor when a tilemap should be rendered
         void SetDebugTileMap(const TileMap& map, const Tileset& tileset);
@@ -336,9 +356,12 @@ namespace ECS {
             Type type;
             std::vector<glm::vec2> vertices;
             std::vector<uint32_t> indices;
+            glm::vec2 center; // for circles
+            float radius;     // for circles
             glm::vec4 color;
             float thickness;
             bool closed; // for polygons
+            bool filled = false;
         };
         std::vector<WireframeSubmission> m_wireframeQueue;
 
@@ -353,6 +376,8 @@ namespace ECS {
             Vector2D size;
             Vector2D startPos; // for lines
             Vector2D endPos; // for lines
+            Vector2D clipPos;
+            Vector2D clipSize;
             Color color;
             Color secondaryColor; // for sliders (handle color), checkboxes (check color)
             Color borderColor; // for sliders, checkboxes
@@ -360,6 +385,7 @@ namespace ECS {
             float value; // for sliders (0.0-1.0)
             float thickness; // for lines
             bool checked; // for checkboxes
+            bool clipEnabled = false;
             std::string fontPath; // for text
             std::string text; // for text
             float fontSize; // for text
@@ -378,6 +404,9 @@ namespace ECS {
         std::unique_ptr<Shader> m_textShader;      ///< SDF text rendering shader
         std::unique_ptr<Shader> m_sdfCircleShader; ///< SDF circle rendering shader
         std::unique_ptr<Shader> m_blitShader;
+        glm::mat4 m_guiProjection = glm::identity<glm::mat4>();
+        glm::mat4 m_guiTextProjection = glm::identity<glm::mat4>();
+        float m_guiViewportHeight = 0.0f;
 
         // Post-process shaders
         std::unique_ptr<Shader> m_bloomBlurShader;      ///< Bloom blur pass

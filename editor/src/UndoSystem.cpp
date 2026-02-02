@@ -1,15 +1,16 @@
 /* Start Header *****************************************************************/
 /*!
 \file   UndoSystem.cpp
-\author Daniel Kay Neo Zuo Feng
-\date   14th November 2025
+\author Samantha Leong Sher Yen
+\par    s.leong@digipen.edu
+\date   21th January 2026
 \brief
 Implementation of the UndoSystem and command types used to support
 undo/redo operations within the editor. This system records user actions,
 applies them via command objects, and restores previous states when
 undoing or redoing actions.
 
-Copyright (C) 2025 DigiPen Institute of Technology.
+Copyright (C) 2026 DigiPen Institute of Technology.
 Reproduction or disclosure of this file or its contents without the
 prior written consent of DigiPen Institute of Technology is prohibited.
 */
@@ -18,6 +19,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "UndoSystem.h"
 #include "services/Input.h"
 #include "core/Logger.h"
+#include "EditorECSUtils.h"
 
 namespace Editor {
 
@@ -52,15 +54,16 @@ namespace Editor {
             return;
         }
 
-        if (!m_world->Has<ECS::Components::LocalTransform>(m_entity)) {
+        auto* transform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(
+            m_world, m_entity, "LocalTransform");
+        if (!transform) {
             LOG_WARNING("[UndoSystem] Entity has no LocalTransform component");
             return;
         }
 
-        auto& transform = m_world->Get<ECS::Components::LocalTransform>(m_entity);
-        transform.Position = m_newPosition;
-        transform.Rotation = m_newRotation;
-        transform.Scale = m_newScale;
+        transform->Position = m_newPosition;
+        transform->Rotation = m_newRotation;
+        transform->Scale = m_newScale;
 
         LOG_DEBUG("[UndoSystem] Applied transform change to entity " << m_entity.Index);
     }
@@ -71,15 +74,16 @@ namespace Editor {
             return;
         }
 
-        if (!m_world->Has<ECS::Components::LocalTransform>(m_entity)) {
+        auto* transform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(
+            m_world, m_entity, "LocalTransform");
+        if (!transform) {
             LOG_WARNING("[UndoSystem] Entity has no LocalTransform component");
             return;
         }
 
-        auto& transform = m_world->Get<ECS::Components::LocalTransform>(m_entity);
-        transform.Position = m_oldPosition;
-        transform.Rotation = m_oldRotation;
-        transform.Scale = m_oldScale;
+        transform->Position = m_oldPosition;
+        transform->Rotation = m_oldRotation;
+        transform->Scale = m_oldScale;
 
         LOG_DEBUG("[UndoSystem] Reverted transform change on entity " << m_entity.Index);
     }
@@ -99,39 +103,53 @@ namespace Editor {
     {
         // Snapshot entity state at creation time
         if (m_world && m_world->IsAlive(entity)) {
-            if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
+            auto* transform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(
+                m_world, entity, "LocalTransform");
+            if (transform) {
                 m_hasTransform = true;
-                m_savedTransform = m_world->Get<ECS::Components::LocalTransform>(entity);
+                m_savedTransform = *transform;
             }
 
-            if (m_world->Has<ECS::Components::Layer>(entity)) {
+            auto* layer = Editor::ECSUtils::GetComponentPtr<ECS::Components::Layer>(
+                m_world, entity, "Layer");
+            if (layer) {
                 m_hasLayer = true;
-                m_savedLayer = m_world->Get<ECS::Components::Layer>(entity);
+                m_savedLayer = *layer;
             }
 
-            if (m_world->Has<ECS::Components::Name>(entity)) {
+            auto* name = Editor::ECSUtils::GetComponentPtr<ECS::Components::Name>(
+                m_world, entity, "Name");
+            if (name) {
                 m_hasName = true;
-                m_savedName = m_world->Get<ECS::Components::Name>(entity);
+                m_savedName = *name;
             }
 
-            if (m_world->Has<ECS::Components::Active>(entity)) {
+            auto* active = Editor::ECSUtils::GetComponentPtr<ECS::Components::Active>(
+                m_world, entity, "Active");
+            if (active) {
                 m_hasActive = true;
-                m_savedActive = m_world->Get<ECS::Components::Active>(entity);
+                m_savedActive = *active;
             }
 
-            if (m_world->Has<ECS::Components::SpriteRenderer2D>(entity)) {
+            auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(
+                m_world, entity, "SpriteRenderer2D");
+            if (sprite) {
                 m_hasSprite = true;
-                m_savedSprite = m_world->Get<ECS::Components::SpriteRenderer2D>(entity);
+                m_savedSprite = *sprite;
             }
 
-            if (m_world->Has<ECS::Components::ShapeBox2D>(entity)) {
+            auto* box = Editor::ECSUtils::GetComponentPtr<ECS::Components::ShapeBox2D>(
+                m_world, entity, "ShapeBox2D");
+            if (box) {
                 m_hasBox = true;
-                m_savedBox = m_world->Get<ECS::Components::ShapeBox2D>(entity);
+                m_savedBox = *box;
             }
 
-            if (m_world->Has<ECS::Components::ShapeCircle2D>(entity)) {
+            auto* circle = Editor::ECSUtils::GetComponentPtr<ECS::Components::ShapeCircle2D>(
+                m_world, entity, "ShapeCircle2D");
+            if (circle) {
                 m_hasCircle = true;
-                m_savedCircle = m_world->Get<ECS::Components::ShapeCircle2D>(entity);
+                m_savedCircle = *circle;
             }
         }
     }
@@ -145,80 +163,56 @@ namespace Editor {
 
         // Restore all components from snapshot
         if (m_hasTransform) {
-            if (m_world->Has<ECS::Components::LocalTransform>(m_entity)) {
-                m_world->Get<ECS::Components::LocalTransform>(m_entity) = m_savedTransform;
-            }
-            else {
-                m_world->Add<ECS::Components::LocalTransform>(m_entity, m_savedTransform);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "LocalTransform", m_savedTransform);
         }
 
         if (m_hasLayer) {
-            if (m_world->Has<ECS::Components::Layer>(m_entity)) {
-                m_world->Get<ECS::Components::Layer>(m_entity) = m_savedLayer;
-            }
-            else {
-                m_world->Add<ECS::Components::Layer>(m_entity, m_savedLayer);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Layer", m_savedLayer);
         }
 
         if (m_hasName) {
-            if (m_world->Has<ECS::Components::Name>(m_entity)) {
-                m_world->Get<ECS::Components::Name>(m_entity) = m_savedName;
-            }
-            else {
-                m_world->Add<ECS::Components::Name>(m_entity, m_savedName);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Name", m_savedName);
         }
 
         if (m_hasActive) {
-            if (m_world->Has<ECS::Components::Active>(m_entity)) {
-                m_world->Get<ECS::Components::Active>(m_entity) = m_savedActive;
-            }
-            else {
-                m_world->Add<ECS::Components::Active>(m_entity, m_savedActive);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", m_savedActive);
         }
 
         if (m_hasSprite) {
-            if (m_world->Has<ECS::Components::SpriteRenderer2D>(m_entity)) {
-                m_world->Get<ECS::Components::SpriteRenderer2D>(m_entity) = m_savedSprite;
-            }
-            else {
-                m_world->Add<ECS::Components::SpriteRenderer2D>(m_entity, m_savedSprite);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "SpriteRenderer2D", m_savedSprite);
         }
 
         if (m_hasBox) {
-            if (m_world->Has<ECS::Components::ShapeBox2D>(m_entity)) {
-                m_world->Get<ECS::Components::ShapeBox2D>(m_entity) = m_savedBox;
-            }
-            else {
-                m_world->Add<ECS::Components::ShapeBox2D>(m_entity, m_savedBox);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeBox2D", m_savedBox);
         }
 
         if (m_hasCircle) {
-            if (m_world->Has<ECS::Components::ShapeCircle2D>(m_entity)) {
-                m_world->Get<ECS::Components::ShapeCircle2D>(m_entity) = m_savedCircle;
-            }
-            else {
-                m_world->Add<ECS::Components::ShapeCircle2D>(m_entity, m_savedCircle);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeCircle2D", m_savedCircle);
         }
 
         LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " restored (redo creation)");
     }
 
     void CreateEntityCommand::Undo() {
-        // Undo, deletes entity
-        if (!m_world || !m_world->IsAlive(m_entity)) {
+        // Undo creation = soft delete (deactivate)
+        if (!m_world) {
+            LOG_WARNING("[UndoSystem] Cannot undo entity creation - world is null");
+            return;
+        }
+
+        if (!m_world->IsAlive(m_entity)) {
             LOG_WARNING("[UndoSystem] Cannot undo entity creation - entity already deleted");
             return;
         }
 
-        // Actually destroy the entity
-        m_world->Destroy(m_entity);
+        if (m_world->Has<ECS::Components::Active>(m_entity)) {
+            m_world->Get<ECS::Components::Active>(m_entity).Enabled = false;
+        }
+        else {
+            m_world->Add<ECS::Components::Active>(m_entity, ECS::Components::Active{ false });
+        }
+
+        LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " deactivated (undo creation)");
 
         if (m_onEntityDeleted) {
             m_onEntityDeleted();
@@ -242,24 +236,53 @@ namespace Editor {
     {
         // Snapshot entity state before deletion
         if (m_world && m_world->IsAlive(entity)) {
-            if (m_world->Has<ECS::Components::LocalTransform>(entity)) {
+            auto* transform = Editor::ECSUtils::GetComponentPtr<ECS::Components::LocalTransform>(
+                m_world, entity, "LocalTransform");
+            if (transform) {
                 m_hasTransform = true;
-                m_savedTransform = m_world->Get<ECS::Components::LocalTransform>(entity);
+                m_savedTransform = *transform;
             }
 
-            if (m_world->Has<ECS::Components::SpriteRenderer2D>(entity)) {
+            auto* layer = Editor::ECSUtils::GetComponentPtr<ECS::Components::Layer>(
+                m_world, entity, "Layer");
+            if (layer) {
+                m_hasLayer = true;
+                m_savedLayer = *layer;
+            }
+
+            auto* name = Editor::ECSUtils::GetComponentPtr<ECS::Components::Name>(
+                m_world, entity, "Name");
+            if (name) {
+                m_hasName = true;
+                m_savedName = *name;
+            }
+
+            auto* active = Editor::ECSUtils::GetComponentPtr<ECS::Components::Active>(
+                m_world, entity, "Active");
+            if (active) {
+                m_hasActive = true;
+                m_savedActive = *active;
+            }
+
+            auto* sprite = Editor::ECSUtils::GetComponentPtr<ECS::Components::SpriteRenderer2D>(
+                m_world, entity, "SpriteRenderer2D");
+            if (sprite) {
                 m_hasSprite = true;
-                m_savedSprite = m_world->Get<ECS::Components::SpriteRenderer2D>(entity);
+                m_savedSprite = *sprite;
             }
 
-            if (m_world->Has<ECS::Components::ShapeBox2D>(entity)) {
+            auto* box = Editor::ECSUtils::GetComponentPtr<ECS::Components::ShapeBox2D>(
+                m_world, entity, "ShapeBox2D");
+            if (box) {
                 m_hasBox = true;
-                m_savedBox = m_world->Get<ECS::Components::ShapeBox2D>(entity);
+                m_savedBox = *box;
             }
 
-            if (m_world->Has<ECS::Components::ShapeCircle2D>(entity)) {
+            auto* circle = Editor::ECSUtils::GetComponentPtr<ECS::Components::ShapeCircle2D>(
+                m_world, entity, "ShapeCircle2D");
+            if (circle) {
                 m_hasCircle = true;
-                m_savedCircle = m_world->Get<ECS::Components::ShapeCircle2D>(entity);
+                m_savedCircle = *circle;
             }
         }
     }
@@ -282,51 +305,48 @@ namespace Editor {
     }
 
     void DeleteEntityCommand::Undo() {
-        if (!m_world || !m_world->IsAlive(m_entity)) {
-            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - entity invalid");
+        if (!m_world) {
+            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - world is null");
+            return;
+        }
+
+        // For soft delete system: entity should still be alive, just deactivated
+        if (!m_world->IsAlive(m_entity)) {
+            LOG_WARNING("[UndoSystem] Cannot undo entity deletion - entity no longer exists in ECS");
             return;
         }
 
         // Restore entity state
         if (m_hasTransform) {
-            if (m_world->Has<ECS::Components::LocalTransform>(m_entity)) {
-                m_world->Get<ECS::Components::LocalTransform>(m_entity) = m_savedTransform;
-            }
-            else {
-                m_world->Add<ECS::Components::LocalTransform>(m_entity, m_savedTransform);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "LocalTransform", m_savedTransform);
+        }
+
+        if (m_hasLayer) {
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Layer", m_savedLayer);
+        }
+
+        if (m_hasName) {
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Name", m_savedName);
         }
 
         if (m_hasSprite) {
-            if (m_world->Has<ECS::Components::SpriteRenderer2D>(m_entity)) {
-                m_world->Get<ECS::Components::SpriteRenderer2D>(m_entity) = m_savedSprite;
-            }
-            else {
-                m_world->Add<ECS::Components::SpriteRenderer2D>(m_entity, m_savedSprite);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "SpriteRenderer2D", m_savedSprite);
         }
 
         if (m_hasBox) {
-            if (m_world->Has<ECS::Components::ShapeBox2D>(m_entity)) {
-                m_world->Get<ECS::Components::ShapeBox2D>(m_entity) = m_savedBox;
-            }
-            else {
-                m_world->Add<ECS::Components::ShapeBox2D>(m_entity, m_savedBox);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeBox2D", m_savedBox);
         }
 
         if (m_hasCircle) {
-            if (m_world->Has<ECS::Components::ShapeCircle2D>(m_entity)) {
-                m_world->Get<ECS::Components::ShapeCircle2D>(m_entity) = m_savedCircle;
-            }
-            else {
-                m_world->Add<ECS::Components::ShapeCircle2D>(m_entity, m_savedCircle);
-            }
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "ShapeCircle2D", m_savedCircle);
         }
 
-        // Reactivate entity
-        if (m_world->Has<ECS::Components::Active>(m_entity)) {
-            m_world->Get<ECS::Components::Active>(m_entity).Enabled = true;
+        // Restore Active component last (this will re-enable the entity)
+        if (m_hasActive) {
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", m_savedActive);
+        }
+        else {
+            Editor::ECSUtils::SetComponent(m_world, m_entity, "Active", ECS::Components::Active{ true });
         }
 
         if (m_onEntityRestored) {
@@ -334,6 +354,43 @@ namespace Editor {
         }
 
         LOG_DEBUG("[UndoSystem] Entity " << m_entity.Index << " restored (undo deletion)");
+    }
+
+    // ========================================================================
+    // ReorderEntitiesCommand Implementation
+    // ========================================================================
+
+    ReorderEntitiesCommand::ReorderEntitiesCommand(
+        EntityId parentId,
+        std::function<void(const std::vector<EntityId>&)> applyOrder,
+        std::vector<EntityId> before,
+        std::vector<EntityId> after
+    )
+        : m_parentId(parentId)
+        , m_applyOrder(std::move(applyOrder))
+        , m_before(std::move(before))
+        , m_after(std::move(after))
+    {
+    }
+
+    void ReorderEntitiesCommand::Execute() {
+        if (m_applyOrder) {
+            m_applyOrder(m_after);
+        }
+    }
+
+    void ReorderEntitiesCommand::Undo() {
+        if (m_applyOrder) {
+            m_applyOrder(m_before);
+        }
+    }
+
+    bool ReorderEntitiesCommand::UpdateAfter(EntityId parentId, const std::vector<EntityId>& after) {
+        if (parentId != m_parentId) {
+            return false;
+        }
+        m_after = after;
+        return true;
     }
 
     // ========================================================================
@@ -525,6 +582,24 @@ namespace Editor {
         TrimUndoStack();
 
         LOG_DEBUG("[UndoSystem] Entity deletion recorded. Undo stack size: " << m_undoStack.size());
+    }
+
+    bool UndoSystem::CoalesceReorder(EntityId parentId, const std::vector<EntityId>& after) {
+        if (m_undoStack.empty()) {
+            return false;
+        }
+
+        auto* command = dynamic_cast<ReorderEntitiesCommand*>(m_undoStack.back().get());
+        if (!command) {
+            return false;
+        }
+
+        if (!command->UpdateAfter(parentId, after)) {
+            return false;
+        }
+
+        m_redoStack.clear();
+        return true;
     }
 
 } // namespace Editor

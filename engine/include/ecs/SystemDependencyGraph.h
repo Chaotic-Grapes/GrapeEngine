@@ -264,23 +264,9 @@ namespace ECS {
         bool _hasCycle() const;
 
         /**
-         * @brief DFS helper for cycle detection.
-         */
-        bool _dfsHasCycle(ISystem* system, 
-                         std::unordered_set<ISystem*>& visited,
-                         std::unordered_set<ISystem*>& recStack) const;
-
-        /**
          * @brief Topological sort using Kahn's algorithm.
          */
         std::vector<std::vector<ISystem*>> _topologicalSort() const;
-
-        /**
-         * @brief DFS helper for topological sort.
-         */
-        void _dfsTopo(ISystem* system,
-                     std::unordered_set<ISystem*>& visited,
-                     std::vector<ISystem*>& stack) const;
     };
 
 }

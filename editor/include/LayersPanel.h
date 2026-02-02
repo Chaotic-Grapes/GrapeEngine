@@ -53,6 +53,7 @@ private:
     void _renderHeader();
     void _renderCollisionMatrix();
     void _renderLayersList();
+    void _renderFooterButtons();
     void _renderImportConfirm();
     void _renderStatusPopup();
 

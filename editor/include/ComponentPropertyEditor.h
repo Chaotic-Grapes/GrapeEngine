@@ -112,6 +112,18 @@ public:
     // render simple editors for booleans, integers, floats and strings.
     void RenderGenericComponent(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
 
+    // Renders material component for assigning materials to renderers
+	void RenderMaterial2D(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI element layout and alignment data
+    void RenderGUIElement(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI container layout configuration
+    void RenderGUIContainer(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
+    // Renders GUI canvas scaling configuration
+    void RenderGUICanvas(nlohmann::json& data, ECS::Entity entity, ECS::World* world);
+
 private:
     // -------------------------------------------------------------------------
     // State

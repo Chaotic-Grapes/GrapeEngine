@@ -20,16 +20,20 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ecs/systems/PhysicsSystem.h"
 #include "ecs/systems/RendererSystem.h"
 #include "ecs/systems/AnimationSystem.h"
+#include "ecs/systems/AnimationPreviewSystem.h"
+#include "ecs/events/EventDispatcher.h"
 #include "scripting/ScriptManager.h"
 #include "scripting/ComponentTypeRegistry.h"
 #include "ecs/systems/TransformSystem.h"
 #include "ecs/systems/AudioSystem.h"
+#include "ecs/systems/GUIInputSystem.h"
+#include "ecs/systems/GUILayoutSystem.h"
+#include "ecs/systems/GUIRenderSystem.h"
 #include "scene/Scene.h"
 #include "services/Input.h"
 #include "services/TimeSystem.h"
 #include <thread>
 #include <filesystem>
-#include "ecs/gui/GUISystem.h"
 #include "services/UIEvents.h"
 #include "platform/glfw/GLFWPlatformContext.h"
 
@@ -171,6 +175,7 @@ namespace Engine {
                 
                 // Update systems - always run for game mode
                 m_systemManager.UpdateWithDependencies(world);
+                ECS::Events::ClearFrameEventComponents(world);
             }
         }
 
@@ -323,6 +328,7 @@ namespace Engine {
         
         // Update Phase Systems
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
+        m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
         m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
         
         // Physics Phase Systems
@@ -333,8 +339,10 @@ namespace Engine {
         // Render Phase Systems
         m_systemManager.RegisterSystem<ECS::RendererSystem>();
         
-        // Register GUI system
-        m_systemManager.RegisterSystem<ECS::GUISystem>();
+        // Register GUI systems
+        m_systemManager.RegisterSystem<ECS::GUILayoutSystem>();
+        m_systemManager.RegisterSystem<ECS::GUIInputSystem>();
+        m_systemManager.RegisterSystem<ECS::GUIRenderSystem>();
 
         // Build dependency graphs (analyzes component access)
         m_systemManager.BuildDependencyGraphs();

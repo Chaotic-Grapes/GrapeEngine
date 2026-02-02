@@ -42,6 +42,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "services/TimeSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
+#include "ecs/ui/GUIContext.h"
+#include "TilePalettePanel.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -75,9 +77,9 @@ void SceneViewport::EndFrame() {
 void SceneViewport::HandleInWorldInteraction() {
     if (!HasValidWorld()) return;
 
-    // Toggle FPS overlay in the Scene viewport (editor-only)
-    if (Input::IsKeyPressed(KEY_F)) {
-        m_showSceneFpsOverlay = !m_showSceneFpsOverlay;
+    // Focus selected entity when the scene viewport is active.
+    if (Input::IsKeyPressed(KEY_F) && !m_selectedEntity.IsNull()) {
+        FocusOnEntity(m_selectedEntity.Index);
     }
 
     // Update viewport interaction manager (gizmo, picking, selection, transforms)
@@ -201,10 +203,42 @@ void SceneViewport::_renderViewport() {
 
             // Get the drawing position of the rendered image
             ImVec2 viewportScreenPos = ImGui::GetItemRectMin();
+            auto& guiCtx = ECS::UI::GUIContext::Get();
+            if (isSceneImageHovered || !guiCtx.UseViewportBounds) {
+                const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+                guiCtx.ViewportOrigin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
+                guiCtx.ViewportSize = { size.x * fbScale.x, size.y * fbScale.y };
+                guiCtx.ViewportDisplayScale = { fbScale.x, fbScale.y };
+                guiCtx.UseViewportBounds = true;
+            }
 
             // Handle mouse click picking on the viewport image
             // Don't pick if gizmo is being used or hovered
-            if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT)) {
+            if (isSceneImageHovered && m_tilePalettePanel && m_tilePalettePanel->IsActive()) {
+                double mx = 0, my = 0;
+                Input::GetMousePosition(mx, my);
+                glm::mat4 view = m_editorCamera->GetCamera()->GetViewMatrix();
+                glm::mat4 proj = m_editorCamera->GetCamera()->GetProjectionMatrix();
+                const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+                glm::vec2 vpMin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
+                glm::vec2 vpSize = { size.x * fbScale.x, size.y * fbScale.y };
+                glm::vec2 localPos = glm::vec2(mx, my) - vpMin;
+                glm::vec4 ndc;
+                ndc.x = (2.0f * localPos.x) / vpSize.x - 1.0f;
+                ndc.y = 1.0f - (2.0f * localPos.y) / vpSize.y;
+                ndc.z = 0.0f;
+                ndc.w = 1.0f;
+                glm::mat4 invViewProj = glm::inverse(proj * view);
+                glm::vec4 world4 = invViewProj * ndc;
+                glm::vec2 worldPos = { world4.x, world4.y };
+                m_tilePalettePanel->OnViewportHover(worldPos);
+                bool left = Input::IsMousePressed(MOUSE_LEFT);
+                bool right = Input::IsMousePressed(MOUSE_RIGHT);
+                if (left || right) {
+                    m_tilePalettePanel->OnViewportClick(worldPos, right);
+                }
+            }
+            else if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT)) {
                 // Check if gizmo should block input
                 bool gizmoBlocking = m_interactionMgr.ShouldBlockInput();
                 
@@ -239,7 +273,7 @@ void SceneViewport::_renderViewport() {
                         glm::vec2(size.x, size.y),
                         view,
                         proj,
-                        false  // isPerspective (editor uses ortho)
+                        camera->UsePerspective
                     );
 
                     // Draw selection outline around selected entity
@@ -247,13 +281,17 @@ void SceneViewport::_renderViewport() {
                         Editor::SelectionOutlineRenderer::RenderOutline(
                             *m_world,
                             m_selectedEntity.Index,
-                            rendererSystem->GetRenderer(),
-                            rendererSystem->GetShader(),
-                            proj * view,
+                            rendererSystem,
                             camera->OrthoSize,
                             size.x,
                             size.y
                         );
+                    }
+
+                    // Submit collider debug visualization for selected entity
+                    if (!m_selectedEntity.IsNull() && m_world) {
+                        const glm::vec4 colliderColor{ 1.0f, 0.64f, 0.0f, 0.45f }; // Orange with some transparency
+                        rendererSystem->SubmitColliderDebugDraw(*m_world, m_selectedEntity.Index, colliderColor);
                     }
 
                     // Render gizmo via interaction manager
@@ -263,10 +301,6 @@ void SceneViewport::_renderViewport() {
                 }
             }
 
-            // Draw FPS overlay if enabled
-            if (m_showSceneFpsOverlay) {
-                _drawFpsOverlay(viewportScreenPos, size);
-            }
         }
     }
     else {

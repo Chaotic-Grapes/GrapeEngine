@@ -15,6 +15,7 @@ so both entities and prefab files use the same UI drawing path.
 
 #include "ComponentWidgets.h"
 #include <imgui.h>
+#include <algorithm>
 
 namespace EditorUI {
 
@@ -82,7 +83,7 @@ namespace EditorUI {
     // The value is loaded from JSON and written back only if the user edits it
     // fieldLabel is an optional unit label like "kg" or "deg"
     void RenderFloatRow(const std::string& label, const std::string& fieldLabel,
-        nlohmann::json& data, const std::string& key, float dragSpeed)
+        nlohmann::json& data, const std::string& key, float dragSpeed, float min, float max)
     {
         // Ensure we are editing a JSON object (key value pairs)
         _ensureObject(data);
@@ -95,7 +96,7 @@ namespace EditorUI {
 
         // Set the width for the drag widget so all floats look consistent
         ImGui::SetNextItemWidth(90.0f);
-        if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed, 0, 0, "%.2f"))
+        if (ImGui::DragFloat(("##" + label).c_str(), &value, dragSpeed, min, max, "%.2f"))
             data[key] = value;
 
         // If a unit label is provided, draw it next to the field
@@ -291,6 +292,10 @@ namespace EditorUI {
         }
     }
 
+    void RenderColorRow(const std::string& label, nlohmann::json& colorData) {
+        RenderColorProperty(label, colorData);
+    }
+
     // Renders a text field for editing a JSON string key
     // Reads the string, copies it into a local buffer, then writes back if the InputText reports a change
     void RenderTextProperty(const std::string& label, nlohmann::json& data, const std::string& key) {
@@ -330,6 +335,95 @@ namespace EditorUI {
         ImGui::SetNextItemWidth(90.0f);
         if (ImGui::DragInt(("##" + label).c_str(), &value))
             data[key] = value;
+    }
+
+    // Renders a dropdown for bitmask editing with labeled entries
+    void RenderBitmaskDropdown(const std::string& label, nlohmann::json& data,
+        const std::string& key, const std::vector<std::string>& bitNames,
+        uint32_t defaultMask)
+    {
+        // Ensure JSON object
+        _ensureObject(data);
+        uint32_t mask = data.value(key, defaultMask); // Load current mask
+
+        // Determine how many bits we have labels for (max 32)
+        const size_t rawCount = bitNames.size();
+        const int bitCount = static_cast<int>(std::min<size_t>(32, rawCount));
+        const uint32_t allMask = (bitCount <= 0) ? 0u
+            : (bitCount >= 32 ? 0xFFFFFFFFu : ((1u << bitCount) - 1u)); // Mask with all bits set
+
+        // Count how many bits are currently selected
+        int selectedCount = 0;
+        for (int i = 0; i < bitCount; ++i) {
+            if (mask & (1u << i)) {
+                ++selectedCount;
+            }
+        }
+
+        // Create summary string for the current selection
+        std::string summary;
+        if (bitCount <= 0) {
+            summary = std::to_string(mask);
+        }
+        else if (selectedCount == 0) {
+            summary = "None";
+        }
+        else if (mask == allMask) {
+            summary = "All";
+        }
+        else {
+            summary = std::to_string(selectedCount) + " of " + std::to_string(bitCount); // e.g. "1 of 3"
+        }
+
+        // Usual label rendering
+        ImGui::Text("%s", _displayLabel(label).c_str());
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(valueStartOffset + ImGui::CalcTextSize("W").x + FIELD_LABEL_GAP);
+        ImGui::SetNextItemWidth(220.0f);
+
+        // Dropdown combo box for bitmask
+        // This part is a bit more complex since we need to handle multiple checkboxes inside the combo
+        bool changed = false;
+        if (ImGui::BeginCombo(("##" + label).c_str(), summary.c_str())) {
+            if (bitCount > 0) {
+                // "All" and "None" buttons for quick selection
+                if (ImGui::SmallButton("All")) {
+                    mask = allMask;
+                    changed = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("None")) {
+                    mask = 0u;
+                    changed = true;
+                }
+                ImGui::Separator(); // Two buttons above, checkboxes below
+
+                // Render each bit as a checkbox with its label
+                for (int i = 0; i < bitCount; ++i) {
+                    bool isSet = (mask & (1u << i)) != 0; // Check if this bit is set
+                    std::string entryLabel = bitNames[i].empty() // Fallback if no label provided
+                        ? ("Bit " + std::to_string(i))
+                        : bitNames[i];
+
+                    // Draw checkbox and update mask if changed
+                    if (ImGui::Checkbox((entryLabel + "##" + label + std::to_string(i)).c_str(), &isSet)) {
+                        if (isSet) {
+                            mask |= (1u << i); // Set the bit
+                        }
+                        else {
+                            mask &= ~(1u << i); // Clear the bit
+                        }
+                        changed = true;
+                    }
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        // Write back to JSON if anything changed
+        if (changed || !data.contains(key) || data[key] != mask) {
+            data[key] = mask;
+        }
     }
 
     // Renders a single checkbox tied directly to a JSON boolean key

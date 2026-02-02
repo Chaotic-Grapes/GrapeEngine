@@ -35,11 +35,11 @@ namespace ECS::Events {
 
         /**
          * @brief Fire a collision event between two entities.
-         * Adds CollisionEvent components to both entities.
+         * Appends CollisionEvent entries to the per-entity buffers.
          */
         void FireCollisionEvent(
-            EntityId entity1Id, // ID of the first entity
-            EntityId entity2Id, // ID of the second entity
+            PackedEntityId entity1Id, // Packed ID of the first entity
+            PackedEntityId entity2Id, // Packed ID of the second entity
             const Vector3D& contactPoint, // Contact point in world space
             const Vector3D& contactNormal, // Contact normal (points from entity1 to entity2)
             const Vector3D& relativeVelocity, // Relative velocity at contact
@@ -48,48 +48,48 @@ namespace ECS::Events {
 
         /**
          * @brief Fire a trigger enter event.
-         * Adds a TriggerEvent component to the trigger entity.
+         * Appends a TriggerEvent entry to the trigger's buffer.
          * 
          * @param triggerId ID of the trigger entity
          * @param otherEntityId ID of the other entity entering the trigger
          */
-        void FireTriggerEnterEvent(EntityId triggerId, EntityId otherEntityId);
+        void FireTriggerEnterEvent(PackedEntityId triggerId, PackedEntityId otherEntityId);
 
         /**
          * @brief Fire a trigger stay event (entity still overlapping).
-         * Adds a TriggerEvent component to the trigger entity.
+         * Appends a TriggerEvent entry to the trigger's buffer.
          * 
          * @param triggerId ID of the trigger entity
          * @param otherEntityId ID of the other entity staying in the trigger
          */
-        void FireTriggerStayEvent(EntityId triggerId, EntityId otherEntityId);
+        void FireTriggerStayEvent(PackedEntityId triggerId, PackedEntityId otherEntityId);
 
         /**
          * @brief Fire a collision exit event between two entities.
-         * Adds CollisionExitEvent components to both entities.
+         * Appends CollisionExitEvent entries to the per-entity buffers.
          * 
          * @param entity1Id ID of the first entity
          * @param entity2Id ID of the second entity
          * @param lastContactPoint Last contact point in world space
          */
         void FireCollisionExitEvent(
-            EntityId entity1Id,
-            EntityId entity2Id,
+            PackedEntityId entity1Id,
+            PackedEntityId entity2Id,
             const Vector3D& lastContactPoint
         );
 
         /**
          * @brief Fire a trigger exit event.
-         * Adds a TriggerExitEvent component to the trigger entity.
+         * Appends a TriggerExitEvent entry to the trigger's buffer.
          * 
          * @param triggerId ID of the trigger entity
          * @param otherEntityId ID of the other entity exiting the trigger
          */
-        void FireTriggerExitEvent(EntityId triggerId, EntityId otherEntityId);
+        void FireTriggerExitEvent(PackedEntityId triggerId, PackedEntityId otherEntityId);
 
         /**
          * @brief Clear all event components added this frame.
-         * Called at the end of each frame to remove event components.
+         * Called at the end of each frame to remove event buffers.
          */
         void ClearFrameEvents();
 
@@ -97,11 +97,36 @@ namespace ECS::Events {
         World* world;
 
         // Track entities that received event components this frame
-        std::vector<EntityId> collisionEventEntities;
-        std::vector<EntityId> triggerEventEntities;
-        std::vector<EntityId> collisionExitEventEntities;
-        std::vector<EntityId> triggerExitEventEntities;
+        std::vector<PackedEntityId> collisionEventEntities;
+        std::vector<PackedEntityId> triggerEventEntities;
+        std::vector<PackedEntityId> collisionExitEventEntities;
+        std::vector<PackedEntityId> triggerExitEventEntities;
     };
+
+    /**
+     * @brief Clear all event components from the world.
+     * 
+     * Intended to be called once per frame after systems have had a chance
+     * to observe collision/trigger events.
+     */
+    inline void ClearFrameEventComponents(World& world) {
+        world.Each<ECS::Events::CollisionEventBuffer>([&](Entity e, ECS::Events::CollisionEventBuffer&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::CollisionEventBuffer>(e))
+                world.Remove<ECS::Events::CollisionEventBuffer>(e);
+        });
+        world.Each<ECS::Events::TriggerEventBuffer>([&](Entity e, ECS::Events::TriggerEventBuffer&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::TriggerEventBuffer>(e))
+                world.Remove<ECS::Events::TriggerEventBuffer>(e);
+        });
+        world.Each<ECS::Events::CollisionExitEventBuffer>([&](Entity e, ECS::Events::CollisionExitEventBuffer&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::CollisionExitEventBuffer>(e))
+                world.Remove<ECS::Events::CollisionExitEventBuffer>(e);
+        });
+        world.Each<ECS::Events::TriggerExitEventBuffer>([&](Entity e, ECS::Events::TriggerExitEventBuffer&) {
+            if (world.IsAlive(e) && world.Has<ECS::Events::TriggerExitEventBuffer>(e))
+                world.Remove<ECS::Events::TriggerExitEventBuffer>(e);
+        });
+    }
 }
 
 #endif

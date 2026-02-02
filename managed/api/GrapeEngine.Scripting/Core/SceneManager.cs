@@ -288,6 +288,28 @@ public class SceneManager
     }
 
     /// <summary>
+    /// Restarts a scene by reloading it from disk into the same slot.
+    /// </summary>
+    /// <param name="sceneIndex">The index of the scene slot to restart.</param>
+    /// <param name="filename">Path to the input file.</param>
+    /// <returns>True if restart was successful, false otherwise.</returns>
+    public bool RestartScene(ulong sceneIndex, string filename)
+    {
+        if (string.IsNullOrEmpty(filename))
+            throw new ArgumentNullException(nameof(filename));
+
+        unsafe
+        {
+            bool result = SceneAPI.RestartScene(_sceneManagerPtr, sceneIndex, filename);
+            if (result)
+            {
+                _sceneCache.Remove(sceneIndex);
+            }
+            return result;
+        }
+    }
+
+    /// <summary>
     /// Internal method to access the native scene manager pointer.
     /// </summary>
     internal unsafe void* NativePtr => _sceneManagerPtr;
