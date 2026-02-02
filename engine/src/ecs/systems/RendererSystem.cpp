@@ -1236,11 +1236,11 @@ namespace ECS {
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
                 // Use batch shader for GUI panels
-                const float width = static_cast<float>(ldr->Width());
-                const float height = static_cast<float>(ldr->Height());
-                glm::mat4 screenOrtho = glm::ortho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
-                m_guiTextProjection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
-                m_guiViewportHeight = height;
+                const float ldrwidth = static_cast<float>(ldr->Width());
+                const float ldrheight = static_cast<float>(ldr->Height());
+                glm::mat4 screenOrtho = glm::ortho(0.0f, ldrwidth, ldrheight, 0.0f, -1.0f, 1.0f);
+                m_guiTextProjection = glm::ortho(0.0f, ldrwidth, 0.0f, ldrheight, -1.0f, 1.0f);
+                m_guiViewportHeight = ldrheight;
                 if (m_shader) {
                     m_shader->use();
                     m_shader->setMat4("uViewProj", screenOrtho);

@@ -786,7 +786,8 @@ void LevelEditor::SetScene(Scenes::Scene* scene) {
         bool hasTileMap = false;
         
         // Iterate all entities with TileMapComponent
-        world->Each<ECS::Components::TileMapComponent>([&](ECS::Components::TileMapComponent& tc) {
+        world->Each<ECS::Components::TileMapComponent>([&](ECS::Entity e, ECS::Components::TileMapComponent& tc) {
+            (void)e;
             hasTileMap = true;
             m_tilePalette.Initialize(tc.Map, m_tilePalette.GetTileset(), world);
         });
