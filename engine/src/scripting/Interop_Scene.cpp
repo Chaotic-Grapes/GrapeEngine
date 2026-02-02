@@ -238,6 +238,22 @@ INTEROP_API bool SceneManagerInterop_LoadScene(void* sceneManagerPtr, uint64_t s
     return manager->LoadScene(static_cast<size_t>(sceneIndex), filename);
 }
 
+/**
+ * @brief Restart a scene by reloading it from disk
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param sceneIndex Index to reload
+ * @param filename Path to the scene file
+ * @return true on success, false on failure
+ */
+INTEROP_API bool SceneManagerInterop_RestartScene(void* sceneManagerPtr, uint64_t sceneIndex, const char* filename) {
+    if (!sceneManagerPtr || !filename)
+        return false;
+
+    Scenes::SceneManager* manager = static_cast<Scenes::SceneManager*>(sceneManagerPtr);
+    return manager->RestartScene(static_cast<size_t>(sceneIndex), filename);
+}
+
 // ============================================================================
 // Scene Properties
 // ============================================================================

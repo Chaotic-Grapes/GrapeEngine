@@ -17,20 +17,17 @@ Features:
 - Designed to be called between beginFrame() and endFrame().
 */
 /* End Header *******************************************************************/
-
 #pragma once
 #include "Export.h"
 #include <glm/glm.hpp>
 #include <vector>
 #include <cstdint>
 #include <glad/glad.h>
-
 #include "font.hpp"
 #include "graphics/vertex.hpp"
 #include "graphics/sprite.hpp"
 
 inline constexpr float kPixelsPerUnit = 100.0f; // 1 world unit == 100 pixels
-
 inline float PixelsToUnits(float px) { return px / kPixelsPerUnit; }
 inline float UnitsToPixels(float wu) { return wu * kPixelsPerUnit; }
 
@@ -52,7 +49,14 @@ public:
         float scale = 1.0f,
         int layer = 0,
         GLuint emissiveTextureId = 0,
-        float emissiveStrength = 0.0f);
+        float emissiveStrength = 0.0f,
+        GLuint normalTextureId = 0,
+        GLuint mraTextureId = 0,
+        float metallic = 0.0f,
+        float smoothness = 0.5f,
+        float aoStrength = 1.0f,
+        float normalStrength = 1.0f,
+        uint32_t materialFlags = 0);
 
     // Generic triangles for helpers (polygons/circles/etc.)
     void submitTriangles(const Vertex* verts, size_t vCount,
@@ -86,17 +90,43 @@ private:
     size_t vboCapacity = 0;
     size_t eboCapacity = 0;
 
-    // We share the max 32 slots with different types of textures...
-    static constexpr int MaxAlbedoTextureSlots = 24;
-    static constexpr int MaxEmissiveTextureSlots = 8;
-    std::vector<GLuint> albedoTextureSlots;      // Bind to GL_TEXTURE0-15
-    std::vector<GLuint> emissiveTextureSlots;    // Bind to GL_TEXTURE16-31
+    // ========================================================================
+    // Texture Slot Management (Unified System)
+    // ========================================================================
+
+    // Texture slot allocation:
+    // Slots 0-15:   Albedo/Diffuse textures    (MaxAlbedoSlots = 16)
+    // Slots 16-23:  Emissive textures          (MaxEmissiveSlots = 8)
+    // Slots 24-31:  Normal maps                (MaxNormalSlots = 8)
+    // Slots 32-39:  MRA maps                   (MaxMRASlots = 8)
+    // Total: 40 slots (well within GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS)
+
+    static constexpr int MaxAlbedoSlots = 16;
+    static constexpr int MaxNormalSlots = 6;
+    static constexpr int MaxMRASlots = 4;
+    static constexpr int MaxEmissiveSlots = 6;
+
+    static constexpr int AlbedoSlotBase = 0;
+    static constexpr int NormalSlotBase = 16;
+    static constexpr int MRASlotBase = 22;
+    static constexpr int EmissiveSlotBase = 26;
+
+    // Texture slot caches (store texture IDs currently bound)
+    std::vector<GLuint> albedoTextureSlots;
+    std::vector<GLuint> emissiveTextureSlots;
+    std::vector<GLuint> normalTextureSlots;
+    std::vector<GLuint> mraTextureSlots;
 
     // Helpers
     void ensureCapacity(size_t vNeeded, size_t iNeeded);
     void flush();
     void clearTextureSlots();
-    int  getOrAssignTextureSlot(GLuint textureId, bool& flushed); // returns 0..N-1
+
+    // Unified texture slot assignment (returns local index 0..N-1)
+    int getOrAssignTextureSlot(GLuint textureId, bool& flushed);
     int getOrAssignEmissiveTextureSlot(GLuint textureId, bool& flushed);
+    int getOrAssignNormalTextureSlot(GLuint textureId, bool& flushed);
+    int getOrAssignMRATextureSlot(GLuint textureId, bool& flushed);
+
     void bindTextureSlots() const;
 };

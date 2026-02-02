@@ -320,9 +320,6 @@ void BaseViewport::_drawFpsOverlay(const ImVec2& viewportPos, const ImVec2& view
             ImGui::Text("Batches: %d", flushCount);
         }
 
-        // Toggle hint
-        ImGui::Separator();
-        ImGui::TextDisabled("Press F to toggle");
     }
     ImGui::End();
 }

@@ -53,6 +53,8 @@ void Renderer::ensureCapacity(size_t vNeeded, size_t iNeeded) {
 void Renderer::clearTextureSlots() {
     albedoTextureSlots.clear();
     emissiveTextureSlots.clear();
+    normalTextureSlots.clear();
+    mraTextureSlots.clear();
 }
 
 void Renderer::flush() {
@@ -81,7 +83,7 @@ int Renderer::getOrAssignTextureSlot(GLuint textureId, bool& flushed) {
     }
 
     // Check if we have room for a new texture
-    if ((int)albedoTextureSlots.size() >= MaxAlbedoTextureSlots) {
+    if ((int)albedoTextureSlots.size() >= MaxAlbedoSlots) {
         flushed = true;
         return -1; // Signal to caller: need to flush before retry
     }
@@ -102,7 +104,7 @@ int Renderer::getOrAssignEmissiveTextureSlot(GLuint textureId, bool& flushed) {
     }
 
     // Check if we have room for a new texture
-    if ((int)emissiveTextureSlots.size() >= MaxEmissiveTextureSlots) {
+    if ((int)emissiveTextureSlots.size() >= MaxEmissiveSlots) {
         flushed = true;
         return -1; // Signal to caller: need to flush before retry
     }
@@ -112,16 +114,70 @@ int Renderer::getOrAssignEmissiveTextureSlot(GLuint textureId, bool& flushed) {
     return (int)emissiveTextureSlots.size() - 1;
 }
 
+int Renderer::getOrAssignNormalTextureSlot(GLuint textureId, bool& flushed) {
+    flushed = false;
+
+    // Check if texture is already bound
+    for (int i = 0; i < (int)normalTextureSlots.size(); ++i) {
+        if (normalTextureSlots[i] == textureId) {
+            return i;
+        }
+    }
+
+    // Check if we have room for a new texture
+    if ((int)normalTextureSlots.size() >= MaxNormalSlots) {
+        flushed = true;
+        return -1; // Signal to caller: need to flush before retry
+    }
+
+    // Add new texture to available slot
+    normalTextureSlots.push_back(textureId);
+    return (int)normalTextureSlots.size() - 1;
+}
+
+int Renderer::getOrAssignMRATextureSlot(GLuint textureId, bool& flushed) {
+    flushed = false;
+
+    // Check if texture is already bound
+    for (int i = 0; i < (int)mraTextureSlots.size(); ++i) {
+        if (mraTextureSlots[i] == textureId) {
+            return i;
+        }
+    }
+
+    // Check if we have room for a new texture
+    if ((int)mraTextureSlots.size() >= MaxMRASlots) {
+        flushed = true;
+        return -1; // Signal to caller: need to flush before retry
+    }
+
+    // Add new texture to available slot
+    mraTextureSlots.push_back(textureId);
+    return (int)mraTextureSlots.size() - 1;
+}
+
 void Renderer::bindTextureSlots() const {
-    // Bind albedo textures to slots 0-23
+    // Bind albedo textures to slots 0-15
     for (int i = 0; i < (int)albedoTextureSlots.size(); ++i) {
-        glActiveTexture(GL_TEXTURE0 + i);
+        glActiveTexture(GL_TEXTURE0 + AlbedoSlotBase + i);
         glBindTexture(GL_TEXTURE_2D, albedoTextureSlots[i]);
     }
 
-    // Bind emissive textures to slots 24-31
+    // Bind normal maps to slots 16-21
+    for (int i = 0; i < (int)normalTextureSlots.size(); ++i) {
+        glActiveTexture(GL_TEXTURE0 + NormalSlotBase + i);
+        glBindTexture(GL_TEXTURE_2D, normalTextureSlots[i]);
+    }
+
+    // Bind MRA maps to slots 22-25
+    for (int i = 0; i < (int)mraTextureSlots.size(); ++i) {
+        glActiveTexture(GL_TEXTURE0 + MRASlotBase + i);
+        glBindTexture(GL_TEXTURE_2D, mraTextureSlots[i]);
+    }
+
+    // Bind emissive textures to slots 26-31
     for (int i = 0; i < (int)emissiveTextureSlots.size(); ++i) {
-        glActiveTexture(GL_TEXTURE24 + i);  // Start at slot 24
+        glActiveTexture(GL_TEXTURE0 + EmissiveSlotBase + i);
         glBindTexture(GL_TEXTURE_2D, emissiveTextureSlots[i]);
     }
 }
@@ -170,6 +226,27 @@ Renderer::Renderer(size_t maxQuads) {
     glEnableVertexArrayAttrib(vao, 6);
     glVertexArrayAttribFormat(vao, 6, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, emissiveStrength));
     glVertexArrayAttribBinding(vao, 6, 0);
+
+    // Material2D attributes
+    // Normal map texture index (location 7)
+    glEnableVertexArrayAttrib(vao, 7);
+    glVertexArrayAttribFormat(vao, 7, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, normalTexIndex));
+    glVertexArrayAttribBinding(vao, 7, 0);
+
+    // MRA texture index (location 8)
+    glEnableVertexArrayAttrib(vao, 8);
+    glVertexArrayAttribFormat(vao, 8, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, mraTexIndex));
+    glVertexArrayAttribBinding(vao, 8, 0);
+
+    // Material parameters vec4 (location 9)
+    glEnableVertexArrayAttrib(vao, 9);
+    glVertexArrayAttribFormat(vao, 9, 4, GL_FLOAT, GL_FALSE, offsetof(Vertex, materialParams));
+    glVertexArrayAttribBinding(vao, 9, 0);
+
+    // Material flags (location 10):
+    glEnableVertexArrayAttrib(vao, 10);
+    glVertexArrayAttribFormat(vao, 10, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, materialFlags));
+    glVertexArrayAttribBinding(vao, 10, 0);
 }
 
 Renderer::~Renderer() {
@@ -214,8 +291,15 @@ void Renderer::submitQuad(const glm::vec2& pos,
     float rotation,
     float uniformScale,
     int /*layer*/,
-    GLuint emissiveTextureId,      // NEW
-    float emissiveStrength)     // NEW
+    GLuint emissiveTextureId,
+    float emissiveStrength,
+    GLuint normalTextureId,
+    GLuint mraTextureId,
+    float metallic,
+    float smoothness,
+    float aoStrength,
+    float normalStrength,
+    uint32_t materialFlags)
     // Depth buffer kinda breaks transparency (Render everything back to front if u have transparent stuff)
 {
     // Handle albedo texture
@@ -273,19 +357,47 @@ void Renderer::submitQuad(const glm::vec2& pos,
         {uvRect.z, uvRect.w}, {uvRect.x, uvRect.w}
     };
 
-    // Build vertices with emissive data
+    // Handle normal map texture
+    float normalTexIndex = -1.0f;
+    if (normalTextureId != 0) {
+        bool flushed = false;
+        int slot = getOrAssignNormalTextureSlot(normalTextureId, flushed);
+        if (flushed) {
+            flush();
+            slot = getOrAssignNormalTextureSlot(normalTextureId, flushed);
+        }
+        normalTexIndex = static_cast<float>(slot);
+    }
+
+    // Handle MRA texture
+    float mraTexIndex = -1.0f;
+    if (mraTextureId != 0) {
+        bool flushed = false;
+        int slot = getOrAssignMRATextureSlot(mraTextureId, flushed);
+        if (flushed) {
+            flush();
+            slot = getOrAssignMRATextureSlot(mraTextureId, flushed);
+        }
+        mraTexIndex = static_cast<float>(slot);
+    }
+
+    // Build vertices with emissive data AND Material2D data
     size_t base = cpuBuffer.size();
     for (int i = 0; i < 4; ++i)
     {
-        glm::vec3 pos3(positions[i], 0.0f); // promote 2D => 3D
+        glm::vec3 pos3(positions[i], 0.0f);
         cpuBuffer.push_back({
-            pos3,
-            uvs[i],
-            color,
-            texIndex,
-            0.0f,
-            emissiveTexIndex,
-            emissiveStrength
+            pos3,                                           // position
+            uvs[i],                                         // texCoord
+            color,                                          // color
+            texIndex,                                       // texIndex
+            0.0f,                                           // strokePx
+            emissiveTexIndex,                               // emissiveTexIndex
+            emissiveStrength,                               // emissiveStrength
+            normalTexIndex,                                 // normalTexIndex
+            mraTexIndex,                                    // mraTexIndex
+            glm::vec4(metallic, smoothness, aoStrength, normalStrength),
+            static_cast<float>(materialFlags)  // materialParams
             });
     }
 
@@ -351,7 +463,14 @@ void Renderer::submitSprite(const Sprite& sprite) {
         sprite.rotation, sprite.uniformScale,
         0,  // layer (default)
         sprite.emissiveTextureId,
-        sprite.emissiveStrength);
+        sprite.emissiveStrength,
+        sprite.normalTextureId,
+        sprite.mraTextureId,
+        sprite.metallic,
+        sprite.smoothness,
+        sprite.aoStrength,
+        sprite.normalStrength,
+        sprite.materialFlags);
 }
 
 void Renderer::submitText(const Font& font,
@@ -397,7 +516,17 @@ void Renderer::submitText(const Font& font,
                 font.getAtlasTexture(),
                 g.uv,
                 color,
-                0.0f, 1.0f, 0);
+                0.0f,       // rotation
+                1.0f,       // uniformScale
+                0,          // layer
+                0,          // emissiveTextureId (no emissive for text)
+                0.0f,       // emissiveStrength
+                0,          // normalTextureId (no normal map for text)
+                0,          // mraTextureId (no MRA for text)
+                0.0f,       // metallic
+                0.5f,       // smoothness
+                1.0f,       // aoStrength
+                1.0f);      // normalStrength
         }
         // Apply global tracking adjustment
         float tracking = 1.05f;          // 5% extra spacing

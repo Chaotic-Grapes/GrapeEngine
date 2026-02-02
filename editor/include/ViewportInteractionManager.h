@@ -154,6 +154,16 @@ namespace Editor {
         }
 
         /**
+         * @brief Configure gizmo snapping behavior
+         */
+        void SetGizmoSnap(bool enabled, float translate, float rotate, float scale) {
+            m_snapEnabled = enabled;
+            m_snapTranslate = translate;
+            m_snapRotate = rotate;
+            m_snapScale = scale;
+        }
+
+        /**
          * @brief Get the current gizmo operation
          */
         GizmoRenderer::Operation GetGizmoOperation() const {
@@ -215,6 +225,11 @@ namespace Editor {
         glm::mat4 m_viewMatrix = glm::mat4(1.0f);
         glm::mat4 m_projMatrix = glm::mat4(1.0f);
         bool m_isPerspective = false;
+        // Per-frame snap configuration for ImGuizmo.
+        bool m_snapEnabled = false;
+        float m_snapTranslate = 1.0f;
+        float m_snapRotate = 15.0f;
+        float m_snapScale = 0.1f;
 
         // Interaction state
         uint32_t m_selectedEntityId = 0;

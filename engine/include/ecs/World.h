@@ -449,14 +449,14 @@ namespace ECS {
 
                     _onComponentChanged(e, TypeIdOf<T>());
                     return Get<T>(e);
+                } else {
+                    // Update existing component by using move semantics
+                    Get<T>(e) = std::move(value);
+
+                    // Then notify change before returning
+                    _onComponentChanged(e, TypeIdOf<T>());
+                    return Get<T>(e);
                 }
-
-                // Update existing component by using move semantics
-                Get<T>(e) = std::move(value);
-
-                // Then notify change before returning
-                _onComponentChanged(e, TypeIdOf<T>());
-                return Get<T>(e);
             }
 
             // Otherwise, add new component

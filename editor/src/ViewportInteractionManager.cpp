@@ -170,7 +170,27 @@ namespace Editor {
         
         // Render and compute output transform using the entity's transform
         glm::mat4 outputTransform;
-        bool isManipulating = m_gizmo.Render(m_viewMatrix, m_projMatrix, entityTransform, outputTransform);
+        // Select snap increments based on the active gizmo operation.
+        const float* snapPtr = nullptr;
+        float snapTranslate[3] = { m_snapTranslate, m_snapTranslate, m_snapTranslate };
+        float snapScale[3] = { m_snapScale, m_snapScale, m_snapScale };
+        float snapRotate = m_snapRotate;
+        if (m_snapEnabled) {
+            switch (m_gizmo.GetOperation()) {
+            case GizmoRenderer::Operation::Translate:
+                snapPtr = snapTranslate;
+                break;
+            case GizmoRenderer::Operation::Rotate:
+                snapPtr = &snapRotate;
+                break;
+            case GizmoRenderer::Operation::Scale:
+                snapPtr = snapScale;
+                break;
+            default:
+                break;
+            }
+        }
+        bool isManipulating = m_gizmo.Render(m_viewMatrix, m_projMatrix, entityTransform, outputTransform, snapPtr);
 
         // Update gizmo interaction state
         m_gizmoController.Update(m_gizmo, selectedEntityId, localState);

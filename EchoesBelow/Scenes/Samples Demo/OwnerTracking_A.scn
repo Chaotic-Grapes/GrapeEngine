@@ -1,0 +1,67 @@
+{
+    "SceneName": "OwnerTracking_A",
+    "Entities": [
+        {
+            "EntityId": 0,
+            "Components": [
+                {
+                    "TypeName": "LocalTransform",
+                    "Data": {
+                        "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+                        "Rotation": { "W": 1.0, "X": 0.0, "Y": 0.0, "Z": 0.0 },
+                        "Scale": { "X": 1.0, "Y": 1.0, "Z": 1.0 }
+                    }
+                },
+                {
+                    "TypeName": "Camera3D",
+                    "Data": {
+                        "AspectRatio": 1.7777777910232544,
+                        "FOV": 45.0,
+                        "FarPlane": 100.0,
+                        "NearPlane": 0.10000000149011612,
+                        "OrthoSize": 10.0,
+                        "UsePerspective": false,
+                        "Active": true
+                    }
+                },
+                {
+                    "TypeName": "Name",
+                    "Data": { "Value": "OwnerTrackingCamera" }
+                }
+            ]
+        },
+        {
+            "EntityId": 1,
+            "Components": [
+                {
+                    "TypeName": "LocalTransform",
+                    "Data": {
+                        "Position": { "X": 0.0, "Y": 0.0, "Z": 0.0 },
+                        "Rotation": { "W": 1.0, "X": 0.0, "Y": 0.0, "Z": 0.0 },
+                        "Scale": { "X": 1.0, "Y": 1.0, "Z": 1.0 }
+                    }
+                },
+                {
+                    "TypeName": "SpriteRenderer2D",
+                    "Data": {
+                        "TextureId": 0,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\FishfolkSheet.png",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Color": { "R": 1.0, "G": 1.0, "B": 1.0, "A": 1.0 },
+                        "Tiling": { "X": 1.0, "Y": 1.0 },
+                        "Offset": { "X": 0.0, "Y": 0.0 }
+                    }
+                },
+                {
+                    "TypeName": "Layer",
+                    "Data": { "Id": 0 }
+                },
+                {
+                    "TypeName": "Name",
+                    "Data": { "Value": "OwnerTrackingSpriteA" }
+                }
+            ]
+        }
+    ]
+}

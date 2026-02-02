@@ -38,6 +38,21 @@ template<>
 std::unordered_map<std::string, std::shared_ptr<Font>>&
 ResourceManager::GetCacheMap<Font>() { return m_fonts; }
 
+// When T = Texture, return texture owner map
+template<>
+std::unordered_map<std::string, std::unordered_set<std::string>>&
+ResourceManager::GetOwnerMap<Texture>() { return m_textureOwners; }
+
+// When T = AudioData, return audio owner map
+template<>
+std::unordered_map<std::string, std::unordered_set<std::string>>&
+ResourceManager::GetOwnerMap<AudioData>() { return m_audioOwners; }
+
+// When T = Font, return font owner map
+template<>
+std::unordered_map<std::string, std::unordered_set<std::string>>&
+ResourceManager::GetOwnerMap<Font>() { return m_fontOwners; }
+
 // Generic Get function: handles caching logic for all asset types
 template <typename T>
 std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
@@ -49,6 +64,7 @@ std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
     auto it = cache.find(name);
     if (it != cache.end()) {
         LOG_DEBUG("[CACHE HIT] " << typeid(T).name() << ": " << name);
+        TrackOwner<T>(name);
         return it->second;  // Cache hit
     }
 
@@ -58,6 +74,7 @@ std::shared_ptr<T> ResourceManager::Get(const std::string& name) {
 
     if (resource) {
         cache[name] = resource;
+        TrackOwner<T>(name);
         LOG_DEBUG("Cached " << typeid(T).name() << ": " << name);
     }
     else {
@@ -205,6 +222,7 @@ std::shared_ptr<Font> ResourceManager::GetFont(const std::string& name, int pixe
     auto it = m_fonts.find(cacheKey);
     if (it != m_fonts.end()) {
         LOG_DEBUG("[CACHE HIT] Font: " << name << " (" << pixelSize << "px)");
+        TrackOwner<Font>(cacheKey);
         return it->second;  // Cache hit
     }
 
@@ -229,6 +247,7 @@ std::shared_ptr<Font> ResourceManager::GetFont(const std::string& name, int pixe
 
         // Cache the loaded font
         m_fonts[cacheKey] = font;
+        TrackOwner<Font>(cacheKey);
         LOG_DEBUG("Cached font: " << name << " (" << pixelSize << "px)");
         return font;
     }
@@ -243,6 +262,9 @@ void ResourceManager::ClearCache() {
     m_textures.clear();
     m_audioFiles.clear();
     m_fonts.clear();
+    m_textureOwners.clear();
+    m_audioOwners.clear();
+    m_fontOwners.clear();
     LOG_INFO("Cleared all cached assets");
 }
 
@@ -260,6 +282,10 @@ void ResourceManager::UnloadAsset(const std::string& name) {
 
     // Try to remove from font cache
     removed |= m_fonts.erase(name) > 0;
+
+    m_textureOwners.erase(name);
+    m_audioOwners.erase(name);
+    m_fontOwners.erase(name);
 
     if (removed) {
         LOG_INFO("Unloaded asset: " << name);
@@ -281,6 +307,45 @@ void ResourceManager::PrintCacheInfo() const {
     LOG_INFO("Audio files: " << m_audioFiles.size());
     LOG_INFO("Fonts: " << m_fonts.size());
     LOG_INFO("Total assets: " << GetCacheSize());
+
+    // Detailed owner info
+    auto dumpOwners = [&](const char* label, const auto& ownerMap) {
+        // Format:
+        // <Label> Owners:
+        //   OwnerTag1 -> N assets
+        //   asset1
+        //   asset2...
+        LOG_INFO(std::string(label) + " Owners:");
+        if (ownerMap.empty()) {
+            LOG_INFO("  (none)");
+            return;
+        }
+
+        // Invert map to group by owner tag
+        std::unordered_map<std::string, std::vector<std::string>> ownersToAssets;
+        for (const auto& [asset, owners] : ownerMap) {
+            for (const auto& owner : owners) {
+                ownersToAssets[owner].push_back(asset);
+            }
+        }
+
+        // Print grouped info
+        // Format:
+        // OwnerTag -> N assets
+        //   asset1
+        //   asset2...
+        for (const auto& [owner, assets] : ownersToAssets) {
+            LOG_INFO("  " << owner << " -> " << assets.size() << " assets");
+            for (const auto& asset : assets) {
+                LOG_INFO("    " << asset);
+            }
+        }
+    };
+
+    // After that, call the helper for each asset type
+    dumpOwners("Texture", m_textureOwners);
+    dumpOwners("Audio", m_audioOwners);
+    dumpOwners("Font", m_fontOwners);
 }
 
 // Get cached audio paths for Audio to load in library
@@ -300,6 +365,45 @@ bool ResourceManager::IsAssetCached(const std::string& name) const {
     return (m_textures.find(name) != m_textures.end()) ||
         (m_audioFiles.find(name) != m_audioFiles.end()) ||
         (m_fonts.find(name) != m_fonts.end());
+}
+
+// Set the current owner tag for asset tracking
+void ResourceManager::SetOwnerTag(const std::string& ownerTag) {
+    m_ownerTag = ownerTag;
+}
+
+// Clear the current owner tag
+void ResourceManager::ClearOwnerTag() {
+    m_ownerTag.clear();
+}
+
+// Unload assets that are only owned by the specified tag
+void ResourceManager::UnloadAssetsByOwner(const std::string& ownerTag) {
+    if (ownerTag.empty()) {
+        return;
+    }
+
+    // Helper lambda to remove assets owned by ownerTag from given ownerMap and cacheMap
+    // This avoids code duplication for each asset type
+    auto removeOwner = [&](auto& ownerMap, auto& cacheMap) {
+        for (auto it = ownerMap.begin(); it != ownerMap.end(); ) {
+            auto& owners = it->second; // set of owner tags for this asset
+            owners.erase(ownerTag); // remove the specified owner tag
+
+            // If no more owners, remove from cache and owner map
+            if (owners.empty()) {
+                cacheMap.erase(it->first);
+                it = ownerMap.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    };
+
+    // After that, call the helper for each asset type
+    removeOwner(m_textureOwners, m_textures);
+    removeOwner(m_audioOwners, m_audioFiles);
+    removeOwner(m_fontOwners, m_fonts);
 }
 
 // Define the global ResourceManager instance

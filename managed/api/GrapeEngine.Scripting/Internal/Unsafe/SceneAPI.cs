@@ -97,6 +97,11 @@ internal static partial class SceneAPI
     [return: MarshalAs(UnmanagedType.Bool)]
     public static unsafe partial bool LoadScene(void* sceneManagerPtr, ulong sceneIndex, string filename);
 
+    [LibraryImport("GrapeEngineNative", EntryPoint = "SceneManagerInterop_RestartScene", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static unsafe partial bool RestartScene(void* sceneManagerPtr, ulong sceneIndex, string filename);
+
     // ============================================================================
     // Scene Properties
     // ============================================================================
