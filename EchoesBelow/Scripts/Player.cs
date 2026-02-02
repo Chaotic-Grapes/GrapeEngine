@@ -3,30 +3,54 @@ using GrapeEngine.Scripting.Components;
 using GrapeEngine.Scripting.Services;
 using GrapeEngine.Scripting.Systems;
 using GrapeEngine.Scripting.Systems.Attributes;
+using GrapeEngine.Scripting.Core;
+using GrapeEngine.Scripting.Events;
 
 namespace EchoesBelow.Scripts;
 
 [Component] public record struct PlayerComponent(
     //[Pseudo-SerializeField]
+    float driftSpeed,
+    float periodicForceInterval,
     float moveSpeed,
-    float timer,
-    float lerpFac,
-    float maxSpeed,
-    float angularVelocity
+    float angularVelocity,
+    bool start // required for start function
 );
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class Player : SystemBase
 {
     public static Compass abs_InputDirection = Compass.N;
+    const float lerpFac = 1;
+    const float maxSpeed = 10;
+    float timer_forRotation = 0;
+    float timer_forPeriodicForce = 0;
     protected override void OnCreate()
     {
         Log("System Player initialized");
     }
+    private bool OnStart(ref bool startBool)
+    {
+        if (startBool == true) return true;
+        startBool = true;
+        //Todo
+        
 
+
+
+
+
+        //End of Start
+        return true;
+    }
     protected override void OnUpdate()
     {
         foreach(var gameObject in World!.Query<PlayerComponent, LinearVelocity2D, AngularVelocity2D, LocalTransform>())
         {
+            //A Pseudo Start function, called once per obj at runtime
+            //This allows onStart to work
+            bool start = gameObject.Component1.start;
+            gameObject.Component1.start = OnStart(ref start);
+
             //Variables
             ref LocalTransform transform = ref gameObject.Component4;
             ref LinearVelocity2D lv = ref gameObject.Component2;
@@ -34,10 +58,10 @@ public class Player : SystemBase
             Vector2 playerDir;
             Vector2 moveDir = Vector2.Zero;
             Vector2 moveDirNormalized = Vector2.Zero;
-            float lerpFac = gameObject.Component1.lerpFac * 0.01f; //this allows floating point decimal values
             float moveSpeed = gameObject.Component1.moveSpeed * 0.01f; //this allows floating point decimal values
-            float maxSpeed = gameObject.Component1.maxSpeed;
+            float driftSpeed = gameObject.Component1.driftSpeed * 0.01f; //this allows floating point decimal values
             float angularVelocity = gameObject.Component1.angularVelocity * 0.01f; //100 == 1
+            float periodicForceInterval = gameObject.Component1.periodicForceInterval;
 
             moveDir = ProcessInput(moveDir, lerpFac);
 
@@ -57,7 +81,7 @@ public class Player : SystemBase
 
             //============================================================================================
             RotationPolarityHandler(transform);
-            float flipFac = GMath.Clamp(HeadingDifference(playerAngle * GMath.Rad2Deg, (float)abs_InputDirection) * GMath.Rad2Deg, -1,1);
+            float flipFactor = GMath.Clamp(HeadingDifference(playerAngle * GMath.Rad2Deg, (float)abs_InputDirection) * GMath.Rad2Deg, -1,1);
             
             //Dot product operation to determine theta as presented by angleBetween in radians!
             float angleBetween_rad = GMath.Acos(GMath.Dot(playerDir, moveDirNormalized) / (playerDir.Magnitude * moveDirNormalized.Magnitude));
@@ -75,39 +99,51 @@ public class Player : SystemBase
             } 
             if (isRotating)
             {
-                gameObject.Component1.timer += Time.DeltaTime;
-                if(flipFac >= 0) av.Value = GMath.Lerp(av.Value, angularVelocity, lerpFac);
-                else av.Value = GMath.Lerp(av.Value, -angularVelocity, lerpFac);
-               
-                //Log("Rotating. . . ");
+                timer_forRotation += Time.DeltaTime;
+                if(flipFactor >= 0) av.Value = GMath.Lerp(av.Value, angularVelocity, lerpFac);
+                else                av.Value = GMath.Lerp(av.Value, -angularVelocity, lerpFac);
             }
-            if (gameObject.Component1.timer > rotDuration)
+            if (timer_forRotation > rotDuration)
             {
                 isRotating = false;
-                gameObject.Component1.timer = 0;
+                timer_forRotation = 0;
                 av.Value = 0;
             }
+
             //Log($"playerAngle: {playerAngle}");
             //Log($"absTarget: {abs_InputDirection}");
             //Log("flipFac2: " + flipFac);
-            AddRelativeForce(ref lv, playerDir, moveSpeed, maxSpeed);
-        }
-    }
 
-    private static void AddRelativeForce(ref LinearVelocity2D lv, Vector2 playerDir, float moveSpeed, float maxSpeed)
-    {
-        //Assignment of linear Velocities================================================================
-        if (Input.IsKeyDown(KeyCode.W) || Input.IsKeyDown(KeyCode.S)
+            if (Input.IsKeyDown(KeyCode.W) || Input.IsKeyDown(KeyCode.S)
             || Input.IsKeyDown(KeyCode.A) || Input.IsKeyDown(KeyCode.D))
-        {
-            lv.Value.X += playerDir.X * moveSpeed;
-            lv.Value.Y += playerDir.Y * moveSpeed;
-            //Clamping these values to a maxSpeed
-            lv.Value.X = GMath.Clamp(lv.Value.X, -maxSpeed, maxSpeed);
-            lv.Value.Y = GMath.Clamp(lv.Value.Y, -maxSpeed, maxSpeed);
+            {
+                AddDriftForce(ref lv, playerDir, driftSpeed, maxSpeed);
+                
+            }
+            if(Input.IsKeyDown(KeyCode.Space))AddPeriodicalForce(ref lv, periodicForceInterval, ref timer_forPeriodicForce, playerDir, moveSpeed);
+                
         }
     }
-
+    private static void AddDriftForce(ref LinearVelocity2D lv, Vector2 playerDir, float moveSpeed, float maxSpeed)
+    {
+        lv.Value.X += playerDir.X * moveSpeed;
+        lv.Value.Y += playerDir.Y * moveSpeed;
+        //Clamping these values to a maxSpeed
+        lv.Value.X = GMath.Clamp(lv.Value.X, -maxSpeed, maxSpeed);
+        lv.Value.Y = GMath.Clamp(lv.Value.Y, -maxSpeed, maxSpeed);
+       
+    }
+    private void AddPeriodicalForce(ref LinearVelocity2D lv, float periodicForceInterval, ref float timer_forPeriodicForce, Vector2 playerDir, float moveSpeed)
+    {
+        //The periodical force is applied 
+        timer_forPeriodicForce += Time.DeltaTime;
+        if(timer_forPeriodicForce > periodicForceInterval)
+        {
+            timer_forPeriodicForce = 0;
+            lv.Value.X += playerDir.X * moveSpeed * GMath.Clamp(lv.Value.X, 1, 10);
+            lv.Value.Y += playerDir.Y * moveSpeed * GMath.Clamp(lv.Value.X, 1, 10);
+        }
+    }
     private void RotationPolarityHandler(LocalTransform transform)
     {
         //Find InputAbsDirection direction
@@ -169,3 +205,11 @@ public class Player : SystemBase
         N  = 0
     }
 }
+
+//public class CollisionTestSystem : CollisionSystemBase
+//{
+//    protected void override OnCollisionEnter()
+//    {
+
+//    }
+//}
