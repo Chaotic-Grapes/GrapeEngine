@@ -636,7 +636,6 @@ namespace ECS {
                                 ToGlm(Vector2D{worldB.X, worldB.Y}),
                                 sl.Thickness, ToGlm(sl.Color), 0);
                         }
-
                         // Sprites
                         if (world.Has<Components::SpriteRenderer2D>(entity)) {
                             const auto& sr = world.Get<Components::SpriteRenderer2D>(entity);
@@ -644,15 +643,33 @@ namespace ECS {
                                 2.0f * (rotation.W * rotation.Z + rotation.X * rotation.Y),
                                 1.0f - 2.0f * (rotation.Y * rotation.Y + rotation.Z * rotation.Z)
                             );
-                            
+
                             // Calculate UV coordinates from Tiling and Offset
-                            // Tiling controls how much of the texture is shown (1.0 = full texture)
-                            // Offset controls where in the texture to start sampling (0.0 = top-left)
                             const float u0 = sr.Offset.X;
                             const float v0 = sr.Offset.Y;
                             const float u1 = sr.Offset.X + sr.Tiling.X;
                             const float v1 = sr.Offset.Y + sr.Tiling.Y;
-                            
+
+                            // Check if entity has Material2D component for PBR rendering
+                            GLuint normalTexId = 0;
+                            GLuint mraTexId = 0;
+                            float metallic = 0.0f;
+                            float smoothness = 0.5f;
+                            float aoStrength = 1.0f;
+                            float normalStrength = 1.0f;
+							float flags = 0.0f;
+
+                            if (world.Has<Components::Material2D>(entity)) {
+                                const auto& mat = world.Get<Components::Material2D>(entity);
+                                normalTexId = mat.NormalTextureId;
+                                mraTexId = mat.MRA_TextureId;
+                                metallic = mat.Metallic;
+                                smoothness = mat.Smoothness;
+                                aoStrength = mat.AOStrength;
+                                normalStrength = mat.NormalStrength;
+                                flags = mat.Flags;
+                            }
+
                             m_renderer->submitSprite({
                                 ToGlm(Vector2D{position.X, position.Y}),
                                 ToGlm(Vector2D{scale.X, scale.Y}),
@@ -663,8 +680,15 @@ namespace ECS {
                                 1.0f,
                                 sr.EmissiveTextureId,
                                 sr.EmissiveStrength,
-                                sr.Width,   // pass texture width
-                                sr.Height   // pass texture height
+                                sr.Width,           // texture width
+                                sr.Height,          // texture height
+                                normalTexId,        // Material2D: normal map
+                                mraTexId,           // Material2D: MRA map
+                                metallic,           // Material2D: metallic value
+                                smoothness,         // Material2D: smoothness value
+                                aoStrength,         // Material2D: AO strength
+                                normalStrength,     // Material2D: normal strength
+                                static_cast<uint32_t>(flags)
                                 });
                         }
                     }

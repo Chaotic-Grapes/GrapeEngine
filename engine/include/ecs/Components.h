@@ -488,6 +488,15 @@ namespace ECS {
         // Used in conjunction with SpriteRenderer2D for enhanced visual effects
         struct Material2D {
         public:
+            enum class Material2DFlags : uint32_t {
+                MATERIAL_USE_NORMAL_MAP     = 1 << 0,
+                MATERIAL_USE_METALLIC_MAP   = 1 << 1,
+                MATERIAL_USE_AO_MAP         = 1 << 2,
+                MATERIAL_ALPHA_TEST         = 1 << 3,
+                MATERIAL_UNLIT              = 1 << 4,
+                MATERIAL_FLAT_LIT           = 1 << 5,
+            };
+
             // --- Texture inputs (albedo comes from SpriteRenderer2D) ---
             uint32_t NormalTextureId = 0;   // RGB normal map (tangent-space)
             uint32_t MRA_TextureId = 0;     // R = Metallic, G = Roughness/Smoothness, B = AO
