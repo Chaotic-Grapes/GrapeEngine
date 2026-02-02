@@ -5,7 +5,7 @@
 \par    ruiqin.foo@digipen.edu
 \date   25th January 2026
 \brief
-Declares the custom MemoryManager class for efficient game object memory allocation.
+Declares the custom MemoryManager class for efficient game object memory allocation
 Provides:
 - Pre-allocated memory pool using memory pages
 - Address-ordered free linked list for optimal fragmentation reduction
@@ -41,16 +41,20 @@ private:
 	// CONSTRUCTORS
 	// ============================================================================
 
-	// Memory block node: represents a single block in the free linked list
-	// Used to track both allocated and free memory regions
+	// Memory block header (embedded)
+	// Aligned to 16 bytes
 	struct MemoryBlock {
-		void* data;           // Pointer to actual memory
-		int size;             // Size of this block in bytes
-		bool allocated;       // true = allocated, false = free
-		MemoryBlock* next;    // Next block in the linked list
-		MemoryBlock* prev;    // Previous block in the linked list
+		size_t size;          // Size of the data part
+		bool allocated;       // Status
+		char padding[7];      // Padding to 16 bytes
+	};
 
-		MemoryBlock(void* ptr, int s);
+	// Free block node (embedded in free memory)
+	// This structure OVERLAYS the memory block when it is free
+	struct FreeBlock {
+		MemoryBlock header;   // The header is always present
+		FreeBlock* next;      // Pointer to next free block
+		FreeBlock* prev;      // Pointer to previous free block
 	};
 
 	// Memory page: represents a single page of pre-allocated memory
@@ -63,11 +67,11 @@ private:
 		MemoryPage(void* start, int size);
 	};
 
-	MemoryBlock* m_blockListHead;   // Head of the memory block linked list (address-ordered)
+	FreeBlock* m_freeListHead;      // Head of the FREE linked list (address-ordered)
 	MemoryPage* m_pageListHead;     // Head of the memory page linked list
 	int m_defaultPageSize;          // Size of each memory page
-	int m_totalAllocated;           // Total bytes allocated
-	int m_totalFreed;               // Total bytes freed
+	size_t m_totalAllocated;        // Total bytes allocated
+	size_t m_totalFreed;            // Total bytes freed
 	bool m_debugMode;               // Enable/disable debug pattern filling
 	std::recursive_mutex m_mutex;   // Thread safety
 
@@ -84,7 +88,7 @@ private:
 	// ============================================================================
 
 	// Merges adjacent free blocks to reduce fragmentation
-	void _mergeAdjacentFreeBlocks(MemoryBlock* block);
+	void _mergeAdjacentFreeBlocks(FreeBlock* block);
 
 	// ============================================================================
 	// ADDRESS-ORDERED INSERTION
@@ -92,7 +96,7 @@ private:
 
 	// Inserts a free block into the address-ordered free list
 	// This significantly reduces fragmentation compared to insertion-order
-	void _insertBlockAddressOrdered(MemoryBlock* block);
+	void _insertBlockAddressOrdered(FreeBlock* block);
 
 public:
 	// ============================================================================
