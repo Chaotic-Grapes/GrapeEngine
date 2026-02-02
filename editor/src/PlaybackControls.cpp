@@ -142,11 +142,11 @@ void Playback::Render() {
 
     // Mode tint keeps the toolbar state-readable at a glance.
     ImGui::PushStyleColor(ImGuiCol_WindowBg, tintedBg);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 8));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
     ImGui::Begin("Game Controls", nullptr, flags);
 
-    const ImVec2 mainBtnSize(52.0f, 34.0f);
-    const ImVec2 smallBtnSize(28.0f, 22.0f);
+    const ImVec2 mainBtnSize(48.0f, 30.0f);
+    const ImVec2 smallBtnSize(26.0f, 20.0f);
 
     // Compact icon button with optional active palette.
     auto drawIconButton = [&](const char* icon, bool enabled, const ImVec2& size, const char* tooltip,

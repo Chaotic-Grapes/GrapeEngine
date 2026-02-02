@@ -43,7 +43,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 struct LevelEditorConfig {
     float TextFontSize = 20.0f;
     float IconFontSize = 22.0f;
-    float ToolbarHeight = 52.0f;
+    float ToolbarHeight = 46.0f;
 };
 
 struct PanelRegistration {

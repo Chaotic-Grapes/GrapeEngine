@@ -60,6 +60,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "helpers/MathUtils.h"
 #include "helpers/EntityUtils.h"
 #include <iostream>
+#include "core/Logger.h"
 #include "audio/FmodAudioDevice.h"
 #include "ecs/events/EventComponents.h"
 #include "ecs/events/EventDispatcher.h"
@@ -452,6 +453,12 @@ namespace ECS {
         if (!Engine::Physics::IsEnabled()) return;
         if (dt <= 0.0f) return;
 
+        int collisionEnterCount = 0;
+        int collisionExitCount = 0;
+        int triggerEnterCount = 0;
+        int triggerExitCount = 0;
+        int triggerStayCount = 0;
+
         //  Choose substep count; make it a tunable or cvar if you like.
         const int   substeps = 8;                         //higher = more stable, slower
         const float subDt = dt / static_cast<float>(substeps);
@@ -459,8 +466,8 @@ namespace ECS {
         // Create event dispatcher for firing collision events
         ECS::Events::EventDispatcher eventDispatcher(&world);
 
-        //to clock currentcollision pairs between A and B entities
-        std::unordered_set<uint64_t> currentCollisions;
+        // Track collisions and trigger overlaps for the whole frame (across substeps).
+        std::unordered_set<uint64_t> frameCollisions;
         std::unordered_set<uint64_t> currentTriggerOverlaps;
 
         // Running frame counter to reset per-frame SFX dedupe
@@ -814,13 +821,11 @@ namespace ECS {
                     if (!hasPhysA && !hasPhysB) continue;
 
                     uint64_t pairID = MakeCollisionPairID(A, B);
-                    currentCollisions.insert(pairID);
+                    const bool firstSeenThisFrame = frameCollisions.insert(pairID).second;
+                    const bool isNewCollision = (m_previousCollisions.find(pairID) == m_previousCollisions.end());
 
-                    bool isNewCollision = (m_previousCollisions.find(pairID) == m_previousCollisions.end());
-
-                    // Fire collision events using EventDispatcher
-                    if (isNewCollision) {
-                        // New collision detected
+                    // Fire collision events once per frame for new pairs.
+                    if (firstSeenThisFrame && isNewCollision) {
                         eventDispatcher.FireCollisionEvent(
                             ECS::EntityUtils::Pack(A), ECS::EntityUtils::Pack(B),
                             Vector3D(manifold.points[0].X, manifold.points[0].Y, 0.0f),
@@ -828,6 +833,7 @@ namespace ECS {
                             Vector3D(0.0f, 0.0f, 0.0f),  // TODO: Compute relative velocity
                             0.0f  // TODO: Compute impact magnitude
                         );
+                        collisionEnterCount++;
                     }
 
                     // Gather physics state (by value) and current velocities; some may be missing.
@@ -907,29 +913,29 @@ namespace ECS {
                 if (resolved == 0) break;
             }
 
-            for (uint64_t pairID : m_previousCollisions) {
-                if (currentCollisions.find(pairID) == currentCollisions.end()) {
-                    // Collision ended
-                    uint32_t idA = (pairID >> 32);
-                    uint32_t idB = (pairID & 0xFFFFFFFF);
-
-                    Entity entityA = world.Resolve(idA);
-                    Entity entityB = world.Resolve(idB);
-
-                    if (world.IsAlive(entityA) && world.IsAlive(entityB)) {
-                        // Fire collision exit events using EventDispatcher
-                        eventDispatcher.FireCollisionExitEvent(
-                            ECS::EntityUtils::Pack(entityA), ECS::EntityUtils::Pack(entityB),
-                            Vector3D(0.0f, 0.0f, 0.0f)  // TODO: Track last contact point
-                        );
-                    }
-                }
-            }
-
-            m_previousCollisions = std::move(currentCollisions);
-
             // (Optional) Integrate positions/orientations here if you separate velocity & pose updates.
         }
+
+        // Emit collision exits once per frame (after all substeps).
+        for (uint64_t pairID : m_previousCollisions) {
+            if (frameCollisions.find(pairID) == frameCollisions.end()) {
+                uint32_t idA = (pairID >> 32);
+                uint32_t idB = (pairID & 0xFFFFFFFF);
+
+                Entity entityA = world.Resolve(idA);
+                Entity entityB = world.Resolve(idB);
+
+                if (world.IsAlive(entityA) && world.IsAlive(entityB)) {
+                    eventDispatcher.FireCollisionExitEvent(
+                        ECS::EntityUtils::Pack(entityA), ECS::EntityUtils::Pack(entityB),
+                        Vector3D(0.0f, 0.0f, 0.0f)  // TODO: Track last contact point
+                    );
+                    collisionExitCount++;
+                }
+            }
+        }
+
+        m_previousCollisions = std::move(frameCollisions);
 
         // Handle trigger events
         for (uint64_t pairID : currentTriggerOverlaps) {
@@ -946,9 +952,11 @@ namespace ECS {
             if (world.IsAlive(triggerEntity) && world.IsAlive(otherEntity)) {
                 if (wasOverlapping) {
                     eventDispatcher.FireTriggerStayEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                    triggerStayCount++;
                 }
                 else {
                     eventDispatcher.FireTriggerEnterEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                    triggerEnterCount++;
                 }
             }
         }
@@ -964,6 +972,7 @@ namespace ECS {
 
                 if (world.IsAlive(triggerEntity) && world.IsAlive(otherEntity)) {
                     eventDispatcher.FireTriggerExitEvent(ECS::EntityUtils::Pack(triggerEntity), ECS::EntityUtils::Pack(otherEntity));
+                    triggerExitCount++;
                 }
             }
         }
