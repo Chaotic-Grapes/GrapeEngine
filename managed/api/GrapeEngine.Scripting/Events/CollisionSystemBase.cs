@@ -119,25 +119,6 @@ public abstract class CollisionSystemBase : SystemBase
                 entity.RemoveComponent<CollisionExitEventBuffer>();
             }
         }
-
-        if (kDebugEventLogging)
-        {
-            var collisionBuffers = 0;
-            var collisionEvents = 0;
-            var collisionExitBuffers = 0;
-            var collisionExitEvents = 0;
-
-            foreach (var (_, buffer) in world.Query<CollisionEventBuffer>())
-            {
-                collisionBuffers++;
-                collisionEvents += buffer.Count;
-            }
-            foreach (var (_, buffer) in world.Query<CollisionExitEventBuffer>())
-            {
-                collisionExitBuffers++;
-                collisionExitEvents += buffer.Count;
-            }
-        }
     }
 
     /// <summary>
