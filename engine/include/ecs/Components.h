@@ -95,6 +95,8 @@ This helps maintain alignment and performance characteristics.
 ================================================================================
 */
 
+class TileMap;
+
 namespace ECS {
     namespace Components {
         // ---------------------------------- Core utility/tag components ----------------------------------
@@ -337,6 +339,11 @@ namespace ECS {
         };
 
         // TODO: Add Shader components
+
+        // TileMap component (holds shared pointer to the actual map data)
+        struct TileMapComponent {
+            std::shared_ptr<TileMap> Map;
+        };
 
         // ---------------------------------- Animation ----------------------------------
 

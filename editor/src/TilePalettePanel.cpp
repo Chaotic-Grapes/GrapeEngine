@@ -8,6 +8,9 @@
 #include "ecs/Components.h"
 #include "ecs/systems/RendererSystem.h"
 #include "../include/core/World/TileTypes.hpp"
+#include "services/ResourceManager.h"
+#include "graphics/texture.hpp"
+#include "graphics/renderer.hpp" // Required for submitQuad
 
 // Assuming ImGui::ImageButton takes ImTextureID (void*)
 // Tileset::GetTextureId() returns uint32_t (OpenGL ID).
@@ -20,15 +23,88 @@ void TilePalettePanel::Initialize(const std::shared_ptr<TileMap>& tileMap, const
     m_world = world;
 }
 
+void TilePalettePanel::LoadTileset(const std::shared_ptr<Tileset>& tileset)
+{
+    m_tileset = tileset;
+    m_selectedTileID = 0; // Reset selection
+}
+
+void TilePalettePanel::LoadTilesetFromPath(const std::string& path)
+{
+    // Use std::filesystem to change extension to .png to find texture
+    std::filesystem::path fsPath(path);
+    std::filesystem::path texturePath = fsPath;
+    texturePath.replace_extension(".png");
+
+    std::shared_ptr<Texture> texture = nullptr;
+
+    // Try to load texture via ResourceManager
+    if (std::filesystem::exists(texturePath)) {
+        texture = RM.Get<Texture>(texturePath.string());
+    } else {
+        // Fallback: try loading the file itself as texture (if user dragged a png)
+        texture = RM.Get<Texture>(path);
+    }
+
+    if (texture) {
+        auto tileset = std::make_shared<Tileset>(texture->ID());
+
+        // Define some default tiles for testing since we don't have serialization yet
+        // Grid of 16x16 tiles? Assume 32x32 pixels per tile.
+        int texW = texture->Width();
+        int texH = texture->Height();
+        int tileW = 32;
+        int tileH = 32;
+        int cols = texW / tileW;
+        int rows = texH / tileH;
+
+        int id = 1;
+        for (int y = 0; y < rows; ++y) {
+            for (int x = 0; x < cols; ++x) {
+                float u0 = (float)(x * tileW) / texW;
+                float v0 = (float)(y * tileH) / texH;
+                float u1 = (float)((x + 1) * tileW) / texW;
+                float v1 = (float)((y + 1) * tileH) / texH;
+
+                tileset->DefineTile(id++, { u0, v0, u1, v1 });
+            }
+        }
+
+        LoadTileset(tileset);
+        LOG_INFO("Loaded tileset from " << path);
+    } else {
+        LOG_ERROR("Failed to load texture for tileset: " << path);
+    }
+}
+
 void TilePalettePanel::Render()
 {
     if (!m_active) return;
 
     if (ImGui::Begin("Tile Palette", &m_active))
     {
+        // Handle Drag & Drop of Tileset Assets
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PATHS"))
+            {
+                const char* data = (const char*)payload->Data;
+                // The payload might contain multiple paths separated by nulls. We just take the first one.
+                std::string path(data);
+                
+                // Check extension
+                if (path.find(".tileset") != std::string::npos || path.find(".png") != std::string::npos)
+                {
+                     LoadTilesetFromPath(path);
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+
         if (!m_tileset)
         {
             ImGui::Text("No Tileset Loaded");
+            ImGui::TextDisabled("Drag .tileset here");
             ImGui::End();
             return;
         }
@@ -130,10 +206,41 @@ void TilePalettePanel::OnViewportHover(const glm::vec2& worldPos)
     if (rs) {
         auto* r = rs->GetRenderer();
         if (r) {
-            glm::vec2 min(tilePos.x, tilePos.y);
-            glm::vec2 max(tilePos.x + size.x, tilePos.y + size.y);
-            glm::vec4 color = m_isEraser ? glm::vec4(1.0f, 0.0f, 0.0f, 0.4f) : glm::vec4(1.0f, 1.0f, 1.0f, 0.4f);
-            DebugDraw2D::RectFill(*r, min, max, color, 0);
+            // Calculate center position for submitQuad
+            glm::vec2 center = tilePos + size * 0.5f;
+
+            // Get UVs for the selected tile
+            TileUV uv;
+            if (m_isEraser) {
+                // Draw red eraser box if eraser mode
+                glm::vec2 min(tilePos.x, tilePos.y);
+                glm::vec2 max(tilePos.x + size.x, tilePos.y + size.y);
+                glm::vec4 color(1.0f, 0.0f, 0.0f, 0.4f);
+                DebugDraw2D::RectFill(*r, min, max, color, 0);
+            }
+            else if (m_tileset->GetTileUV(m_selectedTileID, uv)) {
+                // Textured Ghost Preview
+                // submitQuad expects uvRect as (u0, v0, u1, v1) - but check if it needs min/max or specific order
+                // TileMapRenderer uses (u0, v0, u1, v1) from TileUV directly.
+                glm::vec4 uvRect(uv.u0, uv.v0, uv.u1, uv.v1);
+                
+                // Color with 40% opacity
+                glm::vec4 color(1.0f, 1.0f, 1.0f, 0.4f);
+                
+                // Rotation in radians
+                float rotation = static_cast<float>(m_currentRotation) * 1.57079632679f;
+
+                r->submitQuad(
+                    center,
+                    size,
+                    m_tileset->GetTextureId(),
+                    uvRect,
+                    color,
+                    rotation,
+                    1.0f, // scale
+                    0     // layer
+                );
+            }
         }
     }
 }

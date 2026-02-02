@@ -468,7 +468,7 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
         for (const auto& entry : std::filesystem::directory_iterator(m_currentPath)) {
             std::string entryPath = entry.path().string();
             std::string entryName = entry.path().filename().string();
-            const bool isSelected = m_selectedAssets.contains(entryPath);
+            const bool isSelected = m_selectedAssets.find(entryPath) != m_selectedAssets.end();
 
             // Render icon
             ImGui::PushFont(m_symbolsFont);
@@ -534,6 +534,11 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                         // Double-click prefab: open in inspector
                         m_inspector->InspectPrefab(entryPath);
                     }
+                    else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+                        entry.path().extension() == ".tileset" && m_onLoadTileset) {
+                        // Double-click tileset: load into palette
+                        m_onLoadTileset(entryPath);
+                    }
                     else if (ctrlPressed) {
                         // Ctrl+click: toggle selection
                         if (isSelected) {
@@ -574,7 +579,7 @@ void AssetBrowserPanel::_renderFileListPanel(const float windowWidth) {
                 // Handle right-click on item
                 if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     // Select this item if not already selected
-                    if (!m_selectedAssets.contains(entryPath)) {
+                    if (m_selectedAssets.find(entryPath) == m_selectedAssets.end()) {
                         m_selectedAssets.clear();
                         m_selectedAssets.insert(entryPath);
                         m_selectedAsset = entryPath;
@@ -1286,7 +1291,7 @@ void AssetBrowserPanel::_handleAssetDragDrop(const std::string& assetPath) {
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
         // If this asset is part of selection, drag all selected assets
         std::vector<std::string> draggedAssets;
-        if (m_selectedAssets.contains(assetPath)) {
+        if (m_selectedAssets.find(assetPath) != m_selectedAssets.end()) {
             draggedAssets.assign(m_selectedAssets.begin(), m_selectedAssets.end());
         }
         else {

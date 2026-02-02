@@ -83,6 +83,7 @@ namespace ECS {
         // Compatibility accessors for editor integration
         float GetCameraOrthoSize() const { return m_cameraOrthoSize; }
         RenderGraph* GetRenderGraph() { return m_renderGraph.get(); }
+        Renderer* GetRenderer() const { return m_renderer.get(); }
 
         // Static accessor for global access
         static RendererSystem* GetInstance();

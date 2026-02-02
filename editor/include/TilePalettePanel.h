@@ -17,6 +17,12 @@ public:
     ~TilePalettePanel() = default;
 
     void Initialize(const std::shared_ptr<TileMap>& tileMap, const std::shared_ptr<Tileset>& tileset, ECS::World* world);
+    void LoadTileset(const std::shared_ptr<Tileset>& tileset);
+    void LoadTilesetFromPath(const std::string& path);
+
+    // Get the current tilemap
+    std::shared_ptr<TileMap> GetTileMap() const { return m_tileMap; }
+    std::shared_ptr<Tileset> GetTileset() const { return m_tileset; }
     void SetWorld(ECS::World* world) { m_world = world; }
 
     void Render(); // ImGui Palette Window

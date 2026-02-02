@@ -337,6 +337,10 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this]() {
             m_assetBrowser.Initialize(m_mainFont, m_boldFont, m_symbolsFont, m_world);
             m_assetBrowser.SetInspector(&m_inspector);
+            // Wire up asset browser to load tilesets into the palette
+            m_assetBrowser.SetOnLoadTileset([this](const std::string& path) {
+                m_tilePalette.LoadTilesetFromPath(path);
+            });
         },
         [this]() { m_assetBrowser.Render(); },
         [this](ECS::World* w) { m_assetBrowser.SetWorld(w); }
@@ -749,6 +753,32 @@ void LevelEditor::SetScene(Scenes::Scene* scene) {
     m_entityActions.SetScene(scene);
     ECS::World* world = scene ? &scene->GetWorld() : nullptr;
     SetWorld(world);
+    
+    // Auto-Initialize TileMap if needed
+    if (world) {
+        bool hasTileMap = false;
+        
+        // Iterate all entities with TileMapComponent
+        world->Each<ECS::Components::TileMapComponent>([&](ECS::Entity e, ECS::Components::TileMapComponent& tc) {
+            hasTileMap = true;
+            m_tilePalette.Initialize(tc.Map, m_tilePalette.GetTileset(), world);
+        });
+
+        if (!hasTileMap) {
+            // Create a default TileMap
+            ECS::Entity e = world->Create();
+            world->Add<ECS::Components::Name>(e, "TileMap");
+            
+            auto tileMap = std::make_shared<TileMap>(100, 100, 32.0f); // Default size
+            world->Add<ECS::Components::TileMapComponent>(e, tileMap);
+            
+            // Initialize palette with new map
+            m_tilePalette.Initialize(tileMap, m_tilePalette.GetTileset(), world);
+            
+            LOG_INFO("Auto-initialized default TileMap entity.");
+        }
+    }
+
     // Propagate scene to panels that require Scene access
     m_layersPanel.SetScene(scene);
 }

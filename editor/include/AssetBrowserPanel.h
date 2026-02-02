@@ -48,6 +48,10 @@ public:
     // Connect inspector so double-click can open prefabs
     void SetInspector(InspectorPanel* inspector);
 
+    // Callback for loading tilesets
+    using OnLoadTilesetCallback = std::function<void(const std::string&)>;
+    void SetOnLoadTileset(OnLoadTilesetCallback callback) { m_onLoadTileset = callback; }
+
     // -------------------------------------------------------------------------
     // Rendering
     // -------------------------------------------------------------------------
@@ -97,6 +101,10 @@ private:
 
     // Switch the inspector into edit mode for the selected prefab
     void _editPrefab();
+
+    OnLoadTilesetCallback m_onLoadTileset;
+
+
 
     // Handle clicking empty space to clear selection
     void _selectEmptySpace();
