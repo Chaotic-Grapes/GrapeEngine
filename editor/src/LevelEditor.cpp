@@ -798,7 +798,9 @@ void LevelEditor::SetScene(Scenes::Scene* scene) {
         if (!hasTileMap) {
             // Create a default TileMap
             ECS::Entity e = world->Create();
-            world->Add<ECS::Components::Name>(e, "TileMap");
+            ECS::Components::Name nameComp;
+            nameComp.Value = ECS::StringTable::Intern("TileMap");
+            world->Add<ECS::Components::Name>(e, nameComp);
             
             auto tileMap = std::make_shared<TileMap>(100, 100, 32.0f); // Default size
             world->Add<ECS::Components::TileMapComponent>(e, tileMap);
