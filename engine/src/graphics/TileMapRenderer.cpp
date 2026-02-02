@@ -1,6 +1,6 @@
 #include "graphics/renderer.hpp"
 #include "graphics/TileMapRenderer.hpp"
-#include "../src/core/World/TileLayer.hpp"
+#include "../include/core/World/TileLayer.hpp"
 
 void TileMapRenderer::Submit(
     const TileMap& tileMap,

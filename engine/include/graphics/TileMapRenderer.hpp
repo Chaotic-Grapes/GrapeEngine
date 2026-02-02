@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../src/core/World/TileMap.hpp"
-#include "../src/core/World/TileSet.hpp"
+#include "../include/core/World/TileMap.hpp"
+#include "../include/core/World/TileSet.hpp"
 
 class Renderer; // forward declare your batch renderer
 

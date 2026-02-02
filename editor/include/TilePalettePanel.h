@@ -5,8 +5,8 @@
 #include <string>
 #include <glm/glm.hpp>
 
-#include "../src/core/World/TileMap.hpp"
-#include "../src/core/World/Tileset.hpp"
+#include "../../engine/include/core/World/TileMap.hpp"
+#include "../../engine/include/core/World/Tileset.hpp"
 #include "ecs/Entity.h"
 
 namespace ECS { class World; }

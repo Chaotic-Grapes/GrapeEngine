@@ -7,7 +7,7 @@
 #include "ecs/World.h"
 #include "ecs/Components.h"
 #include "ecs/systems/RendererSystem.h"
-#include "../src/core/World/TileTypes.hpp"
+#include "../include/core/World/TileTypes.hpp"
 
 // Assuming ImGui::ImageButton takes ImTextureID (void*)
 // Tileset::GetTextureId() returns uint32_t (OpenGL ID).
