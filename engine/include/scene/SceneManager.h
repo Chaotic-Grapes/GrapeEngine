@@ -24,6 +24,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
+#include <sstream>
+#include <cstdint>
 #include <nlohmann/json.hpp>
 
 #include "core/Logger.h"
@@ -32,6 +34,8 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 #include "ecs/PrefabManager.h"
+#include "core/messaging/MessageSystem.h"
+#include "services/ResourceManager.h"
 
 using json = nlohmann::json;
 
@@ -90,6 +94,10 @@ namespace Scenes {
             if (index >= m_scenes.size())
                 return false;
 
+            // Get owner tag for resource unloading
+            const Scene* removedScene = m_scenes[index].get();
+            const std::string removedTag = _makeOwnerTag(removedScene);
+
             // If active, clear it
             if (m_active == index) {
                 m_active = NPOS;
@@ -102,6 +110,11 @@ namespace Scenes {
 
             // Erase
             m_scenes.erase(m_scenes.begin() + index);
+
+            // Unload resources owned by this scene
+            if (!removedTag.empty()) {
+                RM.UnloadAssetsByOwner(removedTag);
+            }
 
             // Fix indices post-erase
             if (m_active != NPOS && m_active > index)
@@ -300,8 +313,24 @@ namespace Scenes {
             if (index >= m_scenes.size() || !m_scenes[index])
                 return false;
             
+            // Get reference to scene and world
             Scene& scene = *m_scenes[index];
             auto& world = scene.GetWorld();
+            
+            // Get owner tag scope for resource tracking
+            // Explanation: When loading a scene, we want to track all resources
+            // loaded for that scene so they can be unloaded when the scene is removed.
+            const std::string ownerTag = _makeOwnerTag(&scene);
+            struct OwnerScope { // RAII helper for setting/clearing owner tag
+                explicit OwnerScope(const std::string& tag) {
+                    if (!tag.empty()) {
+                        RM.SetOwnerTag(tag); // Set owner tag
+                    }
+                }
+                ~OwnerScope() {
+                    RM.ClearOwnerTag(); // Clear owner tag on destruction
+                }
+            } ownerScope(ownerTag); // Set owner tag for duration of load
 
             try {
                 json sceneJson;
@@ -409,6 +438,27 @@ namespace Scenes {
             }
         }
 
+        /**
+         * @brief Reloads the specified scene from disk, keeping the same scene slot.
+         * @param index The index of the scene to restart.
+         * @param filename Path to the scene file.
+         * @return true if reload was successful, false otherwise.
+         */
+        bool RestartScene(const size_t index, const std::string& filename) {
+            return LoadScene(index, filename);
+        }
+
+        /**
+         * @brief Reloads the specified scene from disk, keeping the same scene slot.
+         * @param index The index of the scene to restart.
+         * @param filename Path to the scene file.
+         * @param outEntityOrder Optional output vector to receive the loaded entity order.
+         * @return true if reload was successful, false otherwise.
+         */
+        bool RestartScene(const size_t index, const std::string& filename, std::vector<uint32_t>* outEntityOrder) {
+            return LoadScene(index, filename, outEntityOrder);
+        }
+
     private:
         void _processPending() {
             if (m_pendingActive == NPOS)
@@ -422,7 +472,44 @@ namespace Scenes {
             if (toIndex >= m_scenes.size() || m_active == toIndex)
                 return;
 
+            // Notify listeners of scene change
+            std::string oldName;
+            const Scene* oldScene = nullptr;
+            if (m_active != NPOS && m_active < m_scenes.size() && m_scenes[m_active]) {
+                oldScene = m_scenes[m_active].get();
+                oldName = m_scenes[m_active]->GetName();
+            }
+
+            // Get new scene name
+            std::string newName;
+            if (m_scenes[toIndex]) {
+                newName = m_scenes[toIndex]->GetName();
+            }
+
             m_active = toIndex;
+
+            // Send scene changed message
+            Messaging::MessageSystem::Notify(Messaging::SceneChanged{oldName, newName});
+
+            // Unload resources owned by old scene
+            const std::string oldTag = _makeOwnerTag(oldScene);
+            if (!oldTag.empty()) {
+                RM.UnloadAssetsByOwner(oldTag);
+            }
+        }
+
+        // Generate a unique owner tag for a scene based on its pointer
+        static std::string _makeOwnerTag(const Scene* scene) {
+            if (!scene) {
+                return {};
+            }
+
+            // Create a unique tag using the scene's memory address
+            // Format: "Scene@<hex address>"
+            // This is to ensure uniqueness per scene instance
+            std::ostringstream oss;
+            oss << "Scene@" << std::hex << reinterpret_cast<uintptr_t>(scene);
+            return oss.str();
         }
 
         // Initialize runtime prefab metadata post-load
