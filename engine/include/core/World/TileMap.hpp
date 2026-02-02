@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include <cassert>
+#include <string>
 
 #include "TileLayer.hpp"
 #include "TileTypes.hpp" // TileID, EMPTY_TILE
@@ -32,6 +33,21 @@ public:
     // World to tile helpers
     uint32_t WorldToTile(float worldCoord) const;
     float    TileToWorld(uint32_t tileCoord) const;
+
+    /**
+     * @brief Serializes the TileMap data to a binary file.
+     * @param filepath The destination path for the map file.
+     * @return True if the save was successful, false otherwise.
+     */
+    bool SaveMap(const std::string& filepath) const;
+    
+    /**
+     * @brief Deserializes TileMap data from a binary file.
+     * @note This clears existing layers before loading.
+     * @param filepath The path to the binary map file.
+     * @return True if the load was successful, false otherwise.
+     */
+    bool LoadMap(const std::string& filepath);
 
 private:
     const float m_tileSize;          // immutable after creation

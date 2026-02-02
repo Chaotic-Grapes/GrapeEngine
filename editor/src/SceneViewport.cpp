@@ -43,6 +43,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "ecs/ui/GUIContext.h"
+#include "TilePalettePanel.h"
 
 // -------------------------------------------------------------------------
 // Lifecycle
@@ -213,7 +214,31 @@ void SceneViewport::_renderViewport() {
 
             // Handle mouse click picking on the viewport image
             // Don't pick if gizmo is being used or hovered
-            if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT)) {
+            if (isSceneImageHovered && m_tilePalettePanel && m_tilePalettePanel->IsActive()) {
+                double mx = 0, my = 0;
+                Input::GetMousePosition(mx, my);
+                glm::mat4 view = m_editorCamera->GetCamera()->GetViewMatrix();
+                glm::mat4 proj = m_editorCamera->GetCamera()->GetProjectionMatrix();
+                const ImVec2 fbScale = ImGui::GetIO().DisplayFramebufferScale;
+                glm::vec2 vpMin = { viewportScreenPos.x * fbScale.x, viewportScreenPos.y * fbScale.y };
+                glm::vec2 vpSize = { size.x * fbScale.x, size.y * fbScale.y };
+                glm::vec2 localPos = glm::vec2(mx, my) - vpMin;
+                glm::vec4 ndc;
+                ndc.x = (2.0f * localPos.x) / vpSize.x - 1.0f;
+                ndc.y = 1.0f - (2.0f * localPos.y) / vpSize.y;
+                ndc.z = 0.0f;
+                ndc.w = 1.0f;
+                glm::mat4 invViewProj = glm::inverse(proj * view);
+                glm::vec4 world4 = invViewProj * ndc;
+                glm::vec2 worldPos = { world4.x, world4.y };
+                m_tilePalettePanel->OnViewportHover(worldPos);
+                bool left = Input::IsMousePressed(MOUSE_LEFT);
+                bool right = Input::IsMousePressed(MOUSE_RIGHT);
+                if (left || right) {
+                    m_tilePalettePanel->OnViewportClick(worldPos, right);
+                }
+            }
+            else if (isSceneImageHovered && Input::IsMousePressed(MOUSE_LEFT)) {
                 // Check if gizmo should block input
                 bool gizmoBlocking = m_interactionMgr.ShouldBlockInput();
                 

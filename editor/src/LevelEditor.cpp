@@ -30,6 +30,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CompilePanel.h"
+#include "TilePalettePanel.h"
 #include <cmath>
 
 #ifdef ERROR
@@ -165,6 +166,7 @@ void LevelEditor::_buildDockLayout() {
     ImGui::DockBuilderDockWindow("Prefab Editor", rightNode);
     ImGui::DockBuilderDockWindow("Property Editor", rightNode);
     ImGui::DockBuilderDockWindow("Layers", rightNode);
+    ImGui::DockBuilderDockWindow("Tile Palette", rightNode);
     ImGui::DockBuilderDockWindow("Asset Browser", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Console", assetBrowserNode);
     ImGui::DockBuilderDockWindow("Performance", assetBrowserNode);
@@ -387,6 +389,14 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
         [this](ECS::World* w) { m_inspector.SetWorld(w); }
     );
 
+    _registerPanel("Tile Palette",
+        [this]() {
+            m_tilePalette.Initialize(nullptr, nullptr, m_world);
+        },
+        [this]() { m_tilePalette.Render(); },
+        [this](ECS::World* w) { m_tilePalette.SetWorld(w); }
+    );
+
     _registerPanel("Layers",
         [this]() {
             m_layersPanel.Initialize(m_mainFont, m_boldFont, m_symbolsFont);
@@ -464,6 +474,7 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
     // Wire up file menu to viewports after panels are initialized
     m_sceneViewport.SetFileMenu(&m_fileMenu);
     m_gameViewport.SetFileMenu(&m_fileMenu);
+    m_sceneViewport.SetTilePalette(&m_tilePalette);
 
     // Set up hierarchy selection callback to sync with inspector and viewports
     m_hierarchyWindow.OnSelectionChanged([this](const EntityId id) {

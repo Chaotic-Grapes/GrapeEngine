@@ -16,6 +16,7 @@ gizmo manipulation, and drag-to-move functionality.
 #define SCENE_VIEWPORT_H
 
 #include "BaseViewport.h"
+class TilePalettePanel;
 
 class SceneViewport : public BaseViewport {
 public:
@@ -27,9 +28,11 @@ public:
     void HandleInWorldInteraction() override;
     void ShowEditorWindows() override;
     void EndFrame() override;
+    void SetTilePalette(TilePalettePanel* panel) { m_tilePalettePanel = panel; }
 
 private:
     void _renderViewport();
+    TilePalettePanel* m_tilePalettePanel = nullptr;
 };
 
 #endif // SCENE_VIEWPORT_H
