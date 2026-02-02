@@ -60,6 +60,7 @@ namespace Editor {
         const glm::mat4& projMatrix,
         const glm::mat4& inputTransform,
         glm::mat4& outTransform,
+        const float* snap,
         glm::mat4* outDeltaTransform) {
 
         // Validate viewport size FIRST
@@ -121,12 +122,15 @@ namespace Editor {
         const float* src = glm::value_ptr(outTransform);
         for (int i = 0; i < 16; ++i) matrixArr[i] = src[i];
 
+        // Forward optional snap increments to ImGuizmo (null disables snapping).
         bool isManipulating = ImGuizmo::Manipulate(
             glm::value_ptr(viewMatrix),
             glm::value_ptr(projMatrix),
             imguizmoOp,
             imguizmoMode,
-            matrixArr
+            matrixArr,
+            nullptr,
+            snap
         );
         
         // Copy back modified matrix into outTransform

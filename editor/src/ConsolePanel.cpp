@@ -91,22 +91,33 @@ void ConsolePanel::Render() {
 }
 
 void ConsolePanel::_renderToolbar(const std::vector<ConsoleMessage>& snapshot) {
-    // Clear button
+    // Clear button (destructive) uses danger styling.
+    ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::DangerButton);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::DangerButtonHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::DangerButtonActive);
+    ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
     if (ImGui::Button("Clear")) {
         Clear();
     }
+    ImGui::PopStyleColor(4);
 
     ImGui::SameLine();
 
     // Pause/Resume toggle: queues messages instead of adding them
     // Useful when console spam makes it hard to read specific messages
     const bool paused = m_paused.load();  // Atomic read for thread safety
+    // Pause/Resume uses a neutral button palette to avoid destructive emphasis.
+    ImGui::PushStyleColor(ImGuiCol_Button, EditorStyle::SecondaryButton);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorStyle::SecondaryButtonHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorStyle::SecondaryButtonActive);
+    ImGui::PushStyleColor(ImGuiCol_Text, EditorStyle::Text);
     if (ImGui::Button(paused ? "Resume" : "Pause")) {
         m_paused.store(!paused);  // Atomic write
         if (paused) {
             _flushPendingMessages();  // When resuming, add queued messages
         }
     }
+    ImGui::PopStyleColor(4);
 
     ImGui::SameLine(0.0f, 12.0f);
 
@@ -321,7 +332,9 @@ void ConsolePanel::_renderMessageRow(const std::vector<ConsoleMessage>& snapshot
     }
 
     const ImVec2 messageSize = ImGui::CalcTextSize(msg.Content.c_str(), nullptr, false, messageWrapWidth);
-    const float rowHeight = std::max(ImGui::GetTextLineHeightWithSpacing(), messageSize.y) + ImGui::GetStyle().CellPadding.y * 2.0f;
+    // Size rows to content while keeping a compact minimum height.
+    const float minRowHeight = ImGui::GetTextLineHeight();
+    const float rowHeight = std::max(minRowHeight, messageSize.y) + ImGui::GetStyle().CellPadding.y;
 
     ImGui::TableNextRow(ImGuiTableRowFlags_None, rowHeight);
     ImGui::TableSetColumnIndex(0);
@@ -477,7 +490,10 @@ void ConsolePanel::_renderMessageRow(const std::vector<ConsoleMessage>& snapshot
 
     ImVec4 bgColor = EditorStyle::Transparent;
     if (rowSelected) {
-        bgColor = EditorStyle::Scale(EditorStyle::Selection, 1.4f);
+        // Soften selection background to keep text readable.
+        ImVec4 sel = EditorStyle::Selection;
+        sel.w = 0.18f;
+        bgColor = sel;
     }
     else if (hovered) {
         bgColor = EditorStyle::Scale(EditorStyle::FrameBgHover, 0.5f);

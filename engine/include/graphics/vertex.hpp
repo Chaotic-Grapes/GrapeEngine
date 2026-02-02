@@ -20,13 +20,19 @@ Responsibilities:
 #include <glm/glm.hpp>
 
 struct Vertex {
-    glm::vec3 position;
-    glm::vec2 texCoord;
-    glm::vec4 color;
-    float     texIndex; // filled by renderer when you pass a textureId
-    float     strokePx; // stroke width in pixels (0 = filled)
+    glm::vec3 position;          // (location 0) - XYZ position
+    glm::vec2 texCoord;          // (location 1) - UV coordinates
+    glm::vec4 color;             // (location 2) - RGBA color
+    float     texIndex;          // (location 3) - filled by renderer when you pass a textureId
+    float     strokePx;          // (location 4) - stroke width in pixels (0 = filled)
 
-    // Attributes for emissive vertices
-    float emissiveTexIndex; // (location 5)
-    float emissiveStrength; // (location 5)
+    // Emissive attributes
+    float emissiveTexIndex;      // (location 5) - emissive map texture index
+    float emissiveStrength;      // (location 6) - HDR emissive multiplier
+
+    // Material2D attributes (PBR)
+    float normalTexIndex;        // (location 7) - normal map texture index (-1 = none)
+    float mraTexIndex;           // (location 8) - metallic-roughness-AO map texture index (-1 = none)
+    glm::vec4 materialParams;    // (location 9) - x=Metallic, y=Smoothness, z=AOStrength, w=NormalStrength
+	float materialFlags;         // (location 10) - bitmask of Material2D::Material2DFlags
 };

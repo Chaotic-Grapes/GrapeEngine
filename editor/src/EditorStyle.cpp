@@ -3,5 +3,5 @@
 
 namespace EditorStyle {
     // Single, external definition of FontScale to avoid duplicate-symbols across TUs
-    float FontScale = 1.35f;
+    float FontScale = 1.0f;
 }

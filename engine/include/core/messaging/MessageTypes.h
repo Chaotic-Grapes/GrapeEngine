@@ -276,6 +276,13 @@ namespace Messaging {
         }
     };
 
+    // Requests a scene/game viewport dock layout preset.
+    struct EditorViewportLayoutRequested {
+        int Layout = 1;
+        explicit EditorViewportLayoutRequested(int layout)
+            : Layout(layout) {}
+    };
+
     // -------------------------------
     // Editor Integration Events
     // -------------------------------
