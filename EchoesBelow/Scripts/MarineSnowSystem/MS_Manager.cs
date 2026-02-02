@@ -86,15 +86,20 @@ public class MS_Manager : SystemBase
             bool start = gameObject.Component1.start;
             gameObject.Component1.start = OnStart(ref start, objID, msID);
 
-            //int i = 0;
-            //Log("============================================");
-            //Log($"list 0{++i} count: {ms01_ObjectPool.Count}");
-            //Log($"list 0{++i} count: {ms02_ObjectPool.Count}");
-            //Log($"list 0{++i} count: {ms03_ObjectPool.Count}");
-            //Log($"list 0{++i} count: {ms04_ObjectPool.Count}");
-            //Log($"list 0{++i} count: {ms05_ObjectPool.Count}");
-            //Log($"list 0{++i} count: {ms06_ObjectPool.Count}");
-            //Log($"list 0{++i} count: {ms07_ObjectPool.Count}");
+
+            if (Input.IsKeyPressed(KeyCode.Q))
+            {
+                int i = 0;
+                Log("============================================");
+                Log($"list 0{++i} count: {ms01_ObjectPool.Count}");
+                Log($"list 0{++i} count: {ms02_ObjectPool.Count}");
+                Log($"list 0{++i} count: {ms03_ObjectPool.Count}");
+                Log($"list 0{++i} count: {ms04_ObjectPool.Count}");
+                Log($"list 0{++i} count: {ms05_ObjectPool.Count}");
+                Log($"list 0{++i} count: {ms06_ObjectPool.Count}");
+                Log($"list 0{++i} count: {ms07_ObjectPool.Count}");
+            }
+
 
             switch (msID)
             {

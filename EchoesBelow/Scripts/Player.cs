@@ -17,6 +17,7 @@ namespace EchoesBelow.Scripts;
     bool start // required for start function
 );
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
+#region SystemBehaviours
 public class Player : SystemBase
 {
     public static Compass abs_InputDirection = Compass.N;
@@ -24,6 +25,7 @@ public class Player : SystemBase
     const float maxSpeed = 10;
     float timer_forRotation = 0;
     float timer_forPeriodicForce = 0;
+    bool isFreeSpinning = false;
     protected override void OnCreate()
     {
         Log("System Player initialized");
@@ -64,7 +66,6 @@ public class Player : SystemBase
             float periodicForceInterval = gameObject.Component1.periodicForceInterval;
 
             moveDir = ProcessInput(moveDir, lerpFac);
-
             //NaN protection for normalization
             if (-0.0001f <= moveDir.X && moveDir.X <= 0.0001f && -0.0001f <= moveDir.Y && moveDir.Y <= 0.0001f) moveDirNormalized = Vector2.Zero;
             else moveDirNormalized = moveDir.Normalized;
@@ -79,51 +80,21 @@ public class Player : SystemBase
             //NaN protection when player is facing up or at rest
             if (-0.0001f < playerDir.X && playerDir.X < 0.0001f && 0.9999f < playerDir.Y && playerDir.Y < 1.0001f) playerDir = new Vector2(0, 1);
 
-            //============================================================================================
-            RotationPolarityHandler(transform);
-            float flipFactor = GMath.Clamp(HeadingDifference(playerAngle * GMath.Rad2Deg, (float)abs_InputDirection) * GMath.Rad2Deg, -1,1);
-            
-            //Dot product operation to determine theta as presented by angleBetween in radians!
-            float angleBetween_rad = GMath.Acos(GMath.Dot(playerDir, moveDirNormalized) / (playerDir.Magnitude * moveDirNormalized.Magnitude));
-            angleBetween_rad = (float.IsNaN(angleBetween_rad)) ? 0 : angleBetween_rad;
+            //====( Rotation Process )============================================================================
+            //Rotation Polarity decides the heading , RotationHandler handles all rotation
+            RotationPolarityHandler(transform, ref av, angularVelocity);
+            if(!isFreeSpinning)
+            RotationHandler(ref av, ref playerDir, ref moveDirNormalized, angularVelocity, playerAngle);
 
-            //Find change in time required to complete a rotation. This formula requires radians
-            //Must always be positive so we use Magnitude thru Abs
-            float rotDuration = GMath.Abs(angleBetween_rad / angularVelocity);
-            
-            //start Rotation process
-            bool isRotating = false;
-            if (angleBetween_rad != 0) 
-            { 
-                isRotating = true; 
-            } 
-            if (isRotating)
-            {
-                timer_forRotation += Time.DeltaTime;
-                if(flipFactor >= 0) av.Value = GMath.Lerp(av.Value, angularVelocity, lerpFac);
-                else                av.Value = GMath.Lerp(av.Value, -angularVelocity, lerpFac);
-            }
-            if (timer_forRotation > rotDuration)
-            {
-                isRotating = false;
-                timer_forRotation = 0;
-                av.Value = 0;
-            }
+            if (Input.IsKeyDown(KeyCode.W) || Input.IsKeyDown(KeyCode.S))
+            AddDriftForce(ref lv, playerDir, driftSpeed, maxSpeed);
+            if (Input.IsKeyDown(KeyCode.Space)) 
+            AddPeriodicalForce(ref lv, periodicForceInterval, ref timer_forPeriodicForce, playerDir, moveSpeed);
 
-            //Log($"playerAngle: {playerAngle}");
-            //Log($"absTarget: {abs_InputDirection}");
-            //Log("flipFac2: " + flipFac);
-
-            if (Input.IsKeyDown(KeyCode.W) || Input.IsKeyDown(KeyCode.S)
-            || Input.IsKeyDown(KeyCode.A) || Input.IsKeyDown(KeyCode.D))
-            {
-                AddDriftForce(ref lv, playerDir, driftSpeed, maxSpeed);
-                
-            }
-            if(Input.IsKeyDown(KeyCode.Space))AddPeriodicalForce(ref lv, periodicForceInterval, ref timer_forPeriodicForce, playerDir, moveSpeed);
-                
         }
     }
+    #endregion
+
     private static void AddDriftForce(ref LinearVelocity2D lv, Vector2 playerDir, float moveSpeed, float maxSpeed)
     {
         lv.Value.X += playerDir.X * moveSpeed;
@@ -144,20 +115,53 @@ public class Player : SystemBase
             lv.Value.Y += playerDir.Y * moveSpeed * GMath.Clamp(lv.Value.X, 1, 10);
         }
     }
-    private void RotationPolarityHandler(LocalTransform transform)
+    private void RotationPolarityHandler(LocalTransform transform, ref AngularVelocity2D av, float angularVelocity)
     {
-        //Find InputAbsDirection direction
-        //For a quirk in the angles, Keycodes D and A (left and right) are swapped!
-        if (Input.IsKeyDown(KeyCode.W) && Input.IsKeyDown(KeyCode.D)) abs_InputDirection = Compass.NW;
-        else if (Input.IsKeyDown(KeyCode.S) && Input.IsKeyDown(KeyCode.D)) abs_InputDirection = Compass.SW;
-        else if (Input.IsKeyDown(KeyCode.S) && Input.IsKeyDown(KeyCode.A)) abs_InputDirection = Compass.SE;
-        else if (Input.IsKeyDown(KeyCode.W) && Input.IsKeyDown(KeyCode.A)) abs_InputDirection = Compass.NE;
-        else if (Input.IsKeyDown(KeyCode.W)) abs_InputDirection = Compass.N;
-        else if (Input.IsKeyDown(KeyCode.D)) abs_InputDirection = Compass.W;
-        else if (Input.IsKeyDown(KeyCode.S)) abs_InputDirection = Compass.S;
-        else if (Input.IsKeyDown(KeyCode.A)) abs_InputDirection = Compass.E;
+        //Determines absolute input direction for N and S headings for RotationHandler
+        if (Input.IsKeyDown(KeyCode.W)) { abs_InputDirection = Compass.N; isFreeSpinning = false; }
+        if (Input.IsKeyDown(KeyCode.S)) { abs_InputDirection = Compass.S; isFreeSpinning = false; }
+        //Simple rotation torque force for A and D buttons
+        if (Input.IsKeyDown(KeyCode.D)) { av.Value = -angularVelocity; }
+        if (Input.IsKeyDown(KeyCode.A)) { av.Value = angularVelocity; }
+        //Disable free spinning when necessary
+        if (Input.IsKeyDown(KeyCode.D) || Input.IsKeyDown(KeyCode.A)) isFreeSpinning = true;
+        else isFreeSpinning = false;
+       
     }
+    private void RotationHandler(ref AngularVelocity2D av, ref Vector2 playerDir, ref Vector2 moveDirNormalized, float angularVelocity, float playerAngle)
+    {
+        //flip factor computes the vector angle (magnitude and direction) and maps that to a value between -1 and 1
+        float flipFactor = GMath.Clamp(HeadingDifference(playerAngle * GMath.Rad2Deg, (float)abs_InputDirection) * GMath.Rad2Deg, -1, 1);
 
+        //Dot product operation to determine theta as presented by angleBetween in radians!
+        float angleBetween_rad = GMath.Acos(GMath.Dot(playerDir, moveDirNormalized) / (playerDir.Magnitude * moveDirNormalized.Magnitude));
+        angleBetween_rad = (float.IsNaN(angleBetween_rad)) ? 0 : angleBetween_rad;
+
+        //Find change in time required to complete a rotation. This formula requires radians
+        //Must always be positive so we use Magnitude thru Abs
+        float rotDuration = GMath.Abs(angleBetween_rad / angularVelocity);
+
+        //start Rotation process
+        bool isRotating = false;
+        if (angleBetween_rad != 0)
+        {
+            isRotating = true;
+        }
+
+        if (isRotating)
+        {
+            timer_forRotation += Time.DeltaTime;
+            if (flipFactor >= 0) av.Value = GMath.Lerp(av.Value, angularVelocity, lerpFac);
+            else av.Value = GMath.Lerp(av.Value, -angularVelocity, lerpFac);
+        }
+
+        if (timer_forRotation > rotDuration)
+        {
+            isRotating = false;
+            timer_forRotation = 0;
+            av.Value = 0;
+        }
+    }
     private static Vector2 ProcessInput(Vector2 moveDir, float lerpFac)
     {
         if (Input.IsKeyDown(KeyCode.W)) moveDir.Y = GMath.Lerp(moveDir.Y, 1, lerpFac);
@@ -169,7 +173,6 @@ public class Player : SystemBase
         moveDir.Y = GMath.Lerp(moveDir.Y, 0, lerpFac / 2);
         return moveDir;
     }
-
     private float Quat2EulerAxisZ(Quaternion quat)
     {
         //To find out how
@@ -206,10 +209,3 @@ public class Player : SystemBase
     }
 }
 
-//public class CollisionTestSystem : CollisionSystemBase
-//{
-//    protected void override OnCollisionEnter()
-//    {
-
-//    }
-//}

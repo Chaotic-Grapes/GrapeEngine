@@ -1,0 +1,173 @@
+{
+    "Components": [
+        {
+            "Data": {
+                "Position": {
+                    "X": 19.26694679260254,
+                    "Y": 4.315667629241943,
+                    "Z": 0.0
+                },
+                "Rotation": {
+                    "W": 0.9538279175758362,
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": -0.30035358667373657
+                },
+                "Scale": {
+                    "X": 1.0,
+                    "Y": 1.0,
+                    "Z": 1.0
+                }
+            },
+            "TypeName": "LocalTransform"
+        },
+        {
+            "Data": {
+                "Value": "ChaosGrape"
+            },
+            "TypeName": "Name"
+        },
+        {
+            "Data": {
+                "Value": 2.0
+            },
+            "TypeName": "AngularVelocity2D"
+        },
+        {
+            "Data": {
+                "Flags": 0,
+                "LayerMask": 4294967295,
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "Radius": 0.5
+            },
+            "TypeName": "CircleCollider2D"
+        },
+        {
+            "Data": {
+                "Id": 2
+            },
+            "TypeName": "Layer"
+        },
+        {
+            "Data": {
+                "CastsShadows": false,
+                "Color": {
+                    "A": 1.0,
+                    "B": 0.2837229371070862,
+                    "G": 0.3697202205657959,
+                    "R": 1.0
+                },
+                "Direction": {
+                    "X": 0.0,
+                    "Y": -1.0,
+                    "Z": 0.0
+                },
+                "Intensity": 23.5,
+                "LightType": 1,
+                "Position": {
+                    "X": 0.0,
+                    "Y": 0.0,
+                    "Z": 8.399999618530273
+                },
+                "Range": 11.0
+            },
+            "TypeName": "Light2D"
+        },
+        {
+            "Data": {
+                "Value": {
+                    "X": 0.0,
+                    "Y": -1.4886698722839355
+                }
+            },
+            "TypeName": "LinearVelocity2D"
+        },
+        {
+            "Data": {
+                "AOStrength": 1.0,
+                "AlphaCutoff": 0.5,
+                "Flags": 32,
+                "MRA_TextureId": 0,
+                "MRA_TexturePath": "",
+                "Metallic": 0.0,
+                "NormalStrength": 1.0,
+                "NormalTextureId": 0,
+                "NormalTexturePath": "",
+                "Smoothness": 0.5
+            },
+            "TypeName": "Material2D"
+        },
+        {
+            "Data": {
+                "AngularDamping": 0.0,
+                "Flags": 3,
+                "GravityScale": -1.0,
+                "InverseMass": 1.0,
+                "LinearDamping": 0.0,
+                "Mass": 1.0
+            },
+            "TypeName": "Rigidbody2D"
+        },
+        {
+            "Data": {
+                "Color": {
+                    "A": 1.0,
+                    "B": 1.0,
+                    "G": 0.9998999834060669,
+                    "R": 0.9999030232429504
+                },
+                "EmissiveStrength": 5.0,
+                "EmissiveTextureId": 0,
+                "EmissiveTexturePath": "",
+                "NormalTextureId": 0,
+                "NormalTexturePath": "",
+                "Offset": {
+                    "X": 0.0,
+                    "Y": 0.0
+                },
+                "TextureId": 10,
+                "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
+                "Tiling": {
+                    "X": 1.0,
+                    "Y": 1.0
+                }
+            },
+            "TypeName": "SpriteRenderer2D"
+        },
+        {
+            "Data": {
+                "Dirty": false,
+                "Matrix": {
+                    "m00": 0.8195754289627075,
+                    "m01": 0.5729712843894958,
+                    "m02": 0.0,
+                    "m03": 19.26694679260254,
+                    "m10": -0.5729712843894958,
+                    "m11": 0.8195754289627075,
+                    "m12": 0.0,
+                    "m13": 4.315667629241943,
+                    "m20": 0.0,
+                    "m21": 0.0,
+                    "m22": 1.0,
+                    "m23": 0.0,
+                    "m30": 0.0,
+                    "m31": 0.0,
+                    "m32": 0.0,
+                    "m33": 1.0
+                }
+            },
+            "TypeName": "WorldTransform"
+        },
+        {
+            "Data": {
+                "TimeAccumulator": 2.0074718,
+                "startPolarity": 1,
+                "switchInterval": 8
+            },
+            "TypeName": "Grav Switcher"
+        }
+    ]
+}
