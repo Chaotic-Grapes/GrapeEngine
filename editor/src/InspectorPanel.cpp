@@ -874,7 +874,7 @@ void InspectorPanel::_renderAddComponentButton(ECS::Entity entity) {
             });
 
         // Limit the popup height and make the list scrollable
-        float avail = ImGui::GetContentRegionAvail().y;
+        // float avail = ImGui::GetContentRegionAvail().y;
         float maxListHeight = 400.f;
         if (maxListHeight < 120.0f) maxListHeight = 120.0f;
 
@@ -1094,7 +1094,7 @@ void InspectorPanel::_renderPrefabActions() {
 
         // Limit popup height and make the list scrollable
 
-        float avail = ImGui::GetContentRegionAvail().y;
+        // float avail = ImGui::GetContentRegionAvail().y;
         float maxListHeight = 400.0f;
         if (maxListHeight < 120.0f) maxListHeight = 120.0f;
         ImGui::BeginChild("AddComponentListPrefab", ImVec2(0, maxListHeight), false, ImGuiWindowFlags_None);
