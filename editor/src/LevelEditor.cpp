@@ -27,6 +27,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "ViewportPicking.h"
 #include "ecs/ui/GUIContext.h"
 #include <core/Application.h>
+#include "scene/SceneListLoader.h"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include "CompilePanel.h"
@@ -330,7 +331,10 @@ void LevelEditor::Initialize(const GLFWwindow* pWin) {
                 });
         },
         [this]() { m_playback.Render(); },
-        [this](ECS::World* w) { m_playback.SetWorld(w); }
+        [this](ECS::World* w) {
+            const bool preservePlayback = m_playback.GetEditorState() != EditorState::Edit;
+            m_playback.SetWorld(w, preservePlayback);
+        }
     );
 
     _registerPanel("Asset Browser",
@@ -617,9 +621,7 @@ void LevelEditor::Update() {
         }
     }
 
-    if (m_playback.IsPlaying()) {
-        Engine::CORE->GetSceneManager().Update(); // Updates scenemanager to run Audio
-    }
+    // SceneManager::Update is already called in EditorService::Update.
 }
 
 // -------------------------------------------------------------------------
@@ -658,6 +660,11 @@ void LevelEditor::_onPlaybackStateChanged(EditorState oldState, EditorState newS
 
     if (newState == EditorState::Play && m_console.IsClearOnPlayBuildEnabled()) {
         m_console.Clear();
+    }
+
+    if (newState == EditorState::Play && Engine::CORE) {
+        auto& sceneManager = Engine::CORE->GetSceneManager();
+        Scenes::SceneListLoader::LoadFromDefault(sceneManager, true);
     }
 }
 

@@ -60,6 +60,18 @@ namespace Engine {
          * @return Full path to project/ProjectSettings.json
          */
         static std::string GetSettingsPath();
+
+        /**
+         * @brief Get the Scenes directory path
+         * @return Full path to project/Scenes/
+         */
+        static std::string GetScenesPath();
+
+        /**
+         * @brief Get the SceneList.json file path
+         * @return Full path to project/Scenes/SceneList.json
+         */
+        static std::string GetSceneListPath();
         
         /**
          * @brief Get temporary directory for build outputs (e.g., compiled scripts)

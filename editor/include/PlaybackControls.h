@@ -37,7 +37,7 @@ public:
     EditorState GetEditorState() const;
 
     // World management
-    void SetWorld(ECS::World* world);
+    void SetWorld(ECS::World* world, bool preserveState = false);
     bool HasValidWorld() const { return m_world != nullptr; }
 
 private:
@@ -50,6 +50,7 @@ private:
     ECS::Entity _recreateEntityWithId(uint32_t targetId, const nlohmann::json& entityJson);
 
     ECS::World* m_world = nullptr;
+    ECS::World* m_savedWorldPtr = nullptr;
     EditorState m_editorState = EditorState::Edit;
     bool m_stepRequested = false;
     nlohmann::json m_savedWorldState;

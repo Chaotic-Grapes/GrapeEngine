@@ -21,74 +21,23 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 
 #include "ecs/systems/AudioSystem.h"
 #include "services/AudioService.h"
-#include "audio/FmodAudioDevice.h"
 #include "core/ProjectPaths.h"
-#include <iostream>
 #include "core/Logger.h"
 #include <set>
+#include <unordered_set>
 #include "core/Application.h"
-#include "services/TimeSystem.h"
+#include "core/messaging/MessageSystem.h"
+#include "core/messaging/MessageTypes.h"
 
 namespace {
-    // Simple CueId -> Path cache
-    std::unordered_map<uint32_t, std::string> g_cueCache;
-    bool g_cacheBuilt = false;
-
-    std::string GetAudioRoot() {
-        return Engine::ProjectPaths::GetProjectRoot();
+    Audio::Bus ToBus(uint8_t raw) {
+        const auto count = static_cast<uint8_t>(Audio::Bus::Count);
+        if (raw >= count) {
+            return Audio::Bus::SFX;
+        }
+        return static_cast<Audio::Bus>(raw);
     }
-
-    // Build the cache by scanning audio folder once
-    void BuildCueCache() {
-        if (g_cacheBuilt) return;
-
-        namespace fs = std::filesystem;
-
-        const std::string audioRoot = GetAudioRoot();
-        if (!fs::exists(audioRoot) || !fs::is_directory(audioRoot)) {
-            LOG_WARNING("Audio root not found: " << audioRoot);
-            g_cacheBuilt = true;
-            return;
-        }
-
-        // Scan all audio files recursively
-        for (auto& entry : fs::recursive_directory_iterator(audioRoot)) {
-            if (!entry.is_regular_file()) continue;
-
-            auto ext = entry.path().extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-            if (ext != ".wav" && ext != ".ogg" && ext != ".mp3" && ext != ".flac")
-                continue;
-
-            // Normalize path (\ to /)
-            std::string path = entry.path().string();
-            std::replace(path.begin(), path.end(), '\\', '/');
-
-            // Generate CueId from path hash
-            uint32_t cueId = static_cast<uint32_t>(std::hash<std::string>{}(path));
-
-            g_cueCache[cueId] = path;
-        }
-
-        g_cacheBuilt = true;
-    }
-
-    // Resolve CueId to path
-    const std::string* ResolveCueId(uint32_t cueId) {
-        // Build cache on first call
-        if (!g_cacheBuilt) {
-            BuildCueCache();
-        }
-
-        auto it = g_cueCache.find(cueId);
-        if (it != g_cueCache.end()) {
-            return &it->second;
-        }
-
-        return nullptr;
-    }
-} // anonymous namespace
+}
 
 namespace ECS {
 
@@ -99,24 +48,44 @@ namespace ECS {
 
     void AudioSystem::OnCreate(World& world) {
         (void)world;
-        // Build audio cache on first creation
-        BuildCueCache();
+        m_world = &world;
+        // Ensure cue registry is populated for CueId resolution
+        m_audioService.CueRegistry().Refresh(Engine::ProjectPaths::GetProjectRoot());
+
+        // Subscribe to scene change events to clean up audio state
+        Messaging::MessageSystem::Subscribe<Messaging::SceneChanged>([this](const Messaging::SceneChanged& msg) {
+            // When scene changes, clear all active sounds and stop any lingering fades in the engine
+            // This ensures the AudioEngine doesn't carry over fade state from the previous scene
+            m_sceneUnloadInProgress = false;
+            const bool allowCrossfade = m_allowCrossfadeOnUnload;
+            m_allowCrossfadeOnUnload = false;
+            m_activeSounds.clear();
+
+            // Stop all fading sounds in the engine to prevent carryover
+            if (!allowCrossfade) {
+                if (auto* engine = m_audioService.Engine()) {
+                    engine->StopAllFades();
+                }
+            }
+
+            LOG_DEBUG("AudioSystem: Cleaned up audio state after scene change (from '"
+                     << msg.OldScene << "' to '" << msg.NewScene << "')");
+        });
     }
 
     void AudioSystem::OnUpdate(World& world)
     {
-        // Get device
-        Audio::FmodAudioDevice* device = m_audioService.Device();
-        if (!device) {
+        m_world = &world;
+        // Get engine
+        Audio::AudioEngine* engine = m_audioService.Engine();
+        if (!engine) {
             static bool s_warningLogged = false;
             if (!s_warningLogged) {
-                LOG_WARNING("AudioSystem::Update: No audio device available");
+                LOG_WARNING("AudioSystem::Update: No audio engine available");
                 s_warningLogged = true;
             }
             return;
         }
-
-        _updateFades(world, static_cast<float>(TimeSystem::Instance().GetDeltaTime()));
 
         // Check if game is playing (for editor mode)
         bool isPlaying = _isGamePlaying();
@@ -141,8 +110,8 @@ namespace ECS {
                 // ----------------------------------------------------------------
                 // Resolve cueId -> clip info
                 // ----------------------------------------------------------------
-                const std::string* pathPtr = ResolveCueId(src.CueId);
-                if (!pathPtr) {
+                const auto* cueInfo = m_audioService.CueRegistry().FindById(src.CueId);
+                if (!cueInfo) {
                     static std::set<uint32_t> s_warnedCues;
                     if (s_warnedCues.find(src.CueId) == s_warnedCues.end()) {
                         LOG_WARNING("AudioSystem: Entity " << e.Index
@@ -154,7 +123,7 @@ namespace ECS {
                     return;
                 }
 
-                const std::string& cueKey = *pathPtr;
+                const std::string& cueKey = cueInfo->Path;
 
                 // ----------------------------------------------------------------
                 // Load the sound if not already loaded
@@ -177,7 +146,14 @@ namespace ECS {
                 // Check if we have an active instance
                 // ----------------------------------------------------------------
                 auto it = m_activeSounds.find(e);
-                const bool hasInstance = (it != m_activeSounds.end());
+                bool hasInstance = (it != m_activeSounds.end());
+                if (hasInstance && !engine->IsHandleActive(it->second)) {
+                    m_activeSounds.erase(it);
+                    hasInstance = false;
+                }
+                if (m_sceneUnloadInProgress && !hasInstance) {
+                    return;
+                }
 
                 // ----------------------------------------------------------------
                 // Determine if this sound should be playing
@@ -214,17 +190,20 @@ namespace ECS {
                 // ----------------------------------------------------------------
                 if (shouldPlay && !hasInstance) {
                     Audio::PlaySettings settings{};
-                    settings.Volume = src.Volume;
+                    const bool doFadeIn = src.EnableFadeIn && src.FadeInDuration > 0.0f;
+                    settings.Volume = doFadeIn ? 0.0f : src.Volume;
                     settings.Pitch = src.Pitch;
                     settings.Loop = src.Loop;
+                    settings.Spatial3D = src.Spatial3D;
+                    settings.Pan = src.Pan;
 
-                    Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings);
+                    Audio::PlaybackHandle handle = m_audioService.Play(cueKey, settings, ToBus(src.Bus));
                     if (handle) {
                         m_activeSounds[e] = handle;
 
                         // Check if fadein is enabled
-                        if (src.EnableFadeIn && src.FadeInDuration > 0.0f) {
-							_startFadeIn(e, handle, src.FadeInDuration, src.Volume);
+                        if (doFadeIn) {
+							_fadeInHandle(handle, src.FadeInDuration, src.Volume);
                             LOG_DEBUG("AudioSystem: Fade-in started (duration=" << src.FadeInDuration << "s)");
                         }
                         LOG_DEBUG("AudioSystem: Playback started (handle ID=" << handle.Id << ")");
@@ -250,12 +229,15 @@ namespace ECS {
                     Audio::PlaybackHandle handle = it->second;
 
                     // Only set volume directly if NOT currently fading
-                    // Fading entities have their volume managed by _updateFades()
+                    // Fading entities have their volume managed by the AudioEngine
                     if (!IsEntityFading(e)) {
-                        device->SetInstanceVolume(handle, src.Volume);
+                        engine->SetInstanceVolume(handle, src.Volume);
                     }
 
-                    device->SetInstancePitch(handle, src.Pitch);
+                    engine->SetInstancePitch(handle, src.Pitch);
+                    if (!src.Spatial3D) {
+                        engine->SetInstancePan(handle, src.Pan);
+                    }
 
                     // Update 3D position if spatial audio is enabled
                     if (src.Spatial3D && world.Has<Components::WorldTransform>(e)) {
@@ -265,7 +247,7 @@ namespace ECS {
                         const auto& m = transform.Matrix;
                         Audio::Vec3 pos{ m.m03, m.m13, m.m23 };
                         Audio::Vec3 vel{ 0, 0, 0 };
-                        device->SetInstancePosition(handle, pos, vel);
+                        engine->SetInstancePosition(handle, pos, vel);
                     }
                 }
             });
@@ -287,6 +269,7 @@ namespace ECS {
 
     void AudioSystem::OnDestroy(World& world) {
         (void)world;
+        m_world = nullptr;
         // Stop all active sounds
         OnSceneStop();
         LOG_INFO("AudioSystem: Destroyed");
@@ -307,19 +290,22 @@ namespace ECS {
     void AudioSystem::OnSceneStart()
     {
         m_hasStarted = true;
+        m_sceneUnloadInProgress = false;
+        m_allowCrossfadeOnUnload = false;
         LOG_DEBUG("AudioSystem: Scene started - PlayOnStart sounds will now play");
     }
 
     void AudioSystem::OnSceneStop()
     {
         m_hasStarted = false;
+        m_sceneUnloadInProgress = false;
+        m_allowCrossfadeOnUnload = false;
 
         // Stop all currently playing sounds
         for (auto& [entity, handle] : m_activeSounds) {
             m_audioService.Stop(handle, Audio::StopMode::Immediate);
         }
         m_activeSounds.clear();
-        m_activeFades.clear();
 
         LOG_DEBUG("AudioSystem: Scene stopped - all sounds stopped");
     }
@@ -333,17 +319,18 @@ namespace ECS {
 		if (allowFade && world.Has<Components::AudioSource>(entity)) {
             auto& src = world.Get<Components::AudioSource>(entity);
             if (src.EnableFadeOut && src.FadeOutDuration > 0.0f) {
-                _startFadeOut(entity, src.FadeOutDuration);
+                _fadeOutHandle(it->second, src.FadeOutDuration);
+                m_activeSounds.erase(it);
                 LOG_DEBUG("AudioSystem: Fade-out started for entity " << entity.Index
                          << " (duration=" << src.FadeOutDuration << "s)");
+                return;
             }
         }
+
 		// No fade-out; stop immediately
-        else {
-            m_audioService.Stop(it->second, Audio::StopMode::Immediate);
-            m_activeSounds.erase(it);
-            LOG_DEBUG("AudioSystem: Stopped sound for entity " << entity.Index);
-        }
+        m_audioService.Stop(it->second, Audio::StopMode::Immediate);
+        m_activeSounds.erase(it);
+        LOG_DEBUG("AudioSystem: Stopped sound for entity " << entity.Index);
     }
 
     bool AudioSystem::_isGamePlaying() const
@@ -353,203 +340,108 @@ namespace ECS {
         return true;
     }
 
-    void AudioSystem::_startFadeIn(Entity entity, Audio::PlaybackHandle handle, float duration, float targetVolume) {
-        if (!handle || duration <= 0.0f) return;
-
-        Audio::FmodAudioDevice* device = m_audioService.Device();
-        if (!device) return;
-
-        // Initialize fade state
-        FadeState fade;
-        fade.CurrentVolume = 0.0f;
-        fade.TargetVolume = targetVolume;
-        fade.FadeDuration = duration;
-        fade.ElapsedTime = 0.0f;
-        fade.IsFadingIn = true;
-
-        // Set initial volume to 0
-        device->SetInstanceVolume(handle, 0.0f);
-
-        // Store fade state
-        m_activeFades[entity] = fade;
-
-        LOG_DEBUG("AudioSystem: Started fade-in for entity " << entity.Index
-            << " (duration=" << duration << "s, target=" << targetVolume << ")");
+    void AudioSystem::_fadeInHandle(Audio::PlaybackHandle handle, float duration, float targetVolume) {
+        if (!handle || duration <= 0.0f) {
+            return;
+        }
+        if (auto* engine = m_audioService.Engine()) {
+            engine->SetInstanceVolume(handle, 0.0f);
+            engine->FadeInstance(handle, targetVolume, duration, false);
+        }
     }
 
-    void AudioSystem::_startFadeOut(Entity entity, float duration) {
-        auto it = m_activeSounds.find(entity);
-        if (it == m_activeSounds.end()) return;
-
-        Audio::FmodAudioDevice* device = m_audioService.Device();
-        if (!device) return;
-
-        Audio::PlaybackHandle handle = it->second;
-
-        // Get current volume
-        float currentVol = 1.0f;  // Default if we can't get actual volume
-        // Note: FMOD doesn't have a GetInstanceVolume, so we track it ourselves
-        // or just use the component's volume
-
-        // Initialize fade state
-        FadeState fade;
-        fade.CurrentVolume = currentVol;
-        fade.TargetVolume = 0.0f;
-        fade.FadeDuration = duration;
-        fade.ElapsedTime = 0.0f;
-        fade.IsFadingIn = false;
-
-        // Store fade state
-        m_activeFades[entity] = fade;
-
-        LOG_DEBUG("AudioSystem: Started fade-out for entity " << entity.Index
-            << " (duration=" << duration << "s)");
+    void AudioSystem::_fadeOutHandle(Audio::PlaybackHandle handle, float duration) {
+        if (!handle || duration <= 0.0f) {
+            return;
+        }
+        if (auto* engine = m_audioService.Engine()) {
+            engine->FadeInstance(handle, 0.0f, duration, true);
+        }
     }
 
-    void AudioSystem::_startFadeOutByHandle(Audio::PlaybackHandle handle, float duration) {
-        if (!handle || duration <= 0.0f) return;
+    void AudioSystem::OnSceneWillUnload(float fadeDuration, bool allowCrossfade) {
+        m_sceneUnloadInProgress = true;
+        m_allowCrossfadeOnUnload = allowCrossfade;
 
-        Audio::FmodAudioDevice* device = m_audioService.Device();
-        if (!device) return;
+        if (m_activeSounds.empty()) {
+            if (fadeDuration > 0.0f) {
+                FadeOutAllAudio(fadeDuration);
+            }
+            return;
+        }
 
-        // Create synthetic entity ID from handle (won't conflict with real entities)
-        Entity syntheticEntity;
-        syntheticEntity.Index = static_cast<uint32_t>(handle.Id);
-        syntheticEntity.Generation = 0xFFFF; // Mark as synthetic
+        auto* engine = m_audioService.Engine();
+        if (!engine) {
+            OnSceneStop();
+            return;
+        }
 
-        // Initialize fade state
-        FadeState fade;
-        fade.CurrentVolume = 1.0f; // Assume full volume
-        fade.TargetVolume = 0.0f;
-        fade.FadeDuration = duration;
-        fade.ElapsedTime = 0.0f;
-        fade.IsFadingIn = false;
+        bool anyFadeStarted = false;
+        for (auto& [entity, handle] : m_activeSounds) {
+            float duration = fadeDuration;
+            bool shouldFade = fadeDuration > 0.0f;
 
-        // Store fade state and handle using synthetic entity
-        m_activeFades[syntheticEntity] = fade;
-        m_activeSounds[syntheticEntity] = handle;
-    }
-
-    void AudioSystem::_updateFades(World& world, float deltaTime) {
-        Audio::FmodAudioDevice* device = m_audioService.Device();
-        if (!device) return;
-
-        std::vector<Entity> toRemove;
-
-        for (auto& [entity, fade] : m_activeFades) {
-            // Get the playback handle
-            auto soundIt = m_activeSounds.find(entity);
-            if (soundIt == m_activeSounds.end()) {
-                toRemove.push_back(entity);
-                continue;
+            if (m_world && m_world->Has<Components::AudioSource>(entity)) {
+                auto& src = m_world->Get<Components::AudioSource>(entity);
+                if (src.EnableFadeOut && src.FadeOutDuration > 0.0f) {
+                    duration = src.FadeOutDuration;
+                    shouldFade = true;
+                }
             }
 
-            Audio::PlaybackHandle handle = soundIt->second;
-
-            // Update fade progress
-            fade.ElapsedTime += deltaTime;
-
-            if (fade.ElapsedTime >= fade.FadeDuration) {
-                // Fade complete
-                device->SetInstanceVolume(handle, fade.TargetVolume);
-
-                // If fading out, stop the sound
-                if (!fade.IsFadingIn) {
-                    _stopSound(entity, world);
-                }
-
-                toRemove.push_back(entity);
-                LOG_DEBUG("AudioSystem: Fade complete for entity " << entity.Index);
+            if (shouldFade) {
+                _fadeOutHandle(handle, duration);
+                anyFadeStarted = true;
             }
             else {
-                // Calculate interpolated volume (linear fade)
-                float t = fade.ElapsedTime / fade.FadeDuration;
-                float newVolume = fade.CurrentVolume + (fade.TargetVolume - fade.CurrentVolume) * t;
-                device->SetInstanceVolume(handle, newVolume);
+                m_audioService.Stop(handle, Audio::StopMode::Immediate);
             }
         }
 
-        // Clean up completed fades
-        for (Entity entity : toRemove) {
-            m_activeFades.erase(entity);
-        }
-    }
-
-    bool AudioSystem::_hasActiveFadeOuts() const {
-        for (const auto& [entity, fade] : m_activeFades) {
-            if (!fade.IsFadingIn) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    float AudioSystem::_getMaxFadeOutRemaining() const {
-        float maxRemaining = 0.0f;
-
-        for (const auto& [entity, fade] : m_activeFades) {
-            if (!fade.IsFadingIn) {
-                float remaining = fade.FadeDuration - fade.ElapsedTime;
-                if (remaining > maxRemaining) {
-                    maxRemaining = remaining;
-                }
-            }
+        if (allowCrossfade) {
+            m_activeSounds.clear();
         }
 
-        return maxRemaining;
-    }
-
-    void AudioSystem::OnSceneWillUnload(float fadeDuration) {
-        if (fadeDuration > 0.0f) {
-            FadeOutAllAudio(fadeDuration);
-            LOG_DEBUG("AudioSystem: Scene will unload - fading out all audio (duration="
-                     << fadeDuration << "s)");
+        if (anyFadeStarted) {
+            LOG_DEBUG("AudioSystem: Scene will unload - fading out audio");
         }
         else {
-            // Immediate stop without fade
-            OnSceneStop();
+            LOG_DEBUG("AudioSystem: Scene will unload - stopping audio immediately");
         }
     }
 
     void AudioSystem::FadeOutAllAudio(float duration) {
         if (duration <= 0.0f) {
             LOG_WARNING("AudioSystem::FadeOutAllAudio called with duration <= 0, using immediate stop");
-            OnSceneStop();
+            for (auto& [entity, handle] : m_activeSounds) {
+                m_audioService.Stop(handle, Audio::StopMode::Immediate);
+            }
+            m_activeSounds.clear();
             return;
         }
 
-        // Start fade-out for all currently playing sounds
-        for (auto& [entity, handle] : m_activeSounds) {
-            // Check if already fading
-            auto fadeIt = m_activeFades.find(entity);
-            if (fadeIt != m_activeFades.end()) {
-                // Already fading - update to fade-out if it was fading in
-                if (fadeIt->second.IsFadingIn) {
-                    fadeIt->second.IsFadingIn = false;
-                    fadeIt->second.TargetVolume = 0.0f;
-                    fadeIt->second.FadeDuration = duration;
-                    fadeIt->second.ElapsedTime = 0.0f;
-                }
-            }
-            else {
-                // Not fading - start new fade-out
-                _startFadeOut(entity, duration);
-            }
+        if (auto* engine = m_audioService.Engine()) {
+            engine->FadeOutAll(duration);
         }
+        m_activeSounds.clear();
 
         LOG_DEBUG("AudioSystem: Fading out " << m_activeSounds.size()
                  << " sounds (duration=" << duration << "s)");
     }
 
     bool AudioSystem::HasActiveFadeOuts() const {
-        return _hasActiveFadeOuts();
+        return m_audioService.Engine() ? m_audioService.Engine()->HasActiveFadeOuts() : false;
     }
 
     float AudioSystem::GetMaxFadeOutRemaining() const {
-        return _getMaxFadeOutRemaining();
+        return m_audioService.Engine() ? m_audioService.Engine()->GetMaxFadeOutRemaining() : 0.0f;
     }
 
     bool AudioSystem::IsEntityFading(Entity entity) const {
-        return m_activeFades.find(entity) != m_activeFades.end();
+        auto it = m_activeSounds.find(entity);
+        if (it == m_activeSounds.end()) {
+            return false;
+        }
+        return m_audioService.Engine() ? m_audioService.Engine()->IsHandleFading(it->second) : false;
     }
 } // namespace ECS

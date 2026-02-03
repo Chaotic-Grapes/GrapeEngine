@@ -78,6 +78,8 @@ namespace {
     const uint32_t kHashGUIText = Editor::ECSUtils::FNV1aHash("GUIText");
     const uint32_t kHashGUILayoutGroup = Editor::ECSUtils::FNV1aHash("GUILayoutGroup");
     const uint32_t kHashGUITooltip = Editor::ECSUtils::FNV1aHash("GUITooltip");
+    const uint32_t kHashSceneButton = Editor::ECSUtils::FNV1aHash("Scene Button");
+    const uint32_t kHashSceneButtonNoSpace = Editor::ECSUtils::FNV1aHash("SceneButton");
 
     template<typename T>
     nlohmann::json MakeDefaultJson() {
@@ -264,6 +266,14 @@ Without these, the macro would end early and break the expansion
 
         if (const auto id = GetComponentIdFromHashOrWarn(kHashMaterial2D, "Material2D"); id != ECS::NULL_COMPONENT_ID) {
             renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderMaterial2D(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashSceneButton, "Scene Button"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSceneButton(d, e, w); };
+        }
+
+        if (const auto id = GetComponentIdFromHashOrWarn(kHashSceneButtonNoSpace, "SceneButton"); id != ECS::NULL_COMPONENT_ID) {
+            renderers[id] = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSceneButton(d, e, w); };
         }
     }
     
@@ -751,6 +761,8 @@ static void _initializeDefaultRegistry() {
                 { "Loop", false },
                 { "PlayOnStart", false },
                 { "Spatial3D", false },
+                { "Bus", 2 },
+                { "Pan", 0.0f },
                 { "EnableFadeIn", false },
                 { "EnableFadeOut", false },
                 { "FadeInDuration", 1.0f },
@@ -1071,7 +1083,27 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             }
         };
         
-        // Add to registry with generic renderer
+        // Add to registry with generic renderer (or specialized overrides)
+        auto renderFunc = static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>(
+            [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }
+        );
+        auto defaultFunc = static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json::object(); });
+
+        const bool isSceneButton =
+            nativeName == "Scene Button" ||
+            nativeName == "SceneButton";
+
+        if (isSceneButton || nativeMeta.TypeHash == kHashSceneButton || nativeMeta.TypeHash == kHashSceneButtonNoSpace) {
+            renderFunc = [](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderSceneButton(d, e, w); };
+            defaultFunc = []() {
+                return nlohmann::json{
+                    { "TargetSceneIndex", 0 },
+                    { "TransitionMode", 0 },
+                    { "FadeDuration", 1.0f }
+                };
+            };
+        }
+
         s_registry.emplace_back(
             displayName,
             typeName,
@@ -1080,8 +1112,8 @@ void ComponentRegistryUI::RebuildFromNativeRegistry() {
             nativeMeta.TypeHash,
             true,  // Managed components can be deleted
             false,  // IsBuiltin - false because this is a dynamically discovered managed component
-            static_cast<std::function<void(ComponentUI&, nlohmann::json&, ECS::Entity, ECS::World*)>>([](ComponentUI& ui, nlohmann::json& d, ECS::Entity e, ECS::World* w) { ui.RenderGenericComponent(d, e, w); }),
-            static_cast<std::function<nlohmann::json()>>([]() { return nlohmann::json::object(); }),
+            renderFunc,
+            defaultFunc,
             static_cast<std::function<bool(ECS::World*, ECS::Entity)>>(hasComponentFunc),
             static_cast<std::function<void(ECS::World*, ECS::Entity, const nlohmann::json&)>>(addComponentFunc),
             static_cast<std::function<void(ECS::World*, ECS::Entity)>>(removeComponentFunc),

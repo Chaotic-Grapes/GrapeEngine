@@ -175,6 +175,25 @@ public class SceneManager
     }
 
     /// <summary>
+    /// Sets the active scene with audio fade transition support by scene path.
+    /// This will load the scene if it is not already loaded.
+    /// </summary>
+    /// <param name="scenePath">Absolute or project-relative scene path.</param>
+    /// <param name="mode">Transition mode (Immediate, FadeOut, or CrossFade).</param>
+    /// <param name="fadeDuration">Duration of fade in seconds (used for FadeOut and CrossFade modes).</param>
+    /// <returns>True if the scene was found/loaded and transition queued.</returns>
+    public bool SetActiveWithTransition(string scenePath, SceneTransitionMode mode = SceneTransitionMode.Immediate, float fadeDuration = 1.0f)
+    {
+        if (string.IsNullOrWhiteSpace(scenePath))
+            throw new ArgumentException("Scene path cannot be null or empty.", nameof(scenePath));
+
+        unsafe
+        {
+            return SceneAPI.SetActiveWithTransitionByPath(_sceneManagerPtr, scenePath, (int)mode, fadeDuration);
+        }
+    }
+
+    /// <summary>
     /// Gets the currently active scene.
     /// </summary>
     /// <returns>The active scene, or null if none is active.</returns>
@@ -230,6 +249,39 @@ public class SceneManager
     }
 
     /// <summary>
+    /// Gets the number of entries in SceneList.json.
+    /// </summary>
+    /// <param name="listPath">Optional path to SceneList.json (null uses default).</param>
+    public ulong GetSceneListCount(string? listPath = null)
+    {
+        unsafe
+        {
+            return SceneAPI.GetSceneListCount(listPath);
+        }
+    }
+
+    /// <summary>
+    /// Gets the scene list entry (absolute path) for a given index.
+    /// </summary>
+    /// <param name="index">Scene list index.</param>
+    /// <param name="listPath">Optional path to SceneList.json (null uses default).</param>
+    public string? GetSceneListEntry(ulong index, string? listPath = null)
+    {
+        unsafe
+        {
+            const int bufferSize = 4096;
+            byte* buffer = stackalloc byte[bufferSize];
+            buffer[0] = 0;
+            SceneAPI.GetSceneListEntry(listPath, index, buffer, bufferSize);
+            if (buffer[0] == 0)
+            {
+                return null;
+            }
+            return Marshal.PtrToStringUTF8((nint)buffer);
+        }
+    }
+
+    /// <summary>
     /// Updates the scene manager and processes any pending scene transitions.
     /// This should be called once per frame by the engine.
     /// </summary>
@@ -238,6 +290,20 @@ public class SceneManager
         unsafe
         {
             SceneAPI.Update(_sceneManagerPtr);
+        }
+    }
+
+    /// <summary>
+    /// Loads scenes from SceneList.json into the SceneManager.
+    /// </summary>
+    /// <param name="listPath">Optional path to SceneList.json (null uses default).</param>
+    /// <param name="keepActive">If true, keep the current active scene.</param>
+    /// <returns>True if the list was loaded successfully.</returns>
+    public bool LoadSceneList(string? listPath = null, bool keepActive = true)
+    {
+        unsafe
+        {
+            return SceneAPI.LoadSceneList(_sceneManagerPtr, listPath, keepActive);
         }
     }
 

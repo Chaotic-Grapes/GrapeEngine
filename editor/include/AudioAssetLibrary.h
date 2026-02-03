@@ -14,18 +14,12 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <unordered_map>
-#include <filesystem>
-#include <algorithm>
+#include "audio/AudioCueRegistry.h"
 
 class AudioAssetLibrary {
 public:
 
-	struct ClipInfo {
-		uint32_t id; //cueID path is in uint32
-		std::string name; //name of the clip
-		std::string path; //clip's path
-	};
+	using ClipInfo = Audio::AudioCueRegistry::CueInfo;
 
 	static AudioAssetLibrary& Get() {
 		// reference function to always refer to this one static
@@ -55,64 +49,23 @@ public:
       or anytime the asset directory changes (optional).
   */
     void Refresh(const std::string& audioRoot) {
-        m_clips.clear();
-        m_byId.clear();
-        m_byPath.clear();
-
-        namespace fs = std::filesystem;
-
-        fs::path root(audioRoot);
-
-        if (!fs::exists(root) || !fs::is_directory(root))
-            return;
-
-        // Recursively walk all subfolders under the root
-        for (auto& entry : fs::recursive_directory_iterator(root)) {
-            if (!entry.is_regular_file())
-                continue;
-
-            // Filter audio formats the engine supports
-            auto ext = entry.path().extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-            if (ext != ".wav" && ext != ".ogg" && ext != ".mp3" && ext != ".flac")
-                continue;
-
-            // Build normalized path
-            std::string relPath = Normalize(entry.path().string());
-
-            // Name = filename without extension
-            std::string name = entry.path().stem().string();
-
-            // Unique stable ID based on path hash
-            uint32_t id = static_cast<uint32_t>(std::hash<std::string>{}(relPath));
-
-            // Construct clip info
-            ClipInfo info{ id, name, relPath };
-
-            // Store three different ways for fast lookup
-            m_clips.push_back(info);
-            m_byId[id] = info;
-            m_byPath[relPath] = info;
-        }
+        m_registry.Refresh(audioRoot);
     }
 
 
     // Returns ALL loaded audio clips for UI dropdowns or listing
-    const std::vector<ClipInfo>& GetAllClips() const { return m_clips; }
+    const std::vector<ClipInfo>& GetAllClips() const { return m_registry.GetAll(); }
 
 
     // Lookup a clip by its CueId (used by AudioSource)
     const ClipInfo* FindById(uint32_t id) const {
-        auto it = m_byId.find(id);
-        return (it != m_byId.end()) ? &it->second : nullptr;
+        return m_registry.FindById(id);
     }
 
 
     // Lookup by path (used for drag & drop)
     const ClipInfo* FindByPath(const std::string& p) const {
-        std::string norm = Normalize(p);
-        auto it = m_byPath.find(norm);
-        return (it != m_byPath.end()) ? &it->second : nullptr;
+        return m_registry.FindByPath(p);
     }
 
 
@@ -132,22 +85,7 @@ public:
         Allows the editor to support drag-and-drop addition of audio without rescanning everything.
     */
     const ClipInfo& Register(const std::string& p) {
-        std::string norm = Normalize(p);
-        auto it = m_byPath.find(norm);
-        if (it != m_byPath.end())
-            return it->second;
-
-        // Build metadata for new file
-        std::string name = std::filesystem::path(norm).stem().string();
-        uint32_t id = static_cast<uint32_t>(std::hash<std::string>{}(norm));
-
-        ClipInfo info{ id, name, norm };
-
-        m_clips.push_back(info);
-        m_byId[id] = info;
-        m_byPath[norm] = info;
-
-        return m_clips.back();
+        return m_registry.Register(p);
     }
 
 
@@ -175,19 +113,7 @@ private:
             - consistent lookup
             - matching drag-drop paths
     */
-    static std::string Normalize(std::string p) {
-        std::replace(p.begin(), p.end(), '\\', '/');
-        return p;
-    }
-
-    // List of all audio clips (for UI dropdowns)
-    std::vector<ClipInfo> m_clips;
-
-    // Fast lookup: id -> ClipInfo
-    std::unordered_map<uint32_t, ClipInfo> m_byId;
-
-    // Fast lookup: path -> ClipInfo
-    std::unordered_map<std::string, ClipInfo> m_byPath;
+    Audio::AudioCueRegistry m_registry;
 };
 
 

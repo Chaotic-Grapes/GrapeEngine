@@ -228,6 +228,7 @@ void Playback::_saveWorldState() {
     if (!HasValidWorld()) return;
 
     LOG_INFO("Saving world state.");
+    m_savedWorldPtr = m_world;
 
     nlohmann::json worldJson = nlohmann::json::object();
     nlohmann::json entitiesMap = nlohmann::json::object(); // Changed from array to object
@@ -284,6 +285,10 @@ void Playback::_restoreWorldState() {
     // instead of destroying and recreating entities.
     if (!HasValidWorld() || m_savedWorldState.is_null()) {
         LOG_WARNING("No saved state to restore");
+        return;
+    }
+    if (m_savedWorldPtr && m_savedWorldPtr != m_world) {
+        LOG_WARNING("Saved state world does not match current world; skipping restore.");
         return;
     }
 
@@ -438,11 +443,30 @@ EditorState Playback::GetEditorState() const {
 // Update the world reference safely when scenes change
 // Update the bound world reference used by playback operations.
 // Clears saved snapshot since it no longer matches the world.
-void Playback::SetWorld(ECS::World* world) {
+void Playback::SetWorld(ECS::World* world, bool preserveState) {
     m_world = world;
+    if (!world) {
+        m_editorState = EditorState::Edit;
+        m_stepRequested = false;
+        m_savedWorldState.clear();
+        m_savedWorldPtr = nullptr;
+        return;
+    }
+
+    // When preserving state (e.g. during scene transitions in Play),
+    // keep playback state but drop any snapshot tied to another world.
+    if (preserveState) {
+        if (m_savedWorldPtr && m_savedWorldPtr != world) {
+            m_savedWorldState.clear();
+            m_savedWorldPtr = nullptr;
+        }
+        return;
+    }
+
     m_editorState = EditorState::Edit;
     m_stepRequested = false;
     m_savedWorldState.clear();
+    m_savedWorldPtr = nullptr;
 }
 
 // Helper: Restore an entity's state in-place from a JSON snapshot

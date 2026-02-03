@@ -26,14 +26,18 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include <unordered_set>
 #include <sstream>
 #include <cstdint>
+#include <filesystem>
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 #include "core/Logger.h"
+#include "core/ProjectPaths.h"
 #include "services/TimeSystem.h"
 #include "scene/Scene.h"
 #include "serialization/EntitySerializer.h"
 #include "serialization/Serializer.h"
 #include "ecs/PrefabManager.h"
+#include "ecs/systems/AudioSystem.h"
 #include "core/messaging/MessageSystem.h"
 #include "services/ResourceManager.h"
 
@@ -167,10 +171,49 @@ namespace Scenes {
         void SetActiveWithTransition(const size_t index, SceneTransitionMode mode = SceneTransitionMode::Immediate, float fadeDuration = 1.0f) {
             if (index >= m_scenes.size())
                 return;
+            if (index == m_active) {
+                LOG_WARNING("SceneManager: Ignoring transition to already active scene (index=" << index << ")");
+                return;
+            }
 
             m_pendingActive = index;
             m_transitionMode = mode;
             m_transitionFadeDuration = fadeDuration;
+        }
+
+        /**
+         * @brief Sets active scene with audio fade support by path (loads scene if needed).
+         * @param scenePath Path to the scene (absolute or project-relative).
+         * @param mode Transition mode (Immediate, FadeOut, or CrossFade).
+         * @param fadeDuration Duration of fade in seconds (used for FadeOut and CrossFade modes).
+         * @return true if the scene was found/loaded and a transition was queued.
+         */
+        bool SetActiveWithTransitionByPath(const std::string& scenePath, SceneTransitionMode mode = SceneTransitionMode::Immediate, float fadeDuration = 1.0f) {
+            if (scenePath.empty()) {
+                return false;
+            }
+
+            const std::string normalizedTarget = _normalizePath(_resolveScenePath(scenePath));
+            if (normalizedTarget.empty()) {
+                return false;
+            }
+
+            const size_t existingIndex = _findSceneIndexByPath(normalizedTarget);
+            if (existingIndex != NPOS) {
+                SetActiveWithTransition(existingIndex, mode, fadeDuration);
+                return true;
+            }
+
+            auto* scene = new Scene();
+            size_t sceneIndex = AddScene(scene);
+            if (!LoadScene(sceneIndex, normalizedTarget)) {
+                LOG_WARNING("SceneManager: Failed to load scene for transition: " << normalizedTarget);
+                RemoveScene(sceneIndex);
+                return false;
+            }
+
+            SetActiveWithTransition(sceneIndex, mode, fadeDuration);
+            return true;
         }
 
         /**
@@ -443,6 +486,11 @@ namespace Scenes {
                     << "\tVersion: " << sceneJson.value("Version", "Unknown") << '\n'
 					<< "\tEntities loaded: " << loadedCount);
 
+                scene.SetPath(filename);
+                if (sceneJson.contains("SceneName")) {
+                    scene.SetName(sceneJson["SceneName"].get<std::string>());
+                }
+
                 // Rebuild LayerManager membership lists so editor UI (LayersPanel)
                 // sees the correct entities per layer. Deserialization writes the
                 // Layer component directly to the world, which does not update the
@@ -499,15 +547,22 @@ namespace Scenes {
 
             // Handle fade-aware transitions
             if (m_transitionMode != SceneTransitionMode::Immediate && m_audioSystem) {
-                if (!m_waitingForFadeOut) {
-                    // Start fade-out on first call
-                    if (m_transitionMode == SceneTransitionMode::FadeOut ||
-                        m_transitionMode == SceneTransitionMode::CrossFade) {
-                        m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration);
-                        m_waitingForFadeOut = true;
-                        m_transitionFadeTimer = 0.0f;
-                        return; // Don't transition yet, wait for fade
+                if (m_transitionMode == SceneTransitionMode::CrossFade) {
+                    if (!m_crossfadeTriggered) {
+                        m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration, true);
+                        m_crossfadeTriggered = true;
                     }
+                }
+                else if (!m_waitingForFadeOut) {
+                    // Start fade-out on first call
+                    m_audioSystem->OnSceneWillUnload(m_transitionFadeDuration, false);
+                    m_waitingForFadeOut = true;
+                    m_transitionFadeTimer = 0.0f;
+                    const float maxRemaining = m_audioSystem->GetMaxFadeOutRemaining();
+                    if (maxRemaining > m_transitionFadeDuration) {
+                        m_transitionFadeDuration = maxRemaining;
+                    }
+                    return; // Don't transition yet, wait for fade
                 }
                 else {
                     // Update fade timer
@@ -533,6 +588,7 @@ namespace Scenes {
             // Reset transition settings
             m_transitionMode = SceneTransitionMode::Immediate;
             m_transitionFadeDuration = 1.0f;
+            m_crossfadeTriggered = false;
         }
 
         void _performTransition(const size_t toIndex) {
@@ -577,6 +633,46 @@ namespace Scenes {
             std::ostringstream oss;
             oss << "Scene@" << std::hex << reinterpret_cast<uintptr_t>(scene);
             return oss.str();
+        }
+
+        static std::string _resolveScenePath(const std::string& path) {
+            if (path.empty()) {
+                return {};
+            }
+
+            std::filesystem::path pathFs(path);
+            return pathFs.is_absolute()
+                ? pathFs.string()
+                : Engine::ProjectPaths::ToAbsolutePath(path);
+        }
+
+        static std::string _normalizePath(const std::string& path) {
+            std::filesystem::path normalized = std::filesystem::path(path).lexically_normal();
+            std::string normalizedStr = normalized.string();
+            std::replace(normalizedStr.begin(), normalizedStr.end(), '\\', '/');
+            return normalizedStr;
+        }
+
+        size_t _findSceneIndexByPath(const std::string& normalizedAbsolutePath) const {
+            const size_t count = m_scenes.size();
+            for (size_t i = 0; i < count; ++i) {
+                const Scene* scene = m_scenes[i].get();
+                if (!scene) {
+                    continue;
+                }
+
+                const std::string& scenePath = scene->GetPath();
+                if (scenePath.empty()) {
+                    continue;
+                }
+
+                const std::string sceneAbsolute = _resolveScenePath(scenePath);
+                if (_normalizePath(sceneAbsolute) == normalizedAbsolutePath) {
+                    return i;
+                }
+            }
+
+            return NPOS;
         }
 
         // Initialize runtime prefab metadata post-load
@@ -638,6 +734,7 @@ namespace Scenes {
         float m_transitionFadeDuration = 1.0f;
         float m_transitionFadeTimer = 0.0f;
         bool m_waitingForFadeOut = false;
+        bool m_crossfadeTriggered = false;
     };
 }
 

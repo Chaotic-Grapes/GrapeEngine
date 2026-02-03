@@ -29,6 +29,7 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "math/Quaternion.h"
 #include "math/Matrix4x4.h"
 #include "ecs/StringTable.h"
+#include "audio/SoundTypes.h"
 #include <nlohmann/json.hpp>
 #include <cstdint>
 #include <type_traits>
@@ -484,6 +485,8 @@ namespace ECS {
 
             // TODO
             bool Spatial3D = true;
+            uint8_t Bus = static_cast<uint8_t>(Audio::Bus::SFX);
+            float Pan = 0.0f;
 
             // Fade flags
 			bool EnableFadeIn = false;

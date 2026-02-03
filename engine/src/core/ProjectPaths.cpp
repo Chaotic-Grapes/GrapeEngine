@@ -50,6 +50,14 @@ namespace Engine {
     std::string ProjectPaths::GetSettingsPath() {
         return GetProjectRoot() + "/ProjectSettings.json";
     }
+
+    std::string ProjectPaths::GetScenesPath() {
+        return GetProjectRoot() + "/Scenes";
+    }
+
+    std::string ProjectPaths::GetSceneListPath() {
+        return GetScenesPath() + "/SceneList.json";
+    }
     
     std::string ProjectPaths::GetTempScriptsPath() {
         try {

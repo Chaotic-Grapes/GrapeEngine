@@ -156,6 +156,7 @@ namespace Engine {
         m_audio->Update();
 
         // --- Scene Update ---
+        m_sceneManager.Update();
         auto* currentScene = m_sceneManager.GetActive();
         
         if (currentScene) {
@@ -329,7 +330,8 @@ namespace Engine {
         // Update Phase Systems
         m_systemManager.RegisterSystem<ECS::AnimationSystem>();
         m_systemManager.RegisterSystem<ECS::AnimationPreviewSystem>();
-        m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
+        auto* audioSystem = m_systemManager.RegisterSystem<ECS::AudioSystem>(*m_audio);
+        m_sceneManager.SetAudioSystem(audioSystem);
         
         // Physics Phase Systems
         // Ensure transform propagation updated before physics runs

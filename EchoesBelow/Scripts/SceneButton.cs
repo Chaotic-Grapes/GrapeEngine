@@ -12,7 +12,7 @@ namespace EchoesBelow.Scripts;
 /// </summary>
 [Component]
 public record struct SceneButtonComponent(
-    int TargetSceneIndex,           // Which scene to load (0, 1, 2, etc.)
+    ulong TargetSceneIndex,         // Which scene to load (0, 1, 2, etc.)
     int TransitionMode,             // 0=Immediate, 1=FadeOut, 2=CrossFade
     float FadeDuration              // How long the fade takes in seconds
 );
@@ -21,10 +21,10 @@ public record struct SceneButtonComponent(
 /// System that handles scene button clicks.
 /// Checks for mouse clicks and triggers scene transitions.
 /// </summary>
-[SystemGroup(SystemGroup.Update, SystemRunMode.PlayOnly)]
+[System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class SceneButtonSystem : SystemBase
 {
-    private bool wasMousePressed = false;
+    private bool wasAnyMousePressed = false;
 
     protected override void OnCreate()
     {
@@ -36,13 +36,18 @@ public class SceneButtonSystem : SystemBase
 
     protected override void OnUpdate()
     {
-        bool isMousePressed = Input.IsMousePressed(MouseButton.Left);
+        bool isAnyMousePressed =
+            Input.IsMousePressed(MouseButton.Left) ||
+            Input.IsMousePressed(MouseButton.Right) ||
+            Input.IsMousePressed(MouseButton.Middle);
 
-        // Detect mouse click (press -> release)
-        if (wasMousePressed && !isMousePressed)
+        bool isTransitionKeyPressed = Input.IsKeyPressed(KeyCode.G);
+
+        // Detect mouse click (press -> down) or key press
+        if ((!wasAnyMousePressed && isAnyMousePressed) || isTransitionKeyPressed)
         {
             System.Console.WriteLine("========================================");
-            System.Console.WriteLine("[SceneButtonSystem] Mouse clicked!");
+            System.Console.WriteLine("[SceneButtonSystem] Transition input detected!");
             System.Console.WriteLine("========================================");
 
             // Count how many scene buttons exist
@@ -57,8 +62,22 @@ public class SceneButtonSystem : SystemBase
                 Log($"[SceneButtonSystem] Button clicked! Transitioning to scene {button.TargetSceneIndex}", LogLevel.Info);
                 System.Console.WriteLine($"[SceneButtonSystem] TRANSITIONING TO SCENE {button.TargetSceneIndex}");
 
-                SceneTransitionMode mode = (SceneTransitionMode)button.TransitionMode;
-                SceneManager.SetActiveWithTransition(button.TargetSceneIndex, mode, button.FadeDuration);
+                SceneTransitionMode mode = button.TransitionMode switch
+                {
+                    0 => SceneTransitionMode.Immediate,
+                    1 => SceneTransitionMode.FadeOut,
+                    2 => SceneTransitionMode.CrossFade,
+                    3 => SceneTransitionMode.CrossFade,
+                    _ => SceneTransitionMode.Immediate
+                };
+                string? scenePath = SceneManager.Instance.GetSceneListEntry(button.TargetSceneIndex);
+                if (string.IsNullOrEmpty(scenePath))
+                {
+                    Log($"[SceneButtonSystem] Invalid scene index {button.TargetSceneIndex} - no SceneList entry found.", LogLevel.Warning);
+                    break;
+                }
+
+                SceneManager.Instance.SetActiveWithTransition(scenePath, mode, button.FadeDuration);
 
                 // Only trigger one button per click
                 break;
@@ -70,7 +89,7 @@ public class SceneButtonSystem : SystemBase
             }
         }
 
-        wasMousePressed = isMousePressed;
+        wasAnyMousePressed = isAnyMousePressed;
     }
 
     protected override void OnDestroy()

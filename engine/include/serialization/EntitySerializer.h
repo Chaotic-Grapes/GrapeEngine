@@ -355,7 +355,38 @@ namespace ECS {
 		}
 
 
-		NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(AudioSource, CueId, Volume, Pitch, Loop, PlayOnStart, Spatial3D, EnableFadeIn, EnableFadeOut, FadeInDuration, FadeOutDuration)
+		// Custom serialization for AudioSource to handle backward-compatible defaults
+		inline void to_json(nlohmann::json& j, const AudioSource& src) {
+			j = nlohmann::json{
+				{"CueId", src.CueId},
+				{"Volume", src.Volume},
+				{"Pitch", src.Pitch},
+				{"Loop", src.Loop},
+				{"PlayOnStart", src.PlayOnStart},
+				{"Spatial3D", src.Spatial3D},
+				{"Bus", src.Bus},
+				{"Pan", src.Pan},
+				{"EnableFadeIn", src.EnableFadeIn},
+				{"EnableFadeOut", src.EnableFadeOut},
+				{"FadeInDuration", src.FadeInDuration},
+				{"FadeOutDuration", src.FadeOutDuration}
+			};
+		}
+
+		inline void from_json(const nlohmann::json& j, AudioSource& src) {
+			src.CueId = j.value("CueId", 0u);
+			src.Volume = j.value("Volume", 1.0f);
+			src.Pitch = j.value("Pitch", 1.0f);
+			src.Loop = j.value("Loop", false);
+			src.PlayOnStart = j.value("PlayOnStart", false);
+			src.Spatial3D = j.value("Spatial3D", true);
+			src.Bus = j.value("Bus", static_cast<uint8_t>(Audio::Bus::SFX));
+			src.Pan = j.value("Pan", 0.0f);
+			src.EnableFadeIn = j.value("EnableFadeIn", false);
+			src.EnableFadeOut = j.value("EnableFadeOut", false);
+			src.FadeInDuration = j.value("FadeInDuration", 1.0f);
+			src.FadeOutDuration = j.value("FadeOutDuration", 1.0f);
+		}
 	
 		// Custom serialization for Material2D
 		inline void to_json(nlohmann::json& j, const Material2D& mat) {

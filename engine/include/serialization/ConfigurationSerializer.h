@@ -2,6 +2,7 @@
 #define SERIALIZATION_H
 
 #include <nlohmann/json.hpp>
+#include <vector>
 #include "EntitySerializer.h"
 #include "Serializer.h"
 
@@ -35,6 +36,7 @@ struct ProjectSettings {
     std::string Title = "GrapeEngine Game Project"; // Game/project name
     std::string Version = "1.0.0";                  // Version string
     std::string StartupScene = "";                  // Path to startup scene
+    std::vector<std::string> SceneList;             // Ordered list of scenes to load
 };
 
 namespace Serialization {
@@ -71,6 +73,14 @@ namespace Serialization {
             if (settingsJson.contains("StartupScene")) {
                 settings.StartupScene = settingsJson["StartupScene"].get<std::string>();
             }
+            if (settingsJson.contains("SceneList") && settingsJson["SceneList"].is_array()) {
+                settings.SceneList.clear();
+                for (const auto& entry : settingsJson["SceneList"]) {
+                    if (entry.is_string()) {
+                        settings.SceneList.push_back(entry.get<std::string>());
+                    }
+                }
+            }
 
             // Parse WindowSettings
             if (settingsJson.contains("WindowSettings")) {
@@ -103,6 +113,7 @@ namespace Serialization {
             settingsJson["Title"] = settings.Title;
             settingsJson["Version"] = settings.Version;
             settingsJson["StartupScene"] = settings.StartupScene;
+            settingsJson["SceneList"] = settings.SceneList;
             
             settingsJson["WindowSettings"]["Width"] = settings.WindowSettings.Width;
             settingsJson["WindowSettings"]["Height"] = settings.WindowSettings.Height;

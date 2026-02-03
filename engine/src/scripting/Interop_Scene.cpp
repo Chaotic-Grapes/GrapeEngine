@@ -19,10 +19,15 @@ prior written consent of DigiPen Institute of Technology is prohibited.
 #include "Export.h"
 #include "core/Application.h"
 #include "scene/SceneManager.h"
+#include "scene/SceneListLoader.h"
 #include "scene/Scene.h"
+#include "serialization/SceneListSerializer.h"
+#include "core/ProjectPaths.h"
 #include "helpers/EntityUtils.h"
 #include <string>
 #include <cstring>
+#include <vector>
+#include <filesystem>
 
 // ============================================================================
 // SceneManager Lifecycle
@@ -157,6 +162,32 @@ INTEROP_API void SceneManagerInterop_SetActiveWithTransition(void* sceneManagerP
 }
 
 /**
+ * @brief Set the active scene with audio fade transition support by path
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param scenePath Path to the scene (absolute or project-relative)
+ * @param transitionMode 0=Immediate, 1=FadeOut, 2=CrossFade
+ * @param fadeDuration Duration of fade in seconds (used for FadeOut and CrossFade modes)
+ * @return true if the scene was found/loaded and transition queued
+ */
+INTEROP_API bool SceneManagerInterop_SetActiveWithTransitionByPath(void* sceneManagerPtr, const char* scenePath, int transitionMode, float fadeDuration) {
+    if (!sceneManagerPtr || !scenePath || scenePath[0] == '\0')
+        return false;
+
+    Scenes::SceneManager* manager = static_cast<Scenes::SceneManager*>(sceneManagerPtr);
+    Scenes::SceneTransitionMode mode = Scenes::SceneTransitionMode::Immediate;
+
+    switch (transitionMode) {
+        case 0: mode = Scenes::SceneTransitionMode::Immediate; break;
+        case 1: mode = Scenes::SceneTransitionMode::FadeOut; break;
+        case 2: mode = Scenes::SceneTransitionMode::CrossFade; break;
+        default: mode = Scenes::SceneTransitionMode::Immediate; break;
+    }
+
+    return manager->SetActiveWithTransitionByPath(scenePath, mode, fadeDuration);
+}
+
+/**
  * @brief Get the currently active scene
  *
  * @param sceneManagerPtr Pointer to the SceneManager
@@ -214,6 +245,95 @@ INTEROP_API void SceneManagerInterop_Update(void* sceneManagerPtr) {
 
     Scenes::SceneManager* manager = static_cast<Scenes::SceneManager*>(sceneManagerPtr);
     manager->Update();
+}
+
+// ============================================================================
+// Scene List Queries
+// ============================================================================
+
+static bool _loadSceneList(const char* listPath, std::vector<std::string>& sceneList) {
+    std::string path = (listPath && listPath[0] != '\0') ? listPath : Engine::ProjectPaths::GetSceneListPath();
+    if (!Serialization::SceneListSerializer::LoadSceneList(path, sceneList)) {
+        if (!Serialization::SceneListSerializer::BuildSceneListFromFolder(Engine::ProjectPaths::GetScenesPath(), sceneList)) {
+            return false;
+        }
+        if (!Serialization::SceneListSerializer::SaveSceneList(path, sceneList)) {
+            LOG_WARNING("SceneListLoader: Failed to save generated SceneList.json: " << path);
+        }
+    }
+    return true;
+}
+
+/**
+ * @brief Get the number of entries in SceneList.json
+ *
+ * @param listPath Optional path to SceneList.json (NULL uses default)
+ * @return number of entries, or 0 on failure
+ */
+INTEROP_API uint64_t SceneListInterop_GetCount(const char* listPath) {
+    std::vector<std::string> sceneList;
+    if (!_loadSceneList(listPath, sceneList)) {
+        return 0;
+    }
+    return static_cast<uint64_t>(sceneList.size());
+}
+
+/**
+ * @brief Get the scene list entry by index (absolute path) into caller buffer
+ *
+ * @param listPath Optional path to SceneList.json (NULL uses default)
+ * @param index Index of the entry
+ * @param buffer Destination buffer
+ * @param bufferSize Size of destination buffer in bytes
+ */
+INTEROP_API void SceneListInterop_GetEntry(const char* listPath, uint64_t index, char* buffer, int bufferSize) {
+    if (!buffer || bufferSize <= 0) {
+        return;
+    }
+
+    buffer[0] = '\0';
+
+    std::vector<std::string> sceneList;
+    if (!_loadSceneList(listPath, sceneList)) {
+        return;
+    }
+
+    if (index >= sceneList.size()) {
+        return;
+    }
+
+    std::filesystem::path pathFs(sceneList[index]);
+    std::string absolutePath = pathFs.is_absolute()
+        ? pathFs.string()
+        : Engine::ProjectPaths::ToAbsolutePath(sceneList[index]);
+
+    int copySize = std::min(static_cast<int>(absolutePath.size()), bufferSize - 1);
+    std::memcpy(buffer, absolutePath.c_str(), copySize);
+    buffer[copySize] = '\0';
+}
+
+// ============================================================================
+// Scene List Loading
+// ============================================================================
+
+/**
+ * @brief Load scenes from SceneList.json into the SceneManager.
+ *
+ * @param sceneManagerPtr Pointer to the SceneManager
+ * @param listPath Optional path to SceneList.json (NULL uses default)
+ * @param keepActive If true, keep the current active scene
+ * @return true on success, false on failure
+ */
+INTEROP_API bool SceneManagerInterop_LoadSceneList(void* sceneManagerPtr, const char* listPath, bool keepActive) {
+    if (!sceneManagerPtr)
+        return false;
+
+    Scenes::SceneManager* manager = static_cast<Scenes::SceneManager*>(sceneManagerPtr);
+    if (listPath && listPath[0] != '\0') {
+        return Scenes::SceneListLoader::LoadFromFile(*manager, listPath, keepActive);
+    }
+
+    return Scenes::SceneListLoader::LoadFromDefault(*manager, keepActive);
 }
 
 // ============================================================================

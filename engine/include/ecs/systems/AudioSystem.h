@@ -70,7 +70,7 @@ namespace ECS {
          * Initiates fade-out for all active audio if fade is enabled
          * @param fadeDuration Duration of fade-out in seconds (0 for immediate stop)
          */
-        void OnSceneWillUnload(float fadeDuration = 0.0f);
+        void OnSceneWillUnload(float fadeDuration = 0.0f, bool allowCrossfade = false);
 
         /**
          * @brief Fade out all currently playing audio
@@ -100,34 +100,26 @@ namespace ECS {
     private:
         Services::AudioService& m_audioService;
 
-        // Fade State
-        struct FadeState {
-            float CurrentVolume = 0.0f;
-            float TargetVolume = 1.0f;
-            float FadeDuration = 1.0f;
-            float ElapsedTime = 0.0f;
-            bool IsFadingIn = true;
-        };
-
         // Map entity -> playing audio handle
         std::unordered_map<Entity, Audio::PlaybackHandle, EntityHash> m_activeSounds;
-        // Map entity -> fade states stored
-        std::unordered_map<Entity, FadeState, EntityHash> m_activeFades;
+
+        // Cached world pointer for fade-outs during scene transitions
+        World* m_world = nullptr;
 
         // Track if scene has started (for PlayOnStart logic)
         bool m_hasStarted = false;
+
+        // Guard against restarting audio while a scene unload transition is pending
+        bool m_sceneUnloadInProgress = false;
+        bool m_allowCrossfadeOnUnload = false;
 
         // Helper methods
         void _stopSound(Entity entity, World& world, bool allowFade = true);
         bool _isGamePlaying() const;
 
-        // Fade helper methods
-		void _startFadeIn(Entity entity, Audio::PlaybackHandle handle, float duration, float targetVolume);
-		void _startFadeOut(Entity entity, float duration);
-        void _startFadeOutByHandle(Audio::PlaybackHandle handle, float duration);
-		void _updateFades(World& world, float deltaTime);
-        bool _hasActiveFadeOuts() const;
-        float _getMaxFadeOutRemaining() const;
+        // Fade helper methods (delegated to AudioEngine)
+        void _fadeInHandle(Audio::PlaybackHandle handle, float duration, float targetVolume);
+        void _fadeOutHandle(Audio::PlaybackHandle handle, float duration);
     };
 }
 

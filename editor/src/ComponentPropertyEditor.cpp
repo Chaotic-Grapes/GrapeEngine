@@ -34,6 +34,8 @@ prefab assets use the same UI path.
 #include <cstdio>
 #include "AudioAssetLibrary.h"
 #include "core/Application.h"
+#include "core/ProjectPaths.h"
+#include "serialization/SceneListSerializer.h"
 
 namespace {
     ECS::ComponentTypeId GetComponentIdFromHashOrWarn(uint32_t hash, const char* name) {
@@ -1636,14 +1638,14 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
 
     // SINGLE BeginPropertySection call with ALL field names for proper alignment
     // Note: Fade duration fields are conditionally shown, so we include all possible fields
-    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D",
+    EditorUI::BeginPropertySection({ "Audio Clip", "Volume", "Pitch", "Loop", "Play On Start", "Spatial 3D", "Bus", "Pan",
                                      "Enable Fade In", "Fade In Duration", "Enable Fade Out", "Fade Out Duration" });
 
     uint32_t cueId = data.value("CueId", 0u);
     auto& lib = AudioAssetLibrary::Get();
 
     const AudioAssetLibrary::ClipInfo* selectedClip = lib.FindById(cueId);
-    std::string currentLabel = selectedClip ? selectedClip->name : "None (drag audio here)";
+    std::string currentLabel = selectedClip ? selectedClip->Name : "None (drag audio here)";
 
     // Audio clip row + drag drop support like SpriteRenderer2D
     EditorUI::RenderStaticValueRow("Audio Clip", currentLabel, selectedClip == nullptr);
@@ -1661,7 +1663,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
 
             if (supported) {
                 const auto& clipInfo = lib.Register(path.string());
-                data["CueId"] = clipInfo.id;
+                data["CueId"] = clipInfo.Id;
             }
             else {
                 s_showUnsupportedPopup = true;
@@ -1681,7 +1683,7 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
                 bool supported = (ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac");
                 if (!supported) continue;
                 const auto& clipInfo = lib.Register(p.string());
-                data["CueId"] = clipInfo.id;
+                data["CueId"] = clipInfo.Id;
                 break;
             }
         }
@@ -1696,6 +1698,32 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
     EditorUI::RenderCheckboxProperty("Loop", data, "Loop");
     EditorUI::RenderCheckboxProperty("Play On Start", data, "PlayOnStart");
     EditorUI::RenderCheckboxProperty("Spatial 3D", data, "Spatial3D");
+
+    // Bus selection
+    const char* busOptions[] = { "Master", "Music", "SFX", "UI", "Ambient" };
+    int bus = data.value("Bus", 2);
+    bus = std::clamp(bus, 0, 4);
+    ImGui::Text("Bus");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::BeginCombo("##AudioBusCombo", busOptions[bus])) {
+        for (int i = 0; i < 5; ++i) {
+            bool selected = (bus == i);
+            if (ImGui::Selectable(busOptions[i], selected)) {
+                bus = i;
+                data["Bus"] = bus;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    // Stereo pan (2D only)
+    bool spatial3D = data.value("Spatial3D", true);
+    if (!spatial3D) {
+        EditorUI::RenderFloatRow("Pan", "", data, "Pan", 0.01f, -1.0f, 1.0f);
+    }
 
     // Fade settings
     EditorUI::RenderCheckboxProperty("Enable Fade In", data, "EnableFadeIn");
@@ -1737,6 +1765,144 @@ void ComponentUI::RenderAudioSource(nlohmann::json& data, ECS::Entity entity, EC
 
         ImGui::EndPopup();
     }
+}
+
+// Renders the SceneButton component properties
+void ComponentUI::RenderSceneButton(nlohmann::json& data, ECS::Entity entity, ECS::World* world) {
+    (void)entity;
+    (void)world;
+
+    EditorUI::BeginPropertySection({ "Target Scene", "Transition Mode", "Fade Duration" });
+
+    uint64_t targetSceneIndex = data.value("TargetSceneIndex", 0ull);
+    ImGui::Text("Target Scene");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+
+    std::vector<std::string> sceneEntries;
+    static std::vector<std::string> s_cachedSceneList;
+    static std::filesystem::file_time_type s_sceneListTimestamp{};
+    static std::filesystem::file_time_type s_scenesFolderTimestamp{};
+    static bool s_sceneListChecked = false;
+    const std::string sceneListPath = Engine::ProjectPaths::GetSceneListPath();
+    const std::string scenesRoot = Engine::ProjectPaths::GetScenesPath();
+
+    std::error_code ec;
+    bool sceneListExists = std::filesystem::exists(sceneListPath, ec);
+    auto folderTimestamp = std::filesystem::last_write_time(scenesRoot, ec);
+    auto listTimestamp = sceneListExists ? std::filesystem::last_write_time(sceneListPath, ec)
+                                         : std::filesystem::file_time_type{};
+    const bool sceneFolderChanged = (!ec && folderTimestamp != s_scenesFolderTimestamp);
+    const bool sceneListChanged = (sceneListExists && !ec && listTimestamp != s_sceneListTimestamp);
+    const bool shouldRefresh = !s_sceneListChecked || sceneFolderChanged || sceneListChanged;
+
+    if (shouldRefresh) {
+        s_sceneListChecked = true;
+        s_scenesFolderTimestamp = folderTimestamp;
+        s_sceneListTimestamp = listTimestamp;
+        s_cachedSceneList.clear();
+
+        if (sceneListExists) {
+            Serialization::SceneListSerializer::LoadSceneList(sceneListPath, s_cachedSceneList);
+            if (sceneFolderChanged) {
+                std::vector<std::string> folderList;
+                if (Serialization::SceneListSerializer::BuildSceneListFromFolder(scenesRoot, folderList)) {
+                    if (folderList != s_cachedSceneList) {
+                        s_cachedSceneList = std::move(folderList);
+                        Serialization::SceneListSerializer::SaveSceneList(sceneListPath, s_cachedSceneList);
+                        s_sceneListTimestamp = std::filesystem::last_write_time(sceneListPath, ec);
+                    }
+                }
+            }
+        } else {
+            Serialization::SceneListSerializer::BuildSceneListFromFolder(scenesRoot, s_cachedSceneList);
+        }
+    }
+
+    sceneEntries = s_cachedSceneList;
+
+    Scenes::SceneManager* sceneManager = Engine::CORE ? &Engine::CORE->GetSceneManager() : nullptr;
+
+    if (sceneEntries.empty() && sceneManager) {
+        const size_t sceneCount = sceneManager->GetSceneCount();
+        sceneEntries.reserve(sceneCount);
+        for (size_t i = 0; i < sceneCount; ++i) {
+            const Scenes::Scene* scene = sceneManager->GetScene(i);
+            if (!scene) {
+                sceneEntries.push_back(std::string());
+                continue;
+            }
+            const std::string& path = scene->GetPath();
+            if (!path.empty()) {
+                sceneEntries.push_back(path);
+            } else {
+                sceneEntries.push_back(scene->GetName());
+            }
+        }
+    }
+
+    if (sceneEntries.empty()) {
+        ImGui::BeginDisabled();
+        ImGui::InputText("##SceneButtonTargetScene", const_cast<char*>("No scenes loaded"), 0, ImGuiInputTextFlags_ReadOnly);
+        ImGui::EndDisabled();
+    } else {
+        std::vector<std::string> sceneLabels;
+        sceneLabels.reserve(sceneEntries.size());
+        for (size_t i = 0; i < sceneEntries.size(); ++i) {
+            std::string label;
+            if (!sceneEntries[i].empty()) {
+                label = std::filesystem::path(sceneEntries[i]).filename().string();
+            }
+            if (label.empty()) {
+                label = "Scene";
+            }
+            label += " [" + std::to_string(i) + "]";
+            sceneLabels.push_back(label);
+        }
+
+        const char* currentLabel = (targetSceneIndex < sceneEntries.size())
+            ? sceneLabels[static_cast<size_t>(targetSceneIndex)].c_str()
+            : "None";
+        if (ImGui::BeginCombo("##SceneButtonTargetScene", currentLabel)) {
+            for (size_t i = 0; i < sceneEntries.size(); ++i) {
+                const bool selected = (targetSceneIndex == i);
+                if (ImGui::Selectable(sceneLabels[i].c_str(), selected)) {
+                    targetSceneIndex = static_cast<uint64_t>(i);
+                    data["TargetSceneIndex"] = targetSceneIndex;
+                }
+                if (selected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
+
+    const char* transitionModes[] = { "Immediate", "Fade Out", "Cross Fade" };
+    int transitionMode = data.value("TransitionMode", 0);
+    transitionMode = std::clamp(transitionMode, 0, 2);
+    ImGui::Text("Transition Mode");
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(EditorUI::GetContentStartX() + ImGui::CalcTextSize("W").x + 6.0f);
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::BeginCombo("##SceneButtonTransitionMode", transitionModes[transitionMode])) {
+        for (int i = 0; i < 3; ++i) {
+            bool selected = (transitionMode == i);
+            if (ImGui::Selectable(transitionModes[i], selected)) {
+                transitionMode = i;
+                data["TransitionMode"] = transitionMode;
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    EditorUI::RenderFloatRow("Fade Duration", "s", data, "FadeDuration", 0.1f, 0.0f, 0.0f);
+
+    EditorUI::EndPropertySection();
 }
 
 // Renders the Layer component properties

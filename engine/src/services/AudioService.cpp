@@ -29,11 +29,15 @@
 
 
 #include "audio/FmodAudioDevice.h"
+#include "audio/AudioEngine.h"
+#include "audio/AudioCueRegistry.h"
 #include "services/AudioService.h"
 #include "core/Logger.h"
 #include "core/messaging/MessageSystem.h"
 #include "core/messaging/MessageTypes.h"
 #include "services/DeviceManager.h"
+#include "core/ProjectPaths.h"
+#include "services/TimeSystem.h"
 
 Audio::FmodAudioDevice* gAudioDevice = nullptr;
 
@@ -58,6 +62,10 @@ namespace Services {
         }
         // let system activate device
         gAudioDevice = m_device.get();
+        m_engine = std::make_unique<Audio::AudioEngine>(m_device.get());
+        Audio::gAudioEngine = m_engine.get();
+
+        m_cueRegistry.Refresh(Engine::ProjectPaths::GetProjectRoot());
 
         // FMOD system + master group are ready for use.
         Trace("Audio initialized: FMOD");
@@ -91,8 +99,13 @@ namespace Services {
      * - Guarded by IsEnabled() so you can temporarily disable the service.
      */
     void AudioService::Update() {
-        if (m_device && IsEnabled())
+        if (m_device && IsEnabled()) {
+            const float dt = static_cast<float>(TimeSystem::Instance().GetDeltaTime());
+            if (m_engine) {
+                m_engine->Update(dt);
+            }
             m_device->Update();
+        }
     }
 
     /**
@@ -110,10 +123,12 @@ namespace Services {
             Messaging::MessageSystem::Unsubscribe<Messaging::WindowFocusChanged>(m_focusHandle);
         }
 
+        Audio::gAudioEngine = nullptr;
         gAudioDevice = nullptr;
         if (m_device) {
             m_device->Shutdown();
             m_device.reset();
+            m_engine.reset();
             Trace("Audio terminated.");
         }
     }

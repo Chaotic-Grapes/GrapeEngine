@@ -26,7 +26,18 @@
 #ifndef SOUNDTYPES_H
 #define SOUNDTYPES_H
 
+#include <cstdint>
+
 namespace Audio {
+    enum class Bus : uint8_t {
+        Master = 0,
+        Music,
+        SFX,
+        UI,
+        Ambient,
+        Count
+    };
+
     // playmode choice
     enum class PlayMode { Single, Looping };
     // to stop an instance
@@ -45,6 +56,9 @@ namespace Audio {
         float    Volume = 1.0f;   // 0..1 linear gain
         float    Pitch = 1.0f;    // 0.5..2.0 etc frequency ratio
         bool     Loop = false;    // convenience for low-level APIs
+        bool     Spatial3D = false; // true for 3D positional sound
+        float    Pan = 0.0f;      // -1 = left, 0 = center, 1 = right (2D only)
+        bool     StartPaused = false;
     };
     // Minimal vector type to avoid dragging in engine math for audio-only callers.
     struct Vec3 { float x{}, y{}, z{}; };

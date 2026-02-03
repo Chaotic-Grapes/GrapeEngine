@@ -9,6 +9,7 @@ Audio-related ECS component types.
 /* End Header *******************************************************************/
 
 using System.Runtime.InteropServices;
+using GrapeEngine.Scripting.Services;
 
 namespace GrapeEngine.Scripting.Components;
 
@@ -22,6 +23,8 @@ public record struct AudioSource(uint CueId)
     public bool Loop = false;
     public bool PlayOnStart = false;
     public bool Spatial3D = true;
+    public AudioBus Bus = AudioBus.SFX;
+    public float Pan = 0.0f;
 
     // Fade flags
     public bool EnableFadeIn = false;
