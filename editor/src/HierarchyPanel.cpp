@@ -385,35 +385,6 @@ void HierarchyPanel::_renderHeader() {
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::BeginMenu("Create UI")) {
-            if (ImGui::MenuItem("Button")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateButton(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{120.0f, 30.0f}, "Button", 0U, entityName);
-                    selectAndMark(e);
-                }
-            }
-            if (ImGui::MenuItem("Panel")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreatePanel(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{300.0f, 200.0f}, {0.2f, 0.2f, 0.2f, 1.0f}, entityName);
-                    selectAndMark(e);
-                }
-            }
-            if (ImGui::MenuItem("Label")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateLabel(*m_world, Vector2D{10.0f, 10.0f}, "Label", 16.0f, entityName);
-                    selectAndMark(e);
-                }
-            }
-            if (ImGui::MenuItem("Input Field")) {
-                if (m_world) {
-                    ECS::Entity e = ECS::UI::GUIFactory::CreateInputField(*m_world, Vector2D{10.0f, 10.0f}, Vector2D{200.0f, 30.0f}, "Enter text...", entityName);
-                    selectAndMark(e);
-                }
-            }
-
-            ImGui::EndMenu();
-        }
-
         ImGui::EndPopup();
     }
 
