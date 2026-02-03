@@ -124,14 +124,29 @@ public:
 	// DEBUGGING AND UTILITY
 	// ============================================================================
 
-	// Dumps the current state of the memory manager
-	void Dump(std::ostream& os);
-
 	// Enable or disable debug mode at runtime
 	void SetDebugMode(bool enabled);
 
 	// Get current debug mode state
 	bool GetDebugMode() const { return m_debugMode; }
+
+	// Returns total bytes allocated over the lifetime of the manager
+	size_t GetTotalAllocated() const { return m_totalAllocated; }
+
+	// Returns total bytes freed over the lifetime of the manager
+	size_t GetTotalFreed() const { return m_totalFreed; }
+
+	// Returns bytes currently in use (allocated - freed)
+	size_t GetCurrentUsage() const { return m_totalAllocated - m_totalFreed; }
+
+	// Returns total pool size across all memory pages
+	size_t GetTotalPoolSize() const;
+
+	// Returns number of free blocks currently in the free list
+	int GetFreeBlockCount() const;
+
+	// Returns number of memory pages currently allocated
+	int GetPageCount() const;
 
 	// Runs a performance test allocating and freeing memory
 	// Returns time taken in milliseconds

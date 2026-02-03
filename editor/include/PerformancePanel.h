@@ -43,7 +43,7 @@ public:
      * @param world Pointer to the ECS World (may be nullptr)
      */
     void SetWorld(ECS::World* world);
-    
+
     // Reset the panel to show the paused message (call when loading a new scene)
     void ResetForNewScene();
 
@@ -60,7 +60,7 @@ private:
     bool m_hasCollectedData = false;  // Track if we've collected data at least once
     ECS::SystemManager* m_systemManager = nullptr;
     ECS::World* m_world = nullptr;
-    
+
     // Cached data to freeze stats when not playing
     struct CachedScopeData {
         float AverageTimeMs = 0.0f;
@@ -74,22 +74,27 @@ private:
     float m_cachedMinFrameMs = 0.0f;
     float m_cachedMaxFrameMs = 0.0f;
     double m_cachedTotalTime = 0.0;
-    
+
     uint32_t m_cachedEntityCount = 0;
     uint32_t m_cachedComponentCount = 0;
-    
+
     std::map<std::string, CachedScopeData> m_cachedScopes;
 
     // Memory allocator Testing
     bool m_useCustomAllocator = true;
     double m_lastTestTime = -1.0;  // Just a sentinel value (to indicate no test run yet)
 
+    // Memory stats validation (runs once)
+    bool m_statsValidated = false;
+
     // Private rendering methods
     void _updateCachedData();
     void _renderHeader();
     void _renderOverviewStats();
     void _renderSystemsTable();
+    void _renderMemoryStats();
     void _renderMemoryBenchmark();
+    bool _validateMemoryStats();
 };
 
 #endif

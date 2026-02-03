@@ -19,7 +19,6 @@ Implements the custom MemoryManager class for efficient memory allocation
 #include "services/MemoryManager.h"
 #include <cstdlib>
 #include <cstring>
-#include <vector>
 #include <chrono>
 #include <random>
 #include <ctime>
@@ -38,7 +37,7 @@ MemoryManager::MemoryPage::MemoryPage(void* start, int size)
 
 MemoryManager::MemoryManager(int totalBytes, bool debugMode)
 	: m_freeListHead(nullptr), m_pageListHead(nullptr), m_defaultPageSize(totalBytes),
-	m_totalAllocated(0), m_totalFreed(0), m_debugMode(debugMode) 
+	m_totalAllocated(0), m_totalFreed(0), m_debugMode(debugMode)
 {
 	// Allocate the first memory page using raw malloc
 	void* memoryPool = malloc(totalBytes);
@@ -66,11 +65,11 @@ MemoryManager::MemoryManager(int totalBytes, bool debugMode)
 	// Initialize the first free block at the start of the pool
 	// We use "placement" style initialization (writing directly to memory)
 	FreeBlock* initialBlock = (FreeBlock*)memoryPool;
-	
+
 	// Set header
 	initialBlock->header.size = totalBytes - sizeof(MemoryBlock); // Remainder is data
 	initialBlock->header.allocated = false;
-	
+
 	// Set free list pointers
 	initialBlock->next = nullptr;
 	initialBlock->prev = nullptr;
@@ -84,10 +83,10 @@ MemoryManager::~MemoryManager() {
 	MemoryPage* currentPage = m_pageListHead;
 	while (currentPage != nullptr) {
 		MemoryPage* nextPage = currentPage->next;
-		
+
 		// Free the actual memory pool
 		free(currentPage->pageStart);
-		
+
 		// Free the page metadata
 		free(currentPage);
 		currentPage = nextPage;
@@ -125,10 +124,10 @@ void* MemoryManager::Allocate(int size) {
 
 			if (current->header.size >= requiredSpace) {
 				// SPLIT the block
-				
+
 				// 1. Calculate split point
 				size_t originalSize = current->header.size;
-				
+
 				// New block (remainder) starts after the allocated part
 				// Address = current + HeaderSize + AlignedSize
 				char* splitAddress = (char*)current + sizeof(MemoryBlock) + alignedSize;
@@ -137,16 +136,16 @@ void* MemoryManager::Allocate(int size) {
 				// 2. Initialize new block (remainder)
 				newBlock->header.size = originalSize - alignedSize - sizeof(MemoryBlock);
 				newBlock->header.allocated = false;
-				
+
 				// 3. Update Free List
 				// Instead of removing current and inserting new, we can just replace 'current' with 'newBlock' in the list
 				// This maintains the address order naturally!
 				newBlock->next = current->next;
 				newBlock->prev = current->prev;
-				
+
 				if (newBlock->next != nullptr) newBlock->next->prev = newBlock;
 				if (newBlock->prev != nullptr) newBlock->prev->next = newBlock;
-				
+
 				// If current was head, update head
 				if (current == m_freeListHead) m_freeListHead = newBlock;
 
@@ -158,7 +157,7 @@ void* MemoryManager::Allocate(int size) {
 				// Remove current from the free list
 				if (current->prev != nullptr) current->prev->next = current->next;
 				if (current->next != nullptr) current->next->prev = current->prev;
-				
+
 				// If current was head, update head
 				if (current == m_freeListHead) m_freeListHead = current->next;
 			}
@@ -249,7 +248,7 @@ void MemoryManager::_extendMemoryPool() {
 	newBlock->header.allocated = false;
 	newBlock->next = nullptr;
 	newBlock->prev = nullptr;
-	
+
 	// Insert into free list (it will likely be at the end, but use ordered insert to be safe)
 	_insertBlockAddressOrdered(newBlock);
 }
@@ -280,7 +279,7 @@ void MemoryManager::_insertBlockAddressOrdered(FreeBlock* block) {
 
 	// Case 3: Insert somewhere in the middle or end
 	FreeBlock* current = m_freeListHead;
-	
+
 	// Find the node after which we should insert
 	// We want: current < block < current->next
 	while (current->next != nullptr && current->next < block) {
@@ -307,19 +306,19 @@ void MemoryManager::_mergeAdjacentFreeBlocks(FreeBlock* block) {
 		// Check physical adjacency
 		// Address of next block should be: (char*)block + sizeof(Header) + block->size
 		char* nextBlockAddr = (char*)block + sizeof(MemoryBlock) + block->header.size;
-		
+
 		if ((void*)nextBlockAddr == (void*)block->next) {
 			FreeBlock* nextBlock = block->next;
-			
+
 			// Absorb next block
 			block->header.size += sizeof(MemoryBlock) + nextBlock->header.size;
-			
+
 			// Update links to skip nextBlock
 			block->next = nextBlock->next;
 			if (block->next != nullptr) {
 				block->next->prev = block;
 			}
-			
+
 			// nextBlock is now gone (merged)
 		}
 	}
@@ -328,19 +327,19 @@ void MemoryManager::_mergeAdjacentFreeBlocks(FreeBlock* block) {
 	if (block->prev != nullptr) {
 		// Check physical adjacency
 		char* currentBlockAddr = (char*)block->prev + sizeof(MemoryBlock) + block->prev->header.size;
-		
+
 		if ((void*)currentBlockAddr == (void*)block) {
 			FreeBlock* prevBlock = block->prev;
-			
+
 			// Absorb current block into previous
 			prevBlock->header.size += sizeof(MemoryBlock) + block->header.size;
-			
+
 			// Update links to skip block
 			prevBlock->next = block->next;
 			if (prevBlock->next != nullptr) {
 				prevBlock->next->prev = prevBlock;
 			}
-			
+
 			// block is now gone (merged)
 		}
 	}
@@ -354,37 +353,40 @@ void MemoryManager::SetDebugMode(bool enabled) {
 	m_debugMode = enabled;
 }
 
-void MemoryManager::Dump(std::ostream& os) {
-	os << "========================================" << std::endl;
-	os << "MEMORY MANAGER STATE (Free List Only)" << std::endl;
-	os << "========================================" << std::endl;
-	os << "Total Allocated: " << m_totalAllocated << " bytes" << std::endl;
-	os << "Total Freed: " << m_totalFreed << " bytes" << std::endl;
-	os << "Currently In Use: " << (m_totalAllocated - m_totalFreed) << " bytes" << std::endl;
-	
-	// Count free blocks
-	int freeBlockCount = 0;
-	size_t freeMemory = 0;
-	FreeBlock* current = m_freeListHead;
-	while (current != nullptr) {
-		freeBlockCount++;
-		freeMemory += current->header.size;
-		current = current->next;
+size_t MemoryManager::GetTotalPoolSize() const {
+	size_t total = 0;
+	MemoryPage* page = m_pageListHead;
+
+	// Sum sizes of all pages
+	while (page != nullptr) {
+		total += page->pageSize;
+		page = page->next;
 	}
-	
-	os << "Free Blocks Count: " << freeBlockCount << std::endl;
-	os << "Total Free Memory: " << freeMemory << " bytes" << std::endl;
-	os << "----------------------------------------" << std::endl;
-	
-	// Print first 20 free blocks to avoid spam
-	current = m_freeListHead;
+	return total;
+}
+
+int MemoryManager::GetFreeBlockCount() const {
 	int count = 0;
-	while (current != nullptr && count < 20) {
-		os << "Free Block #" << count << ": [Addr: " << current << "] [Size: " << current->header.size << "]" << std::endl;
-		current = current->next;
+	FreeBlock* current = m_freeListHead;
+
+	// Count nodes in free list
+	while (current != nullptr) {
 		count++;
+		current = current->next;
 	}
-	if (current != nullptr) os << "... (more blocks hidden)" << std::endl;
+	return count;
+}
+
+int MemoryManager::GetPageCount() const {
+	int count = 0;
+	MemoryPage* page = m_pageListHead;
+
+	// Count nodes in page list
+	while (page != nullptr) {
+		count++;
+		page = page->next;
+	}
+	return count;
 }
 
 double MemoryManager::Benchmark(bool useCustom, int allocationCount, int minSize, int maxSize) {
