@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 namespace EchoesBelow.Scripts.MarineSnowSystem;
 
-[Component] public record struct MS_TestComponent(int returnThis, int pullThis);
+[Component] public record struct MS_TestComponent(int returnThis, int pullThis, int child, int parent);
 [System(SystemGroup.Update, SystemRunMode.PlayOnly)]
 public class MS_Test : SystemBase
 {
@@ -18,7 +18,7 @@ public class MS_Test : SystemBase
     {
         Log("System MS_Test initialized", LogLevel.Debug);
     }
-
+    //Purely to test out obj pool
     protected override void OnUpdate()
     {
         foreach ( var result in World!.Query<MS_TestComponent>())
@@ -30,6 +30,26 @@ public class MS_Test : SystemBase
             if (Input.IsKeyPressed(KeyCode.R))
             {
                 MS_Manager.instance.ReturnToPool((ulong)result.Component1.returnThis);
+            }
+
+            if (Input.IsKeyPressed(KeyCode.I))
+            {
+                Entity child = Entity.FromId(World!,(ulong)result.Component1.child);
+                Entity parent = Entity.FromId(World!, (ulong)result.Component1.parent);
+
+                Log("parent . . . ");
+                
+                //child.AttachTo(parent);
+                //child.GetParent();
+                //Log("Attempted parenting: " + child.GetParent()!.GetComponent<Name>());
+            }
+            if (Input.IsKeyPressed(KeyCode.K))
+            {
+                Entity child = Entity.FromId(World!, (ulong)result.Component1.child);
+                Entity parent = Entity.FromId(World!, (ulong)result.Component1.parent);
+                Log("child . . . ");
+                //child.Detach();
+                //Log("I wanna live on my own!");
             }
         }
 

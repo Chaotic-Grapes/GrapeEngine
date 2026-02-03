@@ -38,7 +38,7 @@
                 {
                     "Data": {
                         "Active": true,
-                        "AspectRatio": 1.9066389799118042,
+                        "AspectRatio": 2.2840375900268555,
                         "FOV": 45.0,
                         "FarPlane": 100.0,
                         "NearPlane": 0.10000000149011612,
@@ -279,7 +279,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 14,
+                        "TextureId": 6,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -373,7 +373,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 15,
+                        "TextureId": 8,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
                         "Tiling": {
                             "X": 1.0,
@@ -467,7 +467,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 16,
+                        "TextureId": 9,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS03.png",
                         "Tiling": {
                             "X": 1.0,
@@ -561,7 +561,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 17,
+                        "TextureId": 10,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS04.png",
                         "Tiling": {
                             "X": 1.0,
@@ -655,7 +655,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 18,
+                        "TextureId": 11,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS05.png",
                         "Tiling": {
                             "X": 1.0,
@@ -749,7 +749,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 19,
+                        "TextureId": 12,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS06.png",
                         "Tiling": {
                             "X": 1.0,
@@ -843,7 +843,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 20,
+                        "TextureId": 13,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS07.png",
                         "Tiling": {
                             "X": 1.0,
@@ -879,6 +879,2733 @@
                 {
                     "Data": {
                         "msID": 7,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 8.018708229064941,
+                            "Y": 2.8230788707733154,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.25,
+                            "Y": 0.25,
+                            "Z": 0.25
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS02"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 2117681710
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 8,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS02.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.25,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 8.018708229064941,
+                            "m10": 0.0,
+                            "m11": 0.25,
+                            "m12": 0.0,
+                            "m13": 2.8230788707733154,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.25,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 2,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
+                        "start": false
+                    },
+                    "TypeName": "MS_Manager"
+                }
+            ]
+        },
+        {
+            "Components": [
+                {
+                    "Data": {
+                        "Position": {
+                            "X": 7.700089454650879,
+                            "Y": 3.152716636657715,
+                            "Z": 0.0
+                        },
+                        "Rotation": {
+                            "W": 1.0,
+                            "X": 0.0,
+                            "Y": 0.0,
+                            "Z": 0.0
+                        },
+                        "Scale": {
+                            "X": 0.20000000298023224,
+                            "Y": 0.20000000298023224,
+                            "Z": 0.20000000298023224
+                        }
+                    },
+                    "TypeName": "LocalTransform"
+                },
+                {
+                    "Data": {
+                        "Value": "MS01"
+                    },
+                    "TypeName": "Name"
+                },
+                {
+                    "Data": {
+                        "Id": 0
+                    },
+                    "TypeName": "Layer"
+                },
+                {
+                    "Data": {
+                        "Flags": 0,
+                        "PrefabHash": 3520842805
+                    },
+                    "TypeName": "PrefabInstanceMetadata"
+                },
+                {
+                    "Data": {
+                        "Color": {
+                            "A": 1.0,
+                            "B": 1.0,
+                            "G": 1.0,
+                            "R": 1.0
+                        },
+                        "EmissiveStrength": 5.0,
+                        "EmissiveTextureId": 0,
+                        "EmissiveTexturePath": "",
+                        "NormalTextureId": 0,
+                        "NormalTexturePath": "",
+                        "Offset": {
+                            "X": 0.0,
+                            "Y": 0.0
+                        },
+                        "TextureId": 6,
+                        "TexturePath": "EchoesBelow\\Assets\\Sprites\\ParticleAssets\\MS01.png",
+                        "Tiling": {
+                            "X": 1.0,
+                            "Y": 1.0
+                        }
+                    },
+                    "TypeName": "SpriteRenderer2D"
+                },
+                {
+                    "Data": {
+                        "Dirty": false,
+                        "Matrix": {
+                            "m00": 0.20000000298023224,
+                            "m01": 0.0,
+                            "m02": 0.0,
+                            "m03": 7.700089454650879,
+                            "m10": 0.0,
+                            "m11": 0.20000000298023224,
+                            "m12": 0.0,
+                            "m13": 3.152716636657715,
+                            "m20": 0.0,
+                            "m21": 0.0,
+                            "m22": 0.20000000298023224,
+                            "m23": 0.0,
+                            "m30": 0.0,
+                            "m31": 0.0,
+                            "m32": 0.0,
+                            "m33": 1.0
+                        }
+                    },
+                    "TypeName": "WorldTransform"
+                },
+                {
+                    "Data": {
+                        "msID": 1,
                         "start": false
                     },
                     "TypeName": "MS_Manager"
@@ -2090,7 +4817,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 12,
+                        "TextureId": 14,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\SpawnGrape_Bulb.png",
                         "Tiling": {
                             "X": 1.0,
@@ -2263,7 +4990,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 13,
+                        "TextureId": 15,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -2808,7 +5535,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 13,
+                        "TextureId": 15,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -2988,7 +5715,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 13,
+                        "TextureId": 15,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\BackgroundElements\\ChaosGrape01.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3140,7 +5867,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 6,
+                        "TextureId": 16,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\Dash_Fast_000.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3256,7 +5983,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 8,
+                        "TextureId": 17,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\Grain_SpriteSheetV2.png",
                         "Tiling": {
                             "X": 0.0625,
@@ -3281,7 +6008,7 @@
                         "SheetHeight": 2730,
                         "SheetWidth": 2240,
                         "StartFrame": 0,
-                        "TextureId": 8,
+                        "TextureId": 17,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\Grain_SpriteSheetV2.png",
                         "UseRow": true
                     },
@@ -3380,7 +6107,7 @@
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 9,
+                        "TextureId": 18,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Whiskaris.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3476,13 +6203,13 @@
                         "EmissiveStrength": 5.0,
                         "EmissiveTextureId": 0,
                         "EmissiveTexturePath": "",
-                        "NormalTextureId": 11,
+                        "NormalTextureId": 20,
                         "NormalTexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish_n.png",
                         "Offset": {
                             "X": 0.0,
                             "Y": 0.0
                         },
-                        "TextureId": 10,
+                        "TextureId": 19,
                         "TexturePath": "EchoesBelow\\Assets\\Sprites\\NPCs\\Jellyfish.png",
                         "Tiling": {
                             "X": 1.0,
@@ -3755,6 +6482,8 @@
                 },
                 {
                     "Data": {
+                        "child": 0,
+                        "parent": 0,
                         "pullThis": 0,
                         "returnThis": 0
                     },
@@ -3763,11 +6492,119 @@
             ]
         }
     ],
-    "EntityCount": 33,
+    "EntityCount": 60,
     "Hierarchy": [
         {
+            "child": 10,
+            "parent": 2
+        },
+        {
             "child": 11,
-            "parent": 10
+            "parent": 2
+        },
+        {
+            "child": 12,
+            "parent": 2
+        },
+        {
+            "child": 13,
+            "parent": 2
+        },
+        {
+            "child": 14,
+            "parent": 2
+        },
+        {
+            "child": 15,
+            "parent": 2
+        },
+        {
+            "child": 16,
+            "parent": 2
+        },
+        {
+            "child": 17,
+            "parent": 2
+        },
+        {
+            "child": 18,
+            "parent": 2
+        },
+        {
+            "child": 19,
+            "parent": 2
+        },
+        {
+            "child": 20,
+            "parent": 2
+        },
+        {
+            "child": 21,
+            "parent": 2
+        },
+        {
+            "child": 22,
+            "parent": 2
+        },
+        {
+            "child": 23,
+            "parent": 2
+        },
+        {
+            "child": 24,
+            "parent": 2
+        },
+        {
+            "child": 25,
+            "parent": 2
+        },
+        {
+            "child": 26,
+            "parent": 2
+        },
+        {
+            "child": 27,
+            "parent": 2
+        },
+        {
+            "child": 28,
+            "parent": 2
+        },
+        {
+            "child": 29,
+            "parent": 2
+        },
+        {
+            "child": 30,
+            "parent": 2
+        },
+        {
+            "child": 31,
+            "parent": 2
+        },
+        {
+            "child": 32,
+            "parent": 2
+        },
+        {
+            "child": 33,
+            "parent": 2
+        },
+        {
+            "child": 34,
+            "parent": 2
+        },
+        {
+            "child": 35,
+            "parent": 2
+        },
+        {
+            "child": 36,
+            "parent": 2
+        },
+        {
+            "child": 38,
+            "parent": 37
         },
         {
             "child": 3,
@@ -3798,64 +6635,64 @@
             "parent": 2
         },
         {
-            "child": 30,
-            "parent": 29
+            "child": 57,
+            "parent": 56
         },
         {
-            "child": 31,
-            "parent": 29
+            "child": 58,
+            "parent": 56
         },
         {
-            "child": 12,
-            "parent": 10
+            "child": 39,
+            "parent": 37
         },
         {
-            "child": 13,
-            "parent": 10
+            "child": 40,
+            "parent": 37
         },
         {
-            "child": 14,
-            "parent": 10
+            "child": 41,
+            "parent": 37
         },
         {
-            "child": 15,
-            "parent": 10
+            "child": 42,
+            "parent": 37
         },
         {
-            "child": 16,
-            "parent": 10
+            "child": 43,
+            "parent": 37
         },
         {
-            "child": 17,
-            "parent": 10
+            "child": 44,
+            "parent": 37
         },
         {
-            "child": 18,
-            "parent": 10
+            "child": 45,
+            "parent": 37
         },
         {
-            "child": 19,
-            "parent": 10
+            "child": 46,
+            "parent": 37
         },
         {
-            "child": 20,
-            "parent": 10
+            "child": 47,
+            "parent": 37
         },
         {
-            "child": 21,
-            "parent": 10
+            "child": 48,
+            "parent": 37
         },
         {
-            "child": 22,
-            "parent": 10
+            "child": 49,
+            "parent": 37
         },
         {
-            "child": 23,
-            "parent": 10
+            "child": 50,
+            "parent": 37
         },
         {
-            "child": 24,
-            "parent": 10
+            "child": 51,
+            "parent": 37
         }
     ],
     "Layers": [
